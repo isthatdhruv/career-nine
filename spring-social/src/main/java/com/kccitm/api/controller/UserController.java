@@ -11,6 +11,8 @@ import javax.servlet.http.HttpSession;
 import org.apache.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.text.SimpleDateFormat;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.RoleRoleGroupMapping;
 import com.kccitm.api.model.User;
@@ -33,13 +36,24 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.OdooEmailService;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.StudentProvisioningService;
+import com.kccitm.api.service.dashboard.StudentDashboardDataService;
+import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
+import com.kccitm.api.model.userDefinedModel.StudentPortalComputedData;
 
 @RestController
 public class UserController {
 
     @Autowired
     private SmtpEmailService smtpEmailService;
+
+    @Autowired
+    private OdooEmailService odooEmailService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private UserRepository userRepository;
@@ -50,8 +64,14 @@ public class UserController {
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
 
+    @Autowired
+    private StudentDashboardDataService studentDashboardDataService;
+
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
+
+    @PreAuthorize("@auth.allows('user.me')")
     @GetMapping("/user/me")
-    // @PreAuthorize("hasAuthority('USER_ME')")
     public User getCurrentUser(@CurrentUser UserPrincipal userPrincipal) {
         User us = userRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
@@ -71,18 +91,21 @@ public class UserController {
     // return users;
     // }
 
+    @PreAuthorize("@auth.allows('user.read.all')")
     @GetMapping(value = "user/get", headers = "Accept=application/json")
     public List<User> getAllRoles() {
         List<User> users = userRepository.findByDisplay(true);
         return users;
     }
 
+    @PreAuthorize("@auth.allows('user.read')")
     @GetMapping(value = "user/getbyid/{id}", headers = "Accept=application/json")
     public Optional<User> getRoleById(@PathVariable("id") Long userId) {
         Optional<User> user = userRepository.findById(userId);
         return user;
     }
 
+    @PreAuthorize("@auth.allows('user.update')")
     @PostMapping(value = "user/update", headers = "Accept=application/json")
     public List<User> updateUser(@RequestBody User currentUser) {
         userRepository.save(currentUser);
@@ -92,42 +115,18 @@ public class UserController {
     @Autowired
     private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
 
+    @Autowired
+    private com.kccitm.api.service.StudentSessionService studentSessionService;
+
+    // @PreAuthorize-Exempt: student login by username+DOB — anonymous-by-design, mirrors /auth/login.
     @PostMapping(value = "user/auth", headers = "Accept=application/json")
     public HashMap<String, Object> checkUser(@RequestBody User currentUser) {
         if (userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).isPresent()) {
             User user = userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate())
                     .get();
             if (userStudentRepository.getByUserId(user.getId()).isPresent()) {
-
                 UserStudent userStudent = userStudentRepository.getByUserId(user.getId()).get();
-                List<StudentAssessmentMapping> studentAssessmentMappings = studentAssessmentMappingRepository
-                        .findByUserStudentUserStudentId(userStudent.getUserStudentId());
-
-                // Build list of assessments with details
-                List<Map<String, Object>> assessmentsList = new ArrayList<>();
-                for (StudentAssessmentMapping mapping : studentAssessmentMappings) {
-                    Map<String, Object> assessmentInfo = new HashMap<>();
-                    assessmentInfo.put("assessmentId", mapping.getAssessmentId());
-                    assessmentInfo.put("studentStatus", mapping.getStatus());
-
-                    // Fetch assessment details
-                    Optional<com.kccitm.api.model.career9.AssessmentTable> assessment = assessmentTableRepository
-                            .findById(mapping.getAssessmentId());
-                    if (assessment.isPresent()) {
-                        assessmentInfo.put("assessmentName", assessment.get().getAssessmentName());
-                        assessmentInfo.put("isActive", assessment.get().getIsActive());
-                    } else {
-                        assessmentInfo.put("assessmentName", "Unknown Assessment");
-                        assessmentInfo.put("isActive", false);
-                    }
-
-                    assessmentsList.add(assessmentInfo);
-                }
-
-                HashMap<String, Object> response = new HashMap<>();
-                response.put("userStudentId", userStudent.getUserStudentId());
-                response.put("assessments", assessmentsList);
-                return response;
+                return new HashMap<>(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
             } else {
                 return null;
             }
@@ -136,6 +135,217 @@ public class UserController {
         }
     }
 
+    /**
+     * Student auth for dashboard: authenticates with username + DOB and returns
+     * full dashboard data (profile + assessment scores) in a single response.
+     */
+    // @PreAuthorize-Exempt: student dashboard login by username+DOB — anonymous-by-design, mirrors /auth/login.
+    @PostMapping(value = "user/student-auth", headers = "Accept=application/json")
+    public ResponseEntity<?> studentDashboardAuth(@RequestBody User currentUser) {
+        Optional<User> userOpt = userRepository.findByUsernameAndDobDate(
+                currentUser.getUsername(), currentUser.getDobDate());
+
+        if (!userOpt.isPresent()) {
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", "Invalid credentials",
+                    "message", "Username or date of birth is incorrect"));
+        }
+
+        User user = userOpt.get();
+        Optional<UserStudent> userStudentOpt = userStudentRepository.getByUserId(user.getId());
+
+        if (!userStudentOpt.isPresent()) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "error", "Student not found",
+                    "message", "No student record found for this user"));
+        }
+
+        UserStudent userStudent = userStudentOpt.get();
+        Long userStudentId = userStudent.getUserStudentId();
+
+        // Build student profile info
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("userStudentId", userStudentId);
+        profile.put("userId", user.getId());
+        profile.put("infoCompleted", Boolean.TRUE.equals(userStudent.getInfoCompleted()));
+
+        // Fields from User entity
+        profile.put("username", user.getUsername());
+        profile.put("email", user.getEmail());
+        profile.put("phone", user.getPhone());
+        profile.put("careerNineRollNumber", user.getCareerNineRollNumber());
+
+        if (user.getDobDate() != null) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd-MM-yyyy");
+            profile.put("dob", sdf.format(user.getDobDate()));
+        }
+
+        if (userStudent.getStudentInfo() != null) {
+            profile.put("name", userStudent.getStudentInfo().getName());
+            profile.put("grade", userStudent.getStudentInfo().getStudentClass());
+            profile.put("section", userStudent.getStudentInfo().getSchoolSectionId());
+            profile.put("schoolBoard", userStudent.getStudentInfo().getSchoolBoard());
+            profile.put("gender", userStudent.getStudentInfo().getGender());
+        }
+
+        if (userStudent.getInstitute() != null) {
+            profile.put("instituteName", userStudent.getInstitute().getInstituteName());
+            profile.put("instituteCode", userStudent.getInstitute().getInstituteCode());
+        }
+
+        // Build full dashboard data (assessment scores, answers, raw scores)
+        StudentDashboardResponse dashboardData = studentDashboardDataService
+                .buildDashboardData(userStudentId);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("profile", profile);
+        response.put("dashboardData", dashboardData);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update student profile info (name, email, phone).
+     * Auto-generates careerNineRollNumber if missing.
+     * Sets infoCompleted = true on success.
+     */
+    @PreAuthorize("@auth.allows('student_info.update')")
+    @PutMapping(value = "student-portal/update-info/{userStudentId}")
+    public ResponseEntity<?> updateStudentInfo(
+            @PathVariable Long userStudentId,
+            @RequestBody Map<String, String> body) {
+        UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
+
+        User user = userRepository.findById(userStudent.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userStudent.getUserId()));
+
+        String name = body.get("name");
+        String email = body.get("email");
+        String phone = body.get("phone");
+
+        // Validate required fields
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Name is required"));
+        }
+        if (email == null || !email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Valid email is required"));
+        }
+        if (phone == null || !phone.matches("^[6-9]\\d{9}$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Valid 10-digit Indian phone number is required"));
+        }
+
+        // Update User entity
+        user.setName(name.trim());
+        user.setEmail(email.trim());
+        user.setPhone(phone.trim());
+
+        // Update StudentInfo entity
+        if (userStudent.getStudentInfo() != null) {
+            userStudent.getStudentInfo().setName(name.trim());
+            userStudent.getStudentInfo().setEmail(email.trim());
+            userStudent.getStudentInfo().setPhoneNumber(phone.trim());
+        }
+
+        // Generate careerNineRollNumber if missing
+        if (user.getCareerNineRollNumber() == null || user.getCareerNineRollNumber().trim().isEmpty()) {
+            String rollNumber = generateRollNumber(userStudent);
+            user.setCareerNineRollNumber(rollNumber);
+        }
+
+        // Mark info as completed
+        userStudent.setInfoCompleted(true);
+
+        userRepository.save(user);
+        userStudentRepository.save(userStudent);
+        studentProvisioningService.provision(userStudent);
+
+        // Return updated profile
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("userStudentId", userStudentId);
+        profile.put("name", user.getName());
+        profile.put("email", user.getEmail());
+        profile.put("phone", user.getPhone());
+        profile.put("careerNineRollNumber", user.getCareerNineRollNumber());
+        profile.put("infoCompleted", true);
+
+        if (userStudent.getStudentInfo() != null) {
+            profile.put("grade", userStudent.getStudentInfo().getStudentClass());
+            profile.put("section", userStudent.getStudentInfo().getSchoolSectionId());
+            profile.put("schoolBoard", userStudent.getStudentInfo().getSchoolBoard());
+            profile.put("gender", userStudent.getStudentInfo().getGender());
+        }
+        if (userStudent.getInstitute() != null) {
+            profile.put("instituteName", userStudent.getInstitute().getInstituteName());
+            profile.put("instituteCode", userStudent.getInstitute().getInstituteCode());
+        }
+        if (user.getDobDate() != null) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd-MM-yyyy");
+            profile.put("dob", sdf.format(user.getDobDate()));
+        }
+        profile.put("username", user.getUsername());
+
+        return ResponseEntity.ok(profile);
+    }
+
+    /**
+     * Generate a unique Career-9 roll number for a student.
+     * Format: C9-{class}-{section}-{seq:04d}
+     * Uniqueness scoped by institute + class + section.
+     */
+    private String generateRollNumber(UserStudent userStudent) {
+        Integer studentClass = null;
+        Integer sectionId = null;
+        Integer instituteId = null;
+
+        if (userStudent.getStudentInfo() != null) {
+            studentClass = userStudent.getStudentInfo().getStudentClass();
+            sectionId = userStudent.getStudentInfo().getSchoolSectionId();
+            instituteId = userStudent.getStudentInfo().getInstituteId();
+        }
+
+        // Fallbacks
+        if (studentClass == null) studentClass = 0;
+        if (sectionId == null) sectionId = 0;
+        if (instituteId == null && userStudent.getInstitute() != null) {
+            instituteId = userStudent.getInstitute().getInstituteCode();
+        }
+        if (instituteId == null) instituteId = 0;
+
+        String prefix = "C9-" + studentClass + "-" + sectionId + "-";
+
+        // Find all existing roll numbers for this class+section+institute
+        List<String> existing = userRepository.findRollNumbersByClassAndSection(
+                instituteId, studentClass, sectionId);
+
+        // Parse the max sequence from existing roll numbers
+        int maxSeq = 0;
+        for (String rn : existing) {
+            if (rn != null && rn.startsWith(prefix)) {
+                try {
+                    int seq = Integer.parseInt(rn.substring(prefix.length()));
+                    maxSeq = Math.max(maxSeq, seq);
+                } catch (NumberFormatException e) {
+                    // skip non-standard roll numbers
+                }
+            }
+        }
+
+        return prefix + String.format("%04d", maxSeq + 1);
+    }
+
+    /**
+     * Returns pre-computed student portal data: pillar scores, career matches,
+     * CCI level, insight text, and trait tags.
+     */
+    @PreAuthorize("@auth.allows('student_info.read')")
+    @GetMapping(value = "student-portal/computed/{userStudentId}")
+    public ResponseEntity<?> getComputedPortalData(@PathVariable Long userStudentId) {
+        StudentPortalComputedData data = studentDashboardDataService.computePortalData(userStudentId);
+        return ResponseEntity.ok(data);
+    }
+
+    @PreAuthorize("@auth.allows('user.delete')")
     @GetMapping(value = "user/delete/{id}", headers = "Accept=application/json")
     public User deleteUser(@PathVariable("id") Long userId) {
         User user = userRepository.getOne(userId);
@@ -145,6 +355,7 @@ public class UserController {
         return r;
     }
 
+    @PreAuthorize("@auth.allows('user.read.all')")
     @GetMapping(value = "user/registered-users")
     public List<Map<String, Object>> getRegisteredUsers() {
         List<User> users = userRepository.findByProviderNot(AuthProvider.custom_student);
@@ -158,6 +369,7 @@ public class UserController {
             row.put("organisation", u.getOrganisation());
             row.put("designation", u.getDesignation());
             row.put("isActive", u.getIsActive());
+            row.put("isSuperAdmin", Boolean.TRUE.equals(u.getIsSuperAdmin()));
             row.put("provider", u.getProvider() != null ? u.getProvider().name() : null);
             if (u.getDobDate() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -165,20 +377,113 @@ public class UserController {
             } else {
                 row.put("dob", null);
             }
+            // Include userRoleGroupMappings so the frontend can display assigned roles
+            List<Map<String, Object>> mappings = new ArrayList<>();
+            if (u.getUserRoleGroupMappings() != null) {
+                for (UserRoleGroupMapping mapping : u.getUserRoleGroupMappings()) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", mapping.getId());
+                    if (mapping.getRoleGroup() != null) {
+                        Map<String, Object> rg = new HashMap<>();
+                        rg.put("id", mapping.getRoleGroup().getId());
+                        rg.put("name", mapping.getRoleGroup().getName());
+                        m.put("roleGroup", rg);
+                    }
+                    mappings.add(m);
+                }
+            }
+            row.put("userRoleGroupMappings", mappings);
             result.add(row);
         }
         return result;
     }
 
+    /**
+     * Admin-driven password reset. Lets a privileged admin set a target user's
+     * password without going through the user's email-reset flow. Useful for
+     * onboarding new users or recovering locked accounts.
+     *
+     * <p>Body: {@code { "password": "<plaintext>", "sendEmail": true|false }}.
+     * On success the user's password is BCrypt-hashed and stored. If
+     * {@code sendEmail} is true and the user has an email on file, an email is
+     * sent containing the new plaintext password and a prompt to change it on
+     * first login. The email is best-effort — failures are logged but do not
+     * fail the request (the password is already saved).
+     *
+     * <p>Security note: emailing plaintext passwords is a deliberate UX choice
+     * for this admin-onboarding flow. Plaintext passwords sitting in inboxes /
+     * mail logs is an accepted trade-off here. The {@code user.update}
+     * permission gate keeps this off the public surface; super-admins always
+     * bypass via {@code AuthorizationService}.
+     */
+    @PreAuthorize("@auth.allows('user.update')")
+    @PostMapping(value = "user/{id}/admin-reset-password")
+    public ResponseEntity<?> adminResetPassword(@PathVariable("id") Long userId,
+            @RequestBody Map<String, Object> body) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        Object rawPassword = body.get("password");
+        if (!(rawPassword instanceof String) || ((String) rawPassword).trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.SC_BAD_REQUEST)
+                    .body(new ApiResponse(false, "password is required"));
+        }
+        String newPassword = ((String) rawPassword).trim();
+        if (newPassword.length() < 6) {
+            return ResponseEntity.status(HttpStatus.SC_BAD_REQUEST)
+                    .body(new ApiResponse(false, "password must be at least 6 characters"));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        boolean sendEmail = Boolean.TRUE.equals(body.get("sendEmail"));
+        boolean emailQueued = false;
+        String emailError = null;
+        if (sendEmail) {
+            if (user.getEmail() == null || user.getEmail().isEmpty()) {
+                emailError = "User has no email on file";
+            } else {
+                try {
+                    String subject = "Your Career-9 password has been reset";
+                    String text =
+                            "Hello " + (user.getName() != null ? user.getName() : "") + ",\n\n" +
+                            "An administrator has reset your Career-9 password.\n\n" +
+                            "Your new password is: " + newPassword + "\n\n" +
+                            "Please log in at https://dashboard.career-9.com using your registered email " +
+                            "and the password above, and change it immediately from your profile.\n\n" +
+                            "If you did not request this change, contact your administrator.\n\n" +
+                            "— Career-9 Team";
+                    // Odoo path is @Async fire-and-forget — returns immediately and the
+                    // actual send happens on a worker thread. We only know the request
+                    // was queued; OdooEmailService logs the eventual success/failure.
+                    odooEmailService.sendSimpleEmail(user.getEmail(), subject, text);
+                    emailQueued = true;
+                } catch (Exception e) {
+                    emailError = e.getMessage();
+                }
+            }
+        }
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("message", "Password reset successfully" +
+                (sendEmail ? (emailQueued ? " — email is being sent to the user" : " (email failed)") : ""));
+        resp.put("emailRequested", sendEmail);
+        // The FE consumes both keys for back-compat; semantically "queued" is more
+        // accurate when the underlying transport is async (Odoo here).
+        resp.put("emailSent", emailQueued);
+        resp.put("emailQueued", emailQueued);
+        if (emailError != null) resp.put("emailError", emailError);
+        return ResponseEntity.ok(resp);
+    }
+
+    @PreAuthorize("@auth.allows('user.toggle_active')")
     @PostMapping(value = "user/toggle-active/{id}")
     public ResponseEntity<?> toggleUserActive(@PathVariable("id") Long userId) {
 
-        Optional<User> optionalUser = userRepository.findById(userId);
-        if (!optionalUser.isPresent()) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
-                    .body(new ApiResponse(false, "User not found"));
-        }
-        User user = optionalUser.get();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
         boolean newStatus = !(user.getIsActive() != null && user.getIsActive());
         user.setIsActive(newStatus);
 
@@ -193,14 +498,71 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse(true, newStatus ? "User activated" : "User deactivated"));
     }
 
+    /**
+     * Grant or revoke the super-admin flag on a user. Super-admin is a hard
+     * bypass over both the RBAC permission check and the URL whitelist (see
+     * {@code AuthorizationService.decide()} and the FE {@code RequirePermission}
+     * guard), so this endpoint is the privilege-escalation surface and is gated
+     * on {@code permission.grant}.
+     *
+     * <p>Two safety rails:
+     * <ul>
+     *   <li>You cannot demote yourself — prevents accidentally locking the only
+     *       admin out of the system in a single click.</li>
+     *   <li>You cannot demote the last remaining super-admin in the database —
+     *       same reason, just defended at a different layer.</li>
+     * </ul>
+     *
+     * <p>Note: the target user's existing access token keeps its old {@code sa}
+     * claim until it expires or they re-login (we don't have a JWT-revocation
+     * hook from here). The response includes a hint so the FE can surface that.
+     */
+    @PreAuthorize("@auth.allows('permission.grant')")
+    @PostMapping(value = "user/toggle-super-admin/{id}")
+    public ResponseEntity<?> toggleSuperAdmin(@PathVariable("id") Long userId,
+                                              @CurrentUser UserPrincipal currentUser) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        boolean current = Boolean.TRUE.equals(user.getIsSuperAdmin());
+        boolean newStatus = !current;
+
+        if (!newStatus && currentUser != null && currentUser.getId() != null
+                && currentUser.getId().equals(userId)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "You cannot revoke your own super-admin status"));
+        }
+
+        if (!newStatus) {
+            long remaining = userRepository.countByIsSuperAdminTrue();
+            if (remaining <= 1) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                        .body(new ApiResponse(false,
+                                "Cannot revoke — this is the last remaining super-admin"));
+            }
+        }
+
+        user.setIsSuperAdmin(newStatus);
+        userRepository.save(user);
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("isSuperAdmin", newStatus);
+        // The is_super_admin flag is re-read from the DB on every request (it is NOT trusted from
+        // the JWT — see TokenAuthenticationFilter / CustomUserDetailsService), so the change applies
+        // on the user's very next backend request. The frontend caches /auth/me at load, so the user
+        // only needs to REFRESH their browser (no re-login) to see menus/actions update.
+        resp.put("message", newStatus
+                ? "User promoted to super-admin — they should refresh their browser to see it take effect (applies on their next request)."
+                : "Super-admin revoked — applies on the user's next request; they should refresh their browser.");
+        return ResponseEntity.ok(resp);
+    }
+
+    @PreAuthorize("@auth.allows('user.update')")
     @PutMapping(value = "user/update-details/{id}")
     public ResponseEntity<?> updateUserDetails(@PathVariable("id") Long userId, @RequestBody Map<String, Object> body) {
-        Optional<User> optionalUser = userRepository.findById(userId);
-        if (!optionalUser.isPresent()) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
-                    .body(new ApiResponse(false, "User not found"));
-        }
-        User user = optionalUser.get();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         if (body.containsKey("name"))
             user.setName((String) body.get("name"));

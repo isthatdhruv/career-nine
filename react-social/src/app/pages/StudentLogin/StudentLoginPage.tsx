@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { showErrorToast } from '../../utils/toast';
 import { usePreventReload } from './usePreventReload';
 
 const StudentLoginPage: React.FC = () => {
@@ -141,11 +142,11 @@ const StudentLoginPage: React.FC = () => {
           navigate('/allotted-assessment');
         } else {
           console.error('Login failed:', response.statusText);
-          alert('Invalid credentials. Please try again.');
+          showErrorToast('Invalid credentials. Please try again.');
         }
       } catch (error) {
         console.error('Error during login:', error);
-        alert('An error occurred. Please try again later.');
+        showErrorToast('An error occurred. Please try again later.');
       }
     }
   };
@@ -191,7 +192,7 @@ const StudentLoginPage: React.FC = () => {
               margin: "0 auto 1.5rem",
             }}
           >
-            <img src="/media/logos/kcc.jpg" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
+            <img src="/media/logos/kcc.webp" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
           </div>
 
           <h2

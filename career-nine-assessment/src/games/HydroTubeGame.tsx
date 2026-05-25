@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // How to play video path - place video at: public/assets/game/hydro-tube-tutorial.mp4
 const HOW_TO_PLAY_VIDEO_PATH = "/assets/game/hydro-tube-tutorial.mp4";
@@ -44,6 +44,8 @@ const patterns: Pattern[] = [
       [270, 0, 0, 0, 0, 0, 0, 0, 270, 90, 0, 0, 0, 270, 90, 90],
       [90, 90, 0, 0, 0, 270, 90, 90, 270, 90, 90, 180, 0, 270, 180, 90],
       [270, 90, 0, 0, 0, 270, 90, 90, 0, 0, 90, 180, 0, 270, 90, 90],
+      [90, 90, 0, 0, 0, 270, 90, 90, 270, 90, 90, 180, 0, 270, 90, 90],
+      [90, 90, 0, 0, 0, 270, 90, 90, 270, 90, 90, 180, 0, 270, 270, 90],
     ],
   },
   {
@@ -127,6 +129,14 @@ export function HydroTubeGame({
 
   const [tilesCorrect, setTilesCorrect] = useState(0);
   const [totalSolutionTiles, setTotalSolutionTiles] = useState(16);
+  const pendingTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Cleanup all pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      pendingTimeouts.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const currentPattern = patterns[patternId];
 
@@ -155,7 +165,7 @@ export function HydroTubeGame({
         if (nextTime === 135 || nextTime === 90 || nextTime === 45) {
           const randomTile = Math.floor(Math.random() * 16) + 1;
           setHighlightedTile(randomTile);
-          setTimeout(() => setHighlightedTile(null), 5000);
+          pendingTimeouts.current.push(setTimeout(() => setHighlightedTile(null), 5000));
         }
 
         if (prev <= 1) {
@@ -202,6 +212,13 @@ export function HydroTubeGame({
     onComplete,
   ]);
 
+  const normalizeRotation = (rotation: number, pipeType: string): number => {
+    if (pipeType === "straight") {
+      return rotation % 180;
+    }
+    return rotation;
+  };
+
   const checkWin = useCallback(
     (currentRotations: Record<number, number>): boolean => {
       const playerRotations = Array.from(
@@ -211,11 +228,12 @@ export function HydroTubeGame({
       return currentPattern.solutions.some((solution) =>
         solution.every((solRot, i) => {
           const playerRotation = playerRotations[i];
-          return solRot === 0 || solRot === playerRotation;
+          const pipeType = currentPattern.tileTypes[i + 1];
+          return solRot === 0 || normalizeRotation(solRot, pipeType) === normalizeRotation(playerRotation, pipeType);
         }),
       );
     },
-    [currentPattern.solutions],
+    [currentPattern.solutions, currentPattern.tileTypes],
   );
 
   const calculateProgress = useCallback(
@@ -233,7 +251,8 @@ export function HydroTubeGame({
         let correctCount = 0;
         solution.forEach((solRot, i) => {
           const playerRotation = playerRotations[i];
-          if (solRot === 0 || solRot === playerRotation) {
+          const pipeType = currentPattern.tileTypes[i + 1];
+          if (solRot === 0 || normalizeRotation(solRot, pipeType) === normalizeRotation(playerRotation, pipeType)) {
             correctCount++;
           }
         });
@@ -244,7 +263,7 @@ export function HydroTubeGame({
 
       return { correct: bestCorrectCount, total: 16 };
     },
-    [currentPattern.solutions],
+    [currentPattern.solutions, currentPattern.tileTypes],
   );
 
   const loadNextPattern = () => {
@@ -337,7 +356,7 @@ export function HydroTubeGame({
       }
 
       if (checkWin(newState)) {
-        setTimeout(() => setIsWon(true), 500);
+        pendingTimeouts.current.push(setTimeout(() => setIsWon(true), 500));
       }
       return newState;
     });
@@ -500,6 +519,7 @@ export function HydroTubeGame({
         }}
       >
         <div
+          className="game-video-card"
           style={{
             background:
               "linear-gradient(135deg, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))",
@@ -635,6 +655,7 @@ export function HydroTubeGame({
         }}
       >
         <div
+          className="game-modal-card"
           style={{
             background:
               "linear-gradient(135deg, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))",
@@ -815,6 +836,7 @@ export function HydroTubeGame({
 
       {/* Player Info - Top Left */}
       <div
+        className="game-top-left"
         style={{
           position: "absolute",
           top: "20px",
@@ -850,6 +872,7 @@ export function HydroTubeGame({
 
       {/* Timer/Practice Badge - Top Center */}
       <div
+        className="game-top-center"
         style={{
           position: "absolute",
           top: "20px",
@@ -859,15 +882,15 @@ export function HydroTubeGame({
           background: isTrial
             ? "linear-gradient(to bottom, rgba(234, 179, 8, 0.95), rgba(202, 138, 4, 0.95))"
             : timeLeft < 30
-            ? "linear-gradient(to bottom, rgba(220, 38, 38, 0.95), rgba(185, 28, 28, 0.95))"
-            : "linear-gradient(to bottom, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))",
+              ? "linear-gradient(to bottom, rgba(220, 38, 38, 0.95), rgba(185, 28, 28, 0.95))"
+              : "linear-gradient(to bottom, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))",
           padding: "10px 24px",
           borderRadius: "14px",
           border: isTrial
             ? "2px solid rgba(253, 224, 71, 0.5)"
             : timeLeft < 30
-            ? "2px solid rgba(248, 113, 113, 0.5)"
-            : "2px solid rgba(56, 189, 248, 0.5)",
+              ? "2px solid rgba(248, 113, 113, 0.5)"
+              : "2px solid rgba(56, 189, 248, 0.5)",
           boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
         }}
       >
@@ -905,6 +928,7 @@ export function HydroTubeGame({
 
       {/* Controls - Top Right */}
       <div
+        className="game-top-right"
         style={{
           position: "absolute",
           top: "20px",
@@ -927,6 +951,7 @@ export function HydroTubeGame({
             boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
           }}
           title="Exit"
+          aria-label="Exit game"
         >
           ✕
         </button>
@@ -935,6 +960,7 @@ export function HydroTubeGame({
       {/* Stats Cards - Left Side (only during main game) */}
       {!isTrial && (
         <div
+          className="game-stats-panel"
           style={{
             position: "absolute",
             top: "80px",
@@ -1049,6 +1075,7 @@ export function HydroTubeGame({
       {/* Practice Info Card - Left Side (only during trial) */}
       {isTrial && (
         <div
+          className="game-stats-panel"
           style={{
             position: "absolute",
             top: "80px",
@@ -1256,6 +1283,7 @@ export function HydroTubeGame({
 
         {/* Game Frame */}
         <div
+          className="game-frame"
           style={{
             position: "relative",
             background: isWon
@@ -1347,10 +1375,9 @@ export function HydroTubeGame({
 
           {/* Tile Grid */}
           <div
+            className="hydro-grid"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, 80px)",
-              gridTemplateRows: "repeat(4, 80px)",
               gap: "4px",
             }}
           >
@@ -1363,10 +1390,9 @@ export function HydroTubeGame({
               return (
                 <div
                   key={tileNumber}
+                  className="hydro-tile"
                   onClick={() => handleTileClick(tileNumber)}
                   style={{
-                    width: "80px",
-                    height: "80px",
                     background: isHighlighted
                       ? "linear-gradient(145deg, #fef3c7 0%, #fde68a 100%)"
                       : "linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%)",
@@ -1385,8 +1411,8 @@ export function HydroTubeGame({
                     border: isHighlighted
                       ? "3px solid #f59e0b"
                       : isWon
-                      ? "2px solid #10b981"
-                      : "1px solid #e2e8f0",
+                        ? "2px solid #10b981"
+                        : "1px solid #e2e8f0",
                     animation: isHighlighted ? "pulse 1.5s infinite" : "none",
                   }}
                 >

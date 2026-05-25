@@ -21,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +35,7 @@ public class ReportGenerationController {
 
     private static final int SCRIPT_TIMEOUT_MINUTES = 5;
 
+    @PreAuthorize("@auth.allows('report_generation.create')")
     @PostMapping(value = "/run", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Object> runReport(@RequestBody(required = false) Map<String, String> body) {
         String excelPath = null;
@@ -53,6 +55,7 @@ public class ReportGenerationController {
         return executePipeline(excelFile);
     }
 
+    @PreAuthorize("@auth.allows('report_generation.create')")
     @PostMapping(value = "/run/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Object> uploadAndRun(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {

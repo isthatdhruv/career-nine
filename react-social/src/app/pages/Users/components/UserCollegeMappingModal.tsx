@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Button, Form, Spinner, Badge } from "react-bootstrap";
-import { MdDelete, MdSchool } from "react-icons/md";
+import { MdSchool } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { ReadCollegeData } from "../../College/API/College_APIs";
 import { GetSessionsByInstituteCode } from "../../College/API/College_APIs";
 import {
@@ -10,6 +11,7 @@ import {
   createAccessLevel,
   deleteAccessLevel,
 } from "../API/UserMapping_APIs";
+import { showErrorToast } from "../../../utils/toast";
 
 interface UserCollegeMappingModalProps {
   show: boolean;
@@ -25,31 +27,96 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
   const [loading, setLoading] = useState(false);
   const [mapping, setMapping] = useState(false);
 
-  // Access level management state
+  // Access-level state
   const [activeMapping, setActiveMapping] = useState<any | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);
-  const [selectedSession, setSelectedSession] = useState<string>("");
-  const [selectedClass, setSelectedClass] = useState<string>("");
-  const [selectedSection, setSelectedSection] = useState<string>("");
+  const [selectedSessionIds, setSelectedSessionIds] = useState<number[]>([]);
+  const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
+  const [selectedSectionIds, setSelectedSectionIds] = useState<number[]>([]);
   const [addingAccess, setAddingAccess] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
-  // Derived: classes and sections from selected session/class
-  const selectedSessionObj = sessions.find(
-    (s: any) => String(s.id) === selectedSession
-  );
-  const classes: any[] = selectedSessionObj?.schoolClasses || [];
+  // Per-mapping delete spinner (Feature 3): tracks the id being unmapped so
+  // its button shows a spinner while the network call is in-flight.
+  const [unmappingId, setUnmappingId] = useState<number | null>(null);
+  // Per-access-level delete spinner — same idea for the access rows.
+  const [deletingAccessId, setDeletingAccessId] = useState<number | null>(null);
 
-  const selectedClassObj = classes.find(
-    (c: any) => String(c.id) === selectedClass
-  );
-  const sectionsList: any[] = selectedClassObj?.schoolSections || [];
+  // Derived: classes filtered by the selected sessions.
+  // When >1 session is selected, the class label appends "(SessionYear)" so
+  // the admin can disambiguate identically-named classes across sessions.
+  const classOptions = useMemo(() => {
+    const out: { id: number; label: string; sessionId: number; className: string; sessionYear: string }[] = [];
+    const showSessionBracket = selectedSessionIds.length > 1;
+    for (const s of sessions) {
+      if (!selectedSessionIds.includes(s.id)) continue;
+      const sessionYear = s.sessionYear ?? `Session #${s.id}`;
+      for (const c of s.schoolClasses || []) {
+        out.push({
+          id: c.id,
+          className: c.className,
+          sessionYear,
+          sessionId: s.id,
+          label: showSessionBracket ? `${c.className} (${sessionYear})` : c.className,
+        });
+      }
+    }
+    return out;
+  }, [sessions, selectedSessionIds]);
+
+  // Derived: sections filtered by the selected classes.
+  // When >1 class is selected, label appends "(ClassName, SessionYear)".
+  const sectionOptions = useMemo(() => {
+    const out: { id: number; label: string; classId: number; sessionId: number }[] = [];
+    const showClassBracket = selectedClassIds.length > 1;
+    for (const s of sessions) {
+      if (!selectedSessionIds.includes(s.id)) continue;
+      const sessionYear = s.sessionYear ?? `Session #${s.id}`;
+      for (const c of s.schoolClasses || []) {
+        if (!selectedClassIds.includes(c.id)) continue;
+        for (const sec of c.schoolSections || []) {
+          out.push({
+            id: sec.id,
+            classId: c.id,
+            sessionId: s.id,
+            label: showClassBracket
+              ? `${sec.sectionName} (${c.className}${selectedSessionIds.length > 1 ? `, ${sessionYear}` : ""})`
+              : sec.sectionName,
+          });
+        }
+      }
+    }
+    return out;
+  }, [sessions, selectedSessionIds, selectedClassIds]);
+
+  // Prune downstream selections when upstream changes (e.g., deselecting a
+  // session should remove its classes/sections from the picked sets).
+  useEffect(() => {
+    const validClassIds = new Set(classOptions.map((c) => c.id));
+    setSelectedClassIds((prev) => prev.filter((id) => validClassIds.has(id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSessionIds, sessions]);
+
+  useEffect(() => {
+    const validSectionIds = new Set(sectionOptions.map((s) => s.id));
+    setSelectedSectionIds((prev) => prev.filter((id) => validSectionIds.has(id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClassIds, sessions]);
+
+  // After successful map (Feature 2): when a new mapping appears that wasn't
+  // there before, auto-select it so the session/class/section form is the
+  // next visible affordance. Tracked via a ref of last-seen IDs.
+  const previousMappingIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (props.show && props.user) {
+      previousMappingIdsRef.current = new Set();
       loadData();
       setActiveMapping(null);
       setSessions([]);
+      setSelectedSessionIds([]);
+      setSelectedClassIds([]);
+      setSelectedSectionIds([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.show, props.user]);
@@ -63,6 +130,7 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
       ]);
       setInstitutes(instituteRes.data || []);
       setMappings(mappingRes.data || []);
+      previousMappingIdsRef.current = new Set((mappingRes.data || []).map((m: any) => m.id));
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
@@ -76,15 +144,23 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
     setMapping(true);
     try {
       await mapUserToCollege(props.user.id, Number(selectedInstitute));
-      // Refresh mappings
+      // Refresh mappings, then surface the newly-created one so the admin
+      // can immediately attach session/class/section attributes (Feature 2).
       const res = await getUserCollegeMappings(props.user.id);
-      setMappings(res.data || []);
+      const list: any[] = res.data || [];
+      setMappings(list);
+      const previousIds = previousMappingIdsRef.current;
+      const newlyCreated = list.find((m) => !previousIds.has(m.id));
+      previousMappingIdsRef.current = new Set(list.map((m) => m.id));
       setSelectedInstitute("");
+      if (newlyCreated) {
+        await handleSelectMapping(newlyCreated);
+      }
     } catch (error: any) {
       console.error("Failed to map:", error);
       const msg =
         error.response?.data || error.response?.data?.message || error.message;
-      alert("Failed to map: " + msg);
+      showErrorToast("Failed to map: " + msg);
     } finally {
       setMapping(false);
     }
@@ -98,23 +174,32 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
     )
       return;
 
+    setUnmappingId(contactPersonId);
     try {
       await unmapUserFromCollege(contactPersonId);
-      setMappings(mappings.filter((m) => m.id !== contactPersonId));
+      setMappings((prev) => prev.filter((m) => m.id !== contactPersonId));
+      previousMappingIdsRef.current.delete(contactPersonId);
       if (activeMapping?.id === contactPersonId) {
         setActiveMapping(null);
         setSessions([]);
+        setSelectedSessionIds([]);
+        setSelectedClassIds([]);
+        setSelectedSectionIds([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to unmap:", error);
+      const msg = error.response?.data || error.message || "Failed to unmap";
+      showErrorToast(typeof msg === "string" ? msg : "Failed to unmap");
+    } finally {
+      setUnmappingId(null);
     }
   };
 
   const handleSelectMapping = async (m: any) => {
     setActiveMapping(m);
-    setSelectedSession("");
-    setSelectedClass("");
-    setSelectedSection("");
+    setSelectedSessionIds([]);
+    setSelectedClassIds([]);
+    setSelectedSectionIds([]);
     setLoadingSessions(true);
     try {
       const res = await GetSessionsByInstituteCode(m.institute.instituteCode);
@@ -127,56 +212,88 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
     }
   };
 
+  // Submit one access-level row per (session, class, section) combination
+  // implied by the multi-select picks. Existing backend API accepts one row
+  // at a time — we loop with Promise.allSettled so a single failure does not
+  // strand the others.
   const handleAddAccess = async () => {
-    if (!activeMapping || !selectedSession) {
-      alert("Please select at least a session");
+    if (!activeMapping) return;
+    if (selectedSessionIds.length === 0) {
+      showErrorToast("Please select at least one session");
       return;
     }
 
-    const data: any = {
-      contactPersonId: activeMapping.id,
-      sessionId: Number(selectedSession),
-    };
-    if (selectedClass) data.classId = Number(selectedClass);
-    if (selectedSection) data.sectionId = Number(selectedSection);
+    // Build the cartesian list. A pick of (sessions, classes, sections)
+    // expands per the dimensions actually chosen:
+    //   - if no classes picked → one row per session, class=null
+    //   - if classes picked, no sections → one row per (session-of-class, class)
+    //   - if sections picked → one row per (session-of-class, class, section)
+    type Row = { sessionId: number; classId?: number; sectionId?: number };
+    const rows: Row[] = [];
+
+    if (selectedClassIds.length === 0) {
+      for (const sid of selectedSessionIds) rows.push({ sessionId: sid });
+    } else if (selectedSectionIds.length === 0) {
+      for (const c of classOptions) {
+        if (selectedClassIds.includes(c.id)) {
+          rows.push({ sessionId: c.sessionId, classId: c.id });
+        }
+      }
+    } else {
+      for (const sec of sectionOptions) {
+        if (selectedSectionIds.includes(sec.id)) {
+          rows.push({ sessionId: sec.sessionId, classId: sec.classId, sectionId: sec.id });
+        }
+      }
+    }
+
+    if (rows.length === 0) {
+      showErrorToast("Nothing to add — refine your selection");
+      return;
+    }
 
     setAddingAccess(true);
     try {
-      await createAccessLevel(data);
-      // Refresh mappings to get updated access levels
+      const results = await Promise.allSettled(
+        rows.map((r) =>
+          createAccessLevel({
+            contactPersonId: activeMapping.id,
+            ...r,
+          })
+        )
+      );
+      const failures = results.filter((r) => r.status === "rejected").length;
+      if (failures > 0) {
+        showErrorToast(`${failures} of ${rows.length} access level(s) failed to add`);
+      }
+
       const res = await getUserCollegeMappings(props.user!.id);
       setMappings(res.data || []);
-      // Update active mapping's access levels
-      const updated = (res.data || []).find(
-        (m: any) => m.id === activeMapping.id
-      );
+      const updated = (res.data || []).find((m: any) => m.id === activeMapping.id);
       if (updated) setActiveMapping(updated);
-      setSelectedSession("");
-      setSelectedClass("");
-      setSelectedSection("");
+      setSelectedSessionIds([]);
+      setSelectedClassIds([]);
+      setSelectedSectionIds([]);
     } catch (error: any) {
       console.error("Failed to add access level:", error);
-      alert(
-        "Failed to add access level: " +
-          (error.response?.data || error.message)
-      );
+      showErrorToast("Failed to add access level: " + (error.response?.data || error.message));
     } finally {
       setAddingAccess(false);
     }
   };
 
   const handleDeleteAccess = async (accessId: number) => {
+    setDeletingAccessId(accessId);
     try {
       await deleteAccessLevel(accessId);
-      // Refresh
       const res = await getUserCollegeMappings(props.user!.id);
       setMappings(res.data || []);
-      const updated = (res.data || []).find(
-        (m: any) => m.id === activeMapping?.id
-      );
+      const updated = (res.data || []).find((m: any) => m.id === activeMapping?.id);
       if (updated) setActiveMapping(updated);
     } catch (error) {
       console.error("Failed to delete access level:", error);
+    } finally {
+      setDeletingAccessId(null);
     }
   };
 
@@ -188,15 +305,11 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
     }
     if (level.classId) {
       for (const session of sessions) {
-        const cls = (session.schoolClasses || []).find(
-          (c: any) => c.id === level.classId
-        );
+        const cls = (session.schoolClasses || []).find((c: any) => c.id === level.classId);
         if (cls) {
           parts.push(`Class ${cls.className}`);
           if (level.sectionId) {
-            const sec = (cls.schoolSections || []).find(
-              (s: any) => s.id === level.sectionId
-            );
+            const sec = (cls.schoolSections || []).find((s: any) => s.id === level.sectionId);
             parts.push(sec ? `Section ${sec.sectionName}` : `Section #${level.sectionId}`);
           }
           break;
@@ -206,13 +319,8 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
     return parts.join(" / ") || "All";
   };
 
-  // Filter out already-mapped institutes from dropdown
-  const mappedInstituteCodes = new Set(
-    mappings.map((m) => m.institute?.instituteCode)
-  );
-  const availableInstitutes = institutes.filter(
-    (i) => !mappedInstituteCodes.has(i.instituteCode)
-  );
+  const mappedInstituteCodes = new Set(mappings.map((m) => m.institute?.instituteCode));
+  const availableInstitutes = institutes.filter((i) => !mappedInstituteCodes.has(i.instituteCode));
 
   return (
     <Modal show={props.show} onHide={props.onHide} size="xl" centered>
@@ -265,61 +373,67 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
                   </Button>
                 </div>
               </div>
+              <Form.Text className="text-muted mt-2 d-block">
+                After mapping, the access-level form below will open automatically so you can
+                attach sessions, classes, and sections in one step.
+              </Form.Text>
             </div>
 
             {/* Section 2: Mapped Institutes */}
-            <h6 className="mb-3">
-              Mapped Institutes ({mappings.length})
-            </h6>
+            <h6 className="mb-3">Mapped Institutes ({mappings.length})</h6>
             {mappings.length === 0 ? (
               <div className="text-muted text-center py-3">
                 No institute mappings yet. Map to one above.
               </div>
             ) : (
               <div className="row g-2 mb-4">
-                {mappings.map((m: any) => (
-                  <div key={m.id} className="col-md-4">
-                    <div
-                      className={`card h-100 ${
-                        activeMapping?.id === m.id
-                          ? "border-primary shadow-sm"
-                          : ""
-                      }`}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <div className="card-body p-3">
-                        <div className="d-flex justify-content-between align-items-start">
-                          <div onClick={() => handleSelectMapping(m)}>
-                            <h6 className="mb-1">
-                              {m.institute?.instituteName || "Unknown Institute"}
-                            </h6>
-                            <small className="text-muted">
-                              Code: {m.institute?.instituteCode}
-                            </small>
-                            <br />
-                            <Badge bg="info" className="mt-1">
-                              {(m.accessLevels || []).length} access{" "}
-                              {(m.accessLevels || []).length === 1
-                                ? "level"
-                                : "levels"}
-                            </Badge>
+                {mappings.map((m: any) => {
+                  const isBeingDeleted = unmappingId === m.id;
+                  return (
+                    <div key={m.id} className="col-md-4">
+                      <div
+                        className={`card h-100 ${
+                          activeMapping?.id === m.id ? "border-primary shadow-sm" : ""
+                        }`}
+                        style={{ cursor: "pointer", opacity: isBeingDeleted ? 0.6 : 1 }}
+                      >
+                        <div className="card-body p-3">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div onClick={() => !isBeingDeleted && handleSelectMapping(m)} style={{ flex: 1 }}>
+                              <h6 className="mb-1">
+                                {m.institute?.instituteName || "Unknown Institute"}
+                              </h6>
+                              <small className="text-muted">
+                                Code: {m.institute?.instituteCode}
+                              </small>
+                              <br />
+                              <Badge bg="info" className="mt-1">
+                                {(m.accessLevels || []).length} access{" "}
+                                {(m.accessLevels || []).length === 1 ? "level" : "levels"}
+                              </Badge>
+                            </div>
+                            <Button
+                              variant="outline-danger"
+                              size="sm"
+                              disabled={isBeingDeleted || unmappingId !== null}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUnmap(m.id);
+                              }}
+                              title="Unmap from institute"
+                            >
+                              {isBeingDeleted ? (
+                                <Spinner animation="border" size="sm" />
+                              ) : (
+                                <ActionIcon type="delete" size="sm" />
+                              )}
+                            </Button>
                           </div>
-                          <Button
-                            variant="outline-danger"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUnmap(m.id);
-                            }}
-                            title="Unmap from institute"
-                          >
-                            <MdDelete size={16} />
-                          </Button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -328,8 +442,7 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
               <div className="card">
                 <div className="card-header">
                   <h6 className="mb-0">
-                    Access Levels -{" "}
-                    {activeMapping.institute?.instituteName}
+                    Access Levels - {activeMapping.institute?.instituteName}
                   </h6>
                 </div>
                 <div className="card-body">
@@ -340,86 +453,88 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
                     </div>
                   ) : (
                     <>
-                      {/* Add Access Form */}
                       <div className="row g-3 mb-3">
-                        <div className="col-md-3">
-                          <Form.Label>Session</Form.Label>
-                          <Form.Select
-                            value={selectedSession}
-                            onChange={(e) => {
-                              setSelectedSession(e.target.value);
-                              setSelectedClass("");
-                              setSelectedSection("");
-                            }}
-                          >
-                            <option value="">Select Session</option>
-                            {sessions.map((s: any) => (
-                              <option key={s.id} value={s.id}>
-                                {s.sessionYear}
-                              </option>
-                            ))}
-                          </Form.Select>
+                        <div className="col-md-4">
+                          <Form.Label>
+                            Sessions <span style={{ color: "#dc2626" }}>*</span>
+                          </Form.Label>
+                          <MultiSelectChecklist
+                            options={sessions.map((s: any) => ({
+                              id: s.id,
+                              label: s.sessionYear ?? `Session #${s.id}`,
+                            }))}
+                            selected={selectedSessionIds}
+                            onChange={setSelectedSessionIds}
+                            placeholder="Select Sessions"
+                            emptyText="No sessions found for this institute"
+                          />
                         </div>
-                        <div className="col-md-3">
-                          <Form.Label>Class (optional)</Form.Label>
-                          <Form.Select
-                            value={selectedClass}
-                            onChange={(e) => {
-                              setSelectedClass(e.target.value);
-                              setSelectedSection("");
-                            }}
-                            disabled={!selectedSession}
-                          >
-                            <option value="">All Classes</option>
-                            {classes.map((c: any) => (
-                              <option key={c.id} value={c.id}>
-                                {c.className}
-                              </option>
-                            ))}
-                          </Form.Select>
+                        <div className="col-md-4">
+                          <Form.Label>Classes (optional)</Form.Label>
+                          <MultiSelectChecklist
+                            options={classOptions.map((c) => ({ id: c.id, label: c.label }))}
+                            selected={selectedClassIds}
+                            onChange={setSelectedClassIds}
+                            disabled={selectedSessionIds.length === 0}
+                            placeholder={
+                              selectedSessionIds.length === 0
+                                ? "Pick session(s) first"
+                                : "All classes"
+                            }
+                            emptyText="No classes in the picked session(s)"
+                          />
                         </div>
-                        <div className="col-md-3">
-                          <Form.Label>Section (optional)</Form.Label>
-                          <Form.Select
-                            value={selectedSection}
-                            onChange={(e) => setSelectedSection(e.target.value)}
-                            disabled={!selectedClass}
-                          >
-                            <option value="">All Sections</option>
-                            {sectionsList.map((s: any) => (
-                              <option key={s.id} value={s.id}>
-                                {s.sectionName}
-                              </option>
-                            ))}
-                          </Form.Select>
+                        <div className="col-md-4">
+                          <Form.Label>Sections (optional)</Form.Label>
+                          <MultiSelectChecklist
+                            options={sectionOptions.map((s) => ({ id: s.id, label: s.label }))}
+                            selected={selectedSectionIds}
+                            onChange={setSelectedSectionIds}
+                            disabled={selectedClassIds.length === 0}
+                            placeholder={
+                              selectedClassIds.length === 0
+                                ? "Pick class(es) first"
+                                : "All sections"
+                            }
+                            emptyText="No sections in the picked class(es)"
+                          />
                         </div>
-                        <div className="col-md-3 d-flex align-items-end">
+                        <div className="col-12">
                           <Button
                             variant="success"
                             size="sm"
                             onClick={handleAddAccess}
-                            disabled={!selectedSession || addingAccess}
+                            disabled={selectedSessionIds.length === 0 || addingAccess}
                           >
                             {addingAccess ? (
                               <>
-                                <Spinner
-                                  animation="border"
-                                  size="sm"
-                                  className="me-1"
-                                />
+                                <Spinner animation="border" size="sm" className="me-1" />
                                 Adding...
                               </>
                             ) : (
-                              "Add Access"
+                              `Add Access${
+                                selectedSessionIds.length || selectedClassIds.length || selectedSectionIds.length
+                                  ? ` (${
+                                      selectedSectionIds.length > 0
+                                        ? selectedSectionIds.length
+                                        : selectedClassIds.length > 0
+                                        ? selectedClassIds.length
+                                        : selectedSessionIds.length
+                                    } row${
+                                      (selectedSectionIds.length || selectedClassIds.length || selectedSessionIds.length) === 1
+                                        ? ""
+                                        : "s"
+                                    })`
+                                  : ""
+                              }`
                             )}
                           </Button>
                         </div>
                       </div>
 
-                      {/* Access Levels Table */}
                       {(activeMapping.accessLevels || []).length === 0 ? (
                         <div className="text-muted text-center py-3">
-                          No access levels defined. This user has no granular
+                          No access levels defined. This contact-person has no granular
                           access restrictions for this institute.
                         </div>
                       ) : (
@@ -432,25 +547,29 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {(activeMapping.accessLevels || []).map(
-                              (level: any, idx: number) => (
-                                <tr key={level.id}>
+                            {(activeMapping.accessLevels || []).map((level: any, idx: number) => {
+                              const isDeleting = deletingAccessId === level.id;
+                              return (
+                                <tr key={level.id} style={{ opacity: isDeleting ? 0.5 : 1 }}>
                                   <td>{idx + 1}</td>
                                   <td>{getAccessLabel(level)}</td>
                                   <td>
                                     <Button
                                       variant="outline-danger"
                                       size="sm"
-                                      onClick={() =>
-                                        handleDeleteAccess(level.id)
-                                      }
+                                      disabled={isDeleting || deletingAccessId !== null}
+                                      onClick={() => handleDeleteAccess(level.id)}
                                     >
-                                      <MdDelete size={14} />
+                                      {isDeleting ? (
+                                        <Spinner animation="border" size="sm" />
+                                      ) : (
+                                        <ActionIcon type="delete" size="sm" />
+                                      )}
                                     </Button>
                                   </td>
                                 </tr>
-                              )
-                            )}
+                              );
+                            })}
                           </tbody>
                         </table>
                       )}
@@ -468,6 +587,146 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
         </Button>
       </Modal.Footer>
     </Modal>
+  );
+};
+
+// ── Multi-select checkbox dropdown ───────────────────────────────────────────
+// Lightweight inline component. Click-outside closes the panel. Avoids
+// pulling in react-multi-select / react-select just for one screen.
+interface MultiSelectOption {
+  id: number;
+  label: string;
+}
+interface MultiSelectChecklistProps {
+  options: MultiSelectOption[];
+  selected: number[];
+  onChange: (ids: number[]) => void;
+  placeholder: string;
+  emptyText: string;
+  disabled?: boolean;
+}
+const MultiSelectChecklist = ({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  emptyText,
+  disabled,
+}: MultiSelectChecklistProps) => {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  const toggle = (id: number) => {
+    if (selected.includes(id)) onChange(selected.filter((x) => x !== id));
+    else onChange([...selected, id]);
+  };
+
+  const summary = (() => {
+    if (selected.length === 0) return placeholder;
+    if (selected.length <= 2) {
+      return options.filter((o) => selected.includes(o.id)).map((o) => o.label).join(", ");
+    }
+    return `${selected.length} selected`;
+  })();
+
+  const canOpen = !disabled && options.length > 0;
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="form-select form-select-sm text-start"
+        onClick={() => canOpen && setOpen((v) => !v)}
+        disabled={disabled}
+        style={{
+          background: disabled ? "#f3f4f6" : "#fff",
+          color: selected.length === 0 ? "#9ca3af" : "#111827",
+          cursor: canOpen ? "pointer" : "not-allowed",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+        title={summary}
+      >
+        {summary}
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            zIndex: 1080,
+            marginTop: 4,
+            background: "#fff",
+            border: "1px solid #d1d5db",
+            borderRadius: 6,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            maxHeight: 240,
+            overflowY: "auto",
+          }}
+        >
+          {options.length === 0 ? (
+            <div style={{ padding: "10px 12px", color: "#9ca3af", fontSize: "0.85rem" }}>{emptyText}</div>
+          ) : (
+            <>
+              <div style={{ padding: "6px 12px", borderBottom: "1px solid #f3f4f6", display: "flex", gap: 12 }}>
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm p-0"
+                  onClick={() => onChange(options.map((o) => o.id))}
+                  style={{ fontSize: "0.78rem", textDecoration: "none" }}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-link btn-sm p-0 text-muted"
+                  onClick={() => onChange([])}
+                  style={{ fontSize: "0.78rem", textDecoration: "none" }}
+                >
+                  Clear
+                </button>
+              </div>
+              {options.map((o) => (
+                <label
+                  key={o.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 12px",
+                    cursor: "pointer",
+                    fontSize: "0.85rem",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "#f9fafb")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(o.id)}
+                    onChange={() => toggle(o.id)}
+                  />
+                  <span>{o.label}</span>
+                </label>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 

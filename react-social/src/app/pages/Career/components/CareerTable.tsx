@@ -1,10 +1,10 @@
 import { Checkbox, FormControl, InputLabel, ListItemText, MenuItem, OutlinedInput, Select } from "@mui/material";
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import {
     AssignMeasuredQualityTypeToCareer,
     DeleteCareerData,
@@ -12,6 +12,7 @@ import {
     ReadMeasuredQualityTypes,
     RemoveMeasuredQualityTypeFromCareer
 } from "../API/Career_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }) => {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
         } catch (error) {
           // Handle 404 errors gracefully (career might have been deleted)
           if ((error as any)?.response?.status === 404) {
-            console.log(`Career ${career.career_id} not found, skipping...`);
+            // Career not found, skipping
           } else {
             console.error(`Error loading quality types for career ${career.career_id}:`, error);
           }
@@ -63,7 +64,6 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
     const deselected = currentValue.filter(typeId => !newValue.includes(typeId));
     try {
       for (const typeId of newlySelected) {
-        console.log('Assigning type to career_id:', career_id);
         await AssignMeasuredQualityTypeToCareer(typeId, career_id);
       }
       for (const typeId of deselected) {
@@ -71,7 +71,7 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
       }
       setSelectedMeasuredQualityTypesByCareer(prev => ({ ...prev, [career_id]: newValue }));
     } catch (error) {
-      alert('Failed to update MeasuredQualityType assignments. Please try again.');
+      showErrorToast('Failed to update MeasuredQualityType assignments. Please try again.');
       setSelectedMeasuredQualityTypesByCareer(prev => ({ ...prev, [career_id]: currentValue }));
     }
   };
@@ -92,7 +92,7 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
             onClick={() => navigate(`/career/edit/${data.career_id}`, { state: { data } })}
             className="btn btn-icon btn-primary btn-sm me-3"
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
           <button
             onClick={async () => {
@@ -108,7 +108,7 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
                 await DeleteCareerData(data.career_id);
                 props.setPageLoading(["true"]);
               } catch (error) {
-                alert("Failed to delete career. Please try again.");
+                showErrorToast("Failed to delete career. Please try again.");
               } finally {
                 props.setLoading(false);
               }

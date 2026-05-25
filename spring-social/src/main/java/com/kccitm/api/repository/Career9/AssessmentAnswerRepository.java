@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,6 +23,17 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
 
        Long countByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
 
+       // Count DISTINCT questions answered by a student for a given assessment.
+       // Using plain count() counts each answer row, which over-counts when a student
+       // selects multiple options for one question (multi-select / ranking).
+       @Query("SELECT COUNT(DISTINCT aa.questionnaireQuestion.questionnaireQuestionId) " +
+              "FROM AssessmentAnswer aa " +
+              "WHERE aa.userStudent.userStudentId = :userStudentId " +
+              "AND aa.assessment.id = :assessmentId")
+       Long countDistinctQuestionsAnsweredByStudent(
+              @Param("userStudentId") Long userStudentId,
+              @Param("assessmentId") Long assessmentId);
+
        // Main query with JOIN FETCH to load related entities including measured
        // qualities
        @Query("SELECT DISTINCT aa FROM AssessmentAnswer aa " +
@@ -35,12 +47,40 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
                      @Param("userStudentId") Long userStudentId,
                      @Param("assessmentId") Long assessmentId);
 
+       /** Bulk delete — single DELETE query, no entity loading */
+       @Modifying
        @Transactional
-       void deleteByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
+       @Query("DELETE FROM AssessmentAnswer aa WHERE aa.userStudent.userStudentId = :userStudentId AND aa.assessment.id = :assessmentId")
+       void deleteByUserStudent_UserStudentIdAndAssessment_Id(@Param("userStudentId") Long userStudentId, @Param("assessmentId") Long assessmentId);
+
+       @Modifying
+       @Transactional
+       @Query("DELETE FROM AssessmentAnswer aa WHERE aa.userStudent.userStudentId = :userStudentId")
+       void deleteByUserStudent_UserStudentId(@Param("userStudentId") Long userStudentId);
 
        List<AssessmentAnswer> findByAssessment_IdAndTextResponseIsNotNull(Long assessmentId);
 
        List<AssessmentAnswer> findByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
+
+       @Query("SELECT aa FROM AssessmentAnswer aa " +
+              "LEFT JOIN FETCH aa.option " +
+              "LEFT JOIN FETCH aa.questionnaireQuestion qq " +
+              "LEFT JOIN FETCH qq.section " +
+              "LEFT JOIN FETCH aa.userStudent " +
+              "WHERE aa.assessment.id = :assessmentId")
+       List<AssessmentAnswer> findAllByAssessmentIdForExport(
+              @Param("assessmentId") Long assessmentId);
+
+       @Query("SELECT aa FROM AssessmentAnswer aa " +
+              "LEFT JOIN FETCH aa.option " +
+              "LEFT JOIN FETCH aa.questionnaireQuestion qq " +
+              "LEFT JOIN FETCH qq.section " +
+              "LEFT JOIN FETCH aa.userStudent " +
+              "WHERE aa.assessment.id = :assessmentId " +
+              "AND aa.userStudent.userStudentId = :userStudentId")
+       List<AssessmentAnswer> findByAssessmentIdAndStudentIdForExport(
+              @Param("assessmentId") Long assessmentId,
+              @Param("userStudentId") Long userStudentId);
 
        // Find a previously mapped text response for the same question (for auto-mapping)
        Optional<AssessmentAnswer> findFirstByQuestionnaireQuestion_QuestionnaireQuestionIdAndTextResponseAndMappedOptionIsNotNull(

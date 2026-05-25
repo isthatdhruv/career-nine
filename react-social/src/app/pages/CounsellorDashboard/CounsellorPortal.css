@@ -1,0 +1,306 @@
+/* ── Counsellor Portal ── */
+
+.cp-loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #F5F7FA;
+  z-index: 1000;
+}
+
+.cp-loading img { height: 40px; margin-bottom: 20px; }
+.cp-loading-text { color: #6B7A8D; font-size: 14px; }
+
+/* ── Welcome ── */
+.cp-welcome {
+  margin-bottom: 20px;
+}
+
+.cp-welcome-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #263B6A;
+  margin: 0;
+}
+
+.cp-welcome-sub {
+  font-size: 13px;
+  color: #6B7A8D;
+  margin: 4px 0 0;
+}
+
+/* ── Main Layout ── */
+.cp-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+/* ── Student List Panel ── */
+.cp-student-list {
+  background: #fff;
+  border: 1px solid #DDE3EC;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  max-height: 500px;
+}
+
+.cp-student-list-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid #DDE3EC;
+  flex-shrink: 0;
+}
+
+.cp-student-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #DDE3EC;
+  border-radius: 8px;
+  font-size: 12px;
+  outline: none;
+  color: #1A1F2E;
+}
+
+.cp-student-search:focus { border-color: #6984A9; }
+
+.cp-filter-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.cp-filter-tab {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+}
+
+.cp-filter-all { background: #263B6A; color: #fff; }
+.cp-filter-high { background: #D1FAE5; color: #065F46; }
+.cp-filter-mod { background: #FEF3C7; color: #92400E; }
+.cp-filter-low { background: #FEE2E2; color: #991B1B; }
+
+.cp-student-items {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.cp-student-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #DDE3EC;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.15s;
+}
+
+.cp-student-item:hover { background: rgba(105, 132, 169, 0.08); }
+.cp-student-item.active { background: rgba(105, 132, 169, 0.12); border-left: 3px solid #263B6A; }
+.cp-student-item:last-child { border-bottom: none; }
+
+.cp-student-name { font-size: 13px; font-weight: 500; color: #1A1F2E; }
+.cp-student-class { font-size: 11px; color: #6B7A8D; }
+
+/* ── Detail Area ── */
+.cp-detail {
+  min-height: 300px;
+}
+
+.cp-empty-state {
+  background: #fff;
+  border: 1px solid #DDE3EC;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  color: #6B7A8D;
+  gap: 12px;
+  font-size: 14px;
+}
+
+/* ── Student Profile Card ── */
+.cp-profile-card {
+  background: #fff;
+  border: 1px solid #DDE3EC;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 20px;
+}
+
+.cp-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #DDE3EC;
+}
+
+.cp-profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(105, 132, 169, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #263B6A;
+  flex-shrink: 0;
+}
+
+.cp-profile-name { font-size: 16px; font-weight: 600; color: #263B6A; }
+.cp-profile-meta { font-size: 12px; color: #6B7A8D; margin-top: 2px; }
+
+.cp-profile-cci {
+  margin-left: auto;
+  text-align: right;
+}
+
+.cp-profile-cci-label { font-size: 10px; color: #6B7A8D; text-transform: uppercase; letter-spacing: 0.5px; }
+.cp-profile-cci-value { font-size: 16px; font-weight: 700; }
+.cp-cci-high { color: #059669; }
+.cp-cci-medium { color: #D97706; }
+.cp-cci-low { color: #DC2626; }
+
+.cp-profile-scores {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cp-score-item {
+  background: #F8F9FC;
+  border: 1px solid #DDE3EC;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.cp-score-label { font-size: 10px; font-weight: 700; color: #6B7A8D; text-transform: uppercase; letter-spacing: 0.4px; }
+.cp-score-value { font-size: 20px; font-weight: 700; color: #263B6A; margin-top: 4px; }
+
+.cp-profile-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cp-action-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #DDE3EC;
+  background: #fff;
+  color: #263B6A;
+  transition: all 0.15s;
+}
+
+.cp-action-btn:hover { background: rgba(105, 132, 169, 0.08); border-color: #6984A9; }
+.cp-action-btn-primary { background: #263B6A; color: #fff; border-color: #263B6A; }
+.cp-action-btn-primary:hover { background: #1C2D52; }
+
+/* ── Bottom Grid ── */
+.cp-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.cp-card {
+  background: #fff;
+  border: 1px solid #DDE3EC;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 18px;
+}
+
+.cp-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6B7A8D;
+  margin-bottom: 14px;
+}
+
+/* ── Appointments ── */
+.cp-appt-item {
+  background: #F8F9FC;
+  border: 1px solid #DDE3EC;
+  border-left: 3px solid #6984A9;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.cp-appt-time { font-weight: 600; color: #263B6A; }
+.cp-appt-student { color: #1A1F2E; margin-top: 2px; }
+.cp-appt-type { font-size: 10px; color: #6B7A8D; }
+
+/* ── Notes ── */
+.cp-note-item {
+  background: #F8F9FC;
+  border: 1px solid #DDE3EC;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.cp-note-meta {
+  font-size: 10px;
+  color: #6B7A8D;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.cp-note-text { color: #1A1F2E; line-height: 1.5; }
+
+/* ── Messages ── */
+.cp-msg-item {
+  background: #F8F9FC;
+  border: 1px solid #DDE3EC;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.cp-msg-from {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #263B6A;
+  margin-bottom: 4px;
+}
+
+.cp-msg-body { font-size: 12px; color: #1A1F2E; line-height: 1.5; }
+.cp-msg-time { font-size: 10px; color: #6B7A8D; margin-top: 4px; }
+
+/* ── Responsive ── */
+@media (max-width: 992px) {
+  .cp-layout { grid-template-columns: 1fr; }
+  .cp-grid-3 { grid-template-columns: 1fr; }
+}

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,6 +22,7 @@ public class DataController {
     @Autowired
     private StudentRepository studentRepository;
 
+    @PreAuthorize("@auth.allows('data.read')")
     @GetMapping(value = "db/get", headers = "Accept=application/json")
     public void main(String[] args) throws SQLException, ClassNotFoundException {
         // TODO Auto-generated method stub

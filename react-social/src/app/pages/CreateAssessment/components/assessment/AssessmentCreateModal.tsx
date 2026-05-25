@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Field, Form, Formik } from 'formik';
 import { useEffect, useState, useRef } from 'react';
+import { showErrorToast } from '../../../../utils/toast';
 import * as Yup from 'yup';
 import { Modal, Button } from 'react-bootstrap';
 import { ReadCollegeData } from '../../../College/API/College_APIs';
@@ -30,6 +31,7 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
         collegeId: '',
         schoolContactIds: [] as string[],
         career9ContactIds: [] as string[],
+        collectEmailAndPhone: true,
     };
 
     const [college, setCollege] = useState<any[]>([]);
@@ -42,9 +44,7 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
         const fetchCollege = async () => {
             setCollegeLoading(true);
             try {
-                console.log('Fetching colleges...'); // Debug log
                 const response = await ReadCollegeData();
-                console.log('College response:', response); // Debug log
                 
                 // Handle different response structures
                 if (response?.data) {
@@ -52,7 +52,6 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                 } else if (Array.isArray(response)) {
                     setCollege(response);
                 } else {
-                    console.warn('Unexpected college response format:', response);
                     setCollege([]);
                 }
             } catch (error) {
@@ -72,7 +71,6 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
         if (prevShowCollegeModalRef.current && !showCollegeModal && show) {
             (async () => {
                 try {
-                    console.log('Re-fetching colleges after create...'); // Debug log
                     const response = await ReadCollegeData();
                     if (response?.data) {
                         setCollege(response.data);
@@ -107,9 +105,8 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                             collegeId: values.collegeId,
                             schoolContactIds: values.schoolContactIds,
                             career9ContactIds: values.career9ContactIds,
+                            collectEmailAndPhone: values.collectEmailAndPhone,
                         };
-                        
-                        console.log('Submitting assessment payload:', payload); // Debug log
                         
                         // Store data for next step
                         localStorage.setItem('assessmentStep2', JSON.stringify(payload));
@@ -118,7 +115,7 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                     } catch (error) {
                         console.error('Error submitting assessment:', error);
                         // Instead of redirecting to error page, you might want to show a toast/alert
-                        alert('Error creating assessment. Please try again.');
+                        showErrorToast('Error creating assessment. Please try again.');
                     } finally {
                         setLoading(false);
                     }
@@ -228,6 +225,22 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                                             Offline
                                         </label>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Collect Email & Phone */}
+                            <div className="fv-row mb-7">
+                                <div className="form-check form-switch">
+                                    <input
+                                        className="form-check-input"
+                                        type="checkbox"
+                                        id="collectEmailAndPhone"
+                                        checked={values.collectEmailAndPhone}
+                                        onChange={() => setFieldValue('collectEmailAndPhone', !values.collectEmailAndPhone)}
+                                    />
+                                    <label className="form-check-label fs-6 fw-bold" htmlFor="collectEmailAndPhone">
+                                        Collect Email & Phone
+                                    </label>
                                 </div>
                             </div>
 

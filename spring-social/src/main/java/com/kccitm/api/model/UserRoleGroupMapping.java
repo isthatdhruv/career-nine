@@ -35,6 +35,24 @@ public class UserRoleGroupMapping implements Serializable {
     // private User user;
     private Long user;
 
+    /**
+     * Read-only navigation handle for the user (Phase 14 — bug B3 partial fix).
+     * Maps to the SAME {@code user_id} column as the {@link #user} Long above via
+     * {@code insertable=false, updatable=false}, so it does not collide with
+     * the existing write path. Existing callsites that use
+     * {@code getUser()}/{@code setUser(Long)} are unaffected.
+     *
+     * <p>The previous {@code @OneToMany(mappedBy = "user")} on
+     * {@link User#userRoleGroupMappings} was JPA-spec non-compliant but tolerated
+     * by Hibernate 5.x; pointing {@code mappedBy} at this real {@code @ManyToOne}
+     * field makes the bidirectional mapping spec-correct. Phase 15 will use this
+     * field for {@code AuthorizationService} traversal.
+     */
+    @ManyToOne(fetch = javax.persistence.FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private User userRef;
+
     // bi-directional many-to-one association to RoleGroup
     @ManyToOne
     @JoinColumn(name = "role_group_id")
@@ -95,6 +113,11 @@ public class UserRoleGroupMapping implements Serializable {
 
     public void setUser(Long user) {
         this.user = user;
+    }
+
+    /** @see #userRef */
+    public User getUserRef() {
+        return this.userRef;
     }
 
     public RoleGroup getRoleGroup() {

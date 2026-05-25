@@ -18,7 +18,7 @@ Career-Nine is a full-stack educational platform for student assessment, career 
 ```
 React SPA (port 3000)
     ↓ HTTP/REST
-Spring Boot API (port 8091 dev, 8080 docker)
+Spring Boot API (port 8080)
     ↓ JDBC
 MySQL Database (port 3306)
 ```
@@ -83,9 +83,11 @@ mvn clean package -DskipTests
 ```
 
 **Configuration:**
-- Dev profile: `application.yml` (spring.profiles: dev)
-- Database: `kareer-9` database on localhost:3306
-- Server port: 8091
+- Single `application.yml` holds all profiles as separate YAML documents; `spring.profiles.active: dev` is the default. There are no more `application-{dev,sandbox,production}.yml` files.
+- Each profile auto-loads its own root `.env` file via profile-scoped `spring.config.import`: `dev`→`.env.dev`, `sandbox`→`.env.staging`, `production`→`.env.production`. Copy the matching `.env.*.example` template to create one.
+- Dev has **no secret fallbacks**: `mvn spring-boot:run` fails unless `.env.dev` (or matching shell/Docker env) supplies `SPRING_DATASOURCE_PASSWORD` and the three OAuth client secrets.
+- Database: `career-9` on localhost:3306 (docker `mysql_db_api` container exposed on the host)
+- Server port: 8080
 - Default credentials: root/Career-qCsfeuECc3MW
 
 ### Frontend (React)
@@ -149,17 +151,20 @@ docker-compose up -d --build
 
 ## Database Configuration
 
-**Database Name:** `kareer-9` (dev) / `career-9` (docker/staging)
+**Database Names:**
+- `career-9` — dev and production
+- `career-9-staging` — sandbox
 
 **Connection Details:**
-- Dev: `jdbc:mysql://localhost:3306/kareer-9`
-- Docker: `jdbc:mysql://mysql_db_api:3306/career-9`
+- Dev: `jdbc:mysql://localhost:3306/career-9` (connects to the docker `mysql_db_api` container via host port 3306)
+- Production (docker): `jdbc:mysql://mysql_db_api:3306/career-9`
+- Sandbox (docker): `jdbc:mysql://mysql_db_staging:3306/career-9-staging`
 - User: `root`
-- Password: `Career-qCsfeuECc3MW`
+- Password: all profiles read `${SPRING_DATASOURCE_PASSWORD}` from their per-profile `.env` file (`.env.dev` / `.env.staging` / `.env.production`)
 
-**Hibernate DDL:** `update` (auto-creates/updates tables)
+**Hibernate DDL:** `update` for dev/sandbox; `validate` for production
 
-**Note:** The database names are inconsistent (`kareer-9` vs `career-9`). Dev profile uses `kareer-9` while Docker/staging uses `career-9`.
+**Profile config layout:** a single `application.yml` holds shared structure (document 1) plus one `spring.config.activate.on-profile` document per profile (`dev`, `sandbox`, `production`). Each profile document declares its own `spring.config.import` for the matching root `.env` file — `dev`→`.env.dev`, `sandbox`→`.env.staging`, `production`→`.env.production` — covering both CWDs (`./` repo root and `../` from `spring-social/`). The imports are `optional:` so the non-matching CWD path is skipped; fail-fast comes from unresolved `${...}` placeholders, not a missing file. In Docker the same secrets arrive via `env_file:` on each service. Each `.env.*` is gitignored; commit only the `.env.*.example` templates.
 
 ## API Patterns
 
@@ -441,7 +446,7 @@ Feature/
 ```typescript
 import axios from 'axios';
 
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091';
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 export function getAllEntities() {
   return axios.get(`${BASE_URL}/entity-name/getAll`);
@@ -571,7 +576,7 @@ export function getEntityById(id: number) {
 ### Backend Won't Start
 
 - Verify MySQL is running on port 3306
-- Check database exists: `kareer-9` (dev) or `career-9` (docker)
+- Check database exists: `career-9` (dev/production) or `career-9-staging` (sandbox)
 - Verify credentials: root/Career-qCsfeuECc3MW
 - Check `google.json` exists in classpath
 - Verify Java 11 is installed: `java -version`
@@ -597,9 +602,9 @@ export function getEntityById(id: number) {
 
 ## Important Notes
 
-- **Never commit `application.yml` with real credentials** - Use environment variables or profile-specific configs
-- **Database naming inconsistency:** Dev uses `kareer-9`, Docker/staging uses `career-9`
-- **Port mismatch:** Dev runs on 8091, Docker runs on 8080
+- **Never commit real credentials** — `application.yml` uses `${VAR}` placeholders only; secrets live in the gitignored per-profile `.env.dev` / `.env.staging` / `.env.production` at the repo root (commit only the `.env.*.example` templates)
+- **Database names:** `career-9` for dev/production; `career-9-staging` for sandbox
+- **Server port:** 8080 everywhere (dev, production docker, sandbox docker)
 - **Google credentials required:** Backend won't fully start without `google.json` and Firebase config
-- **Profile matters:** Always specify correct Spring profile (dev/staging/production)
+- **Profile matters:** Always specify correct Spring profile (`dev` is the default; docker `api` runs `production`, `api-staging` runs `sandbox`)
 - **TypeScript compilation:** Do NOT run `npm run build`, `tsc`, or test TypeScript compilation unless explicitly asked by the user

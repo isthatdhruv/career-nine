@@ -1,8 +1,10 @@
 package com.kccitm.api.repository;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.kccitm.api.model.career9.school.InstituteDetail;
@@ -21,6 +23,9 @@ public interface InstituteDetailRepository extends JpaRepository<InstituteDetail
     public InstituteDetail getOne(int id);
 
     public InstituteDetail findById(int id);
+
+    @Query("SELECT new map(i.instituteCode as instituteCode, i.instituteName as instituteName) FROM InstituteDetail i WHERE i.display = true")
+    public List<Map<String, Object>> findAllIdAndName();
 
     // @Query(value = "SELECT * FROM InstituteDetail i WHERE i.display = true",
     // nativeQuery = true)

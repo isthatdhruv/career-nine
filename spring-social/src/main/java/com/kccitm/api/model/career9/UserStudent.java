@@ -12,9 +12,19 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import org.hibernate.annotations.Filter;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 
+/**
+ * Phase 15-06 — ABAC row-level filter (scopeFilter). The user_student table
+ * has only an {@code institute_id} column (FK to institute_detail.institute_code);
+ * the session/course/section dimensions of the scopeFilter degenerate to no-op
+ * on this entity because those columns don't exist on user_student.
+ */
+@Filter(name = "scopeFilter", condition =
+        "(institute_id IN (:instituteIds) OR institute_id IS NULL)")
 @Entity
 @Table(name = "user_student")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
@@ -28,9 +38,9 @@ public class UserStudent implements Serializable {
     @Column(name = "user_student_id")
     private Long userStudentId;
 
-    // Institute Id
+    // Institute Id (null for B2C campaign students — they don't belong to an institute)
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "institute_id", referencedColumnName = "institute_code", nullable = false)
+    @JoinColumn(name = "institute_id", referencedColumnName = "institute_code", nullable = true)
     private InstituteDetail institute;
 
     // Student Detail Id
@@ -41,6 +51,15 @@ public class UserStudent implements Serializable {
     // User ID
     @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    @Column(name = "info_completed", nullable = false, columnDefinition = "boolean default false")
+    private Boolean infoCompleted = false;
+
+    @Column(name = "counselling_allowed", columnDefinition = "boolean default false")
+    private Boolean counsellingAllowed = false;
+
+    @Column(name = "reports_visible", columnDefinition = "boolean default false")
+    private Boolean reportsVisible = false;
 
     public UserStudent(com.kccitm.api.model.User user, StudentInfo studentInfo2, InstituteDetail institue_id) {
         // TODO Auto-generated constructor stub
@@ -89,4 +108,18 @@ public class UserStudent implements Serializable {
     public void setUserId(Long userId) {
         this.userId = userId;
     }
+
+    public Boolean getInfoCompleted() {
+        return infoCompleted;
+    }
+
+    public void setInfoCompleted(Boolean infoCompleted) {
+        this.infoCompleted = infoCompleted;
+    }
+
+    public Boolean getCounsellingAllowed() { return counsellingAllowed; }
+    public void setCounsellingAllowed(Boolean counsellingAllowed) { this.counsellingAllowed = counsellingAllowed; }
+
+    public Boolean getReportsVisible() { return reportsVisible; }
+    public void setReportsVisible(Boolean reportsVisible) { this.reportsVisible = reportsVisible; }
 }

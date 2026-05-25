@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 // Asset Paths
-const SCENE_SRC = "/game-scenes/2nd/game-scene-2nd.png";
-const RABBIT_FORWARD_SRC = "/game-scenes/2nd/rabbit-nobg-old.png";
-const RABBIT_REVERSE_SRC = "/game-scenes/2nd/rabbit-nobg.png";
+const SCENE_SRC = "/game-scenes/2nd/game-scene-2nd.webp";
+const RABBIT_FORWARD_SRC = "/game-scenes/2nd/rabbit-nobg-old.webp";
+const RABBIT_REVERSE_SRC = "/game-scenes/2nd/rabbit-nobg.webp";
 
 // How to play video path - place video at: public/assets/game/rabbit-path-tutorial.mp4
 const HOW_TO_PLAY_VIDEO_PATH = "/assets/game/rabbit-path-tutorial.mp4";
@@ -189,25 +189,33 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
   // Preload images
   useEffect(() => {
+    let cancelled = false;
     const imageUrls = [SCENE_SRC, RABBIT_FORWARD_SRC, RABBIT_REVERSE_SRC];
     let loadedCount = 0;
+    const images: HTMLImageElement[] = [];
 
     imageUrls.forEach(src => {
       const img = new Image();
+      images.push(img);
       img.onload = () => {
         loadedCount++;
-        if (loadedCount === imageUrls.length) {
+        if (!cancelled && loadedCount === imageUrls.length) {
           setImagesLoaded(true);
         }
       };
       img.onerror = () => {
         loadedCount++;
-        if (loadedCount === imageUrls.length) {
+        if (!cancelled && loadedCount === imageUrls.length) {
           setImagesLoaded(true);
         }
       };
       img.src = src;
     });
+
+    return () => {
+      cancelled = true;
+      images.forEach(img => { img.src = ''; });
+    };
   }, []);
 
   const clearTimers = useCallback(() => {
@@ -272,7 +280,13 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     }
   }, [isTrial, trialRound, round]);
 
+  const scoredThisRoundRef = useRef(false);
+
   const evaluateAndAdvance = useCallback((input: number[], seq: number[]) => {
+    // Prevent double-scoring if both finishInputAndScore and finishAfterBuffer fire
+    if (scoredThisRoundRef.current) return;
+    scoredThisRoundRef.current = true;
+
     const reversedSeq = [...seq].reverse();
     const correct = input.length === reversedSeq.length && input.every((v, i) => v === reversedSeq[i]);
     // Don't show feedback overlay anymore
@@ -345,6 +359,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
   const retryWithSameSequence = useCallback(() => {
     clearTimers();
+    scoredThisRoundRef.current = false;
     setLastResult(null);
     setPlayerInput([]);
     inputRef.current = [];
@@ -389,6 +404,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
   const startRound = useCallback((nextRoundIndex: number) => {
     clearTimers();
+    scoredThisRoundRef.current = false;
     setLastResult(null);
     setPlayerInput([]);
     inputRef.current = [];
@@ -650,6 +666,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   if (showHowToPlayVideo) {
     return (
       <div
+        className="game-screen"
         style={{
           minHeight: '100vh',
           width: '100%',
@@ -664,6 +681,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
         }}
       >
         <div
+          className="game-video-card"
           style={{
             background: 'linear-gradient(135deg, rgba(30, 58, 95, 0.9), rgba(15, 31, 51, 0.95))',
             borderRadius: '24px',
@@ -756,7 +774,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   }
 
   return (
-    <div style={{
+    <div className="game-screen" style={{
       minHeight: '100vh',
       width: '100%',
       display: 'flex',
@@ -800,7 +818,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       )}
 
       {/* Player Info - Top Left */}
-      <div style={{
+      <div className="game-top-left" style={{
         position: 'absolute',
         top: '20px',
         left: '16px',
@@ -822,7 +840,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       </div>
 
       {/* Status - Top Center */}
-      <div style={{
+      <div className="game-top-center" style={{
         position: 'absolute',
         top: '20px',
         left: '50%',
@@ -851,7 +869,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       </div>
 
       {/* Controls - Top Right */}
-      <div style={{
+      <div className="game-top-right" style={{
         position: 'absolute',
         top: '20px',
         right: '16px',
@@ -889,6 +907,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
             boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
           }}
           title="Exit"
+          aria-label="Exit game"
         >
           ✕
         </button>
@@ -896,7 +915,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
       {/* Phase & Timer Info */}
       {(phase === "show" || phase === "input") && (
-        <div style={{
+        <div className="game-phase-bar" style={{
           position: 'absolute',
           bottom: '20px',
           left: '50%',
@@ -936,7 +955,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
         }}
       >
         {/* Game Frame */}
-        <div style={{
+        <div className="game-frame" style={{
           position: 'relative',
           background: 'linear-gradient(135deg, #1e3a5f 0%, #0f1f33 50%, #1a2d47 100%)',
           padding: '12px',
@@ -945,7 +964,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
           border: '4px solid #3b82f6',
         }}>
           {/* Inner Frame */}
-          <div style={{
+          <div className="game-frame-inner" style={{
             background: 'linear-gradient(135deg, #0f1f33, #071520)',
             padding: '6px',
             borderRadius: '14px',

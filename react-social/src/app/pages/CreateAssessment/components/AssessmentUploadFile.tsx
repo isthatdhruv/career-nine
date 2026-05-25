@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { showErrorToast } from '../../../utils/toast';
 import { Button, Modal } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
@@ -27,7 +28,7 @@ export default function AssessmentUploadFile() {
     const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
 
     if (!allowedExtensions.includes(fileExtension)) {
-      alert("❌ Only Excel files (.xlsx, .xls) are allowed!");
+      showErrorToast("Only Excel files (.xlsx, .xls) are allowed!");
       event.target.value = "";
       return;
     }
@@ -52,7 +53,7 @@ export default function AssessmentUploadFile() {
   // Navigate to the next step
   const handleNext = () => {
     if (!fileName) {
-      alert("❌ Please upload an Excel file before proceeding.");
+      showErrorToast("Please upload an Excel file before proceeding.");
       // return;
     }
     const payload = { fileName, tableData };

@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,109 +25,76 @@ public class PrincipalDashboardController {
     /**
      * Get complete dashboard data for principal
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/data/{principalId}")
     public ResponseEntity<Map<String, Object>> getDashboardData(
             @PathVariable Long principalId,
             @RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> dashboardData = new HashMap<>();
+        Map<String, Object> dashboardData = new HashMap<>();
 
-            // Fetch all dashboard sections
-            dashboardData.put("overview", principalDashboardService.getInstituteOverview());
-            dashboardData.put("assessmentPerformance", principalDashboardService.getAssessmentPerformance(assessmentId));
-            dashboardData.put("classwisePerformance", principalDashboardService.getClasswisePerformance());
-            dashboardData.put("teacherActivity", principalDashboardService.getTeacherActivity());
-            dashboardData.put("enrollmentTrends", principalDashboardService.getEnrollmentTrends());
+        // Fetch all dashboard sections
+        dashboardData.put("overview", principalDashboardService.getInstituteOverview());
+        dashboardData.put("assessmentPerformance", principalDashboardService.getAssessmentPerformance(assessmentId));
+        dashboardData.put("classwisePerformance", principalDashboardService.getClasswisePerformance());
+        dashboardData.put("teacherActivity", principalDashboardService.getTeacherActivity());
+        dashboardData.put("enrollmentTrends", principalDashboardService.getEnrollmentTrends());
 
-            return ResponseEntity.ok(dashboardData);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Failed to fetch dashboard data: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(dashboardData);
     }
 
     /**
      * Get institute overview only
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/overview/{principalId}")
     public ResponseEntity<Map<String, Object>> getOverview(@PathVariable Long principalId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getInstituteOverview());
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getInstituteOverview());
     }
 
     /**
      * Get assessment performance
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/assessment-performance/{principalId}")
     public ResponseEntity<Map<String, Object>> getAssessmentPerformance(
             @PathVariable Long principalId,
             @RequestParam(required = false) Long assessmentId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getAssessmentPerformance(assessmentId));
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getAssessmentPerformance(assessmentId));
     }
 
     /**
      * Get classwise performance
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/classwise-performance/{principalId}")
     public ResponseEntity<Map<String, Object>> getClasswisePerformance(@PathVariable Long principalId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getClasswisePerformance());
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getClasswisePerformance());
     }
 
     /**
      * Get teacher activity
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/teacher-activity/{principalId}")
     public ResponseEntity<Map<String, Object>> getTeacherActivity(@PathVariable Long principalId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getTeacherActivity());
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getTeacherActivity());
     }
 
     /**
      * Get enrollment trends
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/enrollment-trends/{principalId}")
     public ResponseEntity<Map<String, Object>> getEnrollmentTrends(@PathVariable Long principalId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getEnrollmentTrends());
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getEnrollmentTrends());
     }
 
     /**
      * Get all assessments for dropdown
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/assessments")
     public ResponseEntity<List<Map<String, Object>>> getAllAssessments() {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getAllAssessments());
-        } catch (Exception e) {
-            return ResponseEntity.status(500).build();
-        }
+        return ResponseEntity.ok(principalDashboardService.getAllAssessments());
     }
 }

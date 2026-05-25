@@ -1,232 +1,185 @@
 # External Integrations
 
-**Analysis Date:** 2026-02-06
+**Analysis Date:** 2026-03-06
 
-## APIs & External Services
+## Authentication & OAuth2
 
-**Authentication & OAuth2:**
-- Google OAuth2 - Multi-provider OAuth2 authentication
-  - SDK/Client: Spring Security OAuth2 Client (backend), Firebase SDK (frontend)
-  - Scope: `email`, `profile`, `https://www.googleapis.com/auth/admin.directory.user`, `https://www.googleapis.com/auth/admin.directory.group`, `https://www.googleapis.com/auth/admin.directory.orgunit`
-  - Dev Client ID: `101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com`
-  - Production Client ID: `701038408648-gnmlifdksik4mqu2as5vpgpe64l8m55b.apps.googleusercontent.com`
-  - Redirect URI: Environment-specific (see `spring-social/src/main/resources/application.yml`)
+### OAuth2 Providers
 
-- GitHub OAuth2 - Alternative authentication provider
-  - Client ID: `d3e47fc2ddd966fa4352`
-  - Scope: `user:email`, `read:user`
+**Google OAuth2:**
+- Dev/Staging Client ID: `101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com`
+- Production Client ID: `701038408648-gnmlifdksik4mqu2as5vpgpe64l8m55b.apps.googleusercontent.com`
+- Scopes: email, profile, admin.directory.user, admin.directory.group, admin.directory.orgunit
 
-- Facebook OAuth2 - Alternative authentication provider
-  - Client ID: `121189305185277`
-  - Scope: `email`, `public_profile`
-  - Custom endpoints: Facebook v3.0 API
+**Facebook OAuth2:**
+- Client ID: `121189305185277`
+- Scopes: email, public_profile
+- API Version: v3.0
 
-**Text Translation:**
-- OpenAI ChatGPT - Multi-language question and option translation
-  - SDK/Client: `openai` npm package (v5.22.0 frontend, v5.22.1 translator)
-  - Model: `gpt-3.5-turbo`
-  - Endpoint: `https://api.openai.com/v1/chat/completions`
-  - Auth: Environment variable `OPENAI_API_KEY` (in translator service `.env`)
-  - Usage: Translation of assessment questions and options via `translator-service/index.js`
-  - Translator endpoints:
-    - `POST /translate/question` - Translate single question
-    - `POST /translate/option` - Translate single option
-    - `POST /translate/all` - Translate question + options batch
-  - Frontend integration: Through translator microservice at `TRANSLATE_APP_API_URL`
+**GitHub OAuth2:**
+- Client ID: `d3e47fc2ddd966fa4352`
+- Scopes: user:email, read:user
 
-**External Compilers/Judges:**
-- Judge0 Code Compiler - Code execution and compilation
-  - API URL: `REACT_APP_COMPLIER` environment variable
-  - Dev: `http://35.196.122.199`
-  - Staging: `https://judge0.api.kccitm.in`
-  - Purpose: Code testing and evaluation within assessment system
+### JWT Token Management
+- Expiration: 864,000,000 ms (10 days)
+- Header: `Authorization: Bearer <token>`
 
-**LeetCode:**
-- LeetCode Platform - External coding platform integration (frontend)
-  - CORS configured for: `https://leetcode.com`
-  - Purpose: Linked problem references or embedded content
+### Authorized Redirect URIs (all profiles)
+- `https://student.kccitm.in/oauth2/redirect`
+- `https://staging.student.kccitm.in/oauth2/redirect`
+- `http://localhost:3000/oauth2/redirect`
+- `myandroidapp://oauth2/redirect` (mobile)
+- `myiosapp://oauth2/redirect` (mobile)
 
-## Data Storage
+## Google Cloud Platform
 
-**Databases:**
-- MySQL 5.7+ (primary database)
-  - Dev Connection: `jdbc:mysql://localhost:3306/kareer-9` (database: `kareer-9`)
-  - Docker/Staging Connection: `jdbc:mysql://mysql_db_api:3306/career-9` (database: `career-9`)
-  - Production Connection: `jdbc:mysql://easylearning.guru:3310/kcc_student` (database: `kcc_student`)
-  - Credentials: root / `Career-qCsfeuECc3MW`
-  - Client: Hibernate ORM with Spring Data JPA
-  - DDL Strategy: `hibernate.ddl-auto: update` (auto-creates/updates schema)
-  - Dialect: MySQL5InnoDBDialect
+### Google Cloud Storage
+- **Service:** `GoogleCloudAPI` interface
+- **Credentials:** `classpath:google.json` (service account)
+- **Capabilities:**
+  - File upload (direct + byte array)
+  - File retrieval and deletion
+  - Public URL generation
+- **Usage:** Student ID card PDFs, faculty documents, Excel exports
 
-- Firebase Firestore (frontend)
-  - Project ID: `career-9-assessment` (frontend) / `career-library` (backend)
-  - Service: `getFirestore(app)` in `react-social/src/app/firebase.ts`
-  - Purpose: Real-time data synchronization and client-side caching
+### Google Admin Directory API
+- **Service:** `GoogleDirectoryService`
+- **Version:** directory_v1-rev20211221-1.32.1
+- **Capabilities:** User management, group management, org unit operations in Google Workspace
 
-**File Storage:**
-- Google Cloud Storage (GCS)
-  - Client: `com.google.cloud:google-cloud-storage`
-  - Auth: Service account via `google.json` (classpath resource)
-  - Configuration: `app.googleAPIJSON: classpath:google.json`
-  - Usage: File uploads for student documents, assessment attachments
-  - Backend service: `UtilController` at `spring-social/src/main/java/com/kccitm/api/controller/UtilController.java`
+### Google Gmail API
+- **Service:** `GmailApiEmailServiceImpl`
+- **Version:** v1-rev20220404-2.0.0
+- **Sender:** notifications@career-9.net
+- **Capabilities:** Send emails via service account, template-based sending
 
-**Caching:**
-- No explicit caching framework detected (Redis/Memcached not in dependencies)
-- HTTP caching via response headers may be used
+## Firebase
 
-## Authentication & Identity
+- **Project ID:** career-9-assessment
+- **Backend SDK:** Firebase Admin 9.2.0
+- **Frontend SDK:** Firebase 12.8.0
+- **Service Account:** `classpath:firebase-service-account.json`
+- **Backend Service:** `FirebaseService`
+  - Firestore CRUD operations
+  - Query operations (==, >, >=, <, <=, !=)
+  - Batch document operations
+  - Enabled via `app.firebase.enabled` (default: true)
+- **Frontend Usage:** Real-time assessment data synchronization (Firestore)
 
-**Auth Provider:**
-- OAuth2 (multi-provider)
-  - Google, GitHub, Facebook supported
-  - Flow: Redirect → Provider Consent → Token Exchange → JWT Generation
+## Email Services
 
-- Custom JWT-based Authentication
-  - Library: JJWT (Java JWT)
-  - Token Secret: `04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1`
-  - Expiration: 864000000ms (10 days)
-  - Header: `Authorization: Bearer <token>`
-  - Storage: Frontend stores token in secure location (likely localStorage or cookie)
+### Mandrill (Transactional Email)
+- **Libraries:** mandrillClient 1.1, Lutung 0.0.8
+- **Service:** `EmailService`
+- **Capabilities:**
+  - HTML email with templates
+  - Merge variables support
+  - Attachment handling
+  - Click & open tracking
+  - Multiple recipients (To, CC)
 
-**Google Workspace Integration:**
-- Google Admin Directory API - User and group management
-  - Service: `GoogleAPIAdminImpl` at `spring-social/src/main/java/com/kccitm/api/service/GoogleAPIAdminImpl.java`
-  - Capabilities:
-    - Create/read/update/delete users
-    - Create/read/update/delete groups
-    - Manage organizational units
-    - Manage group members
-  - Usage: Student email generation (kccitm.edu.in domain), group assignments
-  - Implementation: `GoogleAdminController` at `spring-social/src/main/java/com/kccitm/api/controller/GoogleAdminController.java`
+### Gmail SMTP
+- **Host:** smtp.gmail.com
+- **Port:** 587 (STARTTLS)
+- **Username:** `${SMTP_USERNAME:notifications@career-9.net}`
+- **Services:** `SmtpEmailService`, `SmtpEmailServiceImpl`
+- **Capabilities:** Simple text, HTML, and attachment emails
+- **Timeouts:** 5s (dev), 10s (staging/production)
 
-**Email Validation:**
-- Official KCCITM Email Validation (kccitm.edu.in)
-  - Endpoints:
-    - `GET /email-validation-official` - Validate email format
-    - `GET /email-validation-official-confermation` - OTP verification
-  - Controller: `StudentController` at `spring-social/src/main/java/com/kccitm/api/controller/career9/StudentController.java`
+## CRM - Odoo Integration
 
-## Monitoring & Observability
+- **URL:** career-91.odoo.com
+- **Database:** career-91
+- **Service:** `OdooLeadService`
+- **Capabilities:**
+  - Lead synchronization from Career-Nine to Odoo
+  - Lead status tracking (OdooSyncStatus: PENDING, SYNCED, FAILED)
+- **Integration Point:** `LeadController`
+- **Staging:** Uses environment variables (`${ODOO_URL}`, `${ODOO_DATABASE}`, etc.)
 
-**Error Tracking:**
-- Not detected - No Sentry, Rollbar, or similar integration
+## Translation Service
 
-**Logs:**
-- Spring Boot built-in logging
-  - Dev profile: `show-sql: true` (SQL statement logging)
-  - Staging/Prod: `show-sql: false`
-  - Format: Standard Spring Boot log output to console/file
+- **Type:** Node.js microservice (Express.js)
+- **Port:** 5000
+- **AI Model:** OpenAI GPT-3.5-turbo
+- **Endpoints:**
+  - `POST /translate/question` - Translate assessment questions
+  - `POST /translate/option` - Translate answer options
+- **Language Focus:** Hindi translations (formal language)
+- **Frontend URL:** `TRANSLATE_APP_API_URL=http://localhost:5000/translate`
 
-**Metrics:**
-- Spring Boot Actuator (dependency present: `spring-boot-starter-actuator`)
-  - Endpoints available but not detailed in config (default: `/actuator`)
-  - Purpose: Health checks, metrics, environment info
+## Code Compiler
 
-## CI/CD & Deployment
+- **Dev:** http://35.196.122.199
+- **Staging:** https://judge0.api.kccitm.in
+- **Purpose:** Online code execution for coding assessments
+- **Frontend Variable:** `REACT_APP_COMPLIER`
 
-**Hosting:**
-- Development: Local Docker (docker-compose.yml orchestrates MySQL + Spring Boot)
-- Staging: Cloud-hosted (Docker containers on infrastructure)
-- Production: Remote MySQL server (easylearning.guru:3310) with Spring Boot API
+## PDF & Document Generation
 
-**Container Orchestration:**
-- Docker Compose (v3.3)
-  - Services: `mysql_db_api` (MySQL 5.7+), `api` (Spring Boot JAR)
-  - Network: `career_shared_net` (custom bridge network)
-  - Build context: `./spring-social/dockerfile` for API
-  - Frontend: Not containerized in compose (commented out)
+### HTML-to-PDF
+- **Service:** `PdfServiceImpl`
+- **Libraries:** iTextPDF 5.5.13, OpenHTMLToPDF 1.0.10, Flying Saucer 9.1.20
+- **Capabilities:** HTML-to-PDF conversion, student/faculty ID card generation
+- **Output:** Uploaded to Google Cloud Storage
 
-**CI Pipeline:**
-- Not detected - No GitHub Actions, Jenkins, GitLab CI config files found
+### QR Code Generation
+- **Library:** Google ZXing 3.3.0
+- **Format:** BarcodeFormat.QR_CODE
+- **Usage:** Embedded in student/faculty ID card PDFs
 
-**Build Artifacts:**
-- Backend: JAR file (`demo.jar`) produced by Maven, packaged in Docker image
-- Frontend: Static build output (webpack bundle) in `build/` directory (not containerized)
+### Excel Processing
+- **Library:** Apache POI 5.2.3
+- **Capabilities:** Assessment question export/import, bulk upload templates
+- **Format:** .xlsx
 
-## Environment Configuration
+## Assessment Proctoring
 
-**Required Environment Variables:**
+### MediaPipe (Computer Vision)
+- **Library:** @mediapipe/tasks-vision 0.10.22
+- **Capability:** Face mesh detection for student authentication/proctoring
+- **Public Path:** `/mediapipe/face_mesh/`
 
-Frontend (React):
-- `REACT_APP_API_URL` - Backend API base URL
-- `REACT_APP_URL` - Frontend application URL
-- `REACT_APP_COMPLIER` - Code compiler/judge service URL
-- `TRANSLATE_APP_API_URL` - Translator microservice endpoint
-- `NODE_ENV` - `development`, `staging`, or `production`
+### WebGazer (Eye Tracking)
+- **Library:** webgazer 3.4.0
+- **Capability:** Eye gaze tracking during assessments
 
-Backend (Spring Boot):
-- Spring profiles: `dev` (default), `staging`, `production`
-- Database credentials (in `application.yml` per profile)
-- `app.mandrill` - Mandrill API key for email
-- `app.auth.tokenSecret` - JWT signing secret
-- Google OAuth2 credentials (clientId, clientSecret, redirectUri)
-- Facebook OAuth2 credentials
-- GitHub OAuth2 credentials
+## CORS Configuration
 
-Translator Microservice (Node.js):
-- `OPENAI_API_KEY` - OpenAI API key for ChatGPT access
-- `PORT` - Server port (default: 5000)
-- `CORS_ORIGIN` - Allowed origin (default: `http://localhost:3000`)
+### Dev Profile
+- `http://localhost:5173` (Vite assessment app)
+- `http://localhost:3000` (React admin app)
+- `http://localhost:3001`
+- Various internal IPs (192.168.x.x)
+- `https://staging.student.kccitm.in/`
+- `https://student.kccitm.in/`
+- `https://erp.aktu.ac.in/`
+- `https://leetcode.com`
 
-**Secrets Location:**
-- `application.yml` (committed, contains dev credentials - **security risk**)
-- `.env` files in react-social (development only, not in production)
-- Environment variables for production deployments (passed to Docker containers)
-- `.env` in translator-service (not committed, contains OPENAI_API_KEY)
+### Staging Profile
+- `https://dashboard.career-9.com`
+- `https://assessment.career-9.com`
+- `https://*.career-9.com`
 
-**Security Notes:**
-- ⚠️ Dev credentials exposed in `application.yml` (Client IDs, secrets, DB passwords, JWT secret)
-- ⚠️ OAuth2 redirect URIs include multiple development IPs/domains in staging config
-- ⚠️ Mandrill API key visible in `application.yml`
-- Firebase credentials should be stored securely in backend `.env` or vault
+### Production Profile
+- `http://localhost:3000`, `http://localhost:8080`
+- `https://staging.student.kccitm.in/`
+- `https://student.kccitm.in/`
 
-## Webhooks & Callbacks
+## Database
 
-**Incoming:**
-- Not detected - No webhook endpoints for external services
+- **Engine:** MySQL 5.7+ (Docker: latest)
+- **Dev:** `jdbc:mysql://localhost:3307/career-9` (root/Career-qCsfeuECc3MW)
+- **Staging:** `jdbc:mysql://mysql_db_api:3306/career-9` (same credentials)
+- **Production:** `jdbc:mysql://easylearning.guru:3310/kcc_student` (root/qCsfeuECc3MW)
+- **ORM:** Hibernate with DDL auto-update
+- **Connection Pool:** HikariCP (30-50 max connections)
 
-**Outgoing:**
-- Assessment Result Delivery - Students receive assessment results via Mandrill email
-- Student Notifications - Automated emails for status updates (email generation, ID cards, etc.)
+## PWA Configuration (Assessment App)
 
-**Email Endpoints:**
-- EmailService implementation at `spring-social/src/main/java/com/kccitm/api/service/EmailService.java`
-- Mandrill integration for transactional emails
-- Student ID card PDF generation and email delivery
-- Official email notification for kccitm.edu.in accounts
-
-## Assessment System Integrations
-
-**Questionnaire-Based Assessment:**
-- Structured question banks linked via `AssessmentTable` and `Questionnaire` entities
-- Language support for internationalization
-- Scoring via `MeasuredQualityTypes` and `OptionScoreBasedOnMeasuredQualityTypes`
-
-**Excel Import/Export:**
-- Bulk question upload via Excel (XLSX format)
-- Endpoint: `POST /assessment-questions/import-excel`
-- Features: Parse Excel → Create questions with options and MQT scores
-- Export endpoint: `GET /assessment-questions/export-excel`
-- Library: Apache POI 5.2.3 (backend), XLSX 0.18.5 (frontend)
-
-**QR Code Generation:**
-- Student ID cards include QR codes
-- Library: Google Zxing (barcode/QR code)
-- Service: `StudentPdfService` at `spring-social/src/main/java/com/kccitm/api/service/StudentPdfService.java`
-
-## Session & Role Management
-
-**Role-Based Access Control:**
-- Role and RoleUser entities with permission hierarchy
-- Authentication flow validates roles before endpoint access
-- Frontend routing checks roles in `PrivateRoutes.tsx`
-
-**Session Management:**
-- JWT-based (stateless)
-- Token stored in frontend (client-side session)
-- No server-side session store (token validation per request)
-
----
-
-*Integration audit: 2026-02-06*
+- **Plugin:** vite-plugin-pwa
+- **Service Worker:** Auto-update with Workbox
+- **Caching:**
+  - Max cache size: 15MB
+  - Video runtime caching: 7-day TTL, max 10 entries
+  - Cached patterns: *.js, *.css, *.html, *.webp, *.png

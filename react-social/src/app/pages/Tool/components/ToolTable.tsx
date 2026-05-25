@@ -1,9 +1,10 @@
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { DeleteToolData } from "../API/Tool_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const ToolTable = (props: {
   data: any;
@@ -57,7 +58,7 @@ const ToolTable = (props: {
             }}
             className="btn btn-icon btn-primary btn-sm me-3"
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
           <button
             onClick={async () => { 
@@ -67,7 +68,7 @@ const ToolTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete tool. Please try again.");
+                showErrorToast("Failed to delete tool. Please try again.");
               } finally {
                 props.setLoading(false);
               }

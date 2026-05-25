@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 
 export default function LoginChangePassword(): JSX.Element {
   const [newPassword, setNewPassword] = useState("");
@@ -9,15 +10,15 @@ export default function LoginChangePassword(): JSX.Element {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPassword || !confirmPassword) {
-      alert("Please fill both fields.");
+      showErrorToast("Please fill both fields.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      alert("Passwords do not match.");
+      showErrorToast("Passwords do not match.");
       return;
     }
     console.log("Password changed:", newPassword);
-    alert("Password updated successfully!");
+    showSuccessToast("Password updated successfully!");
     // Navigate back to login page
     window.location.href = '/login';
   };

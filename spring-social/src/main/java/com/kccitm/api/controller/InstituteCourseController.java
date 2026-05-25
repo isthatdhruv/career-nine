@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +25,7 @@ public class InstituteCourseController {
 	@Autowired
 	private InstituteDetailRepository instituteDetailRepository;
 
+	@PreAuthorize("@auth.allows('institute_course.read.all')")
 	@GetMapping(value = "instituteCourse/get", headers = "Accept=application/json")
 	public List<InstituteCourse> getallInstituteCourse() {
 		List<InstituteCourse> allInstituteCourse = instituteCourseRepository.findAll();
@@ -31,6 +33,7 @@ public class InstituteCourseController {
 	}
 
 
+	@PreAuthorize("@auth.allows('institute_course.read.all')")
 	@GetMapping(value = "instituteCourse/get-options", headers = "Accept=application/json")
 	public List<InstituteCourse> getallInstituteCourseOptions() {
 		List<InstituteCourse> allInstituteCourse = instituteCourseRepository.findOnlyCourseCodeAndAbbCourses();
@@ -38,6 +41,7 @@ public class InstituteCourseController {
 	}
 
 
+	@PreAuthorize("@auth.allows('institute_course.read')")
 	@GetMapping(value = "instituteCourse/getbyid/{id}", headers = "Accept=application/json")
 	public Optional<InstituteCourse> getById(@PathVariable("id") int instituteCourseId) {
 		Optional<InstituteCourse> instituteCourse = instituteCourseRepository.findById(instituteCourseId);
@@ -45,6 +49,7 @@ public class InstituteCourseController {
 		return instituteCourse;
 	}
 
+	@PreAuthorize("@auth.allows('institute_course.read')")
 	@GetMapping(value = "instituteCourse/getbyCollegeId/{id}", headers = "Accept=application/json")
 	public List<InstituteCourse> getByCollegeId(@PathVariable("id") int instituteCollegeId) {
 		return instituteCourseRepository.findByInstituteId(instituteCollegeId);
@@ -52,6 +57,7 @@ public class InstituteCourseController {
 
 
 
+	@PreAuthorize("@auth.allows('institute_course.update')")
 	@PostMapping(value = "instituteCourse/update", headers = "Accept=application/json")
 	public InstituteCourse updateInstituteCourse(@RequestBody Map<String, InstituteCourse> inputData) {
 		InstituteCourse r = inputData.get("values"); 
@@ -60,6 +66,7 @@ public class InstituteCourseController {
 	}
 	
 
+	@PreAuthorize("@auth.allows('institute_course.delete')")
 	@GetMapping(value = "instituteCourse/delete/{id}", headers = "Accept=application/json")
 	public InstituteCourse deleteUser(@PathVariable("id") int instituteCourseId) {
 		InstituteCourse instituteCourse = instituteCourseRepository.getOne(instituteCourseId);

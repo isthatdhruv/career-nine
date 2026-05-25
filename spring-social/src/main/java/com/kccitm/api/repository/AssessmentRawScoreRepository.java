@@ -16,4 +16,7 @@ public interface AssessmentRawScoreRepository
 
     // For bulk export by student assessment mapping IDs
     List<AssessmentRawScore> findByStudentAssessmentMappingStudentAssessmentIdIn(List<Long> studentAssessmentIds);
+
+    // By mapping object
+    List<AssessmentRawScore> findByStudentAssessmentMapping(com.kccitm.api.model.career9.StudentAssessmentMapping mapping);
 }

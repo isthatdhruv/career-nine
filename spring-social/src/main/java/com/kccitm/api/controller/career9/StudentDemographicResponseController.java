@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +31,7 @@ import com.kccitm.api.repository.Career9.AssessmentDemographicMappingRepository;
 import com.kccitm.api.repository.Career9.StudentDemographicResponseRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.service.AssessmentSessionService;
 
 @RestController
 @RequestMapping("/student-demographics")
@@ -47,97 +49,171 @@ public class StudentDemographicResponseController {
     @Autowired
     private StudentInfoRepository studentInfoRepository;
 
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
+
+    /**
+     * Save demographics to Redis for deferred DB persistence.
+     * Called from demographics page so the student can navigate immediately.
+     * The actual DB save happens when assessment answers are submitted.
+     */
+    // no scope arg: body is raw Map; demographic draft save during assessment flow
+    @PreAuthorize("@auth.allows('student_demographic_response.create')")
+    @PostMapping("/draft-save")
+    public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> request) {
+        Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
+        Long assessmentId = Long.valueOf(request.get("assessmentId").toString());
+
+        assessmentSessionService.saveDemographicsDraft(userStudentId, assessmentId, request);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Demographics draft saved");
+        return ResponseEntity.ok(response);
+    }
+
+    // no scope arg: identifies by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.read')")
+    @GetMapping("/contact-info/{userStudentId}")
+    public ResponseEntity<?> getContactInfo(@PathVariable Long userStudentId) {
+        UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+        if (userStudent == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Student not found"));
+        }
+        StudentInfo info = userStudent.getStudentInfo();
+        Map<String, String> result = new HashMap<>();
+        result.put("email", info != null ? info.getEmail() : null);
+        result.put("phoneNumber", info != null ? info.getPhoneNumber() : null);
+        return ResponseEntity.ok(result);
+    }
+
+    // no scope arg: identifies by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.update')")
+    @PostMapping("/contact-info/{userStudentId}")
+    @Transactional
+    public ResponseEntity<?> updateContactInfo(
+            @PathVariable Long userStudentId,
+            @RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String phoneNumber = request.get("phoneNumber");
+
+        List<String> errors = new ArrayList<>();
+        if (email != null && !email.trim().isEmpty()
+                && !Pattern.matches("^[\\w.+-]+@[\\w.-]+\\.[a-zA-Z]{2,}$", email.trim())) {
+            errors.add("Invalid email format");
+        }
+        if (phoneNumber != null && !phoneNumber.trim().isEmpty()
+                && !Pattern.matches("^[0-9]{10}$", phoneNumber.trim())) {
+            errors.add("Phone number must be 10 digits");
+        }
+        if (!errors.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("validationErrors", errors));
+        }
+
+        UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+        if (userStudent == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Student not found"));
+        }
+        StudentInfo info = userStudent.getStudentInfo();
+        if (info == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Student info not found"));
+        }
+        info.setEmail(email != null ? email.trim() : null);
+        info.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
+        studentInfoRepository.save(info);
+
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    // no scope arg: identifies by ids; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.read')")
     @GetMapping("/fields/{assessmentId}/{userStudentId}")
     public ResponseEntity<?> getFieldsForAssessment(
             @PathVariable Long assessmentId,
             @PathVariable Long userStudentId) {
-        try {
-            // Get configured demographic fields for this assessment
-            List<AssessmentDemographicMapping> mappings =
-                    mappingRepository.findByAssessmentIdOrderByDisplayOrderAsc(assessmentId);
+        // Get configured demographic fields for this assessment
+        List<AssessmentDemographicMapping> mappings =
+                mappingRepository.findByAssessmentIdOrderByDisplayOrderAsc(assessmentId);
 
-            if (mappings.isEmpty()) {
-                return ResponseEntity.ok(new ArrayList<>());
-            }
-
-            // Get the student's info for pre-filling SYSTEM fields
-            UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
-            StudentInfo studentInfo = (userStudent != null) ? userStudent.getStudentInfo() : null;
-
-            // Get existing custom responses for pre-filling CUSTOM fields (across all assessments)
-            List<StudentDemographicResponse> existingResponses =
-                    responseRepository.findByUserStudentId(userStudentId);
-            Map<Long, String> responseMap = new HashMap<>();
-            for (StudentDemographicResponse resp : existingResponses) {
-                responseMap.put(resp.getFieldDefinition().getFieldId(), resp.getResponseValue());
-            }
-
-            // Build response array
-            List<Map<String, Object>> result = new ArrayList<>();
-            for (AssessmentDemographicMapping mapping : mappings) {
-                DemographicFieldDefinition field = mapping.getFieldDefinition();
-                Map<String, Object> fieldData = new LinkedHashMap<>();
-
-                fieldData.put("mappingId", mapping.getMappingId());
-                fieldData.put("fieldId", field.getFieldId());
-                fieldData.put("fieldName", field.getFieldName());
-                fieldData.put("displayLabel", field.getDisplayLabel());
-                fieldData.put("customLabel", mapping.getCustomLabel());
-                fieldData.put("fieldSource", field.getFieldSource());
-                fieldData.put("dataType", field.getDataType());
-                fieldData.put("validationRegex", field.getValidationRegex());
-                fieldData.put("validationMessage", field.getValidationMessage());
-                fieldData.put("minValue", field.getMinValue());
-                fieldData.put("maxValue", field.getMaxValue());
-                fieldData.put("placeholder", field.getPlaceholder());
-                fieldData.put("defaultValue", field.getDefaultValue());
-                fieldData.put("isMandatory", mapping.getIsMandatory());
-                fieldData.put("displayOrder", mapping.getDisplayOrder());
-
-                // Pre-fill current value
-                String currentValue = null;
-                if ("SYSTEM".equals(field.getFieldSource()) && studentInfo != null) {
-                    currentValue = getSystemFieldValue(studentInfo, field.getSystemFieldKey());
-                } else if ("CUSTOM".equals(field.getFieldSource())) {
-                    currentValue = responseMap.get(field.getFieldId());
-                }
-                fieldData.put("currentValue", currentValue);
-
-                // Include options for SELECT type fields
-                List<Map<String, Object>> optionsList = new ArrayList<>();
-                if (field.getOptions() != null) {
-                    for (DemographicFieldOption option : field.getOptions()) {
-                        Map<String, Object> optionData = new LinkedHashMap<>();
-                        optionData.put("optionId", option.getOptionId());
-                        optionData.put("optionValue", option.getOptionValue());
-                        optionData.put("optionLabel", option.getOptionLabel());
-                        optionsList.add(optionData);
-                    }
-                }
-                fieldData.put("options", optionsList);
-
-                result.add(fieldData);
-            }
-
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            System.err.println("Error fetching demographic fields: " + e.getMessage());
-            e.printStackTrace();
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to fetch demographic fields: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        if (mappings.isEmpty()) {
+            return ResponseEntity.ok(new ArrayList<>());
         }
+
+        // Get the student's info for pre-filling SYSTEM fields
+        UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+        StudentInfo studentInfo = (userStudent != null) ? userStudent.getStudentInfo() : null;
+
+        // Get existing custom responses for pre-filling CUSTOM fields (across all assessments)
+        List<StudentDemographicResponse> existingResponses =
+                responseRepository.findByUserStudentId(userStudentId);
+        Map<Long, String> responseMap = new HashMap<>();
+        for (StudentDemographicResponse resp : existingResponses) {
+            responseMap.put(resp.getFieldDefinition().getFieldId(), resp.getResponseValue());
+        }
+
+        // Build response array
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (AssessmentDemographicMapping mapping : mappings) {
+            DemographicFieldDefinition field = mapping.getFieldDefinition();
+            Map<String, Object> fieldData = new LinkedHashMap<>();
+
+            fieldData.put("mappingId", mapping.getMappingId());
+            fieldData.put("fieldId", field.getFieldId());
+            fieldData.put("fieldName", field.getFieldName());
+            fieldData.put("displayLabel", field.getDisplayLabel());
+            fieldData.put("customLabel", mapping.getCustomLabel());
+            fieldData.put("fieldSource", field.getFieldSource());
+            fieldData.put("dataType", field.getDataType());
+            fieldData.put("validationRegex", field.getValidationRegex());
+            fieldData.put("validationMessage", field.getValidationMessage());
+            fieldData.put("minValue", field.getMinValue());
+            fieldData.put("maxValue", field.getMaxValue());
+            fieldData.put("placeholder", field.getPlaceholder());
+            fieldData.put("defaultValue", field.getDefaultValue());
+            fieldData.put("isMandatory", mapping.getIsMandatory());
+            fieldData.put("displayOrder", mapping.getDisplayOrder());
+
+            // Pre-fill current value
+            String currentValue = null;
+            if ("SYSTEM".equals(field.getFieldSource()) && studentInfo != null) {
+                currentValue = getSystemFieldValue(studentInfo, field.getSystemFieldKey());
+            } else if ("CUSTOM".equals(field.getFieldSource())) {
+                currentValue = responseMap.get(field.getFieldId());
+            }
+            fieldData.put("currentValue", currentValue);
+
+            // Include options for SELECT type fields
+            List<Map<String, Object>> optionsList = new ArrayList<>();
+            if (field.getOptions() != null) {
+                for (DemographicFieldOption option : field.getOptions()) {
+                    Map<String, Object> optionData = new LinkedHashMap<>();
+                    optionData.put("optionId", option.getOptionId());
+                    optionData.put("optionValue", option.getOptionValue());
+                    optionData.put("optionLabel", option.getOptionLabel());
+                    optionsList.add(optionData);
+                }
+            }
+            fieldData.put("options", optionsList);
+
+            result.add(fieldData);
+        }
+
+        return ResponseEntity.ok(result);
     }
 
+    // no scope arg: body is raw Map; demographic responses submission
+    @PreAuthorize("@auth.allows('student_demographic_response.create')")
     @PostMapping("/submit")
     @Transactional
     public ResponseEntity<?> submit(@RequestBody Map<String, Object> request) {
-        try {
-            Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
-            Long assessmentId = Long.valueOf(request.get("assessmentId").toString());
+        Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
+        Long assessmentId = Long.valueOf(request.get("assessmentId").toString());
 
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> responses = (List<Map<String, Object>>) request.get("responses");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> responses = (List<Map<String, Object>>) request.get("responses");
 
             // Verify student exists
             UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
@@ -240,44 +316,94 @@ public class StudentDemographicResponseController {
                 studentInfoRepository.save(studentInfo);
             }
 
-            Map<String, Object> successResponse = new HashMap<>();
-            successResponse.put("success", true);
-            successResponse.put("message", "Demographics submitted successfully");
-            return ResponseEntity.ok(successResponse);
-
-        } catch (Exception e) {
-            System.err.println("Error submitting demographics: " + e.getMessage());
-            e.printStackTrace();
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to submit demographics: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-        }
+        Map<String, Object> successResponse = new HashMap<>();
+        successResponse.put("success", true);
+        successResponse.put("message", "Demographics submitted successfully");
+        return ResponseEntity.ok(successResponse);
     }
 
+    // no scope arg: identifies by ids; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.read')")
     @GetMapping("/status/{assessmentId}/{userStudentId}")
     public ResponseEntity<?> getStatus(
             @PathVariable Long assessmentId,
             @PathVariable Long userStudentId) {
-        try {
+        List<AssessmentDemographicMapping> mappings =
+                mappingRepository.findByAssessmentIdOrderByDisplayOrderAsc(assessmentId);
+
+        int totalFields = mappings.size();
+
+        if (totalFields == 0) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("completed", true);
+            result.put("totalFields", 0);
+            result.put("completedFields", 0);
+            result.put("missingMandatoryFields", new ArrayList<>());
+            return ResponseEntity.ok(result);
+        }
+
+        // Get student info for SYSTEM fields
+        UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+        StudentInfo studentInfo = (userStudent != null) ? userStudent.getStudentInfo() : null;
+
+        // Get existing custom responses (across all assessments - data is shared per field)
+        List<StudentDemographicResponse> existingResponses =
+                responseRepository.findByUserStudentId(userStudentId);
+        Map<Long, String> responseMap = new HashMap<>();
+        for (StudentDemographicResponse resp : existingResponses) {
+            responseMap.put(resp.getFieldDefinition().getFieldId(), resp.getResponseValue());
+        }
+
+        int completedFields = 0;
+        List<String> missingMandatoryFields = new ArrayList<>();
+
+        for (AssessmentDemographicMapping mapping : mappings) {
+            DemographicFieldDefinition field = mapping.getFieldDefinition();
+            String value = null;
+
+            if ("SYSTEM".equals(field.getFieldSource()) && studentInfo != null) {
+                value = getSystemFieldValue(studentInfo, field.getSystemFieldKey());
+            } else if ("CUSTOM".equals(field.getFieldSource())) {
+                value = responseMap.get(field.getFieldId());
+            }
+
+            boolean hasValue = value != null && !value.trim().isEmpty();
+            if (hasValue) {
+                completedFields++;
+            } else if (Boolean.TRUE.equals(mapping.getIsMandatory())) {
+                String label = mapping.getCustomLabel() != null
+                        ? mapping.getCustomLabel() : field.getDisplayLabel();
+                missingMandatoryFields.add(label);
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("completed", missingMandatoryFields.isEmpty());
+        result.put("totalFields", totalFields);
+        result.put("completedFields", completedFields);
+        result.put("missingMandatoryFields", missingMandatoryFields);
+        return ResponseEntity.ok(result);
+    }
+
+    // no scope arg: body is List<Map>; bulk demographic read; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.read')")
+    @PostMapping("/bulk-fields")
+    public ResponseEntity<?> getBulkDemographicData(@RequestBody List<Map<String, Object>> pairs) {
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Map<String, Object> pair : pairs) {
+            Long userStudentId = Long.valueOf(pair.get("userStudentId").toString());
+            Long assessmentId = Long.valueOf(pair.get("assessmentId").toString());
+
             List<AssessmentDemographicMapping> mappings =
                     mappingRepository.findByAssessmentIdOrderByDisplayOrderAsc(assessmentId);
 
-            int totalFields = mappings.size();
+            if (mappings.isEmpty()) continue;
 
-            if (totalFields == 0) {
-                Map<String, Object> result = new HashMap<>();
-                result.put("completed", true);
-                result.put("totalFields", 0);
-                result.put("completedFields", 0);
-                result.put("missingMandatoryFields", new ArrayList<>());
-                return ResponseEntity.ok(result);
-            }
-
-            // Get student info for SYSTEM fields
             UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
             StudentInfo studentInfo = (userStudent != null) ? userStudent.getStudentInfo() : null;
 
-            // Get existing custom responses (across all assessments - data is shared per field)
+            // Fetch responses across all assessments (data is shared per field)
             List<StudentDemographicResponse> existingResponses =
                     responseRepository.findByUserStudentId(userStudentId);
             Map<Long, String> responseMap = new HashMap<>();
@@ -285,96 +411,26 @@ public class StudentDemographicResponseController {
                 responseMap.put(resp.getFieldDefinition().getFieldId(), resp.getResponseValue());
             }
 
-            int completedFields = 0;
-            List<String> missingMandatoryFields = new ArrayList<>();
-
             for (AssessmentDemographicMapping mapping : mappings) {
                 DemographicFieldDefinition field = mapping.getFieldDefinition();
-                String value = null;
-
+                String currentValue = null;
                 if ("SYSTEM".equals(field.getFieldSource()) && studentInfo != null) {
-                    value = getSystemFieldValue(studentInfo, field.getSystemFieldKey());
+                    currentValue = getSystemFieldValue(studentInfo, field.getSystemFieldKey());
                 } else if ("CUSTOM".equals(field.getFieldSource())) {
-                    value = responseMap.get(field.getFieldId());
+                    currentValue = responseMap.get(field.getFieldId());
                 }
 
-                boolean hasValue = value != null && !value.trim().isEmpty();
-                if (hasValue) {
-                    completedFields++;
-                } else if (Boolean.TRUE.equals(mapping.getIsMandatory())) {
-                    String label = mapping.getCustomLabel() != null
-                            ? mapping.getCustomLabel() : field.getDisplayLabel();
-                    missingMandatoryFields.add(label);
-                }
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("userStudentId", userStudentId);
+                row.put("assessmentId", assessmentId);
+                row.put("fieldName", field.getFieldName());
+                row.put("displayLabel", mapping.getCustomLabel() != null ? mapping.getCustomLabel() : field.getDisplayLabel());
+                row.put("value", currentValue);
+                result.add(row);
             }
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("completed", missingMandatoryFields.isEmpty());
-            result.put("totalFields", totalFields);
-            result.put("completedFields", completedFields);
-            result.put("missingMandatoryFields", missingMandatoryFields);
-            return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            System.err.println("Error checking demographic status: " + e.getMessage());
-            e.printStackTrace();
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to check demographic status: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
-    }
 
-    @PostMapping("/bulk-fields")
-    public ResponseEntity<?> getBulkDemographicData(@RequestBody List<Map<String, Object>> pairs) {
-        try {
-            List<Map<String, Object>> result = new ArrayList<>();
-
-            for (Map<String, Object> pair : pairs) {
-                Long userStudentId = Long.valueOf(pair.get("userStudentId").toString());
-                Long assessmentId = Long.valueOf(pair.get("assessmentId").toString());
-
-                List<AssessmentDemographicMapping> mappings =
-                        mappingRepository.findByAssessmentIdOrderByDisplayOrderAsc(assessmentId);
-
-                if (mappings.isEmpty()) continue;
-
-                UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
-                StudentInfo studentInfo = (userStudent != null) ? userStudent.getStudentInfo() : null;
-
-                // Fetch responses across all assessments (data is shared per field)
-                List<StudentDemographicResponse> existingResponses =
-                        responseRepository.findByUserStudentId(userStudentId);
-                Map<Long, String> responseMap = new HashMap<>();
-                for (StudentDemographicResponse resp : existingResponses) {
-                    responseMap.put(resp.getFieldDefinition().getFieldId(), resp.getResponseValue());
-                }
-
-                for (AssessmentDemographicMapping mapping : mappings) {
-                    DemographicFieldDefinition field = mapping.getFieldDefinition();
-                    String currentValue = null;
-                    if ("SYSTEM".equals(field.getFieldSource()) && studentInfo != null) {
-                        currentValue = getSystemFieldValue(studentInfo, field.getSystemFieldKey());
-                    } else if ("CUSTOM".equals(field.getFieldSource())) {
-                        currentValue = responseMap.get(field.getFieldId());
-                    }
-
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("userStudentId", userStudentId);
-                    row.put("assessmentId", assessmentId);
-                    row.put("fieldName", field.getFieldName());
-                    row.put("displayLabel", mapping.getCustomLabel() != null ? mapping.getCustomLabel() : field.getDisplayLabel());
-                    row.put("value", currentValue);
-                    result.add(row);
-                }
-            }
-
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            System.err.println("Error fetching bulk demographic data: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to fetch bulk demographic data: " + e.getMessage()));
-        }
+        return ResponseEntity.ok(result);
     }
 
     private String getSystemFieldValue(StudentInfo studentInfo, String systemFieldKey) {

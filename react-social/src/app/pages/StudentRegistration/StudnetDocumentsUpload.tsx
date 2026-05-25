@@ -1,8 +1,7 @@
 import clsx from "clsx";
-import { useState ,useCallback} from "react";
+import { useState } from "react";
 import FileBase64 from "react-file-base64";
 import { fileUpload } from "./Student_APIs";
-import ImgsViewer from "react-images-viewer";
 
 
 
@@ -122,7 +121,6 @@ const StudnetDocumentsUpload = (props: {
           multiple={false}
           onDone={(data) => {
             uploadFileData(data, setQualifiedRankLetter);
-            console.log(data)
           }}
         />
         

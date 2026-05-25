@@ -1,5 +1,7 @@
 package com.kccitm.api.config;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -37,13 +39,12 @@ public class FirebaseConfig {
         }
 
         if (FirebaseApp.getApps().isEmpty()) {
-            ClassPathResource res = new ClassPathResource(serviceAccountFile);
-            if (!res.exists()) {
-                logger.warn("Firebase service account not found ({}). Firebase features will not be available. Place the service account JSON in src/main/resources or set '{}' property to point to it.", serviceAccountFile, "app.firebase.service-account-file");
-                return;
-            }
 
-            try (InputStream serviceAccount = res.getInputStream()) {
+            try (InputStream serviceAccount = resolveCredentialStream(serviceAccountFile)) {
+                if (serviceAccount == null) {
+                    logger.warn("Firebase service account not found ({}). Firebase features will not be available.", serviceAccountFile);
+                    return;
+                }
                 FirebaseOptions options = FirebaseOptions.builder()
                         .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                         .setProjectId(projectId)
@@ -53,8 +54,23 @@ public class FirebaseConfig {
                 logger.info("Firebase has been initialized successfully with project: {}", projectId);
             } catch (IOException e) {
                 logger.error("Failed to initialize Firebase from {}: {}", serviceAccountFile, e.getMessage());
-                logger.warn("Firebase features will not be available. Make sure {} exists in src/main/resources/ or set '{}' to a valid classpath resource.", serviceAccountFile, "app.firebase.service-account-file");
             }
         }
+    }
+
+    private InputStream resolveCredentialStream(String path) throws IOException {
+        // Try as absolute file path first (e.g. volume-mounted at /config/firebase-service-account.json)
+        File file = new File(path);
+        if (file.isAbsolute() && file.exists()) {
+            logger.info("Loading Firebase credentials from filesystem: {}", path);
+            return new FileInputStream(file);
+        }
+        // Fall back to classpath resource
+        ClassPathResource res = new ClassPathResource(path);
+        if (res.exists()) {
+            logger.info("Loading Firebase credentials from classpath: {}", path);
+            return res.getInputStream();
+        }
+        return null;
     }
 }

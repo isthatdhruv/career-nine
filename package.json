@@ -2,6 +2,7 @@
   "dependencies": {
     "@mui/icons-material": "^7.3.7",
     "bootstrap": "^5.3.8",
+    "docx": "^9.6.1",
     "lucide-react": "^0.542.0"
   }
 }

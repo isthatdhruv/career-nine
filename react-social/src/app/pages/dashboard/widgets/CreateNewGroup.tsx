@@ -110,7 +110,6 @@ const GroupCreatePage = () => {
           onSubmit={async (values) => {
             setLoading(true);
             try {
-              console.log("FINAL GROUP PAYLOAD 👉", values);
               // await CreateGroupData(values);
               navigate("/school/groups");
             } catch (error) {

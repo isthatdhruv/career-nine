@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getDemographicFieldById, updateDemographicField } from '../API/DemographicField_APIs';
+import { showErrorToast } from '../../../utils/toast';
 
 const SYSTEM_FIELD_OPTIONS = [
   { key: 'name', label: 'Student Name', dataType: 'TEXT' },
@@ -64,7 +65,7 @@ const DemographicFieldEditPage = () => {
         setOptions(field.options || []);
       } catch (error) {
         console.error('Error fetching field:', error);
-        alert('Failed to load field data');
+        showErrorToast('Failed to load field data');
         navigate('/demographic-fields');
       } finally {
         setLoading(false);
@@ -96,13 +97,13 @@ const DemographicFieldEditPage = () => {
     e.preventDefault();
 
     if (!fieldName.trim() || !displayLabel.trim()) {
-      alert('Field name and display label are required');
+      showErrorToast('Field name and display label are required');
       return;
     }
 
     const isSelectType = dataType === 'SELECT_SINGLE' || dataType === 'SELECT_MULTI';
     if (isSelectType && options.length === 0) {
-      alert('Select fields must have at least one option');
+      showErrorToast('Select fields must have at least one option');
       return;
     }
 
@@ -130,7 +131,7 @@ const DemographicFieldEditPage = () => {
       navigate('/demographic-fields');
     } catch (error: any) {
       console.error('Error updating field:', error);
-      alert(error.response?.data?.message || 'Failed to update field');
+      showErrorToast(error.response?.data?.message || 'Failed to update field');
     } finally {
       setSaving(false);
     }

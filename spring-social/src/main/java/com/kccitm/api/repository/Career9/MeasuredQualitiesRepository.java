@@ -12,4 +12,6 @@ import com.kccitm.api.model.career9.MeasuredQualities;
 @Repository
 public interface MeasuredQualitiesRepository extends JpaRepository<MeasuredQualities, Long> {
 
+    List<MeasuredQualities> findByIsDeletedFalseOrIsDeletedIsNull();
+    List<MeasuredQualities> findByIsDeletedTrue();
 }

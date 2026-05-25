@@ -5,10 +5,10 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import {
-  ReadContactInformationByIdData,
   UpdateContactInformationData,
 } from "../API/Contact_Person_APIs";
 import { Modal } from "react-bootstrap";
+import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().required("Contact name is required"),
@@ -80,7 +80,7 @@ const ContactPersonEditModal = (props: Props) => {
         console.error("Update error:", error);
         // navigate to an error page if you want:
         // window.location.replace("/error");
-        alert("Failed to update contact person. Check console for details.");
+        showErrorToast("Failed to update contact person. Check console for details.");
       } finally {
         setLoading(false);
       }

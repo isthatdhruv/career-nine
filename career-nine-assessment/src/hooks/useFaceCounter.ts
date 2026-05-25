@@ -91,7 +91,7 @@ export function useFaceCounter({ videoElement, faceCountRef }: UseFaceCounterPar
         // Start detection as soon as possible
         detect();
       } catch (err) {
-        console.warn('Face counter init failed:', err);
+        // Face counter init failed — detection will be unavailable
       }
     };
 

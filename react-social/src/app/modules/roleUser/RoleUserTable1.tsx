@@ -57,7 +57,6 @@ const RoleUserTable = (props: { data: RoleUserCreateInput }) => {
       }
       // try {
       //   upsertRoleUserData(values).then((data) => {
-      //     console.log(data);
       //     window.location.reload();
       //   });
       // } catch (error) {

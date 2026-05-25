@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchAllDashboardData, getDashboardDataFromCache, getStudentAssessments, exportBetAssessmentToExcel, DashboardData, DashboardApiResponse } from "./API/Dashboard_APIs";
+import GeneralDashboard from "./components/GeneralDashboard";
+import { KTSVG } from "../../../_metronic/helpers";
 import "./StudentDashboard.css";
 import {
   RadarChart,
@@ -142,7 +144,7 @@ const StudentDashboard: React.FC = () => {
       <div className="dashboard-header-modern">
         <div className="header-content">
           <div className="header-left">
-            <img src="/media/logos/kcc.jpg" alt="Career-9" className="header-logo bg-white px-5 py-2" />
+            <img src="/media/logos/kcc.webp" alt="Career-9" className="header-logo bg-white px-5 py-2" />
             <div className="header-text">
               <h1 className="dashboard-title text-white">Student Insight Dashboard</h1>
               <p className="dashboard-subtitle">Comprehensive performance and development tracking</p>
@@ -207,7 +209,12 @@ const StudentDashboard: React.FC = () => {
           </div>
           <div>
             <h3 className="student-name">{student.name}</h3>
-            <p className="student-meta">Grade {student.grade} • {student.schoolBoard} • ID: #{student.userStudentId}</p>
+            <p className="student-meta">
+              Grade {student.grade || "N/A"}
+              {student.section ? ` • Section ${student.section}` : ""}
+              {student.schoolBoard && student.schoolBoard !== "N/A" ? ` • ${student.schoolBoard}` : ""}
+              {student.username ? ` • @${student.username}` : ` • ID: #${student.userStudentId}`}
+            </p>
           </div>
         </div>
         <div className="student-details-grid">
@@ -217,7 +224,7 @@ const StudentDashboard: React.FC = () => {
           </div>
           <div className="detail-item">
             <span className="detail-label">Siblings</span>
-            <span className="detail-value">{student.siblingsCount || 0}</span>
+            <span className="detail-value">{student.siblingsCount != null ? student.siblingsCount : "N/A"}</span>
           </div>
           <div className="detail-item">
             <span className="detail-label">Assessment</span>
@@ -241,15 +248,9 @@ const StudentDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* General Assessment Placeholder */}
-      {!isBetAssessment && (
-        <div className="dashboard-content">
-          <div className="alert alert-info" style={{ margin: '2rem', padding: '2rem', textAlign: 'center' }}>
-            <i className="bi bi-info-circle me-2" style={{ fontSize: '1.5rem' }}></i>
-            <h4>General Assessment Dashboard</h4>
-            <p>Dashboard visualization for general assessments is coming soon.</p>
-          </div>
-        </div>
+      {/* General Assessment Dashboard */}
+      {!isBetAssessment && selectedAssessmentId && (
+        <GeneralDashboard studentId={Number(studentId)} assessmentId={selectedAssessmentId} />
       )}
 
       {/* OVERVIEW VIEW */}
@@ -559,7 +560,10 @@ const StudentDashboard: React.FC = () => {
                       fontSize: '0.9rem',
                       fontWeight: 600
                     }}>
-                      {social.environmentalAwareness.icon} {social.environmentalAwareness.category}
+                      <span style={{ color: social.environmentalAwareness.iconTint, display: 'inline-flex', marginRight: 6 }}>
+                        <KTSVG path={social.environmentalAwareness.iconPath} className='svg-icon-2' />
+                      </span>
+                      {social.environmentalAwareness.category}
                     </span>
                     <p className="mt-2 mb-0" style={{ fontSize: '0.85rem', color: '#6c757d' }}>
                       Net Score: {social.environmentalAwareness.netScore > 0 ? '+' : ''}{social.environmentalAwareness.netScore}/4
@@ -664,7 +668,10 @@ const StudentDashboard: React.FC = () => {
                 <p>{cognitive.attention.interpretation}</p>
               </div>
               <div className="action-tip">
-                <strong>🎯 Action Tip for Parents:</strong>
+                <strong className='d-inline-flex align-items-center gap-1'>
+                  <KTSVG path='/media/icons/duotune/art/art007.svg' className='svg-icon-1 svg-icon-warning' />
+                  Action Tip for Parents:
+                </strong>
                 <p>{cognitive.attention.actionTip}</p>
               </div>
             </div>
@@ -694,7 +701,10 @@ const StudentDashboard: React.FC = () => {
                 <p>{cognitive.workingMemory.interpretation}</p>
               </div>
               <div className="action-tip">
-                <strong>🎯 Action Tip for Parents:</strong>
+                <strong className='d-inline-flex align-items-center gap-1'>
+                  <KTSVG path='/media/icons/duotune/art/art007.svg' className='svg-icon-1 svg-icon-warning' />
+                  Action Tip for Parents:
+                </strong>
                 <p>{cognitive.workingMemory.actionTip}</p>
               </div>
             </div>
@@ -735,7 +745,10 @@ const StudentDashboard: React.FC = () => {
                 <p>{cognitive.cognitiveFlexibility.interpretation}</p>
               </div>
               <div className="action-tip">
-                <strong>🎯 Action Tip for Parents:</strong>
+                <strong className='d-inline-flex align-items-center gap-1'>
+                  <KTSVG path='/media/icons/duotune/art/art007.svg' className='svg-icon-1 svg-icon-warning' />
+                  Action Tip for Parents:
+                </strong>
                 <p>{cognitive.cognitiveFlexibility.actionTip}</p>
               </div>
             </div>
@@ -899,9 +912,9 @@ const StudentDashboard: React.FC = () => {
                 {social.values.map((value, idx) => (
                   <div key={idx} className="value-item">
                     <div className="value-rank">
-                      {idx === 0 && "🥇"}
-                      {idx === 1 && "🥈"}
-                      {idx === 2 && "🥉"}
+                      <span style={{ color: idx === 0 ? '#D4AF37' : idx === 1 ? '#A8A8A8' : '#B08D57', display: 'inline-flex' }}>
+                        <KTSVG path='/media/icons/duotune/art/art007.svg' className='svg-icon-2' />
+                      </span>
                       <span className="rank-label">Rank {idx + 1}</span>
                     </div>
                     <div className="value-content">
@@ -930,7 +943,7 @@ const StudentDashboard: React.FC = () => {
                     <XAxis type="number" domain={[0, social.values.length]} />
                     <YAxis dataKey="name" type="category" style={{ fontSize: '13px' }} />
                     <Tooltip
-                      formatter={(value: any, name: string | undefined, props: any) => [
+                      formatter={(value: any, name: any, props: any) => [
                         `Rank ${props.payload.rank}`,
                         'Priority Level'
                       ]}
@@ -979,7 +992,13 @@ const StudentDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="interpretation">
-                <strong>Category: {social.environmentalAwareness.icon} {social.environmentalAwareness.category}</strong>
+                <strong className='d-inline-flex align-items-center gap-1'>
+                  Category:
+                  <span style={{ color: social.environmentalAwareness.iconTint, display: 'inline-flex' }}>
+                    <KTSVG path={social.environmentalAwareness.iconPath} className='svg-icon-2' />
+                  </span>
+                  {social.environmentalAwareness.category}
+                </strong>
                 <p>{social.environmentalAwareness.interpretation}</p>
               </div>
 

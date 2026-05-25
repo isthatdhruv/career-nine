@@ -85,8 +85,6 @@ const StudentList: React.FC<Props> = ({ className }) => {
 
   // Handle file upload adding new students (simple mapping for demo)
   const handleUpload = (rows: any[][]) => {
-    // In a real app, parse columns here. For now, we just log it.
-    console.log("Uploaded rows:", rows);
     setShowUploadModal(false);
   };
 

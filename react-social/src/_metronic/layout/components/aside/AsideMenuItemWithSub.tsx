@@ -12,6 +12,25 @@ type Props = {
   hasBullet?: boolean;
 };
 
+/**
+ * Walk the children tree and collect every `to` prop we find on descendant
+ * menu items. Used to keep the parent accordion expanded when any child route
+ * matches the current pathname.
+ */
+function collectChildPaths(node: React.ReactNode, acc: string[] = []): string[] {
+  React.Children.forEach(node, (child) => {
+    if (!React.isValidElement(child)) return;
+    const childTo = (child.props as { to?: string })?.to;
+    if (typeof childTo === "string" && childTo) {
+      // Strip query string so `checkIsActive` can match on the path portion.
+      acc.push(childTo.split("?")[0]);
+    }
+    const grandChildren = (child.props as { children?: React.ReactNode })?.children;
+    if (grandChildren) collectChildPaths(grandChildren, acc);
+  });
+  return acc;
+}
+
 const AsideMenuItemWithSub: React.FC<Props & WithChildren> = ({
   children,
   to,
@@ -21,7 +40,10 @@ const AsideMenuItemWithSub: React.FC<Props & WithChildren> = ({
   hasBullet,
 }) => {
   const { pathname } = useLocation();
-  const isActive = checkIsActive(pathname, to);
+  const childPaths = collectChildPaths(children);
+  const isActive =
+    checkIsActive(pathname, to) ||
+    childPaths.some((p) => checkIsActive(pathname, p));
   const { config } = useLayout();
   const { aside } = config;
 

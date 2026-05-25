@@ -31,7 +31,6 @@ export function readStudentData() {
 
 export function ShowStudentByEmailData() {
   return axios.get(ShowDataByEmail);
-  // console.log("bhavya",id)
 }
 
 export function upsertStudentData(values: any) {

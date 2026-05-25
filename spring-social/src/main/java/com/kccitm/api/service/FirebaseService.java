@@ -6,15 +6,20 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.cloud.FirestoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class FirebaseService {
 
     private static final Logger logger = LoggerFactory.getLogger(FirebaseService.class);
+    private static final long FIRESTORE_TIMEOUT_SECONDS = 30;
 
     private Firestore getFirestore() {
         if (FirebaseApp.getApps().isEmpty()) {
@@ -23,10 +28,11 @@ public class FirebaseService {
         return FirestoreClient.getFirestore();
     }
 
-    public List<Map<String, Object>> getAllDocuments(String collectionName) throws ExecutionException, InterruptedException {
+    @Cacheable(value = "firebaseDocuments", key = "#collectionName")
+    public List<Map<String, Object>> getAllDocuments(String collectionName) throws ExecutionException, InterruptedException, TimeoutException {
         Firestore db = getFirestore();
         ApiFuture<QuerySnapshot> future = db.collection(collectionName).get();
-        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
+        List<QueryDocumentSnapshot> documents = future.get(FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS).getDocuments();
 
         List<Map<String, Object>> results = new ArrayList<>();
         for (QueryDocumentSnapshot document : documents) {
@@ -38,11 +44,11 @@ public class FirebaseService {
         return results;
     }
 
-    public Map<String, Object> getDocument(String collectionName, String documentId) throws ExecutionException, InterruptedException {
+    public Map<String, Object> getDocument(String collectionName, String documentId) throws ExecutionException, InterruptedException, TimeoutException {
         Firestore db = getFirestore();
         DocumentReference docRef = db.collection(collectionName).document(documentId);
         ApiFuture<DocumentSnapshot> future = docRef.get();
-        DocumentSnapshot document = future.get();
+        DocumentSnapshot document = future.get(FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
         if (document.exists()) {
             Map<String, Object> data = new HashMap<>(document.getData());
@@ -53,7 +59,7 @@ public class FirebaseService {
     }
 
     public List<Map<String, Object>> queryDocuments(String collectionName, String field, String operator, Object value)
-            throws ExecutionException, InterruptedException {
+            throws ExecutionException, InterruptedException, TimeoutException {
         Firestore db = getFirestore();
         CollectionReference collection = db.collection(collectionName);
 
@@ -82,7 +88,7 @@ public class FirebaseService {
         }
 
         ApiFuture<QuerySnapshot> future = query.get();
-        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
+        List<QueryDocumentSnapshot> documents = future.get(FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS).getDocuments();
 
         List<Map<String, Object>> results = new ArrayList<>();
         for (QueryDocumentSnapshot document : documents) {
@@ -93,28 +99,31 @@ public class FirebaseService {
         return results;
     }
 
-    public String addDocument(String collectionName, Map<String, Object> data) throws ExecutionException, InterruptedException {
+    @CacheEvict(value = "firebaseDocuments", key = "#collectionName")
+    public String addDocument(String collectionName, Map<String, Object> data) throws ExecutionException, InterruptedException, TimeoutException {
         Firestore db = getFirestore();
         ApiFuture<DocumentReference> future = db.collection(collectionName).add(data);
-        DocumentReference docRef = future.get();
+        DocumentReference docRef = future.get(FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         logger.info("Added document with ID: {} to collection: {}", docRef.getId(), collectionName);
         return docRef.getId();
     }
 
+    @CacheEvict(value = "firebaseDocuments", key = "#collectionName")
     public void updateDocument(String collectionName, String documentId, Map<String, Object> data)
-            throws ExecutionException, InterruptedException {
+            throws ExecutionException, InterruptedException, TimeoutException {
         Firestore db = getFirestore();
         DocumentReference docRef = db.collection(collectionName).document(documentId);
         ApiFuture<WriteResult> future = docRef.update(data);
-        future.get();
+        future.get(FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         logger.info("Updated document: {} in collection: {}", documentId, collectionName);
     }
 
-    public void deleteDocument(String collectionName, String documentId) throws ExecutionException, InterruptedException {
+    @CacheEvict(value = "firebaseDocuments", key = "#collectionName")
+    public void deleteDocument(String collectionName, String documentId) throws ExecutionException, InterruptedException, TimeoutException {
         Firestore db = getFirestore();
         DocumentReference docRef = db.collection(collectionName).document(documentId);
         ApiFuture<WriteResult> future = docRef.delete();
-        future.get();
+        future.get(FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         logger.info("Deleted document: {} from collection: {}", documentId, collectionName);
     }
 }

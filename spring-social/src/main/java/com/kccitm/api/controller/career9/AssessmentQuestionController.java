@@ -29,6 +29,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -83,6 +84,7 @@ public class AssessmentQuestionController {
     // and return.
     @Cacheable("assessmentQuestions")
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('assessment_question.read.all')")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
        
         List<AssessmentQuestions> fromDb = fetchAndTransformFromDb();
@@ -90,11 +92,25 @@ public class AssessmentQuestionController {
         return fromDb;
     }
 
+    @GetMapping("/mqt-counts")
+    @PreAuthorize("@auth.allows('assessment_question.read')")
+    public java.util.Map<Long, Long> getMqtCountsPerQuestion() {
+        java.util.Map<Long, Long> counts = new java.util.HashMap<>();
+        for (Object[] row : assessmentQuestionRepository.findMqtCountsPerQuestion()) {
+            Long questionId = ((Number) row[0]).longValue();
+            Long mqtCount = ((Number) row[1]).longValue();
+            counts.put(questionId, mqtCount);
+        }
+        return counts;
+    }
+
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.read')")
     public AssessmentQuestions getAssessmentQuestionById(@PathVariable Long id) {
         return assessmentQuestionRepository.findById(id).orElse(null);
     }
     @GetMapping("/getAllList")
+    @PreAuthorize("@auth.allows('assessment_question.read.all')")
     public List<AssessmentQuestions> findAllQuestionsProjection() {
        
         List<AssessmentQuestions> fromDb = assessmentQuestionRepository.findAllQuestionsProjection();
@@ -106,6 +122,7 @@ public class AssessmentQuestionController {
 
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PostMapping(value = "/create", consumes = "application/json")
+    @PreAuthorize("@auth.allows('assessment_question.create')")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions)
             throws Exception {
         // Wire up relationships before saving
@@ -125,17 +142,22 @@ public class AssessmentQuestionController {
                 // Wire the back-reference from option to question
                 option.setQuestion(assessmentQuestions);
 
-                // Wire up measured quality type scores for each option
+                // Wire up measured quality type scores for each option (dedup by MQT ID)
                 if (option.getOptionScores() != null) {
-                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
-                        // Set the back-reference from score to option
+                    java.util.Set<Long> seenMqtIds = new java.util.HashSet<>();
+                    java.util.Iterator<OptionScoreBasedOnMEasuredQualityTypes> it = option.getOptionScores().iterator();
+                    while (it.hasNext()) {
+                        OptionScoreBasedOnMEasuredQualityTypes score = it.next();
                         score.setQuestion_option(option);
 
-                        // Use ID-only reference for MeasuredQualityType
                         if (score.getMeasuredQualityType() != null
                                 && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
-                            score.setMeasuredQualityType(new MeasuredQualityTypes(
-                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                            Long mqtId = score.getMeasuredQualityType().getMeasuredQualityTypeId();
+                            if (!seenMqtIds.add(mqtId)) {
+                                it.remove(); // duplicate MQT for this option — skip
+                                continue;
+                            }
+                            score.setMeasuredQualityType(new MeasuredQualityTypes(mqtId));
                         }
                     }
                 }
@@ -167,6 +189,7 @@ public class AssessmentQuestionController {
      */
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.update')")
     public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id,
             @RequestBody AssessmentQuestions assessmentQuestions) {
 
@@ -178,7 +201,12 @@ public class AssessmentQuestionController {
         existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
         existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
         existingQuestion.setMaxOptionsAllowed(assessmentQuestions.getMaxOptionsAllowed());
+        existingQuestion.setOptionsRule(assessmentQuestions.getOptionsRule());
+        existingQuestion.setOptionsCount(assessmentQuestions.getOptionsCount());
         existingQuestion.setIsMQT(assessmentQuestions.getIsMQT());
+        existingQuestion.setQuestionMediaType(assessmentQuestions.getQuestionMediaType());
+        existingQuestion.setQuestionImageUrl(assessmentQuestions.getQuestionImageUrl());
+        existingQuestion.setQuestionVideoUrl(assessmentQuestions.getQuestionVideoUrl());
 
         // Step 3: Update section relationship (validate section exists first)
         if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
@@ -201,14 +229,22 @@ public class AssessmentQuestionController {
             for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
                 option.setQuestion(existingQuestion);
 
+                // Dedup scores by MQT ID within each option
                 if (option.getOptionScores() != null) {
-                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+                    java.util.Set<Long> seenMqtIds = new java.util.HashSet<>();
+                    java.util.Iterator<OptionScoreBasedOnMEasuredQualityTypes> it = option.getOptionScores().iterator();
+                    while (it.hasNext()) {
+                        OptionScoreBasedOnMEasuredQualityTypes score = it.next();
                         score.setQuestion_option(option);
 
                         if (score.getMeasuredQualityType() != null
                                 && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
-                            score.setMeasuredQualityType(new MeasuredQualityTypes(
-                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                            Long mqtId = score.getMeasuredQualityType().getMeasuredQualityTypeId();
+                            if (!seenMqtIds.add(mqtId)) {
+                                it.remove(); // duplicate MQT for this option — skip
+                                continue;
+                            }
+                            score.setMeasuredQualityType(new MeasuredQualityTypes(mqtId));
                         }
                     }
                 }
@@ -226,6 +262,7 @@ public class AssessmentQuestionController {
 
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.delete')")
     public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {
         // Soft delete: set isDeleted flag instead of removing from database
         AssessmentQuestions question = assessmentQuestionRepository.findById(id)
@@ -240,12 +277,14 @@ public class AssessmentQuestionController {
     }
 
     @GetMapping("/deleted")
+    @PreAuthorize("@auth.allows('assessment_question.read.all')")
     public List<AssessmentQuestions> getDeletedQuestions() {
         return assessmentQuestionRepository.findByIsDeletedTrue();
     }
 
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PutMapping("/restore/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.update')")
     public ResponseEntity<String> restoreAssessmentQuestion(@PathVariable Long id) {
         AssessmentQuestions question = assessmentQuestionRepository.findById(id)
                 .orElse(null);
@@ -260,6 +299,7 @@ public class AssessmentQuestionController {
 
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @DeleteMapping("/permanent-delete/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.delete')")
     public ResponseEntity<String> permanentlyDeleteAssessmentQuestion(@PathVariable Long id) {
         assessmentQuestionRepository.deleteById(id);
 
@@ -284,6 +324,7 @@ public class AssessmentQuestionController {
      * @throws Exception if Excel generation fails
      */
     @GetMapping("/export-excel")
+    @PreAuthorize("@auth.allows('assessment_question.export')")
     public ResponseEntity<byte[]> exportQuestionsToExcel() throws Exception {
         logger.info("Starting Excel export for assessment questions");
 
@@ -449,6 +490,7 @@ public class AssessmentQuestionController {
      */
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PostMapping("/import-excel")
+    @PreAuthorize("@auth.allows('assessment_question.import')")
     public ResponseEntity<Map<String, Object>> importQuestionsFromExcel(
             @RequestParam("file") MultipartFile file) throws Exception {
 

@@ -1,3 +1,6 @@
+# Local secrets (never commit)
+**/application-local.yml
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -14,13 +17,22 @@ yarn.lock
 
 # Project Documentation
 CLAUDE.md
-
+.env.dev
+.env.production
+.env.staging
 # Environment variables
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Per-profile backend secrets (root-anchored so they don't catch the tracked
+# react-social/.env.* and career-nine-assessment/.env.* files). Templates
+# (.env.*.example) stay tracked.
+/.env.dev
+/.env.staging
+/.env.production
 
 ./spring-social/application.yml
 ./spring-social/src/main/resources/application.yml
@@ -215,14 +227,14 @@ coverage/
 **/.project
 **/.classpath
 **/.settings/
-
+application.yml
 # Webpack and bundler cache
 **/.cache/
 **/webpack-stats.json
-
+**/**/**/application.yml
 # TypeScript
 **/*.tsbuildinfo
-
+spring-social/src/main/resources/application.yml
 # ESLint cache
 **/.eslintcache
 
@@ -233,3 +245,4 @@ coverage/
 # docker-compose.yml files are important and should be committed
 # !docker-compose.yml
 # !**/docker-compose.yml
+./Dump20260324.sql

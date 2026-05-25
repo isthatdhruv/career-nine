@@ -31,3 +31,15 @@ export function UpdateQuestionSectionData(values: any) {
 export function DeleteQuestionSectionData(id: any) {
   return axios.delete(deleteQuestionSection + id);
 }
+
+export function GetDeletedQuestionSections() {
+  return axios.get(`${API_URL}/question-sections/deleted`);
+}
+
+export function RestoreQuestionSection(id: any) {
+  return axios.put(`${API_URL}/question-sections/restore/${id}`);
+}
+
+export function PermanentDeleteQuestionSection(id: any) {
+  return axios.delete(`${API_URL}/question-sections/permanent-delete/${id}`);
+}

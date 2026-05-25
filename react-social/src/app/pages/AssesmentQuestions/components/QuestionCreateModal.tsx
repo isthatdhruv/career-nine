@@ -1,12 +1,15 @@
 import clsx from "clsx";
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Modal, Dropdown, Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
+import { showErrorToast } from '../../../utils/toast';
 import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
-import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
+import { CreateQuestionData, ReadMeasuredQualityTypes, UploadQuestionMedia } from "../API/Question_APIs";
 import { MQT } from "./MeasuredQualityTypesAsOptionComponent";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
+import { convertImageToWebP, generateVideoThumbnail, compressVideo } from "../../../utils/imageUtils";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -31,18 +34,75 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
 
   // State for tracking option type (text vs image) per option index
   const [optionTypes, setOptionTypes] = useState<{ [key: number]: 'text' | 'image' }>({});
-  // State for storing Base64 image data per option index
+  // State for storing processed WebP Base64 image data per option index (for preview and upload)
   const [optionImages, setOptionImages] = useState<{ [key: number]: string }>({});
+  // State for tracking which option images are being processed
+  const [optionImageProcessing, setOptionImageProcessing] = useState<{ [key: number]: boolean }>({});
+  // State for pending image confirmation popup (custom overlay portal)
+  const [pendingImage, setPendingImage] = useState<
+    { source: 'question'; base64: string; originalWidth: number; originalHeight: number; originalSize: number; finalWidth: number; finalHeight: number; finalSize: number }
+    | { source: 'option'; index: number; base64: string; originalWidth: number; originalHeight: number; originalSize: number; finalWidth: number; finalHeight: number; finalSize: number }
+    | null
+  >(null);
 
   // Game as option states
   const [useGameAsOption, setUseGameAsOption] = useState(false);
   const [games, setGames] = useState<any[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
 
+  // Question media type: 'text' | 'image' | 'video'
+  const [questionMediaType, setQuestionMediaType] = useState<'text' | 'image' | 'video'>('text');
+  const [questionMediaBase64, setQuestionMediaBase64] = useState<string>("");
+  const [questionMediaProcessing, setQuestionMediaProcessing] = useState(false);
+  const [questionVideoThumbnail, setQuestionVideoThumbnail] = useState<string>("");
+  const [videoCompressProgress, setVideoCompressProgress] = useState<number>(0);
+
+  // Handle question image upload — convert to webp and compress, then show confirmation popup
+  const handleQuestionImageSelect = async (file: File | null) => {
+    if (!file) { setQuestionMediaBase64(""); return; }
+    setQuestionMediaProcessing(true);
+    try {
+      const result = await convertImageToWebP(file, 0.8, 1280, 720);
+      setPendingImage({
+        source: 'question', base64: result.base64,
+        originalWidth: result.originalWidth, originalHeight: result.originalHeight, originalSize: result.originalSize,
+        finalWidth: result.finalWidth, finalHeight: result.finalHeight, finalSize: result.finalSize,
+      });
+    } catch (error) {
+      console.error("Error converting image to WebP:", error);
+      showErrorToast("Failed to process image. Please try a different file.");
+    } finally {
+      setQuestionMediaProcessing(false);
+    }
+  };
+
+  // Handle question video upload — compress with FFmpeg.wasm
+  const handleQuestionVideoSelect = async (file: File | null) => {
+    if (!file) { setQuestionMediaBase64(""); setQuestionVideoThumbnail(""); return; }
+    setQuestionMediaProcessing(true);
+    setVideoCompressProgress(0);
+    try {
+      const [compressed, thumbnail] = await Promise.all([
+        compressVideo(file, (p) => setVideoCompressProgress(p)),
+        generateVideoThumbnail(file),
+      ]);
+      setQuestionMediaBase64(compressed.base64);
+      setQuestionVideoThumbnail(thumbnail);
+    } catch (error) {
+      console.error("Error compressing video:", error);
+      showErrorToast("Failed to compress video. Please try a different file.");
+    } finally {
+      setQuestionMediaProcessing(false);
+      setVideoCompressProgress(0);
+    }
+  };
+
   const initialValues = {
     questionText: "",
     questionType: "",
     maxOptionsAllowed: "",
+    optionsRule: "equal" as "min" | "max" | "equal",
+    optionsCount: "",
     questionOptions: [""],
     sectionId: ""
   };
@@ -100,14 +160,23 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
     }));
   };
 
-  // Handle image file selection and convert to Base64
-  const handleImageSelect = (index: number, file: File | null) => {
+  // Handle image file selection: compress and convert to WebP, then show confirmation
+  const handleImageSelect = async (index: number, file: File | null) => {
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setOptionImages(prev => ({ ...prev, [index]: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+      setOptionImageProcessing(prev => ({ ...prev, [index]: true }));
+      try {
+        const result = await convertImageToWebP(file, 0.8, 512, 512);
+        setPendingImage({
+          source: 'option', index, base64: result.base64,
+          originalWidth: result.originalWidth, originalHeight: result.originalHeight, originalSize: result.originalSize,
+          finalWidth: result.finalWidth, finalHeight: result.finalHeight, finalSize: result.finalSize,
+        });
+      } catch (error) {
+        console.error("Error converting option image to WebP:", error);
+        showErrorToast("Failed to process option image. Please try a different file.");
+      } finally {
+        setOptionImageProcessing(prev => ({ ...prev, [index]: false }));
+      }
     } else {
       setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
     }
@@ -193,16 +262,30 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
           game: { gameId: Number(selectedGameId) }
         }];
       } else {
-        // Regular options mode
+        // Regular options mode - upload option images to CDN first
+        const optionImageUrls: { [key: number]: string } = {};
+        for (const [indexStr, base64Data] of Object.entries(optionImages)) {
+          const idx = Number(indexStr);
+          if (optionTypes[idx] === 'image' && base64Data) {
+            try {
+              const uploadResult = await UploadQuestionMedia(base64Data, 'image');
+              optionImageUrls[idx] = uploadResult.url;
+            } catch (uploadErr) {
+              console.error(`Option ${idx + 1} image upload failed:`, uploadErr);
+              showErrorToast(`Option ${idx + 1} image upload failed. It will be skipped.`);
+            }
+          }
+        }
+
         options = formikValues.questionOptions.map((option: any, index: number) => {
           // Check if this option is in image mode
           const isImageMode = optionTypes[index] === 'image';
-          
+
           // Handle both cases: when useMQTAsOptions is true (options are objects) and false (options are strings)
           const optionText = isImageMode ? null : (typeof option === 'string' ? option : option.optionText);
-          const optionImageBase64 = isImageMode ? (optionImages[index] || null) : null;
+          const optionImageUrl = isImageMode ? (optionImageUrls[index] || null) : null;
           const optionScores: any[] = [];
-          
+
           if (optionMeasuredQualities[index]) {
             Object.entries(optionMeasuredQualities[index]).forEach(([typeId, val]: any) => {
               if (val.checked) {
@@ -217,7 +300,7 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
           }
           return {
             optionText,
-            optionImageBase64,
+            optionImageUrl,
             optionScores,
             correct: false,
             isGame: false,
@@ -226,15 +309,40 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
         });
       }
 
-      const payload = {
+      // Upload media to DO Spaces if present
+      let questionImageUrl = "";
+      let questionVideoUrl = "";
+      if (questionMediaType === 'image' && questionMediaBase64) {
+        try {
+          const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'image');
+          questionImageUrl = uploadResult.url;
+        } catch (uploadErr) {
+          console.error("Media upload failed:", uploadErr);
+          showErrorToast("Image upload failed. Question will be created without the image.");
+        }
+      } else if (questionMediaType === 'video' && questionMediaBase64) {
+        try {
+          const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'video');
+          questionVideoUrl = uploadResult.url;
+        } catch (uploadErr) {
+          console.error("Media upload failed:", uploadErr);
+          showErrorToast("Video upload failed. Question will be created without the video.");
+        }
+      }
+
+      const payload: any = {
         questionText: formikValues.questionText,
         questionType: formikValues.questionType,
-        maxOptionsAllowed: Number(formikValues.maxOptionsAllowed) || 0,
+        questionMediaType: questionMediaType,
+        questionImageUrl: questionImageUrl || null,
+        questionVideoUrl: questionVideoUrl || null,
+        maxOptionsAllowed: Number(formikValues.optionsCount) || 0,
+        optionsRule: formikValues.optionsRule,
+        optionsCount: Number(formikValues.optionsCount) || 0,
         options,
         section: { sectionId: Number(formikValues.sectionId) },
         flag : useMQTAsOptions ? 1 : 0
       };
-      console.log(payload);
 
       await CreateQuestionData(payload);
       setFormikValues(initialValues);
@@ -243,29 +351,64 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
       setOptionImages({});
       setSelectedGameId("");
       setUseGameAsOption(false);
+      setQuestionMediaType('text');
+      setQuestionMediaBase64("");
+      setQuestionVideoThumbnail("");
       onHide();
       navigate("/assessment-questions");
-    } catch (error) {
-      console.error(error);
-      // window.location.replace("/error");
+    } catch (error: any) {
+      console.error("Error creating question:", error);
+      const msg = error?.response?.data?.message || error?.message || "Unknown error";
+      showErrorToast("Failed to create question: " + msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal show={show} onHide={onHide} size="lg" centered>
+    <><Modal show={show} onHide={onHide} size="lg" centered>
       <Modal.Header closeButton>
         <Modal.Title>Add Assessment Question</Modal.Title>
       </Modal.Header>
       <form onSubmit={handleSubmit}>
         <Modal.Body>
+          {/* Question Content Type Selector */}
+          <div className="mb-3">
+            <label className="form-label fw-bold">Question Content Type:</label>
+            <div className="d-flex gap-2">
+              {(['text', 'image', 'video'] as const).map((type) => (
+                <label key={type} className={clsx(
+                  "btn btn-sm",
+                  questionMediaType === type ? "btn-primary" : "btn-outline-secondary"
+                )}>
+                  <input
+                    type="radio"
+                    name="questionMediaTypeModal"
+                    value={type}
+                    checked={questionMediaType === type}
+                    onChange={() => {
+                      setQuestionMediaType(type);
+                      setQuestionMediaBase64("");
+                      setQuestionVideoThumbnail("");
+                    }}
+                    className="d-none"
+                  />
+                  {type === 'text' && 'Text'}
+                  {type === 'image' && 'Image'}
+                  {type === 'video' && 'Video'}
+                </label>
+              ))}
+            </div>
+          </div>
+
           {/* Question Text */}
           <div className="mb-3">
-            <label className="form-label fw-bold">Question Text:</label>
+            <label className="form-label fw-bold">
+              {questionMediaType === 'text' ? 'Question Text:' : 'Question Text (optional caption):'}
+            </label>
             <textarea
-              rows={4}
-              className={clsx("form-control", {
+              rows={questionMediaType === 'text' ? 4 : 2}
+              className={clsx("form-control", questionMediaType === 'text' && {
                 "is-invalid": !formikValues.questionText,
                 "is-valid": !!formikValues.questionText,
               })}
@@ -273,6 +416,69 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
               onChange={e => setFormikValues(v => ({ ...v, questionText: e.target.value }))}
             />
           </div>
+
+          {/* Question Image Upload */}
+          {questionMediaType === 'image' && (
+            <div className="mb-3">
+              <label className="form-label fw-bold">Question Image:</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleQuestionImageSelect(e.target.files?.[0] || null)}
+                className="form-control form-control-sm mb-2"
+              />
+              <small className="text-muted">Auto-converted to WebP and compressed.</small>
+              {questionMediaProcessing && (
+                <div className="d-flex align-items-center gap-2 text-primary mt-2">
+                  <span className="spinner-border spinner-border-sm"></span>
+                  <span>Processing...</span>
+                </div>
+              )}
+              {questionMediaBase64 && !questionMediaProcessing && (
+                <div className="position-relative d-inline-block mt-2">
+                  <img src={questionMediaBase64} alt="Question" style={{ maxWidth: 300, maxHeight: 200, objectFit: 'contain', borderRadius: 6, border: '1px solid #ddd' }} />
+                  <button type="button" className="btn btn-sm btn-danger position-absolute" style={{ top: -6, right: -6, padding: '2px 8px', fontSize: 11 }} onClick={() => setQuestionMediaBase64("")}>
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Question Video Upload */}
+          {questionMediaType === 'video' && (
+            <div className="mb-3">
+              <label className="form-label fw-bold">Question Video:</label>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => handleQuestionVideoSelect(e.target.files?.[0] || null)}
+                className="form-control form-control-sm mb-2"
+              />
+              <small className="text-muted">Supported: MP4, WebM, OGG. Video will be compressed automatically.</small>
+              {questionMediaProcessing && (
+                <div className="mt-2">
+                  <div className="d-flex align-items-center gap-2 text-primary mb-1">
+                    <span className="spinner-border spinner-border-sm"></span>
+                    <span>Compressing video... {videoCompressProgress > 0 ? `${videoCompressProgress}%` : ''}</span>
+                  </div>
+                  {videoCompressProgress > 0 && (
+                    <div className="progress" style={{ height: 5 }}>
+                      <div className="progress-bar" role="progressbar" style={{ width: `${videoCompressProgress}%` }} />
+                    </div>
+                  )}
+                </div>
+              )}
+              {questionMediaBase64 && !questionMediaProcessing && (
+                <div className="position-relative d-inline-block mt-2">
+                  <video src={questionMediaBase64} controls style={{ maxWidth: 300, maxHeight: 200, borderRadius: 6, border: '1px solid #ddd' }} />
+                  <button type="button" className="btn btn-sm btn-danger position-absolute" style={{ top: -6, right: -6, padding: '2px 8px', fontSize: 11 }} onClick={() => { setQuestionMediaBase64(""); setQuestionVideoThumbnail(""); }}>
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Question Type */}
           <div className="mb-3">
@@ -377,10 +583,17 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
                           onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
                           className="form-control form-control-sm mb-2"
                         />
-                        {optionImages[index] && (
+                        <small className="text-muted d-block mb-1">Auto-compressed and converted to WebP, stored on CDN.</small>
+                        {optionImageProcessing[index] && (
+                          <div className="d-flex align-items-center gap-2 text-primary mb-2">
+                            <span className="spinner-border spinner-border-sm"></span>
+                            <span>Processing...</span>
+                          </div>
+                        )}
+                        {optionImages[index] && !optionImageProcessing[index] && (
                           <div className="position-relative d-inline-block">
-                            <img 
-                              src={optionImages[index]} 
+                            <img
+                              src={optionImages[index]}
                               alt={`Option ${index + 1}`}
                               style={{ maxWidth: 120, maxHeight: 80, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
                             />
@@ -446,17 +659,47 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
             )}
           </div>
 
-          {/* Max Options Allowed */}
+          {/* Options Selection Rule */}
           <div className="mb-3">
-            <label className="form-label fw-bold">Max Options Allowed:</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={formikValues.maxOptionsAllowed}
-              onChange={e => setFormikValues(v => ({ ...v, maxOptionsAllowed: e.target.value }))}
-              className="form-control w-25"
-            />
+            <label className="form-label fw-bold">Options Selection Rule:</label>
+            <div className="d-flex gap-3 align-items-center">
+              <select
+                className="form-select"
+                style={{ width: 180 }}
+                value={formikValues.optionsRule}
+                onChange={e =>
+                  setFormikValues(v => ({
+                    ...v,
+                    optionsRule: e.target.value as "min" | "max" | "equal"
+                  }))
+                }
+              >
+                <option value="min">At least (Min)</option>
+                <option value="max">At most (Max)</option>
+                <option value="equal">Exactly (Equal)</option>
+              </select>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={formikValues.optionsCount}
+                onChange={e =>
+                  setFormikValues(v => ({
+                    ...v,
+                    optionsCount: e.target.value,
+                    maxOptionsAllowed: e.target.value
+                  }))
+                }
+                placeholder="N"
+                className="form-control"
+                style={{ width: 120 }}
+              />
+              <span className="text-muted small">
+                {formikValues.optionsRule === "min" && "Student must select at least N options"}
+                {formikValues.optionsRule === "max" && "Student can select up to N options"}
+                {formikValues.optionsRule === "equal" && "Question is answered only when exactly N options are selected"}
+              </span>
+            </div>
           </div>
 
           {/* Use MQT as Options / Use Game as Option */}
@@ -502,7 +745,71 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
           </Button>
         </Modal.Footer>
       </form>
+
     </Modal>
+
+    {/* Confirmation popup — rendered via portal to document.body so it sits on top of everything */}
+    {pendingImage && createPortal(
+      <div
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        onClick={() => setPendingImage(null)}
+      >
+        <div
+          style={{
+            background: '#fff', borderRadius: 12, padding: 24,
+            maxWidth: 450, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h5 className="mb-3 text-center">Confirm Image</h5>
+          <p className="text-muted text-center mb-2">
+            Image has been compressed, resized and converted to WebP.
+          </p>
+          <div className="mb-3 p-2 rounded" style={{ background: '#f8f9fa', fontSize: 13 }}>
+            <div className="d-flex justify-content-between mb-1">
+              <span className="text-muted">Original:</span>
+              <span>{pendingImage.originalWidth} x {pendingImage.originalHeight} &middot; {(pendingImage.originalSize / 1024).toFixed(1)} KB</span>
+            </div>
+            <div className="d-flex justify-content-between">
+              <span className="text-muted">After processing:</span>
+              <span className="text-success fw-bold">{pendingImage.finalWidth} x {pendingImage.finalHeight} &middot; {(pendingImage.finalSize / 1024).toFixed(1)} KB</span>
+            </div>
+            {pendingImage.originalSize > pendingImage.finalSize && (
+              <div className="text-center mt-1">
+                <span className="badge bg-success">
+                  {Math.round((1 - pendingImage.finalSize / pendingImage.originalSize) * 100)}% smaller
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="text-center mb-3">
+            <img
+              src={pendingImage.base64}
+              alt="Processed preview"
+              style={{ maxWidth: '100%', maxHeight: 250, objectFit: 'contain', borderRadius: 8, border: '1px solid #ddd' }}
+            />
+          </div>
+          <div className="d-flex justify-content-center gap-3">
+            <Button variant="outline-secondary" onClick={() => setPendingImage(null)}>Cancel</Button>
+            <Button variant="primary" onClick={() => {
+              if (pendingImage.source === 'question') {
+                setQuestionMediaBase64(pendingImage.base64);
+              } else {
+                setOptionImages(prev => ({ ...prev, [(pendingImage as any).index]: pendingImage.base64 }));
+              }
+              setPendingImage(null);
+            }}>Confirm</Button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import http from '../api/http';
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
@@ -26,18 +26,38 @@ type DemographicField = {
 
 const DemographicDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { assessmentId } = useParams<{ assessmentId: string }>();
-  const { fetchAssessmentData } = useAssessment();
+  const { fetchAssessmentData, assessmentConfig } = useAssessment();
   usePreventReload();
 
   const [fields, setFields] = useState<DemographicField[]>([]);
   const [values, setValues] = useState<Record<number, string>>({});
   const [multiValues, setMultiValues] = useState<Record<number, string[]>>({});
+  const [otherValues, setOtherValues] = useState<Record<number, string>>({});
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [touched, setTouched] = useState<Record<number, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Treat values matching 'other'/'others' as the catch-all custom option
+  const isOtherValue = (v: string | undefined | null): boolean => {
+    if (!v) return false;
+    const t = v.trim().toLowerCase();
+    return t === "other" || t === "others";
+  };
+
+  const fieldHasOtherOption = (field: DemographicField): boolean =>
+    field.options?.some(
+      (o) => isOtherValue(o.optionValue) || isOtherValue(o.optionLabel)
+    ) ?? false;
+
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactErrors, setContactErrors] = useState<{ email?: string; phone?: string }>({});
+  const [contactTouched, setContactTouched] = useState<{ email?: boolean; phone?: boolean }>({});
+
+  const collectEmailAndPhone = assessmentConfig?.collectEmailAndPhone !== false;
   const userStudentId = localStorage.getItem('userStudentId');
 
   useEffect(() => {
@@ -45,34 +65,66 @@ const DemographicDetailsPage: React.FC = () => {
       navigate('/student-login');
       return;
     }
-    fetchFields();
+    if (collectEmailAndPhone) {
+      fetchContactInfo();
+    }
+    // Use fields passed from AllottedAssessmentPage to avoid duplicate fetch
+    const passedFields = (location.state as any)?.demographicFields;
+    if (passedFields) {
+      initFields(passedFields);
+    } else {
+      fetchFields();
+    }
   }, [assessmentId, userStudentId]);
+
+  const fetchContactInfo = async () => {
+    try {
+      const res = await http.get(`/student-demographics/contact-info/${userStudentId}`);
+      setContactEmail(res.data.email || '');
+      setContactPhone(res.data.phoneNumber || '');
+    } catch (error) {
+      console.error('Error fetching contact info:', error);
+    }
+  };
+
+  const validateContactEmail = (value: string): string => {
+    if (!value.trim()) return '';
+    if (!/^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/.test(value)) return 'Invalid email format';
+    return '';
+  };
+
+  const validateContactPhone = (value: string): string => {
+    if (!value.trim()) return '';
+    if (!/^[0-9]{10}$/.test(value)) return 'Phone number must be 10 digits';
+    return '';
+  };
+
+  const initFields = (fieldData: DemographicField[]) => {
+    setFields(fieldData);
+    const initialValues: Record<number, string> = {};
+    const initialMulti: Record<number, string[]> = {};
+    for (const field of fieldData) {
+      if (field.dataType === 'SELECT_MULTI') {
+        initialMulti[field.fieldId] = field.currentValue
+          ? field.currentValue.split(',')
+          : [];
+      } else {
+        initialValues[field.fieldId] = field.currentValue || field.defaultValue || '';
+      }
+    }
+    setValues(initialValues);
+    setMultiValues(initialMulti);
+    setIsLoading(false);
+  };
 
   const fetchFields = async () => {
     try {
       const response = await http.get(
         `/student-demographics/fields/${assessmentId}/${userStudentId}`
       );
-      const fieldData: DemographicField[] = response.data;
-      setFields(fieldData);
-
-      // Pre-fill values
-      const initialValues: Record<number, string> = {};
-      const initialMulti: Record<number, string[]> = {};
-      for (const field of fieldData) {
-        if (field.dataType === 'SELECT_MULTI') {
-          initialMulti[field.fieldId] = field.currentValue
-            ? field.currentValue.split(',')
-            : [];
-        } else {
-          initialValues[field.fieldId] = field.currentValue || field.defaultValue || '';
-        }
-      }
-      setValues(initialValues);
-      setMultiValues(initialMulti);
+      initFields(response.data);
     } catch (error) {
       console.error('Error fetching demographic fields:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -148,26 +200,24 @@ const DemographicDetailsPage: React.FC = () => {
     }
   };
 
-  const startAssessmentAndNavigate = async () => {
-    await http.post('/assessments/startAssessment', {
-      userStudentId: Number(userStudentId),
-      assessmentId: Number(assessmentId),
-    });
-    await fetchAssessmentData(String(assessmentId));
-    navigate('/general-instructions');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Mark all as touched
+    // Validate contact fields only if collecting
+    let hasError = false;
+    if (collectEmailAndPhone) {
+      const emailErr = validateContactEmail(contactEmail);
+      const phoneErr = validateContactPhone(contactPhone);
+      setContactTouched({ email: true, phone: true });
+      setContactErrors({ email: emailErr || undefined, phone: phoneErr || undefined });
+      hasError = !!emailErr || !!phoneErr;
+    }
+
     const allTouched: Record<number, boolean> = {};
     fields.forEach((f) => (allTouched[f.fieldId] = true));
     setTouched(allTouched);
 
-    // Validate all
     const newErrors: Record<number, string> = {};
-    let hasError = false;
     for (const field of fields) {
       const value =
         field.dataType === 'SELECT_MULTI'
@@ -191,28 +241,62 @@ const DemographicDetailsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const responses = fields.map((field) => ({
-        fieldId: field.fieldId,
-        value:
-          field.dataType === 'SELECT_MULTI'
-            ? (multiValues[field.fieldId] || []).join(',')
-            : values[field.fieldId] || '',
-      }));
+      // Save contact info only if collecting
+      if (collectEmailAndPhone) {
+        await http.post(`/student-demographics/contact-info/${userStudentId}`, {
+          email: contactEmail.trim(),
+          phoneNumber: contactPhone.trim(),
+        });
+      }
 
-      await http.post('/student-demographics/submit', {
-        userStudentId: Number(userStudentId),
-        assessmentId: Number(assessmentId),
-        responses,
-      });
+      // Save dynamic demographics if any
+      if (fields.length > 0) {
+        const responses = fields.map((field) => {
+          let value: string;
+          if (field.dataType === 'SELECT_MULTI') {
+            value = (multiValues[field.fieldId] || []).join(',');
+          } else {
+            const raw = values[field.fieldId] || '';
+            // If user selected "Other" and typed a custom value, send the custom value
+            if (
+              fieldHasOtherOption(field) &&
+              isOtherValue(raw) &&
+              (otherValues[field.fieldId] || '').trim()
+            ) {
+              value = otherValues[field.fieldId].trim();
+            } else {
+              value = raw;
+            }
+          }
+          return {
+            fieldId: field.fieldId,
+            value,
+          };
+        });
 
-      await startAssessmentAndNavigate();
+        await http.post('/student-demographics/submit', {
+          userStudentId: Number(userStudentId),
+          assessmentId: Number(assessmentId),
+          responses,
+        });
+      }
+
+      await Promise.all([
+        http.post('/assessments/startAssessment', {
+          userStudentId: Number(userStudentId),
+          assessmentId: Number(assessmentId),
+        }),
+        fetchAssessmentData(String(assessmentId)),
+      ]);
+
+      navigate('/general-instructions');
     } catch (error: any) {
       console.error('Error submitting demographics:', error);
       const errorData = error.response?.data;
       if (errorData?.validationErrors) {
         alert('Validation errors:\n' + errorData.validationErrors.join('\n'));
       } else {
-        alert(errorData?.error || 'Failed to submit demographics. Please try again.');
+        alert(errorData?.error || 'Failed to save demographics. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -248,9 +332,7 @@ const DemographicDetailsPage: React.FC = () => {
               }}
             />
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -280,9 +362,7 @@ const DemographicDetailsPage: React.FC = () => {
               }}
             />
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -309,9 +389,7 @@ const DemographicDetailsPage: React.FC = () => {
               }}
             />
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -323,25 +401,25 @@ const DemographicDetailsPage: React.FC = () => {
               <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
                 {label} {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
               </label>
-              <div className="d-flex gap-3 flex-wrap">
+              <div className="d-flex gap-2 gap-md-3 flex-wrap">
                 {field.options.map((option) => (
                   <label
                     key={option.optionId}
                     style={{
                       flex: field.options.length <= 2 ? 1 : undefined,
-                      padding: '0.75rem 1rem',
+                      padding: '0.6rem 0.85rem',
                       border: `2px solid ${
                         error && isTouched
                           ? '#e53e3e'
                           : values[field.fieldId] === option.optionValue
-                          ? '#667eea'
+                          ? '#5DD68D'
                           : '#e2e8f0'
                       }`,
                       borderRadius: '10px',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       background:
-                        values[field.fieldId] === option.optionValue ? '#eef2ff' : 'white',
+                        values[field.fieldId] === option.optionValue ? '#ECFDF5' : 'white',
                       display: 'flex',
                       alignItems: 'center',
                     }}
@@ -353,24 +431,35 @@ const DemographicDetailsPage: React.FC = () => {
                       checked={values[field.fieldId] === option.optionValue}
                       onChange={(e) => handleChange(field.fieldId, e.target.value)}
                       onBlur={() => handleBlur(field.fieldId)}
-                      style={{
-                        width: '20px',
-                        height: '20px',
-                        marginRight: '0.75rem',
-                        cursor: 'pointer',
-                        accentColor: '#667eea',
-                      }}
+                      style={{ width: '18px', height: '18px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#5DD68D' }}
                     />
-                    <span style={{ fontSize: '0.95rem', color: '#2d3748' }}>
-                      {option.optionLabel}
-                    </span>
+                    <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
                   </label>
                 ))}
               </div>
+              {/* "Other" custom textbox for radio-style single-select */}
+              {fieldHasOtherOption(field) && isOtherValue(values[field.fieldId]) && (
+                <input
+                  type="text"
+                  placeholder={`Please specify ${label.toLowerCase()}`}
+                  value={otherValues[field.fieldId] || ''}
+                  onChange={(e) =>
+                    setOtherValues((prev) => ({ ...prev, [field.fieldId]: e.target.value }))
+                  }
+                  style={{
+                    marginTop: '0.6rem',
+                    width: '100%',
+                    borderRadius: '10px',
+                    padding: '0.6rem 0.85rem',
+                    border: '2px solid #e2e8f0',
+                    fontSize: '0.92rem',
+                    backgroundColor: '#ffffff',
+                    color: '#2d3748',
+                  }}
+                />
+              )}
               {error && isTouched && (
-                <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                  {error}
-                </div>
+                <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
               )}
             </div>
           );
@@ -396,15 +485,32 @@ const DemographicDetailsPage: React.FC = () => {
             >
               <option value="">Select an option</option>
               {field.options.map((option) => (
-                <option key={option.optionId} value={option.optionValue}>
-                  {option.optionLabel}
-                </option>
+                <option key={option.optionId} value={option.optionValue}>{option.optionLabel}</option>
               ))}
             </select>
+            {/* "Other" custom textbox for dropdown-style single-select */}
+            {fieldHasOtherOption(field) && isOtherValue(values[field.fieldId]) && (
+              <input
+                type="text"
+                placeholder={`Please specify ${label.toLowerCase()}`}
+                value={otherValues[field.fieldId] || ''}
+                onChange={(e) =>
+                  setOtherValues((prev) => ({ ...prev, [field.fieldId]: e.target.value }))
+                }
+                style={{
+                  marginTop: '0.6rem',
+                  width: '100%',
+                  borderRadius: '10px',
+                  padding: '0.6rem 0.85rem',
+                  border: '2px solid #e2e8f0',
+                  fontSize: '0.92rem',
+                  backgroundColor: '#ffffff',
+                  color: '#2d3748',
+                }}
+              />
+            )}
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -422,11 +528,11 @@ const DemographicDetailsPage: React.FC = () => {
                   <label
                     key={option.optionId}
                     style={{
-                      padding: '0.5rem 1rem',
-                      border: `2px solid ${isChecked ? '#667eea' : '#e2e8f0'}`,
+                      padding: '0.4rem 0.85rem',
+                      border: `2px solid ${isChecked ? '#5DD68D' : '#e2e8f0'}`,
                       borderRadius: '10px',
                       cursor: 'pointer',
-                      background: isChecked ? '#eef2ff' : 'white',
+                      background: isChecked ? '#ECFDF5' : 'white',
                       display: 'flex',
                       alignItems: 'center',
                       transition: 'all 0.2s ease',
@@ -435,29 +541,17 @@ const DemographicDetailsPage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      onChange={(e) =>
-                        handleMultiChange(field.fieldId, option.optionValue, e.target.checked)
-                      }
+                      onChange={(e) => handleMultiChange(field.fieldId, option.optionValue, e.target.checked)}
                       onBlur={() => handleBlur(field.fieldId)}
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        marginRight: '0.5rem',
-                        cursor: 'pointer',
-                        accentColor: '#667eea',
-                      }}
+                      style={{ width: '16px', height: '16px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#5DD68D' }}
                     />
-                    <span style={{ fontSize: '0.95rem', color: '#2d3748' }}>
-                      {option.optionLabel}
-                    </span>
+                    <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
                   </label>
                 );
               })}
             </div>
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -467,18 +561,18 @@ const DemographicDetailsPage: React.FC = () => {
     }
   };
 
+  const inputStyle = (hasError: boolean) => ({
+    borderRadius: '10px',
+    padding: '0.75rem',
+    border: `2px solid ${hasError ? '#e53e3e' : '#e2e8f0'}`,
+    fontSize: '0.95rem',
+    backgroundColor: '#ffffff',
+    color: '#2d3748',
+    transition: 'border-color 0.2s ease',
+  });
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "2rem 1rem",
-        colorScheme: "light",
-      }}
-    >
+    <div className="assessment-bg assessment-bg--scrollable">
       {isLoading ? (
         <div className="text-center">
           <div className="spinner-border text-light" role="status" style={{ width: "3rem", height: "3rem" }}>
@@ -486,141 +580,114 @@ const DemographicDetailsPage: React.FC = () => {
           </div>
           <p className="mt-3 text-white fw-semibold">Loading your information...</p>
         </div>
-      ) : fields.length === 0 ? (
-        <div
-          className="card shadow-lg"
-          style={{
-            width: "100%",
-            maxWidth: "650px",
-            borderRadius: "20px",
-            border: "none",
-            background: "#ffffff",
-          }}
-        >
-          <div className="card-body p-5 text-center">
-            <p className="text-muted">No demographic fields configured for this assessment.</p>
-            <button
-              className="btn"
-              onClick={async () => {
-                setIsSubmitting(true);
-                try {
-                  await startAssessmentAndNavigate();
-                } catch (error) {
-                  console.error('Error starting assessment:', error);
-                  alert('Failed to start assessment. Please try again.');
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
-              disabled={isSubmitting}
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                color: "white",
-                padding: "0.875rem 2rem",
-                borderRadius: "10px",
-                fontSize: "1.05rem",
-                fontWeight: 600,
-                border: "none",
-                boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-              }}
-            >
-              {isSubmitting ? 'Loading...' : 'Continue to Assessment'}
-            </button>
-          </div>
-        </div>
       ) : (
-        <div
-          className="card shadow-lg"
-          style={{
-            width: "100%",
-            maxWidth: "650px",
-            borderRadius: "20px",
-            border: "none",
-            background: "#ffffff",
-            colorScheme: "light",
-          }}
-        >
-          <div className="card-body p-5" style={{ background: "#ffffff", color: "#2d3748", borderRadius: "20px" }}>
-            {/* Header */}
-            <div className="text-center mb-4">
-              <div
-                style={{
-                  width: "70px",
-                  height: "70px",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 1rem",
-                  boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-                }}
-              >
-                <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+        <div className="container">
+          <div className="row justify-content-center">
+            <div className="col-12 col-md-8 col-lg-6 col-xl-5">
+              <div className="assessment-card card shadow-lg">
+                <div className="card-body p-3 p-sm-4 p-md-5">
+                  {/* Header */}
+                  <div className="text-center mb-4">
+                    <div className="assessment-icon-circle assessment-icon-circle--sm mx-auto mb-3">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                    <h2 className="assessment-heading" style={{ fontSize: '1.5rem' }}>Your Details</h2>
+                    <p className="assessment-subheading" style={{ marginBottom: 0 }}>Please verify your contact information to continue</p>
+                  </div>
+
+                  <form onSubmit={handleSubmit} noValidate>
+                    {/* Contact Info Section — only if collectEmailAndPhone */}
+                    {collectEmailAndPhone && (
+                      <>
+                        <div className="mb-3">
+                          <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
+                            Email Address
+                          </label>
+                          <input
+                            type="email"
+                            className={`form-control ${contactErrors.email && contactTouched.email ? 'is-invalid' : ''}`}
+                            placeholder="you@example.com"
+                            value={contactEmail}
+                            onChange={(e) => {
+                              setContactEmail(e.target.value);
+                              if (contactTouched.email) {
+                                setContactErrors((prev) => ({ ...prev, email: validateContactEmail(e.target.value) || undefined }));
+                              }
+                            }}
+                            onBlur={() => {
+                              setContactTouched((prev) => ({ ...prev, email: true }));
+                              setContactErrors((prev) => ({ ...prev, email: validateContactEmail(contactEmail) || undefined }));
+                            }}
+                            style={inputStyle(!!(contactErrors.email && contactTouched.email))}
+                          />
+                          {contactErrors.email && contactTouched.email && (
+                            <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.email}</div>
+                          )}
+                        </div>
+
+                        <div className="mb-3">
+                          <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
+                            Phone Number
+                          </label>
+                          <input
+                            type="tel"
+                            className={`form-control ${contactErrors.phone && contactTouched.phone ? 'is-invalid' : ''}`}
+                            placeholder="10-digit phone number"
+                            value={contactPhone}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              setContactPhone(val);
+                              if (contactTouched.phone) {
+                                setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(val) || undefined }));
+                              }
+                            }}
+                            onBlur={() => {
+                              setContactTouched((prev) => ({ ...prev, phone: true }));
+                              setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(contactPhone) || undefined }));
+                            }}
+                            style={inputStyle(!!(contactErrors.phone && contactTouched.phone))}
+                          />
+                          {contactErrors.phone && contactTouched.phone && (
+                            <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.phone}</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Divider + dynamic fields */}
+                    {fields.length > 0 && (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0' }}>
+                          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                          <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Additional Details</span>
+                          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                        </div>
+                        {fields.map((field) => renderField(field))}
+                      </>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="btn btn-assessment-primary w-100 mt-4 py-2 py-md-3"
+                      disabled={isSubmitting}
+                      style={{ fontSize: '1rem', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Saving...
+                        </>
+                      ) : (
+                        "Save and Continue to Assessment"
+                      )}
+                    </button>
+                  </form>
+                </div>
               </div>
-              <h2
-                style={{
-                  fontSize: "2rem",
-                  fontWeight: 700,
-                  color: "#2d3748",
-                  marginBottom: "0.5rem",
-                }}
-              >
-                Demographic Details
-              </h2>
-              <p style={{ color: "#718096", fontSize: "1rem" }}>
-                Please provide your information to continue
-              </p>
             </div>
-
-            <form onSubmit={handleSubmit} noValidate>
-              {fields.map((field) => renderField(field))}
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                className="btn w-100 mt-3"
-                disabled={isSubmitting}
-                style={{
-                  background: isSubmitting
-                    ? "#a0aec0"
-                    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "white",
-                  padding: "0.875rem",
-                  borderRadius: "10px",
-                  fontSize: "1.05rem",
-                  fontWeight: 600,
-                  border: "none",
-                  boxShadow: isSubmitting ? "none" : "0 4px 15px rgba(102, 126, 234, 0.4)",
-                  transition: "all 0.3s ease",
-                  cursor: isSubmitting ? "not-allowed" : "pointer",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.5)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 4px 15px rgba(102, 126, 234, 0.4)";
-                  }
-                }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Saving...
-                  </>
-                ) : (
-                  "Save and Continue to Assessment"
-                )}
-              </button>
-            </form>
           </div>
         </div>
       )}

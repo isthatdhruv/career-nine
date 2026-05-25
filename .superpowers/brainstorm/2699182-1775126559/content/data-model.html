@@ -1,0 +1,121 @@
+<h2>Counselling Scheduling — Data Model</h2>
+<p class="subtitle">7 new entities, integrated with existing User/UserStudent models</p>
+
+<div class="section">
+  <h3>Entity Relationship Overview</h3>
+  <div class="mockup">
+    <div class="mockup-header">Entity Relationships</div>
+    <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 13px; line-height: 1.6;">
+      <pre style="margin:0; white-space: pre-wrap;">
+┌──────────────────────┐       ┌─────────────────────────┐
+│     COUNSELLOR       │       │    AVAILABILITY         │
+│──────────────────────│       │    TEMPLATE             │
+│ id (PK)              │──┐    │─────────────────────────│
+│ user_id (FK → User)  │  │    │ id (PK)                 │
+│ name                 │  ├───▶│ counsellor_id (FK)      │
+│ email                │  │    │ day_of_week (MON-SUN)   │
+│ phone                │  │    │ start_time              │
+│ specializations      │  │    │ end_time                │
+│ bio                  │  │    │ default_slot_duration    │
+│ is_external          │  │    │ is_active               │
+│ onboarding_status    │  │    └─────────────────────────┘
+│ is_active            │  │
+│ profile_image_url    │  │    ┌─────────────────────────┐
+│ created_at           │  │    │   COUNSELLING_SLOT      │
+│ updated_at           │  │    │─────────────────────────│
+└──────────────────────┘  ├───▶│ id (PK)                 │
+                          │    │ counsellor_id (FK)       │
+                          │    │ template_id (FK, nullable│
+┌──────────────────────┐  │    │ date                    │
+│  User (existing)     │  │    │ start_time              │
+│──────────────────────│  │    │ end_time                │
+│ id                   │  │    │ duration_minutes        │
+│ name, email...       │  │    │ status (AVAILABLE /     │
+└──────────────────────┘  │    │   REQUESTED / ASSIGNED /│
+       ▲                  │    │   CONFIRMED / COMPLETED │
+       │                  │    │   / CANCELLED)          │
+┌──────────────────────┐  │    │ is_manually_created     │
+│ UserStudent (exists)  │  │    │ created_at              │
+│──────────────────────│  │    └──────────┬──────────────┘
+│ userStudentId        │  │               │
+│ userId (FK → User)   │  │               │ 1:1
+│ institute_id         │  │               ▼
+└──────────┬───────────┘  │    ┌─────────────────────────┐
+           │              │    │ COUNSELLING_APPOINTMENT  │
+           │              │    │─────────────────────────│
+           └──────────────┼───▶│ id (PK)                 │
+                          │    │ slot_id (FK)             │
+                          │    │ student_id (FK→UserStud) │
+                          │    │ counsellor_id (FK)       │
+                          │    │ assigned_by (FK→User)    │
+                          │    │ status (PENDING /        │
+                          │    │   ASSIGNED / CONFIRMED / │
+                          │    │   COMPLETED / CANCELLED /│
+                          │    │   RESCHEDULED)           │
+                          │    │ student_reason           │
+                          │    │ meeting_link             │
+                          │    │ meeting_link_source      │
+                          │    │   (AUTO / MANUAL)        │
+                          │    │ created_at               │
+                          │    │ updated_at               │
+                          │    └──────────┬──────────────┘
+                          │               │
+                          │               │ 1:1
+                          │               ▼
+                          │    ┌─────────────────────────┐
+                          │    │   SESSION_NOTES         │
+                          │    │─────────────────────────│
+                          │    │ id (PK)                  │
+                          │    │ appointment_id (FK)      │
+                          │    │ key_discussion_points    │
+                          │    │ action_items             │
+                          │    │ recommended_next_session │
+                          │    │ followup_required (bool) │
+                          │    │ public_remarks           │
+                          │    │ private_notes            │
+                          │    │ created_at               │
+                          │    │ updated_at               │
+                          │    └─────────────────────────┘
+
+┌─────────────────────────┐    ┌─────────────────────────┐
+│  APPOINTMENT_AUDIT_LOG  │    │   NOTIFICATION          │
+│─────────────────────────│    │─────────────────────────│
+│ id (PK)                 │    │ id (PK)                  │
+│ appointment_id (FK)     │    │ user_id (FK → User)      │
+│ action (CREATED /       │    │ type (BOOKING_RECEIVED / │
+│   ASSIGNED / CONFIRMED /│    │   ASSIGNED / CONFIRMED / │
+│   CANCELLED /           │    │   CANCELLED / REMINDER / │
+│   RESCHEDULED)          │    │   RESCHEDULED)           │
+│ performed_by (FK→User)  │    │ title                    │
+│ old_values (JSON)       │    │ message                  │
+│ new_values (JSON)       │    │ reference_id             │
+│ reason                  │    │ reference_type           │
+│ timestamp               │    │ is_read (bool)           │
+└─────────────────────────┘    │ created_at               │
+                               └─────────────────────────┘
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key Design Decisions</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 16px;">
+      <h4 style="color: #64ffda; margin-top: 0;">Counsellor ≠ Faculty</h4>
+      <p style="color: #aaa; font-size: 14px;">Standalone entity with optional User link. Supports both internal staff and external professionals with onboarding flow.</p>
+    </div>
+    <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 16px;">
+      <h4 style="color: #64ffda; margin-top: 0;">Slot ↔ Appointment: 1:1</h4>
+      <p style="color: #aaa; font-size: 14px;">Each slot can have at most one appointment. Slot tracks availability state, appointment tracks the booking lifecycle.</p>
+    </div>
+    <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 16px;">
+      <h4 style="color: #64ffda; margin-top: 0;">Template → Slot Materialization</h4>
+      <p style="color: #aaa; font-size: 14px;">Daily cron job generates slots for next 4 weeks from active templates. template_id tracks origin; manually created slots have it null.</p>
+    </div>
+    <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 16px;">
+      <h4 style="color: #64ffda; margin-top: 0;">Generic Notification Table</h4>
+      <p style="color: #aaa; font-size: 14px;">Reusable for in-app bell + email triggers. reference_id + reference_type allow linking to any entity (appointment, slot, etc.).</p>
+    </div>
+  </div>
+</div>

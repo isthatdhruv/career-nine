@@ -52,6 +52,9 @@ public class AssessmentInstituteMapping implements Serializable {
     @Column(name = "token", nullable = false, unique = true, length = 36)
     private String token;
 
+    @Column(name = "amount")
+    private Long amount;
+
     @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean isActive = true;
 
@@ -127,6 +130,14 @@ public class AssessmentInstituteMapping implements Serializable {
 
     public void setSectionId(Integer sectionId) {
         this.sectionId = sectionId;
+    }
+
+    public Long getAmount() {
+        return amount;
+    }
+
+    public void setAmount(Long amount) {
+        this.amount = amount;
     }
 
     public String getToken() {

@@ -4,14 +4,13 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal, Spinner } from "react-bootstrap";
-import * as XLSX from "xlsx";
+import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
 
 // API imports
 import { ReadCollegeData } from "../../../College/API/College_APIs";
 import { ReadQuestionSectionData } from "../../../QuestionSections/API/Question_Section_APIs";
 import { ReadToolData } from "../../../Tool/API/Tool_APIs";
 import { ReadQuestionsDataList, ReadQuestionByIdData } from "../../../AssesmentQuestions/API/Question_APIs";
-import { CreateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadLanguageData } from "../../API/Create_Assessment_APIs";
 
 // Component imports
@@ -20,10 +19,10 @@ import QuestionSectionCreateModal from "../../../QuestionSections/components/Que
 import ToolCreateModal from "../../../Tool/components/ToolCreateModal";
 import QuestionCreateModal from "../../../AssesmentQuestions/components/QuestionCreateModal";
 import QuestionLanguageModal from "../../../AssesmentQuestions/components/QuestionLanguageModal";
-import { QuestionTable } from "../../../AssesmentQuestions/components";
 import SectionQuestionSelector from "../SectionQuestionSelector";
-import { time } from "console";
 import { CreateQuestionaire} from "../../API/Create_Questionaire_APIs";
+import PageHeader from "../../../../components/PageHeader";
+import MarkdownInstructionEditor from "../../../../components/MarkdownInstructionEditor";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
@@ -78,18 +77,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [showToolModal, setShowToolModal] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  
-  // File upload states
-  const [fileName, setFileName] = useState("");
-  const [tableData, setTableData] = useState<{
-    columns: { label: string; field: string; sort: string; width: number }[];
-    rows: any[];
-  }>({
-    columns: [],
-    rows: [],
-  });
 
   const [pageLoadingState, setPageLoadingState] = useState(["false"]);
   
@@ -118,7 +106,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
         // navigate('/questionares');
       }
     } else {
-      console.log("Adista is cool but fool")
       // Redirect back if no data
       // navigate('/questionares/create');
     }
@@ -278,43 +265,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
     if (!showQuestionModal) fetchQuestions();
   }, [showQuestionModal]);
 
-  // File upload handler
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const allowedExtensions = [".xlsx", ".xls"];
-    const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-
-    if (!allowedExtensions.includes(fileExtension)) {
-      alert("❌ Only Excel files (.xlsx, .xls) are allowed!");
-      event.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: "array" });
-      const worksheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[worksheetName];
-      
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      if (jsonData.length > 0) {
-        const keys = Object.keys(jsonData[0] as object);
-        const columns = keys.map(key => ({
-          label: key,
-          field: key,
-          sort: 'asc',
-          width: 150
-        }));
-        setTableData({ columns, rows: jsonData });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    setFileName(file.name);
-    setShowUploadModal(false);
-  };
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
@@ -343,7 +293,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
 
           // Language object must be valid
           if (!langObj || !langObj.languageId) {
-            console.warn(`Language not found for general instructions: ${langName}`);
             return null;
           }
 
@@ -357,8 +306,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
           };
         })
         .filter((lang: any) => lang !== null);
-
-      console.log("Languages payload (with instructions):", languagesPayload);
 
       // Build the sections array with questions and instructions
       const sectionsPayload = (values.sectionIds || []).map((sectionId: string, sectionIdx: number) => {
@@ -423,7 +370,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
 
             // Language object must be valid
             if (!langObj || !langObj.languageId) {
-              console.warn(`Language not found for: ${langName}`);
               return null;
             }
 
@@ -437,8 +383,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
             };
           })
           .filter((inst: any) => inst !== null); // Remove null entries
-
-        console.log(`Section ${sectionId} instructions payload:`, instructionPayload);
 
         return {
           questionnaireSectionId: null, // New entry
@@ -464,20 +408,12 @@ const QuestionareCreateSinglePage: React.FC = () => {
         createdAt: ""
       };
       
-      console.log("=== COMPLETE ASSESSMENT PAYLOAD ===");
-      console.log(JSON.stringify(completePayload, null, 2));
-      
-      // Show alert with summary
-      const totalQuestions = sectionsPayload.reduce((acc: number, s: any) => acc + (s.questions?.length || 0), 0);
-      alert(`Questionare data prepared successfully!\n\nSummary:\n- Name: ${completePayload.name}\n- Tool: ${toolPayload.name || toolPayload.toolId}\n- Languages: ${values.languages?.length || 0}\n- Sections: ${sectionsPayload.length}\n- Total Questions: ${totalQuestions}\n\nCheck console for complete data.`);
-      
       // Clear localStorage
       localStorage.removeItem('questionareStep2');
-      
-      // Uncomment below when ready to actually create questionare
+
       const response = await CreateQuestionaire(completePayload);
       if (response.status === 200 || response.status === 201) {
-        alert("✅ Questionare created successfully!");
+        showSuccessToast("Questionare created successfully!");
         navigate("/questionaire/List");
       } else {
         throw new Error("Failed to create questionare");
@@ -485,7 +421,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
       
     } catch (error) {
       console.error("Error creating questionare:", error);
-      alert("❌ Error creating questionare. Please try again.");
+      showErrorToast("Error creating questionare. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -497,20 +433,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
     setShowTranslationModal(true);
   };
 
-  // build preSectionQuestions from questions fetched (auto-check)
-  useEffect(() => {
-    const map: { [k: string]: string[] } = {};
-    (questions || []).forEach((q: any) => {
-      const sid = q?.section?.sectionId ?? q?.sectionId ?? q?.section?.id;
-      const qid = String(q?.questionId ?? q?.id ?? "");
-      if (sid && qid) {
-        const s = String(sid);
-        if (!map[s]) map[s] = [];
-        if (!map[s].includes(qid)) map[s].push(qid);
-      }
-    });
-    setPreSectionQuestions(map);
-  }, [questions]);
+  // No auto-population of questions on create - start with empty assignments
 
   // Show loading screen while data is being fetched
   if (dataLoading) {
@@ -574,24 +497,46 @@ const QuestionareCreateSinglePage: React.FC = () => {
   }
 
   return (
-    <div className="container-fluid py-5">
-      <div className="row justify-content-center">
-        <div className="col-12 col-xl-10">
+    <div className="ph-page">
+      <div className="container-fluid py-5">
+        <div className="row justify-content-center">
+          <div className="col-12 col-xl-10">
+            <PageHeader
+              icon={<i className="bi bi-journal-plus" />}
+              title="Create Questionnaire"
+              subtitle={
+                questionareData ? (
+                  <>
+                    <strong>{questionareData.name}</strong>
+                    {" · Mode: "}
+                    <strong>{questionareData.mode?.toUpperCase?.()}</strong>
+                    {" · College: "}
+                    <strong>
+                      {colleges.find(
+                        (c) =>
+                          c.instituteCode === questionareData.collegeId ||
+                          c.id === questionareData.collegeId
+                      )?.instituteName || questionareData.collegeId}
+                    </strong>
+                    {questionareData.schoolContactIds?.length > 0 && (
+                      <>
+                        {" · School Contacts: "}
+                        <strong>{questionareData.schoolContactIds.length}</strong>
+                      </>
+                    )}
+                    {questionareData.career9ContactIds?.length > 0 && (
+                      <>
+                        {" · Career-9 Contacts: "}
+                        <strong>{questionareData.career9ContactIds.length}</strong>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  "Complete questionnaire setup"
+                )
+              }
+            />
           <div className="card shadow-sm">
-            <div className="card-header text-center">
-              <h1 className="mb-2 py-3">Complete Questionare Setup</h1>
-              {questionareData && (
-                <div className="mb-3">
-                  <h4 className="text-primary mb-1">{questionareData.name}</h4>
-                  <small className="text-muted">
-                    Mode: {questionareData.mode.toUpperCase()} | 
-                    College: {colleges.find(c => c.instituteCode === questionareData.collegeId || c.id === questionareData.collegeId)?.instituteName || questionareData.collegeId}
-                    {questionareData.schoolContactIds?.length > 0 && ` | School Contacts: ${questionareData.schoolContactIds.length}`}
-                    {questionareData.career9ContactIds?.length > 0 && ` | Career-9 Contacts: ${questionareData.career9ContactIds.length}`}
-                  </small>
-                </div>
-              )}
-            </div>
 
         <Formik
           enableReinitialize
@@ -820,15 +765,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
                           English Instructions (Default):
                         </label>
                         <Field name="instructions.English">
-                          {({ field }: any) => (
-                            <textarea
+                          {({ field, form }: any) => (
+                            <MarkdownInstructionEditor
                               name={field.name}
                               value={field.value || ""}
-                              rows={4}
+                              rows={5}
                               placeholder="Enter general instructions for the questionare in English"
-                              className="form-control form-control-lg form-control-solid"
-                              style={{ resize: "vertical" }}
-                              onChange={field.onChange}
+                              onChange={(v) => form.setFieldValue(field.name, v)}
                               onBlur={field.onBlur}
                             />
                           )}
@@ -851,15 +794,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
                                 {language} Instructions:
                               </label>
                               <Field name={`instructions.${language}`}>
-                                {({ field }: any) => (
-                                  <textarea
+                                {({ field, form }: any) => (
+                                  <MarkdownInstructionEditor
                                     name={field.name}
                                     value={field.value || ""}
-                                    rows={4}
+                                    rows={5}
                                     placeholder={`Enter general instructions for the questionare in ${language}`}
-                                    className="form-control form-control-lg form-control-solid"
-                                    style={{ resize: "vertical" }}
-                                    onChange={field.onChange}
+                                    onChange={(v) => form.setFieldValue(field.name, v)}
                                     onBlur={field.onBlur}
                                   />
                                 )}
@@ -1087,15 +1028,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
                                     English Instructions (Optional):
                                   </label>
                                   <Field name={`sectionInstructions.${sectionId}.English`}>
-                                    {({ field }: any) => (
-                                      <textarea
+                                    {({ field, form }: any) => (
+                                      <MarkdownInstructionEditor
                                         name={field.name}
                                         value={field.value || ""}
-                                        rows={3}
+                                        rows={4}
                                         placeholder={`Enter specific instructions for ${sectionName} in English`}
-                                        className="form-control form-control-solid"
-                                        style={{ resize: "vertical" }}
-                                        onChange={field.onChange}
+                                        onChange={(v) => form.setFieldValue(field.name, v)}
                                         onBlur={field.onBlur}
                                       />
                                     )}
@@ -1114,15 +1053,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
                                             {language} Instructions (Optional):
                                           </label>
                                           <Field name={`sectionInstructions.${sectionId}.${language}`}>
-                                            {({ field }: any) => (
-                                              <textarea
+                                            {({ field, form }: any) => (
+                                              <MarkdownInstructionEditor
                                                 name={field.name}
                                                 value={field.value || ""}
-                                                rows={3}
+                                                rows={4}
                                                 placeholder={`Enter specific instructions for ${sectionName} in ${language} (optional)`}
-                                                className="form-control form-control-solid"
-                                                style={{ resize: "vertical" }}
-                                                onChange={field.onChange}
+                                                onChange={(v) => form.setFieldValue(field.name, v)}
                                                 onBlur={field.onBlur}
                                               />
                                             )}
@@ -1287,6 +1224,24 @@ const QuestionareCreateSinglePage: React.FC = () => {
                                 return (
                                   <li key={questionId} className="list-group-item px-0">
                                     <p className="fw-bold mb-2">{index + 1}. {question ? question.questionText : `Question not found`}</p>
+                                    {question && question.questionImageUrl && (
+                                      <div className="mb-2 ps-4">
+                                        <img
+                                          src={question.questionImageUrl}
+                                          alt="Question"
+                                          style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8, objectFit: "contain" }}
+                                        />
+                                      </div>
+                                    )}
+                                    {question && question.questionVideoUrl && (
+                                      <div className="mb-2 ps-4">
+                                        <video
+                                          src={question.questionVideoUrl}
+                                          controls
+                                          style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8 }}
+                                        />
+                                      </div>
+                                    )}
                                     {question && question.options && question.options.length > 0 ? (
                                       <ul className="list-unstyled ps-4">
                                         {question.options.map((opt: any, optIndex: number) => (
@@ -1350,33 +1305,12 @@ const QuestionareCreateSinglePage: React.FC = () => {
           onHide={() => setShowTranslationModal(false)}
           questionId={translationQuestionId}
           targetLanguage={translationTargetLanguage}
-          setPageLoading={(isLoading) => setPageLoadingState(prev => [String(isLoading)])} 
+          setPageLoading={(isLoading) => setPageLoadingState(prev => [String(isLoading)])}
         />
 
-        {/* File Upload Modal */}
-        <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Upload Excel File</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-              className="form-control"
-            />
-            <small className="text-muted mt-2 d-block">
-              Only Excel files (.xlsx, .xls) are allowed
-            </small>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowUploadModal(false)}>
-              Cancel
-            </Button>
-          </Modal.Footer>
-        </Modal>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

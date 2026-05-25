@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadToolData } from "./API/Tool_APIs";
 import { ToolTable } from "./components";
+import PageHeader from "../../components/PageHeader";
 
 const ToolPage = () => {
   const [toolsData, setToolsData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]); 
+  const [sections, setSections] = useState<any[]>([]);
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
 
@@ -43,56 +41,55 @@ const ToolPage = () => {
 
   useEffect(() => {
     fetchQuestions();
-    
+
     if (pageLoading[0] === "true") {
       setPageLoading(["false"]);
     }
-  }, [pageLoading[0]]); 
+  }, [pageLoading[0]]);
 
 
   return (
-    <div className="card">
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-wrench-adjustable" />}
+        title="Tools"
+        subtitle={
+          loading ? (
+            "Loading..."
+          ) : (
+            <>
+              <strong>{toolsData.length}</strong> tools
+            </>
+          )
+        }
+        actions={[
+          {
+            label: "Add Tool",
+            iconClass: "bi-plus-lg",
+            onClick: () => navigate("/tools/create"),
+            variant: "primary",
+          },
+        ]}
+      />
+
       {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
-
-      {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Tools</h1>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "48px", textAlign: "center" }}>
+          <div className="spinner-border" style={{ color: "#0ea5e9" }} role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  navigate("/tools/create");
-                }}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Add Tool <MdQuestionAnswer size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-            </div>
-          </div>
+          <p className="mt-3" style={{ color: "#6b7280" }}>Loading tools...</p>
         </div>
       )}
 
       {!loading && (
-        <div className="card-body pt-5">
-          <ToolTable
-            data={toolsData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+          <div style={{ padding: "16px" }}>
+            <ToolTable
+              data={toolsData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
+          </div>
         </div>
       )}
     </div>

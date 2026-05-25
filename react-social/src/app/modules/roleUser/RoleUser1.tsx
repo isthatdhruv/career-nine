@@ -140,7 +140,7 @@ const RoleUserPage = () => {
                           <div className="col">
                             {/* <AsyncSelect
                               aria-label="Enter name"
-                              onInputChange={(data) => { console.log(data) }}
+                              onInputChange={(data) => { }}
                               noOptionsMessage={()=>{return "Enter Email address!"}}
                               {...formik.getFieldProps("name")}
                               className={clsx(

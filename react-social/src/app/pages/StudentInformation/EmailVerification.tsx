@@ -19,7 +19,6 @@ function EmailVerification() {
       const response = await axios.post('/api/verify-email', { email, otp });
       // TODO: Handle success case
     } catch (error) {
-      // console.log(error.response.data);
       // TODO: Handle error case
     }
   };

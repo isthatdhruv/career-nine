@@ -9,6 +9,7 @@ import {
   ReadMeasuredQualitiesData,
   UpdateMeasuredQualitiesData,
 } from "../API/Measured_Qualities_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
   measuredQualityName: Yup.string().required("Quality name is required"),
@@ -44,12 +45,8 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update Measured Quality:");
-        console.log("Quality ID:", values.measuredQualityId);
-        console.log("Values being sent:", values);
-
         if (!values.measuredQualityId) {
-          alert(
+          showErrorToast(
             "No question ID found. Please try navigating back and selecting the question again."
           );
           return;
@@ -62,9 +59,7 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
           // Explicitly exclude tools field to prevent relationship reset
         };
 
-        console.log("Values being sent:", updatePayload);
-        const response = await UpdateMeasuredQualitiesData(values.measuredQualityId, updatePayload);
-        console.log("Update successful:", response);
+        await UpdateMeasuredQualitiesData(values.measuredQualityId, updatePayload);
         navigate("/measured-qualities");
 
         if (props?.setPageLoading) {
@@ -82,9 +77,9 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
             (error as any).response?.data?.message ||
             (error as any).message ||
             "Unknown error occurred";
-          alert(`Failed to update question: ${errorMessage}`);
+          showErrorToast(`Failed to update question: ${errorMessage}`);
         } else {
-          alert("Failed to update question: Unknown error occurred");
+          showErrorToast("Failed to update question: Unknown error occurred");
         }
       } finally {
         setLoading(false);

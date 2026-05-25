@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllDemographicFields } from './API/DemographicField_APIs';
 import DemographicFieldTable from './components/DemographicFieldTable';
+import PageHeader from '../../components/PageHeader';
 
 const DemographicFieldsPage = () => {
   const navigate = useNavigate();
@@ -26,45 +27,63 @@ const DemographicFieldsPage = () => {
   }, []);
 
   return (
-    <div className='card'>
-      <div className='card-header border-0 pt-6'>
-        <div className='card-title'>
-          <h2>Demographic Fields</h2>
-        </div>
-        <div className='card-toolbar'>
-          <button
-            className='btn btn-primary'
-            onClick={() => navigate('/demographic-fields/create')}
-          >
-            + Create New Field
-          </button>
-        </div>
-      </div>
-      <div className='card-body py-4'>
-        {loading ? (
-          <div className='text-center py-20'>
-            <div className='spinner-border' role='status'>
-              <span className='visually-hidden'>Loading...</span>
-            </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-person-vcard" />}
+        title="Demographic Fields"
+        subtitle={
+          loading ? (
+            "Loading..."
+          ) : (
+            <>
+              <strong>{data.length}</strong> fields configured
+            </>
+          )
+        }
+        actions={[
+          {
+            label: "Create New Field",
+            iconClass: "bi-plus-lg",
+            onClick: () => navigate('/demographic-fields/create'),
+            variant: "primary",
+          },
+        ]}
+      />
+
+      {/* Loading */}
+      {loading && (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "48px", textAlign: "center" }}>
+          <div className="spinner-border" style={{ color: "#d97706" }} role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
-        ) : (
-          <DemographicFieldTable
-            data={data}
-            setPageLoading={setPageLoading}
-            refreshData={fetchData}
-          />
-        )}
-        {pageLoading && (
-          <div
-            className='position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center'
-            style={{ backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 9999 }}
-          >
-            <div className='spinner-border text-primary' role='status'>
-              <span className='visually-hidden'>Loading...</span>
-            </div>
+          <p className="mt-3" style={{ color: "#6b7280" }}>Loading demographic fields...</p>
+        </div>
+      )}
+
+      {/* Table */}
+      {!loading && (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+          <div style={{ padding: "16px" }}>
+            <DemographicFieldTable
+              data={data}
+              setPageLoading={setPageLoading}
+              refreshData={fetchData}
+            />
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Page loading overlay */}
+      {pageLoading && (
+        <div
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.3)", zIndex: 9999 }}
+        >
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

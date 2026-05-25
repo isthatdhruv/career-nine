@@ -6,6 +6,7 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadMeasuredQualityTypesData, UpdateMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 
 const validationSchema = Yup.object().shape({
@@ -42,17 +43,12 @@ const MeasuredQualityTypesEditPage = (props?: {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update question:");
-        console.log("Question ID:", values.measuredQualityTypeId);
-        console.log("Values being sent:", values);
-
         if (!values.measuredQualityTypeId) {
-          alert("No question ID found. Please try navigating back and selecting the question again.");
+          showErrorToast("No question ID found. Please try navigating back and selecting the question again.");
           return;
         }
 
-        const response = await UpdateMeasuredQualityTypesData(values.measuredQualityTypeId, values);
-        console.log("Update successful:", response);
+        await UpdateMeasuredQualityTypesData(values.measuredQualityTypeId, values);
 
         navigate("/measured-quality-types");
 
@@ -69,9 +65,9 @@ const MeasuredQualityTypesEditPage = (props?: {
           console.error("Error data:", (error as any).response?.data);
 
           const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
-          alert(`Failed to update question: ${errorMessage}`);
+          showErrorToast(`Failed to update question: ${errorMessage}`);
         } else {
-          alert("Failed to update question: Unknown error occurred");
+          showErrorToast("Failed to update question: Unknown error occurred");
         }
       } finally {
         setLoading(false);

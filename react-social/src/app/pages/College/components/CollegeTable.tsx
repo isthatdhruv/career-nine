@@ -1,20 +1,24 @@
 // CollegeTable.tsx
 import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillEdit, AiOutlineInfoCircle } from "react-icons/ai";
+import { AiOutlineInfoCircle } from "react-icons/ai";
 import { Link, useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { Button, Dropdown } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { MdEdit, MdDelete, MdSchool, MdOutlineDashboard } from "react-icons/md";
+import { MdSchool, MdOutlineDashboard } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
+import { showErrorToast } from '../../../utils/toast';
 import CollegeDetailModal from "./CollegeSectionSessionGradeModal";
 import AssessmentMappingModal from "./AssessmentMappingModal";
+import SchoolAssessmentMappingModal from "./SchoolAssessmentMappingModal";
+import InstituteStudentsModal from "./InstituteStudentsModal";
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
@@ -78,7 +82,14 @@ const CollegeTable = (props: {
   );
 
   const [assessmentMappingModalShow, setAssessmentMappingModalShow] = useState(false);
+  const [schoolMappingModalShow, setSchoolMappingModalShow] = useState(false);
   const [assessmentMappingInstitute, setAssessmentMappingInstitute] = useState<{
+    code: number;
+    name: string;
+  }>({ code: 0, name: "" });
+
+  const [studentsModalShow, setStudentsModalShow] = useState(false);
+  const [studentsModalInstitute, setStudentsModalInstitute] = useState<{
     code: number;
     name: string;
   }>({ code: 0, name: "" });
@@ -142,7 +153,7 @@ const CollegeTable = (props: {
               }}
               className="btn btn-icon btn-primary btn-sm me-3"
             >
-              <AiFillEdit size={16} />
+              <ActionIcon type="edit" size="sm" />
             </button>
 
             {/* Delete Button */}
@@ -152,14 +163,11 @@ const CollegeTable = (props: {
                 try {
                   const deleteId = data.id ?? data.instituteCode;
 
-                  console.log("Attempting to delete college. Row:", data);
-                  console.log("Using deleteId:", deleteId);
-
                   if (!deleteId) {
                     console.error(
                       "No 'id' or 'instituteCode' found on this row. Cannot call DeleteCollegeData."
                     );
-                    alert("Cannot delete: no valid ID found for this record.");
+                    showErrorToast("Cannot delete: no valid ID found for this record.");
                     return;
                   }
 
@@ -172,7 +180,7 @@ const CollegeTable = (props: {
                   props.setPageLoading((p: any) => !p);
                 } catch (err) {
                   console.error("Delete failed:", err);
-                  alert("Delete failed. Check console for details.");
+                  showErrorToast("Delete failed. Check console for details.");
                 } finally {
                   props.setLoading(false);
                 }
@@ -266,6 +274,32 @@ const CollegeTable = (props: {
                   <MdSchool size={18} className="me-2" />
                   Assessment Mapping
                 </Dropdown.Item>
+                <Dropdown.Item
+                  onClick={() => {
+                    setAssessmentMappingInstitute({
+                      code: Number(data.instituteCode),
+                      name: data.instituteName || "",
+                    });
+                    setSchoolMappingModalShow(true);
+                  }}
+                >
+                  <MdSchool size={18} className="me-2" />
+                  School Registration Setup
+                </Dropdown.Item>
+
+                {/* Manage student memberships for this institute */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setStudentsModalInstitute({
+                      code: Number(data.instituteCode),
+                      name: data.instituteName || "",
+                    });
+                    setStudentsModalShow(true);
+                  }}
+                >
+                  <MdSchool size={18} className="me-2" />
+                  Students at this institute
+                </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
 
@@ -288,7 +322,7 @@ const CollegeTable = (props: {
               variant="outline-info"
               size="sm"
               className="me-2"
-              onClick={() => navigate(`/school/dashboard/${data.instituteCode || data.id}`)}
+              onClick={() => navigate(`/school/principal/dashboard/${data.instituteCode || data.id}`)}
             >
               <IconContext.Provider value={{ style: { paddingBottom: "3px" } }}>
                 <MdOutlineDashboard />
@@ -393,6 +427,22 @@ const CollegeTable = (props: {
         onHide={() => setAssessmentMappingModalShow(false)}
         instituteCode={assessmentMappingInstitute.code}
         instituteName={assessmentMappingInstitute.name}
+      />
+
+      {/* School Registration Setup */}
+      <SchoolAssessmentMappingModal
+        show={schoolMappingModalShow}
+        onHide={() => setSchoolMappingModalShow(false)}
+        instituteCode={assessmentMappingInstitute.code}
+        instituteName={assessmentMappingInstitute.name}
+      />
+
+      {/* Student memberships for this institute */}
+      <InstituteStudentsModal
+        show={studentsModalShow}
+        onHide={() => setStudentsModalShow(false)}
+        instituteCode={studentsModalInstitute.code}
+        instituteName={studentsModalInstitute.name}
       />
     </>
   );

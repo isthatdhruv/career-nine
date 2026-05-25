@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAssessment } from './AssessmentContext';
 import { usePreventReload } from './usePreventReload';
+import { showErrorToast } from '../../utils/toast';
 import { getFieldsForAssessment, submitDemographics } from './API/StudentDemographic_APIs';
 
 type DemographicField = {
@@ -42,7 +43,7 @@ const DynamicDemographicForm: React.FC = () => {
 
   useEffect(() => {
     if (!userStudentId || !assessmentId) {
-      navigate('/student-login');
+      window.location.replace('https://assessment.career-9.com/');
       return;
     }
     fetchFields();
@@ -201,7 +202,7 @@ const DynamicDemographicForm: React.FC = () => {
       });
 
       // Start assessment
-      await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
+      const startRes = await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -209,6 +210,11 @@ const DynamicDemographicForm: React.FC = () => {
           assessmentId: Number(assessmentId),
         }),
       });
+      const startData = await startRes.json();
+      if (startData.sessionToken) {
+        sessionStorage.setItem('assessmentSessionToken', startData.sessionToken);
+      }
+      localStorage.setItem('assessmentId', String(assessmentId));
 
       await fetchAssessmentData(String(assessmentId));
       navigate('/general-instructions');
@@ -216,9 +222,9 @@ const DynamicDemographicForm: React.FC = () => {
       console.error('Error submitting demographics:', error);
       const errorData = error.response?.data;
       if (errorData?.validationErrors) {
-        alert('Validation errors:\n' + errorData.validationErrors.join('\n'));
+        showErrorToast('Validation errors:\n' + errorData.validationErrors.join('\n'));
       } else {
-        alert(errorData?.error || 'Failed to submit demographics. Please try again.');
+        showErrorToast(errorData?.error || 'Failed to submit demographics. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -514,7 +520,7 @@ const DynamicDemographicForm: React.FC = () => {
             <button
               className='btn btn-primary'
               onClick={async () => {
-                await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
+                const startRes = await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -522,6 +528,11 @@ const DynamicDemographicForm: React.FC = () => {
                     assessmentId: Number(assessmentId),
                   }),
                 });
+                const startData = await startRes.json();
+                if (startData.sessionToken) {
+                  sessionStorage.setItem('assessmentSessionToken', startData.sessionToken);
+                }
+                localStorage.setItem('assessmentId', String(assessmentId));
                 await fetchAssessmentData(String(assessmentId));
                 navigate('/general-instructions');
               }}

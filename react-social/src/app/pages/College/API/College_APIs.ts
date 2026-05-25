@@ -29,6 +29,10 @@ export function ReadCollegeData() {
   return axios.get(readCollege);
 }
 
+export function ReadCollegeList() {
+  return axios.get(`${API_URL}/instituteDetail/get/list`);
+}
+
 export function ReadCollegeByIdData(id: any) {
   return axios.get(readCollegeById + id);
 }
@@ -41,6 +45,14 @@ export function UpdateCollegeData(values: any) {
 
 export function DeleteCollegeData(id: any) {
   return axios.get(deleteCollege + id);
+}
+
+export function GetDeletedInstitutes() {
+  return axios.get(`${API_URL}/instituteDetail/deleted`);
+}
+
+export function RestoreInstitute(id: any) {
+  return axios.get(`${API_URL}/instituteDetail/restore/${id}`);
 }
 
 export function MapContactsAndBoards(instituteCode: number | string, contactPersonIds: number[], boardIds: number[]) {
@@ -58,7 +70,6 @@ export function GetInstituteMappings(instituteCode: number | string) {
 // ============ SESSION FUNCTIONS ============
 
 export function CreateSessionData(values: any) {
-  console.log("API Call - CreateSessionData with values:", values);
   return axios.post(createSession, values);
 }
 

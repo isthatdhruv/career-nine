@@ -1,0 +1,1755 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import {
+  getAssessmentList,
+  getLiveTracking,
+  getLiveTrackingLite,
+  getRedisPartials,
+  flushPartialToDb,
+  getRedisPartialDetail,
+  submitFromRedis,
+  getPendingPersistence,
+  reconcilePersisted,
+  cleanupRedis,
+  retryNow,
+  resetAssessment,
+  getSubmissionFailureDetail,
+  getSubmittedDetail,
+  PendingPersistenceEntry,
+  PendingPersistenceDiagnostic,
+} from "./API/LiveTracking_APIs";
+import { showErrorToast } from '../../utils/toast';
+import PageHeader from "../../components/PageHeader";
+import { ActionIcon } from "../../components/ActionIcon";
+import { useAssessmentsForCurrentUser } from "../../hooks/useScopedAssessments";
+import { ReadCollegeList } from "../College/API/College_APIs";
+
+/* ─── Types ─── */
+
+interface StudentEntry {
+  userStudentId: number;
+  studentName: string;
+  email?: string;
+  username?: string;
+  instituteName: string;
+  status: string;
+  answeredCount: number;
+  currentPage?: string | null;
+  currentSection?: string | null;
+  currentQuestionIndex?: number | null;
+  lastSeen?: string | null;
+  isLive?: boolean;
+}
+
+interface Summary {
+  total: number;
+  notStarted: number;
+  ongoing: number;
+  completed: number;
+}
+
+interface TrackingData {
+  assessmentId: number;
+  assessmentName: string;
+  totalQuestions: number;
+  students: StudentEntry[];
+  summary: Summary;
+}
+
+interface AssessmentOption {
+  id: number;
+  assessmentName: string;
+  isActive: boolean;
+}
+
+interface RedisPartialEntry {
+  userStudentId: number;
+  assessmentId: number;
+  studentName: string;
+  username?: string;
+  answerCount: number;
+  ttlSeconds: number;
+  savedAt: string | null;
+}
+
+/* ─── Adaptive polling config ─── */
+const POLL_FAST = 8_000;   // 8s when there are active students
+const POLL_SLOW = 25_000;  // 25s when idle (all notstarted or all completed)
+const POLL_MIN = 5_000;    // floor when user manually refreshes
+
+/* ─── Status badge ─── */
+const statusBadge = (status: string) => {
+  switch (status) {
+    case "ongoing":
+      return (
+        <span className="badge bg-warning text-dark px-3 py-2">
+          In Progress
+        </span>
+      );
+    case "completed":
+      return (
+        <span className="badge bg-success px-3 py-2">Completed</span>
+      );
+    default:
+      return (
+        <span className="badge bg-secondary px-3 py-2">Not Started</span>
+      );
+  }
+};
+
+/* ─── Current position label ─── */
+const CurrentPosition = ({ student }: { student: StudentEntry }) => {
+  if (student.status !== "ongoing") return null;
+  if (!student.currentPage) {
+    return <small className="text-muted fst-italic">No signal</small>;
+  }
+
+  const pageLabels: Record<string, string> = {
+    question: "Question",
+    "section-select": "Selecting Section",
+    instructions: "Reading Instructions",
+    "section-instructions": "Section Instructions",
+    demographics: "Demographics Form",
+  };
+
+  const label = pageLabels[student.currentPage] || student.currentPage;
+
+  if (student.currentPage === "question") {
+    const qNum =
+      student.currentQuestionIndex != null
+        ? Number(student.currentQuestionIndex) + 1
+        : "?";
+    const section = student.currentSection || "";
+    return (
+      <div>
+        <small className="fw-semibold">
+          Q{qNum}
+        </small>
+        {section && (
+          <small className="text-muted ms-1">({section})</small>
+        )}
+      </div>
+    );
+  }
+
+  return <small className="text-muted">{label}</small>;
+};
+
+/* ─── Progress bar (lightweight, no chart library) ─── */
+const ProgressBar = ({
+  answered,
+  total,
+}: {
+  answered: number;
+  total: number;
+}) => {
+  const safeAnswered = total > 0 ? Math.min(answered, total) : answered;
+  const pct = total > 0 ? Math.min(100, Math.round((safeAnswered / total) * 100)) : 0;
+  return (
+    <div className="d-flex align-items-center gap-2" style={{ minWidth: 160 }}>
+      <div
+        className="progress flex-grow-1"
+        style={{ height: 8, backgroundColor: "#e9ecef" }}
+      >
+        <div
+          className="progress-bar"
+          role="progressbar"
+          style={{
+            width: `${pct}%`,
+            backgroundColor: pct === 100 ? "#198754" : "#0d6efd",
+            transition: "width 0.4s ease",
+          }}
+        />
+      </div>
+      <small className="text-muted" style={{ whiteSpace: "nowrap", fontSize: 12 }}>
+        {safeAnswered}/{total} ({pct}%)
+      </small>
+    </div>
+  );
+};
+
+/* ─── Summary cards ─── */
+const SummaryCards = ({ summary }: { summary: Summary }) => {
+  const cards = [
+    { label: "Total Students", value: summary.total, color: "#6c757d" },
+    { label: "Not Started", value: summary.notStarted, color: "#adb5bd" },
+    { label: "In Progress", value: summary.ongoing, color: "#ffc107" },
+    { label: "Completed", value: summary.completed, color: "#198754" },
+  ];
+  return (
+    <div className="row g-3 mb-4">
+      {cards.map((c) => (
+        <div key={c.label} className="col-6 col-md-3">
+          <div
+            className="card border-0 text-center py-3"
+            style={{ backgroundColor: c.color + "18" }}
+          >
+            <div className="fw-bold fs-2" style={{ color: c.color }}>
+              {c.value}
+            </div>
+            <small className="text-muted">{c.label}</small>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ─── Main component ─── */
+const LiveTrackingPage = () => {
+  // `allAssessments` is the full catalog from /assessments/get/list-summary.
+  // `assessments` (below) is the user-scoped narrowing — what the dropdown renders.
+  const [allAssessments, setAllAssessments] = useState<AssessmentOption[]>([]);
+  // Cast through Assessment[] — the hook only reads .id so shape overlap is enough.
+  const { assessments: scopedAssessments, allowedInstituteCodes } =
+    useAssessmentsForCurrentUser(allAssessments as any);
+  const assessments = scopedAssessments as unknown as AssessmentOption[];
+
+  // Allowed institute *names*, derived from /instituteDetail/get/list (which the
+  // backend already scopes for the current user). Used to drop student rows from
+  // assessments that span multiple schools — a KVS-only user shouldn't see
+  // names from other institutes inside an assessment that's shared with them.
+  const [allowedInstituteNames, setAllowedInstituteNames] = useState<Set<string> | null>(null);
+
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [data, setData] = useState<TrackingData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterInstitute, setFilterInstitute] = useState<string>("all");
+  const [filterUsername, setFilterUsername] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [progressSort, setProgressSort] = useState<"none" | "asc" | "desc">("none");
+  const [isPolling, setIsPolling] = useState(true);
+  const [activeTab, setActiveTab] = useState<"live" | "redis" | "pending">("live");
+  const [redisPartials, setRedisPartials] = useState<RedisPartialEntry[]>([]);
+  const [redisFilterUsername, setRedisFilterUsername] = useState("");
+  const [redisLoading, setRedisLoading] = useState(false);
+  const [flushingIds, setFlushingIds] = useState<Set<number>>(new Set());
+  const [flushingAll, setFlushingAll] = useState(false);
+  const [redisJsonModal, setRedisJsonModal] = useState<{
+    show: boolean; studentName: string; data: any;
+  }>({ show: false, studentName: "", data: null });
+  const [submittingIds, setSubmittingIds] = useState<Set<number>>(new Set());
+  const [selectedStudents, setSelectedStudents] = useState<Set<number>>(new Set());
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
+
+  // ── Pending Persistence state ──────────────────────────────────────────
+  const [pendingEntries, setPendingEntries] = useState<PendingPersistenceEntry[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingActionIds, setPendingActionIds] = useState<Set<number>>(new Set());
+  const [failureDetailModal, setFailureDetailModal] = useState<{
+    show: boolean;
+    studentName: string;
+    detail: any;
+  }>({ show: false, studentName: "", detail: null });
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevDataRef = useRef<string>("");
+  // High watermark: progress & position should never go backwards per student
+  const progressHighWaterRef = useRef<Record<number, number>>({});
+  // Cache last known position so heartbeat gaps don't flash "No signal"
+  const positionCacheRef = useRef<Record<number, {
+    currentPage: string;
+    currentSection?: string | null;
+    currentQuestionIndex?: number | null;
+  }>>({});
+
+  // Load assessment list on mount
+  useEffect(() => {
+    getAssessmentList()
+      .then((res) => {
+        const list: AssessmentOption[] = res.data || [];
+        setAllAssessments(list);
+      })
+      .catch(() => setError("Failed to load assessments"));
+  }, []);
+
+  // Auto-select first active assessment from the *scoped* list — picking from
+  // the raw catalog would auto-load an assessment the user isn't allotted to.
+  useEffect(() => {
+    if (selectedId != null) return; // user (or prior auto-select) already chose one
+    if (assessments.length === 0) return;
+    const active = assessments.find((a) => a.isActive);
+    if (active) setSelectedId(active.id);
+  }, [assessments, selectedId]);
+
+  // Pull allowed institute names from the scoped /instituteDetail/get/list. This
+  // mirrors the BE deny set — the same source we use elsewhere — so the row
+  // filter agrees with the rest of the app. null = no restriction (super-admin
+  // or user has wildcard institute scope).
+  useEffect(() => {
+    if (allowedInstituteCodes === null) {
+      setAllowedInstituteNames(null);
+      return;
+    }
+    ReadCollegeList()
+      .then((res) => {
+        const names = new Set<string>();
+        for (const inst of res.data || []) {
+          if (inst?.instituteName) names.add(inst.instituteName);
+        }
+        setAllowedInstituteNames(names);
+      })
+      .catch(() => setAllowedInstituteNames(new Set()));
+  }, [allowedInstituteCodes]);
+
+  // Track whether we've already loaded lite data for the current assessment
+  const liteLoadedRef = useRef<number | null>(null);
+
+  // Fetch tracking data: lite first (instant), then full in background
+  const fetchData = useCallback(async () => {
+    if (!selectedId) return;
+
+    // On first load for this assessment, fetch lite data instantly
+    if (liteLoadedRef.current !== selectedId) {
+      try {
+        const liteRes = await getLiveTrackingLite(selectedId);
+        const lite = liteRes.data;
+        // Build a TrackingData with lite fields — no progress/position yet
+        const liteData: TrackingData = {
+          assessmentId: lite.assessmentId,
+          assessmentName: lite.assessmentName,
+          totalQuestions: 0,
+          students: (lite.students || []).map((s: any) => ({
+            userStudentId: s.userStudentId,
+            studentName: s.studentName,
+            email: s.email || "",
+            username: s.username || "",
+            instituteName: "",
+            status: s.status || "notstarted",
+            answeredCount: 0,
+          })),
+          summary: lite.summary || { total: 0, notStarted: 0, ongoing: 0, completed: 0 },
+        };
+        setData(liteData);
+        setLoading(false);
+        liteLoadedRef.current = selectedId;
+      } catch {
+        // If lite fails, fall through to full fetch
+      }
+    }
+
+    // Then fetch full data (with progress, heartbeats, answer counts)
+    try {
+      const res = await getLiveTracking(selectedId);
+      const newData: TrackingData = res.data;
+
+      // Preserve email & username from lite data if full response doesn't include them
+      if (data) {
+        const emailMap = new Map(data.students.map(s => [s.userStudentId, s.email]));
+        const usernameMap = new Map(data.students.map(s => [s.userStudentId, s.username]));
+        for (const s of newData.students) {
+          if (!s.email && emailMap.has(s.userStudentId)) {
+            s.email = emailMap.get(s.userStudentId);
+          }
+          if (!s.username && usernameMap.has(s.userStudentId)) {
+            s.username = usernameMap.get(s.userStudentId);
+          }
+        }
+      }
+
+      // High watermark logic for ongoing students:
+      // - Progress never drops (answers are in localStorage until submission)
+      // - Position sticks to last known value during heartbeat gaps
+      const hw = progressHighWaterRef.current;
+      const pc = positionCacheRef.current;
+      for (const s of newData.students) {
+        if (s.status === "ongoing") {
+          // Progress watermark
+          const prev = hw[s.userStudentId] ?? 0;
+          if (s.answeredCount >= prev) {
+            hw[s.userStudentId] = s.answeredCount;
+          } else {
+            s.answeredCount = prev;
+          }
+
+          // Position cache: update when we have fresh data, restore when gap
+          if (s.currentPage) {
+            pc[s.userStudentId] = {
+              currentPage: s.currentPage,
+              currentSection: s.currentSection,
+              currentQuestionIndex: s.currentQuestionIndex,
+            };
+          } else if (pc[s.userStudentId]) {
+            // Heartbeat expired — show last known position instead of "No signal"
+            s.currentPage = pc[s.userStudentId].currentPage;
+            s.currentSection = pc[s.userStudentId].currentSection;
+            s.currentQuestionIndex = pc[s.userStudentId].currentQuestionIndex;
+          }
+        } else {
+          // Student completed or not started — reset caches
+          delete hw[s.userStudentId];
+          delete pc[s.userStudentId];
+        }
+      }
+
+      // Only update state if data actually changed (prevents unnecessary re-renders)
+      const serialized = JSON.stringify(newData);
+      if (serialized !== prevDataRef.current) {
+        prevDataRef.current = serialized;
+        setData(newData);
+      }
+      setLastUpdated(new Date());
+      setError(null);
+    } catch (err: any) {
+      // Don't show error if lite data already loaded (user can see names/emails)
+      if (liteLoadedRef.current !== selectedId) {
+        setError("Failed to load tracking data. Check your connection.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedId]);
+
+  // Adaptive polling interval. Uses the full `data.summary.ongoing` (not the
+  // scope-narrowed count) because (a) `scopedSummary` is declared further down
+  // and pulling it up would create churny diff noise, and (b) fast-vs-slow
+  // polling is 8s vs 25s — the cost of polling slightly faster than strictly
+  // needed for a single-school user is negligible.
+  const getInterval = useCallback((): number => {
+    if (!data) return POLL_FAST;
+    const { ongoing } = data.summary;
+    return ongoing > 0 ? POLL_FAST : POLL_SLOW;
+  }, [data]);
+
+  // Polling loop
+  useEffect(() => {
+    if (!selectedId || !isPolling) return;
+
+    setLoading(true);
+    fetchData();
+
+    const schedule = () => {
+      timerRef.current = setTimeout(() => {
+        fetchData().then(schedule);
+      }, getInterval());
+    };
+    schedule();
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [selectedId, isPolling, fetchData, getInterval]);
+
+  // Manual refresh
+  const handleRefresh = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setLoading(true);
+    fetchData();
+  };
+
+  // Handle assessment change
+  const handleAssessmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = Number(e.target.value);
+    setSelectedId(id || null);
+    setData(null);
+    prevDataRef.current = "";
+    progressHighWaterRef.current = {};
+    positionCacheRef.current = {};
+    liteLoadedRef.current = null;
+    setFilterStatus("all");
+    setFilterInstitute("all");
+    setSearchQuery("");
+  };
+
+  // Fetch Redis partials when tab switches or assessment changes
+  const fetchRedisPartials = useCallback(async () => {
+    setRedisLoading(true);
+    try {
+      const res = await getRedisPartials(selectedId ?? undefined);
+      setRedisPartials(res.data || []);
+      setSelectedStudents(new Set());
+    } catch {
+      setRedisPartials([]);
+    } finally {
+      setRedisLoading(false);
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (activeTab === "redis") {
+      fetchRedisPartials();
+    }
+  }, [activeTab, selectedId, fetchRedisPartials]);
+
+  // ── Pending Persistence fetch + actions ────────────────────────────────
+  const fetchPendingPersistence = useCallback(async () => {
+    if (!selectedId) {
+      setPendingEntries([]);
+      return;
+    }
+    setPendingLoading(true);
+    try {
+      const res = await getPendingPersistence(selectedId);
+      setPendingEntries(res.data || []);
+    } catch {
+      setPendingEntries([]);
+    } finally {
+      setPendingLoading(false);
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (activeTab === "pending") {
+      fetchPendingPersistence();
+    }
+  }, [activeTab, selectedId, fetchPendingPersistence]);
+
+  // Auto-refresh Pending tab every 15s while visible (transient recoveries can
+  // self-heal quickly — we want the list to shrink without a manual refresh).
+  useEffect(() => {
+    if (activeTab !== "pending") return;
+    const handle = setInterval(() => { fetchPendingPersistence(); }, 15_000);
+    return () => clearInterval(handle);
+  }, [activeTab, fetchPendingPersistence]);
+
+  const withPendingAction = async (
+    studentId: number,
+    fn: () => Promise<unknown>
+  ) => {
+    setPendingActionIds((prev) => new Set(prev).add(studentId));
+    try {
+      await fn();
+      await fetchPendingPersistence();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Action failed";
+      showErrorToast(msg);
+    } finally {
+      setPendingActionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(studentId);
+        return next;
+      });
+    }
+  };
+
+  const handlePendingRetry = (entry: PendingPersistenceEntry) =>
+    withPendingAction(entry.userStudentId, () =>
+      retryNow({
+        userStudentId: entry.userStudentId,
+        assessmentId: entry.assessmentId,
+        reason: "Admin retry",
+      })
+    );
+
+  const handlePendingReconcile = (entry: PendingPersistenceEntry) =>
+    withPendingAction(entry.userStudentId, () =>
+      reconcilePersisted({
+        userStudentId: entry.userStudentId,
+        assessmentId: entry.assessmentId,
+        reason: "Admin reconcile — DB has full data",
+      })
+    );
+
+  const handlePendingCleanupRedis = (entry: PendingPersistenceEntry) =>
+    withPendingAction(entry.userStudentId, () =>
+      cleanupRedis({
+        userStudentId: entry.userStudentId,
+        assessmentId: entry.assessmentId,
+        reason: "Admin cleanup — DB has full data",
+      })
+    );
+
+  const handlePendingReset = async (entry: PendingPersistenceEntry) => {
+    const confirmText = window.prompt(
+      `Reset ${entry.studentName || "student #" + entry.userStudentId}?\n\n` +
+      `This will DELETE their answers and require them to retake. ` +
+      `Type the username to confirm.`
+    );
+    if (confirmText === null) return;
+    if (confirmText.trim() !== (entry.username || "").trim()) {
+      showErrorToast("Confirmation did not match username");
+      return;
+    }
+    await withPendingAction(entry.userStudentId, () =>
+      resetAssessment({
+        userStudentId: entry.userStudentId,
+        assessmentId: entry.assessmentId,
+        reason: "Admin reset via pending persistence UI",
+      })
+    );
+  };
+
+  const handleViewFailureDetail = async (entry: PendingPersistenceEntry) => {
+    try {
+      const res = await getSubmissionFailureDetail(
+        entry.userStudentId,
+        entry.assessmentId
+      );
+      setFailureDetailModal({
+        show: true,
+        studentName: entry.studentName || `Student #${entry.userStudentId}`,
+        detail: res.data,
+      });
+    } catch {
+      showErrorToast("No failure history found");
+    }
+  };
+
+  const handleInspectPayload = async (entry: PendingPersistenceEntry) => {
+    try {
+      const res = await getSubmittedDetail(entry.userStudentId, entry.assessmentId);
+      setRedisJsonModal({
+        show: true,
+        studentName: `${entry.studentName || "Student #" + entry.userStudentId} — submitted payload`,
+        data: res.data,
+      });
+    } catch {
+      showErrorToast("No Redis payload found for this student (may have expired)");
+    }
+  };
+
+  // Flush a single student's partial answers to DB
+  const handleFlushOne = async (studentId: number, assessmentId: number) => {
+    setFlushingIds((prev) => new Set(prev).add(studentId));
+    try {
+      await flushPartialToDb({ userStudentId: studentId, assessmentId });
+      await fetchRedisPartials();
+    } catch (err) {
+      console.error("Flush failed", err);
+    } finally {
+      setFlushingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(studentId);
+        return next;
+      });
+    }
+  };
+
+  // Flush all partial answers for the selected assessment
+  const handleFlushAll = async () => {
+    if (!selectedId) return;
+    setFlushingAll(true);
+    try {
+      await flushPartialToDb({ assessmentId: selectedId });
+      await fetchRedisPartials();
+    } catch (err) {
+      console.error("Flush all failed", err);
+    } finally {
+      setFlushingAll(false);
+    }
+  };
+
+  // View raw Redis JSON for a student's partial answers
+  const handleViewRedisJson = async (entry: RedisPartialEntry) => {
+    try {
+      const res = await getRedisPartialDetail(entry.userStudentId, entry.assessmentId);
+      setRedisJsonModal({ show: true, studentName: entry.studentName, data: res.data });
+    } catch (err) {
+      console.error("Failed to fetch Redis detail", err);
+      showErrorToast("Failed to load Redis data");
+    }
+  };
+
+  // Admin submit: trigger async submission pipeline from Redis partial answers
+  const handleSubmitFromRedis = async (entry: RedisPartialEntry) => {
+    setSubmittingIds((prev) => new Set(prev).add(entry.userStudentId));
+    try {
+      await submitFromRedis(entry.userStudentId, entry.assessmentId);
+      await fetchRedisPartials();
+    } catch (err: any) {
+      console.error("Submit from Redis failed", err);
+      const msg = err?.response?.data?.error || err?.response?.data || "Submit failed";
+      showErrorToast(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } finally {
+      setSubmittingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(entry.userStudentId);
+        return next;
+      });
+    }
+  };
+
+  // Toggle single student selection
+  const toggleStudentSelection = (studentId: number) => {
+    setSelectedStudents((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+  };
+
+  // Filtered redis partials (by username)
+  const filteredRedisPartials = useMemo(() => {
+    const u = redisFilterUsername.trim().toLowerCase();
+    if (!u) return redisPartials;
+    return redisPartials.filter((e) => (e.username || "").toLowerCase().includes(u));
+  }, [redisPartials, redisFilterUsername]);
+
+  // Toggle all students selection (scoped to currently visible/filtered rows)
+  const toggleSelectAll = () => {
+    const visibleIds = filteredRedisPartials.map((e) => e.userStudentId);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedStudents.has(id));
+    setSelectedStudents((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  // Bulk submit: selected students, or all visible (filtered) if none selected
+  const handleBulkSubmit = async () => {
+    const targets = selectedStudents.size > 0
+      ? filteredRedisPartials.filter((e) => selectedStudents.has(e.userStudentId))
+      : filteredRedisPartials;
+
+    if (targets.length === 0) return;
+
+    setBulkSubmitting(true);
+    setBulkProgress({ done: 0, total: targets.length, failed: 0 });
+
+    let done = 0;
+    let failed = 0;
+
+    for (const entry of targets) {
+      try {
+        await submitFromRedis(entry.userStudentId, entry.assessmentId);
+      } catch (err: any) {
+        failed++;
+        const msg = err?.response?.data?.error || err?.response?.data || "Submit failed";
+        console.error(`Bulk submit failed for student ${entry.userStudentId}:`, msg);
+      }
+      done++;
+      setBulkProgress({ done, total: targets.length, failed });
+    }
+
+    await fetchRedisPartials();
+    setSelectedStudents(new Set());
+    setBulkSubmitting(false);
+    // Keep progress visible briefly so user can see final count
+    setTimeout(() => setBulkProgress(null), 4000);
+  };
+
+  // Format TTL for display
+  const formatTtl = (seconds: number) => {
+    if (seconds < 0) return "Unknown";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+  };
+
+  // Students the current user is allowed to see — applied BEFORE the existing
+  // status/institute/search filters so the UI options (status counts, institute
+  // dropdown, exported CSV) only ever reflect rows the user can act on. Mirrors
+  // the BE deny set; if the BE later starts scoping /live-tracking server-side
+  // this becomes a redundant client-side belt over the suspenders.
+  const visibleStudents = useMemo(() => {
+    if (!data) return [];
+    if (allowedInstituteNames == null) return data.students; // super-admin / wildcard
+    return data.students.filter((s) => {
+      // Empty instituteName means the row isn't tagged — fail-open so we don't
+      // hide students whose institute hasn't been resolved yet (lite-data path).
+      if (!s.instituteName) return true;
+      return allowedInstituteNames.has(s.instituteName);
+    });
+  }, [data, allowedInstituteNames]);
+
+  // Summary that reflects ONLY the rows the user can see. When scope filtering is
+  // a no-op (super-admin) this equals `data.summary` so the cards/progress bar
+  // are unchanged for admins.
+  const scopedSummary = useMemo<Summary>(() => {
+    if (!data) return { total: 0, notStarted: 0, ongoing: 0, completed: 0 };
+    if (allowedInstituteNames == null) return data.summary;
+    let notStarted = 0, ongoing = 0, completed = 0;
+    for (const s of visibleStudents) {
+      if (s.status === "completed") completed++;
+      else if (s.status === "ongoing") ongoing++;
+      else notStarted++;
+    }
+    return { total: visibleStudents.length, notStarted, ongoing, completed };
+  }, [data, visibleStudents, allowedInstituteNames]);
+
+  // Unique institute names for filter dropdown
+  const instituteOptions = useMemo(() => {
+    const names = new Set(visibleStudents.map((s) => s.instituteName).filter(Boolean));
+    return Array.from(names).sort();
+  }, [visibleStudents]);
+
+  // Filtered & searched students (memoized to avoid re-computation)
+  const filteredStudents = useMemo(() => {
+    if (!data) return [];
+    let list = visibleStudents;
+
+    if (filterStatus !== "all") {
+      list = list.filter((s) => s.status === filterStatus);
+    }
+
+    if (filterInstitute !== "all") {
+      list = list.filter((s) => s.instituteName === filterInstitute);
+    }
+
+    if (filterUsername.trim()) {
+      const u = filterUsername.trim().toLowerCase();
+      list = list.filter((s) => s.username?.toLowerCase().includes(u));
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (s) =>
+          s.studentName?.toLowerCase().includes(q) ||
+          s.email?.toLowerCase().includes(q) ||
+          s.username?.toLowerCase().includes(q) ||
+          s.instituteName?.toLowerCase().includes(q) ||
+          String(s.userStudentId).includes(q)
+      );
+    }
+
+    const total = data.totalQuestions || 0;
+    const pct = (s: StudentEntry) =>
+      total > 0 ? (s.answeredCount / total) * 100 : 0;
+
+    if (progressSort !== "none") {
+      return [...list].sort((a, b) =>
+        progressSort === "asc" ? pct(a) - pct(b) : pct(b) - pct(a)
+      );
+    }
+
+    // Default sort: ongoing first, then notstarted, then completed
+    const order: Record<string, number> = { ongoing: 0, notstarted: 1, completed: 2 };
+    return [...list].sort(
+      (a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1)
+    );
+  }, [data, filterStatus, filterInstitute, filterUsername, searchQuery, progressSort]);
+
+  const handleDownloadExcel = useCallback(() => {
+    if (!data || filteredStudents.length === 0) return;
+    const total = data.totalQuestions || 0;
+    const statusLabel = (s: string) =>
+      s === "ongoing" ? "In Progress"
+      : s === "completed" ? "Completed"
+      : s === "notstarted" ? "Not Started"
+      : s;
+
+    const rows = filteredStudents.map((s) => ({
+      Student: s.studentName || "",
+      Username: s.username || "",
+      Email: s.email || "",
+      Institute: s.instituteName || "",
+      Status: statusLabel(s.status),
+      Progress: total > 0
+        ? `${((s.answeredCount / total) * 100).toFixed(1)}%`
+        : "0%",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows, {
+      header: ["Student", "Username", "Email", "Institute", "Status", "Progress"],
+    });
+    ws["!cols"] = [
+      { wch: 28 }, { wch: 22 }, { wch: 32 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Live Tracking");
+    const safeName = (data.assessmentName || "assessment").replace(/[^a-z0-9]+/gi, "_");
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `live_tracking_${safeName}_${stamp}.xlsx`);
+  }, [data, filteredStudents]);
+
+  return (
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-broadcast" />}
+        title="Live Tracking"
+        subtitle={
+          data ? (
+            <><strong>{scopedSummary.total}</strong> students · <strong>{scopedSummary.completed}</strong> completed · <strong>{scopedSummary.ongoing}</strong> in progress · {isPolling ? "Live" : "Paused"}</>
+          ) : (
+            <>Select an assessment to start tracking</>
+          )
+        }
+        actions={[
+          {
+            label: loading ? "Refreshing..." : "Refresh",
+            iconClass: "bi-arrow-clockwise",
+            onClick: handleRefresh,
+            variant: "primary",
+            disabled: loading || !selectedId,
+          },
+          {
+            label: isPolling ? "Pause" : "Resume",
+            iconClass: isPolling ? "bi-pause-fill" : "bi-play-fill",
+            onClick: () => setIsPolling(!isPolling),
+            variant: "ghost",
+          },
+          {
+            label: "Export Excel",
+            iconClass: "bi-download",
+            onClick: handleDownloadExcel,
+            variant: "ghost",
+            disabled: !data || filteredStudents.length === 0,
+          },
+        ]}
+      />
+      <div className="card">
+      <div className="card-body pt-4">
+        {/* Assessment selector */}
+        <div className="row mb-4">
+          <div className="col-md-6 col-lg-4">
+            <label className="form-label fw-semibold">Select Assessment</label>
+            <select
+              className="form-select"
+              value={selectedId ?? ""}
+              onChange={handleAssessmentChange}
+            >
+              <option value="">-- Choose Assessment --</option>
+              {assessments.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.assessmentName} {a.isActive ? "(Active)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          {lastUpdated && (
+            <div className="col-md-6 col-lg-4 d-flex align-items-end">
+              <small className="text-muted">
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </small>
+            </div>
+          )}
+        </div>
+
+        {/* Tab toggle */}
+        <ul className="nav nav-tabs mb-4">
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === "live" ? "active" : ""}`}
+              onClick={() => setActiveTab("live")}
+            >
+              Live Progress
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === "redis" ? "active" : ""}`}
+              onClick={() => setActiveTab("redis")}
+            >
+              Redis Buffered Answers
+              {redisPartials.length > 0 && (
+                <span className="badge bg-info ms-2">{redisPartials.length}</span>
+              )}
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === "pending" ? "active" : ""}`}
+              onClick={() => setActiveTab("pending")}
+              title="Completed students whose answers haven't been confirmed in MySQL yet"
+            >
+              Pending Persistence
+              {pendingEntries.length > 0 && (
+                <span
+                  className={`badge ms-2 ${
+                    pendingEntries.some((e) => e.diagnostic.startsWith("ghost"))
+                      ? "bg-danger"
+                      : "bg-warning text-dark"
+                  }`}
+                >
+                  {pendingEntries.length}
+                </span>
+              )}
+            </button>
+          </li>
+        </ul>
+
+        {error && (
+          <div className="alert alert-warning py-2">{error}</div>
+        )}
+
+        {!selectedId && !error && (
+          <div className="text-center text-muted py-5">
+            Select an assessment to start tracking
+          </div>
+        )}
+
+        {/* ─── Live Progress Tab ─── */}
+        {activeTab === "live" && data && (
+          <>
+            {/* Summary cards */}
+            <SummaryCards summary={scopedSummary} />
+
+            {/* Completion progress */}
+            <div className="mb-4">
+              <div className="d-flex justify-content-between mb-1">
+                <small className="fw-semibold">Overall Completion</small>
+                <small className="text-muted">
+                  {scopedSummary.completed} / {scopedSummary.total} students
+                </small>
+              </div>
+              <div className="progress" style={{ height: 12 }}>
+                <div
+                  className="progress-bar bg-success"
+                  style={{
+                    width: `${scopedSummary.total > 0
+                      ? (scopedSummary.completed / scopedSummary.total) * 100
+                      : 0}%`,
+                    transition: "width 0.5s ease",
+                  }}
+                />
+                <div
+                  className="progress-bar bg-warning"
+                  style={{
+                    width: `${scopedSummary.total > 0
+                      ? (scopedSummary.ongoing / scopedSummary.total) * 100
+                      : 0}%`,
+                    transition: "width 0.5s ease",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="d-flex flex-wrap gap-3 mb-3">
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Search by name or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ maxWidth: 260 }}
+              />
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Filter by username..."
+                value={filterUsername}
+                onChange={(e) => setFilterUsername(e.target.value)}
+                style={{ maxWidth: 220 }}
+              />
+              <select
+                className="form-select form-select-sm"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                style={{ maxWidth: 180 }}
+              >
+                <option value="all">All Statuses</option>
+                <option value="ongoing">In Progress</option>
+                <option value="notstarted">Not Started</option>
+                <option value="completed">Completed</option>
+              </select>
+              {instituteOptions.length > 1 && (
+                <select
+                  className="form-select form-select-sm"
+                  value={filterInstitute}
+                  onChange={(e) => setFilterInstitute(e.target.value)}
+                  style={{ maxWidth: 240 }}
+                >
+                  <option value="all">All Institutes</option>
+                  {instituteOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <select
+                className="form-select form-select-sm"
+                value={progressSort}
+                onChange={(e) => setProgressSort(e.target.value as "none" | "asc" | "desc")}
+                style={{ maxWidth: 200 }}
+                title="Sort by progress"
+              >
+                <option value="none">Sort: Default</option>
+                <option value="asc">Progress: Low → High</option>
+                <option value="desc">Progress: High → Low</option>
+              </select>
+              <button
+                className="btn btn-sm btn-success"
+                onClick={handleDownloadExcel}
+                disabled={filteredStudents.length === 0}
+                title="Download filtered list as Excel"
+              >
+                <ActionIcon type="download" size="sm" className="me-1" />
+                Download
+              </button>
+              <small className="text-muted align-self-center">
+                Showing {filteredStudents.length} of {data.students.length}
+              </small>
+            </div>
+
+            {/* Student table */}
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
+                  <tr>
+                    <th style={{ width: 60 }}>#</th>
+                    <th>Student</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Institute</th>
+                    <th style={{ width: 130 }}>Status</th>
+                    <th style={{ width: 150 }}>Current Page</th>
+                    <th style={{ width: 220 }}>Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center text-muted py-4">
+                        No students match the current filter
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStudents.map((s, idx) => (
+                      <tr key={s.userStudentId}>
+                        <td className="text-muted">{idx + 1}</td>
+                        <td>
+                          <div className="fw-semibold">{s.studentName}</div>
+                          <small className="text-muted">
+                            ID: {s.userStudentId}
+                          </small>
+                        </td>
+                        <td>
+                          <small>{s.username || ""}</small>
+                        </td>
+                        <td>
+                          <small>{s.email || ""}</small>
+                        </td>
+                        <td>
+                          <small>{s.instituteName}</small>
+                        </td>
+                        <td>{statusBadge(s.status)}</td>
+                        <td>
+                          <CurrentPosition student={s} />
+                        </td>
+                        <td>
+                          <ProgressBar
+                            answered={s.answeredCount}
+                            total={data.totalQuestions}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* ─── Redis Buffered Answers Tab ─── */}
+        {activeTab === "redis" && (
+          <>
+            <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={fetchRedisPartials}
+                disabled={redisLoading}
+              >
+                {redisLoading ? (
+                  <span className="spinner-border spinner-border-sm me-1" role="status" />
+                ) : null}
+                Refresh
+              </button>
+              {redisPartials.length > 0 && (
+                <button
+                  className="btn btn-sm btn-success"
+                  onClick={handleFlushAll}
+                  disabled={flushingAll}
+                >
+                  {flushingAll ? (
+                    <span className="spinner-border spinner-border-sm me-1" role="status" />
+                  ) : null}
+                  Save All to DB ({redisPartials.length})
+                </button>
+              )}
+              {redisPartials.length > 0 && (
+                <button
+                  className="btn btn-sm btn-warning"
+                  onClick={handleBulkSubmit}
+                  disabled={bulkSubmitting}
+                >
+                  {bulkSubmitting ? (
+                    <span className="spinner-border spinner-border-sm me-1" role="status" />
+                  ) : null}
+                  {selectedStudents.size > 0
+                    ? `Bulk Submit Selected (${selectedStudents.size})`
+                    : `Bulk Submit All (${filteredRedisPartials.length})`}
+                </button>
+              )}
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Filter by username..."
+                value={redisFilterUsername}
+                onChange={(e) => setRedisFilterUsername(e.target.value)}
+                style={{ maxWidth: 220 }}
+              />
+              <small className="text-muted">
+                Showing {filteredRedisPartials.length} of {redisPartials.length} student
+                {redisPartials.length !== 1 ? "s" : ""} with buffered answers
+              </small>
+            </div>
+            {bulkProgress && (
+              <div className="alert alert-info py-2 d-flex align-items-center gap-3 mb-3">
+                <div className="progress flex-grow-1" style={{ height: 8 }}>
+                  <div
+                    className="progress-bar"
+                    style={{
+                      width: `${bulkProgress.total > 0 ? (bulkProgress.done / bulkProgress.total) * 100 : 0}%`,
+                      backgroundColor: bulkProgress.failed > 0 ? "#ffc107" : "#0d6efd",
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+                <small className="text-nowrap">
+                  {bulkProgress.done}/{bulkProgress.total} submitted
+                  {bulkProgress.failed > 0 && (
+                    <span className="text-danger ms-1">({bulkProgress.failed} failed)</span>
+                  )}
+                </small>
+              </div>
+            )}
+
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
+                  <tr>
+                    <th style={{ width: 40 }}>
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        checked={
+                          filteredRedisPartials.length > 0 &&
+                          filteredRedisPartials.every((e) => selectedStudents.has(e.userStudentId))
+                        }
+                        onChange={toggleSelectAll}
+                        disabled={bulkSubmitting}
+                      />
+                    </th>
+                    <th style={{ width: 50 }}>#</th>
+                    <th>Student</th>
+                    <th>Username</th>
+                    <th style={{ width: 100 }}>Answers</th>
+                    <th style={{ width: 120 }}>TTL</th>
+                    <th style={{ width: 180 }}>Last Saved</th>
+                    <th style={{ width: 140 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRedisPartials.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="text-center text-muted py-4">
+                        {redisLoading
+                          ? "Loading..."
+                          : redisPartials.length === 0
+                          ? "No buffered answers in Redis"
+                          : "No students match the current filter"}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRedisPartials.map((entry, idx) => (
+                      <tr key={`${entry.userStudentId}-${entry.assessmentId}`}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={selectedStudents.has(entry.userStudentId)}
+                            onChange={() => toggleStudentSelection(entry.userStudentId)}
+                            disabled={bulkSubmitting}
+                          />
+                        </td>
+                        <td className="text-muted">{idx + 1}</td>
+                        <td>
+                          <div className="fw-semibold">{entry.studentName}</div>
+                          <small className="text-muted">ID: {entry.userStudentId}</small>
+                        </td>
+                        <td>
+                          <small>{entry.username || ""}</small>
+                        </td>
+                        <td>
+                          <span
+                            className="badge bg-info px-3 py-2"
+                            style={{ cursor: "pointer" }}
+                            onClick={() => handleViewRedisJson(entry)}
+                            title="Click to view Redis JSON"
+                          >
+                            {entry.answerCount}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className={`badge px-3 py-2 ${
+                              entry.ttlSeconds < 3600
+                                ? "bg-warning text-dark"
+                                : "bg-success"
+                            }`}
+                          >
+                            {formatTtl(entry.ttlSeconds)}
+                          </span>
+                        </td>
+                        <td>
+                          <small className="text-muted">
+                            {entry.savedAt
+                              ? new Date(entry.savedAt).toLocaleTimeString()
+                              : "Unknown"}
+                          </small>
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleFlushOne(entry.userStudentId, entry.assessmentId)}
+                            disabled={flushingIds.has(entry.userStudentId)}
+                          >
+                            {flushingIds.has(entry.userStudentId) ? (
+                              <span className="spinner-border spinner-border-sm me-1" role="status" />
+                            ) : null}
+                            Save to DB
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-warning ms-2"
+                            onClick={() => handleSubmitFromRedis(entry)}
+                            disabled={submittingIds.has(entry.userStudentId)}
+                          >
+                            {submittingIds.has(entry.userStudentId) ? (
+                              <span className="spinner-border spinner-border-sm me-1" role="status" />
+                            ) : null}
+                            Submit this Data
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* ─── Pending Persistence Tab ─── */}
+        {activeTab === "pending" && (
+          <PendingPersistenceTab
+            entries={pendingEntries}
+            loading={pendingLoading}
+            actionIds={pendingActionIds}
+            onRefresh={fetchPendingPersistence}
+            onRetry={handlePendingRetry}
+            onReconcile={handlePendingReconcile}
+            onCleanupRedis={handlePendingCleanupRedis}
+            onReset={handlePendingReset}
+            onViewFailure={handleViewFailureDetail}
+            onInspectPayload={handleInspectPayload}
+          />
+        )}
+
+        {/* Loading skeleton for initial load */}
+        {loading && !data && selectedId && activeTab === "live" && (
+          <div className="text-center py-5">
+            <div className="spinner-border text-primary" role="status" />
+            <div className="text-muted mt-2">Loading tracking data...</div>
+          </div>
+        )}
+      </div>
+
+      {/* Redis JSON Modal */}
+      {redisJsonModal.show && (
+        <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-lg modal-dialog-scrollable">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Redis Data &mdash; {redisJsonModal.studentName}</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setRedisJsonModal({ show: false, studentName: "", data: null })}
+                />
+              </div>
+              <div className="modal-body">
+                <pre style={{ maxHeight: "60vh", overflow: "auto", fontSize: "0.85rem" }}>
+                  {JSON.stringify(redisJsonModal.data, null, 2)}
+                </pre>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setRedisJsonModal({ show: false, studentName: "", data: null })}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Failure Detail Modal */}
+      {failureDetailModal.show && (
+        <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-lg modal-dialog-scrollable">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Failure History &mdash; {failureDetailModal.studentName}</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setFailureDetailModal({ show: false, studentName: "", detail: null })}
+                />
+              </div>
+              <div className="modal-body">
+                {failureDetailModal.detail ? (
+                  <>
+                    <dl className="row mb-3">
+                      <dt className="col-sm-4">Attempt Count</dt>
+                      <dd className="col-sm-8">{failureDetailModal.detail.attemptCount}</dd>
+
+                      <dt className="col-sm-4">First Failed</dt>
+                      <dd className="col-sm-8">{failureDetailModal.detail.firstFailedAt}</dd>
+
+                      <dt className="col-sm-4">Last Attempt</dt>
+                      <dd className="col-sm-8">{failureDetailModal.detail.lastAttemptAt}</dd>
+
+                      <dt className="col-sm-4">Next Retry</dt>
+                      <dd className="col-sm-8">
+                        {failureDetailModal.detail.nextRetryAt || (
+                          <span className="text-danger">Retries stopped — admin action required</span>
+                        )}
+                      </dd>
+
+                      <dt className="col-sm-4">Error Kind</dt>
+                      <dd className="col-sm-8">
+                        <span className={
+                          failureDetailModal.detail.lastErrorKind === "non_transient"
+                            ? "badge bg-danger"
+                            : "badge bg-warning text-dark"
+                        }>
+                          {failureDetailModal.detail.lastErrorKind || "unknown"}
+                        </span>
+                      </dd>
+
+                      <dt className="col-sm-4">Consecutive Non-Transient</dt>
+                      <dd className="col-sm-8">{failureDetailModal.detail.consecutiveNonTransientCount}</dd>
+
+                      <dt className="col-sm-4">Error Class</dt>
+                      <dd className="col-sm-8"><code>{failureDetailModal.detail.lastErrorClass}</code></dd>
+                    </dl>
+                    <h6>Last Error Message</h6>
+                    <pre style={{ maxHeight: "30vh", overflow: "auto", fontSize: "0.85rem", backgroundColor: "#f8f9fa", padding: 12 }}>
+                      {failureDetailModal.detail.lastErrorMessage || "(no message)"}
+                    </pre>
+                  </>
+                ) : (
+                  <em className="text-muted">No failure record</em>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setFailureDetailModal({ show: false, studentName: "", detail: null })}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pulse animation for live indicator */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
+    </div>
+    </div>
+  );
+};
+
+// ═════════════════════════════════════════════════════════════════════════
+//   Pending Persistence tab content
+// ═════════════════════════════════════════════════════════════════════════
+
+const DIAGNOSTIC_META: Record<PendingPersistenceDiagnostic, {
+  label: string;
+  severity: "info" | "warning" | "danger" | "orange";
+  description: string;
+}> = {
+  awaiting_processor: {
+    label: "Awaiting processor",
+    severity: "warning",
+    description: "Redis has the submission; DB is empty. Processor will retry automatically.",
+  },
+  partial_inflight: {
+    label: "Partial (in-flight)",
+    severity: "warning",
+    description: "Redis has the submission; DB has some rows. Processor is mid-write.",
+  },
+  duplicate_cleanup_needed: {
+    label: "Cleanup needed",
+    severity: "warning",
+    description: "Both Redis and DB are in sync (full answer set). Safe to delete Redis.",
+  },
+  excess_pending: {
+    label: "Excess (pending)",
+    severity: "orange",
+    description: "Redis has more questions than expected. Inspect before retrying.",
+  },
+  excess_already_persisted: {
+    label: "Excess (already persisted)",
+    severity: "warning",
+    description: "DB has full data; Redis payload has excess. Safe to delete Redis.",
+  },
+  excess_partial_db: {
+    label: "Excess (partial DB)",
+    severity: "danger",
+    description: "Redis payload is excess; DB only has some rows. Inspect — likely needs reset.",
+  },
+  reconcile_only: {
+    label: "Reconcile only",
+    severity: "info",
+    description: "DB has full answer set; persistenceState flag is stale. Zero-risk to reconcile.",
+  },
+  ghost_partial: {
+    label: "Ghost (partial)",
+    severity: "danger",
+    description: "Redis empty; DB has partial answers. Data is unreliable — reset recommended.",
+  },
+  ghost_empty: {
+    label: "Ghost (empty)",
+    severity: "danger",
+    description: "Redis empty; DB empty. Data is unrecoverable — reset and ask student to retake.",
+  },
+  persisted_with_warnings: {
+    label: "Persisted (with warnings)",
+    severity: "info",
+    description: "Processing succeeded but the payload had duplicates or unknown questionIds/optionIds. DB count matches expected. Acknowledge with Mark Persisted.",
+  },
+  persisted_incomplete: {
+    label: "Persisted (incomplete)",
+    severity: "danger",
+    description: "Flagged persisted but DB has fewer answers than expected. Investigate — retry from Redis if possible, otherwise reset.",
+  },
+  stuck_ongoing: {
+    label: "Stuck ongoing",
+    severity: "orange",
+    description: "Status is ongoing but a submission payload is sitting in Redis. Student pressed submit but something blocked the flow. Retry to finalize on their behalf.",
+  },
+};
+
+const diagnosticBadgeClass = (severity: "info" | "warning" | "danger" | "orange"): string => {
+  switch (severity) {
+    case "info": return "badge bg-info text-white";
+    case "warning": return "badge bg-warning text-dark";
+    case "danger": return "badge bg-danger text-white";
+    case "orange": return "badge text-white";   // orange styled inline
+  }
+};
+
+interface PendingTabProps {
+  entries: PendingPersistenceEntry[];
+  loading: boolean;
+  actionIds: Set<number>;
+  onRefresh: () => void;
+  onRetry: (e: PendingPersistenceEntry) => void;
+  onReconcile: (e: PendingPersistenceEntry) => void;
+  onCleanupRedis: (e: PendingPersistenceEntry) => void;
+  onReset: (e: PendingPersistenceEntry) => void;
+  onViewFailure: (e: PendingPersistenceEntry) => void;
+  onInspectPayload: (e: PendingPersistenceEntry) => void;
+}
+
+const PendingPersistenceTab = (props: PendingTabProps) => {
+  const { entries, loading, actionIds, onRefresh, onRetry, onReconcile, onCleanupRedis, onReset, onViewFailure, onInspectPayload } = props;
+
+  const ghostCount = entries.filter((e) => e.diagnostic.startsWith("ghost")).length;
+  const excessCount = entries.filter((e) => e.diagnostic.startsWith("excess")).length;
+  const reconcileCount = entries.filter((e) => e.diagnostic === "reconcile_only").length;
+
+  return (
+    <>
+      <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <button
+          className="btn btn-sm btn-outline-primary"
+          onClick={onRefresh}
+          disabled={loading}
+        >
+          {loading ? <span className="spinner-border spinner-border-sm me-1" role="status" /> : null}
+          Refresh
+        </button>
+        <small className="text-muted">
+          Showing {entries.length} row{entries.length === 1 ? "" : "s"}
+          {ghostCount > 0 && <> · <span className="text-danger">{ghostCount} ghost</span></>}
+          {excessCount > 0 && <> · <span style={{ color: "#fd7e14" }}>{excessCount} excess</span></>}
+          {reconcileCount > 0 && <> · <span className="text-info">{reconcileCount} reconcile</span></>}
+        </small>
+      </div>
+
+      <div className="alert alert-secondary py-2 small mb-3">
+        These are students with <code>status = completed</code> whose answers
+        aren&apos;t confirmed in MySQL yet. Most self-heal via auto-retry; this
+        view lets you diagnose and fix the ones that need attention.
+      </div>
+
+      <div className="table-responsive">
+        <table className="table table-hover align-middle">
+          <thead className="table-light">
+            <tr>
+              <th style={{ width: 40 }}>#</th>
+              <th>Student</th>
+              <th>Username</th>
+              <th style={{ width: 140 }}>Diagnostic</th>
+              <th style={{ width: 100 }}>Redis</th>
+              <th style={{ width: 100 }}>DB / Expected</th>
+              <th style={{ width: 90 }}>State</th>
+              <th style={{ width: 80 }}>Attempts</th>
+              <th style={{ minWidth: 280 }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="text-center text-muted py-4">
+                  {loading ? "Loading…" : "No pending persistence issues for this assessment 🎉"}
+                </td>
+              </tr>
+            ) : (
+              entries.map((e, idx) => {
+                const meta = DIAGNOSTIC_META[e.diagnostic] ?? DIAGNOSTIC_META.ghost_empty;
+                const busy = actionIds.has(e.userStudentId);
+                const redisInfo = e.redisPresent
+                  ? (e.redisDistinctQuestionCount != null
+                      ? `${e.redisDistinctQuestionCount}q / ${e.redisAnswerCount ?? 0}e`
+                      : "present")
+                  : "—";
+                return (
+                  <tr key={`${e.userStudentId}:${e.assessmentId}`}>
+                    <td className="text-muted">{idx + 1}</td>
+                    <td>
+                      <div className="fw-semibold">{e.studentName || "(unnamed)"}</div>
+                      <small className="text-muted">ID: {e.userStudentId}</small>
+                    </td>
+                    <td><small>{e.username || ""}</small></td>
+                    <td>
+                      <span
+                        className={diagnosticBadgeClass(meta.severity)}
+                        style={meta.severity === "orange" ? { backgroundColor: "#fd7e14" } : undefined}
+                        title={meta.description}
+                      >
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td>
+                      <small>{redisInfo}</small>
+                    </td>
+                    <td>
+                      <small>
+                        {e.dbAnswerCount} / {e.expectedCount || "?"}
+                      </small>
+                    </td>
+                    <td>
+                      <small>
+                        <code>{e.persistenceState}</code>
+                      </small>
+                    </td>
+                    <td>
+                      {e.failure ? (
+                        <button
+                          className="btn btn-link btn-sm p-0"
+                          onClick={() => onViewFailure(e)}
+                          title={`Last error: ${e.failure.lastErrorClass}`}
+                        >
+                          {e.failure.attemptCount}
+                        </button>
+                      ) : (
+                        <small className="text-muted">—</small>
+                      )}
+                    </td>
+                    <td>
+                      <div className="d-flex gap-1 flex-wrap">
+                        {e.recommendedAction === "retry_now" && (
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => onRetry(e)}
+                            disabled={busy}
+                          >
+                            Retry Now
+                          </button>
+                        )}
+                        {e.recommendedAction === "cleanup_redis" && (
+                          <button
+                            className="btn btn-sm btn-outline-warning"
+                            onClick={() => onCleanupRedis(e)}
+                            disabled={busy}
+                          >
+                            Clean Up
+                          </button>
+                        )}
+                        {e.recommendedAction === "reconcile" && (
+                          <button
+                            className="btn btn-sm btn-outline-info"
+                            onClick={() => onReconcile(e)}
+                            disabled={busy}
+                            title="Acknowledge warnings and flip to persisted"
+                          >
+                            Mark Persisted
+                          </button>
+                        )}
+                        {e.recommendedAction === "reset_assessment" && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => onReset(e)}
+                            disabled={busy}
+                          >
+                            Reset
+                          </button>
+                        )}
+                        {/* Always offer inspect when Redis has the payload */}
+                        {e.redisPresent && (
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => onInspectPayload(e)}
+                            disabled={busy}
+                            title="View the raw submitted payload (incl. orphan answers)"
+                          >
+                            Inspect
+                          </button>
+                        )}
+                        {/* For incomplete/warning rows with Redis, offer both Acknowledge and Retry */}
+                        {e.redisPresent &&
+                          (e.diagnostic === "persisted_incomplete" ||
+                            e.diagnostic === "persisted_with_warnings") && (
+                            <button
+                              className="btn btn-sm btn-outline-info"
+                              onClick={() => onReconcile(e)}
+                              disabled={busy}
+                              title="Acknowledge warnings — student doesn't retake"
+                            >
+                              Acknowledge
+                            </button>
+                          )}
+                      </div>
+                      {(e.duplicatesDeduped != null || e.skippedUnknown != null) &&
+                        ((e.duplicatesDeduped ?? 0) > 0 || (e.skippedUnknown ?? 0) > 0) && (
+                          <small className="text-muted d-block mt-1">
+                            {(e.duplicatesDeduped ?? 0) > 0 && (
+                              <span>dup: {e.duplicatesDeduped}</span>
+                            )}
+                            {(e.duplicatesDeduped ?? 0) > 0 &&
+                              (e.skippedUnknown ?? 0) > 0 && <span> · </span>}
+                            {(e.skippedUnknown ?? 0) > 0 && (
+                              <span>skipped: {e.skippedUnknown}</span>
+                            )}
+                          </small>
+                        )}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+};
+
+export default LiveTrackingPage;

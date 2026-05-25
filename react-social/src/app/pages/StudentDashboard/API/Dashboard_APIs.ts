@@ -7,7 +7,9 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
 export interface StudentInfo {
   userStudentId: number;
   name: string;
+  username?: string;
   grade?: string;
+  section?: string;
   schoolBoard?: string;
   familyType?: string;
   siblingsCount?: number;
@@ -78,7 +80,8 @@ export interface ValueData {
 export interface EnvironmentalAwarenessData {
   netScore: number;
   category: string;
-  icon: string;
+  iconPath: string;
+  iconTint: string;
   friendlyChoices: number;
   unfriendlyChoices: number;
   interpretation: string;
@@ -433,23 +436,26 @@ function getSocialInsightFullData(score: number): {
 /**
  * Get environmental awareness category
  */
-function getEnvironmentalCategory(netScore: number): { category: string; icon: string; interpretation: string } {
+function getEnvironmentalCategory(netScore: number): { category: string; iconPath: string; iconTint: string; interpretation: string } {
   if (netScore >= 2) {
     return {
       category: "Mighty Tree",
-      icon: "🌳",
+      iconPath: "/media/icons/duotune/art/art007.svg",
+      iconTint: "#0C6B5A",
       interpretation: "Your child consistently looks past the \"shiny\" stuff to choose what is best for the planet."
     };
   } else if (netScore >= 0) {
     return {
       category: "Growing Sapling",
-      icon: "🌿",
+      iconPath: "/media/icons/duotune/general/gen037.svg",
+      iconTint: "#10B981",
       interpretation: "Your child is balancing convenience with caring for the planet in your daily life."
     };
   } else {
     return {
       category: "Seedling Starter",
-      icon: "🌱",
+      iconPath: "/media/icons/duotune/general/gen043.svg",
+      iconTint: "#65A30D",
       interpretation: "Your child currently prefers things that are quick and easy—try swapping one \"convenient\" choice for a \"green\" one this week!"
     };
   }
@@ -507,7 +513,6 @@ export async function fetchGameResults(studentId: number): Promise<RawGameResult
     const response = await axios.get(`${API_BASE_URL}/game-results/get/${studentId}`);
     return response.data;
   } catch (error) {
-    console.warn("Failed to fetch game results:", error);
     return null;
   }
 }
@@ -593,7 +598,6 @@ export async function getStudentAssessments(studentId: number): Promise<any[]> {
     const response = await axios.get(`${API_BASE_URL}/assessments/student/${studentId}`);
     return response.data;
   } catch (error) {
-    console.warn("Failed to fetch student assessments:", error);
     return [];
   }
 }
@@ -768,7 +772,8 @@ export function processBetAssessmentData(
   const environmentalAwareness: EnvironmentalAwarenessData = {
     netScore: envNetScore,
     category: envResult.category,
-    icon: envResult.icon,
+    iconPath: envResult.iconPath,
+    iconTint: envResult.iconTint,
     friendlyChoices,
     unfriendlyChoices,
     interpretation: envResult.interpretation,
@@ -941,25 +946,64 @@ export async function getDashboardDataFromCache(
       dashboardData.cognitive = processGameResults(gameResults);
     }
   } catch (error) {
-    console.warn("Failed to fetch game results for cognitive data:", error);
   }
 
-  // Enrich student info from demographics endpoint
+  // Enrich student info from legacy demographics endpoint (reads student_info table)
+  let legacyFamily: string | null = null;
+  let legacySibling: number | null = null;
   try {
     const studentResponse = await axios.get(
       `${API_BASE_URL}/student-info/getDemographics/${studentId}`
     );
     const studentData = studentResponse.data;
+    // Prefer className from section hierarchy; fall back to studentClass integer
+    const grade = studentData.className || (studentData.studentClass != null ? studentData.studentClass.toString() : null) || "N/A";
+    const section = studentData.sectionName || null;
+    legacyFamily = studentData.family || null;
+    legacySibling = studentData.sibling != null ? studentData.sibling : null;
     dashboardData.student = {
       ...dashboardData.student,
       name: studentData.name || "Student",
-      grade: studentData.studentClass?.toString() || "N/A",
+      username: studentData.username || undefined,
+      grade,
+      section,
       schoolBoard: studentData.schoolBoard || "N/A",
-      familyType: studentData.family || "N/A",
-      siblingsCount: studentData.sibling || 0,
+      familyType: legacyFamily || "N/A",
+      siblingsCount: legacySibling ?? undefined,
     };
   } catch (error) {
-    console.warn("Failed to fetch student demographics:", error);
+  }
+
+  // Also check dynamic demographics (student_demographic_response table) to fill any missing fields.
+  // This covers students who filled the dynamic assessment form instead of the legacy form.
+  if (legacyFamily === null || legacySibling === null) {
+    try {
+      const dynResponse = await axios.get(
+        `${API_BASE_URL}/student-demographics/fields/${assessmentId}/${studentId}`
+      );
+      const dynFields: any[] = dynResponse.data;
+      if (Array.isArray(dynFields)) {
+        const findValue = (key: string) =>
+          dynFields.find((f) => f.fieldName === key || f.fieldName === key.toLowerCase())?.currentValue ?? null;
+
+        if (legacyFamily === null) {
+          const dynFamily = findValue("family");
+          if (dynFamily) {
+            dashboardData.student = { ...dashboardData.student, familyType: dynFamily };
+          }
+        }
+        if (legacySibling === null) {
+          const dynSibling = findValue("sibling");
+          if (dynSibling != null && dynSibling !== "") {
+            const parsed = parseInt(dynSibling, 10);
+            if (!isNaN(parsed)) {
+              dashboardData.student = { ...dashboardData.student, siblingsCount: parsed };
+            }
+          }
+        }
+      }
+    } catch (error) {
+    }
   }
 
   return { data: dashboardData, isBetAssessment };
@@ -979,8 +1023,6 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
       const studentResponse = await axios.get(`${API_BASE_URL}/student-info/getDemographics/${studentId}`);
       const studentData = studentResponse.data;
 
-      console.log("Student demographics fetched:", studentData);
-
       studentInfo = {
         userStudentId: studentId,
         name: studentData.name || "Student",
@@ -993,7 +1035,6 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
         schoolLogo: undefined,
       };
     } catch (error) {
-      console.warn("Failed to fetch student demographics, using fallback:", error);
       // Fallback student info if API fails
       studentInfo = {
         userStudentId: studentId,
@@ -1016,9 +1057,7 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     try {
       const cognitiveResponse = await axios.get(`${API_BASE_URL}/dashboard/game-results/${studentId}`, { params });
       cognitiveRaw = cognitiveResponse.data;
-      console.log("Cognitive data fetched:", cognitiveRaw);
     } catch (error) {
-      console.warn("Failed to fetch cognitive data, using demo data:", error);
       // Use demo data if API fails or no data available
       cognitiveRaw = {
         attention: {
@@ -1102,9 +1141,7 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     try {
       const socialResponse = await axios.get(`${API_BASE_URL}/dashboard/assessment-scores/${studentId}`, { params });
       socialRaw = socialResponse.data;
-      console.log("Social data fetched:", socialRaw);
     } catch (error) {
-      console.warn("Failed to fetch social data, using demo data:", error);
       // Use demo data if API fails or no data available
       socialRaw = {
         socialInsight: {
@@ -1190,9 +1227,7 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     try {
       const selfManagementResponse = await axios.get(`${API_BASE_URL}/dashboard/self-management/${studentId}`, { params });
       selfManagementRaw = selfManagementResponse.data;
-      console.log("Self-management data fetched:", selfManagementRaw);
     } catch (error) {
-      console.warn("Failed to fetch self-management data, using demo data:", error);
       // Use demo data if API fails or no data available
       selfManagementRaw = {
         selfEfficacy: {
@@ -1361,5 +1396,200 @@ export async function downloadPDFReport(studentId: number): Promise<Blob> {
   } catch (error) {
     console.error("Error downloading PDF:", error);
     throw error;
+  }
+}
+
+// ========== GENERAL ASSESSMENT DASHBOARD ==========
+
+export interface GeneralAssessmentData {
+  id: number;
+  userStudentId: number;
+  assessmentId: number;
+  classGroup: string;
+  studentClass: number;
+
+  // Personality
+  personalityScores: string; // JSON string
+  personalityTop1: string;
+  personalityTop2: string;
+  personalityTop3: string;
+  personalityProfiles: string; // JSON string
+
+  // Intelligence
+  intelligenceScores: string;
+  intelligenceTop1: string;
+  intelligenceTop2: string;
+  intelligenceTop3: string;
+  intelligenceProfiles: string;
+
+  // Abilities
+  abilityScores: string;
+  abilityTop1: string;
+  abilityTop2: string;
+  abilityTop3: string;
+  abilityTop4: string;
+  abilityTop5: string;
+  weakAbility: string;
+  weakAbilityRecommendations: string;
+
+  // Learning Styles
+  learningStyles: string;
+
+  // Career Pathways
+  suitabilityPathways: string;
+  careerMatchResult: string;
+
+  // Preferences
+  subjectsOfInterest: string;
+  careerAspirations: string;
+  studentValues: string;
+
+  // AI
+  aiSummary: string;
+  learningSummary: string;
+
+  // Enriched
+  futureSuggestions: string;
+
+  // Eligibility
+  eligibilityStatus: string;
+  eligibilityIssues: string;
+
+  processedAt: string;
+}
+
+// Parsed versions of JSON string fields
+export interface PersonalityScore {
+  raw: number;
+  stanine: number;
+}
+
+export interface ProfileData {
+  name: string;
+  title: string;
+  description: string;
+  image: string;
+}
+
+export interface LearningStyleData {
+  intelligence: string;
+  style: string;
+  enjoys: string;
+  struggles: string;
+}
+
+export interface PathwayHasLacks {
+  has: string[];
+  lacks: string[];
+}
+
+export interface PathwayDetail {
+  rank: number;
+  name: string;
+  description?: string;
+  subjects?: string;
+  skills?: string;
+  courses?: string;
+  exams?: string;
+  hasLacks?: {
+    personality: PathwayHasLacks;
+    intelligence: PathwayHasLacks;
+    soi: PathwayHasLacks;
+    abilities: PathwayHasLacks;
+    values: PathwayHasLacks;
+  };
+}
+
+export interface ParsedGeneralAssessmentData {
+  raw: GeneralAssessmentData;
+  personalityScores: Record<string, PersonalityScore>;
+  personalityProfiles: ProfileData[];
+  intelligenceScores: Record<string, number>;
+  intelligenceProfiles: ProfileData[];
+  abilityScores: Record<string, number>;
+  learningStyles: LearningStyleData[];
+  suitabilityPathways: PathwayDetail[];
+  subjectsOfInterest: string[];
+  careerAspirations: string[];
+  studentValues: string[];
+  futureSuggestions: { atSchool: string; atHome: string };
+}
+
+function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
+  if (!json) return fallback;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return fallback;
+  }
+}
+
+export function parseGeneralAssessmentData(data: GeneralAssessmentData): ParsedGeneralAssessmentData {
+  return {
+    raw: data,
+    personalityScores: safeJsonParse(data.personalityScores, {}),
+    personalityProfiles: safeJsonParse(data.personalityProfiles, []),
+    intelligenceScores: safeJsonParse(data.intelligenceScores, {}),
+    intelligenceProfiles: safeJsonParse(data.intelligenceProfiles, []),
+    abilityScores: safeJsonParse(data.abilityScores, {}),
+    learningStyles: safeJsonParse(data.learningStyles, []),
+    suitabilityPathways: safeJsonParse(data.suitabilityPathways, []),
+    subjectsOfInterest: safeJsonParse(data.subjectsOfInterest, []),
+    careerAspirations: safeJsonParse(data.careerAspirations, []),
+    studentValues: safeJsonParse(data.studentValues, []),
+    futureSuggestions: safeJsonParse(data.futureSuggestions, { atSchool: "", atHome: "" }),
+  };
+}
+
+/**
+ * Fetch processed general assessment dashboard data.
+ */
+export async function fetchGeneralDashboardData(
+  studentId: number,
+  assessmentId: number
+): Promise<ParsedGeneralAssessmentData | null> {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/general-assessment/dashboard/${studentId}/${assessmentId}`
+    );
+    return parseGeneralAssessmentData(response.data);
+  } catch (error) {
+    console.error("Failed to fetch general dashboard data:", error);
+    return null;
+  }
+}
+
+/**
+ * Trigger processing for a student's general assessment.
+ */
+export async function processGeneralAssessment(
+  studentId: number,
+  assessmentId: number
+): Promise<GeneralAssessmentData | null> {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/general-assessment/process/${studentId}/${assessmentId}`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Failed to process general assessment:", error);
+    return null;
+  }
+}
+
+/**
+ * Check if general assessment result is processed.
+ */
+export async function checkGeneralAssessmentStatus(
+  studentId: number,
+  assessmentId: number
+): Promise<{ processed: boolean; processedAt?: string }> {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/general-assessment/status/${studentId}/${assessmentId}`
+    );
+    return response.data;
+  } catch {
+    return { processed: false };
   }
 }

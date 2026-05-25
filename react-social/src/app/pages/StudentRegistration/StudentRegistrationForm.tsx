@@ -351,7 +351,6 @@ const StudentDetails = () => {
 
   // function Partial_Save(values: any) {
   //   try {
-  //     console.log(values)
   //     upsertStudentData(values).then(() => {
   // alert("Please wait. Don't close the tab")
   //     });
@@ -424,7 +423,6 @@ const StudentDetails = () => {
             // setlistofDocument(list_of_Document);
 
             setloading(false);
-            // console.log(formik.errors);
           })
           .catch((error) => {
             console.error(error);
@@ -592,7 +590,6 @@ const StudentDetails = () => {
     facingMode: "user",
   };
   function validate() {
-    // console.log(formik.errors);
     var ret = "";
     return formik.errors;
   }

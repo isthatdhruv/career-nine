@@ -1,75 +1,87 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
-import { ReadQuestionSectionData } from "./API/Question_Section_APIs";
+import { ReadQuestionSectionDataList } from "./API/Question_Section_APIs";
 import QuestionSectionTable from "./components/QuestionSectionTable";
+import QuestionSectionRecycleBinModal from "./components/QuestionSectionRecycleBinModal";
+import PageHeader from "../../components/PageHeader";
 
 const QuestionSectionPage = () => {
   const [questionSectionData, setQuestionSectionData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(["false"]);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
     try {
-      ReadQuestionSectionData().then((data) => {
+      ReadQuestionSectionDataList().then((data) => {
         setQuestionSectionData(data.data);
         setLoading(false);
       });
     } catch (error) {
       console.error(error);
-      // window.location.replace("/error");
     }
   }, [pageLoading]);
 
   return (
-    <div className="card">
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-collection" />}
+        title="Assessment Sections"
+        subtitle={
+          loading ? (
+            "Loading..."
+          ) : (
+            <>
+              <strong>{questionSectionData.length}</strong> sections
+            </>
+          )
+        }
+        actions={[
+          {
+            label: "Add Section",
+            iconClass: "bi-plus-lg",
+            onClick: () => navigate("/question-sections/create"),
+            variant: "primary",
+          },
+          {
+            label: "Recycle Bin",
+            iconClass: "bi-recycle",
+            onClick: () => setShowRecycleBin(true),
+            variant: "danger",
+          },
+        ]}
+      />
+
+      {/* Loading State */}
       {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "48px", textAlign: "center" }}>
+          <div className="spinner-border" style={{ color: "#7c3aed" }} role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3" style={{ color: "#6b7280" }}>Loading sections...</p>
+        </div>
       )}
 
+      {/* Table Card */}
       {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Assessment Sections</h1>
-          </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  navigate("/question-sections/create");
-                }}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Add Section <MdQuestionAnswer size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-            </div>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+          <div style={{ padding: "16px" }}>
+            <QuestionSectionTable
+              data={questionSectionData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
           </div>
         </div>
       )}
 
-      {!loading && (
-        <div className="card-body pt-5">
-          <QuestionSectionTable
-            data={questionSectionData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
-        </div>
-      )}
+      <QuestionSectionRecycleBinModal
+        show={showRecycleBin}
+        onHide={() => setShowRecycleBin(false)}
+        onRestoreComplete={() => setPageLoading([String(Date.now())])}
+      />
     </div>
   );
 };

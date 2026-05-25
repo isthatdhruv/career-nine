@@ -136,7 +136,7 @@ export function useEyeGazeTracking({ faceCountRef }: UseEyeGazeTrackingParams): 
       } catch (err) {
         // Webcam denied or WebGazer init failure — proctoring continues
         // without gaze data, matching existing graceful-degradation pattern.
-        console.warn('Eye gaze tracking init failed:', err);
+        // Eye gaze tracking init failed — proctoring continues without gaze data
       }
     };
 

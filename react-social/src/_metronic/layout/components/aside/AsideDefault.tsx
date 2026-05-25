@@ -6,7 +6,6 @@ import clsx from "clsx";
 import { useLayout } from "../../core";
 import { KTSVG, toAbsoluteUrl } from "../../../helpers";
 import { AsideMenu } from "./AsideMenu";
-import { colorDarken } from "../../../assets/ts/_utils";
 
 const AsideDefault: FC = () => {
   const { config, classes } = useLayout();
@@ -42,7 +41,7 @@ const AsideDefault: FC = () => {
               <img
                 alt="Logo"
                 className="h-50px logo px-3"
-                src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+                src={toAbsoluteUrl("/media/logos/kcc.webp")}
               />
               {/* <h3
                 style={{
@@ -61,7 +60,7 @@ const AsideDefault: FC = () => {
             <img
               alt="Logo"
               className="h-25px logo"
-              src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+              src={toAbsoluteUrl("/media/logos/kcc.webp")}
             />
           </Link>
         )}

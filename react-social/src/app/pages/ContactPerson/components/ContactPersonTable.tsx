@@ -1,12 +1,12 @@
 // ContactPersonTable.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillEdit } from "react-icons/ai";
-import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { DeleteContactInformationData } from "../API/Contact_Person_APIs";
 import ContactPersonEditModal from "./ContactPersonEditModal";
+import { showErrorToast } from '../../../utils/toast';
 
 type ContactRow = {
   id?: string;
@@ -23,7 +23,6 @@ const ContactPersonTable = (props: {
   setLoading: (v: boolean) => void;
   setPageLoading: (v: any) => void;
 }) => {
-  const navigate = useNavigate();
   const [modalShowEdit, setModalShowEdit] = useState(false);
   const [editModalData, setEditModalData] = useState<ContactRow>({
     id: undefined,
@@ -88,7 +87,7 @@ const ContactPersonTable = (props: {
               className="btn btn-icon btn-primary btn-sm me-3"
               type="button"
             >
-              <AiFillEdit size={16} />
+              <ActionIcon type="edit" size="sm" />
             </button>
 
             <button
@@ -100,7 +99,7 @@ const ContactPersonTable = (props: {
                   props.setPageLoading(["true"]);
                 } catch (error) {
                   console.error("Delete failed:", error);
-                  alert("Failed to delete contact person. Please try again.");
+                  showErrorToast("Failed to delete contact person. Please try again.");
                 } finally {
                   props.setLoading(false);
                 }

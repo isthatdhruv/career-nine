@@ -4,6 +4,7 @@ import java.util.Arrays;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.cribbstechnologies.clients.mandrill.exception.RequestFailedException;
 import com.cribbstechnologies.clients.mandrill.model.MandrillRecipient;
 import com.cribbstechnologies.clients.mandrill.model.response.message.SendMessageResponse;
+import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.service.EmailService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
@@ -26,6 +28,8 @@ EmailService emailService;
 @Autowired
 SmtpEmailService smtpEmailService;
 
+	// no scope arg: test email send (admin diagnostic); scope-less
+	@PreAuthorize("@auth.allows('email.send')")
 	@GetMapping(value = "email-test/get", headers = "Accept=application/json")
 	public SendMessageResponse getEmail() throws RequestFailedException {
         MandrillRecipient[] recipient = {
@@ -36,6 +40,8 @@ SmtpEmailService smtpEmailService;
 	    return emailService.sendMessage("testing", recipient, "Bhavya", "bhavya@kccitm.edu.in", "hello");
 	}
 
+	// no scope arg: email send with attachment; scope-less
+	@PreAuthorize("@auth.allows('email.send')")
 	@PostMapping("/email/send-with-attachment")
 	public ResponseEntity<String> sendWithAttachment(
 			@RequestParam("to") String to,
@@ -57,7 +63,7 @@ SmtpEmailService smtpEmailService;
 			smtpEmailService.sendEmail(request);
 			return ResponseEntity.ok("Email sent successfully");
 		} catch (Exception e) {
-			return ResponseEntity.status(500).body("Email failed: " + e.getMessage());
+			throw new ServiceException("Email failed: " + e.getMessage());
 		}
 	}
 }

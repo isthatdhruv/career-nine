@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useState } from "react";
 
 type Section = {
   sectionId?: string | number;
@@ -52,6 +52,8 @@ const SectionQuestionSelector: FC<SectionQuestionSelectorProps> = ({
   languages,
   onAddTranslation,
 }) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
   const getSectionName = (sectionId: string) => {
     const s = sections.find(
       (sec) => String(sec.sectionId ?? sec.id ?? "") === String(sectionId)
@@ -106,17 +108,33 @@ const SectionQuestionSelector: FC<SectionQuestionSelectorProps> = ({
             </h5>
           </div>
           <div className="card-body">
-            <div className="mb-3">
+            <div className="mb-3 d-flex justify-content-between align-items-center">
               <label className="fs-6 fw-bold">Available Questions:</label>
             </div>
-            
-            <div 
-              className="border rounded p-3" 
+
+            <div className="mb-3">
+              <input
+                type="text"
+                className="form-control form-control-solid"
+                placeholder="Search questions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div
+              className="border rounded p-3"
               style={{ maxHeight: '300px', overflowY: 'auto' }}
             >
               {questions.length > 0 ? (
                 <div className="questions-list">
-                  {questions.map((question, qIndex) => {
+                  {questions
+                    .filter((q) => {
+                      if (!searchQuery.trim()) return true;
+                      const text = (q.questionText || q.question || "").toLowerCase();
+                      return text.includes(searchQuery.toLowerCase());
+                    })
+                    .map((question, qIndex) => {
                     const questionId = String(question.questionId || question.id || qIndex);
                     const questionsField = `sectionQuestions.${selectedSection}`;
                     const orderField = `sectionQuestionsOrder.${selectedSection}`;

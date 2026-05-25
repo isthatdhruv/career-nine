@@ -1,8 +1,8 @@
 {
-  "model_profile": "balanced",
+  "model_profile": "quality",
   "workflow": {
     "research": true,
     "plan_check": true,
-    "verifier": true
+    "verifier": false
   }
 }

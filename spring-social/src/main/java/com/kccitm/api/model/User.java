@@ -52,6 +52,9 @@ public class User implements Serializable {
     @Column(name="isActive", nullable = true, columnDefinition = "boolean default false")
     private Boolean isActive = false;
 
+    @Column(name = "is_super_admin", nullable = false, columnDefinition = "boolean default false")
+    private Boolean isSuperAdmin = false;
+
     @OneToOne
     @JoinColumn(name = "student_info_id", referencedColumnName = "id", nullable = true)
     private StudentInfo studentInfo;
@@ -105,7 +108,15 @@ public class User implements Serializable {
     private List<GrantedAuthority> Role;
 
     // bi-directional many-to-one association to UserRoleGroupMapping
-    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER)
+    // mappedBy updated to "userRef" in Phase 14 Plan 14-04 — see B3 fix.
+    // The previous "user" pointer was JPA-spec non-compliant (UserRoleGroupMapping.user
+    // is a Long column, not a @ManyToOne relationship). Hibernate 5.x tolerated
+    // this — the app currently boots and serves traffic with it — but it
+    // prevents proper bidirectional navigation. Switching mappedBy to "userRef"
+    // makes the mapping spec compliant and lets the Phase 15 AuthorizationService
+    // walk the relationship cleanly. Phase 15 will also flip FetchType.EAGER -> LAZY
+    // (see bug B5).
+    @OneToMany(mappedBy = "userRef", fetch = FetchType.EAGER)
     private List<UserRoleGroupMapping> userRoleGroupMappings;
 
     @ManyToMany
@@ -147,7 +158,15 @@ public class User implements Serializable {
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
     }
-    
+
+    public Boolean getIsSuperAdmin() {
+        return isSuperAdmin;
+    }
+
+    public void setIsSuperAdmin(Boolean isSuperAdmin) {
+        this.isSuperAdmin = isSuperAdmin;
+    }
+
     public Boolean getDisplay() {
         return display;
     }

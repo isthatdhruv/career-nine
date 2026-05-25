@@ -32,6 +32,12 @@ export function deleteAssessmentMapping(id: number) {
   return axios.delete(`${API_URL}/assessment-mapping/delete/${id}`);
 }
 
+export function getAssessmentSummariesByInstitute(instituteCode: number) {
+  return axios.get<{ id: number; assessmentName: string; isActive: boolean; questionnaireType: boolean | null }[]>(
+    `${API_URL}/assessment-mapping/getByInstitute/${instituteCode}/assessments`
+  );
+}
+
 // Lightweight: only id, assessmentName, isActive (no questionnaire cascade)
 export function getAssessmentSummaryList() {
   return axios.get(`${API_URL}/assessments/get/list-summary`);

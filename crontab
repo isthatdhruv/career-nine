@@ -1,0 +1,1 @@
+0 3 * * * /usr/local/bin/sync-master-to-staging.sh >> /var/log/sync.log 2>&1

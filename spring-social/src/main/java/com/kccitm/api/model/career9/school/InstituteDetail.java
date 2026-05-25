@@ -14,17 +14,34 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
+import javax.persistence.Lob;
 import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.validation.constraints.NotNull;
 
+import org.hibernate.annotations.Filter;
+
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.kccitm.api.model.BoardName;
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.InstituteCourse;
 
+/**
+ * Phase 3 (Task 3.2 / audit "school sees only its data"): apply the shared {@code scopeFilter}
+ * (declared on {@link com.kccitm.api.model.career9.StudentInfo}) so institute LIST/query reads
+ * narrow to the caller's institute scope. The PK {@code institute_code} is never null, so the
+ * {@code OR ... IS NULL} carve-out is a no-op here: a non-super-admin with no matching institute
+ * scope sees zero institutes in list endpoints (fail-closed, consistent with StudentInfo).
+ *
+ * <p>Hibernate filters are NOT applied to primary-key loads ({@code EntityManager.find} /
+ * {@code findById}), so institute-name lookups by code keep working for everyone — only
+ * {@code findAll} / JPQL list/projection queries are scoped. Super-admins and full-wildcard
+ * callers skip the filter entirely (see {@code ScopeFilterInterceptor}).
+ */
+@Filter(name = "scopeFilter", condition =
+        "(institute_code IN (:instituteIds) OR institute_code IS NULL)")
 @Entity
 @Table(name = "institute_detail_new")
 public class InstituteDetail implements Serializable {
@@ -50,11 +67,39 @@ public class InstituteDetail implements Serializable {
     private Integer maxStudents;
     private Integer maxContactPersons;
 
+    /**
+     * Max number of assessment allotments allowed for this institute.
+     * Once the count of StudentAssessmentMapping rows for this institute hits
+     * this value, new allotments should be rejected. Null = unlimited.
+     */
+    @Column(name = "max_assessments")
+    private Integer maxAssessments;
+
     private Boolean isSchool;
+
+    @Lob
+    @Column(name = "school_logo", columnDefinition = "LONGBLOB")
+    private byte[] schoolLogo;
 
     // IMPORTANT FIX: Boolean instead of boolean
     @Column(name = "display")
     private Boolean display; // wrapper, can be null
+
+    /**
+     * Phase 19 Plan 01 per-institute feature flag for the cookie-based assessment
+     * authentication. NULL or FALSE → {@code POST /auth/assessment-session} returns
+     * 404 for students under this institute, so the assessment SPA transparently
+     * falls back to the legacy {@code X-Assessment-Session} header path (handled
+     * by {@code AssessmentSessionInterceptor}). TRUE → the endpoint mints a
+     * {@code cn_at_asmnt} cookie carrying a 4h assessment-scoped JWT.
+     *
+     * <p>Default {@code NULL} so existing institutes are not auto-flipped onto the
+     * new auth at upgrade time; operations team enables per institute via a manual
+     * SQL update once 19-04 (assessment SPA cookie path) has been validated for
+     * each tenant.
+     */
+    @Column(name = "assessment_cookie_auth_enabled")
+    private Boolean assessmentCookieAuthEnabled;
 
     @Transient
     private String transientField;
@@ -144,6 +189,15 @@ public class InstituteDetail implements Serializable {
         this.display = display;
     }
 
+    /** Phase 19 Plan 01 cookie-auth feature flag. NULL/FALSE → endpoint returns 404. */
+    public Boolean getAssessmentCookieAuthEnabled() {
+        return assessmentCookieAuthEnabled;
+    }
+
+    public void setAssessmentCookieAuthEnabled(Boolean assessmentCookieAuthEnabled) {
+        this.assessmentCookieAuthEnabled = assessmentCookieAuthEnabled;
+    }
+
     public String getTransientField() {
         return transientField;
     }
@@ -192,6 +246,14 @@ public class InstituteDetail implements Serializable {
         this.maxContactPersons = maxContactPersons;
     }
 
+    public Integer getMaxAssessments() {
+        return maxAssessments;
+    }
+
+    public void setMaxAssessments(Integer maxAssessments) {
+        this.maxAssessments = maxAssessments;
+    }
+
     public void setIsSchool(Boolean isSchool) {
         this.isSchool = isSchool;
     }
@@ -214,6 +276,14 @@ public class InstituteDetail implements Serializable {
 
     public void setBoards(Set<BoardName> boards) {
         this.boards = boards;
+    }
+
+    public byte[] getSchoolLogo() {
+        return schoolLogo;
+    }
+
+    public void setSchoolLogo(byte[] schoolLogo) {
+        this.schoolLogo = schoolLogo;
     }
 
     // public Integer getId() {

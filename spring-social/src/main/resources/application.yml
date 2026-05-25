@@ -1,47 +1,68 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Single consolidated config. One file, three profile documents below.
+#
+#   Document 1 (no on-profile)  → shared config for every profile.
+#   Document 2 (on-profile: dev)        → local development.
+#   Document 3 (on-profile: sandbox)    → staging / pre-prod soak.
+#   Document 4 (on-profile: production) → production.
+#
+# SECRETS live in per-profile .env files at the REPO ROOT (all gitignored):
+#   dev        → .env.dev
+#   sandbox    → .env.staging
+#   production → .env.production
+#
+# Each profile document imports its own .env via spring.config.import. Two
+# paths cover the two real CWDs:
+#   - ./.env.<x>   = repo root  (docker compose, or `mvn -f spring-social/pom.xml` from root)
+#   - ../.env.<x>  = spring-social/  (`cd spring-social && mvn spring-boot:run`)
+# Imports are `optional:` so the path that doesn't match the current CWD is
+# skipped. Fail-fast comes from unresolved ${...} placeholders, NOT a missing
+# file — i.e. a profile won't start unless its secrets are actually present.
+#
+# In Docker the same secrets arrive via `env_file:` on each service, so the
+# optional import simply finds nothing inside the container and that's fine.
+# ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
     active: dev
-
-server:
-  port: 8080
-  # ssl:
-  #   enabled: true
-  #   key-store: classpath:keystore.p12
-  #   key-store-password: 123456
-  #   key-store-type: PKCS12
-  #   key-alias: mysslcert
----
-spring:
-  profiles: dev
+  servlet:
+    multipart:
+      max-file-size: 1GB
+      max-request-size: 1GB
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
   datasource:
-    url: jdbc:mysql://localhost:3307/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
-    # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
-    username: root
-    password: Career-qCsfeuECc3MW
-    # password: MyStrongPass@123
     hikari:
-      maximum-pool-size: 30
-      minimum-idle: 10
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
   jpa:
-    show-sql: true
     hibernate:
       naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
-      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
         jdbc:
           batch_size: 30
         order_inserts: true
         order_updates: true
   cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
+    type: redis
     cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      use-key-prefix: true
+  redis:
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
   mail:
     host: smtp.gmail.com
     port: 587
@@ -54,6 +75,168 @@ spring:
           starttls:
             enable: true
             required: true
+  security:
+    oauth2:
+      client:
+        provider:
+          facebook:
+            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
+            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
+            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+        registration:
+          google:
+            scope:
+              - email
+              - profile
+              - https://www.googleapis.com/auth/admin.directory.user
+              - https://www.googleapis.com/auth/admin.directory.group
+              - https://www.googleapis.com/auth/admin.directory.orgunit
+          facebook:
+            scope:
+              - email
+              - public_profile
+          github:
+            scope:
+              - user:email
+              - read:user
+
+server:
+  port: 8080
+  # Tomcat's response-header buffer. Default is 8 KB which trips
+  # HeadersTooLargeException once the cn_at JWT cookie + the cn_csrf + cn_rt
+  # cookies + CSP/CORS headers stack up — the JWT alone can run 4-6 KB for
+  # super-admins with a full roles/perms/scopes claim shape. 64 KB gives
+  # comfortable headroom (Spring Boot 2.5 maps this to maxHttpHeaderSize).
+  max-http-header-size: 65536
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
+  tomcat:
+    max-http-form-content-size: 500MB
+    max-swallow-size: 500MB
+    accept-count: 100
+    connection-timeout: 60000
+    threads:
+      max: 300
+      min-spare: 50
+
+  # ssl:
+  #   enabled: true
+  #   key-store: classpath:keystore.p12
+  #   key-store-password: 123456
+  #   key-store-type: PKCS12
+  #   key-alias: mysslcert
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
+
+app:
+  googleAPIJSON: classpath:google.json
+  fileTempFolder: classpath:temp
+  auth:
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
+    tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
+  cookie:
+    same-site: Strict
+    access-max-age-seconds: 864000
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+  mandrill: ${APP_MANDRILL:}
+  odoo:
+    url: ${ODOO_URL:}
+    database: ${ODOO_DATABASE:}
+    username: ${ODOO_USERNAME:}
+    api-key: ${ODOO_API_KEY:}
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  firebase:
+    project-id: career-9-assessment
+    service-account-file: firebase-service-account.json
+  digitalocean:
+    spaces:
+      bucket: storage-c9
+      region: sgp1
+      cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
+      endpoint: https://sgp1.digitaloceanspaces.com
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+
+# Phase 15 RBAC + ABAC authorization runtime mode (shared default; profiles may override).
+# `log-only` (the safe default for Phase 15 — Phase 17 flips to `enforce`):
+#   AuthorizationService computes the policy decision, records DENYs to
+#   auth_audit (once 15-06 wires the auditor), and always returns true.
+# `enforce`:
+#   Same decision logic, but DENY actually returns false → @PreAuthorize
+#   triggers a 403. Set AUTH_ENFORCE_MODE=enforce to flip per environment.
+auth:
+  enforce-mode: log-only
+
+# ═══════════════════════════════════════════════════════════════════════
+# DEV — local development. Requires .env.dev at repo root (no secret fallbacks).
+# ═══════════════════════════════════════════════════════════════════════
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+    import:
+      - optional:file:./.env.dev[.properties]
+      - optional:file:../.env.dev[.properties]
+  datasource:
+    url: jdbc:mysql://localhost:3308/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
+    username: user
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      # Dev sizing: a single dev machine with one running JVM rarely needs >10
+      # concurrent JDBC connections, and a high minimum-idle quickly exhausts
+      # MySQL's default max_connections=151 when stale JVMs are left around or
+      # when multiple clients (Workbench, DBeaver) connect alongside.
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+  cache:
+    redis:
+      key-prefix: "career9:"
+  redis:
+    host: localhost
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+  mail:
+    properties:
+      mail:
+        smtp:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
@@ -63,51 +246,25 @@ spring:
         registration:
           google:
             clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
-            clientSecret: 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
-            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            clientSecret: ${GOOGLE_CLIENT_SECRET}
             redirectUri: "http://192.168.0.204:8443/oauth2/callback/{registrationId}"
-
-            scope:
-              - email
-              - profile
-              - https://www.googleapis.com/auth/admin.directory.user
-              - https://www.googleapis.com/auth/admin.directory.group
-              - https://www.googleapis.com/auth/admin.directory.orgunit
           facebook:
             clientId: 121189305185277
-            clientSecret: 42ffe5aa7379e8326387e0fe16f34132
+            clientSecret: ${FACEBOOK_CLIENT_SECRET}
             redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            scope:
-              - email
-              - public_profile
           github:
             clientId: d3e47fc2ddd966fa4352
-            clientSecret: 3bc0f6b8332f93076354c2a5bada2f5a05aea60d
+            clientSecret: ${GITHUB_CLIENT_SECRET}
             redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            scope:
-              - user:email
-              - read:user
-        provider:
-          facebook:
-            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
-            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
-            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
 
 app:
   protocol: http
   name: localhost:3000
-  googleAPIJSON: classpath:google.json
-  fileTempFolder: classpath:temp
-  auth:
-    tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
-    tokenExpirationMsec: 864000000
+  cookie:
+    secure: false
   cors:
-    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com,http://192.168.0.204:8443//,http://localhost:8080
+    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in,https://erp.aktu.ac.in,https://leetcode.com,http://192.168.0.204:8443,http://localhost:8080
   oauth2:
-    # After successfully authenticating with the OAuth2 Provider,
-    # we'll be generating an auth token for the user and sending the token to the
-    # redirectUri mentioned by the client in the /oauth2/authorize request.
-    # We're not using cookies because they won't work well in mobile clients.
     authorizedRedirectUris:
       - https://student.kccitm.in/oauth2/redirect
       - https://staging.student.kccitm.in/oauth2/redirect
@@ -118,60 +275,56 @@ app:
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
       - http://192.168.0.204:3000
-  mandrill: WXX3fC00pJTZgonjnVvkgQ
-  odoo:
-    url: career-91.odoo.com
-    database: career-91
-    username: prasad.khake@career-9.com
-    password: 5685cadbbee4aee3f65cf0bd1bdc9112c9dc772f
-  gmail:
-    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
-  firebase:
-    project-id: career-9-assessment
-    service-account-file: firebase-service-account.json
+  razorpay:
+    callback-base-url: http://localhost:5173
+  b2c:
+    frontendBaseUrl: http://localhost:3000
+    assessmentBaseUrl: http://localhost:5173
+  # Phase 20-01: in-process rate limit (Bucket4j). Dev profile runs against
+  # localhost with no upstream proxy — getRemoteAddr() is authoritative.
+  # XFF would be client-controlled / spoofable, so trust-xff is fail-safe false.
+  rate-limit:
+    trust-xff: false
 
+auth:
+  enforce-mode: log-only
+
+# ═══════════════════════════════════════════════════════════════════════
+# SANDBOX — staging / pre-prod soak. Secrets via .env.staging (or docker env_file).
+# ═══════════════════════════════════════════════════════════════════════
 ---
 spring:
-  profiles: staging
+  config:
+    activate:
+      on-profile: sandbox
+    import:
+      - optional:file:./.env.staging[.properties]
+      - optional:file:../.env.staging[.properties]
   datasource:
-    url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://mysql_db_staging:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&maxAllowedPacket=536870912
     username: root
-    password: Career-qCsfeuECc3MW # password: Google.com1
+    password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      maximum-pool-size: 50
-      minimum-idle: 20
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+      maximum-pool-size: 30
+      minimum-idle: 10
   jpa:
     show-sql: false
     hibernate:
-      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
       ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
-        jdbc:
-          batch_size: 30
-        order_inserts: true
-        order_updates: true
   cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
-    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      key-prefix: "career9-staging:"
+  redis:
+    host: redis_staging
+    lettuce:
+      pool:
+        max-active: 30
+        max-idle: 10
+        min-idle: 2
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${SMTP_USERNAME:notifications@career-9.net}
-    password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
           connectiontimeout: 10000
           timeout: 10000
           writetimeout: 10000
@@ -181,117 +334,101 @@ spring:
         registration:
           google:
             clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
-            clientSecret: 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
-            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            redirectUri: "https://staging.api.kccitm.in/oauth2/callback/{registrationId}"
-
-            scope:
-              - email
-              - profile
-              - https://www.googleapis.com/auth/admin.directory.user
-              - https://www.googleapis.com/auth/admin.directory.group
-              - https://www.googleapis.com/auth/admin.directory.orgunit
+            clientSecret: ${GOOGLE_CLIENT_SECRET}
+            redirectUri: "https://api-staging.career-9.com/oauth2/callback/{registrationId}"
           facebook:
             clientId: 121189305185277
-            clientSecret: 42ffe5aa7379e8326387e0fe16f34132
+            clientSecret: ${FACEBOOK_CLIENT_SECRET}
             redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            scope:
-              - email
-              - public_profile
           github:
             clientId: d3e47fc2ddd966fa4352
-            clientSecret: 3bc0f6b8332f93076354c2a5bada2f5a05aea60d
+            clientSecret: ${GITHUB_CLIENT_SECRET}
             redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            scope:
-              - user:email
-              - read:user
-        provider:
-          facebook:
-            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
-            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
-            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+
 server:
   tomcat:
     threads:
-      max: 300
-      min-spare: 50
-    accept-count: 100
-    connection-timeout: 60000
+      max: 200
+      min-spare: 30
+
 app:
   protocol: https
-  name: api.career-9.com
-  googleAPIJSON: classpath:google.json
-  fileTempFolder: classpath:temp
-  auth:
-    tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
-    tokenExpirationMsec: 864000000
+  name: api-staging.career-9.com
+  cookie:
+    secure: true
+    domain: career-9.com
   cors:
-    allowedOrigins: https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com,https://*.career-9.com
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com,http://localhost:5173,http://localhost:3000
   oauth2:
-    # After successfully authenticating with the OAuth2 Provider,
-    # we'll be generating an auth token for the user and sending the token to the
-    # redirectUri mentioned by the client in the /oauth2/authorize request.
-    # We're not using cookies because they won't work well in mobile clients.
     authorizedRedirectUris:
+      - https://dashboard.career-9.com/oauth2/redirect
+      - https://career-9.com/oauth2/redirect
+      - https://www.career-9.com/oauth2/redirect
+      - https://assessment.career-9.com/oauth2/redirect
       - https://student.kccitm.in/oauth2/redirect
       - https://staging.student.kccitm.in/oauth2/redirect
-      - https://student.kccitm.in/oauth2/redirect
       - http://localhost:3000/oauth2/redirect
       - myandroidapp://oauth2/redirect
-      - http://localhost/oauth2/redirect
-      - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
-  mandrill: WXX3fC00pJTZgonjnVvkgQ
-  odoo:
-    url: ${ODOO_URL:https://your-odoo-instance.odoo.com}
-    database: ${ODOO_DATABASE:your-odoo-db}
-    username: ${ODOO_USERNAME:admin@example.com}
-    password: ${ODOO_PASSWORD:your-api-key}
-  gmail:
-    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:}
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+    callback-base-url: https://staging-assessment.career-9.com
+  digitalocean:
+    spaces:
+      access-key: ${DO_SPACES_ACCESS_KEY:}
+      secret-key: ${DO_SPACES_SECRET_KEY:}
+  b2c:
+    frontendBaseUrl: https://staging-dashboard.career-9.com
+    assessmentBaseUrl: https://staging-assessment.career-9.com
+  # Phase 20-01: in-process rate limit (Bucket4j). Sandbox is a pre-prod soak
+  # environment; per Phase 20 plan the upstream-proxy assumption is NOT yet
+  # confirmed for this profile, so XFF stays fail-safe false. Flip to true
+  # once the deployment is verified to be behind a trusted reverse proxy.
+  rate-limit:
+    trust-xff: false
+
+# Phase 17-04 (2026-05-12): sandbox flipped to `enforce` for pre-prod soak.
+auth:
+  enforce-mode: log-only
+
+# ═══════════════════════════════════════════════════════════════════════
+# PRODUCTION. Secrets via .env.production (or docker env_file).
+# ═══════════════════════════════════════════════════════════════════════
 ---
 spring:
-  profiles: production
+  config:
+    activate:
+      on-profile: production
+    import:
+      - optional:file:./.env.production[.properties]
+      - optional:file:../.env.production[.properties]
   datasource:
-    url: jdbc:mysql://easylearning.guru:3310/kcc_student?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&maxAllowedPacket=536870912
     username: root
-    password: qCsfeuECc3MW
-    # password: Google.com1
+    password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      maximum-pool-size: 30
-      minimum-idle: 10
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+      maximum-pool-size: 50
+      minimum-idle: 20
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
-      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
-      ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
-        jdbc:
-          batch_size: 30
-        order_inserts: true
-        order_updates: true
+      ddl-auto: validate
   cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
-    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      key-prefix: "career9:"
+  redis:
+    host: redis_cache
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 5
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${SMTP_USERNAME}
-    password: ${SMTP_PASSWORD}
     properties:
       mail:
         smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
           connectiontimeout: 10000
           timeout: 10000
           writetimeout: 10000
@@ -300,67 +437,69 @@ spring:
       client:
         registration:
           google:
-            clientId: 701038408648-gnmlifdksik4mqu2as5vpgpe64l8m55b.apps.googleusercontent.com
-            clientSecret: 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
-            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            redirectUri: "https://api.kccitm.in/oauth2/callback/{registrationId}"
-
-            scope:
-              - email
-              - profile
-              - https://www.googleapis.com/auth/admin.directory.user
-              - https://www.googleapis.com/auth/admin.directory.group
-              - https://www.googleapis.com/auth/admin.directory.orgunit
+            clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
+            clientSecret: ${GOOGLE_CLIENT_SECRET}
+            redirectUri: "https://api.career-9.com/oauth2/callback/{registrationId}"
           facebook:
             clientId: 121189305185277
-            clientSecret: 42ffe5aa7379e8326387e0fe16f34132
+            clientSecret: ${FACEBOOK_CLIENT_SECRET}
             redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            scope:
-              - email
-              - public_profile
           github:
             clientId: d3e47fc2ddd966fa4352
-            clientSecret: 3bc0f6b8332f93076354c2a5bada2f5a05aea60d
+            clientSecret: ${GITHUB_CLIENT_SECRET}
             redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            scope:
-              - user:email
-              - read:user
-        provider:
-          facebook:
-            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
-            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
-            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+
 app:
-  protocol: http
-  name: student.kccitm.in
-  googleAPIJSON: classpath:google.json
-  fileTempFolder: classpath:temp
-  auth:
-    tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
-    tokenExpirationMsec: 864000000
+  protocol: https
+  name: api.career-9.com
+  cookie:
+    secure: true
+    domain: career-9.com
   cors:
-    allowedOrigins: http://localhost:3000,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com
   oauth2:
-    # After successfully authenticating with the OAuth2 Provider,
-    # we'll be generating an auth token for the user and sending the token to the
-    # redirectUri mentioned by the client in the /oauth2/authorize request.
-    # We're not using cookies because they won't work well in mobile clients.
     authorizedRedirectUris:
+      - https://dashboard.career-9.com/oauth2/redirect
+      - https://career-9.com/oauth2/redirect
+      - https://www.career-9.com/oauth2/redirect
+      - https://assessment.career-9.com/oauth2/redirect
       - https://student.kccitm.in/oauth2/redirect
       - https://staging.student.kccitm.in/oauth2/redirect
-      - https://student.kccitm.in/oauth2/redirect
       - http://localhost:3000/oauth2/redirect
       - myandroidapp://oauth2/redirect
       - http://localhost/oauth2/redirect
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
-  mandrill: WXX3fC00pJTZgonjnVvkgQ
-  odoo:
-    url: career-91.odoo.com
-    database: career-91
-    username: prasad.khake@career-9.com 
-    password: 5685cadbbee4aee3f65cf0bd1bdc9112c9dc772f
-  gmail:
-    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:}
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+    callback-base-url: https://assessment.career-9.com
+  digitalocean:
+    spaces:
+      access-key: ${DO_SPACES_ACCESS_KEY:}
+      secret-key: ${DO_SPACES_SECRET_KEY:}
+  b2c:
+    frontendBaseUrl: https://dashboard.career-9.com
+    assessmentBaseUrl: https://assessment.career-9.com
+  # Phase 20-01: in-process rate limit (Bucket4j). Production runs behind
+  # DigitalOcean's reverse proxy which sets X-Forwarded-For and strips any
+  # incoming XFF from untrusted clients — safe to trust here.
+  rate-limit:
+    trust-xff: true   # behind DigitalOcean reverse proxy
 
----
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# REQUIRES USER ACTION BEFORE PRODUCTION ENFORCE (Phase 17-04, 2026-05-12)
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Production INTENTIONALLY remains `log-only` per user-directed safety hold.
+# Sandbox is flipped to `enforce` to soak the new enforce semantics.
+# Operator must:
+#   1. Review `auth_audit` DENY rows from sandbox + production for 1-2 days.
+#   2. Confirm ZERO false-positive DENYs against legitimate admin users.
+#   3. Manually edit the line below: `log-only` -> `enforce`.
+#   4. Redeploy production with the change.
+# Until that manual step, production behaves as Phase 15 log-only:
+# DENYs are recorded but allows() returns true (no 403). See 17-04-SUMMARY.md.
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+auth:
+  enforce-mode: log-only

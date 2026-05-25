@@ -25,8 +25,12 @@ public class Career implements Serializable {
     private Long career_id;
 
     private String title;
-    
+
     private String description;
+
+    private String personalityCode1;  // RIASEC code e.g. "R", "I", "A", "S", "E", "C"
+    private String personalityCode2;
+    private String personalityCode3;
 
     // Many-to-Many relationship with measured quality types
     @ManyToMany(mappedBy = "careers")
@@ -57,6 +61,15 @@ public class Career implements Serializable {
     public void setDescription(String description) {
         this.description = description;
     }
+
+    public String getPersonalityCode1() { return personalityCode1; }
+    public void setPersonalityCode1(String personalityCode1) { this.personalityCode1 = personalityCode1; }
+
+    public String getPersonalityCode2() { return personalityCode2; }
+    public void setPersonalityCode2(String personalityCode2) { this.personalityCode2 = personalityCode2; }
+
+    public String getPersonalityCode3() { return personalityCode3; }
+    public void setPersonalityCode3(String personalityCode3) { this.personalityCode3 = personalityCode3; }
 
     public Set<MeasuredQualityTypes> getMeasuredQualityTypes() {
         return measuredQualityTypes;

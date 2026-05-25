@@ -1,8 +1,10 @@
 // StudentAnswerExcelModal.tsx
 import React, { useState, useEffect } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { Student } from "./StudentsList";
 import { getStudentAnswersWithDetails, StudentAnswerDetail, getStudentScores, StudentScoreDetail } from "./StudentInfo_APIs";
 import * as XLSX from "xlsx";
+import { ActionIcon } from "../../components/ActionIcon";
 
 interface StudentAnswerExcelModalProps {
   show: boolean;
@@ -71,6 +73,9 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
           item.excelquestionheader ??
           item.excel_question_header;
 
+        const optionNumber = item.optionNumber ?? item.option_number ?? 0;
+        const isImageOption = item.isImageOption ?? item.is_image_option ?? false;
+
         return {
           questionId: item.questionId ?? item.questionid ?? item.question_id,
           questionText,
@@ -78,6 +83,8 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
           optionText,
           sectionName,
           excelQuestionHeader,
+          optionNumber,
+          isImageOption,
         };
       })
       .filter((item) => item.questionText || item.optionText || item.sectionName || item.excelQuestionHeader);
@@ -140,12 +147,12 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
   const handleDownloadAnswers = () => {
     setDownloading(true);
     try {
-      const excelData = answers.map((answer, index) => ({
+      const excelData = answers.map((answer: any, index: number) => ({
         "S.No": index + 1,
         "Section": answer.sectionName || "",
         "Excel Header": answer.excelQuestionHeader || "",
         "Question": answer.questionText,
-        "Selected Answer": answer.optionText
+        "Selected Answer": answer.optionText || (answer.isImageOption && answer.optionNumber ? `Option ${answer.optionNumber} (Image)` : ""),
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -163,10 +170,10 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
       const filename = `${student.name.replace(/\s+/g, '_')}_Answers_${Date.now()}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      alert(`Download successful for ${student.name}!`);
+      showSuccessToast(`Download successful for ${student.name}!`);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -214,10 +221,10 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
       const filename = `${student.name.replace(/\s+/g, '_')}_Scores_${Date.now()}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      alert(`Scores download successful for ${student.name}!`);
+      showSuccessToast(`Scores download successful for ${student.name}!`);
     } catch (error) {
       console.error("Error downloading scores:", error);
-      alert("Failed to download scores. Please try again.");
+      showErrorToast("Failed to download scores. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -430,7 +437,7 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
                                     fontSize: '0.85rem'
                                   }}
                                 >
-                                  {answer.optionText}
+                                  {answer.optionText || (answer.isImageOption && answer.optionNumber ? `Option ${answer.optionNumber} (Image)` : answer.optionText || "")}
                                 </span>
                               </td>
                             </tr>
@@ -557,7 +564,7 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
                   </>
                 ) : (
                   <>
-                    <i className="bi bi-download me-2"></i>
+                    <ActionIcon type="download" size="sm" className="me-2" />
                     Download {activeTab === "answers" ? "Answers" : "Scores"}
                   </>
                 )}

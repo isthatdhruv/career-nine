@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +29,7 @@ public class QuestionnaireLanguageController {
     private QuestionnaireLanguageRepository questionnaireLanguageRepository;
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('questionnaire_language.create')")
     public ResponseEntity<QuestionnaireLanguage> create(
             @RequestBody QuestionnaireLanguage questionnaireLanguage) {
 
@@ -38,11 +40,13 @@ public class QuestionnaireLanguageController {
     }
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('questionnaire_language.read')")
     public ResponseEntity<List<QuestionnaireLanguage>> getAll() {
         return ResponseEntity.ok(questionnaireLanguageRepository.findAll());
     }
 
     @GetMapping("/getbyid/{id}")
+    @PreAuthorize("@auth.allows('questionnaire_language.read')")
     public ResponseEntity<QuestionnaireLanguage> getById(@PathVariable Long id) {
 
         Optional<QuestionnaireLanguage> optional =
@@ -54,6 +58,7 @@ public class QuestionnaireLanguageController {
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('questionnaire_language.update')")
     public ResponseEntity<QuestionnaireLanguage> update(
             @PathVariable Long id,
             @RequestBody QuestionnaireLanguage request) {
@@ -73,6 +78,7 @@ public class QuestionnaireLanguageController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('questionnaire_language.delete')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
 
         if (!questionnaireLanguageRepository.existsById(id)) {

@@ -56,6 +56,19 @@ public class Questionnaire implements Serializable {
         this.type = type;
     }
 
+    // Tri-state report routing: 'bet' | 'navigator' | 'general'
+    // Takes precedence over the legacy `type` boolean when set.
+    @Column(name = "report_category", nullable = true, length = 20)
+    private String reportCategory;
+
+    public String getReportCategory() {
+        return reportCategory;
+    }
+
+    public void setReportCategory(String reportCategory) {
+        this.reportCategory = reportCategory;
+    }
+
     // Mode id
     @Column(name = "mode_id")
     private Integer modeId;

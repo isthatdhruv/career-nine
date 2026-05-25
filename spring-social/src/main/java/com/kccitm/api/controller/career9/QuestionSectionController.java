@@ -1,10 +1,10 @@
 package com.kccitm.api.controller.career9;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.QuestionSectionRepository;
@@ -26,65 +27,86 @@ public class QuestionSectionController {
     private QuestionSectionRepository questionSectionRepository;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public List<QuestionSection> getAllQuestionSections() {
-        return questionSectionRepository.findAll();
+        return questionSectionRepository.findByIsDeletedFalseOrIsDeletedIsNull();
     }
 
     @GetMapping("/getAllList")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public List<QuestionSection> getAllQuestionSectionsList() {
         return questionSectionRepository.findAllSectionsProjection();
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public QuestionSection getQuestionSectionById(@PathVariable Long id) {
-        return questionSectionRepository.findById(id).orElse(null);
+        return questionSectionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('question_section.create')")
     public QuestionSection createQuestionSection(@RequestBody QuestionSection questionSection) {
         return questionSectionRepository.save(questionSection);
     }
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('question_section.update')")
     public ResponseEntity<QuestionSection> updateQuestionSection(@PathVariable Long id, @RequestBody QuestionSection questionSection) {
-        QuestionSection existingSection = questionSectionRepository.findById(id).orElse(null);
-        if (existingSection == null) {
-            return ResponseEntity.notFound().build();
-        }
-        
-        try {
-            existingSection.setSectionName(questionSection.getSectionName());
-            existingSection.setSectionDescription(questionSection.getSectionDescription());
-            
-            QuestionSection updatedSection = questionSectionRepository.save(existingSection);
-            return ResponseEntity.ok(updatedSection);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        QuestionSection existingSection = questionSectionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
+
+        existingSection.setSectionName(questionSection.getSectionName());
+        existingSection.setSectionDescription(questionSection.getSectionDescription());
+
+        QuestionSection updatedSection = questionSectionRepository.save(existingSection);
+        return ResponseEntity.ok(updatedSection);
     }
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('question_section.delete')")
     public ResponseEntity<String> deleteQuestionSection(@PathVariable Long id) {
-        Optional<QuestionSection> questionSectionOptional = questionSectionRepository.findById(id);
-        if (!questionSectionOptional.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-        QuestionSection questionSection = questionSectionOptional.get();
+        QuestionSection questionSection = questionSectionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
         // Set section to null for all related AssessmentQuestions
         if (questionSection.getQuestions() != null) {
             for (AssessmentQuestions question : questionSection.getQuestions()) {
                 question.setSection(null);
             }
         }
-        questionSectionRepository.deleteById(id);
+        questionSection.setIsDeleted(true);
+        questionSectionRepository.save(questionSection);
         return ResponseEntity.ok("Question section deleted successfully");
     }
     
+    @GetMapping("/deleted")
+    @PreAuthorize("@auth.allows('question_section.read')")
+    public List<QuestionSection> getDeletedQuestionSections() {
+        return questionSectionRepository.findByIsDeletedTrue();
+    }
+
+    @PutMapping("/restore/{id}")
+    @PreAuthorize("@auth.allows('question_section.update')")
+    public ResponseEntity<String> restoreQuestionSection(@PathVariable Long id) {
+        QuestionSection qs = questionSectionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
+        qs.setIsDeleted(false);
+        questionSectionRepository.save(qs);
+        return ResponseEntity.ok("Restored successfully.");
+    }
+
+    @DeleteMapping("/permanent-delete/{id}")
+    @PreAuthorize("@auth.allows('question_section.delete')")
+    public ResponseEntity<String> permanentDeleteQuestionSection(@PathVariable Long id) {
+        questionSectionRepository.deleteById(id);
+        return ResponseEntity.ok("Permanently deleted.");
+    }
+
     // Additional endpoints
     @GetMapping("/{id}/questions")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public ResponseEntity<List<com.kccitm.api.model.career9.AssessmentQuestions>> getSectionQuestions(@PathVariable Long id) {
-        QuestionSection section = questionSectionRepository.findById(id).orElse(null);
-        if (section == null) {
-            return ResponseEntity.notFound().build();
-        }
+        QuestionSection section = questionSectionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
         return ResponseEntity.ok(section.getQuestions());
     } 
 }

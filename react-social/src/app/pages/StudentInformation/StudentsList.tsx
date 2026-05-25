@@ -1,10 +1,13 @@
 // StudentsList.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessment, Assessment } from "./StudentInfo_APIs";
 import StudentAnswerExcelModal from "./StudentAnswerExcelModal";
 import ResetAssessmentModal from "./ResetAssessmentModal";
 import CreateStudentModal from "./CreateStudentModal";
+import StudentInstitutesModal from "./StudentInstitutesModal";
+import { ActionIcon } from "../../components/ActionIcon";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 
 export type Student = {
   id: number;
@@ -17,9 +20,15 @@ export type Student = {
 };
 
 export default function StudentsList() {
-  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  // The page is scoped to a single institute via localStorage; narrow the
+  // assessment list to those mapped to that institute.
+  const lsInstituteId = (() => {
+    const v = localStorage.getItem("instituteId");
+    return v ? Number(v) : ("" as const);
+  })();
+  const { assessments } = useAssessmentsForInstitute(lsInstituteId, allAssessments);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [assessmentsLoading, setAssessmentsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,16 +49,47 @@ export default function StudentsList() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetStudent, setResetStudent] = useState<Student | null>(null);
 
-  useEffect(() => {
-    const instituteId = localStorage.getItem('instituteId');
+  const [institutesModalStudent, setInstitutesModalStudent] = useState<Student | null>(null);
 
-    // Fetch assessments
+  const refreshStudents = () => {
+    const instituteId = localStorage.getItem('instituteId');
+    if (!instituteId) {
+      setStudentsLoading(false);
+      return;
+    }
+    setStudentsLoading(true);
+    getStudentsWithMappingByInstituteId(Number(instituteId))
+      .then(response => {
+        const studentData = response.data.map((student: any) => {
+          const assignedIds = Array.isArray(student.assignedAssessmentIds)
+            ? student.assignedAssessmentIds
+            : [];
+          return {
+            id: student.id,
+            name: student.name || "",
+            schoolRollNumber: student.schoolRollNumber || "",
+            controlNumber: student.controlNumber ?? undefined,
+            selectedAssessment: "",
+            userStudentId: student.userStudentId,
+            assignedAssessmentIds: assignedIds,
+          };
+        });
+        setStudents(studentData);
+      })
+      .catch(error => {
+        console.error("Error fetching student info:", error);
+      })
+      .finally(() => {
+        setStudentsLoading(false);
+      });
+  };
+
+  useEffect(() => {
     setAssessmentsLoading(true);
     getAllAssessments()
       .then(response => {
         const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
-        console.log("Loaded assessments:", activeOnly); // Debug log
+        setAllAssessments(activeOnly);
       })
       .catch(error => {
         console.error("Error fetching assessments:", error);
@@ -58,38 +98,7 @@ export default function StudentsList() {
         setAssessmentsLoading(false);
       });
 
-    // Fetch students
-    if (instituteId) {
-      setStudentsLoading(true);
-      getStudentsWithMappingByInstituteId(Number(instituteId))
-        .then(response => {
-          const studentData = response.data.map((student: any) => {
-            // Ensure assignedAssessmentIds is always an array
-            const assignedIds = Array.isArray(student.assignedAssessmentIds)
-              ? student.assignedAssessmentIds
-              : [];
-            return {
-              id: student.id,
-              name: student.name || "",
-              schoolRollNumber: student.schoolRollNumber || "",
-              controlNumber: student.controlNumber ?? undefined,
-              selectedAssessment: "",
-              userStudentId: student.userStudentId,
-              assignedAssessmentIds: assignedIds,
-            };
-          });
-          console.log("Loaded students:", studentData); // Debug log
-          setStudents(studentData);
-        })
-        .catch(error => {
-          console.error("Error fetching student info:", error);
-        })
-        .finally(() => {
-          setStudentsLoading(false);
-        });
-    } else {
-      setStudentsLoading(false);
-    }
+    refreshStudents();
   }, []);
 
   const handleAssessmentChange = (studentId: number, assessmentId: string) => {
@@ -124,14 +133,14 @@ export default function StudentsList() {
     const assignments = Array.from(assignmentMap.values());
 
     if (assignments.length === 0) {
-      alert("No new assessments to save.");
+      showErrorToast("No new assessments to save.");
       return;
     }
 
     setSaving(true);
     try {
       await bulkAlotAssessment(assignments);
-      alert(`${assignments.length} assessment(s) saved successfully!`);
+      showSuccessToast(`${assignments.length} assessment(s) saved successfully!`);
       setHasChanges(false);
 
       // Refresh data
@@ -155,16 +164,13 @@ export default function StudentsList() {
       }
     } catch (error) {
       console.error("Error saving assessments:", error);
-      alert("Failed to save assessments. Please try again.");
+      showErrorToast("Failed to save assessments. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDownloadClick = (student: Student) => {
-    console.log("Download clicked for student:", student); // Debug log
-    console.log("User Student ID:", student.userStudentId); // Debug log
-    console.log("Assessment ID:", student.selectedAssessment); // Debug log
     setSelectedStudent(student);
     setShowModal(true);
   };
@@ -246,7 +252,7 @@ export default function StudentsList() {
               }}
               onClick={() => setShowAddModal(true)}
             >
-              <i className="bi bi-plus-lg"></i>
+              <ActionIcon type="add" size="sm" />
               Add Student
             </button>
           </div>
@@ -441,7 +447,7 @@ export default function StudentsList() {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <i className="bi bi-download"></i>
+                            <ActionIcon type="download" size="sm" />
                             Download
                           </button>
                           <button
@@ -456,8 +462,21 @@ export default function StudentsList() {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <i className="bi bi-arrow-counterclockwise"></i>
+                            <ActionIcon type="refresh" size="sm" />
                             Reset
+                          </button>
+                          <button
+                            className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                            onClick={() => setInstitutesModalStudent(student)}
+                            title="Manage institute memberships"
+                            style={{
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Institutes
                           </button>
                         </div>
                       </td>
@@ -505,7 +524,7 @@ export default function StudentsList() {
                   </>
                 ) : (
                   <>
-                    <i className="bi bi-check2-circle"></i>
+                    <ActionIcon type="approve" size="sm" />
                     Save Changes
                   </>
                 )}
@@ -539,7 +558,18 @@ export default function StudentsList() {
       <CreateStudentModal
         show={showAddModal}
         onHide={() => setShowAddModal(false)}
+        onSave={() => refreshStudents()}
       />
+
+      {/* Student Institutes Modal */}
+      {institutesModalStudent && (
+        <StudentInstitutesModal
+          show={!!institutesModalStudent}
+          onHide={() => setInstitutesModalStudent(null)}
+          userStudentId={institutesModalStudent.userStudentId}
+          studentName={institutesModalStudent.name}
+        />
+      )}
     </div>
   );
 }

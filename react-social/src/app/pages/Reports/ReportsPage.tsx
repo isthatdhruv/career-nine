@@ -1,313 +1,791 @@
-import React, { useState, useEffect } from "react";
-import { ReadCollegeData } from "../College/API/College_APIs";
-import { getAllAssessments, Assessment, exportScoresByInstitute, getStudentsWithMappingByInstituteId } from "../StudentInformation/StudentInfo_APIs";
+import React, { useState, useEffect, useMemo } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
+import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import {
+  getStudentsWithMappingByInstituteId,
+} from "../StudentInformation/StudentInfo_APIs";
+import { getAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
+import { generateAndExportNavigatorExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
+import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
+import SchoolReportModal from "./SchoolReportModal";
 
-interface Institute {
-  instituteCode: number;
-  instituteName: string;
-}
+type StudentRow = {
+  userStudentId: number;
+  name: string;
+  username?: string;
+  schoolRollNumber?: string;
+  controlNumber?: number;
+  phoneNumber?: string;
+  studentDob?: string;
+  schoolSectionId?: number;
+  assessments?: { assessmentId: number; assessmentName: string; status: string }[];
+  assignedAssessmentIds?: number[];
+};
+
+type SectionInfo = { className: string; sectionName: string };
+type FilterKey = "name" | "grade" | "section";
+
+const FILTER_ITEMS: { key: FilterKey; label: string }[] = [
+  { key: "grade", label: "Grade / Class" },
+  { key: "section", label: "Section" },
+  { key: "name", label: "Name" },
+];
 
 const ReportsPage: React.FC = () => {
-  const [institutes, setInstitutes] = useState<Institute[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  // ── Core selections ──
+  const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  const [institutesLoading, setInstitutesLoading] = useState(false);
+
+  const [assessments, setAssessments] = useState<{ id: number; assessmentName: string; isActive: boolean; questionnaireType: boolean | null }[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
-  const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState<string>("");
-  const [studentCount, setStudentCount] = useState<number | null>(null);
+  const [assessmentsLoading, setAssessmentsLoading] = useState(false);
 
-  // Fetch institutes and assessments on mount
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [sectionLookup, setSectionLookup] = useState<Map<number, SectionInfo>>(new Map());
+  const [studentsLoading, setStudentsLoading] = useState(false);
+
+  // ── Student selection ──
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+
+  // ── Pagination ──
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // ── Filters ──
+  const [filterEnabled, setFilterEnabled] = useState<Set<FilterKey>>(new Set());
+  const [nameQuery, setNameQuery] = useState("");
+  const [selectedGrade, setSelectedGrade] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
+  const [exportingBET, setExportingBET] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  const [zipProgress, setZipProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [reportDataMap, setReportDataMap] = useState<Map<number, { reportStatus: string; reportUrl?: string }>>(new Map()); 
+  // ── Generate ──
+  const [generating, setGenerating] = useState(false);
+  const [exportingMQT, setExportingMQT] = useState(false);
+  const [schoolReportOpen, setSchoolReportOpen] = useState(false);
+
+  // ═══════════════════════ DATA LOADING ═══════════════════════
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [instituteRes, assessmentRes] = await Promise.all([
-          ReadCollegeData(),
-          getAllAssessments()
-        ]);
-
-        const instituteList = Array.isArray(instituteRes.data)
-          ? instituteRes.data
-          : instituteRes.data?.data || [];
-        setInstitutes(instituteList);
-
-        const activeOnly = (assessmentRes.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("Failed to load institutes or assessments.");
-      }
-    };
-
-    fetchData();
+    setInstitutesLoading(true);
+    ReadCollegeList()
+      .then((res) => setInstitutes(res.data || []))
+      .catch(() => setInstitutes([]))
+      .finally(() => setInstitutesLoading(false));
   }, []);
 
-  // Fetch student count when institute changes
   useEffect(() => {
-    const fetchStudentCount = async () => {
-      if (!selectedInstitute) {
-        setStudentCount(null);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const response = await getStudentsWithMappingByInstituteId(Number(selectedInstitute));
-        setStudentCount(response.data?.length || 0);
-      } catch (err) {
-        console.error("Error fetching student count:", err);
-        setStudentCount(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStudentCount();
+    if (selectedInstitute === "") {
+      setAssessments([]);
+      return;
+    }
+    setAssessmentsLoading(true);
+    getAssessmentSummariesByInstitute(Number(selectedInstitute))
+      .then((res) => setAssessments(res.data || []))
+      .catch(() => setAssessments([]))
+      .finally(() => setAssessmentsLoading(false));
   }, [selectedInstitute]);
 
-  const handleExport = async () => {
-    if (!selectedInstitute || !selectedAssessment) {
-      setError("Please select both institute and assessment.");
+  useEffect(() => {
+    if (selectedInstitute === "") {
+      setStudents([]);
+      setSectionLookup(new Map());
+      return;
+    }
+    setStudentsLoading(true);
+    Promise.all([
+      getStudentsWithMappingByInstituteId(Number(selectedInstitute)),
+      GetSessionsByInstituteCode(selectedInstitute),
+    ])
+      .then(([studentsRes, sessionsRes]) => {
+        setStudents(studentsRes.data || []);
+        const lookup = new Map<number, SectionInfo>();
+        for (const session of sessionsRes.data || []) {
+          for (const cls of session.schoolClasses || []) {
+            for (const sec of cls.schoolSections || []) {
+              if (!lookup.has(sec.id)) {
+                lookup.set(sec.id, { className: cls.className, sectionName: sec.sectionName });
+              }
+            }
+          }
+        }
+        setSectionLookup(lookup);
+      })
+      .catch(() => {
+        setStudents([]);
+        setSectionLookup(new Map());
+      })
+      .finally(() => setStudentsLoading(false));
+  }, [selectedInstitute]);
+
+  // Reset on selection change
+  useEffect(() => {
+    setFilterEnabled(new Set());
+    setNameQuery("");
+    setSelectedGrade("");
+    setSelectedSection("");
+    setSelectedStudentIds(new Set());
+    setCurrentPage(1);
+  }, [selectedInstitute, selectedAssessment]);
+
+  // ═══════════════════════ FILTERED STUDENTS ═══════════════════════
+
+  const assessmentStudents = useMemo(() => {
+    if (selectedAssessment === "") return [];
+    return students.filter((s) =>
+      (s.assignedAssessmentIds || []).includes(Number(selectedAssessment))
+    );
+  }, [students, selectedAssessment]);
+
+  const uniqueGrades = useMemo(() => {
+    const grades = new Set<string>();
+    for (const s of assessmentStudents) {
+      const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+      if (info?.className) grades.add(info.className);
+    }
+    return Array.from(grades).sort();
+  }, [assessmentStudents, sectionLookup]);
+
+  const uniqueSections = useMemo(() => {
+    const sections = new Set<string>();
+    for (const s of assessmentStudents) {
+      const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+      if (info?.sectionName) sections.add(info.sectionName);
+    }
+    return Array.from(sections).sort();
+  }, [assessmentStudents, sectionLookup]);
+
+  const displayedStudents = useMemo(() => {
+    let result = assessmentStudents;
+    if (filterEnabled.has("name") && nameQuery.trim()) {
+      const q = nameQuery.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          (s.username || "").toLowerCase().includes(q) ||
+          (s.schoolRollNumber || "").toLowerCase().includes(q)
+      );
+    }
+    if (filterEnabled.has("grade") && selectedGrade) {
+      result = result.filter((s) => {
+        const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+        return info?.className === selectedGrade;
+      });
+    }
+    if (filterEnabled.has("section") && selectedSection) {
+      result = result.filter((s) => {
+        const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+        return info?.sectionName === selectedSection;
+      });
+    }
+    return result;
+  }, [assessmentStudents, filterEnabled, nameQuery, selectedGrade, selectedSection, sectionLookup]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return displayedStudents.slice(start, start + pageSize);
+  }, [displayedStudents, safeCurrentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [nameQuery, selectedGrade, selectedSection, filterEnabled]);
+
+  // ═══════════════════════ ACTIONS ═══════════════════════
+
+  const toggleFilter = (key: FilterKey, checked: boolean) => {
+    setFilterEnabled((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(key);
+      else {
+        next.delete(key);
+        if (key === "name") setNameQuery("");
+        if (key === "grade") setSelectedGrade("");
+        if (key === "section") setSelectedSection("");
+      }
+      return next;
+    });
+  };
+
+  const resetFilters = () => {
+    setFilterEnabled(new Set());
+    setNameQuery("");
+    setSelectedGrade("");
+    setSelectedSection("");
+  };
+
+  const visibleSelectedCount = useMemo(() => {
+    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+    return Array.from(selectedStudentIds).filter((id) => visibleIds.has(id)).length;
+  }, [selectedStudentIds, displayedStudents]);
+
+  const handleGenerateExcel = async () => {
+    if (!selectedAssessment) return;
+
+    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+    const ids = selectedVisible.length > 0
+      ? selectedVisible
+      : displayedStudents.map((s) => s.userStudentId);
+
+    if (ids.length === 0) {
+      showErrorToast("No students to generate data for.");
       return;
     }
 
-    setDownloading(true);
-    setError("");
-
+    setGenerating(true);
     try {
-      const response = await exportScoresByInstitute(
-        Number(selectedInstitute),
-        Number(selectedAssessment)
-      );
-
-      // Create blob and download
-      const blob = new Blob([response.data], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-
-      const instituteName = institutes.find(i => i.instituteCode === selectedInstitute)?.instituteName || "institute";
-      const assessmentName = assessments.find(a => a.id === selectedAssessment)?.assessmentName || "assessment";
-      link.download = `${instituteName.replace(/\s+/g, '_')}_${assessmentName.replace(/\s+/g, '_')}_scores.xlsx`;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const res = await generateAndExportNavigatorExcel(Number(selectedAssessment), ids);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `navigator_data_${selectedAssessment}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
       window.URL.revokeObjectURL(url);
-
-      alert("Export successful!");
+      showSuccessToast(`Generated data for ${ids.length} student(s) — downloading Excel.`);
     } catch (err: any) {
-      console.error("Error exporting scores:", err);
-      setError(err.response?.data?.error || "Failed to export scores. Please try again.");
+      showErrorToast("Generation failed: " + (err?.response?.data?.error || err.message));
     } finally {
-      setDownloading(false);
+      setGenerating(false);
     }
   };
 
+  const handleExportMQT = async () => {
+    if (!selectedAssessment) return;
+
+    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+    const ids = selectedVisible.length > 0 ? selectedVisible : undefined;
+
+    setExportingMQT(true);
+    try {
+      const res = await exportMqtScoresExcel(Number(selectedAssessment), ids);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mq_mqt_scores_${selectedAssessment}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
+    } finally {
+      setExportingMQT(false);
+    }
+  };
+
+  // ═══════════════════════ DERIVED ═══════════════════════
+
+  const selectedInstituteName =
+    institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
+  const selectedAssessmentObj = assessments.find((a) => a.id === selectedAssessment);
+  const selectedAssessmentName = selectedAssessmentObj?.assessmentName || "";
+  // questionnaireType: true = BET, false/null = Navigator
+  const isNavigator = selectedAssessmentObj ? !selectedAssessmentObj.questionnaireType : false;
+
+  const ready = selectedInstitute !== "" && selectedAssessment !== "";
+
+  // ═══════════════════════ STYLES ═══════════════════════
+
+  const thStyle: React.CSSProperties = {
+    padding: "10px 14px", fontWeight: 600, color: "#1a1a2e",
+    borderBottom: "2px solid #e0e0e0", whiteSpace: "nowrap", fontSize: "0.85rem",
+  };
+  const tdStyle: React.CSSProperties = {
+    padding: "10px 14px", borderBottom: "1px solid #f0f0f0", whiteSpace: "nowrap", fontSize: "0.85rem",
+  };
+
+  // ═══════════════════════ RENDER ═══════════════════════
+
   return (
-    <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', padding: '2rem' }}>
+    <div style={{ padding: "24px 32px", maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-        <div className="card-body p-4">
-          <h2 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
-            <i className="bi bi-file-earmark-bar-graph me-2" style={{ color: '#4361ee' }}></i>
-            Reports & Exports
-          </h2>
-          <p className="text-muted mb-0">Export student assessment scores in bulk</p>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontWeight: 800, fontSize: "1.5rem", color: "#1a1a2e", margin: 0 }}>
+          Unified Score Export
+        </h2>
+        <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: "4px 0 0" }}>
+          Export scores and generate reports across assessments
+        </p>
+      </div>
+
+      {/* Selection Row */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24,
+        background: "#fff", padding: 20, borderRadius: 12,
+        border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}>
+        <div>
+          <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 6, display: "block" }}>
+            School / Institute
+          </label>
+          {institutesLoading ? (
+            <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
+          ) : (
+            <select
+              className="form-select form-select-solid"
+              value={selectedInstitute}
+              onChange={(e) => {
+                setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value));
+                setSelectedAssessment("");
+              }}
+            >
+              <option value="">-- Select a school --</option>
+              {institutes.map((inst) => (
+                <option key={inst.instituteCode} value={inst.instituteCode}>
+                  {inst.instituteName}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div>
+          <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 6, display: "block" }}>
+            Assessment
+          </label>
+          <select
+            className="form-select form-select-solid"
+            value={selectedAssessment}
+            onChange={(e) =>
+              setSelectedAssessment(e.target.value === "" ? "" : Number(e.target.value))
+            }
+            disabled={selectedInstitute === "" || assessmentsLoading}
+          >
+            <option value="">
+              {assessmentsLoading ? "Loading assessments..." : "-- Select an assessment --"}
+            </option>
+            {assessments.map((a) => (
+              <option key={a.id} value={a.id}>{a.assessmentName}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Error Alert */}
-      {error && (
-        <div className="alert alert-danger alert-dismissible fade show mb-4" style={{ borderRadius: '12px' }}>
-          <i className="bi bi-exclamation-triangle me-2"></i>
-          {error}
-          <button type="button" className="btn-close" onClick={() => setError("")}></button>
+      {!ready && (
+        <div style={{
+          padding: 48, textAlign: "center", color: "#9ca3af",
+          border: "2px dashed #e5e7eb", borderRadius: 12, background: "#fff",
+        }}>
+          <div style={{ fontSize: "2rem", marginBottom: 8, opacity: 0.4 }}>&#x1F4C4;</div>
+          <div>Select a school and assessment to view students</div>
         </div>
       )}
 
-      {/* Bulk Score Export Card */}
-      <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
-        <div className="card-header bg-white border-0 p-4 pb-0">
-          <h4 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
-            <i className="bi bi-download me-2" style={{ color: '#4361ee' }}></i>
-            Bulk Score Export
-          </h4>
-          <p className="text-muted mb-0">Export all student scores for an institute and assessment</p>
-        </div>
-
-        <div className="card-body p-4">
-          <div className="row g-4">
-            {/* Institute Selection */}
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: '#1a1a2e' }}>
-                <i className="bi bi-building me-2" style={{ color: '#4361ee' }}></i>
-                Select Institute
-              </label>
-              <select
-                className="form-select"
-                style={{
-                  borderRadius: '10px',
-                  border: '2px solid #e0e0e0',
-                  padding: '0.75rem 1rem',
-                  fontWeight: 500
-                }}
-                value={selectedInstitute}
-                onChange={(e) => setSelectedInstitute(e.target.value ? Number(e.target.value) : "")}
-              >
-                <option value="">-- Select Institute --</option>
-                {institutes.map((inst) => (
-                  <option key={inst.instituteCode} value={inst.instituteCode}>
-                    {inst.instituteName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Assessment Selection */}
-            <div className="col-md-6">
-              <label className="form-label fw-semibold" style={{ color: '#1a1a2e' }}>
-                <i className="bi bi-clipboard-check me-2" style={{ color: '#4361ee' }}></i>
-                Select Assessment
-              </label>
-              <select
-                className="form-select"
-                style={{
-                  borderRadius: '10px',
-                  border: '2px solid #e0e0e0',
-                  padding: '0.75rem 1rem',
-                  fontWeight: 500
-                }}
-                value={selectedAssessment}
-                onChange={(e) => setSelectedAssessment(e.target.value ? Number(e.target.value) : "")}
-              >
-                <option value="">-- Select Assessment --</option>
-                {assessments.map((assessment) => (
-                  <option key={assessment.id} value={assessment.id}>
-                    {assessment.assessmentName}
-                  </option>
-                ))}
-              </select>
+      {ready && (
+        <div style={{
+          background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)", padding: 24,
+        }}>
+          {/* Summary */}
+          <div style={{
+            padding: "12px 20px", background: "#f0f4ff", borderRadius: 10,
+            display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap",
+          }}>
+            <span style={{ fontWeight: 700, color: "#4361ee" }}>{selectedInstituteName}</span>
+            <span style={{ color: "#cbd5e1" }}>/</span>
+            <span style={{ fontWeight: 600, color: "#1e293b" }}>{selectedAssessmentName}</span>
+            <div style={{ marginLeft: "auto" }}>
+              <span style={{
+                background: "#4361ee", color: "#fff",
+                padding: "4px 12px", borderRadius: 16, fontSize: "0.8rem", fontWeight: 600,
+              }}>
+                {assessmentStudents.length} students
+              </span>
             </div>
           </div>
 
-          {/* Info Box */}
-          {selectedInstitute && (
-            <div className="mt-4 p-3 rounded-3" style={{ background: '#f8f9fa', border: '1px solid #e0e0e0' }}>
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="d-flex align-items-center justify-content-center"
+          {/* Students */}
+          {studentsLoading ? (
+            <div style={{ color: "#9ca3af", padding: 24 }}>Loading...</div>
+          ) : (
+            <>
+              {/* Compact filter row */}
+              <div style={{
+                display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end",
+              }}>
+                {FILTER_ITEMS.map((item) => {
+                  if (item.key === "name") {
+                    return (
+                      <div key={item.key} style={{ flex: "1 1 200px", minWidth: 180 }}>
+                        <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Search</label>
+                        <input
+                          className="form-control form-control-sm form-control-solid"
+                          placeholder="Name, roll no..."
+                          value={nameQuery}
+                          onChange={(e) => {
+                            setNameQuery(e.target.value);
+                            if (e.target.value && !filterEnabled.has("name")) toggleFilter("name", true);
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                  if (item.key === "grade") {
+                    return (
+                      <div key={item.key} style={{ minWidth: 140 }}>
+                        <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>{item.label}</label>
+                        <select
+                          className="form-select form-select-sm form-select-solid"
+                          value={selectedGrade}
+                          onChange={(e) => {
+                            setSelectedGrade(e.target.value);
+                            if (e.target.value) toggleFilter("grade", true);
+                            else toggleFilter("grade", false);
+                          }}
+                        >
+                          <option value="">All</option>
+                          {uniqueGrades.map((g) => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
+                    );
+                  }
+                  if (item.key === "section") {
+                    return (
+                      <div key={item.key} style={{ minWidth: 140 }}>
+                        <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>{item.label}</label>
+                        <select
+                          className="form-select form-select-sm form-select-solid"
+                          value={selectedSection}
+                          onChange={(e) => {
+                            setSelectedSection(e.target.value);
+                            if (e.target.value) toggleFilter("section", true);
+                            else toggleFilter("section", false);
+                          }}
+                        >
+                          <option value="">All</option>
+                          {uniqueSections.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+                {filterEnabled.size > 0 && (
+                  <button
+                    onClick={resetFilters}
+                    style={{
+                      padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem",
+                      fontWeight: 600, cursor: "pointer", border: "1.5px solid #e5e7eb",
+                      background: "#fff", color: "#ef4444", alignSelf: "flex-end",
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Action bar */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 12, flexWrap: "wrap", gap: 8,
+              }}>
+                <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+                  {displayedStudents.length} student(s)
+                  {visibleSelectedCount > 0 && (
+                    <span style={{ fontWeight: 600, color: "#4361ee", marginLeft: 8 }}>
+                      ({visibleSelectedCount} selected)
+                    </span>
+                  )}
+                </span>
+                {isNavigator && (
+                  <button
+                    className="btn btn-sm"
+                    onClick={handleGenerateExcel}
+                    disabled={displayedStudents.length === 0 || generating}
+                    style={{
+                      background: generating
+                        ? "#6c757d"
+                        : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                      border: "none", borderRadius: 8, padding: "8px 20px",
+                      fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      boxShadow: generating ? "none" : "0 4px 12px rgba(67, 97, 238, 0.3)",
+                    }}
+                  >
+                    {generating ? "Generating..." : (
+                      <>
+                        Generate Data Excel
+                        {visibleSelectedCount > 0
+                          ? ` (${visibleSelectedCount} selected)`
+                          : ` (All ${displayedStudents.length})`}
+                      </>
+                    )}
+                  </button>
+                )}
+                <button
+                  className="btn btn-sm"
+                  onClick={handleExportMQT}
+                  disabled={displayedStudents.length === 0 || exportingMQT}
                   style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'rgba(67, 97, 238, 0.1)'
+                    background: exportingMQT
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingMQT ? "none" : "0 4px 12px rgba(124, 58, 237, 0.3)",
                   }}
                 >
-                  <i className="bi bi-people-fill" style={{ color: '#4361ee', fontSize: '1.25rem' }}></i>
-                </div>
-                <div>
-                  <p className="mb-0 text-muted small">Total Students in Institute</p>
-                  <h4 className="mb-0 fw-bold" style={{ color: '#1a1a2e' }}>
-                    {loading ? (
-                      <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                    ) : (
-                      studentCount !== null ? studentCount : '--'
-                    )}
-                  </h4>
-                </div>
+                  {exportingMQT ? "Exporting..." : (
+                    <>
+                      Export MQ/MQT Scores
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    setExportingBET(true);
+                    try {
+                      const res = await exportBetReportExcel(Number(selectedAssessment));
+                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `bet_report_data_${selectedAssessment}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingBET(false);
+                    }
+                  }}
+                  disabled={exportingBET}
+                  style={{
+                    background: exportingBET
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #e67e22 0%, #d35400 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingBET ? "none" : "0 4px 12px rgba(230, 126, 34, 0.3)",
+                  }}
+                >
+                  {exportingBET ? "Exporting..." : "Export BET Report"}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setSchoolReportOpen(true)}
+                  style={{
+                    background: "linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: "0 4px 12px rgba(30, 58, 95, 0.3)",
+                  }}
+                >
+                  School Report
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+                    // Get students with generated reports
+                    const ids = (selectedVisible.length > 0 ? selectedVisible : displayedStudents.map((s) => s.userStudentId))
+                      .filter((id) => {
+                        const rd = reportDataMap.get(id);
+                        return rd && rd.reportStatus === "generated" && rd.reportUrl;
+                      });
+                    if (ids.length === 0) { showErrorToast("No students with generated reports found."); return; }
+                    setDownloadingZip(true);
+                    setZipProgress(null);
+                    try {
+                      const res = await getBetReportUrls(Number(selectedAssessment), ids);
+                      const students = res.data.reports.map((r: any) => ({ userStudentId: r.userStudentId, fileName: r.fileName }));
+                      await downloadReportsAsZip(
+                        students,
+                        `bet_reports_${selectedAssessment}.zip`,
+                        (uid) => downloadBetReport(uid, Number(selectedAssessment)),
+                        (p) => setZipProgress(p),
+                      );
+                    } catch (err: any) {
+                      showErrorToast("Download failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setDownloadingZip(false);
+                      setZipProgress(null);
+                    }
+                  }}
+                  disabled={downloadingZip}
+                  style={{
+                    background: downloadingZip
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: downloadingZip ? "none" : "0 4px 12px rgba(5, 150, 105, 0.3)",
+                  }}
+                >
+                  {downloadingZip ? "Preparing ZIP..." : (
+                    <>
+                      Download ZIP (PDF)
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
+                </button>
               </div>
-            </div>
-          )}
 
-          {/* Export Button */}
-          <div className="mt-4 pt-3 border-top">
-            <button
-              className="btn btn-lg"
-              onClick={handleExport}
-              disabled={!selectedInstitute || !selectedAssessment || downloading}
-              style={{
-                background: (!selectedInstitute || !selectedAssessment || downloading)
-                  ? '#6c757d'
-                  : 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '0.8rem 2rem',
-                fontWeight: 600,
-                color: 'white',
-                boxShadow: (!selectedInstitute || !selectedAssessment || downloading)
-                  ? 'none'
-                  : '0 8px 20px rgba(76, 175, 80, 0.3)'
-              }}
-            >
-              {downloading ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-file-earmark-excel me-2"></i>
-                  Export All Scores to Excel
-                </>
+              {/* Table */}
+              <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f8fafc" }}>
+                      <th style={{ ...thStyle, width: 40 }}>
+                        <input
+                          type="checkbox"
+                          checked={
+                            paginatedStudents.length > 0 &&
+                            paginatedStudents.every((s) => selectedStudentIds.has(s.userStudentId))
+                          }
+                          onChange={(e) => {
+                            setSelectedStudentIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) paginatedStudents.forEach((s) => next.add(s.userStudentId));
+                              else paginatedStudents.forEach((s) => next.delete(s.userStudentId));
+                              return next;
+                            });
+                          }}
+                        />
+                      </th>
+                      <th style={{ ...thStyle, width: 44 }}>#</th>
+                      <th style={thStyle}>Name</th>
+                      <th style={thStyle}>Status</th>
+                      <th style={thStyle}>Grade</th>
+                      <th style={thStyle}>Section</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedStudents.map((s, idx) => {
+                      const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
+                      const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+                      const isChecked = selectedStudentIds.has(s.userStudentId);
+                      const assessmentStatus = (s.assessments || []).find(
+                        (a) => a.assessmentId === Number(selectedAssessment)
+                      )?.status || "-";
+                      const statusColors: Record<string, { bg: string; color: string }> = {
+                        completed: { bg: "#dcfce7", color: "#059669" },
+                        ongoing: { bg: "#fef3c7", color: "#d97706" },
+                        assigned: { bg: "#dbeafe", color: "#2563eb" },
+                      };
+                      const sc = statusColors[assessmentStatus.toLowerCase()] || { bg: "#f3f4f6", color: "#6b7280" };
+
+                      return (
+                        <tr key={s.userStudentId} style={{ background: globalIdx % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                          <td style={tdStyle}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                setSelectedStudentIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(s.userStudentId);
+                                  else next.delete(s.userStudentId);
+                                  return next;
+                                });
+                              }}
+                            />
+                          </td>
+                          <td style={tdStyle}>{globalIdx + 1}</td>
+                          <td style={tdStyle}><span style={{ fontWeight: 600 }}>{s.name || "-"}</span></td>
+                          <td style={tdStyle}>
+                            <span style={{
+                              background: sc.bg, color: sc.color,
+                              padding: "3px 10px", borderRadius: 6,
+                              fontWeight: 600, fontSize: "0.75rem",
+                            }}>
+                              {assessmentStatus}
+                            </span>
+                          </td>
+                          <td style={tdStyle}>{secInfo?.className || "-"}</td>
+                          <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginTop: 12, flexWrap: "wrap", gap: 8,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                      {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
+                    </span>
+                    <select
+                      className="form-select form-select-sm form-select-solid"
+                      style={{ width: 68, fontSize: "0.8rem" }}
+                      value={pageSize}
+                      onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                    >
+                      {[25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage(1)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>First</button>
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Prev</button>
+                    {(() => {
+                      const pages: (number | string)[] = [];
+                      const maxV = 5;
+                      let start = Math.max(1, safeCurrentPage - Math.floor(maxV / 2));
+                      let end = Math.min(totalPages, start + maxV - 1);
+                      if (end - start + 1 < maxV) start = Math.max(1, end - maxV + 1);
+                      if (start > 1) { pages.push(1); if (start > 2) pages.push("..."); }
+                      for (let i = start; i <= end; i++) pages.push(i);
+                      if (end < totalPages) { if (end < totalPages - 1) pages.push("..."); pages.push(totalPages); }
+                      return pages.map((p, i) =>
+                        typeof p === "string" ? (
+                          <span key={`e-${i}`} style={{ padding: "4px 4px", color: "#9ca3af", fontSize: "0.8rem" }}>...</span>
+                        ) : (
+                          <button key={p} className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
+                            onClick={() => setCurrentPage(p)} style={{ padding: "4px 10px", fontSize: "0.8rem", minWidth: 32 }}>{p}</button>
+                        )
+                      );
+                    })()}
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Next</button>
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Last</button>
+                  </div>
+                </div>
               )}
-            </button>
-
-            {(!selectedInstitute || !selectedAssessment) && (
-              <p className="text-muted mt-2 mb-0 small">
-                <i className="bi bi-info-circle me-1"></i>
-                Please select both institute and assessment to export.
-              </p>
-            )}
-          </div>
+            </>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* Export Format Info */}
-      <div className="card border-0 shadow-sm mt-4" style={{ borderRadius: '16px' }}>
-        <div className="card-body p-4">
-          <h5 className="fw-bold mb-3" style={{ color: '#1a1a2e' }}>
-            <i className="bi bi-info-circle me-2" style={{ color: '#4361ee' }}></i>
-            Export Format
-          </h5>
-          <p className="text-muted mb-3">
-            The exported Excel file will contain the following columns:
-          </p>
-          <div className="table-responsive">
-            <table className="table table-bordered mb-0" style={{ borderRadius: '8px', overflow: 'hidden' }}>
-              <thead style={{ background: '#f8f9fa' }}>
-                <tr>
-                  <th style={{ fontWeight: 600, color: '#1a1a2e' }}>Name</th>
-                  <th style={{ fontWeight: 600, color: '#1a1a2e' }}>Roll Number</th>
-                  <th style={{ fontWeight: 600, color: '#1a1a2e' }}>Class</th>
-                  <th style={{ fontWeight: 600, color: '#1a1a2e' }}>DOB</th>
-                  <th style={{ fontWeight: 600, color: '#4361ee' }}>MQT 1</th>
-                  <th style={{ fontWeight: 600, color: '#4361ee' }}>MQT 2</th>
-                  <th style={{ fontWeight: 600, color: '#4361ee' }}>...</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Student Name</td>
-                  <td>101</td>
-                  <td>10</td>
-                  <td>15-05-2010</td>
-                  <td><span className="badge bg-success">85</span></td>
-                  <td><span className="badge bg-success">72</span></td>
-                  <td>...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="text-muted mt-3 mb-0 small">
-            <i className="bi bi-lightbulb me-1"></i>
-            MQT columns are dynamically generated based on the Measured Quality Types associated with the assessment.
-          </p>
-        </div>
-      </div>
+      {/* School Report Modal */}
+      <SchoolReportModal
+        open={schoolReportOpen}
+        onClose={() => setSchoolReportOpen(false)}
+        assessmentId={Number(selectedAssessment) || 0}
+        assessmentName={selectedAssessmentName}
+        instituteName={selectedInstituteName}
+        instituteCode={Number(selectedInstitute) || 0}
+        userStudentIds={
+          (() => {
+            const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+            const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+            return selectedVisible.length > 0 ? selectedVisible : undefined;
+          })()
+        }
+      />
     </div>
   );
 };

@@ -13,7 +13,7 @@ const Error401: FC = () => {
           <Link to="/" className="mb-10 pt-lg-10">
             <img
               alt="Logo"
-              src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+              src={toAbsoluteUrl("/media/logos/kcc.webp")}
               className="h-40px mb-5"
             />
           </Link>

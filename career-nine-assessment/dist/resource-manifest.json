@@ -1,0 +1,287 @@
+{
+  "version": "mphpb7hd",
+  "generated": "2026-05-23T02:00:06.817Z",
+  "resources": [
+    {
+      "url": "/assessment-cache/43/config.json",
+      "size": 289087,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/43/data.json",
+      "size": 288694,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/45/config.json",
+      "size": 283793,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/45/data.json",
+      "size": 283391,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/46/config.json",
+      "size": 289096,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/46/data.json",
+      "size": 288694,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assets/game/deer.webp",
+      "size": 83100,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/elephant.webp",
+      "size": 95450,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/hydro-tube-tutorial.mp4",
+      "size": 164867,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/jungle-spot-tutorial.mp4",
+      "size": 519737,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/lion.webp",
+      "size": 177336,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/rabbit-path-tutorial.mp4",
+      "size": 480347,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/rhino.webp",
+      "size": 73726,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/tiger.webp",
+      "size": 87960,
+      "priority": "game"
+    },
+    {
+      "url": "/game-scenes/2nd/game-scene-2nd.webp",
+      "size": 789400,
+      "priority": "game"
+    },
+    {
+      "url": "/game-scenes/2nd/rabbit-nobg-old.webp",
+      "size": 7998,
+      "priority": "game"
+    },
+    {
+      "url": "/game-scenes/2nd/rabbit-nobg.webp",
+      "size": 47796,
+      "priority": "game"
+    },
+    {
+      "url": "/mediapipe/face_mesh/README.md",
+      "size": 389,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh.binarypb",
+      "size": 939,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh.js",
+      "size": 65044,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_packed_assets.data",
+      "size": 3986256,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_packed_assets_loader.js",
+      "size": 9126,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_simd_wasm_bin.data",
+      "size": 0,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_simd_wasm_bin.js",
+      "size": 330187,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_simd_wasm_bin.wasm",
+      "size": 6161697,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_wasm_bin.js",
+      "size": 330182,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_wasm_bin.wasm",
+      "size": 6084312,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/index.d.ts",
+      "size": 6656,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/package.json",
+      "size": 691,
+      "priority": "deferred"
+    },
+    {
+      "url": "/assets/HydroTubeGame-CWIo3J9Z.js",
+      "size": 23331,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/JungleSpotGame-DudVr7b2.js",
+      "size": 23397,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/RabbitPathGame-3s1Pf0tW.js",
+      "size": 26981,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/SectionInstructionPage-DwVACpc6.js",
+      "size": 4206,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/SectionQuestionPage-T5cXdF0K.js",
+      "size": 173996,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/SelectSectionPage-DFVpo7dF.js",
+      "size": 5261,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/assessmentApi-CSGjIadr.js",
+      "size": 679,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-CgWpvm-H.js",
+      "size": 360,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-TqC7GSCI.js",
+      "size": 222583,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-09QYokHQ.css",
+      "size": 261097,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-DlQDDg1p.js",
+      "size": 997030,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-t0T0PCaI.js",
+      "size": 1274010,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index.es-D0yBOQjB.js",
+      "size": 158432,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/purify.es-BZstNxVn.js",
+      "size": 25426,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/react-l0sNRNKZ.js",
+      "size": 1,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/router-Df5zuH9P.js",
+      "size": 31101,
+      "priority": "critical"
+    },
+    {
+      "url": "/index.html",
+      "size": 23615,
+      "priority": "critical"
+    },
+    {
+      "url": "/workbox-66610c77.js",
+      "size": 21445,
+      "priority": "critical"
+    },
+    {
+      "url": "/_headers",
+      "size": 189,
+      "priority": "other"
+    },
+    {
+      "url": "/manifest.webmanifest",
+      "size": 188,
+      "priority": "other"
+    },
+    {
+      "url": "/media/logos/kcc.jpg",
+      "size": 652421,
+      "priority": "other"
+    },
+    {
+      "url": "/media/logos/kcc.webp",
+      "size": 274630,
+      "priority": "other"
+    }
+  ],
+  "summary": {
+    "total": 51,
+    "totalSize": 25426330,
+    "byPriority": {
+      "assessment": {
+        "count": 6,
+        "size": 1722755
+      },
+      "game": {
+        "count": 11,
+        "size": 2527717
+      },
+      "deferred": {
+        "count": 12,
+        "size": 16975479
+      },
+      "critical": {
+        "count": 18,
+        "size": 3272951
+      },
+      "other": {
+        "count": 4,
+        "size": 927428
+      }
+    }
+  }
+}

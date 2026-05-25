@@ -170,15 +170,12 @@ export default function Basic() {
       });
   }, []);
   var resultData = (data, filter1) => {
-    // console.log(boxes_data(data, filter1))
     setFinalBoxData(boxes_data(data, filter1));
 
     // setResultDatatable({
     //   ...resultDatatable,
     //   rows: _.map(backs, (d1: any) => {
     //     var t = filter(data, filter_1, d1);
-    //     console.log("This is Filter data 2");
-    //     console.log(finalFilter);
 
     //     setDatatable({
     //       ...datatable,
@@ -296,7 +293,6 @@ export default function Basic() {
                             data-allow-clear="true"
                             value={filterCourseSelected}
                             onChange={(data) => {
-                              // console.log(data.target.value);
                               setfilterCourseSelected(
                                 parseInt(data.target.value)
                               );
@@ -332,7 +328,6 @@ export default function Basic() {
                               data-allow-clear="true"
                               value={filterBranchSelected}
                               onChange={(data) => {
-                                // console.log(data.target.value);
                                 setfilterBranchSelected(
                                   parseInt(data.target.value)
                                 );
@@ -367,7 +362,6 @@ export default function Basic() {
                             data-allow-clear="true"
                             value={filterSessionSelected}
                             onChange={(data) => {
-                              // console.log(data.target.value);
                               setFilterSessionSelected(
                                 parseInt(data.target.value)
                               );
@@ -399,7 +393,6 @@ export default function Basic() {
                             data-allow-clear="true"
                             value={filterSemester}
                             onChange={(data) => {
-                              // console.log(data.target.value);
                               setFilterSemester(parseInt(data.target.value));
                             }}
                           >
@@ -473,8 +466,6 @@ export default function Basic() {
                           setFinalFilter(t);
 
                           resultData(data1, t);
-
-                          // console.log();
                         }}
                       >
                         Apply

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,97 +25,65 @@ public class DashboardController {
      * Get student basic information
      * GET /api/student/getbyid/{studentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/student/getbyid/{studentId}")
     public ResponseEntity<?> getStudentBasicInfo(@PathVariable Long studentId) {
-        try {
-            Map<String, Object> studentInfo = dashboardService.getStudentBasicInfo(studentId);
-            return ResponseEntity.ok(studentInfo);
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            error.put("details", e.getClass().getName());
-            return ResponseEntity.status(404).body(error);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            error.put("stackTrace", e.toString());
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> studentInfo = dashboardService.getStudentBasicInfo(studentId);
+        return ResponseEntity.ok(studentInfo);
     }
 
     /**
      * Get cognitive game results (Attention, Working Memory, Cognitive Flexibility)
      * GET /api/game-results/{studentId}?assessmentId={assessmentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/game-results/{studentId}")
     public ResponseEntity<?> getGameResults(
             @PathVariable Long studentId,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> gameResults = dashboardService.getGameResults(studentId, assessmentId);
-            return ResponseEntity.ok(gameResults);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> gameResults = dashboardService.getGameResults(studentId, assessmentId);
+        return ResponseEntity.ok(gameResults);
     }
 
     /**
      * Get assessment scores (Social Insight, Values, Environmental Awareness)
      * GET /api/assessment-scores/{studentId}?assessmentId={assessmentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/assessment-scores/{studentId}")
     public ResponseEntity<?> getAssessmentScores(
             @PathVariable Long studentId,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> assessmentScores = dashboardService.getAssessmentScores(studentId, assessmentId);
-            return ResponseEntity.ok(assessmentScores);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> assessmentScores = dashboardService.getAssessmentScores(studentId, assessmentId);
+        return ResponseEntity.ok(assessmentScores);
     }
 
     /**
      * Get self-management data (Self-Efficacy, Emotional Regulation, Self-Regulation)
      * GET /api/self-management/{studentId}?assessmentId={assessmentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/self-management/{studentId}")
     public ResponseEntity<?> getSelfManagement(
             @PathVariable Long studentId,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> selfManagement = dashboardService.getSelfManagement(studentId, assessmentId);
-            return ResponseEntity.ok(selfManagement);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> selfManagement = dashboardService.getSelfManagement(studentId, assessmentId);
+        return ResponseEntity.ok(selfManagement);
     }
 
     /**
      * Get complete dashboard data (all sections combined)
      * GET /api/dashboard/{studentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/dashboard/{studentId}")
     public ResponseEntity<?> getCompleteDashboard(@PathVariable Long studentId,@RequestParam Long assessmentId) {
-        try {
-            Map<String, Object> dashboard = new HashMap<>();
-            dashboard.put("student", dashboardService.getStudentBasicInfo(studentId));
-            dashboard.put("cognitive", dashboardService.getGameResults(studentId, assessmentId));
-            dashboard.put("social", dashboardService.getAssessmentScores(studentId,assessmentId));
-            dashboard.put("selfManagement", dashboardService.getSelfManagement(studentId,assessmentId));
+        Map<String, Object> dashboard = new HashMap<>();
+        dashboard.put("student", dashboardService.getStudentBasicInfo(studentId));
+        dashboard.put("cognitive", dashboardService.getGameResults(studentId, assessmentId));
+        dashboard.put("social", dashboardService.getAssessmentScores(studentId,assessmentId));
+        dashboard.put("selfManagement", dashboardService.getSelfManagement(studentId,assessmentId));
 
-            return ResponseEntity.ok(dashboard);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        return ResponseEntity.ok(dashboard);
     }
 }

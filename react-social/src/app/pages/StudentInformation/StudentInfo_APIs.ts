@@ -17,6 +17,7 @@ export interface StudentInfo {
     assesment_id?: string;
     studentDob?: string;
     schoolSectionId?: number;
+    careerNineRollNumber?: string;
 }
 
 export interface Assessment {
@@ -25,6 +26,7 @@ export interface Assessment {
     isActive?: boolean;
     starDate?: string;
     endDate?: string;
+    questionnaire?: { type?: boolean | null; questionnaireId?: number };
 }
 
 export interface BulkAssessmentAssignment {
@@ -51,6 +53,7 @@ export interface StudentWithMapping {
     studentDob?: string;
     username?: string;
     schoolSectionId?: number;
+    gender?: string;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];
 }
@@ -62,6 +65,8 @@ export interface StudentAnswerDetail {
     optionText: string;
     sectionName?: string | null;
     excelQuestionHeader?: string | null;
+    optionNumber?: number;
+    isImageOption?: boolean;
 }
 
 export function getStudentInfoByInstituteId(instituteId: number) {
@@ -88,9 +93,38 @@ export function deleteStudentInfo(id: number) {
     return axios.post<void>(`${STUDENT_INFO_BASE}/delete/${id}`);
 }
 
+export function updateStudentBasicInfo(data: {
+    userStudentId: number;
+    name?: string;
+    email?: string;
+    phoneNumber?: string;
+    studentDob?: string;
+}) {
+    return axios.post(`${STUDENT_INFO_BASE}/updateDemographics`, data);
+}
+
+// (sendLoginCredentials is declared below alongside its typed response
+// interfaces — single canonical definition.)
+
 // Assessment APIs
+// Uses the lightweight cached /get/list-summary projection (id, name, isActive,
+// questionnaireType) instead of /getAll, which deep-loaded each AssessmentTable
+// + Questionnaire + Sections + Questions + Options + Languages. The response is
+// reshaped so existing callers can still read `assessment.questionnaire?.type`.
 export function getAllAssessments() {
-    return axios.get<Assessment[]>(`${ASSESSMENTS_BASE}/getAll`);
+    return axios
+        .get<Array<{ id: number; assessmentName: string; isActive?: boolean; questionnaireType?: boolean | null }>>(
+            `${ASSESSMENTS_BASE}/get/list-summary`
+        )
+        .then((res) => ({
+            ...res,
+            data: (res.data || []).map<Assessment>((s) => ({
+                id: s.id,
+                assessmentName: s.assessmentName,
+                isActive: s.isActive,
+                questionnaire: { type: s.questionnaireType ?? null },
+            })),
+        }));
 }
 
 export function getAssessmentIdNameMap() {
@@ -105,19 +139,44 @@ export function bulkRemoveAssessment(removals: BulkAssessmentAssignment[]) {
     return axios.post(`${STUDENT_INFO_BASE}/bulkRemoveAssessment`, removals);
 }
 
+// Result row returned per-student by /send-login-credentials.
+// `status === "queued"` means the email was handed off to Odoo (fire-and-forget;
+// the actual SMTP send may complete a few seconds later — check Odoo logs for
+// the definitive outcome). `status === "failed"` means validation failed
+// before dispatch (no email / no username / no DOB on file, etc).
+export interface SendCredentialsResult {
+    userStudentId: number;
+    status: "queued" | "failed";
+    email?: string;
+    reason?: string;
+}
+
+export interface SendCredentialsResponse {
+    requested: number;
+    // Count of rows successfully queued for dispatch via Odoo.
+    sent: number;
+    failed: number;
+    results: SendCredentialsResult[];
+}
+
+// Sends username (from User.username) + password (= student's DOB formatted
+// dd-MM-yyyy) by email to every supplied userStudentId. Backend dispatches via
+// OdooEmailService asynchronously; rows missing email/username/dob are
+// reported as `failed` synchronously rather than aborting the batch.
+export function sendLoginCredentials(userStudentIds: number[]) {
+    return axios.post<SendCredentialsResponse>(
+        `${STUDENT_INFO_BASE}/send-login-credentials`,
+        { userStudentIds },
+    );
+}
+
 // New API to get student answers with question and option details
 export function getStudentAnswersWithDetails(userStudentId: number, assessmentId: number) {
-    console.log("API Call - Endpoint:", `${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`);
-    console.log("API Call - Params:", { userStudentId, assessmentId });
-
     return axios.get<StudentAnswerDetail[]>(`${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`, {
         params: {
             userStudentId,
             assessmentId
         }
-    }).then(response => {
-        console.log("API Success:", response);
-        return response;
     }).catch(error => {
         console.error("API Error:", error.response?.data || error.message);
         throw error;
@@ -150,6 +209,17 @@ export function resetAssessment(userStudentId: number, assessmentId: number) {
 // Bulk fetch proctoring data for multiple student+assessment pairs
 export function getBulkProctoringData(pairs: { userStudentId: number; assessmentId: number }[]) {
     return axios.post<any[]>(`${API_URL}/assessment-proctoring/getBulkProctoringData`, pairs);
+}
+
+// Export proctoring data as Excel from backend (server-side generation)
+export function exportProctoringExcel(pairs: { userStudentId: number; assessmentId: number }[]) {
+    return axios.post(`${API_URL}/assessment-proctoring/export-excel`, pairs, {
+        responseType: 'blob',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+            'Content-Type': 'application/json',
+        },
+    });
 }
 
 // Game Results APIs (Firestore via backend)
@@ -189,4 +259,103 @@ export function exportScoresByInstitute(instituteId: number, assessmentId: numbe
         params: { assessmentId },
         responseType: 'blob'
     });
+}
+
+
+export function getContactPersonsByInstitute(instituteCode: number) {
+    return axios.get(`${API_URL}/contact-person/by-institute/${instituteCode}`);
+}
+
+export function assignStudentsToContactPerson(payload: {
+    contactPersonId: number;
+    userStudentIds: number[];
+    instituteId: number;
+}) {
+    return axios.post(`${API_URL}/contact-person/assign-students`, payload);
+}
+
+// BET Report APIs
+export interface BetReportColumn {
+    key: string;
+    header: string;
+    questionId: number;
+    optionId?: number;
+    isMQT: boolean;
+}
+
+export interface BetReportResponse {
+    columns: BetReportColumn[];
+    rows: Record<string, any>[];
+}
+
+export function getBetReport(instituteId: number, assessmentId: number) {
+    return axios.get<BetReportResponse>(
+        `${STUDENT_INFO_BASE}/bet-report/${instituteId}/${assessmentId}`
+    );
+}
+
+// ── One-click report generation (generates data + HTML + returns URL) ──
+
+export interface OneClickReportResponse {
+    reportUrl: string;
+    studentName: string;
+    status: string;
+}
+
+export function generateBetReportOneClick(assessmentId: number, userStudentId: number, force = false) {
+    return axios.post<OneClickReportResponse>(`${API_URL}/bet-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 }); // 2 min timeout for report generation
+}
+
+export function generateNavigatorReportOneClick(assessmentId: number, userStudentId: number, force = false) {
+    return axios.post<OneClickReportResponse>(`${API_URL}/navigator-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 }); // 2 min timeout for report generation + AI
+}
+
+/**
+ * One-click pager (Navigator 4-pager) report generator for the Student
+ * Management page. Response payload uses different keys than the legacy BET /
+ * Navigator endpoints because the pager pipeline tells the caller whether the
+ * row already existed (for Generate vs Regenerate label semantics).
+ */
+export interface PagerOneClickReportResponse {
+    status: string;          // "ready" | "not_ready" | "failed"
+    reportType: "pager";
+    reportUrl: string;
+    alreadyExisted: boolean;
+    generatedAt?: string;
+}
+
+export function generatePagerReportOneClick(assessmentId: number, userStudentId: number, force = false) {
+    return axios.post<PagerOneClickReportResponse>(`${API_URL}/pager-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 });
+}
+
+/**
+ * Bulk fetch every {@code generated_report} row for one student. Powers the
+ * Student Management view-modal hydration so each assessment's Generate /
+ * Download / Regenerate button starts with the right state instead of
+ * forgetting prior generations on every modal open. Backend endpoint at
+ * {@code GET /generated-reports/by-student/:userStudentId}.
+ */
+export interface GeneratedReportRow {
+    assessmentId: number;
+    typeOfReport: string;   // "bet" | "navigator" | "pager"
+    reportStatus: string;   // "notGenerated" | "generated" | "failed"
+    reportUrl: string | null;
+    visibleToStudent?: boolean;
+    updatedAt?: string;
+}
+
+export function getGeneratedReportsForStudent(userStudentId: number) {
+    return axios.get<GeneratedReportRow[]>(`${API_URL}/generated-reports/by-student/${userStudentId}`);
 }

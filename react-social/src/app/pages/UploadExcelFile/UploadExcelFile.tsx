@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Button, Modal, Alert, Spinner, ProgressBar } from "react-bootstrap";
+import { Button, Spinner, ProgressBar } from "react-bootstrap";
 import { MDBDataTableV5 } from "mdbreact";
 import * as XLSX from "xlsx";
 import { setData } from "./StudentDataComputationExcel";
 import { SchoolOMRRow } from "./DataStructure";
 import { addStudentInfo, StudentInfo, getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
 import { ReadCollegeData, GetSessionsByInstituteCode, ResolveOrCreateSection } from "../College/API/College_APIs";
+import PageHeader from "../../components/PageHeader";
+import { ActionIcon } from "../../components/ActionIcon";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
+import CreateStudentModal from "../StudentInformation/CreateStudentModal";
 
 /* ================= MASTER SCHEMA ================= */
 
@@ -51,6 +55,7 @@ export default function UploadExcelFile() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [uploadResult, setUploadResult] = useState<{ success: number; skipped: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showSingleStudentModal, setShowSingleStudentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [tableData, setTableData] = useState<{
@@ -60,7 +65,10 @@ export default function UploadExcelFile() {
 
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  // `allAssessments` is the unfiltered catalog; the hook below narrows it to whatever
+  // is mapped to `selectedInstitute` (or returns all when no institute is picked).
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  const { assessments } = useAssessmentsForInstitute(selectedInstitute, allAssessments);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
 
   // Session/Grade/Section hierarchy
@@ -73,7 +81,6 @@ export default function UploadExcelFile() {
     ReadCollegeData()
       .then((res: any) => {
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-        console.log("Fetched Institutes:", list);
         setInstitutes(list);
       })
       .catch((err: any) => console.error("Failed to fetch institutes", err));
@@ -81,11 +88,16 @@ export default function UploadExcelFile() {
     getAllAssessments()
       .then((res) => {
         const activeOnly = (res.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
-        console.log("Fetched Assessments:", activeOnly);
+        setAllAssessments(activeOnly);
       })
       .catch((err) => console.error("Failed to fetch assessments", err));
   }, []);
+
+  // If the user changes the institute after picking an assessment, clear the
+  // assessment to avoid leaving a stale ID selected that isn't in the new mapped list.
+  useEffect(() => {
+    setSelectedAssessment("");
+  }, [selectedInstitute]);
 
   // Fetch hierarchy when institute changes
   useEffect(() => {
@@ -356,19 +368,36 @@ export default function UploadExcelFile() {
   const getMappedFieldsCount = () => Object.values(columnMap).filter(v => v).length;
 
   return (
-    <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', padding: '2rem' }}>
-      {/* Header Section */}
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-file-earmark-spreadsheet" />}
+        title="Upload Students"
+        subtitle={
+          <>
+            Upload and map Excel files to import student information
+            {rawExcelData.length > 0 && (
+              <>
+                {" · "}<strong>{rawExcelData.length}</strong> rows loaded
+              </>
+            )}
+          </>
+        }
+        actions={[
+          {
+            label: "Add Single Student",
+            onClick: () => setShowSingleStudentModal(true),
+            actionType: "add",
+            variant: "primary",
+            disabled: !selectedInstitute,
+          },
+        ]}
+      />
+
+      {/* Institute + Assessment selectors */}
       <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px', overflow: 'hidden' }}>
         <div className="card-body p-4">
-          <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
-            <div>
-              <h2 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
-                <i className="bi bi-file-earmark-spreadsheet me-2" style={{ color: '#4361ee' }}></i>
-                Student Data Import
-              </h2>
-              <p className="text-muted mb-0">Upload and map Excel files to import student information</p>
-            </div>
-            <div className="d-flex align-items-center gap-3">
+          <div className="d-flex align-items-center justify-content-end flex-wrap gap-3">
+            <div className="d-flex align-items-center gap-3 flex-wrap">
               <div className="position-relative">
                 <select
                   className="form-select shadow-sm"
@@ -382,11 +411,10 @@ export default function UploadExcelFile() {
                   }}
                   value={selectedInstitute}
                   onChange={(e) => {
-                    console.log("Selected value:", e.target.value);
                     setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
                   }}
                 >
-                  <option value="">🏫 Select Institute</option>
+                  <option value="">Select Institute</option>
                   {institutes.map((inst) => (
                     <option key={inst.instituteCode} value={inst.instituteCode}>
                       {inst.instituteName}
@@ -407,11 +435,10 @@ export default function UploadExcelFile() {
                   }}
                   value={selectedAssessment}
                   onChange={(e) => {
-                    console.log("Selected assessment:", e.target.value);
                     setSelectedAssessment(e.target.value ? Number(e.target.value) : "");
                   }}
                 >
-                  <option value="">📝 Select Assessment</option>
+                  <option value="">Select Assessment</option>
                   {assessments.map((assessment) => (
                     <option key={assessment.id} value={assessment.id}>
                       {assessment.assessmentName}
@@ -636,7 +663,7 @@ export default function UploadExcelFile() {
                         setColumnMap({ ...columnMap, [col]: e.target.value })
                       }
                     >
-                      <option value="">⏭️ Ignore this column</option>
+                      <option value="">Ignore this column</option>
                       {SCHEMA_FIELDS.map((f) => (
                         <option key={f} value={f}>
                           ✓ {f}
@@ -663,7 +690,7 @@ export default function UploadExcelFile() {
                   transition: 'all 0.3s ease'
                 }}
               >
-                <i className="bi bi-eye me-2"></i>
+                <ActionIcon type="view" size="sm" className="me-2" />
                 Preview Data
               </Button>
             </div>
@@ -754,7 +781,7 @@ export default function UploadExcelFile() {
                     </>
                   ) : (
                     <>
-                      <i className="bi bi-cloud-upload me-2"></i>
+                      <ActionIcon type="upload" size="sm" className="me-2" />
                       Submit {tableData.rows.length} Students
                     </>
                   )}
@@ -764,6 +791,14 @@ export default function UploadExcelFile() {
           </div>
         </div>
       )}
+
+      {/* Single Student Add Modal */}
+      <CreateStudentModal
+        show={showSingleStudentModal}
+        onHide={() => setShowSingleStudentModal(false)}
+        onSave={() => setShowSingleStudentModal(false)}
+        instituteId={selectedInstitute || undefined}
+      />
 
       {/* Empty State */}
       {!fileName && excelColumns.length === 0 && (

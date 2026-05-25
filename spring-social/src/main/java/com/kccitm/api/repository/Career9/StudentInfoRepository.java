@@ -18,8 +18,13 @@ public interface StudentInfoRepository extends JpaRepository<StudentInfo, Long> 
 
     List<StudentInfo> findByEmailAndInstituteId(String email, Integer instituteId);
 
+    List<StudentInfo> findByEmail(String email);
+
     List<StudentInfo> findByStudentDobAndInstituteIdAndStudentClass(Date studentDob, Integer instituteId,
             Integer studentClass);
+
+    List<StudentInfo> findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(Date studentDob,
+            Integer instituteId, Integer studentClass, String name);
 
     List<StudentInfo> findByNameIgnoreCaseAndStudentDobAndInstituteId(String name, Date studentDob,
             Integer instituteId);
@@ -28,5 +33,7 @@ public interface StudentInfoRepository extends JpaRepository<StudentInfo, Long> 
             Integer instituteId);
 
     List<StudentInfo> findByNameIgnoreCaseAndInstituteId(String name, Integer instituteId);
+
+    List<StudentInfo> findByPhoneNumberAndInstituteId(String phoneNumber, Integer instituteId);
 
 }

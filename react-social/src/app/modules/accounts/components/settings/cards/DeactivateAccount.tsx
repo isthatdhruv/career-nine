@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import * as Yup from "yup";
 import { KTSVG } from "../../../../../../_metronic/helpers";
 import { IDeactivateAccount, deactivateAccount } from "../SettingsModel";
+import { showSuccessToast } from '../../../../../utils/toast';
 
 const deactivateAccountSchema = Yup.object().shape({
   confirm: Yup.boolean().oneOf(
@@ -24,7 +25,7 @@ const DeactivateAccount: React.FC = () => {
       setTimeout(() => {
         setLoading(false);
       }, 1000);
-      alert("Account has been successfully deleted!");
+      showSuccessToast("Account has been successfully deleted!");
     },
   });
 

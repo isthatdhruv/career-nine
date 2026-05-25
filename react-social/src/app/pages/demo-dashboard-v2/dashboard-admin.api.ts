@@ -1,0 +1,114 @@
+import axios from "axios";
+
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
+
+const safeList = (data: any): any[] =>
+  Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+
+export async function fetchStudents(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/student-info/getAll`);
+  return safeList(data);
+}
+
+export async function fetchInstitutes(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/instituteDetail/get`);
+  return safeList(data);
+}
+
+export async function fetchCounsellors(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/api/counsellor/getAll`);
+  return safeList(data);
+}
+
+export async function fetchAssessments(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/assessments/getAll`);
+  return safeList(data);
+}
+
+export async function fetchLogins(
+  startDate: string,
+  endDate: string
+): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/activity-log/logins`, {
+    params: { startDate, endDate },
+  });
+  return safeList(data);
+}
+
+export async function fetchGeneratedReports(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/generated-reports/getAll`);
+  return safeList(data);
+}
+
+export async function fetchStudentsWithMapping(instituteId: number | string): Promise<any[]> {
+  const { data } = await axios.get(
+    `${API_URL}/student-info/getStudentsWithMappingByInstituteId/${instituteId}`
+  );
+  return safeList(data);
+}
+
+export async function fetchAllStudentsWithMapping(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/student-info/getAllStudentsWithMapping`);
+  return safeList(data);
+}
+
+export async function fetchCounsellingAppointments(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/api/counselling-appointment/getAll`);
+  return safeList(data);
+}
+
+export async function fetchCounsellorRatingSummary(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/api/counselling-rating/summary-by-counsellor`);
+  return safeList(data);
+}
+
+export interface AdminDashboardSnapshot {
+  students: any[];
+  institutes: any[];
+  counsellors: any[];
+  appointments: any[];
+  ratingSummary: any[];
+  assessments: any[];
+  reports: any[];
+  studentMappings: any[];
+  /** ISO timestamp of when the payload was originally computed. Drives the
+   *  "updated X ago" pill in the dashboard header. When the payload comes
+   *  from Redis, this is the time of the original DB compute (not the cache
+   *  read), so the staleness label is accurate. */
+  computedAt?: string;
+  /** True when the backend served this payload from Redis; false when it
+   *  was just computed fresh. Useful for the staleness pill and for debug. */
+  cacheHit?: boolean;
+}
+
+const emptySnapshot = (): AdminDashboardSnapshot => ({
+  students: [], institutes: [], counsellors: [], appointments: [],
+  ratingSummary: [], assessments: [], reports: [], studentMappings: [],
+});
+
+const normalizeSnapshot = (data: any): AdminDashboardSnapshot => {
+  const base = emptySnapshot();
+  if (!data || typeof data !== "object") return base;
+  return {
+    students: safeList(data.students),
+    institutes: safeList(data.institutes),
+    counsellors: safeList(data.counsellors),
+    appointments: safeList(data.appointments),
+    ratingSummary: safeList(data.ratingSummary),
+    assessments: safeList(data.assessments),
+    reports: safeList(data.reports),
+    studentMappings: safeList(data.studentMappings),
+    computedAt: typeof data.computedAt === "string" ? data.computedAt : undefined,
+    cacheHit: typeof data.cacheHit === "boolean" ? data.cacheHit : undefined,
+  };
+};
+
+export async function fetchAdminDashboardSnapshot(): Promise<AdminDashboardSnapshot> {
+  const { data } = await axios.get(`${API_URL}/dashboard/admin/snapshot`);
+  return normalizeSnapshot(data);
+}
+
+export async function refreshAdminDashboardSnapshot(): Promise<AdminDashboardSnapshot> {
+  const { data } = await axios.post(`${API_URL}/dashboard/admin/snapshot/refresh`);
+  return normalizeSnapshot(data);
+}

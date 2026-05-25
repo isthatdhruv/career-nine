@@ -3,10 +3,10 @@ package com.kccitm.api.controller.career9;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.school.SchoolSession;
 import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.model.career9.school.SchoolSections;
@@ -42,11 +43,13 @@ public class SchoolSessionController {
     @Autowired
     private SchoolSectionsRepository schoolSectionsRepository;
 
+    @PreAuthorize("@auth.allows('school_session.read.all')")
     @GetMapping("/getAll")
     public List<SchoolSession> getAll() {
         return schoolSessionRepository.findAll();
     }
 
+    @PreAuthorize("@auth.allows('school_session.create')")
     @PostMapping("/create")
     public List<SchoolSession> createSchoolSession(@RequestBody ArrayList<SchoolSession> payload) {
         // Wire up all relationships before saving
@@ -54,7 +57,7 @@ public class SchoolSessionController {
             // 1. Set institute relationship from instituteCode
             if (session.getInstituteCode() != null) {
                 InstituteDetail institute = instituteDetailRepository.findById(session.getInstituteCode())
-                    .orElseThrow(() -> new RuntimeException("Institute not found with code: " + session.getInstituteCode()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Institute", "code", session.getInstituteCode()));
                 session.setInstitute(institute);
             }
 
@@ -79,6 +82,7 @@ public class SchoolSessionController {
 
     // ============ RESOLVE OR CREATE ============
 
+    @PreAuthorize("@auth.allows('school_session.create')")
     @PostMapping("/resolve-or-create")
     @Transactional
     public ResponseEntity<SchoolSections> resolveOrCreateSection(@RequestBody Map<String, Object> payload) {
@@ -94,7 +98,7 @@ public class SchoolSessionController {
                 SchoolSession newSession = new SchoolSession();
                 newSession.setSessionYear(sessionYear);
                 newSession.setInstitute(instituteDetailRepository.findById(instituteCode)
-                    .orElseThrow(() -> new RuntimeException("Institute not found: " + instituteCode)));
+                    .orElseThrow(() -> new ResourceNotFoundException("Institute", "code", instituteCode)));
                 return schoolSessionRepository.save(newSession);
             });
 
@@ -123,6 +127,7 @@ public class SchoolSessionController {
 
     // ============ SESSION CRUD ENDPOINTS ============
 
+    @PreAuthorize("@auth.allows('school_session.read', #instituteCode)")
     @GetMapping("/getByInstituteCode/{instituteCode}")
     @Transactional(readOnly = true)
     public ResponseEntity<List<SchoolSession>> getByInstituteCode(@PathVariable Integer instituteCode) {
@@ -143,24 +148,21 @@ public class SchoolSessionController {
         return ResponseEntity.ok(sessions);
     }
 
+    @PreAuthorize("@auth.allows('school_session.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<SchoolSession> updateSession(@PathVariable Integer id, @RequestBody SchoolSession sessionUpdate) {
-        Optional<SchoolSession> existingOpt = schoolSessionRepository.findById(id);
-        if (!existingOpt.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        SchoolSession existing = existingOpt.get();
+        SchoolSession existing = schoolSessionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("SchoolSession", "id", id));
         existing.setSessionYear(sessionUpdate.getSessionYear());
-
         SchoolSession updated = schoolSessionRepository.save(existing);
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("@auth.allows('school_session.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteSession(@PathVariable Integer id) {
         if (!schoolSessionRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("SchoolSession", "id", id);
         }
         schoolSessionRepository.deleteById(id);
         return ResponseEntity.ok("Session deleted successfully");
@@ -168,45 +170,42 @@ public class SchoolSessionController {
 
     // ============ CLASS CRUD ENDPOINTS ============
 
+    @PreAuthorize("@auth.allows('class.write')")
     @PostMapping("/class/create")
-    public ResponseEntity<SchoolClasses> createClass(@RequestBody SchoolClasses schoolClass) {
-        // Wire up session relationship if sessionId is provided
-        if (schoolClass.getSchoolSession() != null && schoolClass.getSchoolSession().getId() != null) {
-            Optional<SchoolSession> sessionOpt = schoolSessionRepository.findById(schoolClass.getSchoolSession().getId());
-            if (sessionOpt.isPresent()) {
-                schoolClass.setSchoolSession(sessionOpt.get());
-            }
-        }
+    public ResponseEntity<SchoolClasses> createClass(@RequestBody Map<String, Object> payload) {
+        SchoolClasses schoolClass = new SchoolClasses();
+        schoolClass.setClassName((String) payload.get("className"));
 
-        // Wire up section relationships
-        if (schoolClass.getSchoolSections() != null) {
-            for (SchoolSections section : schoolClass.getSchoolSections()) {
-                section.setSchoolClass(schoolClass);
-            }
+        // Extract sessionId from nested schoolSession object (since @JsonIgnore blocks deserialization)
+        Map<String, Object> sessionObj = (Map<String, Object>) payload.get("schoolSession");
+        if (sessionObj != null && sessionObj.get("id") != null) {
+            Integer sessionId = Integer.valueOf(sessionObj.get("id").toString());
+            SchoolSession session = schoolSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("SchoolSession", "id", sessionId));
+            schoolClass.setSchoolSession(session);
+        } else {
+            return ResponseEntity.badRequest().build();
         }
 
         SchoolClasses saved = schoolClassesRepository.save(schoolClass);
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('class.write')")
     @PutMapping("/class/update/{id}")
     public ResponseEntity<SchoolClasses> updateClass(@PathVariable Integer id, @RequestBody SchoolClasses classUpdate) {
-        Optional<SchoolClasses> existingOpt = schoolClassesRepository.findById(id);
-        if (!existingOpt.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        SchoolClasses existing = existingOpt.get();
+        SchoolClasses existing = schoolClassesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("SchoolClass", "id", id));
         existing.setClassName(classUpdate.getClassName());
-
         SchoolClasses updated = schoolClassesRepository.save(existing);
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("@auth.allows('class.write')")
     @DeleteMapping("/class/delete/{id}")
     public ResponseEntity<String> deleteClass(@PathVariable Integer id) {
         if (!schoolClassesRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("SchoolClass", "id", id);
         }
         schoolClassesRepository.deleteById(id);
         return ResponseEntity.ok("Class deleted successfully");
@@ -214,38 +213,42 @@ public class SchoolSessionController {
 
     // ============ SECTION CRUD ENDPOINTS ============
 
+    @PreAuthorize("@auth.allows('section.write')")
     @PostMapping("/section/create")
-    public ResponseEntity<SchoolSections> createSection(@RequestBody SchoolSections section) {
-        // Wire up class relationship if classId is provided
-        if (section.getSchoolClasses() != null && section.getSchoolClasses().getId() != null) {
-            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(section.getSchoolClasses().getId());
-            if (classOpt.isPresent()) {
-                section.setSchoolClass(classOpt.get());
-            }
+    public ResponseEntity<SchoolSections> createSection(@RequestBody Map<String, Object> payload) {
+        SchoolSections section = new SchoolSections();
+        section.setSectionName((String) payload.get("sectionName"));
+
+        // Extract classId from nested schoolClasses object (since @JsonIgnore blocks deserialization)
+        Map<String, Object> classObj = (Map<String, Object>) payload.get("schoolClasses");
+        if (classObj != null && classObj.get("id") != null) {
+            Integer classId = Integer.valueOf(classObj.get("id").toString());
+            SchoolClasses schoolClass = schoolClassesRepository.findById(classId)
+                .orElseThrow(() -> new ResourceNotFoundException("SchoolClass", "id", classId));
+            section.setSchoolClass(schoolClass);
+        } else {
+            return ResponseEntity.badRequest().build();
         }
 
         SchoolSections saved = schoolSectionsRepository.save(section);
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('section.write')")
     @PutMapping("/section/update/{id}")
     public ResponseEntity<SchoolSections> updateSection(@PathVariable Integer id, @RequestBody SchoolSections sectionUpdate) {
-        Optional<SchoolSections> existingOpt = schoolSectionsRepository.findById(id);
-        if (!existingOpt.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        SchoolSections existing = existingOpt.get();
+        SchoolSections existing = schoolSectionsRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("SchoolSection", "id", id));
         existing.setSectionName(sectionUpdate.getSectionName());
-
         SchoolSections updated = schoolSectionsRepository.save(existing);
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("@auth.allows('section.write')")
     @DeleteMapping("/section/delete/{id}")
     public ResponseEntity<String> deleteSection(@PathVariable Integer id) {
         if (!schoolSectionsRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("SchoolSection", "id", id);
         }
         schoolSectionsRepository.deleteById(id);
         return ResponseEntity.ok("Section deleted successfully");

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { showSuccessToast } from '../../../utils/toast';
 
 export default function LoginEnterEmail() {
   const [email, setEmail] = useState("");
@@ -8,7 +9,7 @@ export default function LoginEnterEmail() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Reset request for:", email);
-    alert("If this email exists, you'll receive reset instructions (mock).");
+    showSuccessToast("If this email exists, you'll receive reset instructions (mock).");
   };
   const goToCheckEmail = () => {
     navigate('/login/reset-password/check-email');

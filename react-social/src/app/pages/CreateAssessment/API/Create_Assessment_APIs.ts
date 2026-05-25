@@ -55,6 +55,23 @@ export function UnlockAssessment(id: any) {
   return axios.put(`${API_URL}/assessments/${id}/unlock`);
 }
 
+// Soft-delete: moves to recycle bin
+export function SoftDeleteAssessment(id: any) {
+  return axios.delete(`${API_URL}/assessments/${id}`);
+}
+
+export function GetDeletedAssessments() {
+  return axios.get(`${API_URL}/assessments/deleted`);
+}
+
+export function RestoreAssessment(id: any) {
+  return axios.put(`${API_URL}/assessments/restore/${id}`);
+}
+
+export function PermanentDeleteAssessment(id: any) {
+  return axios.delete(`${API_URL}/assessments/permanent-delete/${id}`);
+}
+
 export function CheckLockedByQuestionnaire(questionnaireId: any) {
   return axios.get(`${API_URL}/assessments/is-locked-by-questionnaire/${questionnaireId}`);
 }

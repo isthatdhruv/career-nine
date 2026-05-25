@@ -1,8 +1,8 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { DeleteGameTableData } from "./API/GAME_APIs";
 import GameEditModal from "./GameEditModal";
 
@@ -57,7 +57,7 @@ const GameTable = (props: {
             }}
             className="btn btn-icon btn-primary btn-sm me-3"
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
 
           <button

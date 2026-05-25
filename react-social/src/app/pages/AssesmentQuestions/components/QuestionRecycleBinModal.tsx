@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Modal, Button } from "react-bootstrap";
 import { GetDeletedQuestions, RestoreQuestion, PermanentDeleteQuestion } from "../API/Question_APIs";
+import { showErrorToast } from '../../../utils/toast';
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { MdRestorePage } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 interface QuestionRecycleBinModalProps {
   show: boolean;
@@ -48,7 +49,7 @@ const QuestionRecycleBinModal = ({
       onRestoreComplete();
     } catch (error) {
       console.error("Error restoring question:", error);
-      alert("Failed to restore question. Please try again.");
+      showErrorToast("Failed to restore question. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -64,7 +65,7 @@ const QuestionRecycleBinModal = ({
       setDeletedQuestions((prev) => prev.filter((q) => q.questionId !== id && q.id !== id));
     } catch (error) {
       console.error("Error permanently deleting question:", error);
-      alert("Failed to permanently delete question. Please try again.");
+      showErrorToast("Failed to permanently delete question. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -124,7 +125,7 @@ const QuestionRecycleBinModal = ({
                           {isActionLoading ? (
                             <span className="spinner-border spinner-border-sm" role="status" />
                           ) : (
-                            <MdRestorePage size={16} />
+                            <ActionIcon type="refresh" size="sm" />
                           )}
                         </button>
                         <button

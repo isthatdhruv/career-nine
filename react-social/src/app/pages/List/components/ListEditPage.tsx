@@ -6,6 +6,7 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadListByIdData, UpdateListData } from "../API/List_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
   listName: Yup.string().required("List name is required"),
@@ -40,7 +41,6 @@ const ListEditPage = (props?: {
         try {
           setLoading(true);
           const response = await ReadListByIdData(id);
-          console.log("Fetched list data:", response.data);
           const transformedData = {
             id: response.data.list_id || response.data.listId,
             listName: response.data.name || response.data.listName,
@@ -84,12 +84,8 @@ const ListEditPage = (props?: {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update list:");
-        console.log("List ID:", values.id);
-        console.log("Values being sent:", values);
-
         if (!values.id) {
-          alert("No list ID found. Please try navigating back and selecting the list again.");
+          showErrorToast("No list ID found. Please try navigating back and selecting the list again.");
           return;
         }
 
@@ -100,10 +96,7 @@ const ListEditPage = (props?: {
           price: values.listPrice === "FREE" ? 0 : Number(values.priceAmount)
         };
 
-        console.log("Payload being sent:", payload);
-
-        const response = await UpdateListData(values.id, payload);
-        console.log("Update successful:", response);
+        await UpdateListData(values.id, payload);
 
         navigate("/lists");
 
@@ -120,9 +113,9 @@ const ListEditPage = (props?: {
           console.error("Error data:", (error as any).response?.data);
 
           const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
-          alert(`Failed to update list: ${errorMessage}`);
+          showErrorToast(`Failed to update list: ${errorMessage}`);
         } else {
-          alert("Failed to update list: Unknown error occurred");
+          showErrorToast("Failed to update list: Unknown error occurred");
         }
       } finally {
         setLoading(false);

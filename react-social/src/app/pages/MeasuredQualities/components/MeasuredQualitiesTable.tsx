@@ -1,11 +1,12 @@
 import { Checkbox, FormControl, InputLabel, ListItemText, MenuItem, OutlinedInput, Select } from "@mui/material";
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { AssignToolToQuality, DeleteMeasuredQualitiesData, GetToolsForQuality, ReadToolsData, RemoveToolFromQuality } from "../API/Measured_Qualities_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 // Define your API base URL here or import it from your config
 
@@ -42,7 +43,7 @@ const MeasuredQualitiesTable = (props: {
         } catch (error) {
           // Handle 404 errors gracefully (quality might have been deleted)
           if ((error as any)?.response?.status === 404) {
-            console.log(`MeasuredQuality ${quality.measuredQualityId} not found, skipping...`);
+            // MeasuredQuality not found, skipping
           } else {
             console.error(`Error loading tools for quality ${quality.measuredQualityId}:`, error);
           }
@@ -75,13 +76,11 @@ const MeasuredQualitiesTable = (props: {
       // Assign new tools
       for (const toolId of newlySelected) {
         await AssignToolToQuality(toolId, qualityId);
-        console.log(`Tool ${toolId} assigned to quality ${qualityId}`);
       }
       
       // Remove deselected tools
       for (const toolId of deselected) {
         await RemoveToolFromQuality(toolId, qualityId);
-        console.log(`Tool ${toolId} removed from quality ${qualityId}`);
       }
       
       // Update state only after successful API calls
@@ -92,7 +91,7 @@ const MeasuredQualitiesTable = (props: {
       
     } catch (error) {
       console.error('Error updating tool assignments:', error);
-      alert('Failed to update tool assignments. Please try again.');
+      showErrorToast('Failed to update tool assignments. Please try again.');
       
       // Revert to previous state on error
       setSelectedToolsByQuality(prev => ({
@@ -101,15 +100,6 @@ const MeasuredQualitiesTable = (props: {
       }));
     }
   };
-
-  // const assignToolToQuality = async (toolId: number, qualityId: number) => {
-  //   try {
-  //     const response = await AssignToolToQuality(toolId, qualityId);
-  //     console.log('Tool assigned successfully:', response.data);
-  //   } catch (error) {
-  //     console.error('Error assigning tool:', error);
-  //   }
-  // };
 
   const datatable = {
     columns: [
@@ -175,13 +165,12 @@ const MeasuredQualitiesTable = (props: {
             }}
             className="btn btn-icon btn-primary btn-sm me-3"
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
           <button
             onClick={async () => {
               props.setLoading(true);
               try {
-                console.log(data);
                 // Remove the quality from local state immediately to prevent API calls
                 setSelectedToolsByQuality(prev => {
                   const newState = {...prev};
@@ -193,7 +182,7 @@ const MeasuredQualitiesTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete measured quality. Please try again.");
+                showErrorToast("Failed to delete measured quality. Please try again.");
               } finally {
                 props.setLoading(false);
               }

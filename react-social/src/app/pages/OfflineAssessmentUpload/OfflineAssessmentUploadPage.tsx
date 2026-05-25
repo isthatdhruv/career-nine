@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Spinner, Button, Form, Badge, Alert } from "react-bootstrap";
 import * as XLSX from "xlsx";
-import { ReadCollegeData, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { getOfflineMapping, bulkSubmitByRollNumber } from "./API/OfflineUpload_APIs";
+import { showErrorToast } from '../../utils/toast';
+import PageHeader from "../../components/PageHeader";
 
 // ============ Interfaces ============
 
@@ -308,7 +310,7 @@ const OfflineAssessmentUploadPage = () => {
       setMappingData(mappingRes.data);
     } catch (error) {
       console.error("Failed to load mapping:", error);
-      alert("Failed to load assessment mapping. Make sure the assessment has a linked questionnaire.");
+      showErrorToast("Failed to load assessment mapping. Make sure the assessment has a linked questionnaire.");
     } finally {
       setLoadingMapping(false);
     }
@@ -345,7 +347,7 @@ const OfflineAssessmentUploadPage = () => {
       const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
 
       if (jsonData.length === 0) {
-        alert("The Excel file is empty or has no data rows.");
+        showErrorToast("The Excel file is empty or has no data rows.");
         return;
       }
 
@@ -474,7 +476,7 @@ const OfflineAssessmentUploadPage = () => {
 
     const rowsWithNoRoll = parsedRows.filter((r) => !r.rollNumber.trim());
     if (rowsWithNoRoll.length > 0) {
-      alert(`${rowsWithNoRoll.length} row(s) have no roll number. Please fix before submitting.`);
+      showErrorToast(`${rowsWithNoRoll.length} row(s) have no roll number. Please fix before submitting.`);
       return;
     }
 
@@ -529,10 +531,28 @@ const OfflineAssessmentUploadPage = () => {
   }, [mappingRows]);
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="card-title">Offline Assessment Data Upload</h3>
-      </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-cloud-upload" />}
+        title="Offline Upload"
+        subtitle={
+          mappingData ? (
+            <><strong>{mappingData.questions.length}</strong> questions · <strong>{parsedRows.length}</strong> rows parsed</>
+          ) : (
+            <>Bulk upload offline assessment answers via Excel</>
+          )
+        }
+        actions={[
+          {
+            label: submitting ? "Submitting..." : `Submit${parsedRows.length ? ` (${parsedRows.length})` : ""}`,
+            iconClass: "bi-upload",
+            onClick: handleSubmit,
+            variant: "primary",
+            disabled: submitting || parsedRows.length === 0,
+          },
+        ]}
+      />
+      <div className="card">
       <div className="card-body">
         {/* Section 1: School & Assessment Selection */}
         <div className="card card-body bg-light mb-4">
@@ -867,6 +887,7 @@ const OfflineAssessmentUploadPage = () => {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 };

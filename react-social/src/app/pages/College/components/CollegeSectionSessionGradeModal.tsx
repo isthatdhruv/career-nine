@@ -1,5 +1,5 @@
 // CollegeSectionSessionGradeModal.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Modal, Button } from "react-bootstrap-v5";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
@@ -15,6 +15,8 @@ import {
   UpdateSectionData,
   DeleteSectionData
 } from "../API/College_APIs";
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
+import { ActionIcon } from "../../../components/ActionIcon";
 
 // ============ TYPE DEFINITIONS ============
 
@@ -136,18 +138,14 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
 
   const fetchExistingData = async (instituteCode: string | number) => {
     if (!instituteCode) {
-      console.log("No institute code provided, skipping fetch");
       return;
     }
 
-    console.log("Fetching data for institute code:", instituteCode);
     setFetchLoading(true);
     setError(null);
     try {
       const response = await GetSessionsByInstituteCode(instituteCode);
-      console.log("API Response:", response.data);
       const transformedData = transformBackendToLocal(response.data);
-      console.log("Transformed Data:", transformedData);
       setExistingData(transformedData);
     } catch (err: any) {
       console.error("Error fetching existing data:", err);
@@ -161,8 +159,6 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
   // Reset and fetch when modal opens
   useEffect(() => {
     if (props.show) {
-      console.log("Modal opened with data:", props.data);
-
       // Reset new data states
       setNewSessionsData([]);
       setNewSessionInput("");
@@ -187,8 +183,6 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
       const instituteCode = props.data?.instituteCode;
       if (instituteCode && instituteCode !== "") {
         fetchExistingData(instituteCode);
-      } else {
-        console.log("No valid institute code in props.data:", props.data);
       }
     }
   }, [props.show, props.data?.instituteCode]);
@@ -467,7 +461,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
 
     try {
       await CreateSessionData(formattedOutput);
-      alert('New sessions submitted successfully!');
+      showSuccessToast('New sessions submitted successfully!');
       setNewSessionsData([]);
       setCurrentSessionIndex(null);
       setCurrentGradeIndex(null);
@@ -476,7 +470,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
       }
     } catch (error) {
       console.error("Error in CreateSessionData:", error);
-      alert('Error submitting. Please try again.');
+      showErrorToast('Error submitting. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -712,7 +706,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                               onClick={handleAddSession}
                               disabled={!newSessionInput.trim()}
                             >
-                              <i className="bi bi-plus-lg"></i>
+                              <ActionIcon type="add" size="sm" />
                             </button>
                           </div>
                         </div>
@@ -744,10 +738,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                         onClick={(e) => e.stopPropagation()}
                                       />
                                       <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleDropdownEditSave(); }}>
-                                        <i className="bi bi-check"></i>
+                                        <ActionIcon type="approve" size="sm" />
                                       </button>
                                       <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setDropdownEdit(null); }}>
-                                        <i className="bi bi-x"></i>
+                                        <ActionIcon type="reject" size="sm" />
                                       </button>
                                     </div>
                                   ) : (
@@ -770,7 +764,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                           }}
                                           title="Edit session"
                                         >
-                                          <i className="bi bi-pencil"></i>
+                                          <ActionIcon type="edit" size="sm" />
                                         </button>
                                       </div>
                                     </div>
@@ -823,10 +817,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                         }
                                         setNewItemEdit(null);
                                       }}>
-                                        <i className="bi bi-check"></i>
+                                        <ActionIcon type="approve" size="sm" />
                                       </button>
                                       <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setNewItemEdit(null); }}>
-                                        <i className="bi bi-x"></i>
+                                        <ActionIcon type="reject" size="sm" />
                                       </button>
                                     </div>
                                   ) : (
@@ -849,7 +843,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                           }}
                                           title="Edit session"
                                         >
-                                          <i className="bi bi-pencil"></i>
+                                          <ActionIcon type="edit" size="sm" />
                                         </button>
                                         <button
                                           className="btn btn-sm btn-outline-danger py-0 px-1"
@@ -868,7 +862,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                           }}
                                           title="Remove session"
                                         >
-                                          <i className="bi bi-trash"></i>
+                                          <ActionIcon type="delete" size="sm" />
                                         </button>
                                       </div>
                                     </div>
@@ -931,7 +925,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                               onClick={handleAddGrade}
                               disabled={!newGradeInput.trim()}
                             >
-                              <i className="bi bi-plus-lg"></i>
+                              <ActionIcon type="add" size="sm" />
                             </button>
                           </div>
                         </div>
@@ -968,10 +962,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                           onClick={(e) => e.stopPropagation()}
                                         />
                                         <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleDropdownEditSave(); }}>
-                                          <i className="bi bi-check"></i>
+                                          <ActionIcon type="approve" size="sm" />
                                         </button>
                                         <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setDropdownEdit(null); }}>
-                                          <i className="bi bi-x"></i>
+                                          <ActionIcon type="reject" size="sm" />
                                         </button>
                                       </div>
                                     ) : !isExistingGrade && newItemEdit?.type === 'grade' && newItemEdit.index === index ? (
@@ -1006,10 +1000,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                           }
                                           setNewItemEdit(null);
                                         }}>
-                                          <i className="bi bi-check"></i>
+                                          <ActionIcon type="approve" size="sm" />
                                         </button>
                                         <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setNewItemEdit(null); }}>
-                                          <i className="bi bi-x"></i>
+                                          <ActionIcon type="reject" size="sm" />
                                         </button>
                                       </div>
                                     ) : (
@@ -1033,7 +1027,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                               }}
                                               title="Edit grade"
                                             >
-                                              <i className="bi bi-pencil"></i>
+                                              <ActionIcon type="edit" size="sm" />
                                             </button>
                                           ) : (
                                             <button
@@ -1045,7 +1039,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                               }}
                                               title="Edit grade"
                                             >
-                                              <i className="bi bi-pencil"></i>
+                                              <ActionIcon type="edit" size="sm" />
                                             </button>
                                           )}
                                         </div>
@@ -1110,7 +1104,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                               onClick={handleAddSection}
                               disabled={!newSectionInput.trim()}
                             >
-                              <i className="bi bi-plus-lg"></i>
+                              <ActionIcon type="add" size="sm" />
                             </button>
                           </div>
                         </div>
@@ -1142,10 +1136,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                         onClick={(e) => e.stopPropagation()}
                                       />
                                       <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleDropdownEditSave(); }}>
-                                        <i className="bi bi-check"></i>
+                                        <ActionIcon type="approve" size="sm" />
                                       </button>
                                       <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setDropdownEdit(null); }}>
-                                        <i className="bi bi-x"></i>
+                                        <ActionIcon type="reject" size="sm" />
                                       </button>
                                     </div>
                                   ) : selectionSource === 'new' && newItemEdit?.type === 'section' && newItemEdit.index === index ? (
@@ -1180,10 +1174,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                         }
                                         setNewItemEdit(null);
                                       }}>
-                                        <i className="bi bi-check"></i>
+                                        <ActionIcon type="approve" size="sm" />
                                       </button>
                                       <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setNewItemEdit(null); }}>
-                                        <i className="bi bi-x"></i>
+                                        <ActionIcon type="reject" size="sm" />
                                       </button>
                                     </div>
                                   ) : (
@@ -1203,7 +1197,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                             }}
                                             title="Edit section"
                                           >
-                                            <i className="bi bi-pencil"></i>
+                                            <ActionIcon type="edit" size="sm" />
                                           </button>
                                         )}
                                         {selectionSource === 'new' && (
@@ -1217,7 +1211,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                               }}
                                               title="Edit section"
                                             >
-                                              <i className="bi bi-pencil"></i>
+                                              <ActionIcon type="edit" size="sm" />
                                             </button>
                                             <button
                                               type="button"
@@ -1226,7 +1220,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                               onClick={() => handleRemoveNewSection(index)}
                                               title="Remove section"
                                             >
-                                              <i className="bi bi-trash"></i>
+                                              <ActionIcon type="delete" size="sm" />
                                             </button>
                                           </>
                                         )}
@@ -1314,10 +1308,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     autoFocus
                                   />
                                   <button className="btn btn-sm btn-success" onClick={handleSaveEdit}>
-                                    <i className="bi bi-check"></i>
+                                    <ActionIcon type="approve" size="sm" />
                                   </button>
                                   <button className="btn btn-sm btn-secondary" onClick={handleCancelEdit}>
-                                    <i className="bi bi-x"></i>
+                                    <ActionIcon type="reject" size="sm" />
                                   </button>
                                 </div>
                               ) : (
@@ -1346,10 +1340,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     autoFocus
                                   />
                                   <button className="btn btn-sm btn-success" onClick={handleSaveEdit}>
-                                    <i className="bi bi-check"></i>
+                                    <ActionIcon type="approve" size="sm" />
                                   </button>
                                   <button className="btn btn-sm btn-secondary" onClick={handleCancelEdit}>
-                                    <i className="bi bi-x"></i>
+                                    <ActionIcon type="reject" size="sm" />
                                   </button>
                                 </div>
                               ) : (
@@ -1379,10 +1373,10 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     autoFocus
                                   />
                                   <button className="btn btn-sm btn-success" onClick={handleSaveEdit}>
-                                    <i className="bi bi-check"></i>
+                                    <ActionIcon type="approve" size="sm" />
                                   </button>
                                   <button className="btn btn-sm btn-secondary" onClick={handleCancelEdit}>
-                                    <i className="bi bi-x"></i>
+                                    <ActionIcon type="reject" size="sm" />
                                   </button>
                                 </div>
                               ) : (
@@ -1406,7 +1400,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     onClick={() => handleStartEdit('section', row.sectionId, row.sessionIndex, row.sectionName, row.gradeIndex, row.sectionIndex)}
                                     title="Edit section"
                                   >
-                                    <i className="bi bi-pencil"></i>
+                                    <ActionIcon type="edit" size="sm" />
                                   </button>
                                 )}
                                 {row.gradeId && !row.sectionId && (
@@ -1415,7 +1409,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     onClick={() => handleStartEdit('grade', row.gradeId, row.sessionIndex, row.gradeName, row.gradeIndex)}
                                     title="Edit grade"
                                   >
-                                    <i className="bi bi-pencil"></i>
+                                    <ActionIcon type="edit" size="sm" />
                                   </button>
                                 )}
                                 {row.sessionId && !row.gradeId && (
@@ -1424,7 +1418,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     onClick={() => handleStartEdit('session', row.sessionId, row.sessionIndex, row.sessionName)}
                                     title="Edit session"
                                   >
-                                    <i className="bi bi-pencil"></i>
+                                    <ActionIcon type="edit" size="sm" />
                                   </button>
                                 )}
                                 {/* Delete buttons */}
@@ -1434,7 +1428,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     onClick={() => handleDeleteConfirm('section', row.sectionId, row.sectionName, row.sessionIndex, row.gradeIndex, row.sectionIndex)}
                                     title="Delete section"
                                   >
-                                    <i className="bi bi-trash"></i>
+                                    <ActionIcon type="delete" size="sm" />
                                   </button>
                                 )}
                                 {row.gradeId && !row.sectionId && (
@@ -1443,7 +1437,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     onClick={() => handleDeleteConfirm('grade', row.gradeId, row.gradeName, row.sessionIndex, row.gradeIndex)}
                                     title="Delete grade"
                                   >
-                                    <i className="bi bi-trash"></i>
+                                    <ActionIcon type="delete" size="sm" />
                                   </button>
                                 )}
                                 {row.sessionId && !row.gradeId && (
@@ -1452,7 +1446,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     onClick={() => handleDeleteConfirm('session', row.sessionId, row.sessionName, row.sessionIndex)}
                                     title="Delete session"
                                   >
-                                    <i className="bi bi-trash"></i>
+                                    <ActionIcon type="delete" size="sm" />
                                   </button>
                                 )}
                               </div>

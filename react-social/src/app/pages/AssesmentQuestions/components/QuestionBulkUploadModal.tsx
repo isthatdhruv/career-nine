@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Button, Dropdown } from "react-bootstrap";
 import * as XLSX from "xlsx";
 import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 
 // Type definitions
 interface ParsedQuestion {
@@ -10,6 +11,8 @@ interface ParsedQuestion {
   questionType: string;
   sectionId: string;
   maxOptionsAllowed: number;
+  optionsRule: "min" | "max" | "equal";
+  optionsCount: number;
   options: ParsedOption[];
 }
 
@@ -181,11 +184,19 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       }
 
       // Create question object
+      const parsedCount = Number(row["Options Count"] ?? row["Max Options Allowed"]) || 0;
+      const ruleRaw = String(row["Options Rule"] || "").trim().toLowerCase();
+      const parsedRule: "min" | "max" | "equal" =
+        ruleRaw === "min" || ruleRaw === "max" || ruleRaw === "equal"
+          ? (ruleRaw as "min" | "max" | "equal")
+          : "equal";
       const question: ParsedQuestion = {
         questionText,
         questionType: row["Question Type"]?.trim() || "",
         sectionId: String(row["Section ID"] || ""),
-        maxOptionsAllowed: Number(row["Max Options Allowed"]) || 0,
+        maxOptionsAllowed: parsedCount,
+        optionsRule: parsedRule,
+        optionsCount: parsedCount,
         options,
       };
 
@@ -205,7 +216,7 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       !selectedFile.name.endsWith(".xlsx") &&
       !selectedFile.name.endsWith(".xls")
     ) {
-      alert("Please select a valid Excel file (.xlsx or .xls)");
+      showErrorToast("Please select a valid Excel file (.xlsx or .xls)");
       return;
     }
 
@@ -224,7 +235,7 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       const parsedQuestions = await parseExcelFile(selectedFile);
 
       if (parsedQuestions.length === 0) {
-        alert("No valid questions found in Excel file");
+        showErrorToast("No valid questions found in Excel file");
         setFile(null);
         return;
       }
@@ -245,10 +256,10 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       });
       setOptionMeasuredQualities(initialMQ);
 
-      alert(`Successfully parsed ${parsedQuestions.length} questions from Excel file`);
+      showSuccessToast(`Successfully parsed ${parsedQuestions.length} questions from Excel file`);
     } catch (error: any) {
       console.error("Error parsing Excel:", error);
-      alert(`Failed to parse Excel file: ${error.message}`);
+      showErrorToast(`Failed to parse Excel file: ${error.message}`);
       setFile(null);
     } finally {
       setParsing(false);
@@ -397,7 +408,7 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
   const removeOption = (index: number) => {
     const currentQuestion = questions[currentIndex];
     if (currentQuestion.options.length <= 1) {
-      alert("At least one option is required");
+      showErrorToast("At least one option is required");
       return;
     }
 
@@ -446,7 +457,9 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
     return {
       questionText: question.questionText,
       questionType: question.questionType,
-      maxOptionsAllowed: question.maxOptionsAllowed,
+      maxOptionsAllowed: question.optionsCount || question.maxOptionsAllowed,
+      optionsRule: question.optionsRule,
+      optionsCount: question.optionsCount || question.maxOptionsAllowed,
       section: { sectionId: Number(question.sectionId) },
       flag: 0,
       options: question.options.map((opt) => ({
@@ -576,6 +589,108 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
         {/* Question Preview/Edit Form */}
         {file && currentQuestion && !uploadResults && (
           <>
+            {/* Missing-fields summary — flags every blank required cell across ALL parsed questions */}
+            {(() => {
+              type Issue = { qIndex: number; field: string };
+              const issues: Issue[] = [];
+              questions.forEach((q, i) => {
+                if (!q.questionText || !q.questionText.trim())
+                  issues.push({ qIndex: i, field: "Question Text" });
+                if (!q.questionType || !q.questionType.trim())
+                  issues.push({ qIndex: i, field: "Question Type" });
+                if (!q.sectionId || !String(q.sectionId).trim())
+                  issues.push({ qIndex: i, field: "Section ID" });
+                if (!q.options || q.options.length === 0) {
+                  issues.push({ qIndex: i, field: "Options (none)" });
+                } else {
+                  q.options.forEach((o, oi) => {
+                    if (!o.optionText || !String(o.optionText).trim())
+                      issues.push({ qIndex: i, field: `Option ${oi + 1} Text` });
+                  });
+                }
+              });
+
+              if (issues.length === 0) return null;
+
+              const affected = Array.from(new Set(issues.map((x) => x.qIndex))).sort((a, b) => a - b);
+              return (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    border: "1px solid rgba(244, 63, 94, 0.3)",
+                    background: "linear-gradient(180deg, #fff1f2 0%, #fff7f8 100%)",
+                    borderRadius: 12,
+                    padding: "14px 16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <i
+                      className="bi bi-exclamation-triangle-fill"
+                      style={{ color: "#e11d48", fontSize: 18 }}
+                    />
+                    <strong style={{ color: "#9f1239", fontSize: 14 }}>
+                      {issues.length} missing field
+                      {issues.length === 1 ? "" : "s"} found across{" "}
+                      {affected.length} question
+                      {affected.length === 1 ? "" : "s"}
+                    </strong>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#7f1d1d", marginBottom: 10 }}>
+                    Fix the highlighted fields below. Click any chip to jump to that question.
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {affected.map((qi) => {
+                      const fields = issues
+                        .filter((x) => x.qIndex === qi)
+                        .map((x) => x.field);
+                      const isCurrent = qi === currentIndex;
+                      return (
+                        <button
+                          key={qi}
+                          type="button"
+                          onClick={() => {
+                            setCurrentIndex(qi);
+                            loadMQTFromQuestion(qi);
+                          }}
+                          title={`Missing: ${fields.join(", ")}`}
+                          style={{
+                            border: "1px solid",
+                            borderColor: isCurrent ? "#e11d48" : "rgba(244, 63, 94, 0.4)",
+                            background: isCurrent ? "#e11d48" : "#ffffff",
+                            color: isCurrent ? "#ffffff" : "#9f1239",
+                            borderRadius: 100,
+                            padding: "4px 12px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 150ms ease",
+                          }}
+                        >
+                          Q{qi + 1}
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              opacity: 0.85,
+                              fontWeight: 500,
+                            }}
+                          >
+                            · {fields.length}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Question Counter */}
             <div className="mb-3">
               <h4 className="text-primary">
@@ -655,22 +770,47 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
               </select>
             </div>
 
-            {/* Max Options Allowed */}
+            {/* Options Selection Rule */}
             <div className="fv-row mb-4">
-              <label className="fs-6 fw-bold mb-2">Max Options Allowed:</label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                className="form-control form-control-lg form-control-solid w-25"
-                value={currentQuestion.maxOptionsAllowed}
-                onChange={(e) =>
-                  updateCurrentQuestion({
-                    ...currentQuestion,
-                    maxOptionsAllowed: Number(e.target.value),
-                  })
-                }
-              />
+              <label className="fs-6 fw-bold mb-2">Options Selection Rule:</label>
+              <div className="d-flex gap-3 align-items-center">
+                <select
+                  className="form-select form-select-lg form-select-solid"
+                  style={{ width: 180 }}
+                  value={currentQuestion.optionsRule}
+                  onChange={(e) =>
+                    updateCurrentQuestion({
+                      ...currentQuestion,
+                      optionsRule: e.target.value as "min" | "max" | "equal",
+                    })
+                  }
+                >
+                  <option value="min">At least (Min)</option>
+                  <option value="max">At most (Max)</option>
+                  <option value="equal">Exactly (Equal)</option>
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="N"
+                  className="form-control form-control-lg form-control-solid"
+                  style={{ width: 120 }}
+                  value={currentQuestion.optionsCount}
+                  onChange={(e) =>
+                    updateCurrentQuestion({
+                      ...currentQuestion,
+                      optionsCount: Number(e.target.value),
+                      maxOptionsAllowed: Number(e.target.value),
+                    })
+                  }
+                />
+                <span className="text-muted fs-7">
+                  {currentQuestion.optionsRule === "min" && "Student must select at least N options"}
+                  {currentQuestion.optionsRule === "max" && "Student can select up to N options"}
+                  {currentQuestion.optionsRule === "equal" && "Question is answered only when exactly N options are selected"}
+                </span>
+              </div>
             </div>
 
             {/* Options */}

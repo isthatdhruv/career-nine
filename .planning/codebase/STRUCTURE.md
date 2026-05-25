@@ -1,245 +1,440 @@
-# Codebase Structure
+# Directory Structure
 
-**Analysis Date:** 2026-02-06
+**Analysis Date:** 2026-03-06
 
-## Directory Layout
+## Top-Level Layout
 
 ```
 career-nine/
-├── spring-social/                  # Spring Boot REST API backend
-│   ├── src/main/java/com/kccitm/api/
-│   │   ├── controller/career9/     # REST endpoints (19+ controllers)
-│   │   ├── service/                # Business logic & integrations (20+ services)
-│   │   ├── repository/Career9/     # JPA repository interfaces (30+ repos)
-│   │   ├── model/career9/          # JPA entities (25+ entities)
-│   │   ├── security/               # Auth filters, JWT, OAuth2 handlers
-│   │   ├── config/                 # Spring configuration, CORS, Security, Properties
-│   │   ├── exception/              # Custom exception classes
-│   │   ├── util/                   # Utility functions
-│   │   ├── payload/                # Request/response DTOs
-│   │   └── Pdf/                    # PDF generation
-│   ├── src/main/resources/
-│   │   ├── application.yml         # Profile-based configuration
-│   │   └── keystore.p12            # SSL certificate
-│   └── pom.xml                     # Maven dependencies
-│
-├── react-social/                   # React 18 TypeScript frontend SPA
-│   ├── src/
-│   │   ├── index.tsx               # App entry point
-│   │   ├── app/
-│   │   │   ├── App.tsx             # Root layout wrapper
-│   │   │   ├── pages/              # Feature pages (42+ pages)
-│   │   │   │   ├── StudentInformation/
-│   │   │   │   ├── AssesmentQuestions/
-│   │   │   │   ├── StudentOnlineAssessment/
-│   │   │   │   ├── CreateAssessment/
-│   │   │   │   ├── ... (38 more pages)
-│   │   │   ├── modules/            # Shared features (auth, roles, profiles, accounts)
-│   │   │   │   ├── auth/           # Authentication context & OAuth2 handling
-│   │   │   │   ├── role/
-│   │   │   │   ├── roleUser/
-│   │   │   │   └── accounts/
-│   │   │   ├── routing/            # React Router configuration
-│   │   │   │   ├── AppRoutes.tsx   # Public + private routes
-│   │   │   │   └── PrivateRoutes.tsx
-│   │   │   ├── components/         # Shared components (OMR, etc.)
-│   │   │   ├── model/              # TypeScript interfaces
-│   │   │   └── firebase.ts         # Firebase SDK config
-│   │   ├── _metronic/              # Metronic UI framework
-│   │   │   ├── layout/             # Layout system, splash screen
-│   │   │   ├── assets/             # SCSS styles, fonts
-│   │   │   ├── i18n/               # Internationalization
-│   │   │   └── helpers/
-│   │   └── setupTests.ts
-│   ├── public/
-│   ├── package.json                # npm dependencies
-│   └── .env, .env.staging, .env.production
-│
-├── translator-service/             # Node.js translation microservice
-│   └── (language translation endpoint)
-│
-├── online-Assement/               # Standalone assessment module
-│
-├── docker-compose.yml              # Docker configuration (MySQL + API)
-├── CLAUDE.md                       # Development guidelines
-├── BULK_UPLOAD_INSTRUCTIONS.md     # Question bulk upload documentation
-└── career-9.sql, Dump*.sql        # Database schema & seed data
+├── spring-social/              (Spring Boot backend API)
+├── react-social/               (React admin frontend - CRA)
+├── career-nine-assessment/     (Vite assessment frontend)
+├── translator/                 (Node.js translation microservice)
+├── docker-compose.yml          (Container orchestration)
+├── CLAUDE.md                   (AI assistant instructions)
+├── .planning/                  (Project planning docs)
+└── Dump20260130 (1).sql        (Database schema dump)
 ```
 
-## Directory Purposes
+## Backend Structure (`spring-social/`)
 
-**Backend - Controllers (`spring-social/src/main/java/com/kccitm/api/controller/career9/`):**
-- Purpose: REST endpoint definitions
-- Contains: 19+ controller classes for assessments, questions, scoring, languages, institutions
-- Key files: `AssessmentTableController.java`, `AssessmentQuestionController.java`, `AssessmentAnswerController.java`, `QuestionnaireController.java`, `ToolController.java`, `MeasuredQualityTypesController.java`, `StudentController.java`
+```
+spring-social/
+├── src/main/java/com/kccitm/api/
+│   ├── SpringSocialApplication.java
+│   │
+│   ├── controller/                          (47+ REST controllers)
+│   │   ├── career9/                         (Career-Nine domain)
+│   │   │   ├── Questionaire/                (Questionnaire mgmt)
+│   │   │   │   ├── QuestionnaireController.java
+│   │   │   │   └── QuestionnaireLanguageController.java
+│   │   │   ├── AssessmentTableController.java
+│   │   │   ├── AssessmentQuestionController.java
+│   │   │   ├── AssessmentQuestionOptionsController.java
+│   │   │   ├── AssessmentAnswerController.java
+│   │   │   ├── AssessmentDemographicMappingController.java
+│   │   │   ├── AssessmentInstituteMappingController.java
+│   │   │   ├── AssessmentProctoringController.java
+│   │   │   ├── CareerController.java
+│   │   │   ├── MeasuredQualitiesController.java
+│   │   │   ├── MeasuredQualityTypesController.java
+│   │   │   ├── OptionScoreController.java
+│   │   │   ├── ToolController.java
+│   │   │   ├── StudentController.java
+│   │   │   ├── QuestionSectionController.java
+│   │   │   ├── LanguageQuestionController.java
+│   │   │   ├── LanguageOptionsController.java
+│   │   │   ├── LanguagesSupportedController.java
+│   │   │   ├── GameTableController.java
+│   │   │   ├── GameResultsController.java
+│   │   │   ├── DemographicFieldController.java
+│   │   │   ├── StudentDemographicResponseController.java
+│   │   │   ├── InstituteDetailController.java
+│   │   │   ├── SchoolSessionController.java
+│   │   │   ├── LeadController.java
+│   │   │   └── UserActivityLogController.java
+│   │   ├── dashboard/
+│   │   │   └── DashboardController.java
+│   │   ├── teacher/
+│   │   │   └── ClassTeacherDashboardController.java
+│   │   ├── principal/
+│   │   │   └── PrincipalDashboardController.java
+│   │   ├── AuthController.java
+│   │   ├── UserController.java
+│   │   ├── RoleController.java
+│   │   ├── GroupController.java
+│   │   ├── StudentInfoController.java
+│   │   ├── EmailController.java
+│   │   ├── GoogleAdminController.java
+│   │   ├── GoogleGroupsController.java
+│   │   └── ReportGenerationController.java
+│   │
+│   ├── service/                             (30+ services)
+│   │   ├── dashboard/
+│   │   │   └── DashboardService.java
+│   │   ├── teacher/
+│   │   │   └── ClassTeacherDashboardService.java
+│   │   ├── principal/
+│   │   │   └── PrincipalDashboardService.java
+│   │   ├── EmailService.java
+│   │   ├── SmtpEmailServiceImpl.java
+│   │   ├── GmailApiEmailServiceImpl.java
+│   │   ├── PdfServiceImpl.java
+│   │   ├── StudentPdfServiceImpl.java
+│   │   ├── FirebaseService.java
+│   │   ├── GoogleAPIAdminImpl.java
+│   │   ├── GoogleCloudAPIImpl.java
+│   │   ├── GoogleDirectoryServiceImpl.java
+│   │   ├── OdooLeadService.java
+│   │   ├── UserService.java
+│   │   ├── StudentService.java
+│   │   ├── FacultyService.java
+│   │   └── CareerNineRollNumberService.java
+│   │
+│   ├── repository/                          (83 JPA repositories)
+│   │   ├── Career9/                         (Career-Nine domain)
+│   │   │   ├── Questionaire/
+│   │   │   │   ├── QuestionnaireRepository.java
+│   │   │   │   ├── QuestionnaireQuestionRepository.java
+│   │   │   │   ├── QuestionnaireLanguageRepository.java
+│   │   │   │   ├── QuestionnaireSectionRepository.java
+│   │   │   │   └── AssessmentAnswerRepository.java
+│   │   │   ├── School/
+│   │   │   │   └── InstituteDetailRepository.java
+│   │   │   ├── AssessmentTableRepository.java
+│   │   │   ├── AssessmentQuestionRepository.java
+│   │   │   ├── AssessmentAnswerRepository.java
+│   │   │   ├── AssessmentRawScoreRepository.java
+│   │   │   ├── StudentAssessmentMappingRepository.java
+│   │   │   ├── CareerRepository.java
+│   │   │   ├── MeasuredQualitiesRepository.java
+│   │   │   ├── MeasuredQualityTypesRepository.java
+│   │   │   ├── OptionScoreBasedOnMeasuredQualityTypesRepository.java
+│   │   │   ├── ToolRepository.java
+│   │   │   ├── UserStudentRepository.java
+│   │   │   └── StudentInfoRepository.java
+│   │   ├── UserRepository.java
+│   │   └── RoleRepository.java
+│   │
+│   ├── model/                               (112 JPA entities)
+│   │   ├── career9/
+│   │   │   ├── Questionaire/
+│   │   │   │   ├── Questionnaire.java
+│   │   │   │   ├── QuestionnaireSection.java
+│   │   │   │   ├── QuestionnaireQuestion.java
+│   │   │   │   ├── QuestionnaireLanguage.java
+│   │   │   │   └── QuestionnaireSectionInstruction.java
+│   │   │   ├── school/
+│   │   │   │   ├── InstituteDetail.java
+│   │   │   │   ├── SchoolSession.java
+│   │   │   │   ├── SchoolClasses.java
+│   │   │   │   └── SchoolSections.java
+│   │   │   ├── AssessmentTable.java
+│   │   │   ├── AssessmentQuestions.java
+│   │   │   ├── AssessmentQuestionOptions.java
+│   │   │   ├── AssessmentAnswer.java
+│   │   │   ├── AssessmentRawScore.java
+│   │   │   ├── StudentAssessmentMapping.java
+│   │   │   ├── Career.java
+│   │   │   ├── MeasuredQualities.java
+│   │   │   ├── MeasuredQualityTypes.java
+│   │   │   ├── OptionScoreBasedOnMEasuredQualityTypes.java
+│   │   │   ├── Tool.java
+│   │   │   ├── UserStudent.java
+│   │   │   ├── StudentInfo.java
+│   │   │   └── GameTable.java
+│   │   ├── userDefinedModel/
+│   │   │   └── StudentDashboardResponse.java
+│   │   ├── User.java
+│   │   ├── Role.java
+│   │   ├── Group.java
+│   │   └── AuthProvider.java (ENUM)
+│   │
+│   ├── security/
+│   │   ├── CustomUserDetailsService.java
+│   │   ├── RestAuthenticationEntryPoint.java
+│   │   ├── TokenAuthenticationFilter.java
+│   │   ├── TokenProvider.java
+│   │   └── oauth2/
+│   │       ├── CustomOAuth2UserService.java
+│   │       ├── OAuth2AuthenticationSuccessHandler.java
+│   │       ├── OAuth2AuthenticationFailureHandler.java
+│   │       ├── HttpCookieOAuth2AuthorizationRequestRepository.java
+│   │       └── user/
+│   │           ├── OAuth2UserInfo.java
+│   │           ├── GoogleOAuth2UserInfo.java
+│   │           ├── GitHubOAuth2UserInfo.java
+│   │           └── FacebookOAuth2UserInfo.java
+│   │
+│   ├── config/
+│   │   ├── SecurityConfig.java
+│   │   ├── WebMvcConfig.java
+│   │   ├── AppProperties.java
+│   │   ├── CacheConfig.java
+│   │   ├── FirebaseConfig.java
+│   │   ├── SmtpMailConfig.java
+│   │   ├── MandrillConfig.java
+│   │   ├── HtmlToPdfConverter.java
+│   │   └── HttpsRedirectConfig.java
+│   │
+│   ├── exception/
+│   │   ├── ResourceNotFoundException.java
+│   │   ├── BadRequestException.java
+│   │   ├── OAuth2AuthenticationProcessingException.java
+│   │   └── EmailSendException.java
+│   │
+│   ├── util/
+│   ├── payload/
+│   └── Pdf/
+│
+├── src/main/resources/
+│   ├── application.yml              (Multi-profile config)
+│   ├── firebase-service-account.json
+│   └── keystore.p12
+│
+├── pom.xml
+└── Dockerfile
+```
 
-**Backend - Services (`spring-social/src/main/java/com/kccitm/api/service/`):**
-- Purpose: Business logic, external integrations
-- Contains: Google API handlers, PDF generation, student email services, CSV readers
-- Key files: `GoogleDirectoryService.java`, `GoogleCloudAPI.java`, `PdfService.java`, `StudentGoogleEmailGenerateService.java`, `CsvReaderImp.java`
+## Admin Frontend Structure (`react-social/`)
 
-**Backend - Repositories (`spring-social/src/main/java/com/kccitm/api/repository/Career9/`):**
-- Purpose: Database abstraction via Spring Data JPA
-- Contains: 30+ repository interfaces with custom query methods
-- Key files: `AssessmentTableRepository.java`, `StudentAssessmentMappingRepository.java`, `MeasuredQualityTypesRepository.java`, `QuestionnaireRepository.java`
-- Subdirectories: `Questionaire/` (new questionnaire system), `School/` (institute management)
+```
+react-social/
+├── src/
+│   ├── index.tsx                            (Entry point)
+│   ├── app/
+│   │   ├── App.tsx                          (Root component)
+│   │   ├── firebase.ts                      (Firebase init)
+│   │   │
+│   │   ├── routing/
+│   │   │   ├── AppRoutes.tsx               (Public + auth routes)
+│   │   │   └── PrivateRoutes.tsx           (Role-based protected routes)
+│   │   │
+│   │   ├── modules/
+│   │   │   ├── auth/                        (Auth context & hooks)
+│   │   │   │   ├── AuthContext.tsx
+│   │   │   │   ├── AuthInit.tsx
+│   │   │   │   ├── useAuth.tsx
+│   │   │   │   ├── AuthPage.tsx
+│   │   │   │   └── Logout.tsx
+│   │   │   ├── role/
+│   │   │   ├── roleUser/
+│   │   │   ├── errors/
+│   │   │   │   ├── Error401.tsx
+│   │   │   │   ├── Error403.tsx
+│   │   │   │   ├── Error404.tsx
+│   │   │   │   └── ErrorsPage.tsx
+│   │   │   ├── apps/
+│   │   │   ├── accounts/
+│   │   │   ├── profile/
+│   │   │   ├── wizards/
+│   │   │   └── widgets/
+│   │   │
+│   │   ├── pages/                           (52 feature pages)
+│   │   │   ├── Career/
+│   │   │   │   ├── CareerPage.tsx
+│   │   │   │   ├── API/Career_APIs.ts
+│   │   │   │   └── components/
+│   │   │   │       ├── CareerTable.tsx
+│   │   │   │       ├── CareerCreatePage.tsx
+│   │   │   │       ├── CareerEditPage.tsx
+│   │   │   │       └── index.ts
+│   │   │   ├── CreateAssessment/
+│   │   │   │   ├── Assessment.tsx
+│   │   │   │   ├── API/
+│   │   │   │   └── components/
+│   │   │   │       ├── questionaire/
+│   │   │   │       ├── assessment/
+│   │   │   │       ├── AssessmentSection.tsx
+│   │   │   │       └── AssessmentQuestion.tsx
+│   │   │   ├── AssesmentQuestions/
+│   │   │   │   ├── API/AssesmentQuestion_APIs.ts
+│   │   │   │   └── components/
+│   │   │   │       ├── QuestionTable.tsx
+│   │   │   │       ├── QuestionBulkUploadModal.tsx
+│   │   │   │       ├── QuestionCreateModal.tsx
+│   │   │   │       └── QuestionEditModal.tsx
+│   │   │   ├── Tool/
+│   │   │   ├── MeasuredQualities/
+│   │   │   ├── MeasuredQualityTypes/
+│   │   │   ├── QuestionSections/
+│   │   │   ├── DemographicFields/
+│   │   │   ├── StudentLogin/
+│   │   │   │   ├── StudentLoginPage.tsx
+│   │   │   │   ├── AllottedAssessmentPage.tsx
+│   │   │   │   ├── DemographicDetailsPage.tsx
+│   │   │   │   └── AssessmentContext.tsx
+│   │   │   ├── OnlineAssement/
+│   │   │   ├── StudentRegistration/
+│   │   │   ├── FacultyRegistration/
+│   │   │   ├── StudentInformation/
+│   │   │   ├── StudentDashboard/
+│   │   │   ├── ClassTeacherDashboard/
+│   │   │   ├── PrincipalDashboard/
+│   │   │   ├── dashboard/
+│   │   │   │   ├── DashboardWrapper.tsx
+│   │   │   │   ├── SchoolDashboardPage.tsx
+│   │   │   │   ├── InstituteDashboard.tsx
+│   │   │   │   └── widgets/
+│   │   │   ├── Group/
+│   │   │   ├── GroupStudent/
+│   │   │   ├── Users/
+│   │   │   ├── Reports/
+│   │   │   ├── ActivityLog/
+│   │   │   ├── Leads/
+│   │   │   ├── Games/
+│   │   │   ├── UniversityResult/
+│   │   │   ├── ContactPerson/
+│   │   │   ├── Branch/
+│   │   │   ├── Batch/
+│   │   │   ├── Course/
+│   │   │   ├── Session/
+│   │   │   ├── GoogleGroups/
+│   │   │   ├── AssessmentMapping/
+│   │   │   └── Login/
+│   │   │
+│   │   ├── model/                           (TypeScript interfaces)
+│   │   ├── components/
+│   │   │   └── omr/
+│   │   └── styles/
+│   │
+│   ├── _metronic/                           (UI framework)
+│   │   ├── layout/
+│   │   │   ├── MasterLayout.tsx
+│   │   │   ├── MasterInit.tsx
+│   │   │   └── core/
+│   │   ├── partials/
+│   │   │   ├── layout/header/
+│   │   │   ├── layout/sidebar/
+│   │   │   ├── layout/footer/
+│   │   │   ├── modals/
+│   │   │   └── widgets/
+│   │   ├── assets/
+│   │   ├── helpers/
+│   │   └── i18n/
+│   │
+│   ├── types/
+│   └── firebase.ts
+│
+├── public/
+├── package.json
+├── tsconfig.json
+├── .env.development
+├── staging.env
+├── production.env
+└── dockerfile
+```
 
-**Backend - Models (`spring-social/src/main/java/com/kccitm/api/model/career9/`):**
-- Purpose: JPA entity definitions
-- Contains: 25+ entity classes
-- Key files: `AssessmentTable.java`, `StudentAssessmentMapping.java`, `Questionnaire.java`, `AssessmentQuestions.java`, `MeasuredQualityTypes.java`, `UserStudent.java`
-- Subdirectories: `Questionaire/` (new assessment entities), `school/` (institute entities)
+## Assessment Frontend (`career-nine-assessment/`)
 
-**Backend - Security (`spring-social/src/main/java/com/kccitm/api/security/`):**
-- Purpose: Authentication and authorization
-- Contains: JWT token provider, OAuth2 handlers, custom user details service
-- Key files: `TokenProvider.java`, `TokenAuthenticationFilter.java`, `CustomOAuth2UserService.java`, `OAuth2AuthenticationSuccessHandler.java`, `UserPrincipal.java`
-- Subdirectories: `oauth2/` (OAuth2 providers & handlers)
+Separate Vite-based React app for student assessment taking:
+- React 19, TypeScript 5.9, Vite 7.3
+- MediaPipe (face detection) + WebGazer (eye tracking) for proctoring
+- Firebase integration for real-time sync
+- PWA support with offline caching
 
-**Backend - Configuration (`spring-social/src/main/java/com/kccitm/api/config/`):**
-- Purpose: Spring Boot configuration
-- Key files: `SecurityConfig.java` (JWT + OAuth2), `WebMvcConfig.java` (CORS), `AppProperties.java` (config properties), `HtmlToPdfConverter.java`, `MandrillConfig.java`
+## Translator Service (`translator/`)
 
-**Frontend - Pages (`react-social/src/app/pages/`):**
-- Purpose: Feature-specific page components
-- Contains: 42+ page directories, each with optional API/, components/ subdirectories
-- Major pages: `StudentOnlineAssessment/` (test-taking UI), `AssesmentQuestions/` (question management with bulk upload), `StudentInformation/` (student CRUD), `CreateAssessment/` (assessment setup), `Login/` (OAuth2 login), `dashboard/`, `Reports/`
-
-**Frontend - Page Structure Pattern:**
-- Layout: `PageName/`
-  - `API/` directory: API call functions (e.g., `Student_APIs.ts`, `Question_APIs.ts`)
-  - `components/` directory: Modals, tables, forms (e.g., `CreateStudentModal.tsx`, `QuestionTable.tsx`)
-  - Main file: `PageName.tsx` or `PageNamePage.tsx` or specific feature file
-
-**Frontend - Modules (`react-social/src/app/modules/`):**
-- Purpose: Shared features across pages
-- Key modules:
-  - `auth/core/`: Auth context, JWT handling, user request
-  - `role/`: Role-based access control
-  - `roleUser/`: User-role relationships
-  - `profile/`: User profile management
-  - `accounts/`: Account management
-  - `widgets/`, `wizards/`, `errors/`: UI components & templates
-
-**Frontend - Routing (`react-social/src/app/routing/`):**
-- Purpose: React Router configuration
-- Key files:
-  - `AppRoutes.tsx`: Public routes (login, registration, OAuth2 redirect), private route wrapper
-  - `PrivateRoutes.tsx`: Protected routes requiring authentication, role-based route guards
-
-**Frontend - Models (`react-social/src/app/model/`):**
-- Purpose: TypeScript interfaces for API contracts
-- Key files: `AssessmentQuestion.interface.ts`, `AssessmentQuestionOption.interface.ts`, `MeasuredQualityType.interface.ts`, `Tool.interface.ts`
-
-**Configuration Files (`spring-social/src/main/resources/`):**
-- `application.yml`: Spring profiles (dev/staging/production) with datasource, OAuth2, JWT, CORS, Google API configs
-- Profile-specific: Each profile has separate datasource, Firebase, Mandrill configs
-
-## Key File Locations
-
-**Entry Points:**
-- Backend: `src/main/java/com/kccitm/api/SpringSocialApplication.java` (Spring Boot application class)
-- Frontend: `src/index.tsx` (React root render), `src/app/App.tsx` (root layout)
-- Auth redirect: `src/app/pages/authRedirectPage.tsx` (OAuth2 callback handler)
-
-**Configuration:**
-- Backend: `spring-social/src/main/resources/application.yml` (all profiles)
-- Backend: `spring-social/src/main/java/com/kccitm/api/config/SecurityConfig.java` (JWT + OAuth2 setup)
-- Frontend: `react-social/src/app/modules/auth/core/Auth.tsx` (auth context), `AuthHelpers.ts` (token storage)
-- Frontend: `.env`, `.env.staging`, `.env.production` (API URL by environment)
-
-**Core Logic:**
-- Question import/export: `src/main/java/com/kccitm/api/controller/career9/AssessmentQuestionController.java` (/export-excel, /import-excel)
-- Question bulk upload modal: `src/app/pages/AssesmentQuestions/components/QuestionBulkUploadModal.tsx`
-- Assessment answer submission: `src/main/java/com/kccitm/api/controller/career9/AssessmentAnswerController.java` (/submit)
-- Assessment status tracking: `src/main/java/com/kccitm/api/model/career9/StudentAssessmentMapping.java`
-
-**Testing:**
-- Backend: `src/test/java/` (JUnit + Spring Boot Test)
-- Frontend: `**/*.test.tsx`, `**/*.spec.tsx` files alongside components
-- Test setup: `src/setupTests.ts`
+Node.js Express microservice:
+- Port 5000
+- OpenAI GPT-3.5-turbo for Hindi translations
+- Endpoints: `/translate/question`, `/translate/option`
 
 ## Naming Conventions
 
-**Files:**
-- Controllers: `[Entity]Controller.java` (e.g., `AssessmentTableController.java`)
-- Services: `[Feature]Service.java` (interface), `[Feature]ServiceImpl.java` (implementation)
-- Repositories: `[Entity]Repository.java` (e.g., `StudentAssessmentMappingRepository.java`)
-- Entities: `[Entity].java` (e.g., `AssessmentTable.java`)
-- React components: PascalCase (e.g., `StudentOnlineAssessment.tsx`, `QuestionBulkUploadModal.tsx`)
-- React pages: `PageName.tsx` or `PageNamePage.tsx`
-- API functions: `[Feature]_APIs.ts` or `[Feature]_APIs.tsx` (e.g., `Student_APIs.tsx`, `Question_APIs.ts`)
-- TypeScript interfaces: `[Entity].interface.ts` (e.g., `AssessmentQuestion.interface.ts`)
+### Backend (Java)
 
-**Directories:**
-- Packages: lowercase, kebab-case for compound (e.g., `career9`, `Questionaire`)
-- React feature folders: PascalCase (e.g., `StudentInformation/`, `AssesmentQuestions/`)
-- Subdirectories: Functional grouping (e.g., `API/`, `components/`, `oauth2/`)
+| Type | Convention | Example |
+|------|-----------|---------|
+| Packages | lowercase | `com.kccitm.api.controller.career9` |
+| Classes | PascalCase | `CareerController`, `AssessmentTable` |
+| Controllers | `{Entity}Controller` | `CareerController.java` |
+| Services | `{Entity}Service` / `{Entity}ServiceImpl` | `PdfService.java` / `PdfServiceImpl.java` |
+| Repositories | `{Entity}Repository` | `CareerRepository.java` |
+| Entities | PascalCase singular | `Career.java`, `Tool.java` |
+| REST paths | kebab-case | `/assessment-questions`, `/measured-quality-types` |
+| Methods | camelCase verb+noun | `getAllCareers()`, `createCareer()` |
 
-**Java Classes:**
-- Entities: Singular or compound (e.g., `AssessmentTable`, `StudentAssessmentMapping`)
-- Enums: UPPERCASE (e.g., assessment status values)
-- Generics: `<T>` for type, `<K, V>` for maps
+**Inconsistencies:**
+- Repository package: `Career9/` (PascalCase) vs controller: `career9/` (lowercase)
+- Misspelling: `Questionaire/` (missing 'n')
+- Entity naming: `OptionScoreBasedOnMEasuredQualityTypes` (typo in 'MEasured')
 
-## Where to Add New Code
+### Frontend (TypeScript/React)
 
-**New Feature (Full CRUD):**
-- Backend JPA entity: `spring-social/src/main/java/com/kccitm/api/model/career9/[Entity].java`
-- Backend repository: `spring-social/src/main/java/com/kccitm/api/repository/Career9/[Entity]Repository.java`
-- Backend controller: `spring-social/src/main/java/com/kccitm/api/controller/career9/[Entity]Controller.java` (endpoints: /getAll, /get/{id}, /create, /update/{id}, /delete/{id})
-- Frontend page: `react-social/src/app/pages/[Feature]/` with:
-  - `[Feature]Page.tsx` (main page container)
-  - `API/[Feature]_APIs.ts` (axios calls)
-  - `components/[Feature]Table.tsx` (data display)
-  - `components/[Feature]Modal.tsx` (create/edit)
+| Type | Convention | Example |
+|------|-----------|---------|
+| Directories | PascalCase | `Career/`, `CreateAssessment/` |
+| Pages | PascalCase + `Page` | `CareerPage.tsx` |
+| Components | PascalCase | `CareerTable.tsx`, `QuestionCreateModal.tsx` |
+| API files | `{Feature}_APIs.ts` | `Career_APIs.ts` |
+| API functions | PascalCase verb+noun | `ReadCareersData()`, `CreateCareerData()` |
+| Interfaces | PascalCase | `Career.ts`, `Assessment.ts` |
+| Context | `{Feature}Context.tsx` | `AssessmentContext.tsx` |
+| Barrel exports | `index.ts` | Component directory exports |
 
-**New Component/Modal:**
-- Create in `react-social/src/app/pages/[Feature]/components/[ComponentName].tsx`
-- Export from `components/index.ts` barrel file
-- Import in feature page and use as `<ComponentName />`
+## How to Add New Features
 
-**Utilities:**
-- Shared helpers: `react-social/src/app/modules/[module]/` or `src/_metronic/helpers/`
-- Backend utilities: `spring-social/src/main/java/com/kccitm/api/util/`
+### Adding a New Backend Entity
 
-**Models/Interfaces:**
-- TypeScript: `react-social/src/app/model/[Entity].interface.ts`
-- Backend: `spring-social/src/main/java/com/kccitm/api/model/career9/[Entity].java`
+1. **Create Entity** in `model/career9/`:
+   ```java
+   @Entity @Table(name = "entity_name")
+   public class EntityName { ... }
+   ```
 
-**Services (Backend Business Logic):**
-- Location: `spring-social/src/main/java/com/kccitm/api/service/[FeatureName]Service.java` (interface + Impl)
-- Pattern: Define interface in same directory, create [FeatureName]ServiceImpl.java
-- Inject in controllers via @Autowired
+2. **Create Repository** in `repository/Career9/`:
+   ```java
+   public interface EntityNameRepository extends JpaRepository<EntityName, Long> { }
+   ```
 
-## Special Directories
+3. **Create Controller** in `controller/career9/`:
+   ```java
+   @RestController @RequestMapping("/entity-name")
+   public class EntityNameController { }
+   ```
 
-**Google Integration Files:**
-- Location: `spring-social/src/main/resources/` (not in repo, must be added locally)
-- Files: `google.json` (service account), `firebase-service-account.json` (Firebase admin)
-- Generated: No, manually created from Google Cloud Console
-- Committed: No, listed in .gitignore
+4. **(Optional) Create Service** in `service/`:
+   - Interface + implementation for complex business logic
 
-**Temporary/Generated Files:**
-- Build output: `spring-social/target/`, `react-social/build/`
-- Dependencies: `spring-social/` has Maven cached deps, `react-social/node_modules/`
-- Generated: Yes
-- Committed: No, listed in .gitignore
+5. **Update SecurityConfig** if endpoint needs public access
 
-**Database Files:**
-- Location: Root directory
-- Files: `career-9.sql` (schema), `Dump*.sql` (seed data)
-- Generated: No (checked in)
-- Committed: Yes, for environment setup
+### Adding a New Frontend Page
 
-**Configuration Directories:**
-- `.planning/codebase/` - Codebase analysis documents (created by GSD mapper)
-- `.claude/` - Claude development workspace files
-- `.vscode/` - VS Code workspace settings
+1. **Create directory** `pages/{FeatureName}/`
 
-**Frontend Build Outputs:**
-- `react-social/build/` - Production build output (generated)
-- `react-social/.env.production` - Production environment variables (not committed, example provided)
+2. **Create API file** `pages/{FeatureName}/API/{FeatureName}_APIs.ts`:
+   ```typescript
+   const BASE_URL = process.env.REACT_APP_API_URL;
+   export function ReadFeatureData() { return axios.get(`${BASE_URL}/entity-name/getAll`); }
+   ```
 
----
+3. **Create page components** in `pages/{FeatureName}/components/`:
+   - `FeatureTable.tsx` - Data table
+   - `FeatureCreatePage.tsx` - Create form
+   - `FeatureEditPage.tsx` - Edit form
+   - `index.ts` - Barrel export
 
-*Structure analysis: 2026-02-06*
+4. **Create main page** `pages/{FeatureName}/FeaturePage.tsx`
+
+5. **Add route** in `routing/PrivateRoutes.tsx`:
+   ```tsx
+   <Route path="/feature/*" element={<FeaturePage />} />
+   ```
+
+6. **Add menu item** in `_metronic/partials/layout/sidebar/AsideMenuMain.tsx`
+
+## Configuration File Locations
+
+| File | Purpose |
+|------|---------|
+| `spring-social/src/main/resources/application.yml` | Backend config (all profiles) |
+| `spring-social/pom.xml` | Backend dependencies |
+| `react-social/package.json` | Frontend dependencies |
+| `react-social/tsconfig.json` | TypeScript config |
+| `react-social/.env.development` | Dev environment vars |
+| `react-social/staging.env` | Staging environment vars |
+| `react-social/production.env` | Production environment vars |
+| `docker-compose.yml` | Container orchestration |
+| `spring-social/src/main/java/com/kccitm/api/config/SecurityConfig.java` | Security/CORS/OAuth2 |
+| `spring-social/src/main/resources/firebase-service-account.json` | Firebase credentials |

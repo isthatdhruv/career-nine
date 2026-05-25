@@ -5,6 +5,7 @@ import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.Tool;
 import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
@@ -30,33 +32,34 @@ public class MeasuredQualitiesController {
     private ToolRepository toolRepository;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('measured_quality.read')")
     public List<MeasuredQualities> getAllMeasuredQualities() {
-        return measuredQualitiesRepository.findAll();
+        return measuredQualitiesRepository.findByIsDeletedFalseOrIsDeletedIsNull();
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('measured_quality.read')")
     public MeasuredQualities getMeasuredQualitiesById(@PathVariable Long id) {
-        return measuredQualitiesRepository.findById(id).orElse(null);
+        return measuredQualitiesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", id));
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('measured_quality.create')")
     public ResponseEntity<MeasuredQualities> createMeasuredQualities(@RequestBody MeasuredQualities measuredQualities) {
-        try {
-            // Don't automatically set tools relationships during creation
-            // This should be done via separate relationship management endpoints
-            MeasuredQualities savedQuality = measuredQualitiesRepository.save(measuredQualities);
-            return ResponseEntity.ok(savedQuality);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
+        // Don't automatically set tools relationships during creation
+        // This should be done via separate relationship management endpoints
+        MeasuredQualities savedQuality = measuredQualitiesRepository.save(measuredQualities);
+        return ResponseEntity.ok(savedQuality);
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('measured_quality.update')")
     public MeasuredQualities updateMeasuredQualities(@PathVariable Long id,
             @RequestBody MeasuredQualities measuredQualities) {
 
         MeasuredQualities existingQuality = measuredQualitiesRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("MeasuredQuality not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", id));
 
         existingQuality.setMeasuredQualityName(measuredQualities.getMeasuredQualityName());
         existingQuality.setMeasuredQualityDescription(measuredQualities.getMeasuredQualityDescription());
@@ -66,11 +69,10 @@ public class MeasuredQualitiesController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('measured_quality.delete')")
     public ResponseEntity<String> deleteMeasuredQualities(@PathVariable Long id) {
-        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(id).orElse(null);
-        if (measuredQuality == null) {
-            return ResponseEntity.notFound().build();
-        }
+        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", id));
         // Remove all mappings to MeasuredQualityTypes (but do not delete the types)
         if (measuredQuality.getQualityTypes() != null) {
             for (var type : measuredQuality.getQualityTypes()) {
@@ -78,20 +80,20 @@ public class MeasuredQualitiesController {
             }
             measuredQuality.getQualityTypes().clear();
         }
-        measuredQualitiesRepository.deleteById(id);
-        return ResponseEntity.ok("MeasuredQualities deleted. All mappings to MeasuredQualityTypes removed, no types deleted.");
+        measuredQuality.setIsDeleted(true);
+        measuredQualitiesRepository.save(measuredQuality);
+        return ResponseEntity.ok("MeasuredQualities soft-deleted. All mappings to MeasuredQualityTypes removed, no types deleted.");
     }
 
     // Many-to-Many relationship management endpoints for Tools
 
     @PostMapping("/{qualityId}/tools/{toolId}")
+    @PreAuthorize("@auth.allows('measured_quality.update')")
     public ResponseEntity<String> addToolToMeasuredQuality(@PathVariable Long qualityId, @PathVariable Long toolId) {
-        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-        Tool tool = toolRepository.findById(toolId).orElse(null);
-
-        if (measuredQuality == null || tool == null) {
-            return ResponseEntity.badRequest().body("MeasuredQuality or Tool not found");
-        }
+        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", qualityId));
+        Tool tool = toolRepository.findById(toolId)
+            .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", toolId));
 
         measuredQuality.addTool(tool);
         measuredQualitiesRepository.save(measuredQuality);
@@ -100,14 +102,13 @@ public class MeasuredQualitiesController {
     }
 
     @DeleteMapping("/{qualityId}/tools/{toolId}")
+    @PreAuthorize("@auth.allows('measured_quality.update')")
     public ResponseEntity<String> removeToolFromMeasuredQuality(@PathVariable Long qualityId,
             @PathVariable Long toolId) {
-        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-        Tool tool = toolRepository.findById(toolId).orElse(null);
-
-        if (measuredQuality == null || tool == null) {
-            return ResponseEntity.badRequest().body("MeasuredQuality or Tool not found");
-        }
+        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", qualityId));
+        Tool tool = toolRepository.findById(toolId)
+            .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", toolId));
 
         measuredQuality.removeTool(tool);
         measuredQualitiesRepository.save(measuredQuality);
@@ -116,13 +117,41 @@ public class MeasuredQualitiesController {
     }
 
     @GetMapping("/{qualityId}/tools")
+    @PreAuthorize("@auth.allows('measured_quality.read')")
     public ResponseEntity<Set<Tool>> getMeasuredQualityTools(@PathVariable Long qualityId) {
-        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-
-        if (measuredQuality == null) {
-            return ResponseEntity.notFound().build();
-        }
-
+        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", qualityId));
         return ResponseEntity.ok(measuredQuality.getTools());
+    }
+
+    @GetMapping("/deleted")
+    @PreAuthorize("@auth.allows('measured_quality.read')")
+    public List<MeasuredQualities> getDeletedMeasuredQualities() {
+        return measuredQualitiesRepository.findByIsDeletedTrue();
+    }
+
+    @PutMapping("/restore/{id}")
+    @PreAuthorize("@auth.allows('measured_quality.update')")
+    public ResponseEntity<String> restoreMeasuredQualities(@PathVariable Long id) {
+        MeasuredQualities mq = measuredQualitiesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", id));
+        mq.setIsDeleted(false);
+        measuredQualitiesRepository.save(mq);
+        return ResponseEntity.ok("Restored successfully.");
+    }
+
+    @DeleteMapping("/permanent-delete/{id}")
+    @PreAuthorize("@auth.allows('measured_quality.delete')")
+    public ResponseEntity<String> permanentDeleteMeasuredQualities(@PathVariable Long id) {
+        MeasuredQualities mq = measuredQualitiesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", id));
+        if (mq.getQualityTypes() != null) {
+            for (var type : mq.getQualityTypes()) {
+                type.setMeasuredQuality(null);
+            }
+            mq.getQualityTypes().clear();
+        }
+        measuredQualitiesRepository.deleteById(id);
+        return ResponseEntity.ok("Permanently deleted.");
     }
 }

@@ -1,12 +1,13 @@
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { ReadMeasuredQualitiesData } from "../../MeasuredQualities/API/Measured_Qualities_APIs";
 import { AssignMeasuredQualityTypeToQuality, DeleteMeasuredQualityTypesData, RemoveMeasuredQualityTypeFromQuality } from "../API/Measured_Quality_Types_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const MeasuredQualityTypesTable = (props: {
   data: any;
@@ -34,19 +35,14 @@ const MeasuredQualityTypesTable = (props: {
     const loadExistingSelections = async () => {
       const newSelections: { [key: number]: any } = {};
 
-      // Debug: Log the actual data structure
-      console.log('MeasuredQualityTypes data:', props.data);
-
       for (const type of props.data) {
         // Extract the linked measured quality ID from the measuredQuality object
         let linkedId = '';
         if (type.measuredQuality && typeof type.measuredQuality === 'object') {
-          console.log('Found measuredQuality for type:', type.measuredQualityTypeId, type.measuredQuality);
           // Try both camelCase (from Jackson serialization) and snake_case
           linkedId = type.measuredQuality.measuredQualityId ||
                      type.measuredQuality.measured_quality_id || '';
         }
-        console.log(`Type ${type.measuredQualityTypeId} -> Quality ${linkedId}`);
         newSelections[type.measuredQualityTypeId] = linkedId;
       }
       setSelectedQualityByType(newSelections);
@@ -61,17 +57,15 @@ const MeasuredQualityTypesTable = (props: {
       if (qualityId) {
         // Assign the type to a quality
         await AssignMeasuredQualityTypeToQuality(typeId, qualityId);
-        console.log(`Assigned type ${typeId} to quality ${qualityId}`);
       } else {
         // Remove the type from quality (set foreign key to null)
         await RemoveMeasuredQualityTypeFromQuality(typeId);
-        console.log(`Removed type ${typeId} from its assigned quality`);
       }
 
       setSelectedQualityByType(prev => ({ ...prev, [typeId]: qualityId }));
 
     } catch (error) {
-      alert('Failed to update quality assignment. Please try again.');
+      showErrorToast('Failed to update quality assignment. Please try again.');
       // Revert the change
       setSelectedQualityByType(prev => ({ ...prev, [typeId]: selectedQualityByType[typeId] }));
     }
@@ -152,7 +146,7 @@ const MeasuredQualityTypesTable = (props: {
             }}
             className="btn btn-icon btn-primary btn-sm me-3"
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
           <button
             onClick={async () => {
@@ -162,7 +156,7 @@ const MeasuredQualityTypesTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete measured quality type. Please try again.");
+                showErrorToast("Failed to delete measured quality type. Please try again.");
               } finally {
                 props.setLoading(false);
               }

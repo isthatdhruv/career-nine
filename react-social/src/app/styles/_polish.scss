@@ -1,0 +1,584 @@
+// App-wide visual polish — palette, depth, typography, interactions.
+// Loaded after Metronic via app/styles/index.scss.
+// Surgical overrides only: colors, borders, shadows, transitions — no layout changes.
+
+// ============================================================
+// Palette tokens
+// ============================================================
+$c-slate-900: #0f172a;
+$c-slate-800: #1e293b;
+$c-slate-700: #334155;
+$c-slate-600: #475569;
+$c-slate-500: #64748b;
+$c-slate-400: #94a3b8;
+$c-slate-300: #cbd5e1;
+$c-slate-200: #e2e8f0;
+$c-slate-100: #f1f5f9;
+$c-slate-50:  #f8fafc;
+
+$c-rose-600:  #e11d48;
+$c-rose-500:  #f43f5e;
+$c-rose-400:  #fb7185;
+$c-rose-100:  #ffe4e6;
+$c-rose-50:   #fff1f2;
+
+$c-emerald-500: #10b981;
+$c-emerald-50:  #ecfdf5;
+$c-amber-500:   #f59e0b;
+$c-amber-50:    #fffbeb;
+
+$border-soft:   rgba(15, 23, 42, 0.06);
+$border-strong: rgba(15, 23, 42, 0.1);
+$shadow-sm:     0 1px 2px rgba(15,23,42,0.04);
+$shadow-md:     0 4px 12px -4px rgba(15,23,42,0.08), 0 2px 4px -2px rgba(15,23,42,0.04);
+$shadow-lg:     0 10px 30px -12px rgba(15,23,42,0.14), 0 4px 8px -2px rgba(15,23,42,0.06);
+
+$ease:        cubic-bezier(0.16, 1, 0.3, 1);
+$font-stack:  'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+// ============================================================
+// Body
+// ============================================================
+body {
+  font-family: $font-stack !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
+}
+
+// ============================================================
+// Cards
+// ============================================================
+.card {
+  border-radius: 14px !important;
+  border: 1px solid $border-soft !important;
+  box-shadow: $shadow-sm !important;
+  transition: box-shadow 220ms $ease, border-color 220ms $ease, transform 220ms $ease !important;
+
+  &.shadow-sm {
+    box-shadow: $shadow-sm !important;
+  }
+
+  // Hoverable cards (opt-in via .card-hover)
+  &.card-hover:hover {
+    border-color: $border-strong !important;
+    box-shadow: $shadow-md !important;
+    transform: translateY(-2px);
+  }
+}
+
+.card-header {
+  padding: 18px 22px !important;
+  border-bottom: 1px solid $border-soft !important;
+  min-height: 0 !important;
+
+  .card-title {
+    font-weight: 600 !important;
+    letter-spacing: -0.01em !important;
+    color: $c-slate-900 !important;
+    font-size: 15px !important;
+  }
+
+  .card-subtitle,
+  .card-label {
+    font-size: 12px !important;
+    color: $c-slate-500 !important;
+    font-weight: 500 !important;
+  }
+}
+
+.card-body {
+  padding: 22px !important;
+}
+
+.card-footer {
+  padding: 16px 22px !important;
+  border-top: 1px solid $border-soft !important;
+  background: transparent !important;
+}
+
+// ============================================================
+// Buttons
+// ============================================================
+.btn {
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.005em !important;
+  transition: all 180ms $ease !important;
+  padding: 9px 16px;
+  line-height: 1.25;
+
+  &.btn-sm {
+    border-radius: 8px !important;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  &.btn-lg {
+    border-radius: 12px !important;
+    padding: 12px 22px;
+    font-size: 15px;
+  }
+
+  // Preserve Metronic button hover (which scales/shadows), just smooth
+  &:active:not(:disabled):not(.disabled) {
+    transform: translateY(1px);
+  }
+
+  &:hover:not(:disabled):not(.disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+// Primary (Metronic default is indigo — keep but soften shadow)
+.btn-primary {
+  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.15) !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28) !important;
+  }
+}
+
+// Slate button — new primary-alternative, matches dashboard ethos
+.btn-dark {
+  background: $c-slate-900 !important;
+  color: #fff !important;
+  border-color: $c-slate-900 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18) !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    background: $c-slate-800 !important;
+    border-color: $c-slate-800 !important;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.24) !important;
+  }
+}
+
+// Secondary — light ghost
+.btn-secondary,
+.btn-light {
+  background: #ffffff !important;
+  color: $c-slate-700 !important;
+  border: 1px solid $border-soft !important;
+  box-shadow: $shadow-sm !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    background: $c-slate-50 !important;
+    border-color: $border-strong !important;
+    color: $c-slate-900 !important;
+  }
+}
+
+// Danger — rose instead of bright red
+.btn-danger {
+  background: $c-rose-500 !important;
+  border-color: $c-rose-500 !important;
+  box-shadow: 0 1px 2px rgba(244, 63, 94, 0.2) !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    background: $c-rose-600 !important;
+    border-color: $c-rose-600 !important;
+    box-shadow: 0 6px 16px rgba(244, 63, 94, 0.32) !important;
+  }
+}
+
+// Success — emerald
+.btn-success {
+  background: $c-emerald-500 !important;
+  border-color: $c-emerald-500 !important;
+  box-shadow: 0 1px 2px rgba(16, 185, 129, 0.18) !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.28) !important;
+  }
+}
+
+// Light variants (outline-ish)
+.btn-light-primary {
+  background: rgba(79, 70, 229, 0.08) !important;
+  color: #4f46e5 !important;
+  border-color: transparent !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    background: rgba(79, 70, 229, 0.14) !important;
+  }
+}
+
+.btn-light-danger {
+  background: rgba(244, 63, 94, 0.08) !important;
+  color: $c-rose-500 !important;
+  border-color: transparent !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    background: rgba(244, 63, 94, 0.14) !important;
+    color: $c-rose-600 !important;
+  }
+}
+
+.btn-light-success {
+  background: rgba(16, 185, 129, 0.08) !important;
+  color: $c-emerald-500 !important;
+  border-color: transparent !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    background: rgba(16, 185, 129, 0.14) !important;
+  }
+}
+
+.btn-light-warning {
+  background: rgba(245, 158, 11, 0.08) !important;
+  color: $c-amber-500 !important;
+  border-color: transparent !important;
+
+  &:hover:not(:disabled):not(.disabled) {
+    background: rgba(245, 158, 11, 0.14) !important;
+  }
+}
+
+// Icon buttons — square, subtle
+.btn-icon {
+  border-radius: 10px !important;
+
+  &.btn-sm {
+    border-radius: 8px !important;
+  }
+}
+
+// ============================================================
+// Forms
+// ============================================================
+.form-control,
+.form-select {
+  border-radius: 10px !important;
+  border: 1px solid $border-soft !important;
+  background: #ffffff !important;
+  color: $c-slate-900 !important;
+  padding: 10px 14px !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease !important;
+
+  &::placeholder {
+    color: $c-slate-400 !important;
+    font-weight: 500;
+  }
+
+  &:hover {
+    border-color: $border-strong !important;
+  }
+
+  &:focus {
+    border-color: $c-rose-500 !important;
+    box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12) !important;
+    outline: none !important;
+  }
+
+  &:disabled,
+  &[readonly] {
+    background: $c-slate-50 !important;
+    color: $c-slate-500 !important;
+  }
+}
+
+.form-control-solid {
+  background: $c-slate-50 !important;
+
+  &:focus {
+    background: #ffffff !important;
+  }
+}
+
+.form-label {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: $c-slate-700 !important;
+  letter-spacing: 0.01em;
+  margin-bottom: 6px !important;
+}
+
+.form-check-input {
+  border-radius: 6px !important;
+  border-color: $c-slate-300 !important;
+
+  &:checked {
+    background-color: $c-rose-500 !important;
+    border-color: $c-rose-500 !important;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12) !important;
+  }
+
+  &[type="radio"] {
+    border-radius: 50% !important;
+  }
+}
+
+// ============================================================
+// Tables
+// ============================================================
+.table {
+  --bs-table-hover-bg: #{$c-slate-50};
+  color: $c-slate-900;
+  font-size: 13.5px;
+
+  thead {
+    th {
+      font-size: 10.5px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.08em !important;
+      text-transform: uppercase !important;
+      color: $c-slate-500 !important;
+      background: #ffffff !important;
+      border-bottom: 1px solid $border-soft !important;
+      padding: 14px 16px !important;
+      white-space: nowrap;
+    }
+  }
+
+  tbody {
+    td {
+      padding: 14px 16px !important;
+      vertical-align: middle;
+      border-bottom: 1px solid $border-soft !important;
+      font-weight: 500;
+    }
+
+    tr:last-child td {
+      border-bottom: 0 !important;
+    }
+
+    tr {
+      transition: background 150ms ease;
+
+      &:hover td {
+        background: $c-slate-50 !important;
+      }
+    }
+  }
+}
+
+// Metronic data tables wrapper
+.table.table-row-bordered tbody tr {
+  border-bottom: 1px solid $border-soft;
+}
+
+// ============================================================
+// Badges / tags
+// ============================================================
+.badge {
+  border-radius: 100px !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.02em;
+  padding: 4px 10px !important;
+}
+
+.badge-light-primary { background: rgba(79, 70, 229, 0.1) !important; color: #4f46e5 !important; }
+.badge-light-success { background: $c-emerald-50 !important; color: $c-emerald-500 !important; }
+.badge-light-danger  { background: $c-rose-50 !important; color: $c-rose-500 !important; }
+.badge-light-warning { background: $c-amber-50 !important; color: $c-amber-500 !important; }
+.badge-light-info    { background: $c-slate-100 !important; color: $c-slate-600 !important; }
+
+// ============================================================
+// Modals
+// ============================================================
+.modal-content {
+  border-radius: 16px !important;
+  border: 1px solid $border-soft !important;
+  box-shadow: $shadow-lg !important;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 20px 24px !important;
+  border-bottom: 1px solid $border-soft !important;
+
+  .modal-title {
+    font-weight: 600 !important;
+    letter-spacing: -0.01em;
+    color: $c-slate-900 !important;
+  }
+}
+
+.modal-body {
+  padding: 24px !important;
+}
+
+.modal-footer {
+  padding: 16px 24px !important;
+  border-top: 1px solid $border-soft !important;
+  gap: 8px;
+}
+
+// ============================================================
+// Tabs & pills
+// ============================================================
+.nav-tabs {
+  border-bottom: 1px solid $border-soft !important;
+  gap: 4px;
+
+  .nav-link {
+    border: 0 !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 10px 14px !important;
+    font-size: 13px;
+    font-weight: 500;
+    color: $c-slate-500 !important;
+    transition: all 180ms ease !important;
+    position: relative;
+
+    &:hover {
+      color: $c-slate-900 !important;
+      background: $c-slate-50 !important;
+    }
+
+    &.active {
+      color: $c-slate-900 !important;
+      background: transparent !important;
+      font-weight: 600;
+
+      &::after {
+        content: '';
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: -1px;
+        height: 2px;
+        background: $c-rose-500;
+        border-radius: 2px;
+      }
+    }
+  }
+}
+
+.nav-pills {
+  gap: 4px;
+
+  .nav-link {
+    border-radius: 8px !important;
+    padding: 8px 14px !important;
+    font-weight: 500;
+    color: $c-slate-600 !important;
+    transition: all 180ms ease !important;
+
+    &:hover {
+      background: $c-slate-100 !important;
+      color: $c-slate-900 !important;
+    }
+
+    &.active {
+      background: $c-slate-900 !important;
+      color: #ffffff !important;
+    }
+  }
+}
+
+// ============================================================
+// Pagination
+// ============================================================
+.pagination {
+  gap: 4px;
+
+  .page-link {
+    border-radius: 8px !important;
+    border: 1px solid $border-soft !important;
+    color: $c-slate-700 !important;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 12px !important;
+    min-width: 36px;
+    text-align: center;
+    transition: all 180ms ease !important;
+
+    &:hover {
+      background: $c-slate-50 !important;
+      border-color: $border-strong !important;
+      color: $c-slate-900 !important;
+    }
+  }
+
+  .page-item.active .page-link {
+    background: $c-slate-900 !important;
+    border-color: $c-slate-900 !important;
+    color: #ffffff !important;
+  }
+
+  .page-item.disabled .page-link {
+    opacity: 0.4;
+  }
+}
+
+// ============================================================
+// Alerts
+// ============================================================
+.alert {
+  border-radius: 12px !important;
+  border-width: 1px !important;
+  padding: 14px 18px !important;
+  font-weight: 500;
+}
+.alert-primary { background: rgba(79, 70, 229, 0.08) !important; border-color: rgba(79, 70, 229, 0.15) !important; color: #4f46e5 !important; }
+.alert-success { background: $c-emerald-50 !important; border-color: rgba(16, 185, 129, 0.2) !important; color: #047857 !important; }
+.alert-warning { background: $c-amber-50 !important; border-color: rgba(245, 158, 11, 0.2) !important; color: #b45309 !important; }
+.alert-danger  { background: $c-rose-50 !important; border-color: rgba(244, 63, 94, 0.2) !important; color: $c-rose-600 !important; }
+
+// ============================================================
+// Page titles & breadcrumbs
+// ============================================================
+.page-title {
+  .page-heading {
+    font-size: 22px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+    color: $c-slate-900 !important;
+  }
+}
+
+.breadcrumb .breadcrumb-item {
+  font-size: 12.5px;
+  color: $c-slate-500 !important;
+
+  &.active {
+    color: $c-slate-900 !important;
+    font-weight: 500;
+  }
+}
+
+// ============================================================
+// Separators
+// ============================================================
+.separator {
+  border-bottom-color: $border-soft !important;
+}
+
+// ============================================================
+// Dropdown menus
+// ============================================================
+.dropdown-menu {
+  border-radius: 12px !important;
+  border: 1px solid $border-soft !important;
+  box-shadow: $shadow-lg !important;
+  padding: 6px !important;
+}
+
+.dropdown-item {
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  font-size: 13px;
+  font-weight: 500;
+  color: $c-slate-700 !important;
+  transition: background 150ms ease;
+
+  &:hover,
+  &:focus {
+    background: $c-slate-50 !important;
+    color: $c-slate-900 !important;
+  }
+
+  &.active,
+  &:active {
+    background: $c-slate-900 !important;
+    color: #ffffff !important;
+  }
+}

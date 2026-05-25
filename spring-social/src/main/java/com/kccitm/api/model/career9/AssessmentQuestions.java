@@ -20,7 +20,8 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 @Entity
 @Table(name = "assessment_questions",
        indexes = {
-           @Index(name = "idx_question_deleted", columnList = "is_deleted")
+           @Index(name = "idx_question_deleted", columnList = "is_deleted"),
+           @Index(name = "idx_question_section", columnList = "section_id")
        })
 public class AssessmentQuestions implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -44,6 +45,27 @@ public class AssessmentQuestions implements Serializable {
 
     @Column(name = "max_options_allowed")
     private int maxOptionsAllowed;
+
+    // New rule-based selection model. The admin chooses one of:
+    //   "min"   — student must select AT LEAST optionsCount options
+    //   "max"   — student must select AT MOST optionsCount options
+    //   "equal" — student must select EXACTLY optionsCount options
+    // For backward compatibility, legacy rows have optionsRule = null and the
+    // student portal falls back to the "equal maxOptionsAllowed" behavior.
+    @Column(name = "options_rule", length = 16)
+    private String optionsRule;
+
+    @Column(name = "options_count")
+    private Integer optionsCount;
+
+    @Column(name = "question_media_type")
+    private String questionMediaType;
+
+    @Column(name = "question_image_url", length = 1024)
+    private String questionImageUrl;
+
+    @Column(name = "question_video_url", length = 1024)
+    private String questionVideoUrl;
 
     // 1 Question to Many Options
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -181,5 +203,45 @@ public class AssessmentQuestions implements Serializable {
 
     public void setIsMQTtyped(Boolean isMQTtyped) {
         this.isMQTtyped = isMQTtyped;
+    }
+
+    public String getQuestionMediaType() {
+        return questionMediaType;
+    }
+
+    public void setQuestionMediaType(String questionMediaType) {
+        this.questionMediaType = questionMediaType;
+    }
+
+    public String getQuestionImageUrl() {
+        return questionImageUrl;
+    }
+
+    public void setQuestionImageUrl(String questionImageUrl) {
+        this.questionImageUrl = questionImageUrl;
+    }
+
+    public String getQuestionVideoUrl() {
+        return questionVideoUrl;
+    }
+
+    public void setQuestionVideoUrl(String questionVideoUrl) {
+        this.questionVideoUrl = questionVideoUrl;
+    }
+
+    public String getOptionsRule() {
+        return optionsRule;
+    }
+
+    public void setOptionsRule(String optionsRule) {
+        this.optionsRule = optionsRule;
+    }
+
+    public Integer getOptionsCount() {
+        return optionsCount;
+    }
+
+    public void setOptionsCount(Integer optionsCount) {
+        this.optionsCount = optionsCount;
     }
 }

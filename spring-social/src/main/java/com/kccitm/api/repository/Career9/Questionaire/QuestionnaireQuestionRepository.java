@@ -26,4 +26,20 @@ public interface QuestionnaireQuestionRepository extends JpaRepository<Questionn
            "LEFT JOIN FETCH q.options o " +
            "WHERE qq.questionnaireQuestionId IN :ids")
     List<QuestionnaireQuestion> findAllByIdIn(@Param("ids") List<Long> ids);
+
+    List<QuestionnaireQuestion> findByQuestion_QuestionId(Long questionId);
+
+    @Query("SELECT COUNT(qq) FROM QuestionnaireQuestion qq " +
+           "JOIN qq.section s " +
+           "WHERE s.questionnaire.questionnaireId = :questionnaireId")
+    Long countByQuestionnaireId(@Param("questionnaireId") Long questionnaireId);
+
+    @Query("SELECT qq FROM QuestionnaireQuestion qq " +
+           "JOIN FETCH qq.question q " +
+           "JOIN FETCH qq.section s " +
+           "WHERE q.questionId = :questionId " +
+           "AND s.questionnaire.questionnaireId = :questionnaireId")
+    List<QuestionnaireQuestion> findByQuestionIdAndQuestionnaireId(
+            @Param("questionId") Long questionId,
+            @Param("questionnaireId") Long questionnaireId);
 }

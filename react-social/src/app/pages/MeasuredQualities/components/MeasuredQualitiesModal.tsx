@@ -20,7 +20,6 @@ const MeasuredQualityModal = (props: {
   data: any
 }) => {
   const [loading, setLoading] = useState(false);
-    console.log("Modal Data", props.data);
   var initialValues: any = {
    
   };

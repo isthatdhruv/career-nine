@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
 import { getAssessmentIdNameMap, addStudentInfo, StudentInfo } from "./StudentInfo_APIs";
 import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
@@ -8,9 +9,17 @@ interface CreateStudentModalProps {
   show: boolean;
   onHide: () => void;
   onSave?: (data: any) => void;
+  /**
+   * Optional institute override. When omitted the modal falls back to the
+   * `instituteId` stored in localStorage (legacy StudentsList behaviour).
+   * Passed from contexts where the user picks an institute in-page (e.g.,
+   * the bulk-upload page) so the modal scopes its session/class/section
+   * cascade to the right school.
+   */
+  instituteId?: number | string;
 }
 
-const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, onSave }) => {
+const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, onSave, instituteId }) => {
   const [formData, setFormData] = useState({
     name: "",
     schoolRollNumber: "",
@@ -18,7 +27,9 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
     phoneNumber: "",
     dob: "",
     selectedAssessmentId: "",
+    careerNineRollNumber: "",
   });
+  const [autoGenerateRoll, setAutoGenerateRoll] = useState(true);
 
   const [assessmentOptions, setAssessmentOptions] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,17 +41,21 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState("");
 
+  const effectiveInstituteId = useMemo(
+    () => (instituteId != null && instituteId !== "" ? String(instituteId) : localStorage.getItem('instituteId')),
+    [instituteId]
+  );
+
   useEffect(() => {
     if (show) {
       setLoading(true);
-      const instituteId = localStorage.getItem('instituteId');
 
       const promises: Promise<any>[] = [
         getAssessmentIdNameMap(),
       ];
 
-      if (instituteId) {
-        promises.push(GetSessionsByInstituteCode(instituteId));
+      if (effectiveInstituteId) {
+        promises.push(GetSessionsByInstituteCode(effectiveInstituteId));
       }
 
       Promise.all(promises)
@@ -58,7 +73,7 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
         .catch((err) => console.error("Failed to load data", err))
         .finally(() => setLoading(false));
     }
-  }, [show]);
+  }, [show, effectiveInstituteId]);
 
   const classes = useMemo(() => {
     if (!selectedSessionId) return [];
@@ -87,14 +102,16 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
   const handleSubmit = async () => {
     // Basic validation
     if (!formData.name || !formData.dob || !formData.selectedAssessmentId || !selectedSectionId) {
-      alert("Please fill in all required fields (Name, DOB, Assessment, Section)");
+      showErrorToast("Please fill in all required fields (Name, DOB, Assessment, Section)");
+      return;
+    }
+    if (!autoGenerateRoll && !formData.careerNineRollNumber.trim()) {
+      showErrorToast("Please enter a roll number or switch to auto-generate");
       return;
     }
 
     setSubmitting(true);
     try {
-        const instituteId = localStorage.getItem('instituteId');
-
         const payload: StudentInfo = {
             name: formData.name,
             schoolRollNumber: formData.schoolRollNumber || "",
@@ -103,27 +120,23 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
             email: "",
             address: "",
             studentDob: formatDateForBackend(formData.dob),
-            instituteId: instituteId ? Number(instituteId) : undefined,
+            instituteId: effectiveInstituteId ? Number(effectiveInstituteId) : undefined,
             assesment_id: formData.selectedAssessmentId,
             schoolSectionId: Number(selectedSectionId),
+            careerNineRollNumber: autoGenerateRoll ? "" : formData.careerNineRollNumber,
         };
-
-        console.log("Submitting Payload:", payload);
 
         await addStudentInfo(payload);
 
-        alert("Student added successfully!");
+        showSuccessToast("Student added successfully!");
 
         if (onSave) {
             onSave(payload);
-        } else {
-             // force refresh or just close
-             window.location.reload();
         }
         onHide();
     } catch (error) {
       console.error("Error creating student:", error);
-      alert("Failed to create student");
+      showErrorToast("Failed to create student");
     } finally {
       setSubmitting(false);
     }
@@ -154,13 +167,47 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label>Roll Number</Form.Label>
+              <Form.Label>Career-Nine Roll Number <span className="text-danger">*</span></Form.Label>
+              <div className="d-flex align-items-center gap-2 mb-2">
+                <Form.Check
+                  type="switch"
+                  id="auto-generate-roll"
+                  label="Auto-generate"
+                  checked={autoGenerateRoll}
+                  onChange={(e) => {
+                    setAutoGenerateRoll(e.target.checked);
+                    if (e.target.checked) {
+                      setFormData((prev) => ({ ...prev, careerNineRollNumber: "" }));
+                    }
+                  }}
+                />
+              </div>
+              {autoGenerateRoll ? (
+                <Form.Control
+                  type="text"
+                  disabled
+                  placeholder="Will be auto-generated from section (e.g., A001)"
+                  className="bg-light"
+                />
+              ) : (
+                <Form.Control
+                  type="text"
+                  name="careerNineRollNumber"
+                  value={formData.careerNineRollNumber}
+                  onChange={handleChange}
+                  placeholder="Enter roll number manually"
+                />
+              )}
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>School Roll Number</Form.Label>
               <Form.Control
                 type="text"
                 name="schoolRollNumber"
                 value={formData.schoolRollNumber}
                 onChange={handleChange}
-                placeholder="Enter roll number"
+                placeholder="Enter school roll number (optional)"
               />
             </Form.Group>
 

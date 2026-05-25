@@ -21,8 +21,13 @@ type Props = {
   onHide: () => void;
 };
 
+const MAX_LOGO_SIZE = 1 * 1024 * 1024; // 1 MB
+
 const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
   const [loading, setLoading] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
   const initialValues = {
     instituteName: "",
@@ -33,6 +38,36 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
     display: 1,
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setLogoError(null);
+    if (file && file.size > MAX_LOGO_SIZE) {
+      setLogoError("Logo must be under 1 MB");
+      setLogoFile(null);
+      setLogoPreview(null);
+      e.target.value = "";
+      return;
+    }
+    setLogoFile(file);
+    if (file) {
+      setLogoPreview(URL.createObjectURL(file));
+    } else {
+      setLogoPreview(null);
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(",")[1]); // strip "data:...;base64,"
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const formik = useFormik({
     enableReinitialize: true,
     initialValues,
@@ -40,18 +75,19 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
     onSubmit: async (values, { resetForm }) => {
       setLoading(true);
       try {
-        // await the promise so we can catch failures
-        await UpdateCollegeData(values);
+        let payload: any = { ...values };
+        if (logoFile) {
+          payload.schoolLogo = await fileToBase64(logoFile);
+        }
+        await UpdateCollegeData(payload);
 
-        // call parent handlers consistently
         onHide();
-        setPageLoading(["true"]); // if parent expects this format, fine — otherwise adjust
+        setPageLoading(["true"]);
         resetForm();
+        setLogoFile(null);
+        setLogoPreview(null);
       } catch (error) {
         console.error("Failed to update college:", error);
-        // show user-friendly notification here if you have one
-        // for now we'll redirect as you did previously (optional)
-        // window.location.replace("/error");
       } finally {
         setLoading(false);
       }
@@ -192,7 +228,34 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
                   </div>
                 )}
               </div>
-              
+
+              {/* School Logo */}
+              <div className="fv-row mb-7">
+                <label className="fs-6 fw-bold mb-2">School Logo :</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="form-control form-control-lg form-control-solid"
+                />
+                {logoError && (
+                  <div className="fv-plugins-message-container">
+                    <div className="fv-help-block text-danger">
+                      <span role="alert">{logoError}</span>
+                    </div>
+                  </div>
+                )}
+                {logoPreview && (
+                  <div className="mt-3 text-center">
+                    <img
+                      src={logoPreview}
+                      alt="Logo preview"
+                      style={{ maxWidth: "120px", maxHeight: "120px", objectFit: "contain", borderRadius: "8px", border: "1px solid #e4e6ef" }}
+                    />
+                  </div>
+                )}
+              </div>
+
             </div>
           </div>
         </Modal.Body>

@@ -2,87 +2,99 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { LayoutSplashScreen } from "../../_metronic/layout/core";
-import { AuthModel, setAuth, useAuth } from "../modules/auth";
+import { useAuth } from "../modules/auth";
+import {
+  exchangeOAuthToken,
+  getCurrentUser,
+} from "../modules/auth/core/_requests";
 
-import { getUserByToken } from "../modules/auth/core/_requests";
-// import  {} from 'universal-cookie';
 export const ACCESS_TOKEN = "accessToken";
 
+/**
+ * Phase 16-04: OAuth-callback landing page.
+ *
+ * The Spring OAuth2 success handler (left untouched in Phase 16) redirects the browser to
+ *     /oauth2/redirect?token=<jwt>
+ * after a successful Google / GitHub / Facebook login. This component:
+ *
+ *   1. Extracts ?token=... from the URL.
+ *   2. POSTs it to /auth/oauth-exchange so the server can re-issue it as the standard
+ *      HttpOnly cn_at + non-HttpOnly cn_csrf cookies.
+ *   3. Strips the token from the address bar via window.history.replaceState — so a
+ *      refresh, bookmark or shoulder-surfer can't recover it.
+ *   4. Bootstraps the user (cookie auto-attached by axios withCredentials).
+ *   5. Navigates to /dashboard on success, or /auth on any failure.
+ *
+ * No localStorage writes. No setAuth({api_token: ...}) — that legacy path is gone.
+ */
 const AuthRedirectPage: React.FC = () => {
-
-  function getUrlParameter(name: any) {
-    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
-
-    var results = regex.exec(window.location.href);
-    return results === null
-      ? ""
-      : decodeURIComponent(results[1].replace(/\+/g, " "));
-  }
-
-  const [token, setToken] = useState("");
+  const { setCurrentUser } = useAuth();
   const didRequest = useRef(false);
   const [showSplashScreen, setShowSplashScreen] = useState(true);
-  const [redirect, setRedirect] = useState(false);
-  const { logout, setCurrentUser } = useAuth();
-  useEffect(() => {
-    setToken(getUrlParameter("token"));
-    var auth: AuthModel = {
-      api_token: token,
-      refreshToken: "",
-      authorityUrls: [""],
-    };
-    setAuth(auth);
-    const requestUser = async (apiToken: string) => {
-      try {
-        if (!didRequest.current) {
-          const { data } = await getUserByToken(apiToken);
+  const [destination, setDestination] = useState<"/dashboard" | "/auth" | null>(
+    null
+  );
 
-          if (data) {
-            auth.authorityUrls = data.authorityUrls;
-            setAuth(auth);
-            setCurrentUser(data);
-          }
+  useEffect(() => {
+    if (didRequest.current) return;
+    didRequest.current = true;
+
+    const run = async () => {
+      try {
+        // 1. Extract ?token=... from the URL.
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("token");
+
+        if (!token) {
+          setDestination("/auth");
+          return;
         }
-      } catch (error) {
-        console.error(error);
-        if (!didRequest.current) {
-          logout();
+
+        // 2. Exchange URL token for cookies (cn_at + cn_csrf).
+        await exchangeOAuthToken(token);
+
+        // 3. Strip token from URL ASAP so a refresh, back button, or
+        //    bookmark cannot leak it. replaceState (not pushState) so the
+        //    back button doesn't return to the token-bearing URL.
+        try {
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname
+          );
+        } catch {
+          // Older browsers — best-effort. Cookie is already set, so the
+          // residual URL token is no longer needed.
         }
+
+        // 4. Bootstrap user (cn_at cookie auto-attached via withCredentials).
+        const { data: user } = await getCurrentUser();
+        if (user) {
+          setCurrentUser(user);
+        }
+
+        setDestination("/dashboard");
+      } catch (err) {
+        // Any failure — missing token, 401 from /auth/oauth-exchange, 401 from
+        // /auth/me — bounces the user to the login page. The axios response
+        // interceptor already surfaces the toast on 401.
+        setDestination("/auth");
       } finally {
         setShowSplashScreen(false);
       }
-
-      return () => (didRequest.current = true);
     };
 
-    if (auth && auth.api_token) {
-      setShowSplashScreen(true);
-      requestUser(auth.api_token).then((response) => {
-        setRedirect(true);
-      });
-    } else {
-      // logout()
-      setShowSplashScreen(false);
-    }
-  }, [token]);
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return (
-    <>
-      {redirect ? (
-        <>
-          <Navigate to="/dashboard" />
-        </>
-      ) : (
-        <p>
-          <LayoutSplashScreen />
-        </p>
-      )}
-    </>
-    // <>{token}</>
-    // <>{error ? <Navigate to="/dashboard" /> : <p>Anshita will be Waiting</p>}</>
-    //<>
-  );
+  if (showSplashScreen) {
+    return <LayoutSplashScreen />;
+  }
+  if (destination) {
+    return <Navigate to={destination} />;
+  }
+  return <LayoutSplashScreen />;
 };
 
 export { AuthRedirectPage };

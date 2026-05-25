@@ -2,8 +2,8 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useState } from "react";
 import { Button, Form } from "react-bootstrap-v5";
-import { AiFillDelete, AiOutlineCheck } from "react-icons/ai";
 import * as Yup from "yup";
+import { ActionIcon } from "../../components/ActionIcon";
 // import { deleteTopicData, upsertTopicData } from "./components/core/Topic_APIs";
 
 type Topic = {
@@ -129,7 +129,7 @@ const TopicTable = (props: { data: Topic }) => {
                   disabled={formik.isSubmitting || !formik.isValid}
                   className="btn btn-icon btn-dark  btn-active-color-primary btn-sm me-1"
                 >
-                  <AiOutlineCheck />
+                  <ActionIcon type="approve" size="sm" />
                 </Button>
                 <Button
                   type="button"
@@ -142,7 +142,7 @@ const TopicTable = (props: { data: Topic }) => {
                   }}
                   className="btn btn-icon btn-danger  btn-active-color-primary btn-sm"
                 >
-                  <AiFillDelete />
+                  <ActionIcon type="delete" size="sm" />
                 </Button>
               </div>
             </div>

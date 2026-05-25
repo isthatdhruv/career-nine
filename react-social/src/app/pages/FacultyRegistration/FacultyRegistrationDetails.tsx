@@ -199,8 +199,7 @@ export default function Basic() {
                 sendFacultyIdEmail(
                   data.collegeIdentificationNumber,
                   officialEmailAddressValue
-                ).then((data) => {
-                  console.log(data);
+                ).then(() => {
                   setMailButtonLoading(false);
                   setOfficialEmailAddressValue("");
                 });

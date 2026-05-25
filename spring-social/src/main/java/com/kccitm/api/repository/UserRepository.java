@@ -19,6 +19,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     User findByEmail(String email);
 
+    User findByEmailAndProvider(String email, AuthProvider provider);
+
     // Optional<User> findByT(String email);
     Boolean existsByEmail(String email);
 
@@ -44,4 +46,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
         @Param("sectionId") Integer sectionId);
 
     Optional<User> findByCareerNineRollNumber(String careerNineRollNumber);
+
+    long countByIsSuperAdminTrue();
+
+    @Query(value = "SELECT u.career_nine_rollnumber FROM student_user u " +
+           "JOIN student_info si ON si.user_id = u.id " +
+           "WHERE si.institute_id = :instituteId AND si.student_class = :studentClass " +
+           "AND si.school_section_id = :sectionId " +
+           "AND u.career_nine_rollnumber IS NOT NULL", nativeQuery = true)
+    List<String> findRollNumbersByClassAndSection(
+        @Param("instituteId") Integer instituteId,
+        @Param("studentClass") Integer studentClass,
+        @Param("sectionId") Integer sectionId);
 }
