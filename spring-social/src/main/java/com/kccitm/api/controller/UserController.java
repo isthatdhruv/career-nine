@@ -118,7 +118,7 @@ public class UserController {
     @Autowired
     private com.kccitm.api.service.StudentSessionService studentSessionService;
 
-    @PreAuthorize("@auth.allows('user.me')")
+    // @PreAuthorize-Exempt: student login by username+DOB — anonymous-by-design, mirrors /auth/login.
     @PostMapping(value = "user/auth", headers = "Accept=application/json")
     public HashMap<String, Object> checkUser(@RequestBody User currentUser) {
         if (userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).isPresent()) {
@@ -139,7 +139,7 @@ public class UserController {
      * Student auth for dashboard: authenticates with username + DOB and returns
      * full dashboard data (profile + assessment scores) in a single response.
      */
-    @PreAuthorize("@auth.allows('user.me')")
+    // @PreAuthorize-Exempt: student dashboard login by username+DOB — anonymous-by-design, mirrors /auth/login.
     @PostMapping(value = "user/student-auth", headers = "Accept=application/json")
     public ResponseEntity<?> studentDashboardAuth(@RequestBody User currentUser) {
         Optional<User> userOpt = userRepository.findByUsernameAndDobDate(

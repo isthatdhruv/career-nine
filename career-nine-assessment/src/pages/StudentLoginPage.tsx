@@ -124,6 +124,9 @@ const StudentLoginPage: React.FC = () => {
         localStorage.clear();
         localStorage.setItem('userStudentId', data.userStudentId);
         localStorage.setItem('allottedAssessments', JSON.stringify(data.assessments));
+        // Stored so /auth/assessment-session can verify identity later
+        // without re-prompting the student (Phase 1 / HIGH-1 DOB requirement).
+        localStorage.setItem('studentDob', dob);
         navigate('/allotted-assessment');
       } catch (error: any) {
         if (error.response) {
