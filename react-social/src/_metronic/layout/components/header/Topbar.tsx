@@ -1,8 +1,12 @@
 import clsx from "clsx";
-import { FC } from "react";
+import { FC, useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../../app/modules/auth";
 import { KTSVG, toAbsoluteUrl } from "../../../helpers";
-import { HeaderUserMenu, ThemeModeSwitcher } from "../../../partials";
+import {
+  GlobalStudentSearchModal,
+  HeaderUserMenu,
+  ThemeModeSwitcher,
+} from "../../../partials";
 import { useLayout } from "../../core";
 
 const toolbarButtonMarginClass = "ms-1 ms-lg-3",
@@ -13,9 +17,50 @@ const toolbarButtonMarginClass = "ms-1 ms-lg-3",
 const Topbar: FC = () => {
   const { currentUser } = useAuth();
   const { config } = useLayout();
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+
+  // Cmd/Ctrl + K is the universal "open search" shortcut (Spotlight uses
+  // Cmd+Space, but that conflicts with macOS itself in a browser). Bound at
+  // the window level so it works regardless of which input has focus.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setSearchOpen((s) => !s);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="d-flex align-items-stretch flex-shrink-0">
-      {/* Search */}
+      {/* Global student search trigger */}
+      <div
+        className={clsx("d-flex align-items-center", toolbarButtonMarginClass)}
+      >
+        <div
+          className={clsx(
+            "btn btn-icon btn-active-light-primary btn-custom",
+            toolbarButtonHeightClass
+          )}
+          onClick={openSearch}
+          title="Search students (⌘K / Ctrl+K)"
+          role="button"
+          aria-label="Open global student search"
+        >
+          <KTSVG
+            path="/media/icons/duotune/general/gen021.svg"
+            className={toolbarButtonIconSizeClass}
+          />
+        </div>
+      </div>
+      <GlobalStudentSearchModal show={searchOpen} handleClose={closeSearch} />
+      {/* Legacy demo Search placeholder retained as reference */}
       {/* <div className={clsx('d-flex align-items-stretch', toolbarButtonMarginClass)}>
         <Search />
       </div> */}
