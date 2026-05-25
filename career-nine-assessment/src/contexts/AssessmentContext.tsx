@@ -267,7 +267,17 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const mintPromise = (async () => {
       try {
-        await http.post('/auth/assessment-session', { userStudentId, assessmentId });
+        const dob = localStorage.getItem('studentDob');
+        if (!dob) {
+          // No DOB cached (e.g. tab opened after a stale-storage flush) — the
+          // backend's @NotNull dob field would 400 the request. Fall back to
+          // the legacy header path; the student keeps working without being
+          // bounced to login.
+          setCookieAuthRuntimeActive(false);
+          setCookieAuthActive(false);
+          return false;
+        }
+        await http.post('/auth/assessment-session', { userStudentId, assessmentId, dob });
         mintedPairRef.current = pairKey;
         setCookieAuthRuntimeActive(true);
         setCookieAuthActive(true);

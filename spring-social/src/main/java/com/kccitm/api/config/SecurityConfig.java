@@ -110,6 +110,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/auth/logout",
             "/auth/oauth-exchange",
             "/auth/refresh",
+            // Student username+DOB login endpoints — anonymous-by-design; previously 401'd
+            // when callers carried an expired cn_at cookie because TokenAuthenticationFilter
+            // silently fails to set auth on expired tokens and the @PreAuthorize gate then
+            // tripped via RestAuthenticationEntryPoint. Listing them here makes the filter
+            // chain treat them as permitAll regardless of cookie state.
+            "/user/auth",
+            "/user/student-auth",
             // Phase 19: assessment-session minting is the SPA's first call; no prior cn_csrf.
             "/auth/assessment-session",
             "/oauth2/**",
