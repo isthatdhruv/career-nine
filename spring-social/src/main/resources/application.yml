@@ -210,7 +210,7 @@ spring:
       - optional:file:../.env.dev[.properties]
   datasource:
     url: jdbc:mysql://localhost:3308/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
-    username: root
+    username: user
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
       # Dev sizing: a single dev machine with one running JVM rarely needs >10
