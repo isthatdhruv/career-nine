@@ -97,31 +97,79 @@ export default function AllottedAssessmentPage() {
     }
   };
 
-  const handleDevAutoFill = (assessment: Assessment) => {
+  const handleDevAutoFill = async (assessment: Assessment) => {
     if (assessment.studentStatus === 'completed' || !assessment.isActive) return;
 
-    const raw = sessionStorage.getItem('assessmentData');
-    if (!raw) {
-      alert('Start the assessment first, then use this button to fill dummy answers.');
-      return;
-    }
-    const parsed = JSON.parse(raw);
-    const questionnaire = Array.isArray(parsed) ? parsed[0] : parsed;
-    if (!questionnaire?.sections?.length) {
-      alert('No sections found in assessment data.');
+    const userStudentId = localStorage.getItem('userStudentId');
+    if (!userStudentId) {
+      alert('Session expired. Please login again.');
+      navigate('/student-login');
       return;
     }
 
-    const { answers, rankingAnswers, textAnswers } = generateRandomAnswers(questionnaire);
+    setLoadingId(assessment.assessmentId);
+    try {
+      // Same setup as handleStartAssessment so the section page can render
+      // the questionnaire and the eventual submit is accepted server-side.
+      localStorage.setItem('assessmentId', String(assessment.assessmentId));
 
-    localStorage.setItem('assessmentAnswers', JSON.stringify(answers));
-    localStorage.setItem('assessmentRankingAnswers', JSON.stringify(rankingAnswers));
-    localStorage.setItem('assessmentTextAnswers', JSON.stringify(textAnswers));
-    localStorage.setItem('assessmentSavedForLater', JSON.stringify({}));
-    localStorage.setItem('assessmentSkipped', JSON.stringify({}));
+      // Drop stale per-section UI state from any prior run so the autofilled
+      // questionnaire starts from a clean slate.
+      localStorage.removeItem('assessmentSavedForLater');
+      localStorage.removeItem('assessmentSkipped');
+      localStorage.removeItem('assessmentElapsedTime');
+      localStorage.removeItem('assessmentCompletedGames');
 
-    const firstSectionId = questionnaire.sections[0].section.sectionId;
-    navigate(`/studentAssessment/sections/${firstSectionId}/questions/0`);
+      await mintAssessmentSessionCookie(
+        Number(userStudentId),
+        Number(assessment.assessmentId),
+      );
+
+      await fetchAssessmentData(String(assessment.assessmentId));
+      const raw = sessionStorage.getItem('assessmentData');
+      if (!raw) {
+        alert('Failed to load assessment data.');
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const questionnaire = Array.isArray(parsed) ? parsed[0] : parsed;
+      if (!questionnaire?.sections?.length) {
+        alert('No sections found in assessment data.');
+        return;
+      }
+
+      // Create the backend StudentAssessmentMapping so save-partial (fired on
+      // section transitions) and the final submit are accepted.
+      await http.post('/assessments/startAssessment', {
+        userStudentId: Number(userStudentId),
+        assessmentId: Number(assessment.assessmentId),
+      });
+
+      // Pre-mark every section as "instructions seen" so the section-intro
+      // modal doesn't interrupt the autofilled run on each section.
+      const allSectionIds = questionnaire.sections.map(
+        (s: any) => s.section.sectionId,
+      );
+      localStorage.setItem(
+        'assessmentSeenSectionInstructions',
+        JSON.stringify(allSectionIds),
+      );
+
+      // Random answers honour per-question min/max and ranking rules.
+      // Passed via route state — SectionQuestionPage seeds React state from
+      // devPrefill and SKIPS the Redis partial-restore for this navigation.
+      const devPrefill = generateRandomAnswers(questionnaire);
+
+      const firstSectionId = questionnaire.sections[0].section.sectionId;
+      navigate(`/studentAssessment/sections/${firstSectionId}/questions/0`, {
+        state: { devPrefill },
+      });
+    } catch (error) {
+      console.error('Dev auto-fill failed:', error);
+      alert('Auto-fill failed. Check the console for details.');
+    } finally {
+      setLoadingId(null);
+    }
   };
 
   const getStatusColor = (status: string | null, isActive: boolean) => {

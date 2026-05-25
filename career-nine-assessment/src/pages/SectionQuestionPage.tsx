@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
 import { usePreventReload } from "../hooks/usePreventReload";
 import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
@@ -79,6 +79,7 @@ type QuestionnaireLanguage = {
 const SectionQuestionPage: React.FC = () => {
   const { sectionId, questionIndex } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { assessmentData, assessmentConfig } = useAssessment();
   const showTimer = assessmentConfig?.showTimer !== false;
   const saveLater = assessmentConfig?.saveLater !== false;
@@ -366,6 +367,24 @@ const SectionQuestionPage: React.FC = () => {
     if (didRestoreRef.current) return;
     if (!questionnaire?.sections) return;
 
+    // Dev-only autofill bypass: AllottedAssessmentPage hands a fully random
+    // answer set via route state. Seed React state from it and skip the
+    // Redis partial-restore so dev runs never read prior real progress.
+    const devPrefill = (location.state as any)?.devPrefill as
+      | {
+          answers: Record<string, Record<number, number[]>>;
+          rankingAnswers: Record<string, Record<number, Record<number, number>>>;
+          textAnswers: Record<string, Record<number, Record<number, string>>>;
+        }
+      | undefined;
+    if (devPrefill) {
+      didRestoreRef.current = true;
+      setAnswers(devPrefill.answers || {});
+      setRankingAnswers(devPrefill.rankingAnswers || {});
+      setTextAnswers(devPrefill.textAnswers || {});
+      return;
+    }
+
     const sidRaw = localStorage.getItem("userStudentId");
     const aidRaw = localStorage.getItem("assessmentId");
     if (!sidRaw || !aidRaw) return;
@@ -425,7 +444,7 @@ const SectionQuestionPage: React.FC = () => {
       setRankingAnswers(hydratedRanking);
       setTextAnswers(hydratedText);
     });
-  }, [questionnaire]);
+  }, [questionnaire, location.state]);
 
   useEffect(() => {
     scheduleWrite(

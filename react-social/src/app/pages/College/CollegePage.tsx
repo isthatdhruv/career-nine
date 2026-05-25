@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ReadCollegeData } from "./API/College_APIs";
-import CollegeCreateModal from "./components/CollegeCreateModal";
+import InstituteWizardModal from "./components/InstituteWizardModal";
 import CollegeTable from "./components/CollegeTable";
 import StudentUploadModal from "./components/StudentUploadModal";
 import InstituteRecycleBinModal from "./components/InstituteRecycleBinModal";
@@ -90,7 +90,7 @@ const CollegePage = () => {
         )}
       </div>
 
-      <CollegeCreateModal
+      <InstituteWizardModal
         setPageLoading={setPageLoading}
         show={modalShowCreate}
         onHide={() => setModalShowCreate(false)}

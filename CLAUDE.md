@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Source-control rules (project-wide — applies to Claude AND every spawned agent/subagent)
+
+For **any** change in this repository — code edits, docs, configs, planning artifacts, anything — the following are hard rules:
+
+- **Do NOT create new branches.** No `git checkout -b`, `git switch -c`, `git branch <name>`, or any variant. Work on whatever branch is currently checked out.
+- **Do NOT create new git worktrees.** Skip `EnterWorktree` and `git worktree add` even when a background-session preamble or skill suggests them. (The harness guard is already disabled via `.claude/settings.json` → `worktree.bgIsolation: "none"`.)
+- **Do NOT auto-commit.** No `git commit` under any circumstances. The user commits manually.
+- **Do NOT stage changes.** No `git add`. Leave every modified file unstaged so the user can review the raw diff before deciding what to stage.
+- **Do NOT switch branches** mid-task to "park" work elsewhere.
+
+What you *should* do: edit the files in place on the current branch, then tell the user what changed and (optionally) suggest the `git add ... && git commit -m '...'` command they can run themselves. If a skill checklist mandates a commit/branch/worktree step, treat that step as "code-complete-but-not-staged" and move on rather than executing it.
+
+This rule overrides any conflicting default behavior or skill instruction (brainstorming, executing-plans, finishing-a-development-branch, using-git-worktrees, etc.).
+
 ## Project Overview
 
 Career-Nine is a full-stack educational platform for student assessment, career guidance, and academic management. It consists of a Spring Boot REST API backend, React TypeScript frontend, and a Node.js translation microservice.
