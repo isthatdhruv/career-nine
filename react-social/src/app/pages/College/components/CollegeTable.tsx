@@ -271,12 +271,12 @@ const CollegeTable = (props: {
                 the Actions dropdown for this row. */}
             {dashboardOpenFor === String(data.instituteCode || data.id || "") && (
               <>
-                {/* Institute Dashboard -> InstituteDashboard.tsx */}
+                {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx */}
                 <button
                   type="button"
                   onClick={() =>
                     navigate(
-                      `/school/principal/dashboard/${data.instituteCode || data.id}`
+                      `/dashboard/school/${data.instituteCode || data.id}`
                     )
                   }
                   className="btn btn-sm btn-info ms-2 d-inline-flex align-items-center gap-1"
@@ -286,12 +286,12 @@ const CollegeTable = (props: {
                   Dashboard 1
                 </button>
 
-                {/* School Dashboard -> SchoolDashboardPage.tsx */}
+                {/* Dashboard 2 -> Dashboards/SchoolNavigatorDashboardPage.tsx */}
                 <button
                   type="button"
                   onClick={() =>
                     navigate(
-                      `/dashboard/school/${data.instituteCode || data.id}`
+                      `/dashboard/school-navigator/${data.instituteCode || data.id}`
                     )
                   }
                   className="btn btn-sm btn-warning ms-2 d-inline-flex align-items-center gap-1"

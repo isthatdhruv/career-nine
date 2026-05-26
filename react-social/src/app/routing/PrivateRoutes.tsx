@@ -40,7 +40,8 @@ import UserRegistration from "../pages/Users/components/UserRegistration";
 import ListCreatePage from "../pages/List/components/ListCreatePage";
 import ListEditPage from "../pages/List/components/ListEditPage";
 import ListPage from "../pages/List/CreateList";
-import { SchoolDashboardPage } from "../pages/dashboard/SchoolDashboardPage";
+import SchoolDashboardPage from "../pages/Dashboards/SchoolDashboardPage";
+import SchoolNavigatorDashboardPage from "../pages/Dashboards/SchoolNavigatorDashboardPage";
 // import QuestionaireList from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import StudentsList from "../pages/StudentInformation/StudentsList";
@@ -329,6 +330,13 @@ const PrivateRoutes = () => {
           <RequirePermission perm="institute.read">
             <SuspensedView>
               <SchoolDashboardPage />
+            </SuspensedView>
+          </RequirePermission>
+        } />
+        <Route path="/dashboard/school-navigator/:id" element={
+          <RequirePermission perm="institute.read">
+            <SuspensedView>
+              <SchoolNavigatorDashboardPage />
             </SuspensedView>
           </RequirePermission>
         } />
