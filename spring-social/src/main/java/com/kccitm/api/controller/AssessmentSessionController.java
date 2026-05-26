@@ -121,8 +121,12 @@ public class AssessmentSessionController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unknown student");
         }
         UserStudent student = studentOpt.get();
+        // Global override: skips both the per-institute and B2C gate checks below.
+        // Used by the dev profile so local testing isn't blocked on a DB flag flip.
+        boolean forceEnabled = Boolean.parseBoolean(
+                env.getProperty("app.auth.assessmentCookieAuthForceEnabled", "false"));
         InstituteDetail institute = student.getInstitute();
-        if (institute != null) {
+        if (!forceEnabled && institute != null) {
             // B2B path: institute must have the flag flipped TRUE.
             Optional<InstituteDetail> instOpt = instituteRepo.findById(institute.getInstituteCode());
             boolean enabled = instOpt.isPresent()
@@ -133,7 +137,7 @@ public class AssessmentSessionController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body("assessment_cookie_auth_not_enabled");
             }
-        } else {
+        } else if (!forceEnabled) {
             // B2C path (no institute) — gated by a single global env property
             // so product can flip B2C separately once per-institute rollout has
             // been validated. Default FALSE keeps B2C on the legacy header path.

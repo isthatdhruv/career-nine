@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkdemo1=self.webpackChunkdemo1||[]).push([[8112],{88112:(e,t,r)=>{r.r(t),r.d(t,{default:()=>c});r(72791);var l=r(80184);const c=()=>(0,l.jsx)("div",{style:{width:"100%",height:"calc(100vh - 100px)"},children:(0,l.jsx)("iframe",{src:"https://project-mlxjt.vercel.app/",title:"Student Portal",style:{width:"100%",height:"100%",border:"none"},allow:"clipboard-read; clipboard-write; fullscreen; camera; microphone"})})}}]);
+//# sourceMappingURL=8112.96df47a9.chunk.js.map

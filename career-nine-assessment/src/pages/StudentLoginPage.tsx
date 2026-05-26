@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePreventReload } from '../hooks/usePreventReload';
-import http from '../api/http';
+import http, { resetAuthState } from '../api/http';
 import { useAssessment } from '../contexts/AssessmentContext';
 
 const StudentLoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { prefetchAssessmentData } = useAssessment();
+  const { prefetchAssessmentData, resetAssessmentAuthState } = useAssessment();
   const [userId, setUserId] = useState('');
   const [dobDay, setDobDay] = useState('');
   const [dobMonth, setDobMonth] = useState('');
@@ -33,7 +33,13 @@ const StudentLoginPage: React.FC = () => {
       localStorage.clear();
     }
     sessionStorage.clear();
-  }, []);
+    // Reset auth carriers so a prior student's tab state does not bleed into
+    // the new session: in-memory http flag + JS-readable cn_csrf cookie locally,
+    // and HttpOnly cn_at_asmnt cookie server-side via best-effort logout.
+    resetAuthState();
+    resetAssessmentAuthState();
+    http.post('/auth/logout').catch(() => {});
+  }, [resetAssessmentAuthState]);
   const [errors, setErrors] = useState({ userId: '', dob: '' });
   const [touched, setTouched] = useState({ userId: false, dob: false });
 
@@ -122,6 +128,11 @@ const StudentLoginPage: React.FC = () => {
           return;
         }
         localStorage.clear();
+        // Reset auth carriers a second time at submit — covers the case where the
+        // student typed credentials between mount and submit (mint runs later on
+        // Start click; the prior session's cookies must not survive into that mint).
+        resetAuthState();
+        resetAssessmentAuthState();
         localStorage.setItem('userStudentId', data.userStudentId);
         localStorage.setItem('allottedAssessments', JSON.stringify(data.assessments));
         // Stored so /auth/assessment-session can verify identity later

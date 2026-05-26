@@ -519,7 +519,22 @@ public enum PermissionCode {
      * <p>Required for: {@code PUT /role/{id}/urls}.
      * <br>FE: 🌐 icon on each Role row in RolesPanel ("Manage URL access").
      */
-    ROLE_URL_UPDATE ("role.url.update", "Manage which React URLs a role grants access to");
+    ROLE_URL_UPDATE ("role.url.update", "Manage which React URLs a role grants access to"),
+
+    /**
+     * Reminder Management — central admin page for scheduled reminders
+     * (B2C invite nudges, counselling 24h/1h, assessment-mapping). Seeded by
+     * V20260525002__reminder_permissions.sql. Each code maps 1:1 to a
+     * controller {@code @PreAuthorize("@auth.allows('...')")} guard.
+     */
+    REMINDERS_VIEW                ("reminders.view",                "Open the Reminder Management page"),
+    REMINDERS_CONFIG_READ         ("reminders.config.read",         "Read reminder system configuration"),
+    REMINDERS_CONFIG_EDIT         ("reminders.config.edit",         "Edit reminder enable/cron/lead-time/cap"),
+    REMINDERS_TEMPLATE_EDIT       ("reminders.template.edit",       "Edit reminder subject/body templates"),
+    REMINDERS_LOGS_VIEW           ("reminders.logs.view",           "View reminder delivery logs and analytics"),
+    REMINDERS_SUPPRESSIONS_MANAGE ("reminders.suppressions.manage", "Manage per-student reminder opt-outs"),
+    REMINDERS_SEND_MANUAL         ("reminders.send.manual",         "Trigger a manual reminder send"),
+    REMINDERS_SEND_TEST           ("reminders.send.test",           "Send a test reminder from the template editor");
 
     private final String code;
     private final String description;

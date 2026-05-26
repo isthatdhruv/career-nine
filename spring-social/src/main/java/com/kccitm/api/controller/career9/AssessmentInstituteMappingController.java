@@ -17,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentInstituteMapping;
+import com.kccitm.api.model.career9.AssessmentMappingTier;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.PromoCode;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
@@ -36,6 +38,7 @@ import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.model.career9.school.SchoolSections;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.PromoCodeRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
@@ -48,6 +51,7 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.career9.AssessmentMappingTierService;
 import com.kccitm.api.service.StudentProvisioningService;
 
 @RestController
@@ -106,6 +110,12 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private PromoCodeRepository promoCodeRepository;
+
+    @Autowired
+    private AssessmentMappingTierRepository tierRepository;
+
+    @Autowired
+    private AssessmentMappingTierService tierService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
     private String callbackBaseUrl;
@@ -183,6 +193,82 @@ public class AssessmentInstituteMappingController {
         return ResponseEntity.ok("Mapping deleted successfully");
     }
 
+    // ----- Pricing tiers (unprotected, matching sibling mapping admin endpoints) -----
+
+    @GetMapping("/{mappingId}/tiers")
+    public ResponseEntity<?> listTiers(@PathVariable Long mappingId) {
+        if (!mappingRepository.existsById(mappingId)) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(tierRepository.findByMappingIdOrderBySortOrderAsc(mappingId));
+    }
+
+    @PostMapping("/{mappingId}/tiers")
+    public ResponseEntity<?> createTier(@PathVariable Long mappingId,
+            @RequestBody AssessmentMappingTier tier) {
+        if (!mappingRepository.existsById(mappingId)) {
+            return ResponseEntity.notFound().build();
+        }
+        if (tier.getName() == null || tier.getName().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Tier name is required");
+        }
+        if (tier.getSortOrder() == null) {
+            return ResponseEntity.badRequest().body("Sort order is required");
+        }
+        tier.setMappingId(mappingId);
+        tier.setCurrentCount(0);
+        return ResponseEntity.ok(tierRepository.save(tier));
+    }
+
+    @PutMapping("/tiers/{tierId}")
+    public ResponseEntity<?> updateTier(@PathVariable Long tierId,
+            @RequestBody AssessmentMappingTier updated) {
+        Optional<AssessmentMappingTier> existingOpt = tierRepository.findById(tierId);
+        if (!existingOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentMappingTier existing = existingOpt.get();
+        if (updated.getName() != null) existing.setName(updated.getName());
+        if (updated.getAmount() != null) existing.setAmount(updated.getAmount());
+        if (updated.getSortOrder() != null) existing.setSortOrder(updated.getSortOrder());
+        // maxRegistrations is nullable-meaningful: always copy it through
+        existing.setMaxRegistrations(updated.getMaxRegistrations());
+        if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
+        return ResponseEntity.ok(tierRepository.save(existing));
+    }
+
+    @PatchMapping("/tiers/{tierId}/toggle")
+    public ResponseEntity<?> toggleTier(@PathVariable Long tierId) {
+        Optional<AssessmentMappingTier> existingOpt = tierRepository.findById(tierId);
+        if (!existingOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentMappingTier existing = existingOpt.get();
+        existing.setIsActive(!Boolean.TRUE.equals(existing.getIsActive()));
+        return ResponseEntity.ok(tierRepository.save(existing));
+    }
+
+    @DeleteMapping("/tiers/{tierId}")
+    public ResponseEntity<?> deleteTier(@PathVariable Long tierId) {
+        if (!tierRepository.existsById(tierId)) {
+            return ResponseEntity.notFound().build();
+        }
+        tierRepository.deleteById(tierId);
+        return ResponseEntity.ok("Tier deleted successfully");
+    }
+
+    @PostMapping("/tiers/{tierId}/recount")
+    public ResponseEntity<?> recountTier(@PathVariable Long tierId) {
+        if (!tierRepository.existsById(tierId)) {
+            return ResponseEntity.notFound().build();
+        }
+        int newCount = tierService.recountTier(tierId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("tierId", tierId);
+        response.put("currentCount", newCount);
+        return ResponseEntity.ok(response);
+    }
+
     // ============ PUBLIC ENDPOINTS ============
 
     // Phase 2 (Task 2.1 / HIGH-B): anonymous token-gated public mapping lookup. @PreAuthorize
@@ -200,7 +286,25 @@ public class AssessmentInstituteMappingController {
         Map<String, Object> info = new HashMap<>();
         info.put("mappingLevel", mapping.getMappingLevel());
         info.put("assessmentId", mapping.getAssessmentId());
-        info.put("amount", mapping.getAmount() != null ? mapping.getAmount() : 0);
+
+        // Tier-aware pricing: resolve the live tier; fall back to mapping.amount
+        // when no tiers are configured (backward compatible).
+        List<AssessmentMappingTier> tiers =
+                tierRepository.findByMappingIdOrderBySortOrderAsc(mapping.getMappingId());
+        if (tiers.isEmpty()) {
+            info.put("amount", mapping.getAmount() != null ? mapping.getAmount() : 0);
+            info.put("registrationClosed", false);
+        } else {
+            AssessmentMappingTier active = tierService.resolveActiveTier(tiers);
+            if (active == null) {
+                info.put("amount", 0);
+                info.put("registrationClosed", true);
+            } else {
+                info.put("amount", active.getAmount() != null ? active.getAmount() : 0);
+                info.put("activeTierName", active.getName());
+                info.put("registrationClosed", false);
+            }
+        }
 
         // Get assessment name
         assessmentTableRepository.findById(mapping.getAssessmentId()).ifPresent(assessment -> {
@@ -316,8 +420,22 @@ public class AssessmentInstituteMappingController {
             }
         }
 
-        // 4. Check if payment is required
-        Long mappingAmount = mapping.getAmount(); // amount in rupees
+        // 4. Resolve the active pricing tier (falls back to mapping.amount when
+        //    no tiers configured). amount in rupees.
+        List<AssessmentMappingTier> tiers =
+                tierRepository.findByMappingIdOrderBySortOrderAsc(mapping.getMappingId());
+        Long mappingAmount;
+        Long activeTierId = null;
+        if (tiers.isEmpty()) {
+            mappingAmount = mapping.getAmount();
+        } else {
+            AssessmentMappingTier active = tierService.resolveActiveTier(tiers);
+            if (active == null) {
+                return ResponseEntity.badRequest().body("Registrations are closed for this link");
+            }
+            mappingAmount = active.getAmount();
+            activeTierId = active.getTierId();
+        }
         boolean paymentRequired = mappingAmount != null && mappingAmount > 0;
 
         // 5. Handle promo code if provided
@@ -363,9 +481,9 @@ public class AssessmentInstituteMappingController {
             if (paymentRequired && finalAmount > 0) {
                 return handleExistingStudentWithPayment(existing, assessmentId, instituteCode,
                         mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                        name, email, dob, phone);
+                        name, email, dob, phone, activeTierId);
             }
-            return handleExistingStudent(existing, assessmentId, instituteCode);
+            return handleExistingStudent(existing, assessmentId, instituteCode, activeTierId);
         }
 
         // 7. Duplicate check by DOB + institute + class + name
@@ -376,9 +494,9 @@ public class AssessmentInstituteMappingController {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
                             mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                            name, email, dob, phone);
+                            name, email, dob, phone, activeTierId);
                 }
-                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode);
+                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId);
             }
         }
 
@@ -386,18 +504,25 @@ public class AssessmentInstituteMappingController {
         if (paymentRequired && finalAmount > 0) {
             return createPaymentAndRedirect(mapping.getMappingId(), assessmentId, instituteCode,
                     finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                    name, email, dob, dobStr, phone, gender);
+                    name, email, dob, dobStr, phone, gender, activeTierId);
         }
 
-        // 9. Free registration (no amount, or 100% promo discount) — create student directly
-        // If 100% promo was used, record a zero-amount transaction
-        if (paymentRequired && finalAmount != null && finalAmount == 0 && promoCodeStr != null) {
+        // 9. Free registration (no amount, or 100% promo discount) — create student directly.
+        // Record a zero-amount paid transaction stamped with the tier so recount has a
+        // single source, and increment the tier tally (no-op when no tier).
+        if (activeTierId != null) {
+            tierRepository.tryIncrementCount(activeTierId);
+        }
+        if (!tiers.isEmpty() || (paymentRequired && finalAmount != null && finalAmount == 0 && promoCodeStr != null)) {
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mapping.getMappingId());
+            txn.setMappingTierId(activeTierId);
             txn.setAmount(0L);
             txn.setOriginalAmount(originalAmount);
-            txn.setPromoCode(promoCodeStr.trim().toUpperCase());
-            txn.setPromoDiscountPercent(promoDiscountPercent);
+            if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
+                txn.setPromoCode(promoCodeStr.trim().toUpperCase());
+                txn.setPromoDiscountPercent(promoDiscountPercent);
+            }
             txn.setStatus("paid");
             txn.setAssessmentId(assessmentId);
             txn.setInstituteCode(instituteCode);
@@ -467,7 +592,7 @@ public class AssessmentInstituteMappingController {
      */
     private ResponseEntity<?> createPaymentAndRedirect(Long mappingId, Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
-            String name, String email, Date dob, String dobStr, String phone, String gender) {
+            String name, String email, Date dob, String dobStr, String phone, String gender, Long mappingTierId) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
@@ -501,6 +626,7 @@ public class AssessmentInstituteMappingController {
             txn.setPaymentLinkUrl((String) rzpResponse.get("shortUrl"));
             txn.setShortUrl((String) rzpResponse.get("shortUrl"));
             txn.setStatus("created");
+            txn.setMappingTierId(mappingTierId);
 
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
                 txn.setPromoCode(promoCodeStr.trim().toUpperCase());
@@ -529,7 +655,7 @@ public class AssessmentInstituteMappingController {
     private ResponseEntity<?> handleExistingStudentWithPayment(StudentInfo existingStudentInfo, Long assessmentId,
             Integer instituteCode, Long mappingId, Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent,
-            String name, String email, Date dob, String phone) {
+            String name, String email, Date dob, String phone, Long mappingTierId) {
         // Check if already assigned
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (!userStudents.isEmpty()) {
@@ -551,14 +677,14 @@ public class AssessmentInstituteMappingController {
         String dobStr = sdf.format(dob);
         return createPaymentAndRedirect(mappingId, assessmentId, instituteCode,
                 finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent,
-                name, email, dob, dobStr, phone, null);
+                name, email, dob, dobStr, phone, null, mappingTierId);
     }
 
     /**
      * Handle assigning assessment to an existing student.
      */
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode) {
+            Integer instituteCode, Long mappingTierId) {
         // Find UserStudent for this student
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (userStudents.isEmpty()) {
@@ -605,6 +731,21 @@ public class AssessmentInstituteMappingController {
             StudentAssessmentMapping sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
             studentAssessmentMappingRepository.save(sam);
+            // Free tiered completion by an existing student: consume a tier slot and
+            // record a zero-amount paid transaction so recount has a single source.
+            if (mappingTierId != null) {
+                tierRepository.tryIncrementCount(mappingTierId);
+                PaymentTransaction freeTxn = new PaymentTransaction();
+                freeTxn.setMappingTierId(mappingTierId);
+                freeTxn.setAmount(0L);
+                freeTxn.setStatus("paid");
+                freeTxn.setAssessmentId(assessmentId);
+                freeTxn.setInstituteCode(instituteCode);
+                freeTxn.setStudentName(existingStudentInfo.getName());
+                freeTxn.setStudentEmail(existingStudentInfo.getEmail());
+                freeTxn.setStudentDob(existingStudentInfo.getStudentDob());
+                paymentTransactionRepository.save(freeTxn);
+            }
             response.put("status", "success");
             response.put("message", "Assessment assigned successfully. Please use your existing credentials to log in.");
         }

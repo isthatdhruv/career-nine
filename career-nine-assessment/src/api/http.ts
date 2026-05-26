@@ -23,17 +23,15 @@ export const COOKIE_AUTH_FLAG =
   String(import.meta.env.VITE_ASSESSMENT_COOKIE_AUTH || '').toLowerCase() === 'true'
 
 /**
- * Runtime override for the build-time flag. Flipped to `false` by
- * DataContext / login pages when POST /auth/assessment-session returns 404
- * (per-institute flag off for the current student). The request interceptor
- * below reads this flag — when false, it falls back to injecting the v2.0
- * X-Assessment-* headers (header path); when true, the cookie is the source
- * of truth and the legacy headers are NOT injected.
+ * Runtime override for the build-time flag. Flipped to `false` by the mint
+ * helper when POST /auth/assessment-session fails. The cookie is then the
+ * only auth carrier we have — the legacy X-Assessment-Session header fallback
+ * was removed because the SPA never wrote `assessmentSessionToken` anywhere,
+ * making it dead code that produced 401s on every authenticated call.
  *
- * The runtime flag starts mirroring COOKIE_AUTH_FLAG. Mint failure paths
- * (404 from per-institute disabled OR 5xx/network from a transient backend
- * error) flip it to false for the lifetime of the tab; the SPA stays on the
- * legacy path until reload.
+ * Starts mirroring COOKIE_AUTH_FLAG. A successful re-mint flips it back true.
+ * `resetAuthState()` restores it to the build-time default — call on student
+ * login so a prior tab-scoped failure doesn't bleed into the new session.
  */
 let cookieAuthRuntimeActive = COOKIE_AUTH_FLAG
 
@@ -43,6 +41,18 @@ export function setCookieAuthRuntimeActive(active: boolean) {
 
 export function isCookieAuthRuntimeActive(): boolean {
   return cookieAuthRuntimeActive
+}
+
+/**
+ * Reset request-side auth state to its build-time defaults. Used by the
+ * student login page so a fresh login does not inherit a prior tab's
+ * cookieAuthRuntimeActive=false state (set by a transient mint failure) and
+ * does not carry the prior CSRF token. The HttpOnly `cn_at_asmnt` cookie
+ * cannot be cleared from JS — POST /auth/logout handles that server-side.
+ */
+export function resetAuthState() {
+  cookieAuthRuntimeActive = COOKIE_AUTH_FLAG
+  document.cookie = 'cn_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
 }
 
 const http = axios.create({
@@ -63,19 +73,17 @@ const http = axios.create({
 })
 
 /**
- * Request interceptor — feature-flag-gated v2.0 header fallback.
+ * Request interceptor. The cn_at_asmnt HttpOnly cookie is the sole auth
+ * carrier — `withCredentials: true` above sends it on every same-origin XHR.
+ * State-changing methods mirror the JS-readable cn_csrf cookie into the
+ * X-CSRF-Token header so Spring Security's CsrfFilter passes.
  *
- * When cookie auth is active (build flag on AND mint succeeded), we DO NOT
- * inject the legacy headers — the cn_at_asmnt cookie is the source of truth.
- *
- * When cookie auth is inactive (build flag off OR mint returned 404/error),
- * inject `X-Assessment-Session` / `X-Assessment-Student-Id` / `X-Assessment-Id`
- * exactly as the legacy react-social `assessmentApi.ts` did. This preserves
- * the v2.0 backwards-compat path for the one-release window.
+ * The previous v2.0 X-Assessment-* header fallback was removed: the SPA
+ * never wrote `assessmentSessionToken` to sessionStorage, so the fallback
+ * always shipped requests with no session identity and produced 401s on
+ * every authenticated call when the cookie path was inactive.
  */
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  // CSRF double-submit: copy the cn_csrf cookie into the X-CSRF-Token header
-  // on state-changing requests so Spring Security's CsrfFilter passes.
   const method = (config.method || 'get').toUpperCase()
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     const match = document.cookie.match(/(?:^|;\s*)cn_csrf=([^;]*)/)
@@ -83,16 +91,6 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
       ;(config.headers as any)['X-CSRF-Token'] = decodeURIComponent(match[1])
     }
   }
-
-  if (cookieAuthRuntimeActive) {
-    return config
-  }
-  const sessionToken = sessionStorage.getItem('assessmentSessionToken')
-  const userStudentId = localStorage.getItem('userStudentId')
-  const assessmentId = localStorage.getItem('assessmentId')
-  if (sessionToken) (config.headers as any)['X-Assessment-Session'] = sessionToken
-  if (userStudentId) (config.headers as any)['X-Assessment-Student-Id'] = userStudentId
-  if (assessmentId) (config.headers as any)['X-Assessment-Id'] = assessmentId
   return config
 })
 
@@ -161,15 +159,19 @@ http.interceptors.response.use(
 
     // 2) Phase 19 (Plan 19-05): redirect to /permission-denied on 403, and on
     //    401 when cookie auth is active. Guard against window being absent
-    //    (tests / SSR) and skip the redirect when already on the denied page
-    //    OR when the failing request was a public B2C endpoint.
+    //    (tests / SSR) and skip the redirect when already on the denied page,
+    //    when the failing request was a public B2C endpoint, OR when the user
+    //    is on a pre-login page where 401s are expected (e.g. the username-blur
+    //    prefetch on /student-login fires before any cookie has been minted).
     const status = error.response?.status
     if (typeof window !== 'undefined') {
       const path = window.location.pathname
       const isDeniedPage = path.endsWith('/permission-denied')
+      const isPreLoginPage = path === '/' || path === '/student-login'
       const publicCall = isPublicEndpoint(config?.url)
       const shouldRedirect =
         !isDeniedPage &&
+        !isPreLoginPage &&
         !publicCall &&
         (status === 403 || (status === 401 && cookieAuthRuntimeActive))
       if (shouldRedirect) {

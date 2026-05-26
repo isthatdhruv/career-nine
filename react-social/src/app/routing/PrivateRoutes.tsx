@@ -47,6 +47,7 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
+import ReminderManagementPage from "../pages/ReminderManagement/ReminderManagementPage";
 // import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
 import StudentListPage from "../pages/GroupStudent/StudentListPage";
 // GroupStudentAdminPage removed — consolidated into Data Download (/group-student)
@@ -76,10 +77,11 @@ import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
 
-/** Backwards-compat: legacy /student-dashboard/:studentId -> /student/dashboard/view/:studentId */
+
+/** Backwards-compat: legacy /student-dashboard/:studentId -> /dashboard/student/view/:studentId */
 const RedirectStudentDashboard: FC = () => {
   const { studentId } = useParams<{ studentId: string }>();
-  return <Navigate to={`/student/dashboard/view/${studentId ?? ""}`} replace />;
+  return <Navigate to={`/dashboard/student/view/${studentId ?? ""}`} replace />;
 };
 
 // Paths that every logged-in user can access without a per-route permission check.
@@ -303,6 +305,13 @@ const PrivateRoutes = () => {
           <RequirePermission perm="institute.read">
             <SuspensedView>
               <InstituteDashboard />
+            </SuspensedView>
+          </RequirePermission>
+        } />
+        <Route path="/reminders" element={
+          <RequirePermission perm="reminders.view">
+            <SuspensedView>
+              <ReminderManagementPage />
             </SuspensedView>
           </RequirePermission>
         } />

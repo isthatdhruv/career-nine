@@ -45,6 +45,7 @@ import com.kccitm.api.model.career9.SchoolRegistrationLink;
 import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.repository.Career9.SchoolAssessmentConfigRepository;
 import com.kccitm.api.repository.Career9.SchoolRegistrationLinkRepository;
+import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
 import com.kccitm.api.service.b2c.StudentInstituteMembershipService;
 import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.security.AuthCookieService;
@@ -76,6 +77,7 @@ public class PaymentWebhookController {
     @Autowired private SchoolClassesRepository schoolClassesRepository;
     @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
     @Autowired private SchoolRegistrationLinkRepository schoolRegistrationLinkRepository;
+    @Autowired private AssessmentMappingTierRepository assessmentMappingTierRepository;
     @Autowired private StudentInstituteMembershipService membershipService;
     @Autowired private StudentProvisioningService studentProvisioningService;
 
@@ -660,6 +662,7 @@ public class PaymentWebhookController {
             membershipService.setPrimaryInstitute(userStudent, instituteCode, null, "payment-provision");
 
             tryIncrementSchoolLink(txn);
+            tryIncrementMappingTier(txn);
 
             StudentAssessmentMapping sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
@@ -704,6 +707,7 @@ public class PaymentWebhookController {
             newUs = userStudentRepository.save(newUs);
             studentProvisioningService.provision(newUs);
             tryIncrementSchoolLink(txn);
+            tryIncrementMappingTier(txn);
             userStudents = List.of(newUs);
         }
 
@@ -760,6 +764,17 @@ public class PaymentWebhookController {
                 logger.info("School link {} hit cap ({}/{}) via webhook, deactivated", linkId, current, max);
             }
         });
+    }
+
+    private void tryIncrementMappingTier(PaymentTransaction txn) {
+        if (txn == null || txn.getMappingTierId() == null) return;
+        int rows = assessmentMappingTierRepository.tryIncrementCount(txn.getMappingTierId());
+        logger.info("Mapping tier increment (webhook): tierId={}, rowsAffected={}",
+                txn.getMappingTierId(), rows);
+        if (rows == 0) {
+            logger.warn("Cap already hit on AssessmentMappingTier {} when processing paid txn {}; allowing this paid registration through.",
+                    txn.getMappingTierId(), txn.getTransactionId());
+        }
     }
 
     private Integer parseClassNumber(Integer classId) {

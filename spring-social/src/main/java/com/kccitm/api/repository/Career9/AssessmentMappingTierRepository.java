@@ -1,0 +1,26 @@
+package com.kccitm.api.repository.Career9;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.kccitm.api.model.career9.AssessmentMappingTier;
+
+@Repository
+public interface AssessmentMappingTierRepository extends JpaRepository<AssessmentMappingTier, Long> {
+
+    List<AssessmentMappingTier> findByMappingIdOrderBySortOrderAsc(Long mappingId);
+
+    List<AssessmentMappingTier> findByMappingIdAndIsActiveOrderBySortOrderAsc(Long mappingId, Boolean isActive);
+
+    void deleteByMappingId(Long mappingId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE AssessmentMappingTier t SET t.currentCount = COALESCE(t.currentCount, 0) + 1 " +
+           "WHERE t.tierId = :tierId AND (COALESCE(t.maxRegistrations, 0) = 0 OR COALESCE(t.currentCount, 0) < COALESCE(t.maxRegistrations, 0))")
+    int tryIncrementCount(@Param("tierId") Long tierId);
+}

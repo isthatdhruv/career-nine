@@ -209,9 +209,9 @@ spring:
       - optional:file:./.env.dev[.properties]
       - optional:file:../.env.dev[.properties]
   datasource:
-    url: jdbc:mysql://localhost:3308/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
-    username: user
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: jdbc:mysql://localhost:3307/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
+    username: root
+    password: Career-qCsfeuECc3MW
     hikari:
       # Dev sizing: a single dev machine with one running JVM rarely needs >10
       # concurrent JDBC connections, and a high minimum-idle quickly exhausts
@@ -285,6 +285,11 @@ app:
   # XFF would be client-controlled / spoofable, so trust-xff is fail-safe false.
   rate-limit:
     trust-xff: false
+  # Dev-only: bypass the per-institute / B2C cookie-auth gates so local
+  # testing isn't blocked on a DB flag flip. Production profiles leave this
+  # unset (defaults false in the controller).
+  auth:
+    assessmentCookieAuthForceEnabled: true
 
 auth:
   enforce-mode: log-only

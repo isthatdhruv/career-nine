@@ -47,4 +47,11 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     List<PaymentTransaction> findByStudentEmailAndAssessmentId(String studentEmail, Long assessmentId);
 
     List<PaymentTransaction> findByAssessmentIdOrderByCreatedAtDesc(Long assessmentId);
+
+    // Used by the spotlight student dossier endpoint to fold every transaction
+    // a given student has triggered (paid, failed, abandoned) into one
+    // chronologically ordered list.
+    List<PaymentTransaction> findByUserStudentIdOrderByCreatedAtDesc(Long userStudentId);
+
+    long countByMappingTierIdAndStatus(Long mappingTierId, String status);
 }
