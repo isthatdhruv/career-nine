@@ -10,6 +10,7 @@ import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
 import { ReadCollegeData } from "../../../College/API/College_APIs";
 import { ReadQuestionSectionData } from "../../../QuestionSections/API/Question_Section_APIs";
 import { ReadToolData } from "../../../Tool/API/Tool_APIs";
+import { ReadReportTypes, ReadReportSubtypes, ReportTypeDto, ReportSubtypeDto } from "../../../ReportTypes/API/Report_Types_APIs";
 import { ReadQuestionsDataList, ReadQuestionByIdData } from "../../../AssesmentQuestions/API/Question_APIs";
 import { ReadLanguageData } from "../../API/Create_Assessment_APIs";
 
@@ -58,6 +59,8 @@ const QuestionareCreateSinglePage: React.FC = () => {
   const [colleges, setColleges] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [tools, setTools] = useState<any[]>([]);
+  const [reportTypes, setReportTypes] = useState<ReportTypeDto[]>([]);
+  const [reportSubtypes, setReportSubtypes] = useState<ReportSubtypeDto[]>([]);
   const [questions, setQuestions] = useState<any[]>([]); // Lightweight: id + text only
   const [questionsFullData, setQuestionsFullData] = useState<any[]>([]); // Full data for preview
   const [loadingPreviewData, setLoadingPreviewData] = useState(false);
@@ -121,6 +124,8 @@ const QuestionareCreateSinglePage: React.FC = () => {
     isFree: "true",
     questionnaireType: "false", // false = General, true = Bet Assessment
     toolId: "",
+    reportTypeId: "",
+    reportSubtypeId: "",
     languages: ["English"] as string[], // English selected by default
     sectionIds: [] as string[],
     sectionQuestions: preSectionQuestions as { [sectionId: string]: string[] },
@@ -169,6 +174,16 @@ const QuestionareCreateSinglePage: React.FC = () => {
       setSections([]);
     } finally {
       setLoadingStates(prev => ({ ...prev, sections: false }));
+    }
+  };
+
+  const fetchReportRouting = async () => {
+    try {
+      const [t, s] = await Promise.all([ReadReportTypes(), ReadReportSubtypes()]);
+      setReportTypes(t.data || []);
+      setReportSubtypes(s.data || []);
+    } catch (e) {
+      console.error("Failed to fetch report types/subtypes:", e);
     }
   };
 
@@ -234,6 +249,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
         fetchColleges(),
         fetchSections(),
         fetchTools(),
+        fetchReportRouting(),
         fetchQuestions(),
         fetchLanguages(),
       ]);
@@ -394,7 +410,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
       });
 
       // Build the final payload matching the GET JSON format
-      const completePayload = {
+      const completePayload: any = {
         questionnaireId: null, // New questionnaire
         tool: toolPayload,
         languages: languagesPayload,
@@ -405,7 +421,16 @@ const QuestionareCreateSinglePage: React.FC = () => {
         name: values.name || questionareData?.name || '',
         display: null,
         sections: sectionsPayload,
-        createdAt: ""
+        createdAt: "",
+        // Report dispatch FKs — backend resolves the managed entities (see
+        // QuestionnaireController.resolveReportRouting). Both are optional;
+        // ReportService falls back to grade-based inference when null.
+        reportType: values.reportTypeId
+          ? { reportTypeId: Number(values.reportTypeId) }
+          : null,
+        reportSubtype: values.reportSubtypeId
+          ? { reportSubtypeId: Number(values.reportSubtypeId) }
+          : null,
       };
       
       // Clear localStorage
@@ -871,6 +896,70 @@ const QuestionareCreateSinglePage: React.FC = () => {
                             </div>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3b. Report routing (optional) */}
+                  <div className="card mb-6">
+                    <div className="card-header">
+                      <h3 className="card-title mb-0">
+                        <i className="fas fa-file-alt text-primary me-2"></i>
+                        3b. Report Type &amp; Subtype
+                        <small className="text-muted ms-2">(optional — sets which template is rendered)</small>
+                      </h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-6 fv-row mb-7">
+                          <label className="fs-6 fw-bold mb-2">Report Type</label>
+                          <Field
+                            as="select"
+                            name="reportTypeId"
+                            className="form-control form-control-lg form-control-solid"
+                            onChange={(e: any) => {
+                              const v = e.target.value;
+                              setFieldValue("reportTypeId", v);
+                              // Clear subtype if it doesn't belong to the new type
+                              const sub = reportSubtypes.find(
+                                (s) => String(s.reportSubtypeId) === String(values.reportSubtypeId)
+                              );
+                              if (sub && String(sub.reportTypeId) !== String(v)) {
+                                setFieldValue("reportSubtypeId", "");
+                              }
+                            }}
+                          >
+                            <option value="">— None —</option>
+                            {reportTypes.map((rt) => (
+                              <option key={rt.reportTypeId} value={rt.reportTypeId}>
+                                {rt.displayName} ({rt.code})
+                              </option>
+                            ))}
+                          </Field>
+                        </div>
+                        <div className="col-md-6 fv-row mb-7">
+                          <label className="fs-6 fw-bold mb-2">Report Subtype</label>
+                          <Field
+                            as="select"
+                            name="reportSubtypeId"
+                            disabled={!values.reportTypeId}
+                            className="form-control form-control-lg form-control-solid"
+                          >
+                            <option value="">
+                              {values.reportTypeId ? "— None —" : "Select a Type first"}
+                            </option>
+                            {reportSubtypes
+                              .filter((s) => String(s.reportTypeId) === String(values.reportTypeId))
+                              .map((s) => (
+                                <option key={s.reportSubtypeId} value={s.reportSubtypeId}>
+                                  {s.displayName} ({s.code})
+                                </option>
+                              ))}
+                          </Field>
+                        </div>
+                      </div>
+                      <div className="form-text">
+                        Leave both empty to let ReportService fall back to the grade-based dispatcher (deprecation window).
                       </div>
                     </div>
                   </div>

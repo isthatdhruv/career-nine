@@ -10,6 +10,7 @@ import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
 import { ReadCollegeData } from "../../../College/API/College_APIs";
 import { ReadQuestionSectionData } from "../../../QuestionSections/API/Question_Section_APIs";
 import { ReadToolData } from "../../../Tool/API/Tool_APIs";
+import { ReadReportTypes, ReadReportSubtypes } from "../../../ReportTypes/API/Report_Types_APIs";
 import { ReadQuestionsDataList, ReadQuestionByIdData } from "../../../AssesmentQuestions/API/Question_APIs";
 import { ReadLanguageData, ReadQuestionaireById, UpdateQuestionaire } from "../../API/Create_Questionaire_APIs";
 import { CheckLockedByQuestionnaire } from "../../API/Create_Assessment_APIs";
@@ -56,6 +57,8 @@ const QuestionareEditSinglePage: React.FC = () => {
   const [colleges, setColleges] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [tools, setTools] = useState<any[]>([]);
+  const [reportTypes, setReportTypes] = useState<any[]>([]);
+  const [reportSubtypes, setReportSubtypes] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]); // Lightweight: id + text only
   const [questionsFullData, setQuestionsFullData] = useState<any[]>([]); // Full data for preview
   const [loadingPreviewData, setLoadingPreviewData] = useState(false);
@@ -146,6 +149,16 @@ const QuestionareEditSinglePage: React.FC = () => {
     }
   };
 
+  const fetchReportRouting = async () => {
+    try {
+      const [t, s] = await Promise.all([ReadReportTypes(), ReadReportSubtypes()]);
+      setReportTypes(t.data || []);
+      setReportSubtypes(s.data || []);
+    } catch (e) {
+      console.error("Failed to fetch report types/subtypes:", e);
+    }
+  };
+
   const fetchTools = async () => {
     try {
       setLoadingStates(prev => ({ ...prev, tools: true }));
@@ -208,6 +221,7 @@ const QuestionareEditSinglePage: React.FC = () => {
         fetchColleges(),
         fetchSections(),
         fetchTools(),
+        fetchReportRouting(),
         fetchQuestions(),
         fetchLanguages(),
         fetchQuestionnaireData(),
@@ -353,6 +367,8 @@ const QuestionareEditSinglePage: React.FC = () => {
       isFree: questionnaireData.isFree === true || questionnaireData.isFree === "true" ? "true" : "false",
       questionnaireType: questionnaireData.type === true || questionnaireData.type === "true" ? "true" : "false", // false = General, true = Bet Assessment
       toolId: extractedToolId,
+      reportTypeId: String(questionnaireData.reportType?.reportTypeId || ""),
+      reportSubtypeId: String(questionnaireData.reportSubtype?.reportSubtypeId || ""),
       languages: selectedLanguages,
       sectionIds,
       sectionQuestions,
@@ -504,7 +520,7 @@ const QuestionareEditSinglePage: React.FC = () => {
       });
 
       // Build the final payload
-      const completePayload = {
+      const completePayload: any = {
         questionnaireId: questionnaireData?.questionnaireId || Number(id),
         tool: toolPayload,
         languages: languagesPayload,
@@ -515,7 +531,13 @@ const QuestionareEditSinglePage: React.FC = () => {
         name: values.name,
         display: questionnaireData?.display || null,
         sections: sectionsPayload,
-        createdAt: questionnaireData?.createdAt || ""
+        createdAt: questionnaireData?.createdAt || "",
+        reportType: values.reportTypeId
+          ? { reportTypeId: Number(values.reportTypeId) }
+          : null,
+        reportSubtype: values.reportSubtypeId
+          ? { reportSubtypeId: Number(values.reportSubtypeId) }
+          : null,
       };
       
       const response = await UpdateQuestionaire(String(id), completePayload); // change it to complete payload afterwards
@@ -967,6 +989,69 @@ const QuestionareEditSinglePage: React.FC = () => {
                             </div>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3b. Report routing (optional) */}
+                  <div className="card mb-6">
+                    <div className="card-header">
+                      <h3 className="card-title mb-0">
+                        <i className="fas fa-file-alt text-primary me-2"></i>
+                        3b. Report Type &amp; Subtype
+                        <small className="text-muted ms-2">(optional — sets which template is rendered)</small>
+                      </h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-6 fv-row mb-7">
+                          <label className="fs-6 fw-bold mb-2">Report Type</label>
+                          <Field
+                            as="select"
+                            name="reportTypeId"
+                            className="form-control form-control-lg form-control-solid"
+                            onChange={(e: any) => {
+                              const v = e.target.value;
+                              setFieldValue("reportTypeId", v);
+                              const sub = reportSubtypes.find(
+                                (s: any) => String(s.reportSubtypeId) === String(values.reportSubtypeId)
+                              );
+                              if (sub && String(sub.reportTypeId) !== String(v)) {
+                                setFieldValue("reportSubtypeId", "");
+                              }
+                            }}
+                          >
+                            <option value="">— None —</option>
+                            {reportTypes.map((rt: any) => (
+                              <option key={rt.reportTypeId} value={rt.reportTypeId}>
+                                {rt.displayName} ({rt.code})
+                              </option>
+                            ))}
+                          </Field>
+                        </div>
+                        <div className="col-md-6 fv-row mb-7">
+                          <label className="fs-6 fw-bold mb-2">Report Subtype</label>
+                          <Field
+                            as="select"
+                            name="reportSubtypeId"
+                            disabled={!values.reportTypeId}
+                            className="form-control form-control-lg form-control-solid"
+                          >
+                            <option value="">
+                              {values.reportTypeId ? "— None —" : "Select a Type first"}
+                            </option>
+                            {reportSubtypes
+                              .filter((s: any) => String(s.reportTypeId) === String(values.reportTypeId))
+                              .map((s: any) => (
+                                <option key={s.reportSubtypeId} value={s.reportSubtypeId}>
+                                  {s.displayName} ({s.code})
+                                </option>
+                              ))}
+                          </Field>
+                        </div>
+                      </div>
+                      <div className="form-text">
+                        Leave both empty to let ReportService fall back to the grade-based dispatcher.
                       </div>
                     </div>
                   </div>

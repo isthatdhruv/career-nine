@@ -116,20 +116,14 @@ public class ReportPreparationService {
     }
 
     /**
-     * Default routing rule (assessment-type-based — student grade only picks
-     * the variant inside the pager path, not the report family):
-     *   • Admin explicit override (assessment.reportType column) — wins.
-     *   • Assessment is BET ({@code questionnaire.type === true}) → "bet"
-     *     (3 class-wise templates for grades 3-5).
-     *   • Else (Navigator-type assessment) → "pager"
-     *     (4-pager Navigator with three class-wise variants picked by
-     *     {@link com.kccitm.api.service.b2c.pager.FourPagerEngineService#resolveVariant}).
+     * Resolution priority:
+     *   1. Questionnaire.reportType FK (new, set by manual backfill) — wins.
+     *   2. Admin explicit override (assessment.reportType column) — preserved
+     *      as escape hatch until {@code AssessmentTable.reportType} is removed.
+     *   3. Legacy fallback: questionnaire.type boolean → "bet" else "pager".
      *
-     * The legacy {@code "navigator"} (18-page) value is preserved for historical
-     * generated_report rows and the ReportsHub admin tooling but is no longer
-     * selected automatically by this resolver. {@code studentClass} is retained
-     * on the signature only because callers already compute it for the
-     * log row.
+     * The legacy {@code "navigator"} string was renamed to {@code "legacy"} in
+     * V20260526005; new code uses {@code "legacy"}.
      */
     private String resolveReportType(Long assessmentId, Integer studentClass) {
         if (assessmentId == null) return "pager";
@@ -137,10 +131,20 @@ public class ReportPreparationService {
         if (!opt.isPresent()) return "pager";
         AssessmentTable assessment = opt.get();
 
+        // 1. New: read from Questionnaire.reportType FK.
+        if (assessment.getQuestionnaire() != null
+                && assessment.getQuestionnaire().getReportType() != null) {
+            return assessment.getQuestionnaire().getReportType().getCode();
+        }
+
+        // 2. Legacy admin override on AssessmentTable.
         String explicit = assessment.getReportType();
         if (explicit != null && !explicit.trim().isEmpty()) {
-            return explicit.trim().toLowerCase();
+            String norm = explicit.trim().toLowerCase();
+            return "navigator".equals(norm) ? "legacy" : norm;
         }
+
+        // 3. Final fallback.
         return assessment.getQuestionnaire() != null
                 && Boolean.TRUE.equals(assessment.getQuestionnaire().getType())
                 ? "bet"

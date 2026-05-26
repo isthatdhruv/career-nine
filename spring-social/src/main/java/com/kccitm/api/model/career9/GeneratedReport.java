@@ -20,12 +20,13 @@ import javax.persistence.TemporalType;
 import javax.persistence.UniqueConstraint;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.kccitm.api.model.career9.report.ReportSubtype;
 
 @Entity
 @Table(name = "generated_report",
     uniqueConstraints = @UniqueConstraint(
-        name = "uk_student_assessment_type",
-        columnNames = {"user_student_id", "assessment_id", "type_of_report"}
+        name = "uk_student_assessment_type_subtype",
+        columnNames = {"user_student_id", "assessment_id", "type_of_report", "report_subtype_id"}
     ),
     indexes = {
         @Index(name = "idx_gr_assessment", columnList = "assessment_id"),
@@ -51,11 +52,19 @@ public class GeneratedReport implements Serializable {
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
 
-    // "bet"      = legacy class-wise report (grades 3-5)
-    // "navigator" = legacy 18-page Navigator report (deprecated, kept for historical rows)
-    // "pager"    = new 4-pager Navigator report (grades 6+, three template variants: insight / subject / career)
+    // "bet"    = BET report (grades 3-5, single template)
+    // "legacy" = legacy 18-page Navigator report (kept for historical rows; was "navigator" pre-V20260526005)
+    // "pager"  = 4-pager Navigator report (grades 6+, three subtypes: insight / subject / career)
     @Column(name = "type_of_report", nullable = false, length = 50)
     private String typeOfReport;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "report_subtype_id", referencedColumnName = "report_subtype_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private ReportSubtype reportSubtype;
+
+    public ReportSubtype getReportSubtype() { return reportSubtype; }
+    public void setReportSubtype(ReportSubtype reportSubtype) { this.reportSubtype = reportSubtype; }
 
     // "notGenerated", "generated", "failed"
     @Column(name = "report_status", nullable = false, length = 50)

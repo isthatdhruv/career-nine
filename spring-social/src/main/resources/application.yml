@@ -140,6 +140,11 @@ management:
   health:
     redis:
       enabled: true
+    # Mail health probe is opt-in: it AUTHs to SMTP on every check, which is
+    # noisy in dev where SMTP_PASSWORD is usually empty. Enable per-profile
+    # (sandbox / production) where real creds are configured.
+    mail:
+      enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
 
 app:
   googleAPIJSON: classpath:google.json
@@ -209,7 +214,7 @@ spring:
       - optional:file:./.env.dev[.properties]
       - optional:file:../.env.dev[.properties]
   datasource:
-    url: jdbc:mysql://localhost:3307/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3308/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW
     hikari:

@@ -19,8 +19,7 @@ import {
   getDemographicFieldsForStudent,
   updateStudentBasicInfo,
   sendLoginCredentials,
-  generateBetReportOneClick,
-  generatePagerReportOneClick,
+  generateUnifiedReportOneClick,
   getGeneratedReportsForStudent,
 } from "../StudentInformation/StudentInfo_APIs";
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
@@ -145,13 +144,11 @@ export default function StudentManagementPage() {
     userStudentId: number,
     force: boolean,
   ): Promise<string | null> => {
-    const fullAssessment = (assessments as any[]).find((a: any) => a.id === assessmentId);
-    const isBet = fullAssessment?.questionnaire?.type === true;
-    if (isBet) {
-      const res = await generateBetReportOneClick(assessmentId, userStudentId, force);
-      return (res.data as any)?.reportUrl || null;
-    }
-    const res = await generatePagerReportOneClick(assessmentId, userStudentId, force);
+    // Phase 1-b-2 rework: backend resolves type+subtype from Questionnaire FKs,
+    // so the FE no longer needs to branch on questionnaire.type. Old per-type
+    // endpoints (generateBetReportOneClick / generatePagerReportOneClick) remain
+    // exported for now but are not called from this surface anymore.
+    const res = await generateUnifiedReportOneClick(assessmentId, userStudentId, force);
     return res.data?.reportUrl || null;
   };
 
