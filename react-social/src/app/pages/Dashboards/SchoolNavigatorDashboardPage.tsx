@@ -983,44 +983,75 @@ const NAVIGATOR_DASHBOARD_BODY = String.raw`
 
 `;
 
-const CHART_JS_SRC = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js";
+const CHART_JS_SRC = "/chart.umd.min.js";
 const DASHBOARD_SCRIPT_SRC = "/career-navigator-school-navigator-dashboard.js";
 const FONTS_HREF =
   "https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
 
 const SchoolNavigatorDashboardPage: FC = () => {
   useEffect(() => {
+    const splash = document.getElementById("splash-screen");
+    if (splash) splash.style.display = "none";
+    document.body.classList.remove("page-loading", "splash-screen");
+
     const previousBodyBg = document.body.style.background;
     document.body.style.background = "#EEF5F1";
 
-    const fontsLink = document.createElement("link");
-    fontsLink.rel = "stylesheet";
-    fontsLink.href = FONTS_HREF;
-    fontsLink.dataset.schoolNavigatorDashboard = "fonts";
-    document.head.appendChild(fontsLink);
+    if (!document.querySelector(`link[data-school-navigator-dashboard="fonts"]`)) {
+      const fontsLink = document.createElement("link");
+      fontsLink.rel = "stylesheet";
+      fontsLink.href = FONTS_HREF;
+      fontsLink.dataset.schoolNavigatorDashboard = "fonts";
+      document.head.appendChild(fontsLink);
+    }
 
-    const chartScript = document.createElement("script");
-    chartScript.src = CHART_JS_SRC;
-    chartScript.async = false;
-    chartScript.dataset.schoolNavigatorDashboard = "chart";
+    const w = window as unknown as { __schoolNavigatorDashboardInit?: () => void };
 
-    let appScript: HTMLScriptElement | null = null;
+    const runInit = () => {
+      try {
+        if (typeof w.__schoolNavigatorDashboardInit === "function") {
+          w.__schoolNavigatorDashboardInit();
+        }
+      } catch (err) {
+        console.error("[SchoolNavigatorDashboard] init failed:", err);
+      }
+    };
 
-    chartScript.onload = () => {
-      appScript = document.createElement("script");
+    const ensureAppScript = () => {
+      if (document.querySelector(`script[data-school-navigator-dashboard="app"]`)) {
+        runInit();
+        return;
+      }
+      const appScript = document.createElement("script");
       appScript.src = DASHBOARD_SCRIPT_SRC;
       appScript.async = false;
       appScript.dataset.schoolNavigatorDashboard = "app";
+      appScript.onload = runInit;
+      appScript.onerror = (e) =>
+        console.error("[SchoolNavigatorDashboard] app script failed:", e);
       document.body.appendChild(appScript);
     };
 
-    document.head.appendChild(chartScript);
+    if (typeof (window as unknown as { Chart?: unknown }).Chart !== "undefined") {
+      ensureAppScript();
+    } else if (document.querySelector(`script[data-school-navigator-dashboard="chart"]`)) {
+      const existing = document.querySelector(
+        `script[data-school-navigator-dashboard="chart"]`
+      ) as HTMLScriptElement;
+      existing.addEventListener("load", ensureAppScript);
+    } else {
+      const chartScript = document.createElement("script");
+      chartScript.src = CHART_JS_SRC;
+      chartScript.async = false;
+      chartScript.dataset.schoolNavigatorDashboard = "chart";
+      chartScript.onload = ensureAppScript;
+      chartScript.onerror = (e) =>
+        console.error("[SchoolNavigatorDashboard] Chart.js failed:", e);
+      document.head.appendChild(chartScript);
+    }
 
     return () => {
       document.body.style.background = previousBodyBg;
-      if (fontsLink.parentNode) fontsLink.parentNode.removeChild(fontsLink);
-      if (chartScript.parentNode) chartScript.parentNode.removeChild(chartScript);
-      if (appScript && appScript.parentNode) appScript.parentNode.removeChild(appScript);
     };
   }, []);
 

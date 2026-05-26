@@ -40,7 +40,6 @@ function animBars() {
     requestAnimationFrame(() => requestAnimationFrame(() => b.style.width = w));
   });
 }
-setTimeout(animBars, 300);
 
 // ─── CLUSTER BARS ────────────────────────────────────────
 function renderClusters() {
@@ -56,7 +55,6 @@ function renderClusters() {
       <div class="cr-pct" style="color:${c.fill}">${c.pct}%</div>
     </div>`).join('');
 }
-renderClusters();
 
 // ─── STUDENT LIST ────────────────────────────────────────
 function renderStudentList(list) {
@@ -72,7 +70,6 @@ function renderStudentList(list) {
       <span class="pill ${s.cci==='High'?'p-hi':s.cci==='Low'||s.cci==='None'?'p-lo':'p-md'}" style="font-size:9px">${s.cci}</span>
     </div>`).join('');
 }
-renderStudentList(students);
 
 function selectStudent(el, id) {
   document.querySelectorAll('.sl-item').forEach(i => i.classList.remove('active'));
@@ -102,7 +99,31 @@ function openModal(id) {
   if (id === 'cciModal') drawCCIChart();
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+function __navWireModalOverlays() {
+  document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+}
+
+window.__schoolNavigatorDashboardInit = function () {
+  // Destroy any Chart.js instances left over from a previous mount
+  if (typeof Chart !== 'undefined' && typeof Chart.getChart === 'function') {
+    document.querySelectorAll('canvas').forEach(c => {
+      const existing = Chart.getChart(c);
+      if (existing) existing.destroy();
+    });
+  }
+  cciChartInst = undefined;
+
+  setTimeout(animBars, 300);
+  renderClusters();
+  renderStudentList(students);
+  __navWireModalOverlays();
+  if (typeof __navDashboardAddPdfBtn === 'function') __navDashboardAddPdfBtn();
+};
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(() => window.__schoolNavigatorDashboardInit(), 0);
+} else {
+  window.addEventListener('load', () => window.__schoolNavigatorDashboardInit());
+}
 
 // ─── CCI CHART ───────────────────────────────────────────
 let cciChartInst;
@@ -136,11 +157,6 @@ const __navDashboardAddPdfBtn = () => {
     banner.appendChild(btn);
   }
 };
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  setTimeout(__navDashboardAddPdfBtn, 0);
-} else {
-  document.addEventListener('DOMContentLoaded', __navDashboardAddPdfBtn);
-}
 
 function generatePDF() {
   // Switch to student view if not already there

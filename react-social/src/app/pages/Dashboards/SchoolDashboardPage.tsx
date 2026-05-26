@@ -1161,35 +1161,61 @@ const SCHOOL_DASHBOARD_BODY = String.raw`
 
 `;
 
-const CHART_JS_SRC = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js";
+const CHART_JS_SRC = "/chart.umd.min.js";
 const DASHBOARD_SCRIPT_SRC = "/career-navigator-school-dashboard.js";
 
 const SchoolDashboardPage: FC = () => {
   useEffect(() => {
+    const splash = document.getElementById("splash-screen");
+    if (splash) splash.style.display = "none";
+    document.body.classList.remove("page-loading", "splash-screen");
+
     const previousBodyBg = document.body.style.background;
     document.body.style.background = "#F2F7F5";
 
-    const chartScript = document.createElement("script");
-    chartScript.src = CHART_JS_SRC;
-    chartScript.async = false;
-    chartScript.dataset.schoolDashboard = "chart";
+    const w = window as unknown as { __schoolDashboardInit?: () => void };
 
-    let appScript: HTMLScriptElement | null = null;
+    const runInit = () => {
+      try {
+        if (typeof w.__schoolDashboardInit === "function") w.__schoolDashboardInit();
+      } catch (err) {
+        console.error("[SchoolDashboard] init failed:", err);
+      }
+    };
 
-    chartScript.onload = () => {
-      appScript = document.createElement("script");
+    const ensureAppScript = () => {
+      if (document.querySelector(`script[data-school-dashboard="app"]`)) {
+        runInit();
+        return;
+      }
+      const appScript = document.createElement("script");
       appScript.src = DASHBOARD_SCRIPT_SRC;
       appScript.async = false;
       appScript.dataset.schoolDashboard = "app";
+      appScript.onload = runInit;
+      appScript.onerror = (e) => console.error("[SchoolDashboard] app script failed:", e);
       document.body.appendChild(appScript);
     };
 
-    document.head.appendChild(chartScript);
+    if (typeof (window as unknown as { Chart?: unknown }).Chart !== "undefined") {
+      ensureAppScript();
+    } else if (document.querySelector(`script[data-school-dashboard="chart"]`)) {
+      const existing = document.querySelector(
+        `script[data-school-dashboard="chart"]`
+      ) as HTMLScriptElement;
+      existing.addEventListener("load", ensureAppScript);
+    } else {
+      const chartScript = document.createElement("script");
+      chartScript.src = CHART_JS_SRC;
+      chartScript.async = false;
+      chartScript.dataset.schoolDashboard = "chart";
+      chartScript.onload = ensureAppScript;
+      chartScript.onerror = (e) => console.error("[SchoolDashboard] Chart.js failed:", e);
+      document.head.appendChild(chartScript);
+    }
 
     return () => {
       document.body.style.background = previousBodyBg;
-      if (chartScript.parentNode) chartScript.parentNode.removeChild(chartScript);
-      if (appScript && appScript.parentNode) appScript.parentNode.removeChild(appScript);
     };
   }, []);
 

@@ -109,6 +109,18 @@ document.addEventListener('click',e=>{if(e.target.classList.contains('modal-bg')
 
 // ══════════════ PRINCIPAL CHARTS ══════════════
 const __schoolDashboardInit = ()=>{
+  // Destroy any Chart.js instances left over from a previous mount
+  if (typeof Chart !== 'undefined' && typeof Chart.getChart === 'function') {
+    document.querySelectorAll('canvas').forEach(c => {
+      const existing = Chart.getChart(c);
+      if (existing) existing.destroy();
+    });
+  }
+  cPersonChartI = null;
+  cCCIChartI = null;
+  teacherIntelI = null;
+  teacherAbilI = null;
+
   renderPersonalityChart();
   renderLSHeatmap();
   renderCCIChart();
@@ -129,6 +141,7 @@ const __schoolDashboardInit = ()=>{
       <button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="selectStudentSlot(this,'${sl}')">Select</button>
     </div>`).join('');
 };
+window.__schoolDashboardInit = __schoolDashboardInit;
 if(document.readyState==='complete'||document.readyState==='interactive'){
   setTimeout(__schoolDashboardInit,0);
 } else {
