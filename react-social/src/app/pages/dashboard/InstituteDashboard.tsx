@@ -1434,7 +1434,7 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                                 onClick={() => {
                                   setShowStudentDropdown(false);
                                   setStudentSearchMode("none");
-                                  window.open(`/dashboard/student/view/${student.userStudentId}`, '_blank');
+                                  window.open(`/student/dashboard/view/${student.userStudentId}`, '_blank');
                                 }}
                               >
                                 <div className="symbol symbol-25px">

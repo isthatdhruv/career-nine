@@ -78,7 +78,7 @@ const BookCounselling: React.FC<BookCounsellingProps> = ({ cciLevel, userStudent
         </div>
         <button
           className='sp-report-btn sp-report-btn-primary'
-          onClick={() => navigate('/dashboard/student/assessments')}
+          onClick={() => navigate('/student/dashboard/assessments')}
         >
           Take Assessment
         </button>
@@ -154,7 +154,7 @@ const BookCounselling: React.FC<BookCounsellingProps> = ({ cciLevel, userStudent
 
         <button
           className='sp-report-btn sp-report-btn-primary'
-          onClick={() => navigate('/dashboard/student/counselling/book')}
+          onClick={() => navigate('/student/dashboard/counselling/book')}
         >
           Book Session
         </button>
@@ -195,7 +195,7 @@ const BookCounselling: React.FC<BookCounsellingProps> = ({ cciLevel, userStudent
 
         <button
           className='sp-report-btn sp-report-btn-primary'
-          onClick={() => navigate('/dashboard/student/counselling/book')}
+          onClick={() => navigate('/student/dashboard/counselling/book')}
         >
           Book Session
         </button>
@@ -237,7 +237,7 @@ const BookCounselling: React.FC<BookCounsellingProps> = ({ cciLevel, userStudent
         <button
           className='sp-report-btn sp-report-btn-outline'
           style={{ flex: 1 }}
-          onClick={() => navigate('/dashboard/student/reports')}
+          onClick={() => navigate('/student/dashboard/reports')}
         >
           View Report
         </button>

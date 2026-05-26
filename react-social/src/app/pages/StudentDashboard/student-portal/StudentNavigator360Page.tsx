@@ -321,7 +321,7 @@ const StudentNavigator360Page: React.FC = () => {
               Complete an assessment to unlock your personalized Navigator 360 career guidance report.
             </p>
             <button
-              onClick={() => navigate('/dashboard/student/assessments')}
+              onClick={() => navigate('/student/dashboard/assessments')}
               style={{
                 marginTop: 16, padding: '10px 24px', borderRadius: 10, border: 'none',
                 background: V.heroGrad, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer',

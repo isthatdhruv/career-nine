@@ -93,7 +93,7 @@ const StudentInfoGuard: FC = () => {
   const { currentUser } = useAuth()
 
   // Always allow the info form itself
-  if (location.pathname === '/dashboard/student/student-info') {
+  if (location.pathname === '/student/dashboard/student-info') {
     return <Outlet />
   }
 
@@ -104,7 +104,7 @@ const StudentInfoGuard: FC = () => {
     (currentUser as any)?.student?.infoCompleted ??
     true
   if (infoCompleted !== true) {
-    return <Navigate to='/dashboard/student/student-info' replace />
+    return <Navigate to='/student/dashboard/student-info' replace />
   }
   return <Outlet />
 }
@@ -117,9 +117,9 @@ const StudentInfoGuard: FC = () => {
  *   /student/login         — Student login (username + DOB)
  *
  * Protected routes (require an authenticated session with STUDENT or B2C_STUDENT role):
- *   /dashboard/student/student-info  — Profile form (required before dashboard access)
- *   /dashboard/student                — Student dashboard (Navigator 360)
- *   /dashboard/student/assessments    — Allocated assessments list
+ *   /student/dashboard/student-info  — Profile form (required before dashboard access)
+ *   /student/dashboard                — Student dashboard (Navigator 360)
+ *   /student/dashboard/assessments    — Allocated assessments list
  */
 const StudentRoutes: FC = () => {
   useEffect(() => {

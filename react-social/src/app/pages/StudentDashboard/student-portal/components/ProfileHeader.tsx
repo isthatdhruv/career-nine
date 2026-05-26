@@ -35,7 +35,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     <div className='sp-profile-header'>
       <div
         className='sp-avatar'
-        onClick={() => navigate('/dashboard/student/student-info')}
+        onClick={() => navigate('/student/dashboard/student-info')}
         title='Edit profile'
         style={{ cursor: 'pointer' }}
       >
@@ -44,7 +44,7 @@ const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       <div className='sp-profile-info'>
         <div
           className='sp-profile-name'
-          onClick={() => navigate('/dashboard/student/student-info')}
+          onClick={() => navigate('/student/dashboard/student-info')}
           title='Edit profile'
           style={{ cursor: 'pointer' }}
         >

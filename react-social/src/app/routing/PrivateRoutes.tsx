@@ -1,11 +1,5 @@
 import { FC, lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
-
-/** Backwards-compat: legacy /student-dashboard/:studentId -> /dashboard/student/view/:studentId */
-const RedirectStudentDashboard: FC = () => {
-  const { studentId } = useParams<{ studentId: string }>();
-  return <Navigate to={`/dashboard/student/view/${studentId ?? ""}`} replace />;
-};
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
@@ -81,6 +75,12 @@ import AdminAssessmentEditPage from "../pages/ReportsHub/AdminAssessmentEdit/Adm
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
+
+/** Backwards-compat: legacy /student-dashboard/:studentId -> /student/dashboard/view/:studentId */
+const RedirectStudentDashboard: FC = () => {
+  const { studentId } = useParams<{ studentId: string }>();
+  return <Navigate to={`/student/dashboard/view/${studentId ?? ""}`} replace />;
+};
 
 // Paths that every logged-in user can access without a per-route permission check.
 // Preserved verbatim per Phase 17 locked decision — Phase 17 does NOT add or remove entries.
@@ -281,6 +281,19 @@ const PrivateRoutes = () => {
 
 
       <Route path="/login" element={<LoginPage />} />
+
+      {/* Standalone "view student dashboard" — opened by the admin Data Download
+          "Dashboard" button. Renders the student portal page WITHOUT the Metronic
+          aside menu, so the admin sees what the student sees when they log in.
+          Permission-protected but layout-free. */}
+      <Route path="/student/dashboard-preview" element={
+        <RequirePermission perm="student.read">
+          <SuspensedView>
+            <StudentPortalDashboard />
+          </SuspensedView>
+        </RequirePermission>
+      } />
+
       {/* payment-status and payment-register moved to public AppRoutes */}
       <Route element={<AuthorizedLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
@@ -438,9 +451,9 @@ const PrivateRoutes = () => {
         } />
 
         {/* Admin viewing a specific student's dashboard.
-            New canonical path: /dashboard/student/view/:studentId
+            New canonical path: /student/dashboard/view/:studentId
             Legacy /student-dashboard/:studentId kept as redirect below for old links. */}
-        <Route path="/dashboard/student/view/:studentId" element={
+        <Route path="/student/dashboard/view/:studentId" element={
           <RequirePermission perm="student.read">
             <SuspensedView>
               <StudentDashboard />
@@ -453,60 +466,67 @@ const PrivateRoutes = () => {
         />
 
         {/* Student portal — now inside MasterLayout (aside-menu shell), permission-gated.
-            All routes moved under /dashboard/student/* to match the new URL scheme.
+            All routes moved under /student/dashboard/* to match the new URL scheme.
             Old /student/* paths redirect below for backwards compat. */}
-        <Route path="/dashboard/student/student-info" element={
+        <Route path="/student/dashboard/student-info" element={
           <SuspensedView>
             <StudentInfoForm />
           </SuspensedView>
         } />
-        <Route path="/dashboard/student" element={
+        <Route path="/student/dashboard" element={
           <RequirePermission perm="assessment.read">
             <SuspensedView>
               <StudentPortalDashboard />
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route path="/dashboard/student/navigator-360" element={
+        <Route path="/student/dashboard/navigator-360" element={
           <RequirePermission perm="generated_report.read">
             <SuspensedView>
               <StudentPortalNavigator360 />
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route path="/dashboard/student/assessments" element={
+        <Route path="/student/dashboard/assessments" element={
           <RequirePermission perm="assessment.read">
             <SuspensedView>
               <StudentPortalAssessments />
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route path="/dashboard/student/reports" element={
+        <Route path="/student/dashboard/reports" element={
           <RequirePermission perm="generated_report.read">
             <SuspensedView>
               <StudentPortalReports />
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route path="/dashboard/student/counselling" element={
+        <Route path="/student/dashboard/counselling" element={
           <SuspensedView>
             <StudentCounsellingPage />
           </SuspensedView>
         } />
-        <Route path="/dashboard/student/counselling/book" element={
+        <Route path="/student/dashboard/counselling/book" element={
           <SuspensedView>
             <SlotBookingPage />
           </SuspensedView>
         } />
 
-        {/* Backwards-compat redirects: legacy /student/* paths -> new /dashboard/student/* */}
-        <Route path="/student/dashboard"          element={<Navigate to="/dashboard/student" replace />} />
-        <Route path="/student/student-info"       element={<Navigate to="/dashboard/student/student-info" replace />} />
-        <Route path="/student/navigator-360"      element={<Navigate to="/dashboard/student/navigator-360" replace />} />
-        <Route path="/student/assessments"        element={<Navigate to="/dashboard/student/assessments" replace />} />
-        <Route path="/student/reports"            element={<Navigate to="/dashboard/student/reports" replace />} />
-        <Route path="/student/counselling"        element={<Navigate to="/dashboard/student/counselling" replace />} />
-        <Route path="/student/counselling/book"   element={<Navigate to="/dashboard/student/counselling/book" replace />} />
+        {/* Backwards-compat redirects: legacy /student/* and /dashboard/student/* paths -> new /student/dashboard/* */}
+        <Route path="/student/student-info"       element={<Navigate to="/student/dashboard/student-info" replace />} />
+        <Route path="/student/navigator-360"      element={<Navigate to="/student/dashboard/navigator-360" replace />} />
+        <Route path="/student/assessments"        element={<Navigate to="/student/dashboard/assessments" replace />} />
+        <Route path="/student/reports"            element={<Navigate to="/student/dashboard/reports" replace />} />
+        <Route path="/student/counselling"        element={<Navigate to="/student/dashboard/counselling" replace />} />
+        <Route path="/student/counselling/book"   element={<Navigate to="/student/dashboard/counselling/book" replace />} />
+        <Route path="/dashboard/student"                   element={<Navigate to="/student/dashboard" replace />} />
+        <Route path="/dashboard/student/student-info"      element={<Navigate to="/student/dashboard/student-info" replace />} />
+        <Route path="/dashboard/student/navigator-360"     element={<Navigate to="/student/dashboard/navigator-360" replace />} />
+        <Route path="/dashboard/student/assessments"       element={<Navigate to="/student/dashboard/assessments" replace />} />
+        <Route path="/dashboard/student/reports"           element={<Navigate to="/student/dashboard/reports" replace />} />
+        <Route path="/dashboard/student/counselling"       element={<Navigate to="/student/dashboard/counselling" replace />} />
+        <Route path="/dashboard/student/counselling/book"  element={<Navigate to="/student/dashboard/counselling/book" replace />} />
+        <Route path="/dashboard/student/view/:studentId"   element={<RedirectStudentDashboard />} />
 
         <Route
           path="/student/university/result-dashboard"

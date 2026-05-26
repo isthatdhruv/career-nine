@@ -2663,7 +2663,14 @@ export default function GroupStudentPage() {
                               </button>
                               <button
                                 className="btn btn-sm d-flex align-items-center gap-1"
-                                onClick={() => window.open(`/dashboard/student/view/${student.userStudentId}`, '_blank')}
+                                onClick={() => {
+                                  const params = new URLSearchParams({
+                                    studentId: String(student.userStudentId ?? ""),
+                                    name: student.name ?? "",
+                                    dob: student.studentDob ?? "",
+                                  });
+                                  window.open(`/student/dashboard-preview?${params.toString()}`, "_blank");
+                                }}
                                 style={{
                                   background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                                   color: "#fff",

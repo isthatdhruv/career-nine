@@ -204,7 +204,7 @@ const SlotBookingPage: React.FC = () => {
       <div style={{ maxWidth: 560, margin: '0 auto' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-            <button onClick={() => navigate('/dashboard/student/counselling')} style={{
+            <button onClick={() => navigate('/student/dashboard/counselling')} style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: 36, height: 36, borderRadius: 8, border: '1.5px solid var(--sp-border, #D1E5DF)',
               background: 'var(--sp-card, #fff)', cursor: 'pointer', color: 'var(--sp-text, #1A2B28)', flexShrink: 0,
@@ -263,14 +263,14 @@ const SlotBookingPage: React.FC = () => {
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               {eligibility?.track === 'NO_ASSESSMENT' ? (
-                <button onClick={() => navigate('/dashboard/student/assessments')} style={{
+                <button onClick={() => navigate('/student/dashboard/assessments')} style={{
                   padding: '12px 28px', fontSize: 14, fontWeight: 600, border: 'none', borderRadius: 10,
                   background: '#D97706', color: '#fff', cursor: 'pointer', boxShadow: '0 2px 8px rgba(217,119,6,0.3)',
                 }}>
                   Take Assessment
                 </button>
               ) : eligibility?.track === 'REPORT_PENDING' ? (
-                <button onClick={() => navigate('/dashboard/student')} style={{
+                <button onClick={() => navigate('/student/dashboard')} style={{
                   padding: '12px 28px', fontSize: 14, fontWeight: 600, border: 'none', borderRadius: 10,
                   background: '#D97706', color: '#fff', cursor: 'pointer', boxShadow: '0 2px 8px rgba(217,119,6,0.3)',
                 }}>
@@ -284,7 +284,7 @@ const SlotBookingPage: React.FC = () => {
                   }}>
                     Pay for Counselling
                   </button>
-                  <button onClick={() => navigate('/dashboard/student/reports')} style={{
+                  <button onClick={() => navigate('/student/dashboard/reports')} style={{
                     padding: '12px 28px', fontSize: 14, fontWeight: 600, border: '1.5px solid #FED7AA',
                     borderRadius: 10, background: '#fff', color: '#92400E', cursor: 'pointer',
                   }}>
@@ -322,7 +322,7 @@ const SlotBookingPage: React.FC = () => {
               ? 'Your counselling session has been moved to the new slot. You will receive a notification with the updated details.'
               : 'Your counselling session has been confirmed. A counsellor has been assigned automatically. You will receive a notification with session details.'}
           </p>
-          <button className='cl-btn-primary' onClick={() => navigate('/dashboard/student/counselling')} style={{ fontSize: 13 }}>
+          <button className='cl-btn-primary' onClick={() => navigate('/student/dashboard/counselling')} style={{ fontSize: 13 }}>
             Back to My Sessions
           </button>
         </div>
@@ -336,7 +336,7 @@ const SlotBookingPage: React.FC = () => {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
           <button
-            onClick={() => navigate('/dashboard/student/counselling')}
+            onClick={() => navigate('/student/dashboard/counselling')}
             style={{
               display: 'inline-flex',
               alignItems: 'center',

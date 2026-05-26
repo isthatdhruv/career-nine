@@ -34,13 +34,14 @@
   "assessment.read": [
     "/assessment-questions",
     "/assessments",
+    "/student/dashboard",
+    "/student/dashboard/assessments",
     "/demographic-fields",
     "/list",
     "/measured-qualities",
     "/measured-quality-types",
     "/question-sections",
-    "/dashboard/student/assessments",
-    "/dashboard/student/student-info",
+    "/student-dashboard/:studentId",
     "/tools"
   ],
   "campaign.read": [
@@ -64,8 +65,8 @@
     "/counsellor/dashboard"
   ],
   "generated_report.read": [
-    "/dashboard/student/navigator-360",
-    "/dashboard/student/reports"
+    "/student/dashboard/navigator-360",
+    "/student/dashboard/reports"
   ],
   "group.read": [
     "/forgotpassword",
@@ -112,12 +113,13 @@
     "/user-management/roles/manage"
   ],
   "student.read": [
+    "/student/dashboard-preview",
+    "/student/dashboard/counselling",
+    "/student/dashboard/view/:studentId",
     "/live-tracking",
     "/school/assigned-students",
     "/school/group-student",
-    "/dashboard/student/view/:studentId",
     "/student-list",
-    "/dashboard/student/counselling",
     "/student/registration-details",
     "/student/university/result",
     "/studentlist",
