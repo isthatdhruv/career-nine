@@ -101,6 +101,12 @@ const ClassRoomPage = lazy(
 const PermissionDeniedPage = lazy(
   () => import("../components/PermissionDeniedPage")
 );
+const SchoolDashboardPage = lazy(
+  () => import("../pages/Dashboards/SchoolDashboardPage")
+);
+const SchoolNavigatorDashboardPage = lazy(
+  () => import("../pages/Dashboards/SchoolNavigatorDashboardPage")
+);
 
 /**
  * Base URL of the website.
@@ -116,6 +122,24 @@ const AppRoutes: FC = () => {
     <Routes>
       {/* Role Portals — standalone layout, no Metronic MasterLayout */}
       <Route path="/counsellor/*" element={<CounsellorRoutes />} />
+
+      {/* Public, standalone School Dashboard — no auth, no Metronic layout, not in aside menu */}
+      <Route
+        path="/school/dashboard"
+        element={
+          <SuspensedView>
+            <SchoolDashboardPage />
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/school/navigator-dashboard"
+        element={
+          <SuspensedView>
+            <SchoolNavigatorDashboardPage />
+          </SuspensedView>
+        }
+      />
 
       <Route element={<App />}>
         <Route path="/student-details" element={<StudentDetailPage />} />
