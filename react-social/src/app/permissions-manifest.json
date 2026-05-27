@@ -34,15 +34,13 @@
   "assessment.read": [
     "/assessment-questions",
     "/assessments",
-    "/student/dashboard",
-    "/student/dashboard/assessments",
-    "/dashboard/student/assessments",
     "/demographic-fields",
     "/list",
     "/measured-qualities",
     "/measured-quality-types",
     "/question-sections",
     "/student-dashboard/:studentId",
+    "/student/dashboard/assessments",
     "/tools"
   ],
   "campaign.read": [
@@ -84,8 +82,6 @@
     "/college",
     "/contact-person",
     "/course",
-    "/dashboard/school-navigator/:id",
-    "/dashboard/school/:id",
     "/section",
     "/session"
   ],
@@ -116,15 +112,13 @@
     "/user-management/roles/manage"
   ],
   "student.read": [
-    "/student/dashboard-preview",
-    "/student/dashboard/counselling",
-    "/student/dashboard/view/:studentId",
-    "/dashboard/student/counselling",
-    "/dashboard/student/view/:studentId",
     "/live-tracking",
+    "/login/reset-password/enter-email",
     "/school/assigned-students",
     "/school/group-student",
     "/student-list",
+    "/student/dashboard/counselling",
+    "/student/dashboard/view/:studentId",
     "/student/registration-details",
     "/student/university/result",
     "/studentlist",
@@ -137,7 +131,7 @@
     "/upload-excel"
   ],
   "student_management.read": [
-    "/login/reset-password/enter-email"
+    "auth}\r\n        <Route path="
   ],
   "user.read": [
     "/faculty/registration-details",

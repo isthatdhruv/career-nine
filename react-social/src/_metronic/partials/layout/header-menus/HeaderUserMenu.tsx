@@ -15,15 +15,42 @@ const HeaderUserMenu: FC = () => {
       <div className="menu-item px-3">
         <div className="menu-content d-flex align-items-center px-3">
           <div className="symbol symbol-50px me-5">
-            <img alt="Logo" src={toAbsoluteUrl(currentUser?.imageUrl!)} />
+            {currentUser?.imageUrl ? (
+              <img alt={currentUser?.name || "Logo"} src={toAbsoluteUrl(currentUser.imageUrl)} />
+            ) : (
+              <div
+                title={currentUser?.name}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #0c6b5a, #084a3e)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                  fontSize: 18,
+                  letterSpacing: 0.5,
+                  fontFamily:
+                    "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                }}
+              >
+                {(() => {
+                  const n = (currentUser?.name || "").trim();
+                  if (!n) return "?";
+                  const w = n.split(/\s+/);
+                  return w.length >= 2 && w[0][0] && w[1][0]
+                    ? (w[0][0] + w[1][0]).toUpperCase()
+                    : n.substring(0, 2).toUpperCase();
+                })()}
+              </div>
+            )}
           </div>
 
           <div className="d-flex flex-column">
             <div className="fw-bolder d-flex align-items-center fs-5">
               {currentUser?.name}
-              <span className="badge badge-light-success fw-bolder fs-8 px-2 py-1 ms-2">
-                Pro
-              </span>
             </div>
             <a href="#" className="fw-bold text-muted text-hover-primary fs-7">
               {currentUser?.email}
@@ -40,6 +67,7 @@ const HeaderUserMenu: FC = () => {
         </Link>
       </div>
 
+      {/* My Projects — hidden per product request
       <div className="menu-item px-5">
         <a href="#" className="menu-link px-5">
           <span className="menu-text">My Projects</span>
@@ -50,7 +78,9 @@ const HeaderUserMenu: FC = () => {
           </span>
         </a>
       </div>
+      */}
 
+      {/* My Subscription — hidden per product request
       <div
         className="menu-item px-5"
         data-kt-menu-trigger="hover"
@@ -112,16 +142,21 @@ const HeaderUserMenu: FC = () => {
           </div>
         </div>
       </div>
+      */}
 
+      {/* My Statements — hidden per product request
       <div className="menu-item px-5">
         <a href="#" className="menu-link px-5">
           My Statements
         </a>
       </div>
+      */}
 
       <div className="separator my-2"></div>
 
+      {/* Language switcher — hidden per product request
       <Languages />
+      */}
 
       <div className="menu-item px-5 my-1">
         <Link to="/crafted/account/settings" className="menu-link px-5">

@@ -79,7 +79,7 @@ const CollegePage = () => {
         )}
 
         {!loading && (
-          <div className="card-body pt-5">
+          <div className="card-body">
             <CollegeTable
               data={collegeData}
               setLoading={setLoading}
