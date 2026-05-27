@@ -55,6 +55,10 @@ export default function AllottedAssessmentPage() {
     try {
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
 
+      // A stale prefill from a prior Dev: Auto-fill run would otherwise be
+      // picked up by SectionQuestionPage on this real-user flow.
+      sessionStorage.removeItem('devAutoFillPrefill');
+
       // Phase 19 — mint the cn_at_asmnt HttpOnly cookie now that both
       // (userStudentId, assessmentId) are known. No-op when the build flag
       // VITE_ASSESSMENT_COOKIE_AUTH is off (production default). On 404
@@ -114,11 +118,14 @@ export default function AllottedAssessmentPage() {
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
 
       // Drop stale per-section UI state from any prior run so the autofilled
-      // questionnaire starts from a clean slate.
+      // questionnaire starts from a clean slate. The Redis partial-restore
+      // is also bypassed downstream (see SectionQuestionPage's devPrefill
+      // check), so no prior in-progress answers leak into this run either.
       localStorage.removeItem('assessmentSavedForLater');
       localStorage.removeItem('assessmentSkipped');
       localStorage.removeItem('assessmentElapsedTime');
       localStorage.removeItem('assessmentCompletedGames');
+      sessionStorage.removeItem('devAutoFillPrefill');
 
       await mintAssessmentSessionCookie(
         Number(userStudentId),
@@ -138,13 +145,6 @@ export default function AllottedAssessmentPage() {
         return;
       }
 
-      // Create the backend StudentAssessmentMapping so save-partial (fired on
-      // section transitions) and the final submit are accepted.
-      await http.post('/assessments/startAssessment', {
-        userStudentId: Number(userStudentId),
-        assessmentId: Number(assessment.assessmentId),
-      });
-
       // Pre-mark every section as "instructions seen" so the section-intro
       // modal doesn't interrupt the autofilled run on each section.
       const allSectionIds = questionnaire.sections.map(
@@ -156,10 +156,40 @@ export default function AllottedAssessmentPage() {
       );
 
       // Random answers honour per-question min/max and ranking rules.
-      // Passed via route state — SectionQuestionPage seeds React state from
-      // devPrefill and SKIPS the Redis partial-restore for this navigation.
+      // Stored in sessionStorage so it survives the optional demographics
+      // hop — SectionQuestionPage seeds React state from this entry,
+      // clears it, and SKIPS the Redis partial-restore for this run.
       const devPrefill = generateRandomAnswers(questionnaire);
+      sessionStorage.setItem('devAutoFillPrefill', JSON.stringify(devPrefill));
 
+      // Demographics aren't auto-fillable (they're per-student, often
+      // mandatory and validated). Mirror handleStartAssessment's gate so
+      // the user fills them by hand; the autofill kicks in once they
+      // land on the first section's first question.
+      const config = JSON.parse(
+        sessionStorage.getItem('assessmentConfig') || '{}',
+      );
+      const shouldCollectContact = config?.collectEmailAndPhone !== false;
+      const fieldsRes = await http.get(
+        `/student-demographics/fields/${assessment.assessmentId}/${userStudentId}`,
+      );
+      const hasDynamicFields =
+        Array.isArray(fieldsRes.data) && fieldsRes.data.length > 0;
+
+      if (shouldCollectContact || hasDynamicFields) {
+        navigate(`/demographics/${assessment.assessmentId}`, {
+          state: { demographicFields: fieldsRes.data },
+        });
+        return;
+      }
+
+      // No demographics — create the mapping ourselves and jump straight
+      // to the first section. devPrefill is also passed via route state
+      // here as a belt-and-braces signal alongside the sessionStorage copy.
+      await http.post('/assessments/startAssessment', {
+        userStudentId: Number(userStudentId),
+        assessmentId: Number(assessment.assessmentId),
+      });
       const firstSectionId = questionnaire.sections[0].section.sectionId;
       navigate(`/studentAssessment/sections/${firstSectionId}/questions/0`, {
         state: { devPrefill },

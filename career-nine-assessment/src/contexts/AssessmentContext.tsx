@@ -178,20 +178,14 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (prefetchingRef.current || !userStudentId.trim()) return;
     prefetchingRef.current = true;
 
+    // Only warm the public assessment-list endpoint here. The full assessment
+    // payload (loadAssessmentById -> /assessments/getby/X + /assessments/getById/X)
+    // requires the cn_at_asmnt cookie, which isn't minted until Start Assessment
+    // is clicked. Loading it here on username-blur produced unauthenticated 401s.
     const promise = http.get(`/assessments/prefetch/${userStudentId}`)
-      .then(async ({ data }) => {
+      .then(({ data }) => {
         if (data && Array.isArray(data) && data.length > 0) {
           setPrefetchedAssessments(data);
-          const firstActive = data.find((a: any) => a.isActive && a.questionnaireId);
-          if (firstActive) {
-            try {
-              const aid = String(firstActive.assessmentId);
-              const result = await loadAssessmentById(aid);
-              applyAssessmentResult(aid, result.data, result.config);
-            } catch {
-              // Prefetch failure is non-critical
-            }
-          }
         }
       })
       .catch(() => {
