@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
-import { ReadCollegeList, GetSessionsByInstituteCode, GetInstituteMappings } from "../College/API/College_APIs";
+import { GetSessionsByInstituteCode, GetInstituteMappings } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
@@ -46,7 +47,7 @@ type StudentAssessmentInfo = {
 export default function GroupStudentSchoolPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [] } = useInstitutes<any>();
   const instituteIdParam = searchParams.get("instituteId");
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">(
     instituteIdParam ? Number(instituteIdParam) : ""
@@ -523,13 +524,6 @@ export default function GroupStudentSchoolPage() {
   };
 
   useEffect(() => {
-    ReadCollegeList()
-      .then((res: any) => {
-        const list = Array.isArray(res.data) ? res.data : [];
-        setInstitutes(list);
-      })
-      .catch((err: any) => console.error("Failed to fetch institutes", err));
-
     // Fetch assessments (only active ones) — hook narrows per institute.
     getAllAssessments()
       .then((response) => {

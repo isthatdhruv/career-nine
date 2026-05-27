@@ -2,10 +2,12 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useState } from "react";
 import { Modal } from "react-bootstrap-v5";
+import { useQueryClient } from "react-query";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { UpdateCollegeData } from "../API/College_APIs";
+import { lookupKeys } from "../../../lib/queries/lookups";
 
 const validationSchema = Yup.object().shape({
   instituteName: Yup.string().required(),
@@ -22,6 +24,7 @@ const CollegeEditModal = (props: {
   setPageLoading: any;
 }) => {
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   var initialValues: any = {
     instituteName: props.data.instituteName,
@@ -40,6 +43,7 @@ const CollegeEditModal = (props: {
       try {
         setLoading(true);
         UpdateCollegeData(values).then(() => {
+          queryClient.invalidateQueries(lookupKeys.institutes);
           props.onHide(false);
           props.setPageLoading(["true"]);
         });

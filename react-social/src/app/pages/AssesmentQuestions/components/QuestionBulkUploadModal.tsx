@@ -2,7 +2,8 @@ import clsx from "clsx";
 import React, { useEffect, useState } from "react";
 import { Modal, Button, Dropdown } from "react-bootstrap";
 import * as XLSX from "xlsx";
-import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
+import { CreateQuestionData } from "../API/Question_APIs";
+import { useMeasuredQualityTypes } from "../../../lib/queries/lookups";
 import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 
 // Type definitions
@@ -48,28 +49,12 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
     failed: number;
     errors: string[];
   } | null>(null);
-  const [mqt, setMqt] = useState<any[]>([]);
+  const { data: mqt = [] } = useMeasuredQualityTypes<any>();
 
   // State for managing measured qualities per option
   const [optionMeasuredQualities, setOptionMeasuredQualities] = useState<
     Record<number, Record<number, { checked: boolean; score: number }>>
   >({});
-
-  // Fetch measured quality types on mount
-  useEffect(() => {
-    const fetchMQT = async () => {
-      try {
-        const response = await ReadMeasuredQualityTypes();
-        setMqt(response.data);
-      } catch (error) {
-        console.error("Error fetching MQT:", error);
-        setMqt([]);
-      }
-    };
-    if (show) {
-      fetchMQT();
-    }
-  }, [show]);
 
   // Reset state when modal closes
   useEffect(() => {

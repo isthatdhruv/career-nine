@@ -22,7 +22,7 @@ import { showErrorToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
 import { useAssessmentsForCurrentUser } from "../../hooks/useScopedAssessments";
-import { ReadCollegeList } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 
 /* ─── Types ─── */
 
@@ -280,21 +280,18 @@ const LiveTrackingPage = () => {
   // mirrors the BE deny set — the same source we use elsewhere — so the row
   // filter agrees with the rest of the app. null = no restriction (super-admin
   // or user has wildcard institute scope).
+  const { data: institutesForNames = [] } = useInstitutes<any>();
   useEffect(() => {
     if (allowedInstituteCodes === null) {
       setAllowedInstituteNames(null);
       return;
     }
-    ReadCollegeList()
-      .then((res) => {
-        const names = new Set<string>();
-        for (const inst of res.data || []) {
-          if (inst?.instituteName) names.add(inst.instituteName);
-        }
-        setAllowedInstituteNames(names);
-      })
-      .catch(() => setAllowedInstituteNames(new Set()));
-  }, [allowedInstituteCodes]);
+    const names = new Set<string>();
+    for (const inst of institutesForNames) {
+      if (inst?.instituteName) names.add(inst.instituteName);
+    }
+    setAllowedInstituteNames(names);
+  }, [allowedInstituteCodes, institutesForNames]);
 
   // Track whether we've already loaded lite data for the current assessment
   const liteLoadedRef = useRef<number | null>(null);

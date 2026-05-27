@@ -3,11 +3,11 @@ import {
   fetchFirebaseSchoolData,
   createInstitute,
   createSession,
-  getAllInstitutes,
   saveMapping,
   saveBatchMappings,
   getMappingsByType,
 } from "./API/OldDataMapping_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import GradeMappingStep from "./steps/GradeMappingStep";
 import SchoolMappingStep from "./steps/SchoolMappingStep";
 import SectionMappingStep from "./steps/SectionMappingStep";
@@ -83,8 +83,7 @@ const OnlineMappingWizard = ({ onBack }: Props) => {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState("");
   const [bulkError, setBulkError] = useState("");
-  const [bulkInstitutes, setBulkInstitutes] = useState<any[]>([]);
-  const [bulkLoading, setBulkLoading] = useState(false);
+  const { data: bulkInstitutes = [], isLoading: bulkLoading } = useInstitutes<any>();
 
   // Bulk create form
   const [bulkNewName, setBulkNewName] = useState("");
@@ -324,13 +323,8 @@ const OnlineMappingWizard = ({ onBack }: Props) => {
     if (action === "new" && selectedSchools.length > 0) {
       setBulkNewName(selectedSchools[0].name);
     }
-    if (action === "existing") {
-      setBulkLoading(true);
-      getAllInstitutes()
-        .then((res) => setBulkInstitutes(res.data || []))
-        .catch(() => setBulkError("Failed to load institutes"))
-        .finally(() => setBulkLoading(false));
-    }
+    // Institutes are loaded via useInstitutes hook (cached);
+    // bulkInstitutes / bulkLoading reflect that cache state.
   };
 
   const handleBulkCreateNew = async () => {

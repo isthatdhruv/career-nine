@@ -347,6 +347,36 @@ export function generatePagerReportOneClick(assessmentId: number, userStudentId:
 }
 
 /**
+ * Unified report-generation endpoint (Phase 1-b-2 rework). Backend resolves
+ * report type + subtype from the Questionnaire's reportType / reportSubtype
+ * FKs, computes / reuses placeholder data, re-renders the HTML template from
+ * Spaces, and returns the public CDN URL. Replaces the per-type BET /
+ * Navigator / Pager one-click endpoints; the old endpoints remain as thin
+ * forwarders during the deprecation window.
+ */
+export interface UnifiedReportResponse {
+    status: string;          // "generated" | "not_ready" | "failed"
+    reportType: string;      // "bet" | "legacy" | "pager"
+    reportSubtype: string;   // "default" | "insight" | "subject" | "career"
+    reportUrl: string;
+    calculatedAt?: string;
+    renderedAt?: string;
+    alreadyExisted: boolean;
+    error?: string;
+    errorCode?: string;
+}
+
+export function generateUnifiedReportOneClick(
+    assessmentId: number, userStudentId: number, force = false
+) {
+    return axios.post<UnifiedReportResponse>(`${API_URL}/generate-report-unified`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 });
+}
+
+/**
  * Bulk fetch every {@code generated_report} row for one student. Powers the
  * Student Management view-modal hydration so each assessment's Generate /
  * Download / Regenerate button starts with the right state instead of

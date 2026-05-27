@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import SingleAssessmentView from "./SingleAssessmentView";
 import AllAssessmentsView from "./AllAssessmentsView";
-import { ReadCollegeList } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import { getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
 import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { getReportType } from "./API/UnifiedReport_APIs";
@@ -10,9 +10,8 @@ import { getReportType } from "./API/UnifiedReport_APIs";
 
 const UnifiedReportManagementPage: React.FC = () => {
   // ── Institute state ──
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [], isLoading: institutesLoading } = useInstitutes();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
-  const [institutesLoading, setInstitutesLoading] = useState(false);
 
   // ── Assessment state ──
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
@@ -20,15 +19,6 @@ const UnifiedReportManagementPage: React.FC = () => {
   const [selectedAssessment, setSelectedAssessment] = useState<number | "all" | "">("");
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
   const [mappedAssessmentIds, setMappedAssessmentIds] = useState<Set<number> | null>(null);
-
-  // ── Load institutes ──
-  useEffect(() => {
-    setInstitutesLoading(true);
-    ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
-      .catch(() => setInstitutes([]))
-      .finally(() => setInstitutesLoading(false));
-  }, []);
 
   // ── Load all assessments ──
   useEffect(() => {

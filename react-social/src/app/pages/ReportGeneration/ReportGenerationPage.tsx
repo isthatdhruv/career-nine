@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
-import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import {
   getAllAssessments,
   getStudentsWithMappingByInstituteId,
@@ -33,9 +34,8 @@ const FILTER_ITEMS: { key: FilterKey; label: string }[] = [
 
 const ReportGenerationPage: React.FC = () => {
   // ── Core selections ──
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [], isLoading: institutesLoading } = useInstitutes();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
-  const [institutesLoading, setInstitutesLoading] = useState(false);
 
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
@@ -63,14 +63,6 @@ const ReportGenerationPage: React.FC = () => {
   const [exportingOMR, setExportingOMR] = useState(false);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
-
-  useEffect(() => {
-    setInstitutesLoading(true);
-    ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
-      .catch(() => setInstitutes([]))
-      .finally(() => setInstitutesLoading(false));
-  }, []);
 
   useEffect(() => {
     setAssessmentsLoading(true);

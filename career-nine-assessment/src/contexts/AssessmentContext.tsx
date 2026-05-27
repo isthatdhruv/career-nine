@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import http, { COOKIE_AUTH_FLAG, setCookieAuthRuntimeActive } from '../api/http';
+import http, { setCookieAuthRuntimeActive } from '../api/http';
 import { getActiveCacheName } from '../components/ResourcePreloader';
 
 type AssessmentContextType = {
@@ -178,20 +178,14 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (prefetchingRef.current || !userStudentId.trim()) return;
     prefetchingRef.current = true;
 
+    // Only warm the public assessment-list endpoint here. The full assessment
+    // payload (loadAssessmentById -> /assessments/getby/X + /assessments/getById/X)
+    // requires the cn_at_asmnt cookie, which isn't minted until Start Assessment
+    // is clicked. Loading it here on username-blur produced unauthenticated 401s.
     const promise = http.get(`/assessments/prefetch/${userStudentId}`)
-      .then(async ({ data }) => {
+      .then(({ data }) => {
         if (data && Array.isArray(data) && data.length > 0) {
           setPrefetchedAssessments(data);
-          const firstActive = data.find((a: any) => a.isActive && a.questionnaireId);
-          if (firstActive) {
-            try {
-              const aid = String(firstActive.assessmentId);
-              const result = await loadAssessmentById(aid);
-              applyAssessmentResult(aid, result.data, result.config);
-            } catch {
-              // Prefetch failure is non-critical
-            }
-          }
         }
       })
       .catch(() => {
@@ -228,23 +222,20 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   /**
-   * Phase 19 — mint cn_at_asmnt by POSTing to /auth/assessment-session.
+   * Mint cn_at_asmnt by POSTing to /auth/assessment-session.
    *
    * Decision matrix:
-   *   - build flag off (COOKIE_AUTH_FLAG=false) → no-op, return false. The
-   *     http-instance interceptor keeps injecting the v2.0 X-Assessment-*
-   *     headers; behaviour is identical to pre-Phase-19.
-   *   - 200 OK → set the http-instance runtime flag to active; cookie is
-   *     the source of truth from now on.
-   *   - 404 (per-institute flag off for this student's institute, per
-   *     Plan 19-01's InstituteDetail.assessmentCookieAuthEnabled) →
-   *     transparently fall back to header path for this student only.
-   *   - 403 (enrolment mismatch — student does not own this assessment) →
-   *     surface as cookie-auth-inactive; subsequent calls will hit the
-   *     header path and the backend will reject them with the same 403,
-   *     which the SPA already maps to "Your assessment session has expired."
-   *   - Network error or 5xx → fall back to header path so the student is
-   *     not blocked; warn to console for ops visibility.
+   *   - 200 OK → mark cookie auth active; cn_at_asmnt is the auth carrier
+   *     for all subsequent /assessments/**, /assessment-answer/**, etc.
+   *   - 404 (assessment_cookie_auth_not_enabled — per-institute or B2C
+   *     rollout gate off on the server) → mark inactive; the SPA has no
+   *     other auth carrier, so downstream calls will 401 and the response
+   *     interceptor's /permission-denied redirect kicks in. Flip the
+   *     server-side flag to roll cookie auth out for this institute / B2C.
+   *   - 403 (enrolment or DOB mismatch) → mark inactive; downstream 403s
+   *     map to "Your assessment session has expired."
+   *   - Network or 5xx → mark inactive and let the calling page surface
+   *     the failure; warn to console for ops visibility.
    *
    * Idempotent per (userStudentId, assessmentId) pair; concurrent callers
    * coalesce via mintInFlightRef.
@@ -253,19 +244,28 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     userStudentId: number,
     assessmentId: number,
   ): Promise<boolean> => {
-    if (!COOKIE_AUTH_FLAG) {
-      setCookieAuthRuntimeActive(false);
-      setCookieAuthActive(false);
-      return false;
-    }
+    console.log('[ASSESS-SESSION-DEBUG] mint() ENTRY userStudentId=' + userStudentId
+      + ' assessmentId=' + assessmentId
+      + ' alreadyMintedPair=' + mintedPairRef.current
+      + ' inFlight=' + !!mintInFlightRef.current);
+
+    // The build-time COOKIE_AUTH_FLAG gate used to short-circuit here so a
+    // legacy X-Assessment-Session header path could carry auth instead. That
+    // header fallback was removed (see comment in src/api/http.ts), which left
+    // the SPA with no auth carrier whenever the flag was false — every
+    // authenticated request 401s. Mint is now always attempted; the per-
+    // institute / B2C rollout gate lives on the server (returns 404
+    // assessment_cookie_auth_not_enabled when off).
 
     const pairKey = `${userStudentId}:${assessmentId}`;
     if (mintedPairRef.current === pairKey) {
+      console.log('[ASSESS-SESSION-DEBUG] mint() SKIP already-minted-this-tab pairKey=' + pairKey);
       // Already minted for this exact pair in this tab — http-instance flag
       // is already set; nothing to do.
       return cookieAuthActive;
     }
     if (mintInFlightRef.current) {
+      console.log('[ASSESS-SESSION-DEBUG] mint() JOIN in-flight pairKey=' + pairKey);
       // Coalesce concurrent callers (e.g. AllottedAssessmentPage + an effect)
       return mintInFlightRef.current;
     }
@@ -274,6 +274,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       try {
         const dob = localStorage.getItem('studentDob');
         if (!dob) {
+          console.log('[ASSESS-SESSION-DEBUG] mint() FAIL no-dob-in-localStorage pairKey=' + pairKey);
           // No DOB cached (e.g. tab opened after a stale-storage flush) — the
           // backend's @NotNull dob field would 400 the request. Fall back to
           // the legacy header path; the student keeps working without being
@@ -282,25 +283,34 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setCookieAuthActive(false);
           return false;
         }
+        console.log('[ASSESS-SESSION-DEBUG] mint() POST /auth/assessment-session pairKey=' + pairKey);
         await http.post('/auth/assessment-session', { userStudentId, assessmentId, dob });
         mintedPairRef.current = pairKey;
         setCookieAuthRuntimeActive(true);
         setCookieAuthActive(true);
+        console.log('[ASSESS-SESSION-DEBUG] mint() SUCCESS pairKey=' + pairKey
+          + ' cookies=' + (typeof document !== 'undefined' ? document.cookie : 'n/a'));
         return true;
       } catch (err: any) {
         const status = err?.response?.status;
+        console.log('[ASSESS-SESSION-DEBUG] mint() ERROR pairKey=' + pairKey
+          + ' status=' + (status ?? 'no-response')
+          + ' msg=' + (err?.message ?? 'n/a'));
         if (status === 404) {
+          console.log('[ASSESS-SESSION-DEBUG] mint() FALLBACK institute-flag-off pairKey=' + pairKey);
           // Per-institute flag OFF — fall back transparently.
           setCookieAuthRuntimeActive(false);
           setCookieAuthActive(false);
           return false;
         }
         if (status === 403) {
+          console.log('[ASSESS-SESSION-DEBUG] mint() FALLBACK enrolment-or-dob-mismatch pairKey=' + pairKey);
           // Enrolment mismatch — fall back; downstream 403 will re-tokenize.
           setCookieAuthRuntimeActive(false);
           setCookieAuthActive(false);
           return false;
         }
+        console.log('[ASSESS-SESSION-DEBUG] mint() FALLBACK network-or-5xx pairKey=' + pairKey);
         // Network or 5xx — fall back so the student is not blocked.
         // eslint-disable-next-line no-console
         console.warn('mintAssessmentSessionCookie failed; falling back to header path', err);

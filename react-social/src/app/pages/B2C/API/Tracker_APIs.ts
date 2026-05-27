@@ -107,8 +107,9 @@ export interface InstituteOption {
   instituteName: string;
 }
 
-export const getInstituteList = () =>
-  axios.get<InstituteOption[]>(`${process.env.REACT_APP_API_URL}/instituteDetail/get/list`);
+// Note: institute list is now fetched via the centralized `useInstitutes`
+// hook in `src/app/lib/queries/lookups.ts`. `getInstituteList` was removed
+// to avoid bypassing the React Query cache.
 
 export const assignStudentInstitute = (userStudentId: number, instituteCode: number) =>
   axios.post<{ status: string; instituteCode: number }>(

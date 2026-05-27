@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { downloadReportAsPdf, htmlToPdfBlob } from "../ReportGeneration/utils/htmlToPdf";
 import JSZip from "jszip";
-import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
@@ -98,10 +99,17 @@ const ReportsHubPage: React.FC = () => {
     return new Set(userScopes.map((s) => s.i!).filter((v) => v != null));
   }, [isSuperAdmin, userScopes]);
 
-  // ── Institute ──
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  // ── Institute (server already scope-filters; we apply the client-side
+  // allowedInstituteIds filter as a defensive belt-and-braces step) ──
+  const { data: allInstitutes = [], isLoading: institutesLoading } = useInstitutes<any>();
+  const institutes = useMemo(
+    () =>
+      allowedInstituteIds == null
+        ? allInstitutes
+        : allInstitutes.filter((inst: any) => allowedInstituteIds.has(Number(inst.instituteCode))),
+    [allInstitutes, allowedInstituteIds]
+  );
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
-  const [institutesLoading, setInstitutesLoading] = useState(false);
 
   // ── Assessment (URM approach: filtered by institute mapping) ──
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
@@ -182,28 +190,19 @@ const ReportsHubPage: React.FC = () => {
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
+  // Auto-select if the user is scoped to exactly one institute so they
+  // don't have to pick from a single-item dropdown.
   useEffect(() => {
-    setInstitutesLoading(true);
-    ReadCollegeList()
-      .then((res) => {
-        const all = res.data || [];
-        // Scope down to institutes this user is allotted to. null = no restriction.
-        const filtered = allowedInstituteIds == null
-          ? all
-          : all.filter((inst: any) => allowedInstituteIds.has(Number(inst.instituteCode)));
-        setInstitutes(filtered);
-        // If user is scoped to exactly one institute, auto-select it so they
-        // don't have to pick from a single-item dropdown.
-        if (filtered.length === 1) {
-          setSelectedInstitute(Number(filtered[0].instituteCode));
-        }
-      })
-      .catch(() => setInstitutes([]))
-      .finally(() => setInstitutesLoading(false));
+    if (institutes.length === 1 && selectedInstitute === "") {
+      setSelectedInstitute(Number(institutes[0].instituteCode));
+    }
+  }, [institutes, selectedInstitute]);
+
+  useEffect(() => {
     getAllAssessments()
       .then((res) => setAllAssessments(res.data || []))
       .catch(() => setAllAssessments([]));
-  }, [allowedInstituteIds]);
+  }, []);
 
   // Load assessment mappings for selected institute
   // null = no institute selected, empty Set = institute selected but no assessments linked

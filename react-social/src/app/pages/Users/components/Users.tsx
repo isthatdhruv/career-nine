@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { UpdateCollegeData } from "../../College/API/College_APIs";
 import { ReadBoardData } from "../../Board/API/Board_APIs";
 import { ReadContactInformationData } from "../../ContactPerson/API/Contact_Person_APIs";
-import { readRoleData } from "../../../modules/role_roleGroup/components/core/Role_RoleGroup_APIs";
+import { useRoles } from "../../../lib/queries/lookups";
 
 type ContactPerson = {
   id?: string;
@@ -64,7 +64,8 @@ export default function Users() {
   const [selectedBoardIndexes, setSelectedBoardIndexes] = useState<number[]>([]);
   const [boardDropdownOpen, setBoardDropdownOpen] = useState(false);
 
-  // Roles from API
+  // Roles from API (cached via useRoles hook)
+  const { data: rawRolesFromHook = [] } = useRoles<any>();
   const [roleOptions, setRoleOptions] = useState<string[]>(FALLBACK_ROLE_OPTIONS);
   const [rolesLoading, setRolesLoading] = useState(false);
 
@@ -138,41 +139,30 @@ export default function Users() {
       }
     };
 
-    // Roles
-    const fetchRoles = async () => {
-      setRolesLoading(true);
-      try {
-        const res = await readRoleData();
-        const rawRoles: any[] =
-          (res as any)?.data?.data ??
-          (res as any)?.data?.roles ??
-          (res as any)?.data ??
-          [];
-        const roles: string[] = (rawRoles || [])
-          .map((r: any) => {
-            if (!r && r !== 0) return null;
-            if (typeof r === "string") return r;
-            if (typeof r === "object") {
-              return r.role ?? r.name ?? r.roleName ?? r.title ?? r.label ?? null;
-            }
-            return null;
-          })
-          .filter(Boolean) as string[];
-        if (roles.length > 0) setRoleOptions(roles);
-        else setRoleOptions(FALLBACK_ROLE_OPTIONS);
-      } catch (err) {
-        console.error("Failed to load roles:", err);
-        setRoleOptions(FALLBACK_ROLE_OPTIONS);
-      } finally {
-        setRolesLoading(false);
-      }
-    };
-
     fetchContacts();
     fetchBoards();
-    fetchRoles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
+
+  // Derive roleOptions from cached useRoles data.
+  useEffect(() => {
+    const rawRoles: any[] = Array.isArray(rawRolesFromHook)
+      ? rawRolesFromHook
+      : (rawRolesFromHook as any)?.data ?? (rawRolesFromHook as any)?.roles ?? [];
+    const roles: string[] = (rawRoles || [])
+      .map((r: any) => {
+        if (!r && r !== 0) return null;
+        if (typeof r === "string") return r;
+        if (typeof r === "object") {
+          return r.role ?? r.name ?? r.roleName ?? r.title ?? r.label ?? null;
+        }
+        return null;
+      })
+      .filter(Boolean) as string[];
+    if (roles.length > 0) setRoleOptions(roles);
+    else setRoleOptions(FALLBACK_ROLE_OPTIONS);
+    setRolesLoading(false);
+  }, [rawRolesFromHook]);
 
   // Initialize per-contact roles if provided in data
   useEffect(() => {

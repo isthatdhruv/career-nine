@@ -17,11 +17,13 @@ import javax.annotation.PostConstruct;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.config.AppProperties;
+import com.kccitm.api.model.JwtTokenAudit.TokenType;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -58,6 +60,15 @@ public class TokenProvider {
     private static final Logger logger = LoggerFactory.getLogger(TokenProvider.class);
 
     private AppProperties appProperties;
+
+    /**
+     * Records every minted JWT into {@code jwt_token_audit} for the super-admin
+     * console. Field-injected (not constructor-injected) so the audit hook is a
+     * pure additive change to a class that other security-package beans depend
+     * on heavily. Best-effort — the service swallows DB failures internally.
+     */
+    @Autowired(required = false)
+    private JwtTokenAuditService auditService;
 
     /**
      * HS512 signing/verification key, built once from the raw bytes of
@@ -106,7 +117,7 @@ public class TokenProvider {
      */
     public String createToken(Authentication authentication) {
         return buildJwtFromAuthentication(authentication,
-                appProperties.getAuth().getTokenExpirationMsec());
+                appProperties.getAuth().getTokenExpirationMsec(), TokenType.LEGACY);
     }
 
     /**
@@ -117,7 +128,7 @@ public class TokenProvider {
      */
     public String createAccessToken(Authentication authentication) {
         return buildJwtFromAuthentication(authentication,
-                appProperties.getAuth().getAccessTokenExpirationMsec());
+                appProperties.getAuth().getAccessTokenExpirationMsec(), TokenType.ACCESS);
     }
 
     /**
@@ -127,7 +138,7 @@ public class TokenProvider {
      */
     public String createAccessToken(UserPrincipal userPrincipal) {
         return buildJwt(userPrincipal,
-                appProperties.getAuth().getAccessTokenExpirationMsec());
+                appProperties.getAuth().getAccessTokenExpirationMsec(), TokenType.ACCESS);
     }
 
     /**
@@ -141,14 +152,15 @@ public class TokenProvider {
         return UUID.randomUUID().toString();
     }
 
-    private String buildJwtFromAuthentication(Authentication authentication, long ttlMsec) {
+    private String buildJwtFromAuthentication(Authentication authentication, long ttlMsec, TokenType tokenType) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-        return buildJwt(userPrincipal, ttlMsec);
+        return buildJwt(userPrincipal, ttlMsec, tokenType);
     }
 
-    private String buildJwt(UserPrincipal userPrincipal, long ttlMsec) {
+    private String buildJwt(UserPrincipal userPrincipal, long ttlMsec, TokenType tokenType) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + ttlMsec);
+        String jti = UUID.randomUUID().toString();
 
         // Serialize scope rows using the short JWT keys (omit null dims for size).
         List<Map<String, Object>> scopes = new ArrayList<>();
@@ -179,16 +191,23 @@ public class TokenProvider {
         // when @auth.allows() runs. Roles / scopes / sa stay in the JWT because
         // they are small and the existing filter treats them as authoritative.
 
-        return Jwts.builder()
+        String token = Jwts.builder()
                 .setSubject(Long.toString(userPrincipal.getId()))
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .setId(UUID.randomUUID().toString())   // jti
+                .setId(jti)
                 .claim("roles", roles)
                 .claim("scopes", scopes)
                 .claim("sa", userPrincipal.isSuperAdmin())
                 .signWith(signingKey, SignatureAlgorithm.HS512)
                 .compact();
+
+        if (auditService != null) {
+            auditService.record(jti, userPrincipal.getId(), userPrincipal.getEmail(),
+                    userPrincipal.getAuthorities(), userPrincipal.isSuperAdmin(),
+                    now, expiryDate, tokenType);
+        }
+        return token;
     }
 
     public Long getUserIdFromToken(String token) {
@@ -241,15 +260,22 @@ public class TokenProvider {
     public String createAssessmentSessionToken(Long userStudentId, Long assessmentId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + appProperties.getAuth().getAssessmentTokenExpirationMsec());
-        return Jwts.builder()
+        String jti = UUID.randomUUID().toString();
+        String token = Jwts.builder()
                 .setSubject(String.valueOf(userStudentId))
                 .claim("aid", assessmentId)
                 .claim("scope", "assessment")
-                .setId(UUID.randomUUID().toString())
+                .setId(jti)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(signingKey, SignatureAlgorithm.HS512)
                 .compact();
+
+        if (auditService != null) {
+            auditService.record(jti, userStudentId, null, null, false,
+                    now, expiryDate, TokenType.ASSESSMENT);
+        }
+        return token;
     }
 
     /**

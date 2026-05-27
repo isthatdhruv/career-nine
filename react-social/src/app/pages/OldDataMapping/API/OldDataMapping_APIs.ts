@@ -100,10 +100,9 @@ export function checkMapping(firebaseId: string, type: string) {
   return axios.get(`${API_URL}/firebase-mapping/check/${firebaseId}/${type}`);
 }
 
-// Institute endpoints (reuse existing)
-export function getAllInstitutes() {
-  return axios.get(`${API_URL}/instituteDetail/get/list`);
-}
+// Note: institute list is now fetched via the centralized `useInstitutes`
+// hook in `src/app/lib/queries/lookups.ts`. `getAllInstitutes` was removed
+// to avoid bypassing the React Query cache.
 
 export function createInstitute(values: any) {
   return axios.post(`${API_URL}/instituteDetail/update`, { values });

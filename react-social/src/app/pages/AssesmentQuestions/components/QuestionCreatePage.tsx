@@ -5,8 +5,9 @@ import { Dropdown, Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { showErrorToast } from '../../../utils/toast';
 import * as Yup from "yup";
-import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
-import { CreateQuestionData, ReadMeasuredQualityTypes, UploadQuestionMedia } from "../API/Question_APIs";
+import { useQuestionSections } from "../../../lib/queries/lookups";
+import { CreateQuestionData, UploadQuestionMedia } from "../API/Question_APIs";
+import { useMeasuredQualityTypes } from "../../../lib/queries/lookups";
 import { MQT } from "./MeasuredQualityTypesAsOptionComponent"; // Adjust the import based on your file structure
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 import { convertImageToWebP, generateVideoThumbnail, compressVideo } from "../../../utils/imageUtils";
@@ -21,8 +22,8 @@ const validationSchema = Yup.object().shape({
 const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
 
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
-  const [mqt, setMqt] = useState<any[]>([]); // Measured Quality Types
+  const { data: sections = [] } = useQuestionSections<any>();
+  const { data: mqt = [] } = useMeasuredQualityTypes<any>(); // Measured Quality Types
   const [optionMeasuredQualities, setOptionMeasuredQualities] = useState<any>({});
   const [useMQTAsOptions, setUseMQTAsOptions] = React.useState(false);
   const navigate = useNavigate();
@@ -262,31 +263,6 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [formikValues, setFormikValues] = useState(initialValues);
 
 
-
-  // Fetch sections and measured quality types on mount (but do not fetch scores)
-  useEffect(() => {
-    const fetchSections = async () => {
-      try {
-        const response = await ReadQuestionSectionData();
-        setSections(response.data);
-      } catch (error) {
-        setSections([]);
-      }
-    };
-    fetchSections();
-  }, []);
-
-  useEffect(() => {
-    const fetchMQT = async () => {
-      try {
-        const response = await ReadMeasuredQualityTypes();
-        setMqt(response.data);
-      } catch (error) {
-        setMqt([]);
-      }
-    };
-    fetchMQT();
-  }, []);
 
   // NEW: Fetch games on mount
   useEffect(() => {

@@ -8,6 +8,7 @@ import {
   Dispatch,
   SetStateAction,
 } from "react";
+import { useQueryClient } from "react-query";
 import { LayoutSplashScreen } from "../../../../_metronic/layout/core";
 import { User, Scope } from "./_models";
 import { allows } from "./permissions";
@@ -37,6 +38,7 @@ const useAuth = () => {
 
 const AuthProvider: FC<WithChildren> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | undefined>();
+  const queryClient = useQueryClient();
 
   const logout = async () => {
     // Phase 18: best-effort POST `/auth/logout` — server revokes the access-jti
@@ -50,6 +52,10 @@ const AuthProvider: FC<WithChildren> = ({ children }) => {
       // ignore — we still want to clear local state even if the server call fails
     }
     setCurrentUser(undefined);
+    // Drop any user-scoped React Query caches (lookups are filtered by
+    // user scope server-side, so a next-login under a different account
+    // must not see the previous user's list).
+    queryClient.clear();
   };
 
   // Mirrors backend AuthorizationService.allows() — see permissions.ts.
@@ -82,13 +88,21 @@ const AuthInit: FC<WithChildren> = ({ children }) => {
     const bootstrap = async () => {
       if (didRequest.current) return;
       didRequest.current = true;
+      console.log("[SESSION-DEBUG] AuthInit bootstrap — calling /auth/me, pathname=" + window.location.pathname);
       try {
         // Cookie (cn_at) is auto-attached via axios withCredentials.
         const { data } = await getCurrentUser();
         if (data) {
+          console.log("[SESSION-DEBUG] AuthInit /auth/me OK — userId=" + (data as any)?.id);
           setCurrentUser(data);
+        } else {
+          console.log("[SESSION-DEBUG] AuthInit /auth/me returned no body");
         }
-      } catch (error) {
+      } catch (error: any) {
+        console.log(
+          "[SESSION-DEBUG] AuthInit /auth/me FAILED status=" + (error?.response?.status ?? "n/a") +
+          " msg=" + (error?.message ?? "n/a")
+        );
         // 401 (no cookie / expired) is the normal "not logged in" path.
         // Don't toast — the response interceptor already redirected.
         // Silently fall through to splash-off; PrivateRoutes will gate.

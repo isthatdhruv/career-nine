@@ -289,6 +289,29 @@ const DemographicDetailsPage: React.FC = () => {
         fetchAssessmentData(String(assessmentId)),
       ]);
 
+      // Dev: Auto-fill bypasses instruction/section-select screens after
+      // demographics so the test run lands on questions immediately. The
+      // prefill payload itself is consumed (and cleared) by
+      // SectionQuestionPage on mount.
+      if (sessionStorage.getItem('devAutoFillPrefill')) {
+        const rawData = sessionStorage.getItem('assessmentData');
+        if (rawData) {
+          try {
+            const parsed = JSON.parse(rawData);
+            const q = Array.isArray(parsed) ? parsed[0] : parsed;
+            const firstSectionId = q?.sections?.[0]?.section?.sectionId;
+            if (firstSectionId != null) {
+              navigate(
+                `/studentAssessment/sections/${firstSectionId}/questions/0`,
+              );
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to parse assessmentData for dev autofill:', e);
+          }
+        }
+      }
+
       navigate('/general-instructions');
     } catch (error: any) {
       console.error('Error submitting demographics:', error);

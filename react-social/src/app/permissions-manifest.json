@@ -108,11 +108,20 @@
     "/roles/role",
     "/unified-report-management"
   ],
+  "report_type.create": [
+    "/admin/report-types/create"
+  ],
+  "report_type.read": [
+    "/admin/report-types"
+  ],
+  "report_type.update": [
+    "/admin/report-types/edit/:id"
+  ],
   "role.assign": [
     "/user-management/roles/manage"
   ],
   "student.read": [
-    "/live-tracking",
+    "/admin/jwt-tokens",
     "/login/reset-password/enter-email",
     "/school/assigned-students",
     "/school/group-student",
@@ -131,7 +140,7 @@
     "/upload-excel"
   ],
   "student_management.read": [
-    "auth}\r\n        <Route path="
+    "auth}\n        <Route path="
   ],
   "user.read": [
     "/faculty/registration-details",

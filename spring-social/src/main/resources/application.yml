@@ -140,6 +140,11 @@ management:
   health:
     redis:
       enabled: true
+    # Mail health probe is opt-in: it AUTHs to SMTP on every check, which is
+    # noisy in dev where SMTP_PASSWORD is usually empty. Enable per-profile
+    # (sandbox / production) where real creds are configured.
+    mail:
+      enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
 
 app:
   googleAPIJSON: classpath:google.json
@@ -206,8 +211,10 @@ spring:
     activate:
       on-profile: dev
     import:
-      - optional:file:./.env.dev[.properties]
-      - optional:file:../.env.dev[.properties]
+      # - optional:file:./.env.dev[.properties]
+      # - optional:file:../.env.dev[.properties]
+      - optional:file:./.env.staging[.properties]
+      - optional:file:../.env.staging[.properties]
   datasource:
     url: jdbc:mysql://localhost:3307/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
     username: root
@@ -263,7 +270,7 @@ app:
   cookie:
     secure: false
   cors:
-    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in,https://erp.aktu.ac.in,https://leetcode.com,http://192.168.0.204:8443,http://localhost:8080
+    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in,https://erp.aktu.ac.in,https://leetcode.com,http://192.168.0.204:8443,http://localhost:8080,https://staging-dashboard.career-9.com,https://staging-assessment.career-9.com,https://api-staging.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://api.career-9.com
   oauth2:
     authorizedRedirectUris:
       - https://student.kccitm.in/oauth2/redirect

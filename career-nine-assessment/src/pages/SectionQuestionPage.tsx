@@ -368,16 +368,29 @@ const SectionQuestionPage: React.FC = () => {
     if (!questionnaire?.sections) return;
 
     // Dev-only autofill bypass: AllottedAssessmentPage hands a fully random
-    // answer set via route state. Seed React state from it and skip the
-    // Redis partial-restore so dev runs never read prior real progress.
-    const devPrefill = (location.state as any)?.devPrefill as
-      | {
-          answers: Record<string, Record<number, number[]>>;
-          rankingAnswers: Record<string, Record<number, Record<number, number>>>;
-          textAnswers: Record<string, Record<number, Record<number, string>>>;
+    // answer set via route state OR sessionStorage (the latter survives the
+    // demographics hop when those fields are required). Seed React state
+    // from it and skip the Redis partial-restore so dev runs never read
+    // prior real progress.
+    type DevPrefill = {
+      answers: Record<string, Record<number, number[]>>;
+      rankingAnswers: Record<string, Record<number, Record<number, number>>>;
+      textAnswers: Record<string, Record<number, Record<number, string>>>;
+    };
+    let devPrefill = (location.state as any)?.devPrefill as DevPrefill | undefined;
+    if (!devPrefill) {
+      const stored = sessionStorage.getItem('devAutoFillPrefill');
+      if (stored) {
+        try {
+          devPrefill = JSON.parse(stored) as DevPrefill;
+        } catch (e) {
+          console.error('Failed to parse devAutoFillPrefill:', e);
         }
-      | undefined;
+      }
+    }
     if (devPrefill) {
+      // One-shot: clear so navigating back here later doesn't re-seed.
+      sessionStorage.removeItem('devAutoFillPrefill');
       didRestoreRef.current = true;
       setAnswers(devPrefill.answers || {});
       setRankingAnswers(devPrefill.rankingAnswers || {});

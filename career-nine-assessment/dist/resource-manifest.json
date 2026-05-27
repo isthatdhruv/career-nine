@@ -1,7 +1,12 @@
 {
-  "version": "mpl0j65n",
-  "generated": "2026-05-25T09:37:32.651Z",
+  "version": "mpnuygai",
+  "generated": "2026-05-27T09:24:46.458Z",
   "resources": [
+    {
+      "url": "/assessment-cache/.DS_Store",
+      "size": 8196,
+      "priority": "assessment"
+    },
     {
       "url": "/assessment-cache/43/config.json",
       "size": 289087,
@@ -70,6 +75,11 @@
     {
       "url": "/assets/game/tiger.webp",
       "size": 87960,
+      "priority": "game"
+    },
+    {
+      "url": "/game-scenes/.DS_Store",
+      "size": 8196,
       "priority": "game"
     },
     {
@@ -148,32 +158,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-BbjftPBc.js",
+      "url": "/assets/HydroTubeGame-Dm3aWfA6.js",
       "size": 23331,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-CwXYpAOR.js",
+      "url": "/assets/JungleSpotGame-BEzbm__C.js",
       "size": 23397,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-Dj7I2ADh.js",
+      "url": "/assets/RabbitPathGame-BuV6j2E6.js",
       "size": 26981,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-BxsVnMtG.js",
+      "url": "/assets/SectionInstructionPage-BokWLU--.js",
       "size": 4206,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-DBeQIiJZ.js",
-      "size": 174039,
+      "url": "/assets/SectionQuestionPage-BGLYfwBu.js",
+      "size": 174344,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-DZH1kh99.js",
+      "url": "/assets/SelectSectionPage-BnmInejF.js",
       "size": 5261,
       "priority": "critical"
     },
@@ -183,13 +193,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/firebase-BgISDq8X.js",
+      "url": "/assets/firebase-BOVtng-N.js",
       "size": 360,
       "priority": "critical"
     },
     {
-      "url": "/assets/firebase-Illc6rc8.js",
-      "size": 218011,
+      "url": "/assets/firebase-CHGGj5-7.js",
+      "size": 222580,
       "priority": "critical"
     },
     {
@@ -198,17 +208,17 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-CB9ncFiR.js",
+      "url": "/assets/index-g-SzyX9_.js",
+      "size": 999709,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-t0T0PCaI.js",
       "size": 1274010,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-kYbGuRj4.js",
-      "size": 1002753,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/index.es-CsaJelsc.js",
+      "url": "/assets/index.es-CkRDneRW.js",
       "size": 158432,
       "priority": "critical"
     },
@@ -223,7 +233,7 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/router-B4gyqhFH.js",
+      "url": "/assets/router-Df5zuH9P.js",
       "size": 31101,
       "priority": "critical"
     },
@@ -233,13 +243,23 @@
       "priority": "critical"
     },
     {
-      "url": "/workbox-dcde9eb3.js",
-      "size": 21434,
+      "url": "/workbox-66610c77.js",
+      "size": 21445,
       "priority": "critical"
+    },
+    {
+      "url": "/.DS_Store",
+      "size": 6148,
+      "priority": "other"
     },
     {
       "url": "/_headers",
       "size": 189,
+      "priority": "other"
+    },
+    {
+      "url": "/assets/.DS_Store",
+      "size": 8196,
       "priority": "other"
     },
     {
@@ -259,16 +279,16 @@
     }
   ],
   "summary": {
-    "total": 51,
-    "totalSize": 25427513,
+    "total": 55,
+    "totalSize": 25460090,
     "byPriority": {
       "assessment": {
-        "count": 6,
-        "size": 1722755
+        "count": 7,
+        "size": 1730951
       },
       "game": {
-        "count": 11,
-        "size": 2527717
+        "count": 12,
+        "size": 2535913
       },
       "deferred": {
         "count": 12,
@@ -276,11 +296,11 @@
       },
       "critical": {
         "count": 18,
-        "size": 3274134
+        "size": 3275975
       },
       "other": {
-        "count": 4,
-        "size": 927428
+        "count": 6,
+        "size": 941772
       }
     }
   }

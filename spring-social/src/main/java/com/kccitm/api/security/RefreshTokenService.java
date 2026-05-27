@@ -11,8 +11,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.config.AppProperties;
+import com.kccitm.api.model.JwtTokenAudit.TokenType;
 import com.kccitm.api.model.RefreshToken;
 import com.kccitm.api.repository.RefreshTokenRepository;
+
+import java.util.Collections;
+import java.util.Date;
 
 /**
  * Server-side lifecycle for the OPAQUE refresh tokens introduced in Phase 18.
@@ -57,6 +61,12 @@ public class RefreshTokenService {
     @Autowired
     private AppProperties appProperties;
 
+    @Autowired(required = false)
+    private JwtTokenAuditService auditService;
+
+    @Autowired(required = false)
+    private com.kccitm.api.repository.UserRepository userRepository;
+
     /**
      * Issue a fresh refresh token for a user and return its jti.
      * The jti IS the cookie value the client sees — opaque, UUID v4.
@@ -83,6 +93,19 @@ public class RefreshTokenService {
         row.setUserAgent(safeTrim(userAgent, 255));
         row.setIp(safeTrim(ip, 45));
         repo.save(row);
+
+        if (auditService != null) {
+            String email = null;
+            if (userRepository != null) {
+                try {
+                    email = userRepository.findById(userId).map(u -> u.getEmail()).orElse(null);
+                } catch (Exception ignored) { }
+            }
+            Date issued = Date.from(now.atZone(java.time.ZoneId.systemDefault()).toInstant());
+            Date expires = Date.from(exp.atZone(java.time.ZoneId.systemDefault()).toInstant());
+            auditService.record(jti, userId, email, Collections.emptyList(), false,
+                    issued, expires, TokenType.REFRESH);
+        }
         return jti;
     }
 
@@ -142,6 +165,9 @@ public class RefreshTokenService {
             logger.warn("Lost rotation race for jti={} userId={}", oldJti, old.getUserId());
             throw new RefreshTokenReuseException("Refresh token already rotated");
         }
+        if (auditService != null) {
+            auditService.revoke(oldJti, null, "Rotated to " + newJti);
+        }
         return newJti;
     }
 
@@ -156,6 +182,9 @@ public class RefreshTokenService {
             return;
         }
         repo.revokeIfLive(jti, LocalDateTime.now(), null);
+        if (auditService != null) {
+            auditService.revoke(jti, null, "User logout");
+        }
     }
 
     /**

@@ -2,8 +2,10 @@ import clsx from "clsx";
 import { Field, Form, Formik } from "formik";
 import { useState } from "react";
 import { Modal, Button } from "react-bootstrap";
+import { useQueryClient } from "react-query";
 import * as Yup from "yup";
 import { CreateToolData } from "../API/Tool_APIs";
+import { lookupKeys } from "../../../lib/queries/lookups";
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().required("Tool name is required"),
@@ -25,6 +27,7 @@ interface ToolCreateModalProps {
 
 const ToolCreateModal = ({ show, onHide, setPageLoading }: ToolCreateModalProps) => {
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   const initialValues = {
     name: "",
@@ -53,6 +56,7 @@ const ToolCreateModal = ({ show, onHide, setPageLoading }: ToolCreateModalProps)
               price: isFreeBool ? 0 : Number(values.price),
             };
             await CreateToolData(payload);
+            queryClient.invalidateQueries(lookupKeys.tools);
             resetForm();
             onHide();
           } catch (error) {

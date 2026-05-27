@@ -51,6 +51,8 @@ export function isCookieAuthRuntimeActive(): boolean {
  * cannot be cleared from JS — POST /auth/logout handles that server-side.
  */
 export function resetAuthState() {
+  console.log('[ASSESS-SESSION-DEBUG] resetAuthState() called — clearing cn_csrf, resetting runtime flag'
+    + ' pathname=' + (typeof window !== 'undefined' ? window.location.pathname : 'n/a'))
   cookieAuthRuntimeActive = COOKIE_AUTH_FLAG
   document.cookie = 'cn_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
 }
@@ -145,6 +147,14 @@ http.interceptors.response.use(
   async (error: AxiosError) => {
     const config = error.config as (AxiosRequestConfig & { __retryCount?: number }) | undefined
 
+    console.log(
+      '[ASSESS-SESSION-DEBUG] interceptor error url=' + (config?.url ?? 'n/a') +
+      ' method=' + (config?.method ?? 'n/a') +
+      ' status=' + (error.response?.status ?? 'no-response') +
+      ' cookieAuthRuntimeActive=' + cookieAuthRuntimeActive +
+      ' cookies=' + (typeof document !== 'undefined' ? document.cookie : 'n/a')
+    )
+
     // 1) Retry on network / 5xx with exponential backoff.
     if (config) {
       const retryCount = config.__retryCount || 0
@@ -152,6 +162,10 @@ http.interceptors.response.use(
       if (isRetryable && retryCount < MAX_RETRIES) {
         config.__retryCount = retryCount + 1
         const delay = BASE_DELAY_MS * Math.pow(2, config.__retryCount - 1)
+        console.log(
+          '[ASSESS-SESSION-DEBUG] interceptor RETRY url=' + config.url +
+          ' attempt=' + config.__retryCount + '/' + MAX_RETRIES + ' delayMs=' + delay
+        )
         await new Promise((resolve) => setTimeout(resolve, delay))
         return http(config)
       }
@@ -174,8 +188,17 @@ http.interceptors.response.use(
         !isPreLoginPage &&
         !publicCall &&
         (status === 403 || (status === 401 && cookieAuthRuntimeActive))
+      console.log(
+        '[ASSESS-SESSION-DEBUG] interceptor redirect-decision status=' + status +
+        ' path=' + path +
+        ' isDeniedPage=' + isDeniedPage +
+        ' isPreLoginPage=' + isPreLoginPage +
+        ' publicCall=' + publicCall +
+        ' shouldRedirect=' + shouldRedirect
+      )
       if (shouldRedirect) {
         const from = encodeURIComponent(path + window.location.search)
+        console.log('[ASSESS-SESSION-DEBUG] interceptor REDIRECTING TO /permission-denied from=' + path)
         window.location.href = `/permission-denied?from=${from}`
       }
     }

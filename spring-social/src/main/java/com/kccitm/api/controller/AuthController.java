@@ -46,6 +46,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
 import com.kccitm.api.security.CurrentScopes;
 import com.kccitm.api.security.JtiDenyListService;
+import com.kccitm.api.security.JwtTokenAuditService;
 import com.kccitm.api.security.RefreshTokenService;
 import com.kccitm.api.security.RefreshTokenService.RefreshTokenReuseException;
 import com.kccitm.api.security.CustomUserDetailsService;
@@ -111,6 +112,9 @@ public class AuthController {
 
     @Autowired
     private JtiDenyListService jtiDenyListService;
+
+    @Autowired(required = false)
+    private JwtTokenAuditService jwtTokenAuditService;
 
     @Autowired
     private RoleUrlRepository roleUrlRepository;
@@ -294,7 +298,11 @@ public class AuthController {
         // Phase 18-03: revoke the access-token jti (best-effort — no-op on missing/legacy tokens).
         String accessJti = readAccessTokenJti(request);
         if (accessJti != null) {
-            jtiDenyListService.revoke(accessJti);
+            if (jwtTokenAuditService != null) {
+                jwtTokenAuditService.revoke(accessJti, null, "User logout");
+            } else {
+                jtiDenyListService.revoke(accessJti);
+            }
         }
 
         // Phase 18-02: revoke the refresh-token row (idempotent — no-op on missing cookie).
@@ -326,24 +334,46 @@ public class AuthController {
     // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06 / 18-02).
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(HttpServletRequest request, HttpServletResponse response) {
+        String dbgIp = UserActivityLogService.getClientIp(request);
+        String dbgUa = request.getHeader("User-Agent");
+        Cookie[] dbgCookies = request.getCookies();
+        StringBuilder dbgNames = new StringBuilder();
+        if (dbgCookies != null) {
+            for (Cookie c : dbgCookies) {
+                if (dbgNames.length() > 0) dbgNames.append(',');
+                dbgNames.append(c.getName());
+            }
+        }
+        System.out.println("[SESSION-DEBUG] REFRESH ENTRY ip=" + dbgIp
+                + " ua=" + (dbgUa == null ? "null" : dbgUa.substring(0, Math.min(40, dbgUa.length())))
+                + " origin=" + request.getHeader("Origin")
+                + " referer=" + request.getHeader("Referer")
+                + " cookieNames=[" + dbgNames + "]");
+
         Optional<String> rtOpt = authCookieService.readRefreshTokenCookie(request);
         if (!rtOpt.isPresent()) {
+            System.out.println("[SESSION-DEBUG] REFRESH FAIL no-cn_rt-cookie ip=" + dbgIp);
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         String oldJti = rtOpt.get();
+        System.out.println("[SESSION-DEBUG] REFRESH oldJti=" + oldJti);
         // Pre-rotation validation + user-id lookup. We need the userId BEFORE rotating
         // because the new access token must encode it.
         if (!refreshTokenService.validate(oldJti).isPresent()) {
+            System.out.println("[SESSION-DEBUG] REFRESH FAIL validate-failed oldJti=" + oldJti
+                    + " — row missing / expired / revoked");
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         Long userId = refreshTokenService.getUserIdForJti(oldJti);
         if (userId == null) {
+            System.out.println("[SESSION-DEBUG] REFRESH FAIL no-userId oldJti=" + oldJti);
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
+        System.out.println("[SESSION-DEBUG] REFRESH validated userId=" + userId + " oldJti=" + oldJti);
 
         String userAgent = request.getHeader("User-Agent");
         String ip = UserActivityLogService.getClientIp(request);
@@ -351,8 +381,11 @@ public class AuthController {
         String newJti;
         try {
             newJti = refreshTokenService.rotate(oldJti, userAgent, ip);
+            System.out.println("[SESSION-DEBUG] REFRESH rotated userId=" + userId + " oldJti=" + oldJti + " newJti=" + newJti);
         } catch (RefreshTokenReuseException ex) {
             // Race lost OR replay attempt. Clear cookies; the client must re-login.
+            System.out.println("[SESSION-DEBUG] REFRESH FAIL race-lost-or-replay userId=" + userId
+                    + " oldJti=" + oldJti + " msg=" + ex.getMessage());
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -362,6 +395,7 @@ public class AuthController {
         // on the next request — refresh path lacks an Authentication context).
         User refreshedUser = userRepository.findById(userId).orElse(null);
         if (refreshedUser == null) {
+            System.out.println("[SESSION-DEBUG] REFRESH FAIL user-not-found userId=" + userId);
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -370,6 +404,7 @@ public class AuthController {
 
         authCookieService.setAccessToken(response, accessJwt);
         authCookieService.setRefreshToken(response, newJti);
+        System.out.println("[SESSION-DEBUG] REFRESH SUCCESS userId=" + userId + " newJti=" + newJti + " jwtLen=" + accessJwt.length());
         return ResponseEntity.noContent().build();
     }
 
@@ -387,7 +422,9 @@ public class AuthController {
      */
     @GetMapping("/me")
     public ResponseEntity<?> me(@AuthenticationPrincipal UserPrincipal principal) {
+        System.out.println("[SESSION-DEBUG] ME ENTRY principal=" + (principal == null ? "null" : ("id=" + principal.getId() + " email=" + principal.getEmail())));
         if (principal == null) {
+            System.out.println("[SESSION-DEBUG] ME 401 — no principal in security context");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 

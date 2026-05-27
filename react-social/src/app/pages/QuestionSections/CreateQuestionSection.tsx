@@ -1,28 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ReadQuestionSectionDataList } from "./API/Question_Section_APIs";
+import { useQuestionSections } from "../../lib/queries/lookups";
 import QuestionSectionTable from "./components/QuestionSectionTable";
 import QuestionSectionRecycleBinModal from "./components/QuestionSectionRecycleBinModal";
 import PageHeader from "../../components/PageHeader";
 
 const QuestionSectionPage = () => {
-  const [questionSectionData, setQuestionSectionData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data: questionSectionData = [], isLoading: loading } = useQuestionSections<any>();
   const [pageLoading, setPageLoading] = useState(["false"]);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    setLoading(true);
-    try {
-      ReadQuestionSectionDataList().then((data) => {
-        setQuestionSectionData(data.data);
-        setLoading(false);
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  }, [pageLoading]);
 
   return (
     <div className="ph-page">

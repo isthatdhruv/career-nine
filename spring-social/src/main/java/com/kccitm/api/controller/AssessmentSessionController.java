@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Optional;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -112,11 +113,20 @@ public class AssessmentSessionController {
     @PostMapping("/assessment-session")
     public ResponseEntity<?> issueAssessmentSession(
             @Valid @RequestBody AssessmentSessionRequest req,
+            HttpServletRequest request,
             HttpServletResponse response) {
+
+        System.out.println("[ASSESS-SESSION-DEBUG] MINT ENTRY userStudentId=" + req.userStudentId
+                + " assessmentId=" + req.assessmentId
+                + " origin=" + request.getHeader("Origin")
+                + " referer=" + request.getHeader("Referer")
+                + " ua=" + (request.getHeader("User-Agent") == null ? "null"
+                        : request.getHeader("User-Agent").substring(0, Math.min(40, request.getHeader("User-Agent").length()))));
 
         // 1. Look up student + per-institute feature flag.
         Optional<UserStudent> studentOpt = userStudentRepo.findById(req.userStudentId);
         if (!studentOpt.isPresent()) {
+            System.out.println("[ASSESS-SESSION-DEBUG] MINT FAIL unknown-student userStudentId=" + req.userStudentId);
             logger.warn("Assessment-session: unknown student userStudentId={}", req.userStudentId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Unknown student");
         }
@@ -132,6 +142,8 @@ public class AssessmentSessionController {
             boolean enabled = instOpt.isPresent()
                     && Boolean.TRUE.equals(instOpt.get().getAssessmentCookieAuthEnabled());
             if (!enabled) {
+                System.out.println("[ASSESS-SESSION-DEBUG] MINT FAIL institute-flag-off institute=" + institute.getInstituteCode()
+                        + " userStudentId=" + req.userStudentId);
                 logger.info("Assessment-session: cookie auth not enabled for institute={}, falling back to legacy header path",
                         institute.getInstituteCode());
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -144,6 +156,7 @@ public class AssessmentSessionController {
             boolean b2cEnabled = Boolean.parseBoolean(
                     env.getProperty("app.auth.assessmentCookieAuthB2C", "false"));
             if (!b2cEnabled) {
+                System.out.println("[ASSESS-SESSION-DEBUG] MINT FAIL b2c-flag-off userStudentId=" + req.userStudentId);
                 logger.info("Assessment-session: B2C cookie auth disabled (no institute), userStudentId={}",
                         req.userStudentId);
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -157,6 +170,8 @@ public class AssessmentSessionController {
         Optional<StudentAssessmentMapping> mapping = mappingRepo
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(req.userStudentId, req.assessmentId);
         if (!mapping.isPresent()) {
+            System.out.println("[ASSESS-SESSION-DEBUG] MINT FAIL enrolment-missing userStudentId=" + req.userStudentId
+                    + " assessmentId=" + req.assessmentId);
             logger.warn("Assessment-session: enrolment check failed userStudentId={} assessmentId={}",
                     req.userStudentId, req.assessmentId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -169,6 +184,8 @@ public class AssessmentSessionController {
         // recorded DOB are not locked out) but log it. This closes the pure-id enumeration path.
         Date suppliedDob = parseDob(req.dob);
         if (suppliedDob == null) {
+            System.out.println("[ASSESS-SESSION-DEBUG] MINT FAIL bad-dob userStudentId=" + req.userStudentId
+                    + " rawDob=" + req.dob);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Invalid date of birth; expected format dd-MM-yyyy");
         }
@@ -176,10 +193,12 @@ public class AssessmentSessionController {
         Date storedDob = info != null ? info.getStudentDob() : null;
         if (storedDob != null) {
             if (!sameDay(storedDob, suppliedDob)) {
+                System.out.println("[ASSESS-SESSION-DEBUG] MINT FAIL dob-mismatch userStudentId=" + req.userStudentId);
                 logger.warn("Assessment-session: DOB mismatch userStudentId={}", req.userStudentId);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Identity verification failed");
             }
         } else {
+            System.out.println("[ASSESS-SESSION-DEBUG] MINT WARN no-dob-on-record userStudentId=" + req.userStudentId);
             logger.warn("Assessment-session: no DOB on record for userStudentId={} — minting without DOB proof",
                     req.userStudentId);
         }
@@ -200,6 +219,8 @@ public class AssessmentSessionController {
         authCookieService.issueCsrfCookie(response,
                 (int) (assessmentTokenExpirationMsec / 1000));
 
+        System.out.println("[ASSESS-SESSION-DEBUG] MINT SUCCESS userStudentId=" + req.userStudentId
+                + " assessmentId=" + req.assessmentId + " ttlMsec=" + assessmentTokenExpirationMsec);
         logger.info("Assessment-session issued userStudentId={} assessmentId={}",
                 req.userStudentId, req.assessmentId);
         return ResponseEntity.ok(Collections.singletonMap("ok", true));

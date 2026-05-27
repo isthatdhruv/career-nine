@@ -6,10 +6,10 @@ import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import {
   DeleteQuestionData,
-  ReadMeasuredQualityTypes,
   ExportQuestionsToExcel,
   GetMqtCountsPerQuestion,
 } from "../API/Question_APIs";
+import { useMeasuredQualityTypes } from "../../../lib/queries/lookups";
 import QuestionLanguageModal from "./QuestionLanguageModal";
 import QuestionBulkUploadModal from "./QuestionBulkUploadModal";
 import * as XLSX from "xlsx";
@@ -22,7 +22,7 @@ const QuestionTable = (props: {
 }) => {
   const navigate = useNavigate();
   const [selectedMeasuredQualityTypesByQuestion, setSelectedMeasuredQualityTypesByQuestion] = useState<{ [key: number]: any[] }>({});
-  const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
+  const { data: measuredQualityTypes = [] } = useMeasuredQualityTypes<any>();
   const [mqtCounts, setMqtCounts] = useState<Record<number, number>>({});
   const [mqtSortDir, setMqtSortDir] = useState<"none" | "asc" | "desc">("none");
   const [searchText, setSearchText] = useState("");
@@ -35,18 +35,6 @@ const QuestionTable = (props: {
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
-
-  useEffect(() => {
-    const fetchMeasuredQualityTypes = async () => {
-      try {
-        const response = await ReadMeasuredQualityTypes();
-        setMeasuredQualityTypes(response.data);
-      } catch (error) {
-        console.error("Error fetching MeasuredQualityTypes:", error);
-      }
-    };
-    fetchMeasuredQualityTypes();
-  }, []);
 
   useEffect(() => {
     GetMqtCountsPerQuestion()

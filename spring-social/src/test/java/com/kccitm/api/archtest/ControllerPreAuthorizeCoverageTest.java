@@ -133,7 +133,11 @@ public class ControllerPreAuthorizeCoverageTest {
             "com.kccitm.api.controller.career9.b2c.ReportPreparationController#prepareReport",
             "com.kccitm.api.controller.career9.b2c.EntitlementController#redeemToken",
             "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getMappingInfoByToken",
-            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#registerStudentByToken"
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#registerStudentByToken",
+
+            // Operator-run 4-pager HTML template publish to DigitalOcean Spaces — runs from
+            // an authenticated operator shell, not user JWT; gated by network reachability only.
+            "com.kccitm.api.controller.career9.FourPagerTemplateController#uploadTemplates"
 
             // Plan 15-04 DEFERRED block removed by Plan 15-04 FINAL COMPLETION (2026-05-11).
             // All 17 assessment / questionnaire / scoring / report-generation controllers
