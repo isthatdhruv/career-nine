@@ -3,7 +3,7 @@ import { Field, Form, Formik, FieldArray } from "formik";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
-import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
+import { useQuestionSections } from "../../../lib/queries/lookups";
 import QuestionSectionCreateModal from "../../QuestionSections/components/QuestionSectionCreateModal";
 
 const validationSchema = Yup.object().shape({
@@ -14,7 +14,7 @@ const AssessmentSection = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const [sections, setSections] = useState<any[]>([]);
+  const { data: sections = [] } = useQuestionSections<any>();
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [initialValues, setInitialValues] = useState({ sectionIds: [] as string[] });
 
@@ -25,20 +25,6 @@ const AssessmentSection = () => {
       setInitialValues({ sectionIds: [] });
     }
   }, []);
-
-  // Fetch sections
-  useEffect(() => {
-    const fetchSections = async () => {
-      try {
-        const response = await ReadQuestionSectionData();
-        setSections(response.data || []);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      }
-    };
-
-    fetchSections();
-  }, [!showSectionModal]);
 
   return (
     <div className="container py-5">

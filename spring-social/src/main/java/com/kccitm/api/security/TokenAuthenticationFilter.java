@@ -82,7 +82,27 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = getJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+            Cookie[] dbgCookies = request.getCookies();
+            StringBuilder dbgCookieNames = new StringBuilder();
+            if (dbgCookies != null) {
+                for (Cookie c : dbgCookies) {
+                    if (dbgCookieNames.length() > 0) dbgCookieNames.append(',');
+                    dbgCookieNames.append(c.getName()).append('=').append(c.getValue() == null || c.getValue().isEmpty() ? "<empty>" : "<set:" + c.getValue().length() + ">");
+                }
+            }
+            System.out.println("[SESSION-DEBUG] FILTER ENTRY uri=" + request.getRequestURI()
+                    + " method=" + request.getMethod()
+                    + " origin=" + request.getHeader("Origin")
+                    + " referer=" + request.getHeader("Referer")
+                    + " cookies=[" + dbgCookieNames + "]"
+                    + " bearer=" + (request.getHeader("Authorization") != null)
+                    + " jwtExtracted=" + (jwt != null)
+                    + " jwtLen=" + (jwt == null ? 0 : jwt.length()));
+
+            boolean dbgValid = StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt);
+            System.out.println("[SESSION-DEBUG] FILTER validateToken=" + dbgValid + " uri=" + request.getRequestURI());
+
+            if (StringUtils.hasText(jwt) && dbgValid) {
                 // Phase 18: consult the jti deny list AFTER signature/expiry validation
                 // and BEFORE populating the security context. A revoked jti causes us to
                 // skip setAuthentication entirely — the unauthenticated request falls
@@ -91,7 +111,10 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 // Legacy v2.0 tokens (no `jti` claim) surface as null from getJtiFromToken
                 // and isRevoked(null) returns false, so they pass through to natural expiry.
                 String jti = tokenProvider.getJtiFromToken(jwt);
-                if (jtiDenyListService.isRevoked(jti)) {
+                boolean dbgRevoked = jtiDenyListService.isRevoked(jti);
+                System.out.println("[SESSION-DEBUG] FILTER jti=" + jti + " revoked=" + dbgRevoked + " uri=" + request.getRequestURI());
+                if (dbgRevoked) {
+                    System.out.println("[SESSION-DEBUG] FILTER REJECTED-DENYLIST jti=" + jti + " uri=" + request.getRequestURI());
                     logger.warn("Rejected request — jti is on deny list (jti={})", jti);
                     filterChain.doFilter(request, response);
                     return;
@@ -212,9 +235,14 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception ex) {
+            System.out.println("[SESSION-DEBUG] FILTER EXCEPTION uri=" + request.getRequestURI() + " ex=" + ex.getClass().getSimpleName() + " msg=" + ex.getMessage());
+            ex.printStackTrace();
             logger.error("Could not set user authentication in security context", ex);
         }
 
+        System.out.println("[SESSION-DEBUG] FILTER EXIT uri=" + request.getRequestURI()
+                + " authenticated=" + (SecurityContextHolder.getContext().getAuthentication() != null
+                        && SecurityContextHolder.getContext().getAuthentication().isAuthenticated()));
         filterChain.doFilter(request, response);
     }
 

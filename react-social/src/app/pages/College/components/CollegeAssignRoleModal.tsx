@@ -6,7 +6,7 @@ import menu2 from "react-useanimations/lib/menu2";
 import { UpdateCollegeData } from "../API/College_APIs";
 import { ReadBoardData } from "../../Board/API/Board_APIs";
 import { ReadContactInformationData } from "../../ContactPerson/API/Contact_Person_APIs";
-import { readRoleData } from "../../../modules/role_roleGroup/components/core/Role_RoleGroup_APIs";
+import { useRoles } from "../../../lib/queries/lookups";
 
 
 type ContactPerson = {
@@ -66,9 +66,30 @@ const CollegeAssignRoleModal = (props: Props) => {
   const [selectedBoardIndexes, setSelectedBoardIndexes] = useState<number[]>([]);
   const [boardDropdownOpen, setBoardDropdownOpen] = useState(false);
 
-  // Roles from API
+  // Roles from API (cached via useRoles hook)
+  const { data: rawRolesFromHook = [] } = useRoles<any>();
   const [roleOptions, setRoleOptions] = useState<string[]>(FALLBACK_ROLE_OPTIONS);
   const [rolesLoading, setRolesLoading] = useState(false);
+
+  // Derive roleOptions from cached useRoles data.
+  useEffect(() => {
+    const rawRoles: any[] = Array.isArray(rawRolesFromHook)
+      ? rawRolesFromHook
+      : (rawRolesFromHook as any)?.data ?? (rawRolesFromHook as any)?.roles ?? [];
+    const roles: string[] = (rawRoles || [])
+      .map((r: any) => {
+        if (!r && r !== 0) return null;
+        if (typeof r === "string") return r;
+        if (typeof r === "object") {
+          return r.role ?? r.name ?? r.roleName ?? r.title ?? r.label ?? null;
+        }
+        return null;
+      })
+      .filter(Boolean) as string[];
+    if (roles.length > 0) setRoleOptions(roles);
+    else setRoleOptions(FALLBACK_ROLE_OPTIONS);
+    setRolesLoading(false);
+  }, [rawRolesFromHook]);
 
   useEffect(() => {
     if (!props.show) return;
@@ -137,49 +158,8 @@ const CollegeAssignRoleModal = (props: Props) => {
       }
     };
 
-    // Fetch roles from API
-    const fetchRoles = async () => {
-      setRolesLoading(true);
-      try {
-        const res = await readRoleData();
-        // Normalize different possible shapes: { data: { data: [...] } } or { data: [...] } or [...]
-        const rawRoles: any[] =
-          (res as any)?.data?.data ??
-          (res as any)?.data?.roles ??
-          (res as any)?.data ??
-          [];
-
-        // Try to extract string labels. If roles are objects, try common keys.
-        const roles: string[] = (rawRoles || [])
-          .map((r) => {
-            if (!r && r !== 0) return null;
-            if (typeof r === "string") return r;
-            if (typeof r === "object") {
-              // prefer name/role/roleName/title
-              return r.role ?? r.name ?? r.roleName ?? r.title ?? r.label ?? null;
-            }
-            return null;
-          })
-          .filter(Boolean) as string[];
-
-        if (roles.length > 0) {
-          setRoleOptions(roles);
-        } else {
-          // fallback if API returned empty
-          setRoleOptions(FALLBACK_ROLE_OPTIONS);
-        }
-      } catch (err) {
-        console.error("Failed to load roles:", err);
-        // fallback to default roles if API fails
-        setRoleOptions(FALLBACK_ROLE_OPTIONS);
-      } finally {
-        setRolesLoading(false);
-      }
-    };
-
     fetchContacts();
     fetchBoards();
-    fetchRoles();
   }, [props.show, props.data]);
 
   // Initialize per-contact role selections when contacts or selected indexes change.

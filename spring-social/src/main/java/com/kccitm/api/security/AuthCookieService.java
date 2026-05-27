@@ -84,6 +84,12 @@ public class AuthCookieService {
         String csrfValue = generateCsrfToken();
         response.addHeader("Set-Cookie",
                 buildSetCookie(CSRF_COOKIE, csrfValue, maxAge, /* httpOnly= */ false, secure, sameSite, "/", domain));
+
+        // Evict any stale host-only duplicates from a prior deployment that ran
+        // before app.cookie.domain was configured. See evictHostOnlyDuplicates
+        // javadoc for the duplicate-cookie scenario this guards against.
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, ACCESS_COOKIE, "/", true);
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, CSRF_COOKIE, "/", false);
     }
 
     /**
@@ -98,6 +104,7 @@ public class AuthCookieService {
         String csrfValue = generateCsrfToken();
         response.addHeader("Set-Cookie",
                 buildSetCookie(CSRF_COOKIE, csrfValue, maxAgeSeconds, /* httpOnly= */ false, secure, sameSite, "/", domain));
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, CSRF_COOKIE, "/", false);
     }
 
     /**
@@ -113,6 +120,8 @@ public class AuthCookieService {
                 buildSetCookie(ACCESS_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite, "/", domain));
         response.addHeader("Set-Cookie",
                 buildSetCookie(CSRF_COOKIE, "", 0, /* httpOnly= */ false, secure, sameSite, "/", domain));
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, ACCESS_COOKIE, "/", true);
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, CSRF_COOKIE, "/", false);
     }
 
     // ── Phase 18 Plan 02: split-token API (cn_at + cn_rt) ──────────────────
@@ -130,6 +139,7 @@ public class AuthCookieService {
         String domain = appProperties.getCookie().getDomain();
         response.addHeader("Set-Cookie",
                 buildSetCookie(ACCESS_COOKIE, accessJwt, maxAge, /* httpOnly= */ true, secure, sameSite, "/", domain));
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, ACCESS_COOKIE, "/", true);
     }
 
     /**
@@ -145,6 +155,7 @@ public class AuthCookieService {
         response.addHeader("Set-Cookie",
                 buildSetCookie(REFRESH_COOKIE, refreshJti, maxAge, /* httpOnly= */ true, secure, sameSite,
                         REFRESH_COOKIE_PATH, domain));
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, REFRESH_COOKIE, REFRESH_COOKIE_PATH, true);
     }
 
     /**
@@ -189,6 +200,7 @@ public class AuthCookieService {
         response.addHeader("Set-Cookie",
                 buildSetCookie(ASSESSMENT_SESSION_COOKIE, jwt, maxAgeSeconds,
                         /* httpOnly= */ true, secure, sameSite, "/", domain));
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, ASSESSMENT_SESSION_COOKIE, "/", true);
     }
 
     /**
@@ -203,6 +215,7 @@ public class AuthCookieService {
         response.addHeader("Set-Cookie",
                 buildSetCookie(ASSESSMENT_SESSION_COOKIE, "", 0,
                         /* httpOnly= */ true, secure, sameSite, "/", domain));
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, ASSESSMENT_SESSION_COOKIE, "/", true);
     }
 
     /**
@@ -226,6 +239,49 @@ public class AuthCookieService {
                         REFRESH_COOKIE_PATH, domain));
         response.addHeader("Set-Cookie",
                 buildSetCookie(ASSESSMENT_SESSION_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite, "/", domain));
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, ACCESS_COOKIE, "/", true);
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, CSRF_COOKIE, "/", false);
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, REFRESH_COOKIE, REFRESH_COOKIE_PATH, true);
+        evictHostOnlyDuplicates(response, domain, secure, sameSite, ASSESSMENT_SESSION_COOKIE, "/", true);
+    }
+
+    /**
+     * Emits a {@code Set-Cookie} header that deletes any stale host-only cookie
+     * (i.e. a cookie set WITHOUT a {@code Domain} attribute, scoped to the
+     * exact host of the original Set-Cookie) sharing the given name and path.
+     *
+     * <p>The duplicate-cookie scenario: a prior deployment ran with
+     * {@code app.cookie.domain} unset (or set to a different value), so the
+     * browser stored a host-only {@code cn_csrf} (and {@code cn_at}) cookie.
+     * The deployment was later switched to {@code domain: career-9.com}, which
+     * causes new Set-Cookie writes to live in a SEPARATE domain-scoped cookie
+     * jar. The browser now sends BOTH cookies on every request; Spring's
+     * default CSRF repo picks the first one, which is the stale host-only
+     * value, and the double-submit comparison fails with a 403.
+     *
+     * <p>To clear a host-only cookie the Set-Cookie must NOT carry a Domain
+     * attribute (per RFC 6265 §5.3.1, the host-only flag is set when Domain is
+     * absent at write time). We therefore emit {@code Set-Cookie: name=;
+     * Path=...; Max-Age=0} with no Domain. The browser matches it to the
+     * host-only entry and deletes it without touching the live
+     * Domain-scoped cookie we just wrote.
+     *
+     * <p>No-op when {@code domain} is null/empty, because in that case the live
+     * cookies themselves are host-only and there's no duplicate to evict.
+     *
+     * @param httpOnly whether the original cookie was {@code HttpOnly}. Some
+     *     browsers require the deletion Set-Cookie to mirror the original
+     *     flags exactly to match — replicating the live cookie's flags is the
+     *     safe default.
+     */
+    private static void evictHostOnlyDuplicates(HttpServletResponse response, String domain,
+                                                boolean secure, String sameSite,
+                                                String name, String path, boolean httpOnly) {
+        if (domain == null || domain.isEmpty()) {
+            return;
+        }
+        response.addHeader("Set-Cookie",
+                buildSetCookie(name, "", 0, httpOnly, secure, sameSite, path, /* domain= */ null));
     }
 
     private static String buildSetCookie(String name, String value, int maxAge,

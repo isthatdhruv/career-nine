@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Form, Spinner } from "react-bootstrap";
-import { ReadCollegeList } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import SchoolAssessmentMappingPanel from "../College/components/SchoolAssessmentMappingPanel";
 import AssessmentMappingPanel from "../College/components/AssessmentMappingPanel";
 
@@ -12,19 +12,10 @@ interface Institute {
 }
 
 const AssessmentMappingPage = () => {
-  const [institutes, setInstitutes] = useState<Institute[]>([]);
-  const [loadingInstitutes, setLoadingInstitutes] = useState(false);
+  const { data: institutes = [], isLoading: loadingInstitutes } = useInstitutes<Institute>();
   const [search, setSearch] = useState("");
   const [selectedInstituteCode, setSelectedInstituteCode] = useState<string>("");
   const [level, setLevel] = useState<Level>("SCHOOL");
-
-  useEffect(() => {
-    setLoadingInstitutes(true);
-    ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
-      .catch(() => setInstitutes([]))
-      .finally(() => setLoadingInstitutes(false));
-  }, []);
 
   const selectedInstitute = useMemo(
     () => institutes.find((i) => String(i.instituteCode) === selectedInstituteCode) || null,

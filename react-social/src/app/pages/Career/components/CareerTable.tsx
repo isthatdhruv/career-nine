@@ -9,27 +9,15 @@ import {
     AssignMeasuredQualityTypeToCareer,
     DeleteCareerData,
     GetMeasuredQualityTypesForCareer,
-    ReadMeasuredQualityTypes,
     RemoveMeasuredQualityTypeFromCareer
 } from "../API/Career_APIs";
+import { useMeasuredQualityTypes } from "../../../lib/queries/lookups";
 import { showErrorToast } from '../../../utils/toast';
 
 const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }) => {
   const navigate = useNavigate();
   const [selectedMeasuredQualityTypesByCareer, setSelectedMeasuredQualityTypesByCareer] = useState<{ [key: number]: any[] }>({});
-  const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchMeasuredQualityTypes = async () => {
-      try {
-        const response = await ReadMeasuredQualityTypes();
-        setMeasuredQualityTypes(response.data);
-      } catch (error) {
-        console.error("Error fetching MeasuredQualityTypes:", error);
-      }
-    };
-    fetchMeasuredQualityTypes();
-  }, []);
+  const { data: measuredQualityTypes = [] } = useMeasuredQualityTypes<any>();
 
   useEffect(() => {
     const loadExistingSelections = async () => {

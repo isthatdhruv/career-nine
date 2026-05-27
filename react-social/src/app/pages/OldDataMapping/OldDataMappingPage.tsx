@@ -1,28 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import StudentImportWizard from "./StudentImportWizard";
 import ExistingMappingView from "./ExistingMappingView";
 import FirebaseMappingOverview from "./FirebaseMappingOverview";
 import UnmappedQuestionsTool from "./UnmappedQuestionsTool";
 import { deleteFirebaseStudents } from "./API/OldDataMapping_APIs";
-import { ReadCollegeList } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 
 // ── Delete Firebase Students Panel ──
 const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [], isLoading: loadingInstitutes } = useInstitutes<any>();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
-  const [loadingInstitutes, setLoadingInstitutes] = useState(true);
   const [result, setResult] = useState<any>(null);
   const [confirmText, setConfirmText] = useState("");
   const [showOrphanPrompt, setShowOrphanPrompt] = useState(false);
   const [orphanCount, setOrphanCount] = useState(0);
-
-  useEffect(() => {
-    ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
-      .catch(() => setInstitutes([]))
-      .finally(() => setLoadingInstitutes(false));
-  }, []);
 
   const selectedName = institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
 

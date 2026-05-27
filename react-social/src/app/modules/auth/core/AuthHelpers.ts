@@ -45,9 +45,10 @@ function isAuthFlowUrl(url: string | undefined): boolean {
 function performRefresh(axios: any): Promise<void> {
   // Pin the call so concurrent 401s await the SAME promise.
   if (!inFlightRefresh) {
+    console.log("[SESSION-DEBUG] performRefresh START — posting /auth/refresh");
     inFlightRefresh = (async () => {
       try {
-        await axios.post(
+        const resp = await axios.post(
           "/auth/refresh",
           {},
           {
@@ -59,6 +60,13 @@ function performRefresh(axios: any): Promise<void> {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any
         );
+        console.log("[SESSION-DEBUG] performRefresh OK status=" + resp?.status);
+      } catch (e: any) {
+        console.log(
+          "[SESSION-DEBUG] performRefresh ERROR status=" + (e?.response?.status ?? "no-response") +
+          " msg=" + (e?.message ?? "n/a")
+        );
+        throw e;
       } finally {
         // Clear the reference AFTER the promise settles so subsequent 401s start a
         // fresh refresh cycle. Done in a microtask via setTimeout(0) so any retries
@@ -68,6 +76,8 @@ function performRefresh(axios: any): Promise<void> {
         }, 0);
       }
     })();
+  } else {
+    console.log("[SESSION-DEBUG] performRefresh — joining in-flight refresh promise");
   }
   return inFlightRefresh;
 }
@@ -122,17 +132,26 @@ export function setupAxios(axios: any) {
       const url: string | undefined = originalConfig?.url;
 
       if (status === 401) {
+        console.log(
+          "[SESSION-DEBUG] interceptor 401 url=" + url +
+          " __skipAuthRedirect=" + !!originalConfig.__skipAuthRedirect +
+          " __isRefreshCall=" + !!originalConfig.__isRefreshCall +
+          " __hasRetriedAfterRefresh=" + !!originalConfig.__hasRetriedAfterRefresh +
+          " pathname=" + (typeof window !== "undefined" ? window.location.pathname : "n/a")
+        );
         // 0) Opt-out: callers (AuthInit's "am I logged in?" probe) can mark a
         // request with __skipAuthRedirect to handle the 401 themselves without
         // triggering a toast or a redirect. Required because AuthInit fires on
         // every page load — including the public /auth page — and a redirect
         // to /auth would loop forever.
         if (originalConfig.__skipAuthRedirect) {
+          console.log("[SESSION-DEBUG] interceptor 401 skipped (probe) — propagating to caller");
           return Promise.reject(error);
         }
 
         // 1) Never silently refresh for auth-flow endpoints OR the refresh call itself.
         if (isAuthFlowUrl(url) || originalConfig.__isRefreshCall) {
+          console.log("[SESSION-DEBUG] interceptor 401 on auth-flow url — REDIRECTING TO /auth");
           // Defense-in-depth: if we're already on /auth, don't redirect to /auth
           // (and don't spam the toast). The page is already where it needs to be.
           const onAuthPage =
@@ -149,6 +168,7 @@ export function setupAxios(axios: any) {
         // 2) Never retry twice. If we've already attempted a silent refresh for THIS
         //    request, give up.
         if (originalConfig.__hasRetriedAfterRefresh) {
+          console.log("[SESSION-DEBUG] interceptor 401 after retry — REDIRECTING TO /auth url=" + url);
           const onAuthPage =
             typeof window !== "undefined" &&
             window.location.pathname.startsWith("/auth");
@@ -162,9 +182,12 @@ export function setupAxios(axios: any) {
 
         // 3) Silent refresh (deduped via inFlightRefresh).
         try {
+          console.log("[SESSION-DEBUG] interceptor — invoking performRefresh for url=" + url);
           await performRefresh(axios);
+          console.log("[SESSION-DEBUG] interceptor — refresh resolved, will retry url=" + url);
         } catch (refreshError) {
           // Refresh itself failed → log out, no retry.
+          console.log("[SESSION-DEBUG] interceptor — refresh FAILED, REDIRECTING TO /auth url=" + url);
           const onAuthPage =
             typeof window !== "undefined" &&
             window.location.pathname.startsWith("/auth");
@@ -179,8 +202,11 @@ export function setupAxios(axios: any) {
         // 4) Refresh succeeded — retry the original request exactly once.
         originalConfig.__hasRetriedAfterRefresh = true;
         try {
-          return await axios.request(originalConfig);
-        } catch (retryError) {
+          const retryResp = await axios.request(originalConfig);
+          console.log("[SESSION-DEBUG] interceptor — retry OK status=" + retryResp?.status + " url=" + url);
+          return retryResp;
+        } catch (retryError: any) {
+          console.log("[SESSION-DEBUG] interceptor — retry FAILED status=" + (retryError?.response?.status ?? "n/a") + " url=" + url);
           // If retry returns 401, this same interceptor re-enters and the
           // __hasRetriedAfterRefresh guard above handles the logout path.
           return Promise.reject(retryError);

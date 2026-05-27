@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { ReadCollegeList } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import { getAssessmentIdNameMap } from "../StudentInformation/StudentInfo_APIs";
 import {
   GetReportStatusByInstitute,
@@ -28,8 +28,7 @@ interface EmailComposeData {
 
 const SendReportsPage: React.FC = () => {
   // Institute selection
-  const [institutes, setInstitutes] = useState<any[]>([]);
-  const [institutesLoading, setInstitutesLoading] = useState(false);
+  const { data: institutes = [], isLoading: institutesLoading } = useInstitutes();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
 
   // Assessment selection
@@ -67,14 +66,8 @@ const SendReportsPage: React.FC = () => {
     message: string;
   } | null>(null);
 
-  // Load institutes and assessments on mount
+  // Load assessments on mount (institutes load via useInstitutes hook)
   useEffect(() => {
-    setInstitutesLoading(true);
-    ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
-      .catch(() => setInstitutes([]))
-      .finally(() => setInstitutesLoading(false));
-
     setAssessmentsLoading(true);
     getAssessmentIdNameMap()
       .then((res) => {

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { createInstitute, createSession, getAllInstitutes, saveMapping, saveBatchMappings } from "../API/OldDataMapping_APIs";
+import { useState } from "react";
+import { createInstitute, createSession, saveMapping, saveBatchMappings } from "../API/OldDataMapping_APIs";
+import { useInstitutes } from "../../../lib/queries/lookups";
 
 interface FirebaseSection { id: string; name: string; }
 interface FirebaseGrade { id: string; name: string; sections: FirebaseSection[]; }
@@ -15,8 +16,7 @@ interface Props {
 
 const SchoolMappingStep = ({ school, schoolIndex, totalSchools, onMapped, onAutoMapped }: Props) => {
   const [choice, setChoice] = useState<"new" | "existing" | null>(null);
-  const [institutes, setInstitutes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data: institutes = [], isLoading: loading } = useInstitutes<any>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [autoCreateProgress, setAutoCreateProgress] = useState("");
@@ -27,16 +27,6 @@ const SchoolMappingStep = ({ school, schoolIndex, totalSchools, onMapped, onAuto
   const [newAddress, setNewAddress] = useState("");
   const [newMaxStudents, setNewMaxStudents] = useState("");
   const [newMaxContactPersons, setNewMaxContactPersons] = useState("");
-
-  useEffect(() => {
-    if (choice === "existing") {
-      setLoading(true);
-      getAllInstitutes()
-        .then((res) => setInstitutes(res.data || []))
-        .catch(() => setError("Failed to load institutes"))
-        .finally(() => setLoading(false));
-    }
-  }, [choice]);
 
   const handleCreateNew = async () => {
     if (!newName.trim()) { setError("College Name is required"); return; }

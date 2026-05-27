@@ -34,7 +34,17 @@ import { AssessmentProvider } from "./app/pages/StudentLogin/AssessmentContext";
 setupAxios(axios);
 Chart.register(...registerables);
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: Infinity,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+      retry: 1,
+    },
+  },
+});
 const container = document.getElementById("root");
 if (container) {
   createRoot(container).render(

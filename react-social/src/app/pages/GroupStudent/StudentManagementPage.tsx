@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
-import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 // Student Management — cloned from GroupStudentPage (the Data Download menu)
 // and stripped of every data-export path. Allotment / reset / demographics-view
 // / edit-basic-info / report-status visibility stay; CSV/Excel/PDF exports +
@@ -70,7 +71,7 @@ type StudentAssessmentInfo = {
 
 export default function StudentManagementPage() {
   const navigate = useNavigate();
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [] } = useInstitutes<any>();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [students, setStudents] = useState<Student[]>([]);
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
@@ -511,13 +512,6 @@ export default function StudentManagementPage() {
   };
 
   useEffect(() => {
-    ReadCollegeList()
-      .then((res: any) => {
-        const list = Array.isArray(res.data) ? res.data : [];
-        setInstitutes(list);
-      })
-      .catch((err: any) => console.error("Failed to fetch institutes", err));
-
     // Fetch assessments (only active ones) — the hook narrows this down per institute.
     getAllAssessments()
       .then((response) => {

@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
 import {
-  getAllInstitutes,
   getStudentsByInstitute,
   fetchFirebaseUserData,
   getAllAssessmentQuestions,
@@ -9,6 +8,7 @@ import {
   saveQuestionMappings,
   getQuestionMappings,
 } from "./API/OldDataMapping_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -70,7 +70,17 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
   const [step, setStep] = useState<"select-student" | "map-questions">("select-student");
 
   // Data
-  const [institutes, setInstitutes] = useState<Institute[]>([]);
+  const { data: rawInstitutes = [] } = useInstitutes<any>();
+  const institutes = useMemo<Institute[]>(
+    () =>
+      rawInstitutes
+        .map((i: any) => ({
+          instituteCode: Number(i.instituteCode ?? i.id),
+          instituteName: i.instituteName ?? i.name ?? "",
+        }))
+        .sort((a: Institute, b: Institute) => a.instituteName.localeCompare(b.instituteName)),
+    [rawInstitutes]
+  );
   const [systemQuestions, setSystemQuestions] = useState<SystemQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -101,20 +111,14 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(null);
   const [allAssessments, setAllAssessments] = useState<any[]>([]);
 
-  // Fetch institutes + system questions on mount
+  // Fetch system questions + assessments on mount (institutes via useInstitutes hook)
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      getAllInstitutes(),
       getAllAssessmentQuestions(),
       getAllAssessments(),
     ])
-      .then(([instRes, questionsRes, assessRes]) => {
-        const instList = (instRes.data || []).map((i: any) => ({
-          instituteCode: Number(i.instituteCode ?? i.id),
-          instituteName: i.instituteName ?? i.name ?? "",
-        })).sort((a: Institute, b: Institute) => a.instituteName.localeCompare(b.instituteName));
-        setInstitutes(instList);
+      .then(([questionsRes, assessRes]) => {
         setSystemQuestions(questionsRes.data || []);
         setAllAssessments(assessRes.data || []);
       })

@@ -2,8 +2,10 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useState } from "react";
 import { Modal, Button } from "react-bootstrap";
+import { useQueryClient } from "react-query";
 import * as Yup from "yup";
 import { CreateQuestionSectionData } from "../API/Question_Section_APIs";
+import { lookupKeys } from "../../../lib/queries/lookups";
 
 const validationSchema = Yup.object().shape({
   sectionName: Yup.string().required("Section name is required"),
@@ -19,6 +21,7 @@ interface QuestionSectionCreateModalProps {
 
 const QuestionSectionCreateModal = ({ show, onHide, onSuccess }: QuestionSectionCreateModalProps) => {
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   const initialValues = {
     sectionName: "",
@@ -41,6 +44,7 @@ const QuestionSectionCreateModal = ({ show, onHide, onSuccess }: QuestionSection
           toBeLinkedWith: values.toBeLinkedWith,
         };
         await CreateQuestionSectionData(payload);
+        queryClient.invalidateQueries(lookupKeys.questionSections);
         formik.resetForm();
         if (onSuccess) onSuccess(); // Call parent callback
         onHide(); // Close modal

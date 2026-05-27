@@ -5,8 +5,9 @@ import { Modal, Dropdown, Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { showErrorToast } from '../../../utils/toast';
 import * as Yup from "yup";
-import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
-import { CreateQuestionData, ReadMeasuredQualityTypes, UploadQuestionMedia } from "../API/Question_APIs";
+import { useQuestionSections } from "../../../lib/queries/lookups";
+import { CreateQuestionData, UploadQuestionMedia } from "../API/Question_APIs";
+import { useMeasuredQualityTypes } from "../../../lib/queries/lookups";
 import { MQT } from "./MeasuredQualityTypesAsOptionComponent";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 import { convertImageToWebP, generateVideoThumbnail, compressVideo } from "../../../utils/imageUtils";
@@ -26,8 +27,8 @@ interface QuestionCreateModalProps {
 
 const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide, setPageLoading }) => {
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
-  const [mqt, setMqt] = useState<any[]>([]);
+  const { data: sections = [] } = useQuestionSections<any>();
+  const { data: mqt = [] } = useMeasuredQualityTypes<any>();
   const [optionMeasuredQualities, setOptionMeasuredQualities] = useState<any>({});
   const [useMQTAsOptions, setUseMQTAsOptions] = useState(false);
   const navigate = useNavigate();
@@ -190,29 +191,6 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
     });
   };
 
-  useEffect(() => {
-    const fetchSections = async () => {
-      try {
-        const response = await ReadQuestionSectionData();
-        setSections(response.data);
-      } catch {
-        setSections([]);
-      }
-    };
-    fetchSections();
-  }, []);
-
-  useEffect(() => {
-    const fetchMQT = async () => {
-      try {
-        const response = await ReadMeasuredQualityTypes();
-        setMqt(response.data);
-      } catch {
-        setMqt([]);
-      }
-    };
-    fetchMQT();
-  }, []);
 
   // Fetch games on mount
   useEffect(() => {

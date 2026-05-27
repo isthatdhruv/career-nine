@@ -50,8 +50,9 @@ export interface CampaignFullDto {
   institute?: InstituteOption | null;
 }
 
-export const getInstituteList = () =>
-  axios.get<InstituteOption[]>(`${API_URL}/instituteDetail/get/list`);
+// Note: institute list is now fetched via the centralized `useInstitutes`
+// hook in `src/app/lib/queries/lookups.ts`. `getInstituteList` was removed
+// to avoid bypassing the React Query cache.
 
 export const getAllCampaigns = () => axios.get<Campaign[]>(`${API_URL}/campaign/getAll`);
 export const getCampaign = (id: number) => axios.get<CampaignFullDto>(`${API_URL}/campaign/get/${id}`);

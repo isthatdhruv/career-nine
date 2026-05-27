@@ -8,8 +8,7 @@ import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
 
 // API imports
 import { ReadCollegeData } from "../../../College/API/College_APIs";
-import { ReadQuestionSectionData } from "../../../QuestionSections/API/Question_Section_APIs";
-import { ReadToolData } from "../../../Tool/API/Tool_APIs";
+import { useQuestionSections, useTools } from "../../../../lib/queries/lookups";
 import { ReadReportTypes, ReadReportSubtypes } from "../../../ReportTypes/API/Report_Types_APIs";
 import { ReadQuestionsDataList, ReadQuestionByIdData } from "../../../AssesmentQuestions/API/Question_APIs";
 import { ReadLanguageData, ReadQuestionaireById, UpdateQuestionaire } from "../../API/Create_Questionaire_APIs";
@@ -55,8 +54,23 @@ const QuestionareEditSinglePage: React.FC = () => {
 
   // Data states
   const [colleges, setColleges] = useState<any[]>([]);
-  const [sections, setSections] = useState<any[]>([]);
-  const [tools, setTools] = useState<any[]>([]);
+  const { data: rawSections = [] } = useQuestionSections<any>();
+  const sections = useMemo(
+    () =>
+      (rawSections || [])
+        .map((section: any) =>
+          section && typeof section === "object"
+            ? {
+                sectionId: String(section.sectionId || section.id || ""),
+                sectionName: String(section.sectionName || section.name || ""),
+                sectionDescription: String(section.sectionDescription || section.description || ""),
+              }
+            : null
+        )
+        .filter(Boolean),
+    [rawSections]
+  );
+  const { data: tools = [] } = useTools<any>();
   const [reportTypes, setReportTypes] = useState<any[]>([]);
   const [reportSubtypes, setReportSubtypes] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]); // Lightweight: id + text only
@@ -67,8 +81,6 @@ const QuestionareEditSinglePage: React.FC = () => {
   // Loading states for individual data types
   const [loadingStates, setLoadingStates] = useState({
     colleges: true,
-    sections: true,
-    tools: true,
     questions: true,
     languages: true,
     questionnaire: true,
@@ -123,31 +135,6 @@ const QuestionareEditSinglePage: React.FC = () => {
     }
   };
 
-  const fetchSections = async () => {
-    try {
-      setLoadingStates(prev => ({ ...prev, sections: true }));
-      const response = await ReadQuestionSectionData();
-      const sectionsData = response.data || [];
-      const cleanedSections = Array.isArray(sectionsData) 
-        ? sectionsData.map(section => {
-            if (section && typeof section === 'object') {
-              return {
-                sectionId: String(section.sectionId || section.id || ''),
-                sectionName: String(section.sectionName || section.name || ''),
-                sectionDescription: String(section.sectionDescription || section.description || '')
-              };
-            }
-            return null;
-          }).filter(Boolean)
-        : [];
-      setSections(cleanedSections);
-    } catch (error) {
-      console.error("Error fetching sections:", error);
-      setSections([]);
-    } finally {
-      setLoadingStates(prev => ({ ...prev, sections: false }));
-    }
-  };
 
   const fetchReportRouting = async () => {
     try {
@@ -156,18 +143,6 @@ const QuestionareEditSinglePage: React.FC = () => {
       setReportSubtypes(s.data || []);
     } catch (e) {
       console.error("Failed to fetch report types/subtypes:", e);
-    }
-  };
-
-  const fetchTools = async () => {
-    try {
-      setLoadingStates(prev => ({ ...prev, tools: true }));
-      const response = await ReadToolData();
-      setTools(response.data || []);
-    } catch (error) {
-      console.error("Error fetching tools:", error);
-    } finally {
-      setLoadingStates(prev => ({ ...prev, tools: false }));
     }
   };
 
@@ -219,8 +194,6 @@ const QuestionareEditSinglePage: React.FC = () => {
       setDataLoading(true);
       await Promise.all([
         fetchColleges(),
-        fetchSections(),
-        fetchTools(),
         fetchReportRouting(),
         fetchQuestions(),
         fetchLanguages(),
@@ -251,14 +224,6 @@ const QuestionareEditSinglePage: React.FC = () => {
   useEffect(() => {
     if (!showCollegeModal) fetchColleges();
   }, [showCollegeModal]);
-
-  useEffect(() => {
-    if (!showSectionModal) fetchSections();
-  }, [showSectionModal]);
-
-  useEffect(() => {
-    if (!showToolModal) fetchTools();
-  }, [showToolModal]);
 
   useEffect(() => {
     if (!showQuestionModal) fetchQuestions();

@@ -2,8 +2,10 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "react-query";
 import * as Yup from "yup";
 import { CreateQuestionSectionData } from "../API/Question_Section_APIs";
+import { lookupKeys } from "../../../lib/queries/lookups";
 
 const validationSchema = Yup.object().shape({
   sectionName: Yup.string().required("Section name is required"),
@@ -14,6 +16,7 @@ const validationSchema = Yup.object().shape({
 const QuestionSectionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const initialValues = {
     sectionName: "",
@@ -34,6 +37,7 @@ const QuestionSectionCreatePage = ({ setPageLoading }: { setPageLoading?: any })
           toBeLinkedWith: values.toBeLinkedWith,
         };
         await CreateQuestionSectionData(payload);
+        queryClient.invalidateQueries(lookupKeys.questionSections);
         formik.resetForm();
         navigate("/question-sections");
       } catch (error) {

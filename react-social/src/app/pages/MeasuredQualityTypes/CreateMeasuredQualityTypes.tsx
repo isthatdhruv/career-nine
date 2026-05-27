@@ -1,32 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "react-query";
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
-import { ReadMeasuredQualityTypesData } from "./API/Measured_Quality_Types_APIs";
+import { useMeasuredQualityTypes, lookupKeys } from "../../lib/queries/lookups";
 import { ReadMeasuredQualitiesData } from "../MeasuredQualities/API/Measured_Qualities_APIs";
 import { MeasuredQualityTypesTable } from "./components";
 import MeasuredQualityTypesRecycleBinModal from "./components/MeasuredQualityTypesRecycleBinModal";
 import PageHeader from "../../components/PageHeader";
 
 const MeasuredQualityTypesPage = () => {
-  const [measuredQualityTypesData, setMeasuredQualityTypesData] = useState<any[]>([]);
+  const { data: measuredQualityTypesData = [], isLoading: loading } = useMeasuredQualityTypes<any>();
+  const queryClient = useQueryClient();
   const [measuredQualities, setMeasuredQualities] = useState<any[]>([]);
   const [selectedQualityFilter, setSelectedQualityFilter] = useState<string>("");
-  const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(["false"]);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   const navigate = useNavigate();
-
-  const fetchMeasuredQualityTypes = async () => {
-    setLoading(true);
-    try {
-      const response = await ReadMeasuredQualityTypesData();
-      setMeasuredQualityTypesData(response.data);
-    } catch (error) {
-      console.error("Failed to fetch measured quality types :", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     const fetchMeasuredQualities = async () => {
@@ -41,12 +30,11 @@ const MeasuredQualityTypesPage = () => {
   }, []);
 
   useEffect(() => {
-    fetchMeasuredQualityTypes();
-
     if (pageLoading[0] === "true") {
+      queryClient.invalidateQueries(lookupKeys.measuredQualityTypes);
       setPageLoading(["false"]);
     }
-  }, [pageLoading[0]]);
+  }, [pageLoading, queryClient]);
 
   const filteredData = useMemo(() => {
     if (!selectedQualityFilter) return measuredQualityTypesData;
@@ -133,7 +121,7 @@ const MeasuredQualityTypesPage = () => {
         show={showRecycleBin}
         onHide={() => setShowRecycleBin(false)}
         onRestoreComplete={() => {
-          fetchMeasuredQualityTypes();
+          queryClient.invalidateQueries(lookupKeys.measuredQualityTypes);
         }}
       />
     </div>

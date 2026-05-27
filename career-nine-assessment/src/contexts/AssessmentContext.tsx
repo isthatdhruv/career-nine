@@ -253,7 +253,14 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     userStudentId: number,
     assessmentId: number,
   ): Promise<boolean> => {
+    console.log('[ASSESS-SESSION-DEBUG] mint() ENTRY userStudentId=' + userStudentId
+      + ' assessmentId=' + assessmentId
+      + ' COOKIE_AUTH_FLAG=' + COOKIE_AUTH_FLAG
+      + ' alreadyMintedPair=' + mintedPairRef.current
+      + ' inFlight=' + !!mintInFlightRef.current);
+
     if (!COOKIE_AUTH_FLAG) {
+      console.log('[ASSESS-SESSION-DEBUG] mint() SKIP build-flag-off — header path');
       setCookieAuthRuntimeActive(false);
       setCookieAuthActive(false);
       return false;
@@ -261,11 +268,13 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const pairKey = `${userStudentId}:${assessmentId}`;
     if (mintedPairRef.current === pairKey) {
+      console.log('[ASSESS-SESSION-DEBUG] mint() SKIP already-minted-this-tab pairKey=' + pairKey);
       // Already minted for this exact pair in this tab — http-instance flag
       // is already set; nothing to do.
       return cookieAuthActive;
     }
     if (mintInFlightRef.current) {
+      console.log('[ASSESS-SESSION-DEBUG] mint() JOIN in-flight pairKey=' + pairKey);
       // Coalesce concurrent callers (e.g. AllottedAssessmentPage + an effect)
       return mintInFlightRef.current;
     }
@@ -274,6 +283,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       try {
         const dob = localStorage.getItem('studentDob');
         if (!dob) {
+          console.log('[ASSESS-SESSION-DEBUG] mint() FAIL no-dob-in-localStorage pairKey=' + pairKey);
           // No DOB cached (e.g. tab opened after a stale-storage flush) — the
           // backend's @NotNull dob field would 400 the request. Fall back to
           // the legacy header path; the student keeps working without being
@@ -282,25 +292,34 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setCookieAuthActive(false);
           return false;
         }
+        console.log('[ASSESS-SESSION-DEBUG] mint() POST /auth/assessment-session pairKey=' + pairKey);
         await http.post('/auth/assessment-session', { userStudentId, assessmentId, dob });
         mintedPairRef.current = pairKey;
         setCookieAuthRuntimeActive(true);
         setCookieAuthActive(true);
+        console.log('[ASSESS-SESSION-DEBUG] mint() SUCCESS pairKey=' + pairKey
+          + ' cookies=' + (typeof document !== 'undefined' ? document.cookie : 'n/a'));
         return true;
       } catch (err: any) {
         const status = err?.response?.status;
+        console.log('[ASSESS-SESSION-DEBUG] mint() ERROR pairKey=' + pairKey
+          + ' status=' + (status ?? 'no-response')
+          + ' msg=' + (err?.message ?? 'n/a'));
         if (status === 404) {
+          console.log('[ASSESS-SESSION-DEBUG] mint() FALLBACK institute-flag-off pairKey=' + pairKey);
           // Per-institute flag OFF — fall back transparently.
           setCookieAuthRuntimeActive(false);
           setCookieAuthActive(false);
           return false;
         }
         if (status === 403) {
+          console.log('[ASSESS-SESSION-DEBUG] mint() FALLBACK enrolment-or-dob-mismatch pairKey=' + pairKey);
           // Enrolment mismatch — fall back; downstream 403 will re-tokenize.
           setCookieAuthRuntimeActive(false);
           setCookieAuthActive(false);
           return false;
         }
+        console.log('[ASSESS-SESSION-DEBUG] mint() FALLBACK network-or-5xx pairKey=' + pairKey);
         // Network or 5xx — fall back so the student is not blocked.
         // eslint-disable-next-line no-console
         console.warn('mintAssessmentSessionCookie failed; falling back to header path', err);

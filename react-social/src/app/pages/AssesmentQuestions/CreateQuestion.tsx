@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ReadQuestionSectionData } from "../QuestionSections/API/Question_Section_APIs";
+import { useQuestionSections } from "../../lib/queries/lookups";
 import { ReadQuestionsDataList } from "./API/Question_APIs";
 import { QuestionTable } from "./components";
 import QuestionRecycleBinModal from "./components/QuestionRecycleBinModal";
@@ -8,7 +8,7 @@ import QuestionRecycleBinModal from "./components/QuestionRecycleBinModal";
 const AssessmentQuestionsPage = () => {
   const [questionsData, setQuestionsData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
+  const { data: sections = [] } = useQuestionSections<any>();
   const [pageLoading, setPageLoading] = useState(["false"]);
   const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
   const navigate = useNavigate();
@@ -24,21 +24,6 @@ const AssessmentQuestionsPage = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    const fetchSections = async () => {
-      setLoading(true);
-      try {
-        const response = await ReadQuestionSectionData();
-        setSections(response.data);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSections();
-  }, []);
 
   useEffect(() => {
     fetchQuestions();

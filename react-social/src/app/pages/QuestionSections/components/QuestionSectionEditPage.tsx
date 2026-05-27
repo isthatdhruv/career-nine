@@ -2,10 +2,12 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "react-query";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadQuestionSectionByIdData, UpdateQuestionSectionData } from "../API/Question_Section_APIs";
+import { lookupKeys } from "../../../lib/queries/lookups";
 
 const validationSchema = Yup.object().shape({
   sectionName: Yup.string().required("Section name is required"),
@@ -26,6 +28,7 @@ const QuestionSectionEditPage = (props?: {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
 
   // Fetch question section data when component mounts
   useEffect(() => {
@@ -77,6 +80,7 @@ const QuestionSectionEditPage = (props?: {
           sectionId: values.sectionId || id
         };
         await UpdateQuestionSectionData(updateData);
+        queryClient.invalidateQueries(lookupKeys.questionSections);
         navigate("/question-sections"); // Navigate to question sections list
         if (props?.setPageLoading) {
           props.setPageLoading(["true"]);

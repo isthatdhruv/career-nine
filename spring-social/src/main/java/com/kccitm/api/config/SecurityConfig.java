@@ -18,7 +18,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.firewall.HttpFirewall;
 import org.springframework.security.web.firewall.StrictHttpFirewall;
 import org.springframework.security.web.header.HeaderWriter;
@@ -206,8 +206,16 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
      * is an acceptable Phase-16 defect; Phase 18 will harden via a custom subclass.
      */
     @Bean
-    public CookieCsrfTokenRepository csrfTokenRepository() {
-        CookieCsrfTokenRepository repo = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    public CsrfTokenRepository csrfTokenRepository() {
+        // DuplicateTolerantCsrfTokenRepository wraps CookieCsrfTokenRepository
+        // (which is `final` in Spring Security 5.5) and overrides loadToken to
+        // prefer the cn_csrf cookie whose value matches the submitted
+        // X-CSRF-Token header. Necessary because browsers can carry duplicate
+        // cn_csrf cookies (host-only + Domain-scoped) when the deployment's
+        // app.cookie.domain has changed over time, and the default repo would
+        // pick the wrong one — see the class javadoc.
+        com.kccitm.api.security.DuplicateTolerantCsrfTokenRepository repo =
+                com.kccitm.api.security.DuplicateTolerantCsrfTokenRepository.withHttpOnlyFalse();
         repo.setCookieName("cn_csrf");
         repo.setHeaderName("X-CSRF-Token");
         repo.setCookiePath("/");

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 import { downloadReportAsPdf, downloadReportsAsZip, ZipProgress } from "../utils/htmlToPdf";
-import { ReadCollegeList, GetSessionsByInstituteCode } from "../../College/API/College_APIs";
+import { GetSessionsByInstituteCode } from "../../College/API/College_APIs";
+import { useInstitutes } from "../../../lib/queries/lookups";
 import {
   getAllAssessments,
   getStudentsWithMappingByInstituteId,
@@ -97,9 +98,8 @@ const ReportGenerationPage: React.FC<{
   const [activeTab, setActiveTab] = useState<ActiveTab>("data");
 
   // ── Core selections ──
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [], isLoading: institutesLoading } = useInstitutes();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">(externalInstitute ?? "");
-  const [institutesLoading, setInstitutesLoading] = useState(false);
 
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
@@ -159,14 +159,6 @@ const ReportGenerationPage: React.FC<{
   const [mappedAssessmentIds, setMappedAssessmentIds] = useState<Set<number> | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
-
-  useEffect(() => {
-    setInstitutesLoading(true);
-    ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
-      .catch(() => setInstitutes([]))
-      .finally(() => setInstitutesLoading(false));
-  }, []);
 
   useEffect(() => {
     getAllAssessments()

@@ -5,7 +5,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { ReadMeasuredQualityTypesData, UpdateMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
+import { useQueryClient } from "react-query";
+import { UpdateMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
+import { useMeasuredQualityTypes, lookupKeys } from "../../../lib/queries/lookups";
 import { showErrorToast } from '../../../utils/toast';
 
 
@@ -19,9 +21,10 @@ const MeasuredQualityTypesEditPage = (props?: {
   setPageLoading?: any;
 }) => {
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
+  const { data: sections = [] } = useMeasuredQualityTypes<any>();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
 
   const MeasuredQualityTypesData = (location.state as any)?.data || {
     measuredQualityTypeName: "",
@@ -49,6 +52,7 @@ const MeasuredQualityTypesEditPage = (props?: {
         }
 
         await UpdateMeasuredQualityTypesData(values.measuredQualityTypeId, values);
+        queryClient.invalidateQueries(lookupKeys.measuredQualityTypes);
 
         navigate("/measured-quality-types");
 
@@ -74,19 +78,6 @@ const MeasuredQualityTypesEditPage = (props?: {
       }
     },
   });
-
-  // ✅ Fetch sections data
-  useEffect(() => {
-    const fetchSections = async () => {
-      try {
-        const response = await ReadMeasuredQualityTypesData();
-        setSections(response.data);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      }
-    };
-    fetchSections();
-  }, []);
 
   return (
     <div className="container py-5">
