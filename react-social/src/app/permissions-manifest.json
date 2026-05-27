@@ -34,6 +34,8 @@
   "assessment.read": [
     "/assessment-questions",
     "/assessments",
+    "/student/dashboard",
+    "/student/dashboard/assessments",
     "/dashboard/student/assessments",
     "/demographic-fields",
     "/list",
@@ -64,8 +66,8 @@
     "/counsellor/dashboard"
   ],
   "generated_report.read": [
-    "/dashboard/student/navigator-360",
-    "/dashboard/student/reports"
+    "/student/dashboard/navigator-360",
+    "/student/dashboard/reports"
   ],
   "group.read": [
     "/forgotpassword",
@@ -82,6 +84,8 @@
     "/college",
     "/contact-person",
     "/course",
+    "/dashboard/school-navigator/:id",
+    "/dashboard/school/:id",
     "/section",
     "/session"
   ],
@@ -121,6 +125,9 @@
     "/user-management/roles/manage"
   ],
   "student.read": [
+    "/student/dashboard-preview",
+    "/student/dashboard/counselling",
+    "/student/dashboard/view/:studentId",
     "/dashboard/student/counselling",
     "/dashboard/student/view/:studentId",
     "/live-tracking",

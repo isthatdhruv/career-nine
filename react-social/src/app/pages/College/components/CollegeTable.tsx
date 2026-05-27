@@ -8,6 +8,7 @@ import trash from "react-useanimations/lib/trash";
 import { Dropdown } from "react-bootstrap";
 import { MdOutlineDashboard } from "react-icons/md";
 import { ActionIcon } from "../../../components/ActionIcon";
+import { toAbsoluteUrl } from "../../../../_metronic/helpers";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import InstituteWizardModal from "./InstituteWizardModal";
@@ -68,6 +69,11 @@ const CollegeTable = (props: {
     undefined
   );
 
+  // Tracks which row currently shows the two Dashboard buttons (Institute / School).
+  // Set by clicking the "Dashboard" item in that row's Actions dropdown.
+  // null = no row expanded. Clicking Dashboard again on the same row collapses it.
+  const [dashboardOpenFor, setDashboardOpenFor] = useState<string | null>(null);
+
   // Students-at-this-institute flow disabled per product request.
   // const [studentsModalShow, setStudentsModalShow] = useState(false);
   // const [studentsModalInstitute, setStudentsModalInstitute] = useState<{
@@ -120,7 +126,22 @@ const CollegeTable = (props: {
         return Boolean(d.display);
       })
       .map((data) => ({
-        name: data.instituteName ?? "",
+        name: (
+          <div className="d-flex align-items-center gap-2">
+            <img
+              src={toAbsoluteUrl("/media/logos/kcc.webp")}
+              alt={`${data.instituteName ?? "Institute"} logo`}
+              style={{
+                width: 36,
+                height: 36,
+                objectFit: "contain",
+                borderRadius: 6,
+              }}
+              className="shadow-sm"
+            />
+            <span>{data.instituteName ?? ""}</span>
+          </div>
+        ),
         code: data.instituteCode ?? "",
         address: data.instituteAddress ?? "",
         actions: (
@@ -216,13 +237,14 @@ const CollegeTable = (props: {
                   Assign Roles
                 </Dropdown.Item>
 
-                {/* Dashboard */}
+                {/* Dashboard — toggles the two dashboard buttons to the right of Actions */}
                 <Dropdown.Item
-                  onClick={() =>
-                    navigate(
-                      `/school/principal/dashboard/${data.instituteCode || data.id}`
-                    )
-                  }
+                  onClick={() => {
+                    const rowKey = String(data.instituteCode || data.id || "");
+                    setDashboardOpenFor((current) =>
+                      current === rowKey ? null : rowKey
+                    );
+                  }}
                 >
                   <MdOutlineDashboard size={18} className="me-2" />
                   Dashboard
@@ -245,7 +267,41 @@ const CollegeTable = (props: {
               </Dropdown.Menu>
             </Dropdown>
 
-            {/* Dashboard moved into the Actions dropdown above */}
+            {/* Two dashboard buttons — visible only after clicking "Dashboard" in
+                the Actions dropdown for this row. */}
+            {dashboardOpenFor === String(data.instituteCode || data.id || "") && (
+              <>
+                {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/dashboard/school/${data.instituteCode || data.id}`
+                    )
+                  }
+                  className="btn btn-sm btn-info ms-2 d-inline-flex align-items-center gap-1"
+                  title="Dashboard 1"
+                >
+                  <MdOutlineDashboard size={16} />
+                  Dashboard 1
+                </button>
+
+                {/* Dashboard 2 -> Dashboards/SchoolNavigatorDashboardPage.tsx */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/dashboard/school-navigator/${data.instituteCode || data.id}`
+                    )
+                  }
+                  className="btn btn-sm btn-warning ms-2 d-inline-flex align-items-center gap-1"
+                  title="Dashboard 2"
+                >
+                  <MdOutlineDashboard size={16} />
+                  Dashboard 2
+                </button>
+              </>
+            )}
           </>
         ),
       })) ?? [];
