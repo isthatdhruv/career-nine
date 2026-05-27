@@ -5,6 +5,9 @@ import { useAuth } from '../modules/auth/core/Auth'
 const StudentDashboardLogin = lazy(
   () => import('../pages/StudentDashboard/student-portal/StudentDashboardLogin')
 )
+const StudentSsoLanding = lazy(
+  () => import('../pages/StudentDashboard/student-portal/StudentSsoLanding')
+)
 const StudentPortalDashboard = lazy(
   () => import('../pages/StudentDashboard/student-portal/StudentPortalDashboard')
 )
@@ -138,6 +141,16 @@ const StudentRoutes: FC = () => {
       <Routes>
         {/* Public */}
         <Route path='login' element={<StudentDashboardLogin />} />
+
+        {/*
+          SSO landing for the assessment Thank-You page "Go to Dashboard" CTA.
+          Anonymous-by-design: ?t=<accessToken>&e=<entitlementId>. The landing
+          component POSTs /entitlement/redeem-dashboard-token, which validates
+          the entitlement and issues cn_at + cn_csrf. On success we hydrate
+          currentUser from /auth/me and navigate to /student/dashboard; on any
+          failure we fall back to /student/login with a toast (no silent fail).
+        */}
+        <Route path='sso' element={<StudentSsoLanding />} />
 
         {/*
           Phase 19 (Plan 19-05): student-portal permission-denied page.

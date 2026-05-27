@@ -28,6 +28,7 @@ import {
   StudentRoleGroupDetail,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
+import { getEntitlementsByStudent, EntitlementSummary } from "../B2C/API/Tracker_APIs";
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 import * as XLSX from "xlsx";
 
@@ -1241,6 +1242,53 @@ export default function GroupStudentPage() {
       );
     }
   };
+
+  // ── Thank-You picker state + handler ──
+  // Opens the assessment SPA's /studentAssessment/completed page for a chosen
+  // entitlement. When the student owns more than one entitlement (multi-
+  // assessment or multi-campaign) we surface a picker; with a single match we
+  // skip the picker and open the URL directly. Pre-checks on zero entitlements
+  // so we don't drop the admin onto an empty Thank-You shell.
+  const [thankYouLoadingFor, setThankYouLoadingFor] = useState<number | null>(null);
+  const [thankYouPicker, setThankYouPicker] = useState<{
+    student: Student;
+    options: EntitlementSummary[];
+  } | null>(null);
+
+  const buildThankYouUrl = useCallback((student: Student, ent: EntitlementSummary) => {
+    const base = process.env.REACT_APP_ASSESSMENT_APP_URL || "https://assessment.career-9.com";
+    const params = new URLSearchParams({
+      e: String(ent.entitlementId),
+      userStudentId: String(student.userStudentId),
+    });
+    if (ent.assessmentId != null) params.set("assessmentId", String(ent.assessmentId));
+    return `${base}/studentAssessment/completed?${params.toString()}`;
+  }, []);
+
+  const handleOpenThankYou = async (student: Student) => {
+    if (!student?.userStudentId) return;
+    setThankYouLoadingFor(student.userStudentId);
+    try {
+      const { data } = await getEntitlementsByStudent(student.userStudentId);
+      const options = Array.isArray(data) ? data : [];
+      if (options.length === 0) {
+        showErrorToast(`No Thank-You page available — ${student.name || "this student"} doesn't have any campaign entitlements.`);
+        return;
+      }
+      if (options.length === 1) {
+        window.open(buildThankYouUrl(student, options[0]), "_blank", "noopener,noreferrer");
+        return;
+      }
+      setThankYouPicker({ student, options });
+    } catch (err) {
+      console.error("Failed to load entitlements for student", err);
+      showErrorToast("Could not load Thank-You options. Please try again.");
+    } finally {
+      setThankYouLoadingFor(null);
+    }
+  };
+
+  const closeThankYouPicker = () => setThankYouPicker(null);
 
   const handleEditStudent = (student: Student) => {
     setEditForm({
@@ -2680,6 +2728,28 @@ export default function GroupStudentPage() {
                               >
                                 <i className="bi bi-speedometer2"></i>
                                 Dashboard
+                              </button>
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                onClick={() => handleOpenThankYou(student)}
+                                disabled={thankYouLoadingFor === student.userStudentId}
+                                title="Open the student's Thank-You page (assessment-app view)"
+                                style={{
+                                  background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+                                  color: "#fff",
+                                  border: "none",
+                                  padding: "5px 10px",
+                                  borderRadius: "6px",
+                                  fontWeight: 600,
+                                  fontSize: "0.78rem",
+                                  transition: "all 0.2s",
+                                  boxShadow: "0 2px 8px rgba(139, 92, 246, 0.3)",
+                                  whiteSpace: "nowrap",
+                                  opacity: thankYouLoadingFor === student.userStudentId ? 0.6 : 1,
+                                }}
+                              >
+                                <i className="bi bi-heart-fill"></i>
+                                {thankYouLoadingFor === student.userStudentId ? "Loading…" : "Thank You"}
                               </button>
                             </div>
                           </td>
@@ -5031,6 +5101,190 @@ export default function GroupStudentPage() {
                     Save Changes
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Thank-You picker — surfaces only when a student owns multiple entitlements.
+          A single-entitlement student bypasses the modal and opens the URL directly
+          from handleOpenThankYou. Each row links to the assessment SPA's
+          /studentAssessment/completed page with the matching entitlement ID. */}
+      {thankYouPicker && (
+        <div
+          onClick={closeThankYouPicker}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.55)",
+            zIndex: 1050,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              width: "100%",
+              maxWidth: 560,
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div
+              style={{
+                background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+                color: "#fff",
+                padding: "1.1rem 1.4rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>
+                  Open Thank-You page
+                </h2>
+                <div style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: 2 }}>
+                  {thankYouPicker.student.name} · ID #{thankYouPicker.student.userStudentId}
+                </div>
+                <div style={{ fontSize: "0.78rem", opacity: 0.85, marginTop: 4 }}>
+                  This student has {thankYouPicker.options.length} assessments. Pick one to open.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeThankYouPicker}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#fff",
+                  fontSize: "1.5rem",
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  padding: 4,
+                }}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem 1rem 1rem" }}>
+              {thankYouPicker.options.map((opt) => {
+                const created = opt.createdAt
+                  ? new Date(opt.createdAt).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null;
+                return (
+                  <button
+                    key={opt.entitlementId}
+                    type="button"
+                    onClick={() => {
+                      window.open(
+                        buildThankYouUrl(thankYouPicker.student, opt),
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                      closeThankYouPicker();
+                    }}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      background: "#F8FAFC",
+                      border: "1px solid #E2E8F0",
+                      borderRadius: 10,
+                      padding: "0.75rem 0.9rem",
+                      marginBottom: 8,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#F1F5F9";
+                      e.currentTarget.style.borderColor = "#C4B5FD";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#F8FAFC";
+                      e.currentTarget.style.borderColor = "#E2E8F0";
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "0.92rem",
+                        color: "#0F172A",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {opt.assessmentName || `Assessment #${opt.assessmentId}`}
+                    </div>
+                    <div style={{ fontSize: "0.8rem", color: "#475569" }}>
+                      {opt.campaignName ? (
+                        <>
+                          <span style={{ fontWeight: 500 }}>{opt.campaignName}</span>
+                          <span style={{ margin: "0 6px", color: "#CBD5E1" }}>·</span>
+                        </>
+                      ) : null}
+                      <span
+                        style={{
+                          textTransform: "capitalize",
+                          color: opt.alreadyActive ? "#059669" : "#92400E",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {opt.status}
+                      </span>
+                      {created && (
+                        <>
+                          <span style={{ margin: "0 6px", color: "#CBD5E1" }}>·</span>
+                          <span>{created}</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                padding: "0.85rem 1.4rem",
+                borderTop: "1px solid #E5E7EB",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                onClick={closeThankYouPicker}
+                style={{
+                  background: "#F1F5F9",
+                  color: "#1E293B",
+                  border: "1px solid #CBD5E1",
+                  padding: "0.5rem 1rem",
+                  borderRadius: 10,
+                  fontSize: "0.9rem",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
               </button>
             </div>
           </div>

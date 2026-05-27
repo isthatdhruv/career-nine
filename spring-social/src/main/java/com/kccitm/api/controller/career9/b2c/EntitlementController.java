@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +37,9 @@ import com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
+import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.TokenProvider;
+import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.StudentSessionService;
 import com.kccitm.api.service.b2c.EntitlementService;
@@ -59,8 +62,10 @@ public class EntitlementController {
     @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
+    @Autowired private CustomUserDetailsService customUserDetailsService;
     @Autowired private StudentSessionService studentSessionService;
     @Autowired private StudentProvisioningService studentProvisioningService;
+    @Autowired private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
 
     @org.springframework.beans.factory.annotation.Value("${app.auth.assessmentTokenExpirationMsec:14400000}")
     private long assessmentTokenExpirationMsec;
@@ -224,12 +229,123 @@ public class EntitlementController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * PUBLIC: token-exchange for dashboard auto-login. The assessment Thank-You
+     * page sends the student to {@code /student/sso?t=<accessToken>&e=<entitlementId>}
+     * on the dashboard host; that route POSTs this endpoint, which validates the
+     * token, mints a full Phase-18 access JWT, and issues the {@code cn_at} +
+     * {@code cn_csrf} cookies on the dashboard domain so the regular student
+     * routes accept the session without forcing a username+DOB login.
+     *
+     * <p>Body: {@code { token, entitlementId }}. On success returns
+     * {@code { userStudentId, entitlementId, redirectPath: "/student/dashboard" }}
+     * and sets the auth cookies. On invalid/expired token returns 401.
+     *
+     * <p>Auth/CSRF: in {@code PUBLIC_PATHS} — anonymous-by-design, gated by the
+     * unguessable 30-byte SecureRandom access token validated in
+     * {@code EntitlementService.redeemAccessToken}. Mirrors the
+     * {@code /entitlement/redeem-token} pattern; the only difference is the
+     * cookie issued (full {@code cn_at} instead of the assessment-scoped
+     * {@code cn_at_asmnt}) so the dashboard's regular guards accept the session.
+     */
+    @PostMapping("/redeem-dashboard-token")
+    public ResponseEntity<?> redeemDashboardToken(@RequestBody Map<String, Object> body,
+                                                   HttpServletResponse httpResponse) {
+        String token = body.get("token") != null ? body.get("token").toString() : null;
+        Long entitlementId = body.get("entitlementId") != null
+                ? Long.valueOf(body.get("entitlementId").toString()) : null;
+
+        StudentEntitlement e = entitlementService.redeemAccessToken(token, entitlementId);
+        if (e == null) return ResponseEntity.status(401).body("Invalid or expired token");
+        if (e.getUserStudentId() == null) {
+            return ResponseEntity.status(404).body("No student linked to this entitlement");
+        }
+        if (!Boolean.TRUE.equals(e.getDashboardActive())) {
+            // Dashboard access wasn't purchased for this entitlement. The Thank-You
+            // page should not have rendered the auto-login button in this case, but
+            // double-check defensively so a tampered URL can't grant dashboard access
+            // to a free-tier student.
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Dashboard access is not included in your plan");
+        }
+
+        Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
+        if (!usOpt.isPresent() || usOpt.get().getUserId() == null) {
+            return ResponseEntity.status(404).body("Student user not found");
+        }
+
+        // Hydrate the UserPrincipal via the same path the regular login uses, so the
+        // minted JWT carries the same roles/scopes/superAdmin claim shape and every
+        // subsequent request through TokenAuthenticationFilter validates identically.
+        UserPrincipal principal;
+        try {
+            principal = (UserPrincipal) customUserDetailsService.loadUserById(usOpt.get().getUserId());
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(404).body("Student user not found");
+        }
+
+        String jwt = tokenProvider.createAccessToken(principal);
+        authCookieService.issueAuthCookies(httpResponse, jwt);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("userStudentId", e.getUserStudentId());
+        response.put("entitlementId", e.getEntitlementId());
+        response.put("redirectPath", "/student/dashboard");
+        return ResponseEntity.ok(response);
+    }
+
     @PreAuthorize("@auth.allows('entitlement.read')")
     @GetMapping("/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         Optional<StudentEntitlement> opt = entitlementRepository.findById(id);
         if (!opt.isPresent()) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(opt.get());
+    }
+
+    /**
+     * Lists every entitlement belonging to a student, newest first, enriched
+     * with the assessment + campaign names so the admin UI can present a
+     * pickable list (e.g. "Career Discovery — Demo Campaign — completed
+     * (Jun 17)") when more than one match exists. Used by the Group Students
+     * admin page to drive its "Thank You" button — single-entitlement students
+     * open the Thank-You URL directly; multi-entitlement students see a picker
+     * modal sourced from this list.
+     *
+     * <p>Response shape per row: {@code { entitlementId, assessmentId,
+     * assessmentName, campaignId, campaignName, status, alreadyActive,
+     * createdAt }}. An empty list (HTTP 200, {@code []}) means the student
+     * never went through a B2C funnel — the caller should surface that as
+     * "no Thank-You page available" rather than open an empty one.
+     */
+    @PreAuthorize("@auth.allows('entitlement.read')")
+    @GetMapping("/by-student/{userStudentId}")
+    public ResponseEntity<?> getByStudent(@PathVariable Long userStudentId) {
+        List<StudentEntitlement> entitlements = entitlementRepository
+                .findByUserStudentIdOrderByCreatedAtDesc(userStudentId);
+
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (StudentEntitlement e : entitlements) {
+            Map<String, Object> dto = new HashMap<>();
+            dto.put("entitlementId", e.getEntitlementId());
+            dto.put("assessmentId", e.getAssessmentId());
+            dto.put("campaignId", e.getCampaignId());
+            dto.put("status", e.getStatus());
+            dto.put("alreadyActive", "active".equals(e.getStatus()));
+            dto.put("createdAt", e.getCreatedAt());
+            // Per-row name lookups. N+1 is fine: an individual student rarely
+            // owns more than a handful of entitlements, and this endpoint is
+            // not on any hot path.
+            if (e.getAssessmentId() != null) {
+                assessmentTableRepository.findById(e.getAssessmentId())
+                        .ifPresent(at -> dto.put("assessmentName", at.getAssessmentName()));
+            }
+            if (e.getCampaignId() != null) {
+                campaignRepository.findById(e.getCampaignId())
+                        .ifPresent(c -> dto.put("campaignName", c.getName()));
+            }
+            out.add(dto);
+        }
+        return ResponseEntity.ok(out);
     }
 
     @PreAuthorize("@auth.allows('entitlement.read')")

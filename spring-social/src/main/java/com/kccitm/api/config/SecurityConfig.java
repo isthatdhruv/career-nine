@@ -126,6 +126,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/payment/webhook/**",
             "/campaign/public/**",
             "/entitlement/redeem-token",
+            // Dashboard auto-login from the assessment Thank-You page. Anonymous;
+            // gated by the same 30-byte SecureRandom entitlement accessToken used
+            // by /entitlement/redeem-token. On success the endpoint sets cn_at +
+            // cn_csrf so the dashboard route accepts the student session.
+            "/entitlement/redeem-dashboard-token",
             // Phase 2 (Task 2.1 / HIGH-B): corrected from the dead "/promo-code/validate" typo to
             // the real endpoint path; was CSRF-exempt-but-not-permitAll, so anonymous validation 401'd.
             "/promo-codes/public/validate",
