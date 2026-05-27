@@ -547,8 +547,12 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
               const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'image');
               questionImageUrl = uploadResult.url;
             } catch (uploadErr) {
-              console.error("Media upload failed:", uploadErr);
-              showErrorToast("Image upload failed. Question will be saved without the image.");
+              // DO Spaces upload failed (often missing credentials in dev).
+              // Fall back to storing the base64 data URL inline on the question —
+              // the DB column is now LONGTEXT to hold it. The image still renders
+              // because <img src="data:image/..."> works natively.
+              console.warn("Media upload to DO Spaces failed; saving base64 inline.", uploadErr);
+              questionImageUrl = questionMediaBase64;
             }
           } else {
             questionImageUrl = questionMediaBase64;

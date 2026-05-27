@@ -408,8 +408,10 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'image');
                   questionImageUrl = uploadResult.url;
                 } catch (uploadErr) {
-                  console.error("Media upload failed:", uploadErr);
-                  showErrorToast("Image upload failed. Question will be created without the image.");
+                  // DO Spaces upload failed (often missing credentials in dev).
+                  // Fall back to storing the base64 data URL inline on the question.
+                  console.warn("Media upload to DO Spaces failed; saving base64 inline.", uploadErr);
+                  questionImageUrl = questionMediaBase64;
                 }
               } else if (questionMediaType === 'video' && questionMediaBase64) {
                 // YouTube link — store directly
