@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import http, { COOKIE_AUTH_FLAG, setCookieAuthRuntimeActive } from '../api/http';
+import http, { setCookieAuthRuntimeActive } from '../api/http';
 import { getActiveCacheName } from '../components/ResourcePreloader';
 
 type AssessmentContextType = {
@@ -222,23 +222,20 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   /**
-   * Phase 19 — mint cn_at_asmnt by POSTing to /auth/assessment-session.
+   * Mint cn_at_asmnt by POSTing to /auth/assessment-session.
    *
    * Decision matrix:
-   *   - build flag off (COOKIE_AUTH_FLAG=false) → no-op, return false. The
-   *     http-instance interceptor keeps injecting the v2.0 X-Assessment-*
-   *     headers; behaviour is identical to pre-Phase-19.
-   *   - 200 OK → set the http-instance runtime flag to active; cookie is
-   *     the source of truth from now on.
-   *   - 404 (per-institute flag off for this student's institute, per
-   *     Plan 19-01's InstituteDetail.assessmentCookieAuthEnabled) →
-   *     transparently fall back to header path for this student only.
-   *   - 403 (enrolment mismatch — student does not own this assessment) →
-   *     surface as cookie-auth-inactive; subsequent calls will hit the
-   *     header path and the backend will reject them with the same 403,
-   *     which the SPA already maps to "Your assessment session has expired."
-   *   - Network error or 5xx → fall back to header path so the student is
-   *     not blocked; warn to console for ops visibility.
+   *   - 200 OK → mark cookie auth active; cn_at_asmnt is the auth carrier
+   *     for all subsequent /assessments/**, /assessment-answer/**, etc.
+   *   - 404 (assessment_cookie_auth_not_enabled — per-institute or B2C
+   *     rollout gate off on the server) → mark inactive; the SPA has no
+   *     other auth carrier, so downstream calls will 401 and the response
+   *     interceptor's /permission-denied redirect kicks in. Flip the
+   *     server-side flag to roll cookie auth out for this institute / B2C.
+   *   - 403 (enrolment or DOB mismatch) → mark inactive; downstream 403s
+   *     map to "Your assessment session has expired."
+   *   - Network or 5xx → mark inactive and let the calling page surface
+   *     the failure; warn to console for ops visibility.
    *
    * Idempotent per (userStudentId, assessmentId) pair; concurrent callers
    * coalesce via mintInFlightRef.
@@ -249,16 +246,16 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   ): Promise<boolean> => {
     console.log('[ASSESS-SESSION-DEBUG] mint() ENTRY userStudentId=' + userStudentId
       + ' assessmentId=' + assessmentId
-      + ' COOKIE_AUTH_FLAG=' + COOKIE_AUTH_FLAG
       + ' alreadyMintedPair=' + mintedPairRef.current
       + ' inFlight=' + !!mintInFlightRef.current);
 
-    if (!COOKIE_AUTH_FLAG) {
-      console.log('[ASSESS-SESSION-DEBUG] mint() SKIP build-flag-off — header path');
-      setCookieAuthRuntimeActive(false);
-      setCookieAuthActive(false);
-      return false;
-    }
+    // The build-time COOKIE_AUTH_FLAG gate used to short-circuit here so a
+    // legacy X-Assessment-Session header path could carry auth instead. That
+    // header fallback was removed (see comment in src/api/http.ts), which left
+    // the SPA with no auth carrier whenever the flag was false — every
+    // authenticated request 401s. Mint is now always attempted; the per-
+    // institute / B2C rollout gate lives on the server (returns 404
+    // assessment_cookie_auth_not_enabled when off).
 
     const pairKey = `${userStudentId}:${assessmentId}`;
     if (mintedPairRef.current === pairKey) {
