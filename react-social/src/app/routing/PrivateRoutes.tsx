@@ -68,6 +68,7 @@ import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
+import JwtTokensPage from "../pages/JwtTokens/JwtTokensPage";
 import LeadsPage from "../pages/Leads/LeadsPage";
 import LiveTrackingPage from "../pages/LiveTracking/LiveTrackingPage";
 import CommunicationLogsPage from "../pages/CommunicationLogs/CommunicationLogsPage";
@@ -1343,6 +1344,15 @@ const PrivateRoutes = () => {
                 <ActivityLogPage />
               </SuspensedView>
             </RequirePermission>
+          }
+        />
+
+        <Route
+          path="/admin/jwt-tokens"
+          element={
+            <SuspensedView>
+              <JwtTokensPage />
+            </SuspensedView>
           }
         />
 

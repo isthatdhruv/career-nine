@@ -46,6 +46,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
 import com.kccitm.api.security.CurrentScopes;
 import com.kccitm.api.security.JtiDenyListService;
+import com.kccitm.api.security.JwtTokenAuditService;
 import com.kccitm.api.security.RefreshTokenService;
 import com.kccitm.api.security.RefreshTokenService.RefreshTokenReuseException;
 import com.kccitm.api.security.CustomUserDetailsService;
@@ -111,6 +112,9 @@ public class AuthController {
 
     @Autowired
     private JtiDenyListService jtiDenyListService;
+
+    @Autowired(required = false)
+    private JwtTokenAuditService jwtTokenAuditService;
 
     @Autowired
     private RoleUrlRepository roleUrlRepository;
@@ -294,7 +298,11 @@ public class AuthController {
         // Phase 18-03: revoke the access-token jti (best-effort — no-op on missing/legacy tokens).
         String accessJti = readAccessTokenJti(request);
         if (accessJti != null) {
-            jtiDenyListService.revoke(accessJti);
+            if (jwtTokenAuditService != null) {
+                jwtTokenAuditService.revoke(accessJti, null, "User logout");
+            } else {
+                jtiDenyListService.revoke(accessJti);
+            }
         }
 
         // Phase 18-02: revoke the refresh-token row (idempotent — no-op on missing cookie).

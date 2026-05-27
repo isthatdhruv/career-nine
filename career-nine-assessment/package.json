@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:staging": "vite --mode staging",
+    "dev:staging:local": "VITE_DEV_HOST=127.0.0.1 VITE_DEV_PORT=5173 VITE_HMR_HOST=staging-assessment.career-9.com VITE_HMR_PROTOCOL=wss VITE_HMR_CLIENT_PORT=443 vite --mode staging",
+    "dev:production": "vite --mode production",
+    "dev:production:local": "VITE_DEV_HOST=127.0.0.1 VITE_DEV_PORT=5173 VITE_HMR_HOST=assessment.career-9.com VITE_HMR_PROTOCOL=wss VITE_HMR_CLIENT_PORT=443 vite --mode production",
     "sync-cache": "bash scripts/cache-assessment.sh",
     "build": "bash scripts/cache-assessment.sh && tsc -b && vite build && node scripts/generate-manifest.cjs",
     "build:staging": "VITE_API_URL=https://api-staging.career-9.com bash scripts/cache-assessment.sh https://api-staging.career-9.com && VITE_API_URL=https://api-staging.career-9.com vite build --mode staging && node scripts/generate-manifest.cjs",

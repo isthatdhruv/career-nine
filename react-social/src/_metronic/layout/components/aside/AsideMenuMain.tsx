@@ -93,6 +93,8 @@ export function AsideMenuMain() {
     allowed("/user-management/users/manage");
 
   const showActivityLog = allowed("/activity-log");
+  // JWT Token console is super-admin-only — backend enforces via @PreAuthorize("principal.superAdmin")
+  const showJwtTokens = isSuperAdmin;
   const showLeads = allowed("/leads");
   const showOldDataMapping = allowed("/old-data-mapping");
   const showScoreDebug = allowed("/score-debug");
@@ -537,7 +539,7 @@ export function AsideMenuMain() {
       )}
 
 
-      {showActivityLog && (
+      {(showActivityLog || showJwtTokens) && (
         <>
           <div className="menu-item">
             <div className="menu-content pt-8 pb-2">
@@ -552,6 +554,14 @@ export function AsideMenuMain() {
               icon="/media/icons/duotune/general/gen019.svg"
               title="Activity Log"
               fontIcon="bi-journal-text"
+            />
+          )}
+          {showJwtTokens && (
+            <AsideMenuItem
+              to="/admin/jwt-tokens"
+              icon="/media/icons/duotune/general/gen047.svg"
+              title="JWT Tokens"
+              fontIcon="bi-shield-lock"
             />
           )}
         </>
