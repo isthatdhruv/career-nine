@@ -14,6 +14,57 @@ const toolbarButtonMarginClass = "ms-1 ms-lg-3",
   toolbarUserAvatarHeightClass = "symbol-30px symbol-md-40px",
   toolbarButtonIconSizeClass = "svg-icon-1";
 
+/**
+ * Initials for the user-avatar placeholder.
+ * "Career9 ADMIN" -> "CA" ; "Hiba" -> "HI" ; "" -> "?"
+ */
+function userInitials(name?: string): string {
+  if (!name) return "?";
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2 && words[0][0] && words[1][0]) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return trimmed.substring(0, 2).toUpperCase();
+}
+
+/**
+ * Topbar user avatar — renders the real imageUrl if present, otherwise a
+ * teal initials placeholder. Fills its parent .symbol element so existing
+ * Metronic sizing classes still apply.
+ */
+const UserAvatar: FC<{ imageUrl?: string; name?: string }> = ({
+  imageUrl,
+  name,
+}) => {
+  if (imageUrl) {
+    return <img src={toAbsoluteUrl(imageUrl)} alt={name || "user"} />;
+  }
+  return (
+    <div
+      title={name}
+      style={{
+        width: "100%",
+        height: "100%",
+        borderRadius: "50%",
+        background: "linear-gradient(135deg, #0c6b5a, #084a3e)",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 700,
+        fontSize: 13,
+        letterSpacing: 0.5,
+        fontFamily:
+          "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      }}
+    >
+      {userInitials(name)}
+    </div>
+  );
+};
+
 const Topbar: FC = () => {
   const { currentUser } = useAuth();
   const { config } = useLayout();
@@ -154,7 +205,7 @@ const Topbar: FC = () => {
         {/* end::Menu wrapper */}
       </div>
 
-      {/* begin::Theme mode */}
+      {/* Theme mode switcher hidden per product request — app is locked to light theme.
       <div
         className={clsx("d-flex align-items-center", toolbarButtonMarginClass)}
       >
@@ -165,7 +216,7 @@ const Topbar: FC = () => {
           )}
         />
       </div>
-      {/* end::Theme mode */}
+      */}
 
       {/* begin::User */}
       <div
@@ -183,7 +234,10 @@ const Topbar: FC = () => {
           data-kt-menu-placement="bottom-end"
           data-kt-menu-flip="bottom"
         >
-          <img src={toAbsoluteUrl(currentUser?.imageUrl!)} alt="metronic" />
+          <UserAvatar
+            imageUrl={currentUser?.imageUrl}
+            name={currentUser?.name}
+          />
         </div>
         <HeaderUserMenu />
         {/* end::Toggle */}

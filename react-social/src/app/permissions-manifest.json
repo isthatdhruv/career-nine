@@ -121,8 +121,12 @@
     "/user-management/roles/manage"
   ],
   "student.read": [
-    "/admin/jwt-tokens",
-    "/login/reset-password/enter-email",
+    "/student/dashboard-preview",
+    "/student/dashboard/counselling",
+    "/student/dashboard/view/:studentId",
+    "/dashboard/student/counselling",
+    "/dashboard/student/view/:studentId",
+    "/live-tracking",
     "/school/assigned-students",
     "/school/group-student",
     "/student-list",
@@ -140,7 +144,7 @@
     "/upload-excel"
   ],
   "student_management.read": [
-    "auth}\n        <Route path="
+    "/login/reset-password/enter-email"
   ],
   "user.read": [
     "/faculty/registration-details",

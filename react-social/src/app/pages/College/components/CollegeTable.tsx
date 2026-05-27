@@ -8,7 +8,6 @@ import trash from "react-useanimations/lib/trash";
 import { Dropdown } from "react-bootstrap";
 import { MdOutlineDashboard } from "react-icons/md";
 import { ActionIcon } from "../../../components/ActionIcon";
-import { toAbsoluteUrl } from "../../../../_metronic/helpers";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import InstituteWizardModal from "./InstituteWizardModal";
@@ -49,6 +48,75 @@ type ModalData = {
   contactPersons?: any[];
 };
 
+/**
+ * Generate institute initials for the placeholder badge.
+ * - "GL BAJAJ"      → "GB"   (first letter of first two words)
+ * - "Career-9"      → "CA"   (first two chars)
+ * - "KCC"           → "KC"
+ * - "" / undefined  → "?"
+ */
+function initialsFor(name?: string): string {
+  if (!name) return "?";
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2 && words[0][0] && words[1][0]) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return trimmed.substring(0, 2).toUpperCase();
+}
+
+/**
+ * Square avatar shown in the Name column.
+ * - If the institute has a `schoolLogo` (base64 or URL), render that.
+ * - Otherwise fall back to a dark-teal placeholder badge with the institute's initials.
+ */
+const InstituteLogo: React.FC<{ logoUrl?: string; name?: string }> = ({
+  logoUrl,
+  name,
+}) => {
+  const baseStyle: React.CSSProperties = {
+    width: 36,
+    height: 36,
+    borderRadius: "50%",
+    flexShrink: 0,
+  };
+
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt={`${name ?? "Institute"} logo`}
+        style={{ ...baseStyle, objectFit: "contain" }}
+        className="shadow-sm"
+      />
+    );
+  }
+
+  return (
+    <div
+      aria-label={`${name ?? "Institute"} placeholder`}
+      title={name}
+      style={{
+        ...baseStyle,
+        background: "linear-gradient(135deg, #0c6b5a, #084a3e)",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 700,
+        fontSize: 12,
+        letterSpacing: 0.5,
+        fontFamily:
+          "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      }}
+      className="shadow-sm"
+    >
+      {initialsFor(name)}
+    </div>
+  );
+};
+
 const CollegeTable = (props: {
   data?: CollegeRow[];
   setLoading: (v: boolean) => void;
@@ -68,11 +136,6 @@ const CollegeTable = (props: {
   const [infoRolesModalData, setInfoRolesModalData] = useState<ModalData | undefined>(
     undefined
   );
-
-  // Tracks which row currently shows the two Dashboard buttons (Institute / School).
-  // Set by clicking the "Dashboard" item in that row's Actions dropdown.
-  // null = no row expanded. Clicking Dashboard again on the same row collapses it.
-  const [dashboardOpenFor, setDashboardOpenFor] = useState<string | null>(null);
 
   // Students-at-this-institute flow disabled per product request.
   // const [studentsModalShow, setStudentsModalShow] = useState(false);
@@ -128,16 +191,9 @@ const CollegeTable = (props: {
       .map((data) => ({
         name: (
           <div className="d-flex align-items-center gap-2">
-            <img
-              src={toAbsoluteUrl("/media/logos/kcc.webp")}
-              alt={`${data.instituteName ?? "Institute"} logo`}
-              style={{
-                width: 36,
-                height: 36,
-                objectFit: "contain",
-                borderRadius: 6,
-              }}
-              className="shadow-sm"
+            <InstituteLogo
+              logoUrl={(data as { schoolLogo?: string }).schoolLogo}
+              name={data.instituteName}
             />
             <span>{data.instituteName ?? ""}</span>
           </div>
@@ -237,17 +293,28 @@ const CollegeTable = (props: {
                   Assign Roles
                 </Dropdown.Item>
 
-                {/* Dashboard — toggles the two dashboard buttons to the right of Actions */}
+                {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx */}
                 <Dropdown.Item
-                  onClick={() => {
-                    const rowKey = String(data.instituteCode || data.id || "");
-                    setDashboardOpenFor((current) =>
-                      current === rowKey ? null : rowKey
-                    );
-                  }}
+                  onClick={() =>
+                    navigate(
+                      `/dashboard/school/${data.instituteCode || data.id}`
+                    )
+                  }
                 >
                   <MdOutlineDashboard size={18} className="me-2" />
-                  Dashboard
+                  Dashboard 1
+                </Dropdown.Item>
+
+                {/* Dashboard 2 -> Dashboards/SchoolNavigatorDashboardPage.tsx */}
+                <Dropdown.Item
+                  onClick={() =>
+                    navigate(
+                      `/dashboard/school-navigator/${data.instituteCode || data.id}`
+                    )
+                  }
+                >
+                  <MdOutlineDashboard size={18} className="me-2" />
+                  Dashboard 2
                 </Dropdown.Item>
 
                 {/* Students at this institute — disabled per product request
@@ -266,42 +333,6 @@ const CollegeTable = (props: {
                 */}
               </Dropdown.Menu>
             </Dropdown>
-
-            {/* Two dashboard buttons — visible only after clicking "Dashboard" in
-                the Actions dropdown for this row. */}
-            {dashboardOpenFor === String(data.instituteCode || data.id || "") && (
-              <>
-                {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      `/dashboard/school/${data.instituteCode || data.id}`
-                    )
-                  }
-                  className="btn btn-sm btn-info ms-2 d-inline-flex align-items-center gap-1"
-                  title="Dashboard 1"
-                >
-                  <MdOutlineDashboard size={16} />
-                  Dashboard 1
-                </button>
-
-                {/* Dashboard 2 -> Dashboards/SchoolNavigatorDashboardPage.tsx */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(
-                      `/dashboard/school-navigator/${data.instituteCode || data.id}`
-                    )
-                  }
-                  className="btn btn-sm btn-warning ms-2 d-inline-flex align-items-center gap-1"
-                  title="Dashboard 2"
-                >
-                  <MdOutlineDashboard size={16} />
-                  Dashboard 2
-                </button>
-              </>
-            )}
           </>
         ),
       })) ?? [];

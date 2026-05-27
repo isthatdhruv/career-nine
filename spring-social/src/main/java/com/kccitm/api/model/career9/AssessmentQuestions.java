@@ -9,6 +9,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
+import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Index;
@@ -61,7 +62,11 @@ public class AssessmentQuestions implements Serializable {
     @Column(name = "question_media_type")
     private String questionMediaType;
 
-    @Column(name = "question_image_url", length = 1024)
+    // LONGTEXT so we can store the full base64-encoded image inline when
+    // DigitalOcean Spaces credentials aren't configured (dev environment) —
+    // the frontend's upload-failure fallback puts a data: URL here.
+    @Lob
+    @Column(name = "question_image_url", columnDefinition = "LONGTEXT")
     private String questionImageUrl;
 
     @Column(name = "question_video_url", length = 1024)
