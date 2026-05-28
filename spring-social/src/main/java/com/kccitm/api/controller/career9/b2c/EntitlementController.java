@@ -196,8 +196,10 @@ public class EntitlementController {
         // server-side auth — not just localStorage trust. Same TTL as paid /
         // free-registration flows for consistency.
         if (e.getUserStudentId() != null && e.getAssessmentId() != null) {
+            Long ownerUserId = userStudentRepository.findById(e.getUserStudentId())
+                    .map(UserStudent::getUserId).orElse(null);
             String sessionJwt = tokenProvider.createAssessmentSessionToken(
-                    e.getUserStudentId(), e.getAssessmentId());
+                    e.getUserStudentId(), e.getAssessmentId(), ownerUserId);
             authCookieService.issueAssessmentSessionCookie(httpResponse, sessionJwt,
                     (int) (assessmentTokenExpirationMsec / 1000));
         }

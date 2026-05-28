@@ -868,7 +868,7 @@ public class CampaignPublicController {
         // Without this, the assessment SPA was running purely on
         // localStorage.userStudentId trust.
         String sessionJwt = tokenProvider.createAssessmentSessionToken(
-                userStudent.getUserStudentId(), mapping.getAssessmentId());
+                userStudent.getUserStudentId(), mapping.getAssessmentId(), userStudent.getUserId());
         authCookieService.issueAssessmentSessionCookie(httpResponse, sessionJwt,
                 (int) (assessmentTokenExpirationMsec / 1000));
 

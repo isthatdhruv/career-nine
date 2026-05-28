@@ -257,7 +257,7 @@ public class TokenProvider {
      * does not have to re-authenticate. No refresh path — Phase 18 owns refresh and
      * deliberately excluded the assessment cookie from rotation.
      */
-    public String createAssessmentSessionToken(Long userStudentId, Long assessmentId) {
+    public String createAssessmentSessionToken(Long userStudentId, Long assessmentId, Long ownerUserId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + appProperties.getAuth().getAssessmentTokenExpirationMsec());
         String jti = UUID.randomUUID().toString();
@@ -272,7 +272,10 @@ public class TokenProvider {
                 .compact();
 
         if (auditService != null) {
-            auditService.record(jti, userStudentId, null, null, false,
+            // ownerUserId is the User.id (student_user PK) — the audit table FK
+            // points there, NOT at user_student.user_student_id. Passing
+            // userStudentId here previously caused fk_jta_user violations.
+            auditService.record(jti, ownerUserId, null, null, false,
                     now, expiryDate, TokenType.ASSESSMENT);
         }
         return token;

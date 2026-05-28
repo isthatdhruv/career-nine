@@ -82,6 +82,8 @@
     "/college",
     "/contact-person",
     "/course",
+    "/dashboard/school-navigator/:id",
+    "/dashboard/school/:id",
     "/section",
     "/session"
   ],
