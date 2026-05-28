@@ -17,6 +17,7 @@ import javax.persistence.JoinTable;
 import javax.persistence.Lob;
 import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
+import javax.persistence.PrePersist;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.validation.constraints.NotNull;
@@ -87,19 +88,26 @@ public class InstituteDetail implements Serializable {
 
     /**
      * Phase 19 Plan 01 per-institute feature flag for the cookie-based assessment
-     * authentication. NULL or FALSE → {@code POST /auth/assessment-session} returns
-     * 404 for students under this institute, so the assessment SPA transparently
-     * falls back to the legacy {@code X-Assessment-Session} header path (handled
-     * by {@code AssessmentSessionInterceptor}). TRUE → the endpoint mints a
-     * {@code cn_at_asmnt} cookie carrying a 4h assessment-scoped JWT.
+     * authentication. TRUE → {@code POST /auth/assessment-session} mints a
+     * {@code cn_at_asmnt} cookie carrying a 4h assessment-scoped JWT. FALSE → the
+     * endpoint returns 404 and the SPA falls back to its legacy path (which no
+     * longer carries an auth header, so the institute is effectively opted out).
      *
-     * <p>Default {@code NULL} so existing institutes are not auto-flipped onto the
-     * new auth at upgrade time; operations team enables per institute via a manual
-     * SQL update once 19-04 (assessment SPA cookie path) has been validated for
-     * each tenant.
+     * <p>New institutes default to TRUE via {@link #applyAssessmentCookieAuthDefault()}.
+     * Legacy NULL rows are flipped to TRUE on boot by
+     * {@code AssessmentCookieAuthBackfillRunner}. An admin can still opt an institute
+     * out by setting FALSE explicitly — neither the runner nor the PrePersist hook
+     * will overwrite that.
      */
     @Column(name = "assessment_cookie_auth_enabled")
     private Boolean assessmentCookieAuthEnabled;
+
+    @PrePersist
+    private void applyAssessmentCookieAuthDefault() {
+        if (this.assessmentCookieAuthEnabled == null) {
+            this.assessmentCookieAuthEnabled = Boolean.TRUE;
+        }
+    }
 
     @Transient
     private String transientField;

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -26,6 +27,14 @@ public interface InstituteDetailRepository extends JpaRepository<InstituteDetail
 
     @Query("SELECT new map(i.instituteCode as instituteCode, i.instituteName as instituteName) FROM InstituteDetail i WHERE i.display = true")
     public List<Map<String, Object>> findAllIdAndName();
+
+    @Query("SELECT COUNT(i) FROM InstituteDetail i WHERE i.assessmentCookieAuthEnabled IS NULL")
+    long countAssessmentCookieAuthMissing();
+
+    @Modifying
+    @Query("UPDATE InstituteDetail i SET i.assessmentCookieAuthEnabled = true "
+         + "WHERE i.assessmentCookieAuthEnabled IS NULL")
+    int enableAssessmentCookieAuthForAllNull();
 
     // @Query(value = "SELECT * FROM InstituteDetail i WHERE i.display = true",
     // nativeQuery = true)
