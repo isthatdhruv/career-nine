@@ -110,6 +110,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/auth/logout",
             "/auth/oauth-exchange",
             "/auth/refresh",
+            // Anonymous-by-design password reset funnel: /forgot-password takes an email
+            // and emails a single-use token; /reset-password consumes that token + new
+            // password. Gating is via token validity (single-use, 1h TTL) in-controller.
+            "/auth/forgot-password",
+            "/auth/reset-password",
             // Student username+DOB login endpoints — anonymous-by-design; previously 401'd
             // when callers carried an expired cn_at cookie because TokenAuthenticationFilter
             // silently fails to set auth on expired tokens and the @PreAuthorize gate then

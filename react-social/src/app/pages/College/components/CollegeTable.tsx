@@ -321,6 +321,20 @@ const CollegeTable = (props: {
                   Dashboard 2
                 </Dropdown.Item>
 
+                {/* Dashboard 3 -> Dashboards/SchoolCombinedDashboardPage.tsx (opens in new tab) */}
+                <Dropdown.Item
+                  onClick={() =>
+                    window.open(
+                      `/dashboard/school-combined/${data.instituteCode || data.id}`,
+                      "_blank",
+                      "noopener,noreferrer"
+                    )
+                  }
+                >
+                  <MdOutlineDashboard size={18} className="me-2" />
+                  Dashboard 3
+                </Dropdown.Item>
+
                 {/* Students at this institute — disabled per product request
                 <Dropdown.Item
                   onClick={() => {

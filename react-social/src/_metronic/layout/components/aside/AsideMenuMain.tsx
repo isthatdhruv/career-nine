@@ -117,6 +117,10 @@ export function AsideMenuMain() {
       (r) => r === "STUDENT" || r === "B2C_STUDENT" || r === "ROLE_STUDENT" || r === "ROLE_B2C_STUDENT"
     );
 
+  const showCounsellorPortal =
+    isSuperAdmin ||
+    userRoles.some((r) => r === "COUNSELLOR" || r === "ROLE_COUNSELLOR");
+
   return (
     <>
       <AsideMenuItem
@@ -696,6 +700,30 @@ export function AsideMenuMain() {
             <AsideMenuItem to="/student/dashboard/assessments" title="My Assessments" hasBullet={true} />
             <AsideMenuItem to="/student/dashboard/reports" title="My Reports" hasBullet={true} />
             <AsideMenuItem to="/student/dashboard/counselling" title="Counselling" hasBullet={true} />
+          </AsideMenuItemWithSub>
+        </>
+      )}
+
+      {showCounsellorPortal && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                Counsellor Portal
+              </span>
+            </div>
+          </div>
+          <AsideMenuItemWithSub
+            to="/counsellor/dashboard"
+            title="Counsellor Portal"
+            fontIcon="bi-app-indicator"
+            icon="/media/icons/duotune/general/gen049.svg"
+          >
+            <AsideMenuItem to="/counsellor/dashboard" title="Dashboard" hasBullet={true} />
+            <AsideMenuItem to="/counsellor/appointments" title="Appointments" hasBullet={true} />
+            <AsideMenuItem to="/counsellor/notes" title="Session Notes" hasBullet={true} />
+            <AsideMenuItem to="/counsellor/availability" title="Availability" hasBullet={true} />
+            <AsideMenuItem to="/counsellor/profile" title="Profile" hasBullet={true} />
           </AsideMenuItemWithSub>
         </>
       )}

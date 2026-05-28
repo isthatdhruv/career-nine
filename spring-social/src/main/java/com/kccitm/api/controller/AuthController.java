@@ -34,13 +34,17 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import com.kccitm.api.exception.BadRequestException;
 import com.kccitm.api.exception.DuplicateResourceException;
 import com.kccitm.api.model.AuthProvider;
+import com.kccitm.api.model.PasswordResetToken;
 import com.kccitm.api.model.User;
 import com.kccitm.api.payload.ApiResponse;
 import com.kccitm.api.payload.AuthResponse;
+import com.kccitm.api.payload.ForgotPasswordRequest;
 import com.kccitm.api.payload.LoginRequest;
 import com.kccitm.api.payload.MeResponse;
 import com.kccitm.api.payload.OAuthExchangeRequest;
+import com.kccitm.api.payload.ResetPasswordRequest;
 import com.kccitm.api.payload.SignUpRequest;
+import com.kccitm.api.repository.PasswordResetTokenRepository;
 import com.kccitm.api.repository.RoleUrlRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
@@ -52,16 +56,22 @@ import com.kccitm.api.security.RefreshTokenService.RefreshTokenReuseException;
 import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.OdooEmailService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.UserActivityLogService;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.UUID;
 @RestController
 @RequestMapping("/auth")
 
@@ -127,6 +137,18 @@ public class AuthController {
 
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
+
+    @Autowired
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
+    private OdooEmailService odooEmailService;
+
+    @Value("${app.frontend.url:http://localhost:3000}")
+    private String frontendUrl;
+
+    /** Reset link single-use TTL. Single-use is also enforced via used_at stamp. */
+    private static final long RESET_TOKEN_TTL_MINUTES = 60;
 
     // @PreAuthorize-Exempt: login/signup are anonymous-by-design — auth entrypoint establishes auth context, cannot consume it
     // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
@@ -616,6 +638,144 @@ public class AuthController {
     return ResponseEntity.created(location)
         .body(new ApiResponse(true, "User registered successfully"));
     }
-    // return ResponseEntity.ok(new ApiResponse(true, "User registered successfully"));
-    // }
+
+    /**
+     * POST /auth/forgot-password — issues a single-use reset link and emails it
+     * via Odoo. Per the product spec the endpoint REVEALS whether an email is
+     * registered (matches user request despite the enumeration trade-off).
+     */
+    // @PreAuthorize-Exempt: anonymous-by-design entrypoint; token-gated reset on /auth/reset-password.
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest payload) {
+        String email = payload.getEmail() == null ? "" : payload.getEmail().trim();
+        if (email.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "Email is required."));
+        }
+
+        User user = userRepository.findByEmailAndProvider(email, AuthProvider.local);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse(false, "This email is not registered."));
+        }
+
+        // Invalidate any earlier outstanding tokens for this user — only the
+        // latest /forgot-password request yields a live link.
+        passwordResetTokenRepository.deleteAllForUser(user.getId());
+
+        String token = UUID.randomUUID().toString();
+        Instant expiresAt = Instant.now().plus(RESET_TOKEN_TTL_MINUTES, ChronoUnit.MINUTES);
+        passwordResetTokenRepository.save(new PasswordResetToken(user.getId(), token, expiresAt));
+
+        String resetLink = buildResetLink(token);
+        try {
+            odooEmailService.sendHtmlEmail(
+                    user.getEmail(),
+                    "Reset your Career-9 password",
+                    buildResetEmailHtml(user.getName(), resetLink));
+        } catch (Exception e) {
+            // Email send is best-effort — log only; the token is still persisted.
+        }
+
+        return ResponseEntity.ok(new ApiResponse(true,
+                "A link to reset your password has been sent to your email."));
+    }
+
+    /**
+     * POST /auth/reset-password — consumes a single-use token, rewrites the
+     * user's BCrypt password hash, and sends an Odoo confirmation email.
+     */
+    // @PreAuthorize-Exempt: anonymous-by-design — auth context derives from the token in the body.
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest payload) {
+        Optional<PasswordResetToken> tokenOpt = passwordResetTokenRepository.findByToken(payload.getToken());
+        if (!tokenOpt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "This reset link is invalid."));
+        }
+        PasswordResetToken token = tokenOpt.get();
+        if (token.isConsumed()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "This reset link has already been used."));
+        }
+        if (token.isExpired()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "This reset link has expired. Please request a new one."));
+        }
+
+        User user = userRepository.findById(token.getUserId()).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "This reset link is invalid."));
+        }
+
+        user.setPassword(passwordEncoder.encode(payload.getNewPassword()));
+        userRepository.save(user);
+
+        token.setUsedAt(Instant.now());
+        passwordResetTokenRepository.save(token);
+
+        try {
+            odooEmailService.sendHtmlEmail(
+                    user.getEmail(),
+                    "Your Career-9 password was reset",
+                    buildResetConfirmationHtml(user.getName()));
+        } catch (Exception e) {
+            // Best-effort confirmation — reset itself already succeeded.
+        }
+
+        return ResponseEntity.ok(new ApiResponse(true,
+                "Your password has been reset successfully. Please log in with your new password."));
+    }
+
+    private String buildResetLink(String token) {
+        String base = frontendUrl == null ? "" : frontendUrl;
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return base + "/auth/reset-password/" + token;
+    }
+
+    private String buildResetEmailHtml(String displayName, String resetLink) {
+        String greeting = (displayName != null && !displayName.trim().isEmpty())
+                ? "Hi " + escapeHtml(displayName) + ","
+                : "Hi,";
+        return "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2937; max-width: 560px; margin: 0 auto; padding: 32px;\">"
+             + "<h2 style=\"color: #111827; margin-bottom: 16px;\">Reset your password</h2>"
+             + "<p>" + greeting + "</p>"
+             + "<p>We received a request to reset your Career-9 password. Click the button below to set a new password. This link is valid for "
+             + RESET_TOKEN_TTL_MINUTES + " minutes and can be used only once.</p>"
+             + "<p style=\"text-align: center; margin: 32px 0;\">"
+             + "<a href=\"" + resetLink + "\" style=\"display: inline-block; background: linear-gradient(135deg, #10b981 0%, #f59e0b 100%); color: #ffffff; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600;\">Reset Password</a>"
+             + "</p>"
+             + "<p style=\"color: #6b7280; font-size: 14px;\">If the button doesn't work, copy and paste this URL into your browser:</p>"
+             + "<p style=\"color: #4b5563; font-size: 13px; word-break: break-all;\">" + resetLink + "</p>"
+             + "<hr style=\"border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;\"/>"
+             + "<p style=\"color: #6b7280; font-size: 13px;\">If you did not request this, you can safely ignore this email — your password will remain unchanged.</p>"
+             + "<p style=\"color: #6b7280; font-size: 13px;\">— The Career-9 Team</p>"
+             + "</div>";
+    }
+
+    private String buildResetConfirmationHtml(String displayName) {
+        String greeting = (displayName != null && !displayName.trim().isEmpty())
+                ? "Hi " + escapeHtml(displayName) + ","
+                : "Hi,";
+        return "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2937; max-width: 560px; margin: 0 auto; padding: 32px;\">"
+             + "<h2 style=\"color: #111827; margin-bottom: 16px;\">Your password was reset</h2>"
+             + "<p>" + greeting + "</p>"
+             + "<p>This is a confirmation that the password for your Career-9 account was just changed.</p>"
+             + "<p>If this wasn't you, please contact support immediately and reset your password again.</p>"
+             + "<hr style=\"border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;\"/>"
+             + "<p style=\"color: #6b7280; font-size: 13px;\">— The Career-9 Team</p>"
+             + "</div>";
+    }
+
+    private static String escapeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
+    }
 }

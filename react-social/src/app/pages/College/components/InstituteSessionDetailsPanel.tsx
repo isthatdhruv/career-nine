@@ -1,28 +1,19 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import {
+  CreateClassData,
+  CreateSectionData,
   CreateSessionData,
+  DeleteClassData,
+  DeleteSectionData,
+  DeleteSessionData,
   GetSessionsByInstituteCode,
 } from "../API/College_APIs";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 
 export interface InstituteSessionDetailsPanelHandle {
-  /** Persist any unsaved new sessions/grades/sections.
-   *  Resolves to true when at least one session exists for the institute
-   *  (either pre-existing or newly created). */
+  /** Resolves to true when at least one session exists for the institute. */
   save: () => Promise<boolean>;
   hasAnySession: () => boolean;
-}
-
-interface NewSection {
-  sectionName: string;
-}
-interface NewGrade {
-  gradeName: string;
-  sections: NewSection[];
-}
-interface NewSession {
-  sessionName: string;
-  grades: NewGrade[];
 }
 
 interface ExistingSection {
@@ -50,23 +41,25 @@ const InstituteSessionDetailsPanel = forwardRef<
 >(({ instituteCode }, ref) => {
   const [existing, setExisting] = useState<ExistingSession[]>([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const [newSessions, setNewSessions] = useState<NewSession[]>([]);
   const [sessionInput, setSessionInput] = useState("");
-  const [activeSessionIdx, setActiveSessionIdx] = useState<number | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [gradeInput, setGradeInput] = useState("");
-  const [activeGradeIdx, setActiveGradeIdx] = useState<number | null>(null);
+  const [activeGradeId, setActiveGradeId] = useState<number | null>(null);
   const [sectionInput, setSectionInput] = useState("");
 
-  const fetchExisting = async () => {
-    if (!instituteCode) return;
+  const fetchExisting = async (): Promise<ExistingSession[]> => {
+    if (!instituteCode) return [];
     setLoading(true);
     try {
       const res = await GetSessionsByInstituteCode(instituteCode);
-      setExisting(res.data || []);
+      const data: ExistingSession[] = res.data || [];
+      setExisting(data);
+      return data;
     } catch (err) {
       console.error("Failed to load sessions", err);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -74,106 +67,167 @@ const InstituteSessionDetailsPanel = forwardRef<
 
   useEffect(() => {
     fetchExisting();
+    setActiveSessionId(null);
+    setActiveGradeId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instituteCode]);
 
-  const addSession = () => {
+  const activeSession =
+    activeSessionId !== null
+      ? existing.find((s) => s.id === activeSessionId) || null
+      : null;
+  const activeGrade =
+    activeSession && activeGradeId !== null
+      ? activeSession.schoolClasses.find((g) => g.id === activeGradeId) || null
+      : null;
+
+  const handleAddSession = async () => {
     const name = sessionInput.trim();
     if (!name) return;
-    if (newSessions.some((s) => s.sessionName === name)) return;
-    setNewSessions([...newSessions, { sessionName: name, grades: [] }]);
-    setSessionInput("");
-  };
-
-  const addGrade = () => {
-    if (activeSessionIdx === null) return;
-    const name = gradeInput.trim();
-    if (!name) return;
-    const updated = [...newSessions];
-    if (updated[activeSessionIdx].grades.some((g) => g.gradeName === name)) return;
-    updated[activeSessionIdx].grades.push({ gradeName: name, sections: [] });
-    setNewSessions(updated);
-    setGradeInput("");
-  };
-
-  const addSection = () => {
-    if (activeSessionIdx === null || activeGradeIdx === null) return;
-    const name = sectionInput.trim();
-    if (!name) return;
-    const updated = [...newSessions];
-    const grade = updated[activeSessionIdx].grades[activeGradeIdx];
-    if (grade.sections.some((s) => s.sectionName === name)) return;
-    grade.sections.push({ sectionName: name });
-    setNewSessions(updated);
-    setSectionInput("");
-  };
-
-  const removeNewSession = (idx: number) => {
-    setNewSessions(newSessions.filter((_, i) => i !== idx));
-    if (activeSessionIdx === idx) {
-      setActiveSessionIdx(null);
-      setActiveGradeIdx(null);
+    if (!instituteCode) {
+      showErrorToast("Institute code is missing. Save Basic Info first.");
+      return;
+    }
+    if (existing.some((s) => s.sessionYear === name)) {
+      showErrorToast("Session already exists for this institute.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = [
+        {
+          id: null,
+          sessionYear: name,
+          schoolClasses: [],
+          instituteCode: Number(instituteCode),
+        },
+      ];
+      const res = await CreateSessionData(payload);
+      const created = Array.isArray(res.data) ? res.data[0] : res.data;
+      showSuccessToast("Session saved");
+      setSessionInput("");
+      const refreshed = await fetchExisting();
+      if (created?.id) {
+        setActiveSessionId(created.id);
+        setActiveGradeId(null);
+      } else {
+        const match = refreshed.find((s) => s.sessionYear === name);
+        if (match) setActiveSessionId(match.id);
+      }
+    } catch (err) {
+      console.error("Failed to save session", err);
+      showErrorToast("Failed to save session");
+    } finally {
+      setBusy(false);
     }
   };
 
-  const removeNewGrade = (sIdx: number, gIdx: number) => {
-    const updated = [...newSessions];
-    updated[sIdx].grades.splice(gIdx, 1);
-    setNewSessions(updated);
-    if (activeSessionIdx === sIdx && activeGradeIdx === gIdx) setActiveGradeIdx(null);
+  const handleAddGrade = async () => {
+    if (!activeSession) return;
+    const name = gradeInput.trim();
+    if (!name) return;
+    if (activeSession.schoolClasses.some((g) => g.className === name)) {
+      showErrorToast("Class already exists for this session.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await CreateClassData({
+        className: name,
+        schoolSession: { id: activeSession.id },
+      });
+      const created = res.data;
+      showSuccessToast("Class saved");
+      setGradeInput("");
+      await fetchExisting();
+      if (created?.id) setActiveGradeId(created.id);
+    } catch (err) {
+      console.error("Failed to save class", err);
+      showErrorToast("Failed to save class");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const removeNewSection = (sIdx: number, gIdx: number, secIdx: number) => {
-    const updated = [...newSessions];
-    updated[sIdx].grades[gIdx].sections.splice(secIdx, 1);
-    setNewSessions(updated);
+  const handleAddSection = async () => {
+    if (!activeGrade) return;
+    const name = sectionInput.trim();
+    if (!name) return;
+    if (activeGrade.schoolSections.some((s) => s.sectionName === name)) {
+      showErrorToast("Section already exists for this class.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await CreateSectionData({
+        sectionName: name,
+        schoolClasses: { id: activeGrade.id },
+      });
+      showSuccessToast("Section saved");
+      setSectionInput("");
+      await fetchExisting();
+    } catch (err) {
+      console.error("Failed to save section", err);
+      showErrorToast("Failed to save section");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteSession = async (id: number) => {
+    setBusy(true);
+    try {
+      await DeleteSessionData(id);
+      showSuccessToast("Session deleted");
+      if (activeSessionId === id) {
+        setActiveSessionId(null);
+        setActiveGradeId(null);
+      }
+      await fetchExisting();
+    } catch (err) {
+      console.error("Failed to delete session", err);
+      showErrorToast("Failed to delete session");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteGrade = async (id: number) => {
+    setBusy(true);
+    try {
+      await DeleteClassData(id);
+      showSuccessToast("Class deleted");
+      if (activeGradeId === id) setActiveGradeId(null);
+      await fetchExisting();
+    } catch (err) {
+      console.error("Failed to delete class", err);
+      showErrorToast("Failed to delete class");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteSection = async (id: number) => {
+    setBusy(true);
+    try {
+      await DeleteSectionData(id);
+      showSuccessToast("Section deleted");
+      await fetchExisting();
+    } catch (err) {
+      console.error("Failed to delete section", err);
+      showErrorToast("Failed to delete section");
+    } finally {
+      setBusy(false);
+    }
   };
 
   useImperativeHandle(ref, () => ({
     save: async () => {
-      if (newSessions.length === 0) {
-        // Nothing new to save — succeed only if institute already has data.
-        return existing.length > 0;
-      }
-      setSaving(true);
-      try {
-        const payload = newSessions.map((s) => ({
-          id: null,
-          sessionYear: s.sessionName,
-          schoolClasses: s.grades.map((g) => ({
-            id: null,
-            className: g.gradeName,
-            schoolSections: g.sections.map((sec) => ({
-              id: null,
-              sectionName: sec.sectionName,
-            })),
-          })),
-          instituteCode: instituteCode || null,
-        }));
-        await CreateSessionData(payload);
-        showSuccessToast("Session details saved");
-        setNewSessions([]);
-        setActiveSessionIdx(null);
-        setActiveGradeIdx(null);
-        await fetchExisting();
-        return true;
-      } catch (err) {
-        console.error("Failed to save session details", err);
-        showErrorToast("Failed to save session details");
-        return false;
-      } finally {
-        setSaving(false);
-      }
+      // Everything is saved on click, so this is just a validation hook.
+      return existing.length > 0;
     },
-    hasAnySession: () => existing.length > 0 || newSessions.length > 0,
+    hasAnySession: () => existing.length > 0,
   }));
-
-  const activeSession =
-    activeSessionIdx !== null ? newSessions[activeSessionIdx] : null;
-  const activeGrade =
-    activeSession && activeGradeIdx !== null
-      ? activeSession.grades[activeGradeIdx]
-      : null;
 
   return (
     <div>
@@ -235,10 +289,10 @@ const InstituteSessionDetailsPanel = forwardRef<
         </div>
       </div>
 
-      {/* Add new — sessions */}
+      {/* Add — sessions */}
       <div className="card border-0 shadow-sm mb-3">
         <div className="card-body">
-          <h6 className="fw-semibold mb-2">Add new session(s)</h6>
+          <h6 className="fw-semibold mb-2">Add session</h6>
           <div className="input-group mb-3">
             <input
               type="text"
@@ -249,38 +303,40 @@ const InstituteSessionDetailsPanel = forwardRef<
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  addSession();
+                  handleAddSession();
                 }
               }}
+              disabled={busy}
             />
             <button
               type="button"
               className="btn btn-primary"
-              onClick={addSession}
-              disabled={!sessionInput.trim()}
+              onClick={handleAddSession}
+              disabled={!sessionInput.trim() || busy}
             >
               Add session
             </button>
           </div>
 
-          {newSessions.length > 0 && (
+          {existing.length > 0 && (
             <div className="list-group">
-              {newSessions.map((s, i) => (
+              {existing.map((s) => (
                 <button
-                  key={i}
+                  key={s.id}
                   type="button"
                   className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${
-                    activeSessionIdx === i ? "active" : ""
+                    activeSessionId === s.id ? "active" : ""
                   }`}
                   onClick={() => {
-                    setActiveSessionIdx(i);
-                    setActiveGradeIdx(null);
+                    setActiveSessionId(s.id);
+                    setActiveGradeId(null);
                   }}
                 >
                   <span>
-                    {s.sessionName}{" "}
+                    {s.sessionYear}{" "}
                     <span className="badge bg-secondary ms-2">
-                      {s.grades.length} class{s.grades.length === 1 ? "" : "es"}
+                      {s.schoolClasses.length} class
+                      {s.schoolClasses.length === 1 ? "" : "es"}
                     </span>
                   </span>
                   <span
@@ -288,7 +344,7 @@ const InstituteSessionDetailsPanel = forwardRef<
                     className="btn btn-sm btn-outline-danger"
                     onClick={(e) => {
                       e.stopPropagation();
-                      removeNewSession(i);
+                      handleDeleteSession(s.id);
                     }}
                   >
                     Remove
@@ -300,12 +356,12 @@ const InstituteSessionDetailsPanel = forwardRef<
         </div>
       </div>
 
-      {/* Add new — grades */}
+      {/* Add — grades */}
       {activeSession && (
         <div className="card border-0 shadow-sm mb-3">
           <div className="card-body">
             <h6 className="fw-semibold mb-2">
-              Add class to "{activeSession.sessionName}"
+              Add class to "{activeSession.sessionYear}"
             </h6>
             <div className="input-group mb-3">
               <input
@@ -317,36 +373,37 @@ const InstituteSessionDetailsPanel = forwardRef<
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    addGrade();
+                    handleAddGrade();
                   }
                 }}
+                disabled={busy}
               />
               <button
                 type="button"
                 className="btn btn-success"
-                onClick={addGrade}
-                disabled={!gradeInput.trim()}
+                onClick={handleAddGrade}
+                disabled={!gradeInput.trim() || busy}
               >
                 Add class
               </button>
             </div>
 
-            {activeSession.grades.length > 0 && (
+            {activeSession.schoolClasses.length > 0 && (
               <div className="list-group">
-                {activeSession.grades.map((g, i) => (
+                {activeSession.schoolClasses.map((g) => (
                   <button
-                    key={i}
+                    key={g.id}
                     type="button"
                     className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${
-                      activeGradeIdx === i ? "active" : ""
+                      activeGradeId === g.id ? "active" : ""
                     }`}
-                    onClick={() => setActiveGradeIdx(i)}
+                    onClick={() => setActiveGradeId(g.id)}
                   >
                     <span>
-                      {g.gradeName}{" "}
+                      {g.className}{" "}
                       <span className="badge bg-secondary ms-2">
-                        {g.sections.length} section
-                        {g.sections.length === 1 ? "" : "s"}
+                        {g.schoolSections.length} section
+                        {g.schoolSections.length === 1 ? "" : "s"}
                       </span>
                     </span>
                     <span
@@ -354,7 +411,7 @@ const InstituteSessionDetailsPanel = forwardRef<
                       className="btn btn-sm btn-outline-danger"
                       onClick={(e) => {
                         e.stopPropagation();
-                        removeNewGrade(activeSessionIdx!, i);
+                        handleDeleteGrade(g.id);
                       }}
                     >
                       Remove
@@ -367,12 +424,12 @@ const InstituteSessionDetailsPanel = forwardRef<
         </div>
       )}
 
-      {/* Add new — sections */}
+      {/* Add — sections */}
       {activeSession && activeGrade && (
         <div className="card border-0 shadow-sm mb-3">
           <div className="card-body">
             <h6 className="fw-semibold mb-2">
-              Add section to "{activeGrade.gradeName}"
+              Add section to "{activeGrade.className}"
             </h6>
             <div className="input-group mb-3">
               <input
@@ -384,25 +441,26 @@ const InstituteSessionDetailsPanel = forwardRef<
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    addSection();
+                    handleAddSection();
                   }
                 }}
+                disabled={busy}
               />
               <button
                 type="button"
                 className="btn btn-info"
-                onClick={addSection}
-                disabled={!sectionInput.trim()}
+                onClick={handleAddSection}
+                disabled={!sectionInput.trim() || busy}
               >
                 Add section
               </button>
             </div>
 
-            {activeGrade.sections.length > 0 && (
+            {activeGrade.schoolSections.length > 0 && (
               <div className="d-flex flex-wrap gap-2">
-                {activeGrade.sections.map((sec, i) => (
+                {activeGrade.schoolSections.map((sec) => (
                   <span
-                    key={i}
+                    key={sec.id}
                     className="badge bg-light text-dark border d-flex align-items-center gap-2"
                     style={{ padding: "0.5rem 0.75rem" }}
                   >
@@ -411,9 +469,7 @@ const InstituteSessionDetailsPanel = forwardRef<
                       type="button"
                       className="btn-close btn-close-sm"
                       aria-label="Remove"
-                      onClick={() =>
-                        removeNewSection(activeSessionIdx!, activeGradeIdx!, i)
-                      }
+                      onClick={() => handleDeleteSection(sec.id)}
                     />
                   </span>
                 ))}
@@ -423,10 +479,10 @@ const InstituteSessionDetailsPanel = forwardRef<
         </div>
       )}
 
-      {saving && (
+      {busy && (
         <div className="text-muted small">
           <span className="spinner-border spinner-border-sm me-2" />
-          Saving session details...
+          Saving...
         </div>
       )}
     </div>

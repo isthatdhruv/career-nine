@@ -5,6 +5,7 @@ import { toAbsoluteUrl } from "../../../_metronic/helpers";
 import { ForgotPassword } from "./components/ForgotPassword";
 import Login from "./components/Login";
 import { Registration } from "./components/Registration";
+import ResetPasswordPage from "./components/ResetPasswordPage";
 
 const AuthLayout = () => {
   useEffect(() => {
@@ -65,10 +66,13 @@ const AuthLayout = () => {
 
 const AuthPage = () => (
   <Routes>
+    {/* Glassmorphism standalone pages — render full-screen, outside AuthLayout. */}
+    <Route path="forgot-password" element={<ForgotPassword />} />
+    <Route path="reset-password/:token" element={<ResetPasswordPage />} />
+
     <Route element={<AuthLayout />}>
       <Route path="login" element={<Login />} />
       <Route path="registration" element={<Registration />} />
-      <Route path="forgot-password" element={<ForgotPassword />} />
       <Route index element={<Login />} />
     </Route>
   </Routes>

@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { requestPasswordReset } from "../core/_requests";
+import { resetPasswordWithToken } from "../core/_requests";
 
-const forgotPasswordSchema = Yup.object().shape({
-  email: Yup.string()
-    .email("Please enter a valid email address")
-    .required("Email is required"),
+const resetSchema = Yup.object().shape({
+  newPassword: Yup.string()
+    .min(6, "Password must be at least 6 characters")
+    .required("New password is required"),
+  confirmPassword: Yup.string()
+    .oneOf([Yup.ref("newPassword")], "Passwords do not match")
+    .required("Please confirm your new password"),
 });
 
 type Status =
@@ -16,29 +19,36 @@ type Status =
   | { kind: "success"; message: string }
   | { kind: "error"; message: string };
 
-export function ForgotPassword() {
+export default function ResetPasswordPage() {
+  const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const formik = useFormik({
-    initialValues: { email: "" },
-    validationSchema: forgotPasswordSchema,
+    initialValues: { newPassword: "", confirmPassword: "" },
+    validationSchema: resetSchema,
     onSubmit: async (values) => {
+      if (!token) {
+        setStatus({ kind: "error", message: "This reset link is invalid." });
+        return;
+      }
       setStatus({ kind: "loading" });
       try {
-        const { data } = await requestPasswordReset(values.email.trim());
+        const { data } = await resetPasswordWithToken(token, values.newPassword);
         setStatus({
           kind: "success",
           message:
             data?.message ||
-            "A link to reset your password has been sent to your email.",
+            "Your password has been reset. Please log in with your new password.",
         });
+        setTimeout(() => navigate("/auth/login"), 2500);
       } catch (err: any) {
         const apiMsg =
           err?.response?.data?.message ||
           err?.response?.data?.error ||
-          (err?.response?.status === 404
-            ? "This email is not registered."
-            : "Something went wrong. Please try again.");
+          "Something went wrong. Please try again.";
         setStatus({ kind: "error", message: apiMsg });
       }
     },
@@ -59,6 +69,8 @@ export function ForgotPassword() {
         padding: "2.5rem 1.5rem",
         fontFamily:
           "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       {/* Ambient green/amber glows */}
@@ -135,8 +147,10 @@ export function ForgotPassword() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              <path d="M21 2v6h-6" />
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+              <path d="M3 22v-6h6" />
+              <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
             </svg>
           </div>
           <h1
@@ -149,7 +163,7 @@ export function ForgotPassword() {
               textShadow: "0 2px 12px rgba(0, 0, 0, 0.15)",
             }}
           >
-            Forgot your password?
+            Reset your Password
           </h1>
           <p
             style={{
@@ -160,11 +174,10 @@ export function ForgotPassword() {
               lineHeight: 1.5,
             }}
           >
-            Enter your registered email and we'll send you a link to reset it.
+            Choose a new password for your Career-9 account.
           </p>
         </div>
 
-        {/* Status banners */}
         {status.kind === "error" && (
           <div
             style={{
@@ -200,59 +213,31 @@ export function ForgotPassword() {
 
         {!isSuccess && (
           <form noValidate onSubmit={formik.handleSubmit}>
-            <div style={{ marginBottom: "1.25rem" }}>
-              <label
-                htmlFor="email"
-                style={{
-                  display: "block",
-                  color: "rgba(255, 255, 255, 0.92)",
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                  marginBottom: "0.5rem",
-                }}
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                autoComplete="email"
-                {...formik.getFieldProps("email")}
-                style={{
-                  width: "100%",
-                  padding: "0.85rem 1rem",
-                  borderRadius: "12px",
-                  border:
-                    formik.touched.email && formik.errors.email
-                      ? "1px solid rgba(248, 113, 113, 0.8)"
-                      : "1px solid rgba(255, 255, 255, 0.35)",
-                  background: "rgba(255, 255, 255, 0.92)",
-                  color: "#1f2937",
-                  fontSize: "1rem",
-                  outline: "none",
-                  boxShadow: "0 2px 12px rgba(0, 0, 0, 0.08)",
-                }}
-              />
-              {formik.touched.email && formik.errors.email && (
-                <div
-                  style={{
-                    color: "#fecaca",
-                    fontSize: "0.825rem",
-                    marginTop: "0.375rem",
-                  }}
-                >
-                  {formik.errors.email}
-                </div>
-              )}
-            </div>
+            <PasswordField
+              id="newPassword"
+              label="Enter New Password"
+              show={showNew}
+              onToggle={() => setShowNew((v) => !v)}
+              formik={formik}
+              field="newPassword"
+            />
+
+            <PasswordField
+              id="confirmPassword"
+              label="Confirm New Password"
+              show={showConfirm}
+              onToggle={() => setShowConfirm((v) => !v)}
+              formik={formik}
+              field="confirmPassword"
+            />
 
             <button
               type="submit"
-              disabled={isLoading || !formik.isValid}
+              disabled={isLoading || !formik.isValid || !formik.dirty}
               style={{
                 width: "100%",
                 padding: "0.95rem 1rem",
+                marginTop: "0.25rem",
                 borderRadius: "14px",
                 border: "none",
                 color: "white",
@@ -260,16 +245,19 @@ export function ForgotPassword() {
                 fontWeight: 700,
                 letterSpacing: "0.01em",
                 cursor:
-                  isLoading || !formik.isValid ? "not-allowed" : "pointer",
+                  isLoading || !formik.isValid || !formik.dirty
+                    ? "not-allowed"
+                    : "pointer",
                 background:
                   "linear-gradient(135deg, #10b981 0%, #f59e0b 100%)",
                 boxShadow:
                   "0 10px 30px rgba(16, 185, 129, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1) inset",
-                opacity: isLoading || !formik.isValid ? 0.7 : 1,
+                opacity:
+                  isLoading || !formik.isValid || !formik.dirty ? 0.7 : 1,
                 transition: "transform 0.2s ease, box-shadow 0.2s ease",
               }}
               onMouseEnter={(e) => {
-                if (isLoading || !formik.isValid) return;
+                if (isLoading || !formik.isValid || !formik.dirty) return;
                 e.currentTarget.style.transform = "translateY(-1px)";
                 e.currentTarget.style.boxShadow =
                   "0 14px 36px rgba(245, 158, 11, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.12) inset";
@@ -280,7 +268,7 @@ export function ForgotPassword() {
                   "0 10px 30px rgba(16, 185, 129, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.1) inset";
               }}
             >
-              {isLoading ? "Sending link…" : "Send reset link"}
+              {isLoading ? "Resetting password…" : "Reset Password"}
             </button>
           </form>
         )}
@@ -299,6 +287,95 @@ export function ForgotPassword() {
           </Link>
         </div>
       </div>
+    </div>
+  );
+}
+
+type PasswordFieldProps = {
+  id: string;
+  label: string;
+  show: boolean;
+  onToggle: () => void;
+  field: "newPassword" | "confirmPassword";
+  // formik typing kept loose for inline use
+  formik: any;
+};
+
+function PasswordField({
+  id,
+  label,
+  show,
+  onToggle,
+  formik,
+  field,
+}: PasswordFieldProps) {
+  const hasError = formik.touched[field] && formik.errors[field];
+  return (
+    <div style={{ marginBottom: "1.1rem" }}>
+      <label
+        htmlFor={id}
+        style={{
+          display: "block",
+          color: "rgba(255, 255, 255, 0.92)",
+          fontSize: "0.875rem",
+          fontWeight: 600,
+          marginBottom: "0.5rem",
+        }}
+      >
+        {label}
+      </label>
+      <div style={{ position: "relative" }}>
+        <input
+          id={id}
+          type={show ? "text" : "password"}
+          autoComplete="new-password"
+          {...formik.getFieldProps(field)}
+          style={{
+            width: "100%",
+            padding: "0.85rem 3rem 0.85rem 1rem",
+            borderRadius: "12px",
+            border: hasError
+              ? "1px solid rgba(248, 113, 113, 0.8)"
+              : "1px solid rgba(255, 255, 255, 0.35)",
+            background: "rgba(255, 255, 255, 0.92)",
+            color: "#1f2937",
+            fontSize: "1rem",
+            outline: "none",
+            boxShadow: "0 2px 12px rgba(0, 0, 0, 0.08)",
+          }}
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={show ? "Hide password" : "Show password"}
+          style={{
+            position: "absolute",
+            top: "50%",
+            right: "0.65rem",
+            transform: "translateY(-50%)",
+            background: "transparent",
+            border: "none",
+            color: "#6b7280",
+            cursor: "pointer",
+            padding: "0.25rem 0.5rem",
+            fontSize: "0.8rem",
+            fontWeight: 600,
+          }}
+        >
+          {show ? "Hide" : "Show"}
+        </button>
+      </div>
+      {hasError && (
+        <div
+          style={{
+            color: "#fecaca",
+            fontSize: "0.825rem",
+            marginTop: "0.375rem",
+          }}
+        >
+          {formik.errors[field]}
+        </div>
+      )}
     </div>
   );
 }

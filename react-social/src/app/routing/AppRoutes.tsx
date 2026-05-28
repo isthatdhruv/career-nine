@@ -107,6 +107,9 @@ const SchoolDashboardPage = lazy(
 const SchoolNavigatorDashboardPage = lazy(
   () => import("../pages/Dashboards/SchoolNavigatorDashboardPage")
 );
+const SchoolCombinedDashboardPage = lazy(
+  () => import("../pages/Dashboards/SchoolCombinedDashboardPage")
+);
 
 /**
  * Base URL of the website.
@@ -137,6 +140,14 @@ const AppRoutes: FC = () => {
         element={
           <SuspensedView>
             <SchoolNavigatorDashboardPage />
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/school/combined-dashboard"
+        element={
+          <SuspensedView>
+            <SchoolCombinedDashboardPage />
           </SuspensedView>
         }
       />
