@@ -201,7 +201,7 @@ const CollegeTable = (props: {
         code: data.instituteCode ?? "",
         address: data.instituteAddress ?? "",
         actions: (
-          <>
+          <div className="d-flex align-items-center justify-content-center gap-1">
             {/* Edit Button — opens the institute wizard pre-filled */}
             <button
               type="button"
@@ -293,11 +293,13 @@ const CollegeTable = (props: {
                   Assign Roles
                 </Dropdown.Item>
 
-                {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx */}
+                {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx (opens in new tab) */}
                 <Dropdown.Item
                   onClick={() =>
-                    navigate(
-                      `/dashboard/school/${data.instituteCode || data.id}`
+                    window.open(
+                      `/dashboard/school/${data.instituteCode || data.id}`,
+                      "_blank",
+                      "noopener,noreferrer"
                     )
                   }
                 >
@@ -305,11 +307,13 @@ const CollegeTable = (props: {
                   Dashboard 1
                 </Dropdown.Item>
 
-                {/* Dashboard 2 -> Dashboards/SchoolNavigatorDashboardPage.tsx */}
+                {/* Dashboard 2 -> Dashboards/SchoolNavigatorDashboardPage.tsx (opens in new tab) */}
                 <Dropdown.Item
                   onClick={() =>
-                    navigate(
-                      `/dashboard/school-navigator/${data.instituteCode || data.id}`
+                    window.open(
+                      `/dashboard/school-navigator/${data.instituteCode || data.id}`,
+                      "_blank",
+                      "noopener,noreferrer"
                     )
                   }
                 >
@@ -333,7 +337,7 @@ const CollegeTable = (props: {
                 */}
               </Dropdown.Menu>
             </Dropdown>
-          </>
+          </div>
         ),
       })) ?? [];
 
@@ -342,7 +346,7 @@ const CollegeTable = (props: {
       {
         label: "Name",
         field: "name",
-        width: 150,
+        width: 260,
         attributes: {
           "aria-controls": "DataTable",
           "aria-label": "Name",
@@ -352,18 +356,18 @@ const CollegeTable = (props: {
         label: "Code",
         field: "code",
         sort: "asc",
-        width: 100,
+        width: 140,
       },
       {
         label: "Address",
         field: "address",
-        width: 100,
+        width: 260,
       },
       {
         label: "Actions",
         field: "actions",
         sort: "disabled",
-        width: 150,
+        width: 220,
       },
     ],
     rows: rows,
@@ -381,6 +385,12 @@ const CollegeTable = (props: {
         .college-table-wrapper .dropdown-menu.show {
           position: fixed !important;
           z-index: 1050 !important;
+        }
+        /* Center both the "Actions" header and the buttons below it so the
+           values sit directly underneath the column heading. */
+        .college-table-wrapper table thead th:last-child,
+        .college-table-wrapper table tbody td:last-child {
+          text-align: center !important;
         }
       `}</style>
       <div className="college-table-wrapper" style={{ overflow: 'visible' }}>

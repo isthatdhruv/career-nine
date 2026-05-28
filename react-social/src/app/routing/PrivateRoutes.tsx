@@ -301,6 +301,24 @@ const PrivateRoutes = () => {
         </RequirePermission>
       } />
 
+      {/* Standalone school dashboards — opened from the institutes list "Dashboard 1 /
+          Dashboard 2" actions via window.open(..., "_blank"). Rendered WITHOUT the
+          Metronic aside menu so only the dashboard surface shows in the new tab. */}
+      <Route path="/dashboard/school/:id" element={
+        <RequirePermission perm="institute.read">
+          <SuspensedView>
+            <SchoolDashboardPage />
+          </SuspensedView>
+        </RequirePermission>
+      } />
+      <Route path="/dashboard/school-navigator/:id" element={
+        <RequirePermission perm="institute.read">
+          <SuspensedView>
+            <SchoolNavigatorDashboardPage />
+          </SuspensedView>
+        </RequirePermission>
+      } />
+
       {/* payment-status and payment-register moved to public AppRoutes */}
       <Route element={<AuthorizedLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
@@ -330,20 +348,6 @@ const PrivateRoutes = () => {
             </RequirePermission>
           }
         />
-        <Route path="/dashboard/school/:id" element={
-          <RequirePermission perm="institute.read">
-            <SuspensedView>
-              <SchoolDashboardPage />
-            </SuspensedView>
-          </RequirePermission>
-        } />
-        <Route path="/dashboard/school-navigator/:id" element={
-          <RequirePermission perm="institute.read">
-            <SuspensedView>
-              <SchoolNavigatorDashboardPage />
-            </SuspensedView>
-          </RequirePermission>
-        } />
         <Route path="/game-list" element={
           <SuspensedView>
             <GamePage />
