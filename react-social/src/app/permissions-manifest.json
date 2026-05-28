@@ -82,6 +82,7 @@
     "/college",
     "/contact-person",
     "/course",
+    "/dashboard/school-combined/:id",
     "/dashboard/school-navigator/:id",
     "/dashboard/school/:id",
     "/section",

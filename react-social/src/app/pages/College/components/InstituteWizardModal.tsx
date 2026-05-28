@@ -149,9 +149,7 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
 
   const handleStep2SaveAndContinue = async () => {
     if (!sessionPanelRef.current) return;
-    setLoading(true);
     const ok = await sessionPanelRef.current.save();
-    setLoading(false);
     if (!ok) {
       showErrorToast(
         "Add at least one session for this institute before continuing."
@@ -468,14 +466,7 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
                 onClick={handleStep2SaveAndContinue}
                 disabled={loading}
               >
-                {loading ? (
-                  <>
-                    Saving...{" "}
-                    <span className="spinner-border spinner-border-sm align-middle ms-2" />
-                  </>
-                ) : (
-                  "Save & Continue"
-                )}
+                Continue
               </button>
             )}
 
