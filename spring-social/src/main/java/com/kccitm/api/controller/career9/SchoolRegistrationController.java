@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -29,6 +30,7 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.PromoCode;
 import com.kccitm.api.model.career9.SchoolAssessmentConfig;
+import com.kccitm.api.model.career9.SchoolAssessmentTier;
 import com.kccitm.api.model.career9.SchoolRegistrationLink;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
@@ -41,6 +43,7 @@ import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.PromoCodeRepository;
 import com.kccitm.api.repository.Career9.SchoolAssessmentConfigRepository;
+import com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository;
 import com.kccitm.api.repository.Career9.SchoolRegistrationLinkRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
@@ -53,6 +56,7 @@ import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.StudentProvisioningService;
+import com.kccitm.api.service.career9.AssessmentMappingTierService;
 
 @RestController
 @RequestMapping("/school-registration")
@@ -61,6 +65,8 @@ public class SchoolRegistrationController {
     private static final Logger logger = LoggerFactory.getLogger(SchoolRegistrationController.class);
 
     @Autowired private SchoolAssessmentConfigRepository configRepository;
+    @Autowired private SchoolAssessmentTierRepository schoolTierRepository;
+    @Autowired private AssessmentMappingTierService tierService;
     @Autowired private SchoolRegistrationLinkRepository linkRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
@@ -249,6 +255,112 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(link);
     }
 
+    // ============ PRICING-TIER ENDPOINTS (per assessment, per session) ============
+
+    @PreAuthorize("@auth.allows('school_registration.read', #instituteCode, #sessionId, null, null)")
+    @GetMapping("/tiers/{instituteCode}/{sessionId}/{assessmentId}")
+    public ResponseEntity<?> listSchoolTiers(@PathVariable Long instituteCode,
+            @PathVariable Long sessionId, @PathVariable Long assessmentId) {
+        return ResponseEntity.ok(schoolTierRepository
+                .findByInstituteCodeAndSessionIdAndAssessmentIdOrderBySortOrderAsc(
+                        instituteCode, sessionId, assessmentId));
+    }
+
+    @PreAuthorize("@auth.allows('school_registration.create')")
+    @PostMapping("/tiers/{instituteCode}/{sessionId}/{assessmentId}")
+    public ResponseEntity<?> createSchoolTier(@PathVariable Long instituteCode,
+            @PathVariable Long sessionId, @PathVariable Long assessmentId,
+            @RequestBody SchoolAssessmentTier tier) {
+        if (tier.getName() == null || tier.getName().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Tier name is required");
+        }
+        if (tier.getDescription() == null || tier.getDescription().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Tier description is required");
+        }
+        if (tier.getDescription().trim().length() > 200) {
+            return ResponseEntity.badRequest().body("Tier description must be 200 characters or fewer");
+        }
+        if (tier.getSortOrder() == null) {
+            return ResponseEntity.badRequest().body("Sort order is required");
+        }
+        tier.setName(tier.getName().trim());
+        tier.setDescription(tier.getDescription().trim());
+        tier.setInstituteCode(instituteCode);
+        tier.setSessionId(sessionId);
+        tier.setAssessmentId(assessmentId);
+        tier.setCurrentCount(0);
+        return ResponseEntity.ok(schoolTierRepository.save(tier));
+    }
+
+    @PreAuthorize("@auth.allows('school_registration.update')")
+    @PutMapping("/tiers/{tierId}")
+    public ResponseEntity<?> updateSchoolTier(@PathVariable Long tierId,
+            @RequestBody SchoolAssessmentTier updated) {
+        Optional<SchoolAssessmentTier> existingOpt = schoolTierRepository.findById(tierId);
+        if (!existingOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        SchoolAssessmentTier existing = existingOpt.get();
+        if (updated.getName() != null) {
+            String trimmed = updated.getName().trim();
+            if (trimmed.isEmpty()) {
+                return ResponseEntity.badRequest().body("Tier name is required");
+            }
+            existing.setName(trimmed);
+        }
+        if (updated.getDescription() != null) {
+            String trimmed = updated.getDescription().trim();
+            if (trimmed.isEmpty()) {
+                return ResponseEntity.badRequest().body("Tier description is required");
+            }
+            if (trimmed.length() > 200) {
+                return ResponseEntity.badRequest().body("Tier description must be 200 characters or fewer");
+            }
+            existing.setDescription(trimmed);
+        }
+        if (updated.getAmount() != null) existing.setAmount(updated.getAmount());
+        if (updated.getSortOrder() != null) existing.setSortOrder(updated.getSortOrder());
+        // maxRegistrations is nullable-meaningful: always copy it through
+        existing.setMaxRegistrations(updated.getMaxRegistrations());
+        if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
+        return ResponseEntity.ok(schoolTierRepository.save(existing));
+    }
+
+    @PreAuthorize("@auth.allows('school_registration.update')")
+    @PatchMapping("/tiers/{tierId}/toggle")
+    public ResponseEntity<?> toggleSchoolTier(@PathVariable Long tierId) {
+        Optional<SchoolAssessmentTier> existingOpt = schoolTierRepository.findById(tierId);
+        if (!existingOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        SchoolAssessmentTier existing = existingOpt.get();
+        existing.setIsActive(!Boolean.TRUE.equals(existing.getIsActive()));
+        return ResponseEntity.ok(schoolTierRepository.save(existing));
+    }
+
+    @PreAuthorize("@auth.allows('school_registration.delete')")
+    @DeleteMapping("/tiers/{tierId}")
+    public ResponseEntity<?> deleteSchoolTier(@PathVariable Long tierId) {
+        if (!schoolTierRepository.existsById(tierId)) {
+            return ResponseEntity.notFound().build();
+        }
+        schoolTierRepository.deleteById(tierId);
+        return ResponseEntity.ok("Tier deleted successfully");
+    }
+
+    @PreAuthorize("@auth.allows('school_registration.update')")
+    @PostMapping("/tiers/{tierId}/recount")
+    public ResponseEntity<?> recountSchoolTier(@PathVariable Long tierId) {
+        if (!schoolTierRepository.existsById(tierId)) {
+            return ResponseEntity.notFound().build();
+        }
+        int newCount = tierService.recountSchoolTier(tierId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("tierId", tierId);
+        response.put("currentCount", newCount);
+        return ResponseEntity.ok(response);
+    }
+
     // ============ PUBLIC ENDPOINTS ============
 
     // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public registration info by token
@@ -288,7 +400,20 @@ public class SchoolRegistrationController {
             Map<String, Object> classInfo = new HashMap<>();
             classInfo.put("classId", config.getClassId());
             classInfo.put("assessmentId", config.getAssessmentId());
-            classInfo.put("amount", config.getAmount() != null ? config.getAmount() : 0);
+
+            // Pricing comes from the active tier for this (institute, session, assessment).
+            // No active tier → registration closed for that class.
+            SchoolAssessmentTier activeTier = tierService.resolveActiveTierForSchoolAssessment(
+                    instituteCode.longValue(), sessionId.longValue(), config.getAssessmentId());
+            if (activeTier != null) {
+                classInfo.put("amount", activeTier.getAmount() != null ? activeTier.getAmount() : 0);
+                classInfo.put("activeTierName", activeTier.getName());
+                classInfo.put("activeTierDescription", activeTier.getDescription());
+                classInfo.put("registrationClosed", false);
+            } else {
+                classInfo.put("amount", 0);
+                classInfo.put("registrationClosed", true);
+            }
 
             // Class name
             schoolClassesRepository.findById(config.getClassId()).ifPresent(sc -> {
@@ -469,8 +594,17 @@ public class SchoolRegistrationController {
 
         SchoolAssessmentConfig config = configOpt.get();
         Long assessmentId = config.getAssessmentId();
-        Long mappingAmount = config.getAmount();
-        boolean paymentRequired = mappingAmount != null && mappingAmount > 0;
+
+        // 4b. Resolve active pricing tier for this assessment. No active tier → registration closed.
+        SchoolAssessmentTier activeTier = tierService.resolveActiveTierForSchoolAssessment(
+                instituteCode.longValue(), sessionId.longValue(), assessmentId);
+        if (activeTier == null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Registration closed for this assessment");
+        }
+        Long activeTierId = activeTier.getTierId();
+        Long mappingAmount = activeTier.getAmount() != null ? activeTier.getAmount() : 0L;
+        boolean paymentRequired = mappingAmount > 0;
 
         // 5. Parse student class number (BUG FIX: always set studentClass)
         Integer studentClass = parseClassNumber(classId);
@@ -506,10 +640,11 @@ public class SchoolRegistrationController {
         if (!byEmail.isEmpty()) {
             if (paymentRequired && finalAmount > 0) {
                 return handleExistingStudentWithPayment(byEmail.get(0), assessmentId, instituteCode,
-                        config.getConfigId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
+                        config.getConfigId(), activeTierId, finalAmount, originalAmount,
+                        promoCodeStr, promoDiscountPercent,
                         name, email, dob, phone);
             }
-            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, link.getLinkId());
+            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, activeTierId);
         }
 
         // 8. Duplicate check by DOB + institute + class + name
@@ -519,16 +654,17 @@ public class SchoolRegistrationController {
             if (!byDob.isEmpty()) {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
-                            config.getConfigId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
+                            config.getConfigId(), activeTierId, finalAmount, originalAmount,
+                            promoCodeStr, promoDiscountPercent,
                             name, email, dob, phone);
                 }
-                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, link.getLinkId());
+                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId);
             }
         }
 
         // 9. Payment required → create payment and redirect
         if (paymentRequired && finalAmount > 0) {
-            return createPaymentAndRedirect(config.getConfigId(), assessmentId, instituteCode,
+            return createPaymentAndRedirect(config.getConfigId(), activeTierId, assessmentId, instituteCode,
                     finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
                     name, email, dob, dobStr, phone, gender, classId, schoolSectionId, studentClass);
         }
@@ -537,6 +673,7 @@ public class SchoolRegistrationController {
         if (paymentRequired && finalAmount != null && finalAmount == 0 && promoCodeStr != null) {
             PaymentTransaction txn = new PaymentTransaction();
             txn.setSchoolConfigId(config.getConfigId());
+            txn.setMappingTierId(activeTierId);
             txn.setAmount(0L);
             txn.setOriginalAmount(originalAmount);
             txn.setPromoCode(promoCodeStr.trim().toUpperCase());
@@ -581,7 +718,7 @@ public class SchoolRegistrationController {
         userStudent = userStudentRepository.save(userStudent);
         studentProvisioningService.provision(userStudent);
 
-        incrementLinkCountAndDeactivateIfFull(link.getLinkId());
+        incrementSchoolTierCount(activeTierId);
 
         StudentAssessmentMapping sam = new StudentAssessmentMapping(
                 userStudent.getUserStudentId(), assessmentId);
@@ -603,23 +740,20 @@ public class SchoolRegistrationController {
 
     // ============ PRIVATE HELPERS ============
 
-    private void incrementLinkCountAndDeactivateIfFull(Long linkId) {
-        if (linkId == null) return;
-        int rows = linkRepository.tryIncrementCount(linkId);
-        logger.info("School link increment: linkId={}, rowsAffected={}", linkId, rows);
-        if (rows == 0) return;
-        linkRepository.findById(linkId).ifPresent(refreshed -> {
-            int max = refreshed.getMaxRegistrations() != null ? refreshed.getMaxRegistrations() : 0;
-            int current = refreshed.getCurrentCount() != null ? refreshed.getCurrentCount() : 0;
-            if (max > 0 && current >= max) {
-                refreshed.setIsActive(false);
-                linkRepository.save(refreshed);
-                logger.info("School link {} hit cap ({}/{}), deactivated", linkId, current, max);
-            }
-        });
+    /**
+     * Per-tier atomic increment for the free-registration path. The tier resolver has already
+     * verified there's capacity, but the update is guarded so a race that lost the last slot
+     * is silently absorbed — the student still gets registered, the count just doesn't
+     * over-shoot. recountSchoolTier() is the drift backstop.
+     */
+    private void incrementSchoolTierCount(Long tierId) {
+        if (tierId == null) return;
+        int rows = schoolTierRepository.tryIncrementCount(tierId);
+        logger.info("School tier increment: tierId={}, rowsAffected={}", tierId, rows);
     }
 
-    private ResponseEntity<?> createPaymentAndRedirect(Long schoolConfigId, Long assessmentId, Integer instituteCode,
+    private ResponseEntity<?> createPaymentAndRedirect(Long schoolConfigId, Long mappingTierId,
+            Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
             String name, String email, Date dob, String dobStr, String phone, String gender,
             Integer classId, Integer schoolSectionId, Integer studentClass) {
@@ -647,6 +781,7 @@ public class SchoolRegistrationController {
 
             PaymentTransaction txn = new PaymentTransaction();
             txn.setSchoolConfigId(schoolConfigId);
+            txn.setMappingTierId(mappingTierId);
             txn.setAmount(finalAmountInr);
             txn.setOriginalAmount(originalAmountInr);
             txn.setAssessmentId(assessmentId);
@@ -684,7 +819,8 @@ public class SchoolRegistrationController {
     }
 
     private ResponseEntity<?> handleExistingStudentWithPayment(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode, Long schoolConfigId, Long finalAmountInr, Long originalAmountInr,
+            Integer instituteCode, Long schoolConfigId, Long mappingTierId,
+            Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent,
             String name, String email, Date dob, String phone) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
@@ -703,13 +839,13 @@ public class SchoolRegistrationController {
 
         SimpleDateFormat sdfFmt = new SimpleDateFormat("dd-MM-yyyy");
         String dobStr = sdfFmt.format(dob);
-        return createPaymentAndRedirect(schoolConfigId, assessmentId, instituteCode,
+        return createPaymentAndRedirect(schoolConfigId, mappingTierId, assessmentId, instituteCode,
                 finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent,
                 name, email, dob, dobStr, phone, null, null, null, null);
     }
 
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode, Long linkId) {
+            Integer instituteCode, Long activeTierId) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (userStudents.isEmpty()) {
             InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
@@ -725,7 +861,7 @@ public class SchoolRegistrationController {
             UserStudent newUs = new UserStudent(existingUser, existingStudentInfo, institute);
             newUs = userStudentRepository.save(newUs);
             studentProvisioningService.provision(newUs);
-            incrementLinkCountAndDeactivateIfFull(linkId);
+            incrementSchoolTierCount(activeTierId);
             userStudents = List.of(newUs);
         }
 

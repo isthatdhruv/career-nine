@@ -10,10 +10,10 @@ import {
   generateSchoolLink,
   getSchoolLink,
   toggleSchoolLink,
-  updateLinkMaxRegistrations,
 } from "../../SchoolRegistration/API/SchoolRegistration_APIs";
 import { getAssessmentSummaryList } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
 import { showErrorToast } from "../../../utils/toast";
+import SchoolTierManagementModal from "./SchoolTierManagementModal";
 
 interface Props {
   instituteCode: number;
@@ -28,16 +28,16 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [classConfigs, setClassConfigs] = useState<Record<string, { assessmentId: string; amount: string; configId?: number }>>({});
+  const [classConfigs, setClassConfigs] = useState<Record<string, { assessmentId: string; configId?: number }>>({});
 
   const [bulkSelectedClasses, setBulkSelectedClasses] = useState<Set<string>>(new Set());
   const [bulkAssessmentId, setBulkAssessmentId] = useState<string>("");
-  const [bulkAmount, setBulkAmount] = useState<string>("");
 
   const [link, setLink] = useState<any>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showQr, setShowQr] = useState(false);
-  const [maxRegistrations, setMaxRegistrations] = useState<string>("");
+
+  const [tierModalAssessmentId, setTierModalAssessmentId] = useState<number | null>(null);
 
   const selectedSessionObj = sessions.find((s: any) => String(s.id) === selectedSession);
   const classes: any[] = selectedSessionObj?.schoolClasses || [];
@@ -73,21 +73,18 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
         getSchoolLink(instituteCode, Number(sessionId)),
       ]);
 
-      const configs: Record<string, { assessmentId: string; amount: string; configId?: number }> = {};
+      const configs: Record<string, { assessmentId: string; configId?: number }> = {};
       for (const c of configRes.data || []) {
         configs[String(c.classId)] = {
           assessmentId: String(c.assessmentId),
-          amount: c.amount ? String(c.amount) : "",
           configId: c.configId,
         };
       }
       setClassConfigs(configs);
       setLink(linkRes.data || null);
-      setMaxRegistrations(linkRes.data?.maxRegistrations ? String(linkRes.data.maxRegistrations) : "");
     } catch {
       setClassConfigs({});
       setLink(null);
-      setMaxRegistrations("");
     }
   };
 
@@ -95,11 +92,10 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
     setSelectedSession(val);
     setClassConfigs({});
     setLink(null);
-    setMaxRegistrations("");
     if (val) loadConfigsForSession(val);
   };
 
-  const updateClassConfig = (classId: string, field: "assessmentId" | "amount", value: string) => {
+  const updateClassConfig = (classId: string, field: "assessmentId", value: string) => {
     setClassConfigs((prev) => ({
       ...prev,
       [classId]: { ...prev[classId], [field]: value },
@@ -138,31 +134,25 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
         next[classId] = {
           ...next[classId],
           assessmentId: bulkAssessmentId,
-          amount: bulkAmount,
         };
       });
       return next;
     });
     setBulkSelectedClasses(new Set());
     setBulkAssessmentId("");
-    setBulkAmount("");
   };
 
   const handleSaveAll = async () => {
     if (!selectedSession) return;
 
-    const configs: { classId: number; assessmentId: number; amount?: number }[] = classes
+    const configs: { classId: number; assessmentId: number }[] = classes
       .filter((c: any) => classConfigs[String(c.id)]?.assessmentId)
       .map((c: any) => {
         const cfg = classConfigs[String(c.id)];
-        const cfgEntry: { classId: number; assessmentId: number; amount?: number } = {
+        return {
           classId: c.id,
           assessmentId: Number(cfg.assessmentId),
         };
-        if (cfg.amount && Number(cfg.amount) > 0) {
-          cfgEntry.amount = Math.round(Number(cfg.amount));
-        }
-        return cfgEntry;
       });
 
     if (configs.length === 0) {
@@ -191,7 +181,6 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
       const res = await generateSchoolLink({
         instituteCode,
         sessionId: Number(selectedSession),
-        maxRegistrations: maxRegistrations ? Number(maxRegistrations) : 0,
       });
       setLink(res.data);
     } catch (error) {
@@ -206,22 +195,6 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
       setLink(res.data);
     } catch (error) {
       showErrorToast("Failed to toggle link");
-    }
-  };
-
-  const handleUpdateMaxRegistrations = async () => {
-    if (!link?.linkId) return;
-    const value = maxRegistrations ? Number(maxRegistrations) : 0;
-    if (Number.isNaN(value) || value < 0) {
-      showErrorToast("Max registrations must be 0 or a positive number");
-      return;
-    }
-    try {
-      const res = await updateLinkMaxRegistrations(link.linkId, value);
-      setLink(res.data);
-      setMaxRegistrations(res.data?.maxRegistrations ? String(res.data.maxRegistrations) : "");
-    } catch (error) {
-      showErrorToast("Failed to update max registrations");
     }
   };
 
@@ -289,10 +262,10 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                   Bulk Assign
                 </h6>
                 <span style={{ fontSize: "0.78rem", color: "#3b82f6", fontWeight: 500 }}>
-                  Select multiple classes &amp; apply one assessment + amount
+                  Select multiple classes &amp; apply one assessment. Pricing is set per assessment below.
                 </span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 12, alignItems: "end" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "end" }}>
                 <div>
                   <Form.Label style={{ fontWeight: 600, fontSize: "0.75rem", color: "#475569", marginBottom: 6 }}>
                     Assessment
@@ -307,19 +280,6 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                       <option key={a.id} value={a.id}>{a.AssessmentName || a.assessmentName}</option>
                     ))}
                   </Form.Select>
-                </div>
-                <div>
-                  <Form.Label style={{ fontWeight: 600, fontSize: "0.75rem", color: "#475569", marginBottom: 6 }}>
-                    Amount (INR)
-                  </Form.Label>
-                  <Form.Control
-                    type="number"
-                    placeholder="0 = Free"
-                    value={bulkAmount}
-                    onChange={(e) => setBulkAmount(e.target.value)}
-                    min="0"
-                    style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid #bfdbfe", fontSize: "0.85rem", background: "#fff" }}
-                  />
                 </div>
                 <Button
                   onClick={handleApplyBulk}
@@ -392,7 +352,7 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                           title="Select all"
                         />
                       </th>
-                      {["Class", "Assessment", "Amount (INR)", "Status"].map((h) => (
+                      {["Class", "Assessment", "Status"].map((h) => (
                         <th key={h} style={{
                           padding: "12px 16px", fontWeight: 700, fontSize: "0.78rem",
                           color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",
@@ -403,7 +363,7 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                   </thead>
                   <tbody>
                     {classes.map((cls: any) => {
-                      const cfg = classConfigs[String(cls.id)] || { assessmentId: "", amount: "" };
+                      const cfg = classConfigs[String(cls.id)] || { assessmentId: "" };
                       const isSelected = bulkSelectedClasses.has(String(cls.id));
                       return (
                         <tr key={cls.id} style={{
@@ -434,16 +394,6 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                                 </option>
                               ))}
                             </Form.Select>
-                          </td>
-                          <td style={{ padding: "12px 16px" }}>
-                            <Form.Control
-                              type="number"
-                              placeholder="0 = Free"
-                              value={cfg.amount}
-                              onChange={(e) => updateClassConfig(String(cls.id), "amount", e.target.value)}
-                              min="0"
-                              style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.85rem", maxWidth: 140 }}
-                            />
                           </td>
                           <td style={{ padding: "12px 16px" }}>
                             {cfg.configId ? (
@@ -505,6 +455,89 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
             </div>
           )}
 
+          {/* Assessment Tiers Section — pricing + caps per unique assessment mapped above */}
+          {selectedSession && (
+            <div style={{
+              background: "#fff", borderRadius: 16, padding: "24px 28px",
+              border: "1px solid #e2e8f0", marginBottom: 24,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4361ee" }} />
+                  <h6 style={{ margin: 0, fontWeight: 700, fontSize: "1rem", color: "#1e293b" }}>
+                    Assessment Tiers
+                  </h6>
+                </div>
+                <span style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}>
+                  Pricing &amp; registration caps come from tiers — required before students can register.
+                </span>
+              </div>
+
+              {(() => {
+                const uniqueAssessments = Array.from(new Set(
+                  Object.values(classConfigs)
+                    .map((c) => c.assessmentId)
+                    .filter((id) => id)
+                )).map((id) => {
+                  const a = assessments.find((x: any) => String(x.id) === String(id));
+                  return {
+                    id: Number(id),
+                    name: a ? (a.AssessmentName || a.assessmentName) : `Assessment #${id}`,
+                  };
+                });
+
+                if (uniqueAssessments.length === 0) {
+                  return (
+                    <div style={{
+                      padding: "24px", textAlign: "center",
+                      border: "2px dashed #e2e8f0", borderRadius: 12, color: "#94a3b8",
+                      fontSize: "0.85rem",
+                    }}>
+                      Map at least one class to an assessment above, then configure tiers per assessment here.
+                    </div>
+                  );
+                }
+
+                return (
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc" }}>
+                        {["Assessment", ""].map((h) => (
+                          <th key={h} style={{
+                            padding: "10px 12px", fontWeight: 700, fontSize: "0.75rem",
+                            color: "#64748b", textAlign: "left", borderBottom: "2px solid #e2e8f0",
+                          }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uniqueAssessments.map((a) => (
+                        <tr key={a.id}>
+                          <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", fontWeight: 600, color: "#1e293b" }}>
+                            {a.name}
+                          </td>
+                          <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9", textAlign: "right" }}>
+                            <button
+                              onClick={() => setTierModalAssessmentId(a.id)}
+                              style={{
+                                padding: "5px 14px", borderRadius: 8,
+                                border: "1.5px solid #e2e8f0", background: "#f8fafc",
+                                color: "#4361ee", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
+                              }}
+                            >
+                              Manage Tiers
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Registration Link Section */}
           {selectedSession && (
             <div style={{
@@ -521,18 +554,8 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
 
               {!link?.token ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ maxWidth: 240 }}>
-                    <Form.Label style={{ fontWeight: 600, fontSize: "0.82rem", color: "#475569", marginBottom: 6 }}>
-                      Max Registrations
-                    </Form.Label>
-                    <Form.Control
-                      type="number"
-                      min="0"
-                      placeholder="0 = unlimited"
-                      value={maxRegistrations}
-                      onChange={(e) => setMaxRegistrations(e.target.value)}
-                      style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: "0.9rem" }}
-                    />
+                  <div style={{ fontSize: "0.82rem", color: "#64748b" }}>
+                    Pricing and registration caps are set per assessment in the Assessment Tiers section above.
                   </div>
                   <Button
                     onClick={handleGenerateLink}
@@ -584,35 +607,11 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                   </div>
 
                   <div style={{
-                    display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap",
-                    padding: "12px 14px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
+                    fontSize: "0.82rem", color: "#64748b",
+                    padding: "10px 14px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
                   }}>
-                    <div style={{ flex: "0 0 auto" }}>
-                      <Form.Label style={{ fontWeight: 600, fontSize: "0.78rem", color: "#475569", marginBottom: 4 }}>
-                        Max Registrations
-                      </Form.Label>
-                      <Form.Control
-                        type="number"
-                        min="0"
-                        placeholder="0 = unlimited"
-                        value={maxRegistrations}
-                        onChange={(e) => setMaxRegistrations(e.target.value)}
-                        style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.85rem", width: 180 }}
-                      />
-                    </div>
-                    <Button
-                      onClick={handleUpdateMaxRegistrations}
-                      style={{
-                        background: "#2563eb", border: "none", borderRadius: 8,
-                        padding: "8px 16px", fontWeight: 600, fontSize: "0.8rem",
-                      }}
-                    >
-                      Update
-                    </Button>
-                    <div style={{ marginLeft: "auto", fontSize: "0.82rem", color: "#475569", fontWeight: 600 }}>
-                      Registrations: <span style={{ color: "#1e293b" }}>{link.currentCount ?? 0}</span>
-                      {link.maxRegistrations > 0 ? ` / ${link.maxRegistrations}` : " (unlimited)"}
-                    </div>
+                    Pricing and per-assessment caps are managed in the Assessment Tiers section above.
+                    Per-tier registration counts are visible inside each assessment&rsquo;s tier modal.
                   </div>
                   <a
                     href={getRegistrationUrl()}
@@ -696,6 +695,20 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
             </div>
           )}
         </>
+      )}
+
+      {tierModalAssessmentId !== null && selectedSession && (
+        <SchoolTierManagementModal
+          instituteCode={instituteCode}
+          sessionId={Number(selectedSession)}
+          assessmentId={tierModalAssessmentId}
+          assessmentName={(() => {
+            const a = assessments.find((x: any) => Number(x.id) === tierModalAssessmentId);
+            return a ? (a.AssessmentName || a.assessmentName) : undefined;
+          })()}
+          show={tierModalAssessmentId !== null}
+          onHide={() => setTierModalAssessmentId(null)}
+        />
       )}
     </div>
   );

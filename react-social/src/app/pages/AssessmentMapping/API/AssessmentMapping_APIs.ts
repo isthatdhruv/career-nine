@@ -73,6 +73,7 @@ export interface AssessmentMappingTier {
   tierId?: number;
   mappingId?: number;
   name: string;
+  description: string;
   amount: number | null;
   sortOrder: number;
   maxRegistrations: number | null;

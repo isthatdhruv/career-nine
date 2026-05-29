@@ -1254,6 +1254,12 @@ export default function GroupStudentPage() {
     student: Student;
     options: EntitlementSummary[];
   } | null>(null);
+  // Per-assessment Thank-You button inside the assessment modal. Cached
+  // entitlements avoid re-hitting the API for each click within the same modal
+  // session. assessmentThankYouLoadingFor tracks which assessment row's button
+  // is currently spinning.
+  const [modalEntitlements, setModalEntitlements] = useState<EntitlementSummary[] | null>(null);
+  const [assessmentThankYouLoadingFor, setAssessmentThankYouLoadingFor] = useState<number | null>(null);
 
   const buildThankYouUrl = useCallback((student: Student, ent: EntitlementSummary) => {
     const base = process.env.REACT_APP_ASSESSMENT_APP_URL || "https://assessment.career-9.com";
@@ -1429,6 +1435,50 @@ export default function GroupStudentPage() {
       return true;
     });
     setStudentAssessments(deduplicated);
+    // Reset and prefetch entitlements for the per-assessment Thank-You buttons.
+    // Pre-fetching here means clicks on individual rows feel instant.
+    setModalEntitlements(null);
+    if (student?.userStudentId) {
+      getEntitlementsByStudent(student.userStudentId)
+        .then((res) => setModalEntitlements(Array.isArray(res.data) ? res.data : []))
+        .catch(() => setModalEntitlements([]));
+    }
+  };
+
+  // Per-assessment Thank-You navigation used from inside the assessment modal.
+  // Resolves the entitlement whose assessmentId matches the row's assessment
+  // and opens the assessment-app Thank-You page in a new tab. Falls back to a
+  // toast when no matching entitlement exists (student hasn't been issued one
+  // for this assessment yet).
+  const handleOpenThankYouForAssessment = async (
+    student: Student,
+    assessmentId: number,
+  ) => {
+    if (!student?.userStudentId) return;
+    setAssessmentThankYouLoadingFor(assessmentId);
+    try {
+      let entitlements = modalEntitlements;
+      if (!entitlements) {
+        const res = await getEntitlementsByStudent(student.userStudentId);
+        entitlements = Array.isArray(res.data) ? res.data : [];
+        setModalEntitlements(entitlements);
+      }
+      const match = entitlements.find(
+        (e) => Number(e.assessmentId) === Number(assessmentId),
+      );
+      if (!match) {
+        showErrorToast(
+          "No entitlement found for this assessment — the student hasn't been issued a campaign entitlement for it.",
+        );
+        return;
+      }
+      window.open(buildThankYouUrl(student, match), "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error("Failed to open Thank-You page for assessment", err);
+      showErrorToast("Could not open Thank-You page. Please try again.");
+    } finally {
+      setAssessmentThankYouLoadingFor(null);
+    }
   };
 
   const handleViewDemographics = async (student: Student, assessmentId: number, assessmentName: string) => {
@@ -2346,9 +2396,24 @@ export default function GroupStudentPage() {
                   </p>
                 </div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
-                    <thead>
+                <div
+                  className="table-responsive"
+                  style={{
+                    maxHeight: "calc(100vh - 320px)",
+                    overflowX: "auto",
+                    overflowY: "auto",
+                  }}
+                >
+                  <table
+                    className="table align-middle mb-0"
+                    style={{
+                      minWidth: "1280px",
+                      width: "100%",
+                      tableLayout: "auto",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                       <tr style={{ background: "#f8f9fa" }}>
                         <th
                           style={{
@@ -3126,6 +3191,54 @@ export default function GroupStudentPage() {
                           <ActionIcon type="refresh" size="sm" />
                           Reset
                         </button>
+                        {/* Testing-only: open the assessment-app Thank-You page
+                            for this specific assessment. Resolves the matching
+                            entitlement under the hood. */}
+                        {(() => {
+                          const isThankYouLoading =
+                            assessmentThankYouLoadingFor === assessment.assessmentId;
+                          const hasEntitlement =
+                            modalEntitlements === null
+                              ? true
+                              : modalEntitlements.some(
+                                  (e) => Number(e.assessmentId) === Number(assessment.assessmentId),
+                                );
+                          return (
+                            <button
+                              className="btn btn-sm d-flex align-items-center gap-1"
+                              disabled={isThankYouLoading || !hasEntitlement}
+                              title={
+                                !hasEntitlement
+                                  ? "No campaign entitlement for this assessment"
+                                  : "Open the assessment-app Thank-You page (testing only)"
+                              }
+                              onClick={() =>
+                                handleOpenThankYouForAssessment(
+                                  modalStudent,
+                                  assessment.assessmentId,
+                                )
+                              }
+                              style={{
+                                borderRadius: "6px",
+                                padding: "5px 10px",
+                                fontWeight: 600,
+                                fontSize: "0.78rem",
+                                background: hasEntitlement
+                                  ? "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)"
+                                  : "#f1f5f9",
+                                color: hasEntitlement ? "#fff" : "#94a3b8",
+                                border: hasEntitlement ? "none" : "1px solid #e2e8f0",
+                                boxShadow: hasEntitlement
+                                  ? "0 2px 8px rgba(139, 92, 246, 0.3)"
+                                  : "none",
+                                opacity: isThankYouLoading ? 0.6 : 1,
+                              }}
+                            >
+                              <i className="bi bi-heart-fill"></i>
+                              {isThankYouLoading ? "Loading…" : "Thank You"}
+                            </button>
+                          );
+                        })()}
 
                         {/* Report actions group — only for completed */}
                         {isCompleted && (

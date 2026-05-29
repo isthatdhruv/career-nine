@@ -27,7 +27,7 @@ spring:
     active: sandbox
   servlet:
     multipart:
-      max-file-size: 1GB
+      max-file-size: a1GB
       max-request-size: 1GB
   flyway:
     enabled: true

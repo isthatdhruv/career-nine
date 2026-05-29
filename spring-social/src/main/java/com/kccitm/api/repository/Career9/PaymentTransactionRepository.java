@@ -54,4 +54,10 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     List<PaymentTransaction> findByUserStudentIdOrderByCreatedAtDesc(Long userStudentId);
 
     long countByMappingTierIdAndStatus(Long mappingTierId, String status);
+
+    // mappingTierId is overloaded across AssessmentMappingTier (paid via /assessment-mapping)
+    // and SchoolAssessmentTier (paid via /school-registration). Disambiguate by which scope
+    // column is populated on the transaction.
+    long countByMappingTierIdAndStatusAndMappingIdIsNotNull(Long mappingTierId, String status);
+    long countByMappingTierIdAndStatusAndSchoolConfigIdIsNotNull(Long mappingTierId, String status);
 }
