@@ -18,6 +18,7 @@ import javax.persistence.TemporalType;
 import javax.persistence.UniqueConstraint;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.kccitm.api.model.career9.ReportTemplate;
 
 /**
  * Per-(student, assessment, type, subtype) placeholder JSON payload. Computed
@@ -29,8 +30,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @Entity
 @Table(name = "calculated_report_data",
     uniqueConstraints = @UniqueConstraint(
-        name = "uk_calc_student_assessment_type_subtype",
-        columnNames = {"user_student_id", "assessment_id", "report_type_id", "report_subtype_id"}),
+        name = "uk_calc_student_assessment_template",
+        columnNames = {"user_student_id", "assessment_id", "report_template_id"}),
     indexes = {
         @Index(name = "idx_calc_assessment", columnList = "assessment_id"),
         @Index(name = "idx_calc_student",    columnList = "user_student_id")
@@ -53,14 +54,9 @@ public class CalculatedReportData implements Serializable {
     private Long assessmentId;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "report_type_id", referencedColumnName = "report_type_id", nullable = false)
+    @JoinColumn(name = "report_template_id", referencedColumnName = "report_template_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private ReportType reportType;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "report_subtype_id", referencedColumnName = "report_subtype_id", nullable = false)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private ReportSubtype reportSubtype;
+    private ReportTemplate reportTemplate;
 
     @Column(name = "calculated_json", nullable = false, columnDefinition = "JSON")
     private String calculatedJson;
@@ -83,11 +79,8 @@ public class CalculatedReportData implements Serializable {
     public Long getAssessmentId() { return assessmentId; }
     public void setAssessmentId(Long assessmentId) { this.assessmentId = assessmentId; }
 
-    public ReportType getReportType() { return reportType; }
-    public void setReportType(ReportType reportType) { this.reportType = reportType; }
-
-    public ReportSubtype getReportSubtype() { return reportSubtype; }
-    public void setReportSubtype(ReportSubtype reportSubtype) { this.reportSubtype = reportSubtype; }
+    public ReportTemplate getReportTemplate() { return reportTemplate; }
+    public void setReportTemplate(ReportTemplate reportTemplate) { this.reportTemplate = reportTemplate; }
 
     public String getCalculatedJson() { return calculatedJson; }
     public void setCalculatedJson(String calculatedJson) { this.calculatedJson = calculatedJson; }

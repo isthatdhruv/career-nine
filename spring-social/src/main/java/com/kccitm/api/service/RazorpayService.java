@@ -33,6 +33,13 @@ public class RazorpayService {
     private static final Logger logger = LoggerFactory.getLogger(RazorpayService.class);
     private static final String RAZORPAY_API_URL = "https://api.razorpay.com/v1/payment_links";
 
+    // Stale links must not linger payable. A Razorpay payment link is an immutable
+    // price snapshot, so a link reopened from an old email/redirect would still charge
+    // the price baked in when it was issued — even after the price changed or a promo
+    // was applied. Auto-expiring links 48h out bounds that window. Razorpay's expire_by
+    // is a Unix epoch in SECONDS and must be at least 15 minutes in the future.
+    private static final long LINK_EXPIRY_SECONDS = 48L * 60L * 60L;
+
     @Value("${app.razorpay.key-id:}")
     private String keyId;
 
@@ -151,6 +158,10 @@ public class RazorpayService {
 
         request.put("reminder_enable", true);
 
+        // Bound how long this snapshot stays payable so a stale price can't be paid
+        // indefinitely from a reopened old link. See LINK_EXPIRY_SECONDS.
+        request.put("expire_by", (System.currentTimeMillis() / 1000L) + LINK_EXPIRY_SECONDS);
+
         HttpEntity<String> entity = new HttpEntity<>(request.toString(), getAuthHeaders());
         ResponseEntity<String> response = restTemplate.postForEntity(RAZORPAY_API_URL, entity, String.class);
 
@@ -191,6 +202,25 @@ public class RazorpayService {
                 org.springframework.http.HttpMethod.GET,
                 entity, String.class);
         return new JSONObject(response.getBody());
+    }
+
+    /**
+     * Cancels a previously-issued payment link via
+     * {@code POST /payment_links/{id}/cancel}. Because a Razorpay link is an immutable
+     * price snapshot, cancelling is the only way to stop a stale link (old price, or
+     * pre-promo) from being paid once a fresher link has been issued or the price has
+     * changed. Only links still in the {@code "created"} state can be cancelled —
+     * Razorpay returns an error for links that are already paid / expired / cancelled,
+     * so callers should treat this as a best-effort operation and not mark a transaction
+     * cancelled locally unless this call returns without throwing.
+     */
+    public void cancelPaymentLink(String linkId) throws Exception {
+        if (linkId == null || linkId.isEmpty()) {
+            throw new IllegalArgumentException("linkId is required");
+        }
+        HttpEntity<String> entity = new HttpEntity<>("{}", getAuthHeaders());
+        restTemplate.postForEntity(RAZORPAY_API_URL + "/" + linkId + "/cancel", entity, String.class);
+        logger.info("Razorpay payment link cancelled: {}", linkId);
     }
 
     public boolean verifyWebhookSignature(byte[] payloadBytes, String signature) {

@@ -547,7 +547,12 @@ public enum PermissionCode {
     REPORT_SUBTYPE_UPLOAD_TEMPLATE    ("report_subtype.upload_template",  "Upload / replace the HTML template for a subtype"),
     REPORT_SUBTYPE_DELETE             ("report_subtype.delete",           "Delete a report subtype"),
     CALCULATED_REPORT_DATA_READ       ("calculated_report_data.read",     "View persisted calculated report payloads"),
-    INTERMEDIARY_SCORES_READ          ("intermediary_scores.read",        "View persisted intermediary score payloads");
+    INTERMEDIARY_SCORES_READ          ("intermediary_scores.read",        "View persisted intermediary score payloads"),
+
+    // ── Collapsed report_template system (V20260601007 seed) ────────────
+    // report_template.{read,create,update,delete} already exist above (~L356).
+    REPORT_TEMPLATE_UPLOAD_TEMPLATE   ("report_template.upload_template", "Upload / replace a report template HTML"),
+    REPORT_TEMPLATE_MAP               ("report_template.map",             "Map templates to questionnaires and set the default");
 
     private final String code;
     private final String description;

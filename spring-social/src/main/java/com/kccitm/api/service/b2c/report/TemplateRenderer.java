@@ -32,7 +32,8 @@ public class TemplateRenderer {
                 break;
             }
             String key = template.substring(open + 2, close).trim();
-            if (key.matches("[a-zA-Z0-9_]+") && str.containsKey(key)) {
+            // '%' is allowed so career-percentage keys like {{p1%}} resolve.
+            if (key.matches("[a-zA-Z0-9_%]+") && str.containsKey(key)) {
                 String v = str.get(key);
                 out.append(v != null ? v : "");
             } else {

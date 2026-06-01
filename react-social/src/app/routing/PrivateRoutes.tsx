@@ -255,6 +255,7 @@ const PrivateRoutes = () => {
   const ManageStudentsPage = lazy(() => import("../pages/Counselling/admin/ManageStudentsPage"));
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
   const ReportTypesPage = lazy(() => import("../pages/ReportTypes/ReportTypesPage"));
+  const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
   const ReportTypesCreatePage = lazy(() => import("../pages/ReportTypes/components/ReportTypesCreatePage"));
   const ReportTypesEditPage = lazy(() => import("../pages/ReportTypes/components/ReportTypesEditPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
@@ -1519,6 +1520,16 @@ const PrivateRoutes = () => {
             <RequirePermission perm="report_type.update">
               <SuspensedView>
                 <ReportTypesEditPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/report-templates"
+          element={
+            <RequirePermission perm="report_template.read">
+              <SuspensedView>
+                <ReportTemplatesPage />
               </SuspensedView>
             </RequirePermission>
           }

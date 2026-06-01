@@ -233,17 +233,46 @@ public class DigitalOceanSpacesService {
      * Returns the file bytes, or null if not found.
      */
     public byte[] downloadFileByUrl(String fileUrl) {
-        if (s3Client == null || fileUrl == null || !fileUrl.startsWith(cdnUrl)) {
+        if (fileUrl == null) {
             return null;
         }
-        String objectKey = fileUrl.substring(cdnUrl.length() + 1);
-        try {
-            S3Object s3Object = s3Client.getObject(bucket, objectKey);
-            try (InputStream is = s3Object.getObjectContent()) {
-                return is.readAllBytes();
+        // Preferred: authenticated S3 fetch (also works for private objects) when
+        // the URL lives in our bucket.
+        if (s3Client != null && fileUrl.startsWith(cdnUrl)) {
+            String objectKey = fileUrl.substring(cdnUrl.length() + 1);
+            try {
+                S3Object s3Object = s3Client.getObject(bucket, objectKey);
+                try (InputStream is = s3Object.getObjectContent()) {
+                    return is.readAllBytes();
+                }
+            } catch (Exception e) {
+                logger.warn("S3 getObject failed for {} ({}); falling back to public HTTP GET",
+                        fileUrl, e.getMessage());
             }
+        }
+        // Fallback: plain public HTTP GET. Templates and rendered reports are
+        // uploaded public-read, so this succeeds even when the S3 client has a
+        // credential/endpoint mismatch.
+        return downloadViaHttp(fileUrl);
+    }
+
+    private byte[] downloadViaHttp(String fileUrl) {
+        try {
+            java.net.HttpURLConnection conn =
+                    (java.net.HttpURLConnection) java.net.URI.create(fileUrl).toURL().openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(20000);
+            int status = conn.getResponseCode();
+            if (status >= 200 && status < 300) {
+                try (InputStream is = conn.getInputStream()) {
+                    return is.readAllBytes();
+                }
+            }
+            logger.warn("Public HTTP GET for {} returned status {}", fileUrl, status);
+            return null;
         } catch (Exception e) {
-            logger.error("Failed to download file from Spaces: {}", fileUrl, e);
+            logger.error("Failed to download file from Spaces (S3 + HTTP): {}", fileUrl, e);
             return null;
         }
     }

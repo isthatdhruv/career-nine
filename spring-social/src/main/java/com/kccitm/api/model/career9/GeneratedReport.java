@@ -20,13 +20,12 @@ import javax.persistence.TemporalType;
 import javax.persistence.UniqueConstraint;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.kccitm.api.model.career9.report.ReportSubtype;
 
 @Entity
 @Table(name = "generated_report",
     uniqueConstraints = @UniqueConstraint(
-        name = "uk_student_assessment_type_subtype",
-        columnNames = {"user_student_id", "assessment_id", "type_of_report", "report_subtype_id"}
+        name = "uk_student_assessment_template",
+        columnNames = {"user_student_id", "assessment_id", "report_template_id"}
     ),
     indexes = {
         @Index(name = "idx_gr_assessment", columnList = "assessment_id"),
@@ -58,13 +57,19 @@ public class GeneratedReport implements Serializable {
     @Column(name = "type_of_report", nullable = false, length = 50)
     private String typeOfReport;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "report_subtype_id", referencedColumnName = "report_subtype_id")
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "report_template_id", referencedColumnName = "report_template_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private ReportSubtype reportSubtype;
+    private ReportTemplate reportTemplate;
 
-    public ReportSubtype getReportSubtype() { return reportSubtype; }
-    public void setReportSubtype(ReportSubtype reportSubtype) { this.reportSubtype = reportSubtype; }
+    public ReportTemplate getReportTemplate() { return reportTemplate; }
+    public void setReportTemplate(ReportTemplate reportTemplate) { this.reportTemplate = reportTemplate; }
+
+    /** Convenience id for clients (filter generated reports by template). */
+    @com.fasterxml.jackson.annotation.JsonProperty("reportTemplateId")
+    public Long getReportTemplateId() {
+        return reportTemplate != null ? reportTemplate.getReportTemplateId() : null;
+    }
 
     // "notGenerated", "generated", "failed"
     @Column(name = "report_status", nullable = false, length = 50)

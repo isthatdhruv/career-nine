@@ -1,17 +1,17 @@
 package com.kccitm.api.controller.career9.report;
 
-public class UnifiedReportRequest {
+import java.util.List;
 
-    private Long userStudentId;
+/** Bulk variant of {@link UnifiedReportRequest} — generate one template for many students. */
+public class UnifiedBulkRequest {
+
     private Long assessmentId;
-    /** Optional — when null, the questionnaire's default template is used. */
+    /** Optional — null uses the questionnaire's default template. */
     private Long reportTemplateId;
     private Boolean force;
+    private List<Long> userStudentIds;
 
-    public UnifiedReportRequest() {}
-
-    public Long getUserStudentId() { return userStudentId; }
-    public void setUserStudentId(Long userStudentId) { this.userStudentId = userStudentId; }
+    public UnifiedBulkRequest() {}
 
     public Long getAssessmentId() { return assessmentId; }
     public void setAssessmentId(Long assessmentId) { this.assessmentId = assessmentId; }
@@ -21,4 +21,7 @@ public class UnifiedReportRequest {
 
     public Boolean getForce() { return force; }
     public void setForce(Boolean force) { this.force = force; }
+
+    public List<Long> getUserStudentIds() { return userStudentIds; }
+    public void setUserStudentIds(List<Long> userStudentIds) { this.userStudentIds = userStudentIds; }
 }

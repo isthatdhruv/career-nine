@@ -18,43 +18,41 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
-import com.kccitm.api.model.career9.StudentInfo;
-import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.model.career9.ReportTemplate;
 import com.kccitm.api.model.career9.report.CalculatedReportData;
 import com.kccitm.api.model.career9.report.IntermediaryScoresRow;
-import com.kccitm.api.model.career9.report.ReportSubtype;
-import com.kccitm.api.model.career9.report.ReportType;
+import com.kccitm.api.model.career9.report.QuestionnaireReportTemplate;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.GeneratedReportRepository;
+import com.kccitm.api.repository.Career9.ReportTemplateRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.report.CalculatedReportDataRepository;
 import com.kccitm.api.repository.Career9.report.IntermediaryScoresRepository;
-import com.kccitm.api.repository.Career9.report.ReportSubtypeRepository;
-import com.kccitm.api.repository.Career9.report.ReportTypeRepository;
+import com.kccitm.api.repository.Career9.report.QuestionnaireReportTemplateRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
 import com.kccitm.api.service.b2c.pager.PagerScoreSource;
 import com.kccitm.api.service.b2c.report.SanityCheckService.SanityResult;
 
 /**
- * Unified report-generation orchestrator. Drives one entry point for BET,
- * Legacy 18-page, and Pager 4-pager — see plan
- * {@code /home/babayaga/.claude/plans/1-b-2-indexed-valley.md}.
+ * Unified report-generation orchestrator. One entry point for every report
+ * type; routing is driven entirely by the chosen {@link ReportTemplate}'s
+ * {@code engineCode} (bet / pager / legacy).
  *
  * <p>Flow ({@code force=false}):
  * <ol>
  *   <li>Sanity pre-flight (mapping completed).</li>
- *   <li>Resolve {@link ReportType} + {@link ReportSubtype} from the
- *       questionnaire, with grade-based fallback during deprecation window.</li>
- *   <li>If strategy uses intermediary scores: load cached
- *       {@code intermediary_scores} row OR compute via
- *       {@link PagerScoreSource} (which carries the async-persistence
- *       retry).</li>
- *   <li>Load cached {@code calculated_report_data} row OR call strategy
- *       and upsert.</li>
- *   <li>Always re-fetch template from Spaces (cached) + fill + re-upload
- *       rendered HTML — template edits propagate without recomputing.</li>
- *   <li>Upsert {@code generated_report} with new URL.</li>
+ *   <li>Resolve the {@link ReportTemplate}: an explicit {@code reportTemplateId}
+ *       (validated to belong to the assessment's questionnaire), else the
+ *       questionnaire's default template.</li>
+ *   <li>If the strategy uses intermediary scores: load the cached
+ *       {@code intermediary_scores} row OR compute via {@link PagerScoreSource}.</li>
+ *   <li>Load the cached {@code calculated_report_data} row (keyed by template)
+ *       OR call the strategy and upsert.</li>
+ *   <li>Always re-fetch the template HTML from Spaces (cached), expose the full
+ *       placeholder map as {@code chartDataJson} for client-side charts, fill,
+ *       and re-upload — template edits propagate without recomputing.</li>
+ *   <li>Upsert {@code generated_report} with the new URL.</li>
  * </ol>
  */
 @Service
@@ -65,8 +63,8 @@ public class ReportService {
     @Autowired private SanityCheckService sanityCheckService;
     @Autowired private PagerScoreSource pagerScoreSource;
 
-    @Autowired private ReportTypeRepository reportTypeRepository;
-    @Autowired private ReportSubtypeRepository reportSubtypeRepository;
+    @Autowired private ReportTemplateRepository reportTemplateRepository;
+    @Autowired private QuestionnaireReportTemplateRepository questionnaireReportTemplateRepository;
     @Autowired private IntermediaryScoresRepository intermediaryScoresRepository;
     @Autowired private CalculatedReportDataRepository calculatedReportDataRepository;
     @Autowired private GeneratedReportRepository generatedReportRepository;
@@ -80,137 +78,142 @@ public class ReportService {
 
     @Autowired private List<PlaceholderCalculator> allStrategies;
 
-    private Map<String, PlaceholderCalculator> strategyByType;
+    private Map<String, PlaceholderCalculator> strategyByEngine;
 
     @PostConstruct
     public void init() {
-        strategyByType = new HashMap<>();
+        strategyByEngine = new HashMap<>();
         for (PlaceholderCalculator c : allStrategies) {
-            strategyByType.put(c.typeCode(), c);
+            strategyByEngine.put(c.typeCode(), c);
         }
-        logger.info("ReportService initialized with strategies: {}", strategyByType.keySet());
+        logger.info("ReportService initialized with engines: {}", strategyByEngine.keySet());
     }
 
-    public ReportResult generate(Long userStudentId, Long assessmentId, boolean force) {
+    /**
+     * @param reportTemplateId explicit template id, or {@code null} to use the
+     *                         questionnaire's default template.
+     */
+    public ReportResult generate(Long userStudentId, Long assessmentId,
+                                 Long reportTemplateId, boolean force) {
         // 1. Sanity pre-flight
         SanityResult sanity = sanityCheckService.existsAndComplete(userStudentId, assessmentId);
         if (!sanity.ok) {
             throw new SanityFailedException(sanity.code, sanity.reason);
         }
 
-        // 2. Resolve (type, subtype)
+        // 2. Resolve the template (explicit id or questionnaire default)
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                 .orElseThrow(() -> new ReportRoutingException("Assessment not found: " + assessmentId));
-        TypeAndSubtype routing = resolveTypeAndSubtype(assessment, userStudentId);
-        ReportType    type    = routing.type;
-        ReportSubtype subtype = routing.subtype;
+        Questionnaire q = assessment.getQuestionnaire();
+        if (q == null) {
+            throw new ReportRoutingException("Assessment " + assessmentId + " has no questionnaire");
+        }
+        ReportTemplate template = resolveTemplate(q.getQuestionnaireId(), reportTemplateId);
 
-        PlaceholderCalculator strategy = strategyByType.get(type.getCode());
+        if (template.getEngineCode() == null || template.getEngineCode().trim().isEmpty()) {
+            throw new ReportRoutingException("Template " + template.getReportTemplateId()
+                    + " has no engineCode set — cannot route to a scoring engine");
+        }
+        PlaceholderCalculator strategy = strategyByEngine.get(template.getEngineCode());
         if (strategy == null) {
-            throw new ReportRoutingException("No strategy registered for type=" + type.getCode());
+            throw new ReportRoutingException(
+                    "No engine registered for engineCode=" + template.getEngineCode()
+                            + " (template " + templateLabel(template) + ")");
         }
 
-        // 3. Intermediary scores (Pager/Legacy only)
+        // 3. Intermediary scores (pager/legacy only)
         IntermediaryScoresPayload intermediary = null;
         if (strategy.usesIntermediary()) {
             intermediary = ensureIntermediaryScores(userStudentId, assessmentId, force);
         }
 
-        // 4. Calculated report data (per type+subtype)
+        // 4. Calculated report data (per template)
         boolean reusedCalc = false;
-        CalculatedReportData calcRow = null;
+        CalculatedReportData calcRow;
         Optional<CalculatedReportData> existing = calculatedReportDataRepository
-                .findByUserStudentIdAndAssessmentIdAndReportType_CodeAndReportSubtype_Code(
-                        userStudentId, assessmentId, type.getCode(), subtype.getCode());
+                .findByUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+                        userStudentId, assessmentId, template.getReportTemplateId());
 
         if (!force && existing.isPresent()
                 && strategy.engineVersion().equals(existing.get().getEngineVersion())) {
             calcRow = existing.get();
             reusedCalc = true;
         } else {
-            Map<String, Object> placeholders = strategy.calculate(
-                    userStudentId, assessmentId, subtype.getCode(), intermediary);
+            Map<String, Object> placeholders = strategy.calculate(userStudentId, assessmentId, intermediary);
             calcRow = upsertCalculatedReportData(
                     existing.orElse(null), userStudentId, assessmentId,
-                    type, subtype, placeholders, strategy.engineVersion());
+                    template, placeholders, strategy.engineVersion());
         }
 
         // 5. Render — always re-load template and re-fill (template edits propagate).
         String templateHtml = templateCache.get(
-                subtype.getTemplateSpacesUrl(), subtype.getTemplateUploadedAt());
+                template.getTemplateSpacesUrl(), template.getTemplateUploadedAt());
         if (templateHtml == null || templateHtml.isEmpty()) {
-            throw new ReportRoutingException("Template not uploaded to Spaces for subtype "
-                    + type.getCode() + "/" + subtype.getCode()
-                    + " (expected template_spaces_url to be set; run the one-time bootstrap)");
+            throw new ReportRoutingException("Template HTML not uploaded to Spaces for template "
+                    + templateLabel(template) + " (upload the HTML first)");
         }
 
         Map<String, Object> placeholders = deserialize(calcRow.getCalculatedJson());
+        // Expose the whole placeholder set as a JSON blob so templates can draw
+        // dynamic, per-student charts client-side. Embed in the template inside
+        // <script type="application/json">{{chartDataJson}}</script>. Computed at
+        // render time (not stored) so it never duplicates into the cached JSON.
+        placeholders.put("chartDataJson", serialize(placeholders));
         String filledHtml = templateRenderer.fill(templateHtml, placeholders);
 
         // 6. Upload to Spaces
-        String fileName = renderedFileName(userStudentId, subtype);
-        String folder   = subtype.getSpacesRenderFolder() + "/assessment-" + assessmentId;
+        String fileName = renderedFileName(userStudentId, template);
+        String renderFolder = (template.getSpacesRenderFolder() != null
+                && !template.getSpacesRenderFolder().trim().isEmpty())
+                ? template.getSpacesRenderFolder()
+                : "report-renders/" + templateLabel(template);
+        String folder   = renderFolder + "/assessment-" + assessmentId;
         String reportUrl = spacesService.uploadBytes(
                 filledHtml.getBytes(StandardCharsets.UTF_8), "text/html", folder, fileName);
 
         // 7. Upsert generated_report
-        GeneratedReport gr = upsertGeneratedReport(
-                userStudentId, assessmentId, type, subtype, reportUrl);
+        GeneratedReport gr = upsertGeneratedReport(userStudentId, assessmentId, template, reportUrl);
 
-        return new ReportResult(reportUrl, type.getCode(), subtype.getCode(),
+        return new ReportResult(reportUrl, template.getEngineCode(), templateLabel(template),
                 calcRow.getCalculatedAt(), gr.getUpdatedAt(), reusedCalc);
     }
 
     // ───────────────────────────────────────────────────────── helpers ──
 
-    private static class TypeAndSubtype {
-        final ReportType type;
-        final ReportSubtype subtype;
-        TypeAndSubtype(ReportType t, ReportSubtype s) { this.type = t; this.subtype = s; }
-    }
-
     /**
-     * Reads (report_type, report_subtype) from the questionnaire FKs. Falls
-     * back to the legacy {@code questionnaire.type} boolean + student grade
-     * during the backfill deprecation window (plan Risk #1).
+     * Resolves the template to render. Explicit id wins (validated to belong to
+     * the questionnaire). Otherwise the questionnaire's default; if no default
+     * flag is set but exactly one template is mapped, it is adopted and flagged
+     * default. Empty mapping → routing error.
      */
-    private TypeAndSubtype resolveTypeAndSubtype(AssessmentTable assessment, Long userStudentId) {
-        Questionnaire q = assessment.getQuestionnaire();
-        if (q == null) {
-            throw new ReportRoutingException(
-                    "Assessment " + assessment.getId() + " has no questionnaire");
+    private ReportTemplate resolveTemplate(Long questionnaireId, Long reportTemplateId) {
+        if (reportTemplateId != null) {
+            QuestionnaireReportTemplate link = questionnaireReportTemplateRepository
+                    .findByQuestionnaireIdAndReportTemplate_Id(questionnaireId, reportTemplateId)
+                    .orElseThrow(() -> new ReportRoutingException(
+                            "Template " + reportTemplateId + " is not mapped to questionnaire " + questionnaireId));
+            return link.getReportTemplate();
         }
 
-        if (q.getReportType() != null && q.getReportSubtype() != null) {
-            return new TypeAndSubtype(q.getReportType(), q.getReportSubtype());
+        Optional<QuestionnaireReportTemplate> def = questionnaireReportTemplateRepository
+                .findByQuestionnaireIdAndIsDefaultTrue(questionnaireId);
+        if (def.isPresent()) {
+            return def.get().getReportTemplate();
         }
 
-        // Deprecation-window fallback: infer from questionnaire.type + grade.
-        logger.warn("Questionnaire {} not backfilled with report_type/subtype — using grade-based fallback",
-                q.getQuestionnaireId());
-
-        boolean isBet = Boolean.TRUE.equals(q.getType());
-        String typeCode    = isBet ? "bet" : "pager";
-        String subtypeCode = isBet ? "default" : inferSubtypeByGrade(userStudentId);
-
-        ReportType t    = reportTypeRepository.findByCode(typeCode)
-                .orElseThrow(() -> new ReportRoutingException("Missing report_type row: " + typeCode));
-        ReportSubtype s = reportSubtypeRepository.findByReportTypeCodeAndCode(typeCode, subtypeCode)
-                .orElseThrow(() -> new ReportRoutingException(
-                        "Missing report_subtype row: " + typeCode + "/" + subtypeCode));
-        return new TypeAndSubtype(t, s);
-    }
-
-    private String inferSubtypeByGrade(Long userStudentId) {
-        Integer grade = userStudentRepository.findById(userStudentId)
-                .map(UserStudent::getStudentInfo)
-                .map(StudentInfo::getStudentClass)
-                .orElse(null);
-        if (grade == null) return "career";
-        if (grade >= 6  && grade <= 8)  return "insight";
-        if (grade >= 9  && grade <= 10) return "subject";
-        if (grade >= 11 && grade <= 12) return "career";
-        return "career";
+        List<QuestionnaireReportTemplate> all = questionnaireReportTemplateRepository
+                .findByQuestionnaireId(questionnaireId);
+        if (all.isEmpty()) {
+            throw new ReportRoutingException("No template mapped to questionnaire " + questionnaireId);
+        }
+        if (all.size() == 1) {
+            QuestionnaireReportTemplate only = all.get(0);
+            only.setIsDefault(true);
+            questionnaireReportTemplateRepository.save(only);
+            return only.getReportTemplate();
+        }
+        throw new ReportRoutingException("Questionnaire " + questionnaireId
+                + " has multiple templates but no default — pass a reportTemplateId or set a default");
     }
 
     private IntermediaryScoresPayload ensureIntermediaryScores(
@@ -261,14 +264,12 @@ public class ReportService {
 
     private CalculatedReportData upsertCalculatedReportData(
             CalculatedReportData existing, Long userStudentId, Long assessmentId,
-            ReportType type, ReportSubtype subtype,
-            Map<String, Object> placeholders, String engineVersion) {
+            ReportTemplate template, Map<String, Object> placeholders, String engineVersion) {
 
         CalculatedReportData row = existing != null ? existing : new CalculatedReportData();
         row.setUserStudentId(userStudentId);
         row.setAssessmentId(assessmentId);
-        row.setReportType(type);
-        row.setReportSubtype(subtype);
+        row.setReportTemplate(template);
         try {
             row.setCalculatedJson(objectMapper.writeValueAsString(placeholders));
         } catch (Exception e) {
@@ -280,28 +281,46 @@ public class ReportService {
     }
 
     private GeneratedReport upsertGeneratedReport(Long userStudentId, Long assessmentId,
-                                                  ReportType type, ReportSubtype subtype,
-                                                  String reportUrl) {
+                                                  ReportTemplate template, String reportUrl) {
         Optional<GeneratedReport> opt = generatedReportRepository
-                .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(
-                        userStudentId, assessmentId, type.getCode());
+                .findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+                        userStudentId, assessmentId, template.getReportTemplateId());
         GeneratedReport gr = opt.orElseGet(() -> {
             GeneratedReport newGr = new GeneratedReport();
             newGr.setUserStudent(userStudentRepository.findById(userStudentId).orElse(null));
             newGr.setAssessmentId(assessmentId);
-            newGr.setTypeOfReport(type.getCode());
             newGr.setCreatedAt(new Date());
             return newGr;
         });
-        gr.setReportSubtype(subtype);
+        // type_of_report keeps the engine code so the legacy String-keyed
+        // GeneratedReport queries/endpoints keep working.
+        gr.setTypeOfReport(template.getEngineCode());
+        gr.setReportTemplate(template);
         gr.setReportStatus("generated");
         gr.setReportUrl(reportUrl);
         gr.setUpdatedAt(new Date());
         return generatedReportRepository.save(gr);
     }
 
-    private static String renderedFileName(Long userStudentId, ReportSubtype subtype) {
-        return "student_" + userStudentId + "_" + subtype.getCode() + ".html";
+    private static String renderedFileName(Long userStudentId, ReportTemplate template) {
+        return "student_" + userStudentId + "_" + templateLabel(template) + ".html";
+    }
+
+    /** Stable label for paths/filenames: the code if set, else the id. */
+    private static String templateLabel(ReportTemplate template) {
+        if (template.getCode() != null && !template.getCode().trim().isEmpty()) {
+            return template.getCode();
+        }
+        return "tpl" + template.getReportTemplateId();
+    }
+
+    private String serialize(Map<String, Object> data) {
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            logger.warn("Failed to serialize chartDataJson", e);
+            return "{}";
+        }
     }
 
     @SuppressWarnings("unchecked")

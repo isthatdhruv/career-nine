@@ -86,7 +86,7 @@ export function AsideMenuMain() {
     allowed("/payment-tracking") ||
     allowed("/promo-codes");
 
-  const showReports = allowed("/reports-hub") || allowed("/admin/report-types");
+  const showReports = allowed("/reports-hub") || allowed("/admin/report-types") || allowed("/admin/report-templates");
 
   const showRoles =
     allowed("/user-management/roles/manage") ||
@@ -503,6 +503,14 @@ export function AsideMenuMain() {
               to="/admin/report-types"
               icon="/media/icons/duotune/files/fil003.svg"
               title="Report Types"
+              fontIcon="bi-file-earmark-text"
+            />
+          )}
+          {(allowed("/admin/report-templates") || allowed("/admin/report-types")) && (
+            <AsideMenuItem
+              to="/admin/report-templates"
+              icon="/media/icons/duotune/files/fil003.svg"
+              title="Report Templates"
               fontIcon="bi-file-earmark-text"
             />
           )}
