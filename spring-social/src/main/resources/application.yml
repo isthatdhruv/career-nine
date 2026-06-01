@@ -170,6 +170,24 @@ app:
   openai:
     api-key: ${OPENAI_API_KEY:}
   mandrill: ${APP_MANDRILL:}
+  # Google Analytics (GA4) server-side conversion tracking via the Measurement
+  # Protocol. The measurement-id is public (it also ships in the frontend
+  # index.html). The api-secret IS sensitive — supply it per-profile via the
+  # GA_API_SECRET env var (.env.dev / .env.staging / .env.production). When the
+  # api-secret is blank the GoogleAnalyticsService is a silent no-op, so dev
+  # runs without it. Shared across profiles since there is one GA property.
+  ga:
+    # Primary property — the dashboard frontend (react-social) and the B2B /
+    # school funnel report here.
+    measurement-id: ${GA_MEASUREMENT_ID:G-7R463ZX69B}
+    api-secret: ${GA_API_SECRET:}
+    # B2C property — the assessment frontend (career-nine-assessment) already
+    # tags its page views with G-BNS71Q704M, so B2C purchase conversions are
+    # routed here to line up with those sessions. Needs its OWN Measurement
+    # Protocol API secret. If b2c-api-secret is blank the service falls back to
+    # the primary property/secret above, so nothing breaks before it's set.
+    b2c-measurement-id: ${GA_B2C_MEASUREMENT_ID:G-BNS71Q704M}
+    b2c-api-secret: ${GA_B2C_API_SECRET:}
   odoo:
     url: ${ODOO_URL:}
     database: ${ODOO_DATABASE:}

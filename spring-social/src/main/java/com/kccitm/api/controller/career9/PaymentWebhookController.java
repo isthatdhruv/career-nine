@@ -80,6 +80,7 @@ public class PaymentWebhookController {
     @Autowired private AssessmentMappingTierRepository assessmentMappingTierRepository;
     @Autowired private StudentInstituteMembershipService membershipService;
     @Autowired private StudentProvisioningService studentProvisioningService;
+    @Autowired private com.kccitm.api.service.GoogleAnalyticsService googleAnalyticsService;
 
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
@@ -433,7 +434,54 @@ public class PaymentWebhookController {
         } else {
             createStudentAndAllotAssessment(txn);
         }
+
+        // Fire the GA4 "purchase" conversion now that payment is confirmed.
+        // Done server-side (Measurement Protocol) because the buyer is on
+        // Razorpay at this point and may never return to the site, so a
+        // browser-only event would miss real paid sales. Async + best-effort:
+        // it never blocks or fails this transaction.
+        sendPurchaseConversionToGa(txn);
+
         return true;
+    }
+
+    /**
+     * Fire the GA4 "purchase" conversion for a confirmed-paid transaction.
+     * Tags the event so conversions can be split by funnel and source in GA:
+     *   - B2C (campaign-linked) → campaign ids
+     *   - B2B (institute/school) → institute code / school-config / mapping id
+     * Best-effort only — {@link GoogleAnalyticsService} is async and swallows
+     * its own errors, and this wrapper guards anyway.
+     */
+    private void sendPurchaseConversionToGa(PaymentTransaction txn) {
+        try {
+            // txn.amount is stored in paise (Razorpay's unit); GA wants rupees.
+            Double valueRupees = txn.getAmount() != null ? txn.getAmount() / 100.0 : null;
+
+            Map<String, Object> params = new HashMap<>();
+            if (txn.getAssessmentId() != null) params.put("assessment_id", txn.getAssessmentId());
+            if (txn.getPromoCode() != null && !txn.getPromoCode().isEmpty()) params.put("promo_code", txn.getPromoCode());
+
+            boolean isB2C = txn.getCampaignId() != null && txn.getCampaignAssessmentTierId() != null;
+            if (isB2C) {
+                params.put("funnel", "b2c");
+                params.put("campaign_id", txn.getCampaignId());
+                params.put("campaign_tier_id", txn.getCampaignAssessmentTierId());
+            } else {
+                params.put("funnel", "b2b");
+                if (txn.getInstituteCode() != null) params.put("institute_code", txn.getInstituteCode());
+                if (txn.getSchoolConfigId() != null) params.put("school_config_id", txn.getSchoolConfigId());
+                if (txn.getMappingId() != null) params.put("mapping_id", txn.getMappingId());
+            }
+
+            // Stable per-transaction client id. If we later capture the
+            // browser's GA client_id at registration and store it on the txn,
+            // pass that here instead for tighter session-level attribution.
+            String clientId = "txn." + txn.getTransactionId();
+            googleAnalyticsService.sendPurchase(clientId, String.valueOf(txn.getTransactionId()), valueRupees, params, isB2C);
+        } catch (Exception e) {
+            logger.warn("Failed to enqueue GA purchase conversion for txn {}: {}", txn.getTransactionId(), e.getMessage());
+        }
     }
 
     private void provisionB2CStudentAndEntitlement(PaymentTransaction txn) {

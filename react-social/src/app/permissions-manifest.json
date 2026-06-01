@@ -82,6 +82,8 @@
     "/college",
     "/contact-person",
     "/course",
+    "/dashboard/school-navigator/:id",
+    "/dashboard/school/:id",
     "/section",
     "/session"
   ],
@@ -140,7 +142,7 @@
     "/upload-excel"
   ],
   "student_management.read": [
-    "auth}\n        <Route path="
+    "auth}\r\n        <Route path="
   ],
   "user.read": [
     "/faculty/registration-details",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { showErrorToast } from "../../utils/toast";
+import { trackEvent } from "../../utils/analytics";
 import { getSchoolInfo, registerSchoolStudent, verifyStudentDetails } from "./API/SchoolRegistration_APIs";
 import { validatePromoCode } from "../PromoCode/API/PromoCode_APIs";
 
@@ -101,6 +102,24 @@ const SchoolAssessmentRegisterPage = () => {
     ? amountRupees * (100 - promoApplied.discountPercent) / 100
     : amountRupees;
 
+  // GA funnel: fire when the "Registration Successful!" screen is shown.
+  // Skips the "already registered" case (not a new conversion). For PAID
+  // registrations the buyer is redirected to Razorpay and never reaches this
+  // screen — that conversion is recorded server-side by the payment webhook —
+  // so this fires for the free / no-payment path, which completes in-browser.
+  useEffect(() => {
+    if (result && result.status !== "already_registered") {
+      trackEvent("registration_complete", {
+        funnel: "b2b",
+        institute: schoolInfo?.instituteName,
+        assessment: assessmentName,
+        value: discountedAmountRupees,
+        currency: "INR",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
   const handleDobChange = (value: string) => {
     let cleaned = value.replace(/[^0-9-]/g, "");
     const digits = cleaned.replace(/-/g, "");
@@ -179,6 +198,16 @@ const SchoolAssessmentRegisterPage = () => {
       // BUG FIX: handle payment_required with null paymentUrl
       if (res.data.status === "payment_required") {
         if (res.data.paymentUrl) {
+          // GA funnel step: buyer is leaving for Razorpay. The authoritative
+          // "purchase" conversion is fired server-side by the payment webhook
+          // once money is confirmed (the buyer may never return here).
+          trackEvent("payment_initiated", {
+            funnel: "b2b",
+            institute: schoolInfo?.instituteName,
+            assessment: assessmentName,
+            value: discountedAmountRupees,
+            currency: "INR",
+          });
           window.location.href = res.data.paymentUrl;
         } else {
           showErrorToast("Payment link could not be generated. Please try again.");
