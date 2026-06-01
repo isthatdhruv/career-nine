@@ -40,6 +40,11 @@ export interface AssessmentDetail {
     status: string; // 'notstarted' | 'inprogress' | 'completed'
 }
 
+export interface StudentRoleGroupRef {
+    id: number;
+    name: string;
+}
+
 export interface StudentWithMapping {
     id: number;
     name: string;
@@ -56,6 +61,7 @@ export interface StudentWithMapping {
     gender?: string;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];
+    roleGroups?: StudentRoleGroupRef[];
 }
 
 export interface StudentAnswerDetail {
@@ -103,6 +109,9 @@ export function updateStudentBasicInfo(data: {
     return axios.post(`${STUDENT_INFO_BASE}/updateDemographics`, data);
 }
 
+// (sendLoginCredentials is declared below alongside its typed response
+// interfaces — single canonical definition.)
+
 // Assessment APIs
 // Uses the lightweight cached /get/list-summary projection (id, name, isActive,
 // questionnaireType) instead of /getAll, which deep-loaded each AssessmentTable
@@ -134,6 +143,37 @@ export function bulkAlotAssessment(assignments: BulkAssessmentAssignment[]) {
 
 export function bulkRemoveAssessment(removals: BulkAssessmentAssignment[]) {
     return axios.post(`${STUDENT_INFO_BASE}/bulkRemoveAssessment`, removals);
+}
+
+// Result row returned per-student by /send-login-credentials.
+// `status === "queued"` means the email was handed off to Odoo (fire-and-forget;
+// the actual SMTP send may complete a few seconds later — check Odoo logs for
+// the definitive outcome). `status === "failed"` means validation failed
+// before dispatch (no email / no username / no DOB on file, etc).
+export interface SendCredentialsResult {
+    userStudentId: number;
+    status: "queued" | "failed";
+    email?: string;
+    reason?: string;
+}
+
+export interface SendCredentialsResponse {
+    requested: number;
+    // Count of rows successfully queued for dispatch via Odoo.
+    sent: number;
+    failed: number;
+    results: SendCredentialsResult[];
+}
+
+// Sends username (from User.username) + password (= student's DOB formatted
+// dd-MM-yyyy) by email to every supplied userStudentId. Backend dispatches via
+// OdooEmailService asynchronously; rows missing email/username/dob are
+// reported as `failed` synchronously rather than aborting the batch.
+export function sendLoginCredentials(userStudentIds: number[]) {
+    return axios.post<SendCredentialsResponse>(
+        `${STUDENT_INFO_BASE}/send-login-credentials`,
+        { userStudentIds },
+    );
 }
 
 // New API to get student answers with question and option details
@@ -282,4 +322,110 @@ export function generateNavigatorReportOneClick(assessmentId: number, userStuden
         userStudentId,
         force,
     }, { timeout: 120000 }); // 2 min timeout for report generation + AI
+}
+
+/**
+ * One-click pager (Navigator 4-pager) report generator for the Student
+ * Management page. Response payload uses different keys than the legacy BET /
+ * Navigator endpoints because the pager pipeline tells the caller whether the
+ * row already existed (for Generate vs Regenerate label semantics).
+ */
+export interface PagerOneClickReportResponse {
+    status: string;          // "ready" | "not_ready" | "failed"
+    reportType: "pager";
+    reportUrl: string;
+    alreadyExisted: boolean;
+    generatedAt?: string;
+}
+
+export function generatePagerReportOneClick(assessmentId: number, userStudentId: number, force = false) {
+    return axios.post<PagerOneClickReportResponse>(`${API_URL}/pager-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 });
+}
+
+/**
+ * Unified report-generation endpoint (Phase 1-b-2 rework). Backend resolves
+ * report type + subtype from the Questionnaire's reportType / reportSubtype
+ * FKs, computes / reuses placeholder data, re-renders the HTML template from
+ * Spaces, and returns the public CDN URL. Replaces the per-type BET /
+ * Navigator / Pager one-click endpoints; the old endpoints remain as thin
+ * forwarders during the deprecation window.
+ */
+export interface UnifiedReportResponse {
+    status: string;          // "generated" | "not_ready" | "failed"
+    reportType: string;      // "bet" | "legacy" | "pager"
+    reportSubtype: string;   // "default" | "insight" | "subject" | "career"
+    reportUrl: string;
+    calculatedAt?: string;
+    renderedAt?: string;
+    alreadyExisted: boolean;
+    error?: string;
+    errorCode?: string;
+}
+
+export function generateUnifiedReportOneClick(
+    assessmentId: number, userStudentId: number, force = false
+) {
+    return axios.post<UnifiedReportResponse>(`${API_URL}/generate-report-unified`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 });
+}
+
+/**
+ * Bulk fetch every {@code generated_report} row for one student. Powers the
+ * Student Management view-modal hydration so each assessment's Generate /
+ * Download / Regenerate button starts with the right state instead of
+ * forgetting prior generations on every modal open. Backend endpoint at
+ * {@code GET /generated-reports/by-student/:userStudentId}.
+ */
+export interface GeneratedReportRow {
+    assessmentId: number;
+    typeOfReport: string;   // "bet" | "navigator" | "pager"
+    reportStatus: string;   // "notGenerated" | "generated" | "failed"
+    reportUrl: string | null;
+    visibleToStudent?: boolean;
+    updatedAt?: string;
+}
+
+export function getGeneratedReportsForStudent(userStudentId: number) {
+    return axios.get<GeneratedReportRow[]>(`${API_URL}/generated-reports/by-student/${userStudentId}`);
+}
+
+// ── Student role-group + effective-permission editor (Data Download page) ──
+export interface StudentRoleGroupDetail {
+    mappingId: number;
+    id: number;
+    name: string;
+    permissionCodes: string[];
+}
+
+export interface StudentRoleGroupPayload {
+    userStudentId: number;
+    userId: number;
+    roleGroups: StudentRoleGroupDetail[];
+    effectivePermissions: string[];
+}
+
+export function getStudentRoleGroups(userStudentId: number) {
+    return axios.get<StudentRoleGroupPayload>(
+        `${STUDENT_INFO_BASE}/${userStudentId}/role-groups`
+    );
+}
+
+export function updateStudentRoleGroups(userStudentId: number, roleGroupIds: number[]) {
+    return axios.put<StudentRoleGroupPayload>(
+        `${STUDENT_INFO_BASE}/${userStudentId}/role-groups`,
+        { roleGroupIds }
+    );
+}
+
+export function getRoleGroupCatalog() {
+    return axios.get<StudentRoleGroupRef[]>(
+        `${STUDENT_INFO_BASE}/role-groups/catalog`
+    );
 }

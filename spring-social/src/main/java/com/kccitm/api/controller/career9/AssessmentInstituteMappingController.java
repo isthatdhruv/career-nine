@@ -8,11 +8,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import javax.servlet.http.HttpServletResponse;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,9 +51,12 @@ import com.kccitm.api.repository.Career9.School.SchoolSessionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.security.AuthCookieService;
+import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
+import com.kccitm.api.service.StudentProvisioningService;
 
 @RestController
 @RequestMapping("/assessment-mapping")
@@ -92,6 +98,9 @@ public class AssessmentInstituteMappingController {
     private SmtpEmailService gmailApiEmailService;
 
     @Autowired
+    private StudentProvisioningService studentProvisioningService;
+
+    @Autowired
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
 
     @Autowired
@@ -112,12 +121,22 @@ public class AssessmentInstituteMappingController {
     @Autowired
     private AssessmentMappingTierService tierService;
 
+    @Autowired
+    private AuthCookieService authCookieService;
+
+    @Autowired
+    private TokenProvider tokenProvider;
+
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
     private String callbackBaseUrl;
+
+    @org.springframework.beans.factory.annotation.Value("${app.auth.assessmentTokenExpirationMsec:14400000}")
+    private long assessmentTokenExpirationMsec;
 
     // ============ ADMIN ENDPOINTS ============
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.create')")
     public ResponseEntity<?> createMapping(@RequestBody AssessmentInstituteMapping mapping) {
         // Validate assessment exists
         if (!assessmentTableRepository.existsById(mapping.getAssessmentId())) {
@@ -132,21 +151,25 @@ public class AssessmentInstituteMappingController {
     }
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')") // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06)
     public List<AssessmentInstituteMapping> getAll() {
         return mappingRepository.findAll();
     }
 
     @GetMapping("/getByInstitute/{instituteCode}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
     public List<AssessmentInstituteMapping> getByInstitute(@PathVariable Integer instituteCode) {
         return mappingRepository.findByInstituteCode(instituteCode);
     }
 
     @GetMapping("/getByInstitute/{instituteCode}/assessments")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
     public List<AssessmentTableRepository.AssessmentSummary> getAssessmentsByInstitute(@PathVariable Integer instituteCode) {
         return assessmentTableRepository.findAssessmentSummariesByInstitute(instituteCode);
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         return mappingRepository.findById(id)
                 .map(m -> ResponseEntity.ok((Object) m))
@@ -154,6 +177,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.update')")
     public ResponseEntity<?> updateMapping(@PathVariable Long id,
             @RequestBody AssessmentInstituteMapping updated) {
         Optional<AssessmentInstituteMapping> existingOpt = mappingRepository.findById(id);
@@ -173,6 +197,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.delete')")
     public ResponseEntity<?> deleteMapping(@PathVariable Long id) {
         if (!mappingRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
@@ -200,9 +225,17 @@ public class AssessmentInstituteMappingController {
         if (tier.getName() == null || tier.getName().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Tier name is required");
         }
+        if (tier.getDescription() == null || tier.getDescription().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Tier description is required");
+        }
+        if (tier.getDescription().trim().length() > 200) {
+            return ResponseEntity.badRequest().body("Tier description must be 200 characters or fewer");
+        }
         if (tier.getSortOrder() == null) {
             return ResponseEntity.badRequest().body("Sort order is required");
         }
+        tier.setName(tier.getName().trim());
+        tier.setDescription(tier.getDescription().trim());
         tier.setMappingId(mappingId);
         tier.setCurrentCount(0);
         return ResponseEntity.ok(tierRepository.save(tier));
@@ -216,7 +249,23 @@ public class AssessmentInstituteMappingController {
             return ResponseEntity.notFound().build();
         }
         AssessmentMappingTier existing = existingOpt.get();
-        if (updated.getName() != null) existing.setName(updated.getName());
+        if (updated.getName() != null) {
+            String trimmed = updated.getName().trim();
+            if (trimmed.isEmpty()) {
+                return ResponseEntity.badRequest().body("Tier name is required");
+            }
+            existing.setName(trimmed);
+        }
+        if (updated.getDescription() != null) {
+            String trimmed = updated.getDescription().trim();
+            if (trimmed.isEmpty()) {
+                return ResponseEntity.badRequest().body("Tier description is required");
+            }
+            if (trimmed.length() > 200) {
+                return ResponseEntity.badRequest().body("Tier description must be 200 characters or fewer");
+            }
+            existing.setDescription(trimmed);
+        }
         if (updated.getAmount() != null) existing.setAmount(updated.getAmount());
         if (updated.getSortOrder() != null) existing.setSortOrder(updated.getSortOrder());
         // maxRegistrations is nullable-meaningful: always copy it through
@@ -259,6 +308,9 @@ public class AssessmentInstituteMappingController {
 
     // ============ PUBLIC ENDPOINTS ============
 
+    // Phase 2 (Task 2.1 / HIGH-B): anonymous token-gated public mapping lookup. @PreAuthorize
+    // removed so the enforce flip won't 403 the public caller; permitAll + CSRF-exempt via
+    // PUBLIC_PATHS (/assessment-mapping/public/**). The path token is the gate. Coverage-excluded.
     @GetMapping("/public/info/{token}")
     public ResponseEntity<?> getMappingInfoByToken(@PathVariable String token) {
         Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findByTokenAndIsActive(token, true);
@@ -341,10 +393,14 @@ public class AssessmentInstituteMappingController {
         return ResponseEntity.ok(info);
     }
 
+    // Phase 2 (Task 2.1 / HIGH-B): anonymous token-gated B2C self-registration. @PreAuthorize
+    // removed so the enforce flip won't 403 the public caller; permitAll + CSRF-exempt via
+    // PUBLIC_PATHS (/assessment-mapping/public/**). The path token is the gate. Coverage-excluded.
     @PostMapping("/public/register/{token}")
     @Transactional
     public ResponseEntity<?> registerStudentByToken(@PathVariable String token,
-            @RequestBody Map<String, Object> studentData) {
+            @RequestBody Map<String, Object> studentData,
+            HttpServletResponse httpResponse) {
         // 1. Find mapping by token
         Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findByTokenAndIsActive(token, true);
         if (!mappingOpt.isPresent()) {
@@ -463,9 +519,9 @@ public class AssessmentInstituteMappingController {
             if (paymentRequired && finalAmount > 0) {
                 return handleExistingStudentWithPayment(existing, assessmentId, instituteCode,
                         mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                        name, email, dob, phone, activeTierId);
+                        name, email, dob, phone, activeTierId, httpResponse);
             }
-            return handleExistingStudent(existing, assessmentId, instituteCode, activeTierId);
+            return handleExistingStudent(existing, assessmentId, instituteCode, activeTierId, httpResponse);
         }
 
         // 7. Duplicate check by DOB + institute + class + name
@@ -476,9 +532,9 @@ public class AssessmentInstituteMappingController {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
                             mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                            name, email, dob, phone, activeTierId);
+                            name, email, dob, phone, activeTierId, httpResponse);
                 }
-                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId);
+                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId, httpResponse);
             }
         }
 
@@ -546,6 +602,7 @@ public class AssessmentInstituteMappingController {
         InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
         UserStudent userStudent = new UserStudent(user, studentInfo, institute);
         userStudent = userStudentRepository.save(userStudent);
+        studentProvisioningService.provision(userStudent);
 
         // Create StudentAssessmentMapping
         StudentAssessmentMapping sam = new StudentAssessmentMapping(
@@ -559,6 +616,7 @@ public class AssessmentInstituteMappingController {
         response.put("username", user.getUsername());
         response.put("dob", dobStr);
         response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
+        issueAssessmentSessionCookie(httpResponse, userStudent, assessmentId);
 
         // Send registration email with credentials
         String assessmentName = assessmentTableRepository.findById(assessmentId)
@@ -636,7 +694,8 @@ public class AssessmentInstituteMappingController {
     private ResponseEntity<?> handleExistingStudentWithPayment(StudentInfo existingStudentInfo, Long assessmentId,
             Integer instituteCode, Long mappingId, Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent,
-            String name, String email, Date dob, String phone, Long mappingTierId) {
+            String name, String email, Date dob, String phone, Long mappingTierId,
+            HttpServletResponse httpResponse) {
         // Check if already assigned
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (!userStudents.isEmpty()) {
@@ -649,6 +708,7 @@ public class AssessmentInstituteMappingController {
                 response.put("status", "already_registered");
                 response.put("message", "You are already registered for this assessment.");
                 response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
+                issueAssessmentSessionCookie(httpResponse, userStudent, assessmentId);
                 return ResponseEntity.ok(response);
             }
         }
@@ -665,7 +725,7 @@ public class AssessmentInstituteMappingController {
      * Handle assigning assessment to an existing student.
      */
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode, Long mappingTierId) {
+            Integer instituteCode, Long mappingTierId, HttpServletResponse httpResponse) {
         // Find UserStudent for this student
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (userStudents.isEmpty()) {
@@ -692,6 +752,7 @@ public class AssessmentInstituteMappingController {
             }
             UserStudent newUs = new UserStudent(existingUser, existingStudentInfo, institute);
             newUs = userStudentRepository.save(newUs);
+            studentProvisioningService.provision(newUs);
             userStudents = List.of(newUs);
         }
 
@@ -749,8 +810,25 @@ public class AssessmentInstituteMappingController {
 
         // Auto-login session payload — same shape /user/auth returns.
         response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
+        issueAssessmentSessionCookie(httpResponse, userStudent, assessmentId);
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Issues the cn_at_asmnt HttpOnly cookie so the freshly registered /
+     * auto-logged-in student is genuinely authenticated against
+     * assessment-scoped endpoints (e.g. /student-demographics/**). Without
+     * this the SPA holds only localStorage.userStudentId and the next
+     * request to a scoped route 403s in TokenAuthenticationFilter.
+     */
+    private void issueAssessmentSessionCookie(HttpServletResponse httpResponse,
+            UserStudent userStudent, Long assessmentId) {
+        if (httpResponse == null || userStudent == null) return;
+        String sessionJwt = tokenProvider.createAssessmentSessionToken(
+                userStudent.getUserStudentId(), assessmentId, userStudent.getUserId());
+        authCookieService.issueAssessmentSessionCookie(httpResponse, sessionJwt,
+                (int) (assessmentTokenExpirationMsec / 1000));
     }
 
     /**

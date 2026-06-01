@@ -11,6 +11,8 @@ import javax.servlet.http.HttpSession;
 import org.apache.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,7 +36,9 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.OdooEmailService;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.dashboard.StudentDashboardDataService;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
 import com.kccitm.api.model.userDefinedModel.StudentPortalComputedData;
@@ -44,6 +48,12 @@ public class UserController {
 
     @Autowired
     private SmtpEmailService smtpEmailService;
+
+    @Autowired
+    private OdooEmailService odooEmailService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private UserRepository userRepository;
@@ -57,8 +67,11 @@ public class UserController {
     @Autowired
     private StudentDashboardDataService studentDashboardDataService;
 
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
+
+    @PreAuthorize("@auth.allows('user.me')")
     @GetMapping("/user/me")
-    // @PreAuthorize("hasAuthority('USER_ME')")
     public User getCurrentUser(@CurrentUser UserPrincipal userPrincipal) {
         User us = userRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
@@ -78,18 +91,21 @@ public class UserController {
     // return users;
     // }
 
+    @PreAuthorize("@auth.allows('user.read.all')")
     @GetMapping(value = "user/get", headers = "Accept=application/json")
     public List<User> getAllRoles() {
         List<User> users = userRepository.findByDisplay(true);
         return users;
     }
 
+    @PreAuthorize("@auth.allows('user.read')")
     @GetMapping(value = "user/getbyid/{id}", headers = "Accept=application/json")
     public Optional<User> getRoleById(@PathVariable("id") Long userId) {
         Optional<User> user = userRepository.findById(userId);
         return user;
     }
 
+    @PreAuthorize("@auth.allows('user.update')")
     @PostMapping(value = "user/update", headers = "Accept=application/json")
     public List<User> updateUser(@RequestBody User currentUser) {
         userRepository.save(currentUser);
@@ -102,6 +118,7 @@ public class UserController {
     @Autowired
     private com.kccitm.api.service.StudentSessionService studentSessionService;
 
+    // @PreAuthorize-Exempt: student login by username+DOB — anonymous-by-design, mirrors /auth/login.
     @PostMapping(value = "user/auth", headers = "Accept=application/json")
     public HashMap<String, Object> checkUser(@RequestBody User currentUser) {
         if (userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).isPresent()) {
@@ -122,6 +139,7 @@ public class UserController {
      * Student auth for dashboard: authenticates with username + DOB and returns
      * full dashboard data (profile + assessment scores) in a single response.
      */
+    // @PreAuthorize-Exempt: student dashboard login by username+DOB — anonymous-by-design, mirrors /auth/login.
     @PostMapping(value = "user/student-auth", headers = "Accept=application/json")
     public ResponseEntity<?> studentDashboardAuth(@RequestBody User currentUser) {
         Optional<User> userOpt = userRepository.findByUsernameAndDobDate(
@@ -191,6 +209,7 @@ public class UserController {
      * Auto-generates careerNineRollNumber if missing.
      * Sets infoCompleted = true on success.
      */
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PutMapping(value = "student-portal/update-info/{userStudentId}")
     public ResponseEntity<?> updateStudentInfo(
             @PathVariable Long userStudentId,
@@ -239,6 +258,7 @@ public class UserController {
 
         userRepository.save(user);
         userStudentRepository.save(userStudent);
+        studentProvisioningService.provision(userStudent);
 
         // Return updated profile
         Map<String, Object> profile = new HashMap<>();
@@ -318,12 +338,14 @@ public class UserController {
      * Returns pre-computed student portal data: pillar scores, career matches,
      * CCI level, insight text, and trait tags.
      */
+    @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping(value = "student-portal/computed/{userStudentId}")
     public ResponseEntity<?> getComputedPortalData(@PathVariable Long userStudentId) {
         StudentPortalComputedData data = studentDashboardDataService.computePortalData(userStudentId);
         return ResponseEntity.ok(data);
     }
 
+    @PreAuthorize("@auth.allows('user.delete')")
     @GetMapping(value = "user/delete/{id}", headers = "Accept=application/json")
     public User deleteUser(@PathVariable("id") Long userId) {
         User user = userRepository.getOne(userId);
@@ -333,6 +355,7 @@ public class UserController {
         return r;
     }
 
+    @PreAuthorize("@auth.allows('user.read.all')")
     @GetMapping(value = "user/registered-users")
     public List<Map<String, Object>> getRegisteredUsers() {
         List<User> users = userRepository.findByProviderNot(AuthProvider.custom_student);
@@ -346,6 +369,7 @@ public class UserController {
             row.put("organisation", u.getOrganisation());
             row.put("designation", u.getDesignation());
             row.put("isActive", u.getIsActive());
+            row.put("isSuperAdmin", Boolean.TRUE.equals(u.getIsSuperAdmin()));
             row.put("provider", u.getProvider() != null ? u.getProvider().name() : null);
             if (u.getDobDate() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -374,6 +398,87 @@ public class UserController {
         return result;
     }
 
+    /**
+     * Admin-driven password reset. Lets a privileged admin set a target user's
+     * password without going through the user's email-reset flow. Useful for
+     * onboarding new users or recovering locked accounts.
+     *
+     * <p>Body: {@code { "password": "<plaintext>", "sendEmail": true|false }}.
+     * On success the user's password is BCrypt-hashed and stored. If
+     * {@code sendEmail} is true and the user has an email on file, an email is
+     * sent containing the new plaintext password and a prompt to change it on
+     * first login. The email is best-effort — failures are logged but do not
+     * fail the request (the password is already saved).
+     *
+     * <p>Security note: emailing plaintext passwords is a deliberate UX choice
+     * for this admin-onboarding flow. Plaintext passwords sitting in inboxes /
+     * mail logs is an accepted trade-off here. The {@code user.update}
+     * permission gate keeps this off the public surface; super-admins always
+     * bypass via {@code AuthorizationService}.
+     */
+    @PreAuthorize("@auth.allows('user.update')")
+    @PostMapping(value = "user/{id}/admin-reset-password")
+    public ResponseEntity<?> adminResetPassword(@PathVariable("id") Long userId,
+            @RequestBody Map<String, Object> body) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        Object rawPassword = body.get("password");
+        if (!(rawPassword instanceof String) || ((String) rawPassword).trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.SC_BAD_REQUEST)
+                    .body(new ApiResponse(false, "password is required"));
+        }
+        String newPassword = ((String) rawPassword).trim();
+        if (newPassword.length() < 6) {
+            return ResponseEntity.status(HttpStatus.SC_BAD_REQUEST)
+                    .body(new ApiResponse(false, "password must be at least 6 characters"));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        boolean sendEmail = Boolean.TRUE.equals(body.get("sendEmail"));
+        boolean emailQueued = false;
+        String emailError = null;
+        if (sendEmail) {
+            if (user.getEmail() == null || user.getEmail().isEmpty()) {
+                emailError = "User has no email on file";
+            } else {
+                try {
+                    String subject = "Your Career-9 password has been reset";
+                    String text =
+                            "Hello " + (user.getName() != null ? user.getName() : "") + ",\n\n" +
+                            "An administrator has reset your Career-9 password.\n\n" +
+                            "Your new password is: " + newPassword + "\n\n" +
+                            "Please log in at https://dashboard.career-9.com using your registered email " +
+                            "and the password above, and change it immediately from your profile.\n\n" +
+                            "If you did not request this change, contact your administrator.\n\n" +
+                            "— Career-9 Team";
+                    // Odoo path is @Async fire-and-forget — returns immediately and the
+                    // actual send happens on a worker thread. We only know the request
+                    // was queued; OdooEmailService logs the eventual success/failure.
+                    odooEmailService.sendSimpleEmail(user.getEmail(), subject, text);
+                    emailQueued = true;
+                } catch (Exception e) {
+                    emailError = e.getMessage();
+                }
+            }
+        }
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("message", "Password reset successfully" +
+                (sendEmail ? (emailQueued ? " — email is being sent to the user" : " (email failed)") : ""));
+        resp.put("emailRequested", sendEmail);
+        // The FE consumes both keys for back-compat; semantically "queued" is more
+        // accurate when the underlying transport is async (Odoo here).
+        resp.put("emailSent", emailQueued);
+        resp.put("emailQueued", emailQueued);
+        if (emailError != null) resp.put("emailError", emailError);
+        return ResponseEntity.ok(resp);
+    }
+
+    @PreAuthorize("@auth.allows('user.toggle_active')")
     @PostMapping(value = "user/toggle-active/{id}")
     public ResponseEntity<?> toggleUserActive(@PathVariable("id") Long userId) {
 
@@ -393,6 +498,67 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse(true, newStatus ? "User activated" : "User deactivated"));
     }
 
+    /**
+     * Grant or revoke the super-admin flag on a user. Super-admin is a hard
+     * bypass over both the RBAC permission check and the URL whitelist (see
+     * {@code AuthorizationService.decide()} and the FE {@code RequirePermission}
+     * guard), so this endpoint is the privilege-escalation surface and is gated
+     * on {@code permission.grant}.
+     *
+     * <p>Two safety rails:
+     * <ul>
+     *   <li>You cannot demote yourself — prevents accidentally locking the only
+     *       admin out of the system in a single click.</li>
+     *   <li>You cannot demote the last remaining super-admin in the database —
+     *       same reason, just defended at a different layer.</li>
+     * </ul>
+     *
+     * <p>Note: the target user's existing access token keeps its old {@code sa}
+     * claim until it expires or they re-login (we don't have a JWT-revocation
+     * hook from here). The response includes a hint so the FE can surface that.
+     */
+    @PreAuthorize("@auth.allows('permission.grant')")
+    @PostMapping(value = "user/toggle-super-admin/{id}")
+    public ResponseEntity<?> toggleSuperAdmin(@PathVariable("id") Long userId,
+                                              @CurrentUser UserPrincipal currentUser) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        boolean current = Boolean.TRUE.equals(user.getIsSuperAdmin());
+        boolean newStatus = !current;
+
+        if (!newStatus && currentUser != null && currentUser.getId() != null
+                && currentUser.getId().equals(userId)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "You cannot revoke your own super-admin status"));
+        }
+
+        if (!newStatus) {
+            long remaining = userRepository.countByIsSuperAdminTrue();
+            if (remaining <= 1) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                        .body(new ApiResponse(false,
+                                "Cannot revoke — this is the last remaining super-admin"));
+            }
+        }
+
+        user.setIsSuperAdmin(newStatus);
+        userRepository.save(user);
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("isSuperAdmin", newStatus);
+        // The is_super_admin flag is re-read from the DB on every request (it is NOT trusted from
+        // the JWT — see TokenAuthenticationFilter / CustomUserDetailsService), so the change applies
+        // on the user's very next backend request. The frontend caches /auth/me at load, so the user
+        // only needs to REFRESH their browser (no re-login) to see menus/actions update.
+        resp.put("message", newStatus
+                ? "User promoted to super-admin — they should refresh their browser to see it take effect (applies on their next request)."
+                : "Super-admin revoked — applies on the user's next request; they should refresh their browser.");
+        return ResponseEntity.ok(resp);
+    }
+
+    @PreAuthorize("@auth.allows('user.update')")
     @PutMapping(value = "user/update-details/{id}")
     public ResponseEntity<?> updateUserDetails(@PathVariable("id") Long userId, @RequestBody Map<String, Object> body) {
         User user = userRepository.findById(userId)

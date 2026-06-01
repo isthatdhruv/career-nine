@@ -4,11 +4,17 @@ import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
 import { useHeartbeat } from '../hooks/useHeartbeat';
 import http from '../api/http';
+import { restorePartialAnswers } from '../api/assessmentApi';
 
 type Section = {
   sectionId: string | number;
   sectionName: string;
   sectionDescription?: string;
+};
+
+type SectionWithQuestions = {
+  section: { sectionId: string | number };
+  questions: { questionnaireQuestionId: number }[];
 };
 
 const SelectSectionPage: React.FC = () => {
@@ -42,7 +48,10 @@ const SelectSectionPage: React.FC = () => {
     }
   }, [assessmentData]);
 
-  // Status check runs independently — doesn't block section rendering
+  // Status check runs independently — doesn't block section rendering. For
+  // an "ongoing" status with partial answers we additionally auto-route the
+  // student to the next-unanswered question so they don't have to remember
+  // which section they paused in.
   useEffect(() => {
     const checkStudentStatus = async () => {
       const assessmentId = localStorage.getItem('assessmentId');
@@ -66,9 +75,37 @@ const SelectSectionPage: React.FC = () => {
         }
 
         if (studentStatus === 'completed') {
-          alert("You have already completed this assessment.");
-          navigate("/student-login");
+          // Student already submitted — send them straight to the
+          // thank-you / report page, NOT back to login. The thank-you page
+          // resolves entitlement + report state from localStorage; it
+          // gracefully no-ops if those keys are absent.
+          navigate('/studentAssessment/completed', { replace: true });
           return;
+        }
+
+        if (studentStatus === 'ongoing' && assessmentData && assessmentData[0]) {
+          // Resume path — pick the first section that still has an
+          // unanswered question and jump straight to it. SectionQuestionPage
+          // will restore the partial answers on mount and land the student
+          // on the within-section next-unanswered.
+          try {
+            const partial = await restorePartialAnswers(
+              Number(userStudentId), Number(assessmentId),
+            );
+            const answeredIds = collectAnsweredQuestionIds(partial?.data);
+            const target = findNextUnansweredSection(assessmentData[0], answeredIds);
+            if (target) {
+              navigate(
+                `/studentAssessment/sections/${target.sectionId}/questions/0`,
+                { replace: true },
+              );
+              return;
+            }
+            // No unanswered question found — fall through to the section
+            // picker (student can re-enter manually if they want).
+          } catch (restoreErr) {
+            console.warn('Partial restore failed on resume; showing picker:', restoreErr);
+          }
         }
       } catch (error) {
         console.error("Error checking student status:", error);
@@ -76,7 +113,42 @@ const SelectSectionPage: React.FC = () => {
     };
 
     checkStudentStatus();
-  }, [navigate]);
+    // assessmentData participates in the effect because the resume path needs
+    // it to compute the next-unanswered section.
+  }, [navigate, assessmentData]);
+
+  // Pulls the set of answered questionnaireQuestionIds out of the
+  // /partial-restore response shape ({ answers: [{ questionnaireQuestionId, ... }] }).
+  function collectAnsweredQuestionIds(restored: any): Set<number> {
+    const out = new Set<number>();
+    const list = restored?.answers;
+    if (Array.isArray(list)) {
+      for (const a of list) {
+        const qid = a?.questionnaireQuestionId;
+        if (typeof qid === 'number') out.add(qid);
+      }
+    }
+    return out;
+  }
+
+  // Walks sections in order; returns the first one that still has any
+  // unanswered question. Section shape mirrors what AssessmentContext loads.
+  function findNextUnansweredSection(
+    questionnaire: any,
+    answeredIds: Set<number>,
+  ): { sectionId: string | number } | null {
+    const sectionsList: SectionWithQuestions[] = questionnaire?.sections || [];
+    for (const s of sectionsList) {
+      const qs = Array.isArray(s.questions) ? s.questions : [];
+      const hasUnanswered = qs.some((q) =>
+        typeof q?.questionnaireQuestionId === 'number'
+          ? !answeredIds.has(q.questionnaireQuestionId)
+          : false,
+      );
+      if (hasUnanswered) return { sectionId: s.section.sectionId };
+    }
+    return null;
+  }
 
   const handleSectionClick = (section: Section) => {
     navigate(`/studentAssessment/sections/${section.sectionId}`);

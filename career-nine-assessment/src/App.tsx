@@ -14,6 +14,8 @@ import AssessmentRegisterPage from './pages/AssessmentRegisterPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
 import CampaignRegisterPage from './pages/CampaignRegisterPage'
 import PayForReportPage from './pages/PayForReportPage'
+import AssessmentStartPage from './pages/AssessmentStartPage'
+import PermissionDeniedPage from './components/PermissionDeniedPage'
 
 const SelectSectionPage = lazy(() => import('./pages/SelectSectionPage'))
 const SectionInstructionPage = lazy(() => import('./pages/SectionInstructionPage'))
@@ -45,11 +47,21 @@ export default function App() {
               <Route path="/studentAssessment/sections/:sectionId/questions/:questionIndex" element={<SectionQuestionPage />} />
               <Route path="/studentAssessment/completed" element={<ThankYouPage />} />
               <Route path="/assessment-register/:token" element={<AssessmentRegisterPage />} />
+              <Route path="/assessment/start" element={<AssessmentStartPage />} />
               <Route path="/payment-status" element={<PaymentStatusPage />} />
               <Route path="/c/:slug" element={<CampaignRegisterPage />} />
               <Route path="/c/:slug/:assessmentId" element={<CampaignRegisterPage />} />
               <Route path="/c/:slug/:assessmentId/upgrade/:entitlementId" element={<PayForReportPage />} />
               <Route path="/c/:slug/:assessmentId/:tierId" element={<CampaignRegisterPage />} />
+              {/*
+                Phase 19 (Plan 19-05): assessment SPA permission-denied page.
+                Mounted BEFORE the wildcard so /permission-denied does not get
+                swallowed by the redirect-to-student-login fallback. The http.ts
+                response interceptor redirects here on 403 (and on 401 when
+                cookieAuthRuntimeActive is true, i.e. cn_at_asmnt is the active
+                auth mechanism).
+              */}
+              <Route path="/permission-denied" element={<PermissionDeniedPage />} />
               <Route path="*" element={<Navigate to="/student-login" replace />} />
             </Routes>
           </Suspense>

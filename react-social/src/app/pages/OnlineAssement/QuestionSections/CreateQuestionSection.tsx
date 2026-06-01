@@ -1,29 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
-import { ReadQuestionSectionData } from "./API/Question_Section_APIs";
+import { useQuestionSections } from "../../../lib/queries/lookups";
 import QuestionSectionTable from "./components/QuestionSectionTable";
 
 const QuestionSectionPage = () => {
-  const [questionSectionData, setQuestionSectionData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data: questionSectionData = [], isLoading: loading } = useQuestionSections<any>();
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    setLoading(true);
-    try {
-      ReadQuestionSectionData().then((data) => {
-        setQuestionSectionData(data.data);
-        setLoading(false);
-      });
-    } catch (error) {
-      console.error(error);
-      // window.location.replace("/error");
-    }
-  }, [pageLoading]);
 
   return (
     <div className="card">

@@ -9,7 +9,8 @@ import {
   StudentMembership,
   undropStudentMembership,
 } from "../B2C/API/Membership_APIs";
-import { getInstituteList, InstituteOption } from "../B2C/API/Campaign_APIs";
+import { InstituteOption } from "../B2C/API/Campaign_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 
 interface Props {
   show: boolean;
@@ -20,7 +21,7 @@ interface Props {
 
 const StudentInstitutesModal = ({ show, onHide, userStudentId, studentName }: Props) => {
   const [rows, setRows] = useState<StudentMembership[]>([]);
-  const [institutes, setInstitutes] = useState<InstituteOption[]>([]);
+  const { data: institutes = [] } = useInstitutes<InstituteOption>();
   const [loading, setLoading] = useState(false);
   const [busyCode, setBusyCode] = useState<number | null>(null);
   const [addCode, setAddCode] = useState<string>("");
@@ -29,9 +30,8 @@ const StudentInstitutesModal = ({ show, onHide, userStudentId, studentName }: Pr
     if (!userStudentId) return;
     setLoading(true);
     try {
-      const [m, i] = await Promise.all([getStudentMemberships(userStudentId), getInstituteList()]);
+      const m = await getStudentMemberships(userStudentId);
       setRows(m.data || []);
-      setInstitutes(i.data || []);
     } catch (e: any) {
       showErrorToast(e?.response?.data || "Failed to load memberships");
     } finally {

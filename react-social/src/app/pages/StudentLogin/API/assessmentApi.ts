@@ -1,3 +1,17 @@
+/**
+ * @deprecated Phase 19 — this axios instance and its X-Assessment-* header
+ * injection are slated for removal once every institute has the new cookie-
+ * based assessment auth enabled (InstituteDetail.assessmentCookieAuthEnabled,
+ * see Plan 19-01). New code in react-social SHOULD use the global axios
+ * configured by AuthHelpers.ts; new code in the standalone assessment SPA
+ * (career-nine-assessment/) SHOULD use career-nine-assessment/src/api/http.ts
+ * which already speaks the cookie path with a v2.0 fallback (Plan 19-04).
+ *
+ * This file is retained verbatim for the one-release backwards-compat window
+ * so existing react-social callers (AllottedAssessmentPage, AssessmentContext,
+ * DynamicDemographicForm, etc.) continue to work unchanged on the v2.0 path.
+ * Do NOT add new imports of this module.
+ */
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
 const MAX_RETRIES = 3;

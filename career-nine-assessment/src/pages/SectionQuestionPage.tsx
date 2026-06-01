@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
 import { usePreventReload } from "../hooks/usePreventReload";
 import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
@@ -17,7 +17,7 @@ import { useFaceCounter } from "../hooks/useFaceCounter";
 import { useMouseClickTracker } from "../hooks/useMouseClickTracker";
 import { usePerQuestionProctoring } from "../hooks/usePerQuestionProctoring";
 import { submitProctoringData } from "../api/proctoringApi";
-import { savePartialAnswers } from "../api/assessmentApi";
+import { savePartialAnswers, restorePartialAnswers } from "../api/assessmentApi";
 import type { ProctoringPayload } from "../types/proctoring";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 
@@ -79,6 +79,7 @@ type QuestionnaireLanguage = {
 const SectionQuestionPage: React.FC = () => {
   const { sectionId, questionIndex } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { assessmentData, assessmentConfig } = useAssessment();
   const showTimer = assessmentConfig?.showTimer !== false;
   const saveLater = assessmentConfig?.saveLater !== false;
@@ -145,20 +146,18 @@ const SectionQuestionPage: React.FC = () => {
   const [isGameActive, setIsGameActive] = useState<boolean>(false);
   const [activeGameCode, setActiveGameCode] = useState<number | null>(null);
 
-  // Load initial state from localStorage
+  // Answer state lives in-memory only; hydrated from Redis (partial-restore)
+  // on mount. localStorage is NOT consulted — Redis is the single source of
+  // truth for in-progress answers. Tradeoff: a tab crash mid-section loses
+  // un-saved-to-Redis answers (last Redis snapshot is the previous section
+  // boundary); the student redoes the current section. Accepted design.
   const [answers, setAnswers] = useState<
     Record<string, Record<number, number[]>>
-  >(() => {
-    const stored = localStorage.getItem("assessmentAnswers");
-    return stored ? JSON.parse(stored) : {};
-  });
+  >({});
   // For ranking questions: sectionId -> questionId -> optionId -> rank
   const [rankingAnswers, setRankingAnswers] = useState<
     Record<string, Record<number, Record<number, number>>>
-  >(() => {
-    const stored = localStorage.getItem("assessmentRankingAnswers");
-    return stored ? JSON.parse(stored) : {};
-  });
+  >({});
   const [savedForLater, setSavedForLater] = useState<
     Record<string, Set<number>>
   >(() => {
@@ -192,12 +191,10 @@ const SectionQuestionPage: React.FC = () => {
     return stored ? parseInt(stored) : 0;
   });
   // For text-type questions: sectionId -> questionId -> inputIndex -> text value
+  // Same Redis-only contract as `answers` / `rankingAnswers` above.
   const [textAnswers, setTextAnswers] = useState<
     Record<string, Record<number, Record<number, string>>>
-  >(() => {
-    const stored = localStorage.getItem("assessmentTextAnswers");
-    return stored ? JSON.parse(stored) : {};
-  });
+  >({});
   // Refs mirroring state for use in callbacks (avoids stale closures)
   const sectionIdRef = useRef(sectionId);
   sectionIdRef.current = sectionId;
@@ -327,15 +324,11 @@ const SectionQuestionPage: React.FC = () => {
     prevSectionIdRef.current = sectionId!;
   }, [sectionId]);
 
-  // Debounced localStorage writes - batches all state into single write cycles
-  useEffect(() => {
-    scheduleWrite("assessmentAnswers", JSON.stringify(answers));
-  }, [answers, scheduleWrite]);
-
-  useEffect(() => {
-    scheduleWrite("assessmentRankingAnswers", JSON.stringify(rankingAnswers));
-  }, [rankingAnswers, scheduleWrite]);
-
+  // Debounced localStorage writes — batches all state into single write cycles.
+  // NOTE: answer state (answers / rankingAnswers / textAnswers) intentionally
+  // NOT persisted to localStorage. Redis is the single source of truth for
+  // those, hydrated via /partial-restore on mount and refreshed by
+  // /save-partial on section transitions.
   useEffect(() => {
     const toStore: Record<string, number[]> = {};
     for (const key in savedForLater) {
@@ -360,9 +353,111 @@ const SectionQuestionPage: React.FC = () => {
     scheduleWrite("assessmentCompletedGames", JSON.stringify(completedGames));
   }, [completedGames, scheduleWrite]);
 
+  // Hydrate answer state from the Redis partial-restore endpoint on mount.
+  // Runs once, after the questionnaire is loaded (need it to map
+  // questionnaireQuestionId → sectionId). Replaces the previous
+  // localStorage-initialized state.
+  //
+  // Recovery contract: the latest /save-partial snapshot from any prior
+  // attempt on this (student, assessment) is restored. Any in-section
+  // progress that never reached a section boundary is gone (Redis hasn't
+  // seen it). Accepted tradeoff — see the answer-state useState comments.
+  const didRestoreRef = useRef(false);
   useEffect(() => {
-    scheduleWrite("assessmentTextAnswers", JSON.stringify(textAnswers));
-  }, [textAnswers, scheduleWrite]);
+    if (didRestoreRef.current) return;
+    if (!questionnaire?.sections) return;
+
+    // Dev-only autofill bypass: AllottedAssessmentPage hands a fully random
+    // answer set via route state OR sessionStorage (the latter survives the
+    // demographics hop when those fields are required). Seed React state
+    // from it and skip the Redis partial-restore so dev runs never read
+    // prior real progress.
+    type DevPrefill = {
+      answers: Record<string, Record<number, number[]>>;
+      rankingAnswers: Record<string, Record<number, Record<number, number>>>;
+      textAnswers: Record<string, Record<number, Record<number, string>>>;
+    };
+    let devPrefill = (location.state as any)?.devPrefill as DevPrefill | undefined;
+    if (!devPrefill) {
+      const stored = sessionStorage.getItem('devAutoFillPrefill');
+      if (stored) {
+        try {
+          devPrefill = JSON.parse(stored) as DevPrefill;
+        } catch (e) {
+          console.error('Failed to parse devAutoFillPrefill:', e);
+        }
+      }
+    }
+    if (devPrefill) {
+      // One-shot: clear so navigating back here later doesn't re-seed.
+      sessionStorage.removeItem('devAutoFillPrefill');
+      didRestoreRef.current = true;
+      setAnswers(devPrefill.answers || {});
+      setRankingAnswers(devPrefill.rankingAnswers || {});
+      setTextAnswers(devPrefill.textAnswers || {});
+      return;
+    }
+
+    const sidRaw = localStorage.getItem("userStudentId");
+    const aidRaw = localStorage.getItem("assessmentId");
+    if (!sidRaw || !aidRaw) return;
+    const sid = parseInt(sidRaw);
+    const aid = parseInt(aidRaw);
+    if (isNaN(sid) || isNaN(aid)) return;
+
+    didRestoreRef.current = true;
+
+    restorePartialAnswers(sid, aid).then((data) => {
+      if (!data || !Array.isArray(data.answers) || data.answers.length === 0) return;
+
+      // Build qqId → sectionId lookup from the loaded questionnaire.
+      const qqIdToSection: Record<number, string> = {};
+      for (const sec of questionnaire.sections) {
+        const secId = String(sec.section.sectionId);
+        for (const q of sec.questions || []) {
+          qqIdToSection[q.questionnaireQuestionId] = secId;
+        }
+      }
+
+      const hydratedAnswers: Record<string, Record<number, number[]>> = {};
+      const hydratedRanking: Record<
+        string,
+        Record<number, Record<number, number>>
+      > = {};
+      const hydratedText: Record<
+        string,
+        Record<number, Record<number, string>>
+      > = {};
+      const textIdxCounter: Record<string, number> = {};
+
+      for (const a of data.answers) {
+        const qqId = a.questionnaireQuestionId;
+        const secId = qqIdToSection[qqId];
+        if (!secId) continue; // unknown question — skip
+
+        if (a.textResponse !== undefined && a.textResponse !== null) {
+          if (!hydratedText[secId]) hydratedText[secId] = {};
+          if (!hydratedText[secId][qqId]) hydratedText[secId][qqId] = {};
+          const counterKey = `${secId}-${qqId}`;
+          const idx = textIdxCounter[counterKey] ?? 0;
+          textIdxCounter[counterKey] = idx + 1;
+          hydratedText[secId][qqId][idx] = a.textResponse;
+        } else if (a.rankOrder !== undefined && a.rankOrder !== null) {
+          if (!hydratedRanking[secId]) hydratedRanking[secId] = {};
+          if (!hydratedRanking[secId][qqId]) hydratedRanking[secId][qqId] = {};
+          hydratedRanking[secId][qqId][a.optionId] = a.rankOrder;
+        } else if (a.optionId !== undefined && a.optionId !== null) {
+          if (!hydratedAnswers[secId]) hydratedAnswers[secId] = {};
+          if (!hydratedAnswers[secId][qqId]) hydratedAnswers[secId][qqId] = [];
+          hydratedAnswers[secId][qqId].push(a.optionId);
+        }
+      }
+
+      setAnswers(hydratedAnswers);
+      setRankingAnswers(hydratedRanking);
+      setTextAnswers(hydratedText);
+    });
+  }, [questionnaire, location.state]);
 
   useEffect(() => {
     scheduleWrite(
@@ -1014,14 +1109,20 @@ const SectionQuestionPage: React.FC = () => {
       const maxRetries = 3;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
+          const csrfMatch = document.cookie.match(/(?:^|;\s*)cn_csrf=([^;]*)/)
+          const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : undefined
+          const submitHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          }
+          if (csrfToken) submitHeaders["X-CSRF-Token"] = csrfToken
+
           const response = await fetch(
             `${import.meta.env.VITE_API_URL}/assessment-answer/submit`,
             {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
+              credentials: "include",
+              headers: submitHeaders,
               body: JSON.stringify(submissionJSON),
               signal: AbortSignal.timeout(10000), // 10s timeout (async processing)
             },

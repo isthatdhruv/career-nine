@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toAbsoluteUrl } from '../../../../_metronic/helpers'
+import { useAuth } from '../../../modules/auth/core/Auth'
 import './StudentPortal.css'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080'
@@ -18,6 +19,7 @@ interface FormErrors {
 
 const StudentInfoForm: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser, setCurrentUser } = useAuth()
   const [profile, setProfile] = useState<any>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -28,19 +30,16 @@ const StudentInfoForm: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false)
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('studentPortalLoggedIn')
-    if (!isLoggedIn) {
+    // Phase 19 (19-02): auth gating moved to StudentAuthGuard / useAuth().
+    // We still need the student profile fields (userStudentId, infoCompleted, etc.)
+    // — these come from currentUser. Fields not yet on the canonical User type
+    // are accessed via `as any` until Phase 16 surfaces them on /auth/me.
+    if (!currentUser) {
       navigate('/student/login')
       return
     }
 
-    const profileStr = localStorage.getItem('studentPortalProfile')
-    if (!profileStr) {
-      navigate('/student/login')
-      return
-    }
-
-    const p = JSON.parse(profileStr)
+    const p = currentUser as any
     setProfile(p)
     setName(p.name || '')
     setEmail(p.email || '')
@@ -52,7 +51,7 @@ const StudentInfoForm: React.FC = () => {
     if (splash) splash.style.display = 'none'
     document.body.classList.remove('page-loading', 'splash-screen')
     document.documentElement.setAttribute('data-theme', 'light')
-  }, [navigate])
+  }, [navigate, currentUser])
 
   const validate = (): boolean => {
     const e: FormErrors = {}
@@ -88,12 +87,16 @@ const StudentInfoForm: React.FC = () => {
     try {
       const res = await axios.put(
         `${API_BASE_URL}/student-portal/update-info/${profile.userStudentId}`,
-        { name: name.trim(), email: email.trim(), phone: phone.trim() }
+        { name: name.trim(), email: email.trim(), phone: phone.trim() },
+        { withCredentials: true }
       )
 
-      // Update localStorage with new profile data
-      const updatedProfile = { ...profile, ...res.data }
-      localStorage.setItem('studentPortalProfile', JSON.stringify(updatedProfile))
+      // Phase 19 (19-02): no localStorage.studentPortalProfile write. Update the
+      // in-memory currentUser via the auth context so downstream pages re-render
+      // with the new profile values. /auth/me on next bootstrap will re-hydrate
+      // from the server (the durable source of truth).
+      const updatedProfile = { ...(currentUser as any), ...profile, ...res.data }
+      setCurrentUser(updatedProfile)
 
       navigate('/student/dashboard')
     } catch (err: any) {

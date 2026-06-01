@@ -4,6 +4,7 @@ import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,35 +31,40 @@ public class ToolController {
     private MeasuredQualitiesRepository measuredQualitiesRepository;
 
     @GetMapping(value = "/getAll" , headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('tool.read')")
     public List<Tool> getAll() {
         return toolRepository.findAll();
     }
     @GetMapping(value = "/get/{id}" , headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('tool.read')")
     public Tool getToolById(@PathVariable Long id) {
         return toolRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", id));
     }
 
     @PostMapping(value = "/create" , headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('tool.create')")
     public Tool createTool(@RequestBody Tool tool) {
         if (tool.getIsFree()) {
             tool.setPrice(0.0);
         }
-        
+
         return toolRepository.save(tool);
     }
-    
+
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('tool.update')")
     public Tool updateTool(@PathVariable Long id, @RequestBody Tool tool) {
         tool.setToolId(id);
-        
+
         if (tool.getIsFree()) {
             tool.setPrice(0.0);
         }
-        
+
         return toolRepository.save(tool);
     }
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('tool.delete')")
     public ResponseEntity<String> deleteTool(@PathVariable Long id) {
         Tool tool = toolRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", id));
@@ -80,6 +86,7 @@ public class ToolController {
     // Many-to-Many relationship management endpoints
     
     @PostMapping("/{toolId}/measured-qualities/{qualityId}")
+    @PreAuthorize("@auth.allows('tool.update')")
     public ResponseEntity<String> addMeasuredQualityToTool(@PathVariable Long toolId, @PathVariable Long qualityId) {
         Tool tool = toolRepository.findById(toolId)
             .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", toolId));
@@ -93,6 +100,7 @@ public class ToolController {
     }
     
     @DeleteMapping("/{toolId}/measured-qualities/{qualityId}")
+    @PreAuthorize("@auth.allows('tool.update')")
     public ResponseEntity<String> removeMeasuredQualityFromTool(@PathVariable Long toolId, @PathVariable Long qualityId) {
         Tool tool = toolRepository.findById(toolId)
             .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", toolId));
@@ -106,6 +114,7 @@ public class ToolController {
     }
     
     @GetMapping("/{toolId}/measured-qualities")
+    @PreAuthorize("@auth.allows('tool.read')")
     public ResponseEntity<Set<MeasuredQualities>> getToolMeasuredQualities(@PathVariable Long toolId) {
         Tool tool = toolRepository.findById(toolId)
             .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", toolId));

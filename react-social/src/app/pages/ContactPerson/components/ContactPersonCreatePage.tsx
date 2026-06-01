@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import axios from "axios";
 import { CreateContactInformationData } from "../API/Contact_Person_APIs";
-import { ReadCollegeList } from "../../College/API/College_APIs";
+import { useInstitutes } from "../../../lib/queries/lookups";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -53,7 +53,7 @@ const emptyPerson = {
 const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [] } = useInstitutes();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const navigate = useNavigate();
 
@@ -62,10 +62,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
       .get<UserRow[]>(`${API_URL}/user/registered-users`)
       .then(({ data }) => setUsers(data))
       .catch((err) => console.error("Failed to fetch users", err));
-
-    ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
-      .catch((err) => console.error("Failed to fetch institutes", err));
   }, []);
 
   const initialValues = {

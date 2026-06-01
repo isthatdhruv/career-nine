@@ -17,15 +17,32 @@ import javax.persistence.JoinTable;
 import javax.persistence.Lob;
 import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
+import javax.persistence.PrePersist;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.validation.constraints.NotNull;
+
+import org.hibernate.annotations.Filter;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.kccitm.api.model.BoardName;
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.InstituteCourse;
 
+/**
+ * Phase 3 (Task 3.2 / audit "school sees only its data"): apply the shared {@code scopeFilter}
+ * (declared on {@link com.kccitm.api.model.career9.StudentInfo}) so institute LIST/query reads
+ * narrow to the caller's institute scope. The PK {@code institute_code} is never null, so the
+ * {@code OR ... IS NULL} carve-out is a no-op here: a non-super-admin with no matching institute
+ * scope sees zero institutes in list endpoints (fail-closed, consistent with StudentInfo).
+ *
+ * <p>Hibernate filters are NOT applied to primary-key loads ({@code EntityManager.find} /
+ * {@code findById}), so institute-name lookups by code keep working for everyone — only
+ * {@code findAll} / JPQL list/projection queries are scoped. Super-admins and full-wildcard
+ * callers skip the filter entirely (see {@code ScopeFilterInterceptor}).
+ */
+@Filter(name = "scopeFilter", condition =
+        "(institute_code IN (:instituteIds) OR institute_code IS NULL)")
 @Entity
 @Table(name = "institute_detail_new")
 public class InstituteDetail implements Serializable {
@@ -68,6 +85,29 @@ public class InstituteDetail implements Serializable {
     // IMPORTANT FIX: Boolean instead of boolean
     @Column(name = "display")
     private Boolean display; // wrapper, can be null
+
+    /**
+     * Phase 19 Plan 01 per-institute feature flag for the cookie-based assessment
+     * authentication. TRUE → {@code POST /auth/assessment-session} mints a
+     * {@code cn_at_asmnt} cookie carrying a 4h assessment-scoped JWT. FALSE → the
+     * endpoint returns 404 and the SPA falls back to its legacy path (which no
+     * longer carries an auth header, so the institute is effectively opted out).
+     *
+     * <p>New institutes default to TRUE via {@link #applyAssessmentCookieAuthDefault()}.
+     * Legacy NULL rows are flipped to TRUE on boot by
+     * {@code AssessmentCookieAuthBackfillRunner}. An admin can still opt an institute
+     * out by setting FALSE explicitly — neither the runner nor the PrePersist hook
+     * will overwrite that.
+     */
+    @Column(name = "assessment_cookie_auth_enabled")
+    private Boolean assessmentCookieAuthEnabled;
+
+    @PrePersist
+    private void applyAssessmentCookieAuthDefault() {
+        if (this.assessmentCookieAuthEnabled == null) {
+            this.assessmentCookieAuthEnabled = Boolean.TRUE;
+        }
+    }
 
     @Transient
     private String transientField;
@@ -155,6 +195,15 @@ public class InstituteDetail implements Serializable {
 
     public void setDisplay(Boolean display) {
         this.display = display;
+    }
+
+    /** Phase 19 Plan 01 cookie-auth feature flag. NULL/FALSE → endpoint returns 404. */
+    public Boolean getAssessmentCookieAuthEnabled() {
+        return assessmentCookieAuthEnabled;
+    }
+
+    public void setAssessmentCookieAuthEnabled(Boolean assessmentCookieAuthEnabled) {
+        this.assessmentCookieAuthEnabled = assessmentCookieAuthEnabled;
     }
 
     public String getTransientField() {

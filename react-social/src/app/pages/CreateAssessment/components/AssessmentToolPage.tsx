@@ -3,7 +3,7 @@ import { Field, Form, Formik } from "formik";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
-import { ReadToolData } from "../../Tool/API/Tool_APIs";
+import { useTools } from "../../../lib/queries/lookups";
 import ToolCreateModal from "../../Tool/components/ToolCreateModal";
 
 const validationSchema = Yup.object().shape({
@@ -14,7 +14,7 @@ const AssessmentToolPage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const [tools, setTools] = useState<any[]>([]);
+  const { data: tools = [] } = useTools<any>();
   const [showToolModal, setShowToolModal] = useState(false);
   const [initialValues, setInitialValues] = useState({ toolId: "" });
 
@@ -25,19 +25,6 @@ const AssessmentToolPage = ({ setPageLoading }: { setPageLoading?: any }) => {
       const parsed = JSON.parse(savedStep1);
       setInitialValues({ toolId: "" }); // only step 2 field; step1 data stays in localStorage
     }
-  }, []);
-
-  useEffect(() => {
-    const fetchTool = async () => {
-      try {
-        const response = await ReadToolData();
-        setTools(response.data || []);
-      } catch (error) {
-        console.error("Error fetching tool:", error);
-      }
-    };
-
-    fetchTool();
   }, []);
 
   return (

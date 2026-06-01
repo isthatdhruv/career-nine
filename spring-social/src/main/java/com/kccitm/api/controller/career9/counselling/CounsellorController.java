@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,12 +43,18 @@ public class CounsellorController {
     @Autowired
     private com.kccitm.api.service.counselling.CounsellingActivityLogService activityLogService;
 
+    // Phase 2 (Task 2.2 / HIGH-A): shared BCrypt encoder (replaces inline unsalted SHA-256).
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     /**
      * POST /api/counsellor/self-register
      * Public endpoint for counsellors to create an account.
      * Sets onboardingStatus = PENDING, isActive = false.
      * Counsellor cannot login until admin sets isActive = true.
      */
+    // Phase 2 (Task 2.2 / HIGH-A): anonymous pre-auth self-registration. @PreAuthorize removed so
+    // the enforce flip won't 403 prospective counsellors; permitAll via PUBLIC_PATHS. Coverage-excluded.
     @PostMapping("/self-register")
     public ResponseEntity<?> selfRegister(@RequestBody Map<String, Object> body) {
         String name = (String) body.get("name");
@@ -72,17 +80,9 @@ public class CounsellorController {
         counsellor.setOnboardingStatus("PENDING");
         counsellor.setIsActive(false);
 
-        // Hash password with SHA-256
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(password.getBytes("UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) sb.append(String.format("%02x", b));
-            counsellor.setPasswordHash(sb.toString());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to process registration"));
-        }
+        // Phase 2 (Task 2.2 / HIGH-A): hash with BCrypt (salted, work-factored) via the shared
+        // encoder instead of the previous unsalted SHA-256.
+        counsellor.setPasswordHash(passwordEncoder.encode(password));
 
         // Optional onboarding fields
         if (body.get("specializations") != null) counsellor.setSpecializations((String) body.get("specializations"));
@@ -114,6 +114,11 @@ public class CounsellorController {
      * Counsellor login with email + password.
      * Only allows login if isActive = true (admin approved).
      */
+    // Phase 2 (Task 2.2 / HIGH-A): anonymous pre-auth login. @PreAuthorize removed so the enforce
+    // flip won't 403 the login itself; permitAll via PUBLIC_PATHS, rate-limited generically. Coverage-excluded.
+    // NOTE (deferred): this still returns the counsellor record without issuing a scoped session
+    // token/cookie — the counsellor portal currently trusts the client. Issuing a real cn_at-style
+    // session is FE-coupled and tracked as a follow-up (Phase 2 residual).
     @PostMapping("/login")
     public ResponseEntity<?> counsellorLogin(@RequestBody Map<String, Object> body) {
         String email = (String) body.get("email");
@@ -131,21 +136,11 @@ public class CounsellorController {
 
         Counsellor counsellor = counsellorOpt.get();
 
-        // Verify password
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(password.getBytes("UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) sb.append(String.format("%02x", b));
-            String inputHash = sb.toString();
-
-            if (counsellor.getPasswordHash() == null || !counsellor.getPasswordHash().equals(inputHash)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("error", "Invalid email or password"));
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Login failed"));
+        // Phase 2 (Task 2.2 / HIGH-A): verify against BCrypt, with a one-time fallback that accepts a
+        // legacy unsalted-SHA-256 hash and transparently re-hashes to BCrypt on success (no forced reset).
+        if (!verifyAndUpgradePassword(counsellor, password)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Invalid email or password"));
         }
 
         // Check if admin approved
@@ -179,10 +174,51 @@ public class CounsellorController {
     }
 
     /**
+     * Phase 2 (Task 2.2): verify a raw password against the stored hash. BCrypt hashes (the new
+     * format, prefixed {@code $2}) are checked with the shared encoder. A legacy unsalted-SHA-256
+     * hex hash is accepted once and immediately re-hashed to BCrypt on success, so existing
+     * counsellors keep logging in without a forced reset and are migrated transparently.
+     */
+    private boolean verifyAndUpgradePassword(Counsellor counsellor, String rawPassword) {
+        String stored = counsellor.getPasswordHash();
+        if (stored == null || stored.isEmpty()) {
+            return false;
+        }
+        if (stored.startsWith("$2")) { // BCrypt
+            return passwordEncoder.matches(rawPassword, stored);
+        }
+        // Legacy unsalted SHA-256 (64 hex chars) — accept once, then upgrade to BCrypt.
+        String legacy = sha256Hex(rawPassword);
+        if (legacy != null && legacy.equals(stored)) {
+            counsellor.setPasswordHash(passwordEncoder.encode(rawPassword));
+            counsellorRepository.save(counsellor);
+            logger.info("Counsellor {} password migrated SHA-256 -> BCrypt on login", counsellor.getEmail());
+            return true;
+        }
+        return false;
+    }
+
+    private static String sha256Hex(String s) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(s.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * POST /api/counsellor/upload-photo/{id}
      * Upload a profile photo as base64 data URL.
      * Body: { "photo": "data:image/png;base64,..." }
      */
+    // no scope arg: update by id; counsellor self-update photo
+    @PreAuthorize("@auth.allows('counsellor.update')")
     @PostMapping("/upload-photo/{id}")
     public ResponseEntity<?> uploadPhoto(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         String photo = (String) body.get("photo");
@@ -208,22 +244,30 @@ public class CounsellorController {
         }
     }
 
+    // no scope arg: body is Counsellor entity; admin-only create
+    @PreAuthorize("@auth.allows('counsellor.create')")
     @PostMapping("/create")
     public ResponseEntity<Counsellor> create(@RequestBody Counsellor counsellor) {
         logger.info("Creating new counsellor: {}", counsellor.getName());
         return ResponseEntity.ok(counsellorService.create(counsellor));
     }
 
+    // no scope arg: catalog list — counsellor entries are global
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/getAll")
     public ResponseEntity<List<Counsellor>> getAll() {
         return ResponseEntity.ok(counsellorService.getAll());
     }
 
+    // no scope arg: catalog list — active counsellors
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/getActive")
     public ResponseEntity<List<Counsellor>> getActive() {
         return ResponseEntity.ok(counsellorService.getAllActive());
     }
 
+    // no scope arg: fetch by id
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/get/{id}")
     public ResponseEntity<Counsellor> getById(@PathVariable Long id) {
         return counsellorService.getById(id)
@@ -231,6 +275,8 @@ public class CounsellorController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // no scope arg: fetch by user id
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/get/by-user/{userId}")
     public ResponseEntity<Counsellor> getByUserId(@PathVariable Long userId) {
         return counsellorService.getByUserId(userId)
@@ -238,12 +284,16 @@ public class CounsellorController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // no scope arg: update by id; admin-only
+    @PreAuthorize("@auth.allows('counsellor.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<Counsellor> update(@PathVariable Long id, @RequestBody Counsellor counsellor) {
         logger.info("Updating counsellor with id: {}", id);
         return ResponseEntity.ok(counsellorService.update(id, counsellor));
     }
 
+    // no scope arg: toggle by id; admin-only approval action
+    @PreAuthorize("@auth.allows('counsellor.update')")
     @PutMapping("/toggle-active/{id}")
     public ResponseEntity<Counsellor> toggleActive(@PathVariable Long id) {
         logger.info("Toggling active status for counsellor with id: {}", id);

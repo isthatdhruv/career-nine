@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,6 +28,8 @@ public class CommunicationLogController {
     @Autowired
     private CommunicationLogRepository repository;
 
+    // no scope arg: cross-institute admin list — scope-filter narrows result set
+    @PreAuthorize("@auth.allows('communication_log.read')")
     @GetMapping
     public ResponseEntity<Page<CommunicationLog>> list(
             @RequestParam(required = false) String channel,

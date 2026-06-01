@@ -29,15 +29,16 @@ public class AssessmentSessionService {
 
     private static final String SESSION_KEY_PREFIX = "career9:session:";
     private static final int SESSION_TTL_HOURS = 24;
-    private static final String DRAFT_KEY_PREFIX = "career9:draft:";
-    private static final int DRAFT_TTL_HOURS = 24;
-    // Submit lock is now short-lived (90s). A crashed processor auto-releases
-    // instead of blocking the student for 24h. Authoritative "already submitted"
+    // Submit lock is short-lived (90s) — a crashed processor auto-releases
+    // instead of blocking the student. Authoritative "already submitted"
     // check is mapping.status / persistenceState in MySQL.
-    private static final String SUBMIT_KEY_PREFIX = "career9:submit:";
+    //
+    // Lock and result use SEPARATE keys so clearing the in-flight lock at the
+    // end of processing does NOT wipe the cached result. An accidental
+    // double-submit within the result TTL still gets the same response.
+    private static final String SUBMIT_LOCK_KEY_PREFIX = "career9:submit:lock:";
     private static final int SUBMIT_LOCK_TTL_SECONDS = 90;
-    // Cached submit result lingers a bit longer so an accidental double-submit
-    // still gets a meaningful response instead of re-locking.
+    private static final String SUBMIT_RESULT_KEY_PREFIX = "career9:submit:result:";
     private static final int SUBMIT_RESULT_TTL_SECONDS = 3600;
     private static final String HEARTBEAT_KEY_PREFIX = "career9:heartbeat:";
     private static final int HEARTBEAT_TTL_SECONDS = 60;
@@ -117,64 +118,47 @@ public class AssessmentSessionService {
      * Returns true if the lock was acquired, false if already locked.
      */
     public boolean acquireSubmissionLock(Long studentId, Long assessmentId) {
-        String key = SUBMIT_KEY_PREFIX + studentId + ":" + assessmentId;
+        String key = SUBMIT_LOCK_KEY_PREFIX + studentId + ":" + assessmentId;
         Boolean result = redisTemplate.opsForValue()
                 .setIfAbsent(key, "processing", SUBMIT_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
         return Boolean.TRUE.equals(result);
     }
 
     /**
-     * Mark a submission as complete by caching the result for an hour.
-     * Lets an accidental double-submit return the same response instead of
-     * re-locking or re-processing.
+     * Cache a submission result for an hour on its own key.
+     * Survives the lock-clear in the processor's finally block, so an
+     * accidental double-submit within the result TTL gets the same response
+     * instead of re-processing.
      */
     public void markSubmissionComplete(Long studentId, Long assessmentId, Object result) {
-        String key = SUBMIT_KEY_PREFIX + studentId + ":" + assessmentId;
+        String key = SUBMIT_RESULT_KEY_PREFIX + studentId + ":" + assessmentId;
         redisTemplate.opsForValue().set(key, result, SUBMIT_RESULT_TTL_SECONDS, TimeUnit.SECONDS);
     }
 
     /**
-     * Get the result of a previous submission.
+     * Get the cached result of a previous submission. Null if not cached
+     * (expired, never set, or admin reset).
      */
     public Object getSubmissionResult(Long studentId, Long assessmentId) {
-        String key = SUBMIT_KEY_PREFIX + studentId + ":" + assessmentId;
+        String key = SUBMIT_RESULT_KEY_PREFIX + studentId + ":" + assessmentId;
         return redisTemplate.opsForValue().get(key);
     }
 
     /**
-     * Clear the submission lock for a student+assessment pair.
+     * Clear the in-flight submission lock. Does NOT touch the cached result.
      */
     public void clearSubmissionLock(Long studentId, Long assessmentId) {
-        String key = SUBMIT_KEY_PREFIX + studentId + ":" + assessmentId;
+        String key = SUBMIT_LOCK_KEY_PREFIX + studentId + ":" + assessmentId;
         redisTemplate.delete(key);
     }
 
     /**
-     * Save a draft of student's current answer state to Redis.
-     * Overwrites any existing draft for the same student+assessment.
+     * Clear the cached submission result. Called on admin reset only; normal
+     * processing leaves the cached result intact for the duration of its TTL.
      */
-    public void saveDraft(Long studentId, Long assessmentId, Object draftData) {
-        String key = DRAFT_KEY_PREFIX + studentId + ":" + assessmentId;
-        redisTemplate.opsForValue().set(key, draftData, DRAFT_TTL_HOURS, TimeUnit.HOURS);
-        logger.debug("Saved draft for student={} assessment={}", studentId, assessmentId);
-    }
-
-    /**
-     * Retrieve a saved draft for a student+assessment pair.
-     * Returns null if no draft exists (expired or never saved).
-     */
-    public Object getDraft(Long studentId, Long assessmentId) {
-        String key = DRAFT_KEY_PREFIX + studentId + ":" + assessmentId;
-        return redisTemplate.opsForValue().get(key);
-    }
-
-    /**
-     * Delete a draft after successful submission.
-     */
-    public void deleteDraft(Long studentId, Long assessmentId) {
-        String key = DRAFT_KEY_PREFIX + studentId + ":" + assessmentId;
+    public void deleteSubmissionResult(Long studentId, Long assessmentId) {
+        String key = SUBMIT_RESULT_KEY_PREFIX + studentId + ":" + assessmentId;
         redisTemplate.delete(key);
-        logger.debug("Deleted draft for student={} assessment={}", studentId, assessmentId);
     }
 
     /**
@@ -409,7 +393,7 @@ public class AssessmentSessionService {
      * Check if a submission lock exists for a student+assessment pair.
      */
     public boolean hasSubmissionLock(Long studentId, Long assessmentId) {
-        String key = SUBMIT_KEY_PREFIX + studentId + ":" + assessmentId;
+        String key = SUBMIT_LOCK_KEY_PREFIX + studentId + ":" + assessmentId;
         return Boolean.TRUE.equals(redisTemplate.hasKey(key));
     }
 
@@ -579,10 +563,10 @@ public class AssessmentSessionService {
     public void clearAllForMapping(Long studentId, Long assessmentId) {
         deleteSession(studentId, assessmentId);
         clearSubmissionLock(studentId, assessmentId);
+        deleteSubmissionResult(studentId, assessmentId);
         deletePartialAnswers(studentId, assessmentId);
         deleteSubmittedAnswers(studentId, assessmentId);
         deleteProctoringData(studentId, assessmentId);
-        deleteDraft(studentId, assessmentId);
         // heartbeat auto-expires in 60s — skip explicit delete
         logger.info("Cleared all Redis state for student={} assessment={}", studentId, assessmentId);
     }

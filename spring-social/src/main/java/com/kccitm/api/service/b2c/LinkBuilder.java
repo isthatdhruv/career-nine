@@ -31,6 +31,15 @@ public class LinkBuilder {
         return assessmentBaseUrl + "/assessment/start?t=" + accessToken + "&e=" + entitlementId;
     }
 
+    /**
+     * The manual sign-in URL we surface in the welcome email as the fallback to
+     * the one-click magic link. Students log in here with username + DOB if the
+     * magic link is unavailable.
+     */
+    public String manualLogin() {
+        return assessmentBaseUrl + "/student-login";
+    }
+
     public String onePager(String accessToken, Long entitlementId) {
         return frontendBaseUrl + "/report/one-pager?t=" + accessToken + "&e=" + entitlementId;
     }
@@ -42,7 +51,12 @@ public class LinkBuilder {
     }
 
     public String dashboard(String accessToken, Long entitlementId) {
-        return frontendBaseUrl + "/dashboard?t=" + accessToken + "&e=" + entitlementId;
+        // Lands on the student SSO bridge, which POSTs /entitlement/redeem-dashboard-token
+        // to trade the entitlement accessToken for cn_at + cn_csrf cookies, then
+        // navigates the browser to /student/dashboard. Without this hop the dashboard
+        // route would 401 — it requires the cookie session set by /user/student-auth,
+        // and the magic-link student doesn't have one.
+        return frontendBaseUrl + "/student/sso?t=" + accessToken + "&e=" + entitlementId;
     }
 
     public String counsellingBook(String accessToken, Long entitlementId) {

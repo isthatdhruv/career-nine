@@ -11,16 +11,16 @@ import javax.persistence.Id;
 import javax.persistence.Index;
 import javax.persistence.Lob;
 import javax.persistence.Table;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import javax.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "dashboard_snapshot",
-        indexes = {
-                @Index(name = "idx_dashboard_snapshot_key", columnList = "snapshot_key", unique = true),
-                @Index(name = "idx_dashboard_snapshot_computed_at", columnList = "computed_at")
-        })
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@Table(
+    name = "dashboard_snapshot",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"snapshot_key"}),
+    indexes = {
+        @Index(name = "idx_dashboard_snapshot_key", columnList = "snapshot_key")
+    }
+)
 public class DashboardSnapshot implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -30,11 +30,13 @@ public class DashboardSnapshot implements Serializable {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "snapshot_key", nullable = false, unique = true, length = 64)
+    @Column(name = "snapshot_key", nullable = false, length = 128)
     private String snapshotKey;
 
+    // Snapshot payload can be hundreds of MB on a real DB; store as LONGTEXT
+    // so MySQL doesn't truncate at TEXT's ~64KB limit.
     @Lob
-    @Column(name = "payload_json", columnDefinition = "LONGTEXT", nullable = false)
+    @Column(name = "payload_json", nullable = false, columnDefinition = "LONGTEXT")
     private String payloadJson;
 
     @Column(name = "computed_at", nullable = false)
@@ -44,11 +46,11 @@ public class DashboardSnapshot implements Serializable {
     public void setId(Long id) { this.id = id; }
 
     public String getSnapshotKey() { return snapshotKey; }
-    public void setSnapshotKey(String snapshotKey) { this.snapshotKey = snapshotKey; }
+    public void setSnapshotKey(String v) { this.snapshotKey = v; }
 
     public String getPayloadJson() { return payloadJson; }
-    public void setPayloadJson(String payloadJson) { this.payloadJson = payloadJson; }
+    public void setPayloadJson(String v) { this.payloadJson = v; }
 
     public Instant getComputedAt() { return computedAt; }
-    public void setComputedAt(Instant computedAt) { this.computedAt = computedAt; }
+    public void setComputedAt(Instant v) { this.computedAt = v; }
 }

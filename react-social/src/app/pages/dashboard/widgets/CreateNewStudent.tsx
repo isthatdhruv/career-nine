@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 
 // ✅ API
-import { ReadToolData } from "../../Tool/API/Tool_APIs";
+import { useTools } from "../../../lib/queries/lookups";
 
 /* -------------------- VALIDATION -------------------- */
 const validationSchema = Yup.object().shape({
@@ -20,7 +20,7 @@ const validationSchema = Yup.object().shape({
 const StudentCreatePage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [assessments, setAssessments] = useState<any[]>([]);
+  const { data: assessments = [] } = useTools<any>();
 
   const initialValues = {
     studentName: "",
@@ -31,19 +31,6 @@ const StudentCreatePage = () => {
     groupName: "",
   };
 
-  /* -------------------- FETCH ASSESSMENTS -------------------- */
-  useEffect(() => {
-    const fetchAssessments = async () => {
-      try {
-        const res = await ReadToolData();
-        setAssessments(res.data);
-      } catch (error) {
-        console.error("Error fetching assessments:", error);
-      }
-    };
-
-    fetchAssessments();
-  }, []);
 
   return (
     <div className="container py-5">

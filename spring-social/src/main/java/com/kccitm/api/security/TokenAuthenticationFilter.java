@@ -2,10 +2,12 @@ package com.kccitm.api.security;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -29,8 +31,14 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
 
+    @Autowired
+    private JtiDenyListService jtiDenyListService;
+
     @Autowired(required = false)
     private UserActivityLogService userActivityLogService;
+
+    @Autowired(required = false)
+    private com.kccitm.api.repository.Career9.UserStudentRepository userStudentRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(TokenAuthenticationFilter.class);
 
@@ -39,16 +47,178 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             "/activity-log/", ".png", ".jpg", ".gif", ".svg", ".css", ".js",
             ".html", ".ico", ".woff", ".woff2", ".ttf", ".map");
 
+    /**
+     * Phase 19 Plan 01 route allow-list for the assessment-scoped session cookie
+     * ({@link AuthCookieService#ASSESSMENT_SESSION_COOKIE} = {@code cn_at_asmnt}).
+     *
+     * <p>Two purposes:
+     * <ol>
+     *   <li>In {@link #getJwtFromRequest}, on a request whose URI starts with one of
+     *       these prefixes, the filter prefers the {@code cn_at_asmnt} cookie over the
+     *       admin {@code cn_at} cookie (so an invigilator's admin tab and the student
+     *       assessment tab can co-exist in the same browser without collision).</li>
+     *   <li>In {@link #doFilterInternal}, a token whose {@code scope} claim is
+     *       {@code "assessment"} is REJECTED on any URI NOT starting with one of these
+     *       prefixes — preventing cross-scope use of the short-lived assessment JWT.</li>
+     * </ol>
+     *
+     * <p>Sourced from {@code docs/AUTH_REDESIGN_PLAN.md} §9 + the controllers that
+     * currently honour {@code X-Assessment-Session} (Heartbeat at /assessments,
+     * AssessmentProctoring at /assessment-proctoring, LiveTracking at /assessments,
+     * AssessmentTable at /assessments, StudentDemographicResponse at
+     * /student-demographics, AssessmentAnswer at /assessment-answer, StudentInfo
+     * at /student-info).
+     */
+    private static final List<String> ASSESSMENT_SCOPE_PATHS = Arrays.asList(
+            "/assessments/",
+            "/assessment-answer/",
+            "/student-demographics/",
+            "/assessment-proctoring/",
+            "/student-info/");
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         try {
             String jwt = getJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                Long userId = tokenProvider.getUserIdFromToken(jwt);
+            Cookie[] dbgCookies = request.getCookies();
+            StringBuilder dbgCookieNames = new StringBuilder();
+            if (dbgCookies != null) {
+                for (Cookie c : dbgCookies) {
+                    if (dbgCookieNames.length() > 0) dbgCookieNames.append(',');
+                    dbgCookieNames.append(c.getName()).append('=').append(c.getValue() == null || c.getValue().isEmpty() ? "<empty>" : "<set:" + c.getValue().length() + ">");
+                }
+            }
+            System.out.println("[SESSION-DEBUG] FILTER ENTRY uri=" + request.getRequestURI()
+                    + " method=" + request.getMethod()
+                    + " origin=" + request.getHeader("Origin")
+                    + " referer=" + request.getHeader("Referer")
+                    + " cookies=[" + dbgCookieNames + "]"
+                    + " bearer=" + (request.getHeader("Authorization") != null)
+                    + " jwtExtracted=" + (jwt != null)
+                    + " jwtLen=" + (jwt == null ? 0 : jwt.length()));
 
-                UserDetails userDetails = customUserDetailsService.loadUserById(userId);
+            boolean dbgValid = StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt);
+            System.out.println("[SESSION-DEBUG] FILTER validateToken=" + dbgValid + " uri=" + request.getRequestURI());
+
+            if (StringUtils.hasText(jwt) && dbgValid) {
+                // Phase 18: consult the jti deny list AFTER signature/expiry validation
+                // and BEFORE populating the security context. A revoked jti causes us to
+                // skip setAuthentication entirely — the unauthenticated request falls
+                // through to RestAuthenticationEntryPoint, which returns 401.
+                //
+                // Legacy v2.0 tokens (no `jti` claim) surface as null from getJtiFromToken
+                // and isRevoked(null) returns false, so they pass through to natural expiry.
+                String jti = tokenProvider.getJtiFromToken(jwt);
+                boolean dbgRevoked = jtiDenyListService.isRevoked(jti);
+                System.out.println("[SESSION-DEBUG] FILTER jti=" + jti + " revoked=" + dbgRevoked + " uri=" + request.getRequestURI());
+                if (dbgRevoked) {
+                    System.out.println("[SESSION-DEBUG] FILTER REJECTED-DENYLIST jti=" + jti + " uri=" + request.getRequestURI());
+                    logger.warn("Rejected request — jti is on deny list (jti={})", jti);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
+                // Phase 19 Plan 01: route-vs-scope guard. An assessment-scoped JWT
+                // (scope=assessment, minted by /auth/assessment-session) may only be
+                // used on assessment routes. A session-scoped JWT (scope=session OR
+                // the claim is absent — legacy/admin tokens) is accepted on every
+                // route. Cross-scope use of the assessment cookie outside the
+                // allow-list is refused: we skip setAuthentication and the request
+                // falls through unauthenticated, returning 401 via the entry point.
+                String scope = tokenProvider.getScopeFromToken(jwt);
+                if ("assessment".equals(scope)) {
+                    if (!isAssessmentScopePath(request.getRequestURI())) {
+                        logger.warn("Refusing assessment-scoped token on non-assessment path uri={}",
+                                request.getRequestURI());
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+                    // On the allow-listed path: surface the (userStudentId, assessmentId)
+                    // pair as request attributes so downstream controllers/interceptors
+                    // can read them without re-parsing the JWT, and populate a minimal
+                    // Authentication so Spring Security's .anyRequest().authenticated()
+                    // gate passes. We deliberately do NOT load a full UserPrincipal — the
+                    // assessment JWT subject is a userStudentId (NOT a user id) and
+                    // Phase 15's permission-based authorisation surface does not apply to
+                    // assessment flows. They remain ABAC-checked via StudentAssessmentMapping
+                    // at the service layer, exactly as the v2.0 X-Assessment-Session path did.
+                    Long aUserStudentId = tokenProvider.getStudentIdFromToken(jwt);
+                    Long aAssessmentId = tokenProvider.getAssessmentIdFromToken(jwt);
+                    request.setAttribute("assessmentScope", "assessment");
+                    request.setAttribute("assessmentUserStudentId", aUserStudentId);
+                    request.setAttribute("assessmentAssessmentId", aAssessmentId);
+
+                    // R6: hydrate the student's User principal (role-group perms + scopes) so the
+                    // @PreAuthorize("@auth.allows(...)") gates on the assessment endpoints resolve
+                    // against the granted `student` role group when enforce-mode is on. The
+                    // (userStudentId, assessmentId) request attributes above remain the contract for
+                    // controllers that read the student id. Falls back to a minimal authority-less
+                    // principal if the user can't be resolved, so .authenticated() still passes and
+                    // the legacy service-layer (StudentAssessmentMapping) ABAC continues to apply.
+                    UsernamePasswordAuthenticationToken assessmentAuth = null;
+                    try {
+                        Long resolvedUserId = (userStudentRepository == null || aUserStudentId == null)
+                                ? null
+                                : userStudentRepository.findById(aUserStudentId)
+                                        .map(com.kccitm.api.model.career9.UserStudent::getUserId)
+                                        .orElse(null);
+                        if (resolvedUserId != null) {
+                            UserDetails studentDetails = customUserDetailsService.loadUserById(resolvedUserId);
+                            assessmentAuth = new UsernamePasswordAuthenticationToken(
+                                    studentDetails, null, studentDetails.getAuthorities());
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Assessment-scope: failed to hydrate student perms for userStudentId={} — "
+                                + "falling back to minimal principal", aUserStudentId, e);
+                    }
+                    if (assessmentAuth == null) {
+                        assessmentAuth = new UsernamePasswordAuthenticationToken(
+                                String.valueOf(aUserStudentId),
+                                null,
+                                Collections.<org.springframework.security.core.GrantedAuthority>emptyList());
+                    }
+                    assessmentAuth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(assessmentAuth);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
+                // Phase 15: parse the full claim shape (roles/perms/scopes/sa/jti).
+                TokenProvider.TokenClaims claims = tokenProvider.parseClaims(jwt);
+                UserDetails userDetails = customUserDetailsService.loadUserById(claims.userId);
+
+                // Hydrate the principal with the JWT-carried RBAC + ABAC state so
+                // @auth.allows(...) doesn't have to round-trip to the DB per request.
+                if (userDetails instanceof UserPrincipal) {
+                    UserPrincipal up = (UserPrincipal) userDetails;
+                    // Permissions and the super-admin flag are NOT trusted from the JWT.
+                    // - Permissions don't fit in the JWT (4 KB cookie limit vs 400+ codes
+                    //   for admin users), so loadUserById walks role_permission live.
+                    // - The `sa` claim DOES fit but it goes stale: SuperAdminBootstrapper
+                    //   promoting a user mid-session previously left them locked out until
+                    //   their access token expired and re-issued. Treating it the same as
+                    //   permissions (DB-of-truth, ignore JWT) makes promotions and
+                    //   revocations take effect on the next request.
+                    // Scopes and jti stay sourced from the JWT — small, and the design
+                    //   already treats them as authoritative there.
+                    if (claims.isLegacyShape) {
+                        // Pre-Phase-15 token: scopes claim absent too. Keep DB-loaded
+                        // scopes/sa (already populated by hydrate()); just clear jti so
+                        // the deny-list lookup doesn't match a stale UUID.
+                        logger.warn("LEGACY_TOKEN: keeping DB-loaded perms/scopes/sa for userId={}",
+                                claims.userId);
+                        up.setJti(null);
+                    } else {
+                        up.setScopes(claims.scopes);
+                        // up.setSuperAdmin intentionally NOT called — keep DB-loaded value
+                        // from CustomUserDetailsService.loadUserById to avoid stale-JWT
+                        // privilege drift in either direction.
+                        up.setJti(claims.jti);
+                    }
+                }
+
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -58,25 +228,87 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 // Async URL access logging - fire-and-forget, never blocks the request
                 try {
                     if (userActivityLogService != null && shouldLogUrl(request.getRequestURI())) {
-                        userActivityLogService.logUrlAccess(userId, request.getRequestURI(), request.getMethod());
+                        userActivityLogService.logUrlAccess(claims.userId, request.getRequestURI(), request.getMethod());
                     }
                 } catch (Exception logEx) {
                     logger.error("Failed to initiate URL access logging", logEx);
                 }
             }
         } catch (Exception ex) {
+            System.out.println("[SESSION-DEBUG] FILTER EXCEPTION uri=" + request.getRequestURI() + " ex=" + ex.getClass().getSimpleName() + " msg=" + ex.getMessage());
+            ex.printStackTrace();
             logger.error("Could not set user authentication in security context", ex);
         }
 
+        System.out.println("[SESSION-DEBUG] FILTER EXIT uri=" + request.getRequestURI()
+                + " authenticated=" + (SecurityContextHolder.getContext().getAuthentication() != null
+                        && SecurityContextHolder.getContext().getAuthentication().isAuthenticated()));
         filterChain.doFilter(request, response);
     }
 
     private String getJwtFromRequest(HttpServletRequest request) {
+        // Cookie-first: prefer the HttpOnly cn_at cookie (Phase 16). An HttpOnly
+        // cookie cannot be set or read by JS, so it has a smaller attack surface
+        // than an Authorization header that a phishing form or malicious script
+        // could plant. The Bearer-header fallback below keeps the v2.0 assessment
+        // app, external curl scripts, and the legacy admin frontend working through
+        // the cookie-rollout overlap window.
+        //
+        // Phase 19 Plan 01: extends cookie-first to TWO cookies:
+        //   - On assessment-route requests, prefer cn_at_asmnt (assessment-scoped JWT);
+        //     fall through to cn_at if the assessment cookie is absent / empty.
+        //   - On every other request, ONLY cn_at is honoured — cn_at_asmnt is ignored
+        //     (it would also be rejected later by the scope guard in doFilterInternal,
+        //     but reading it here lets us avoid the unnecessary parse/validate path).
+        // The Bearer header is the final fallback so external admin scripts keep working.
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            String uri = request.getRequestURI() == null ? "" : request.getRequestURI();
+            boolean isAssessmentPath = isAssessmentScopePath(uri);
+
+            // On assessment paths, prefer cn_at_asmnt first.
+            if (isAssessmentPath) {
+                for (Cookie c : cookies) {
+                    if (AuthCookieService.ASSESSMENT_SESSION_COOKIE.equals(c.getName())) {
+                        String value = c.getValue();
+                        if (StringUtils.hasText(value)) {
+                            return value;
+                        }
+                    }
+                }
+            }
+
+            // Admin/staff/student/counsellor session cookie — accepted on every route.
+            for (Cookie c : cookies) {
+                if (AuthCookieService.ACCESS_COOKIE.equals(c.getName())) {
+                    String value = c.getValue();
+                    if (StringUtils.hasText(value)) {
+                        return value;
+                    }
+                }
+            }
+        }
+
+        // Fallback: Authorization: Bearer <jwt>
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7, bearerToken.length());
+            return bearerToken.substring(7);
         }
         return null;
+    }
+
+    /**
+     * Phase 19 Plan 01 helper. Returns true iff the request URI starts with one of
+     * the {@link #ASSESSMENT_SCOPE_PATHS} prefixes. Used both by
+     * {@link #getJwtFromRequest} (to pick the right cookie) and by the scope guard
+     * in {@link #doFilterInternal} (to enforce route-vs-scope coupling).
+     */
+    private boolean isAssessmentScopePath(String uri) {
+        if (uri == null) return false;
+        for (String prefix : ASSESSMENT_SCOPE_PATHS) {
+            if (uri.startsWith(prefix)) return true;
+        }
+        return false;
     }
 
     private boolean shouldLogUrl(String uri) {

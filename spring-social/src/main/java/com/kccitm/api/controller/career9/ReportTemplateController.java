@@ -22,6 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -78,6 +79,7 @@ public class ReportTemplateController {
     // ==================== CRUD ====================
 
     @PostMapping("/upload")
+    @PreAuthorize("@auth.allows('report_template.create')")
     public ResponseEntity<?> uploadTemplate(
             @RequestParam("file") MultipartFile file,
             @RequestParam("templateName") String templateName,
@@ -102,11 +104,13 @@ public class ReportTemplateController {
     }
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('report_template.read')")
     public ResponseEntity<List<ReportTemplate>> getAll() {
         return ResponseEntity.ok(reportTemplateRepository.findAll());
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('report_template.read')")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         Optional<ReportTemplate> opt = reportTemplateRepository.findById(id);
         return opt.map(t -> ResponseEntity.ok((Object) t))
@@ -114,11 +118,13 @@ public class ReportTemplateController {
     }
 
     @GetMapping("/by-assessment/{assessmentId}")
+    @PreAuthorize("@auth.allows('report_template.read')")
     public ResponseEntity<List<ReportTemplate>> getByAssessment(@PathVariable Long assessmentId) {
         return ResponseEntity.ok(reportTemplateRepository.findByAssessmentId(assessmentId));
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('report_template.update')")
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody ReportTemplate body) {
         Optional<ReportTemplate> opt = reportTemplateRepository.findById(id);
         if (opt.isEmpty()) {
@@ -134,6 +140,7 @@ public class ReportTemplateController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('report_template.delete')")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         Optional<ReportTemplate> opt = reportTemplateRepository.findById(id);
         if (opt.isEmpty()) {
@@ -153,6 +160,7 @@ public class ReportTemplateController {
     // ==================== PLACEHOLDER DETECTION ====================
 
     @GetMapping("/parse-placeholders/{id}")
+    @PreAuthorize("@auth.allows('report_template.read')")
     public ResponseEntity<?> parsePlaceholders(@PathVariable Long id) throws Exception {
         Optional<ReportTemplate> opt = reportTemplateRepository.findById(id);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
@@ -167,6 +175,7 @@ public class ReportTemplateController {
     }
 
     @GetMapping("/available-fields")
+    @PreAuthorize("@auth.allows('report_template.read')")
     public ResponseEntity<?> getAvailableFieldsEndpoint() {
         List<Map<String, String>> fields = new ArrayList<>();
 
@@ -196,6 +205,7 @@ public class ReportTemplateController {
     // ==================== PREVIEW & GENERATE ====================
 
     @PostMapping("/preview")
+    @PreAuthorize("@auth.allows('report_template.read')")
     public ResponseEntity<?> previewReport(@RequestBody Map<String, Object> request) throws Exception {
         Long templateId = ((Number) request.get("templateId")).longValue();
         Long userStudentId = ((Number) request.get("userStudentId")).longValue();
@@ -215,6 +225,7 @@ public class ReportTemplateController {
     }
 
     @PostMapping("/generate-pdf")
+    @PreAuthorize("@auth.allows('report_template.read')")
     public ResponseEntity<?> generatePdf(@RequestBody Map<String, Object> request) throws Exception {
         Long templateId = ((Number) request.get("templateId")).longValue();
         Long userStudentId = ((Number) request.get("userStudentId")).longValue();
@@ -243,6 +254,7 @@ public class ReportTemplateController {
     }
 
     @PostMapping("/generate-pdf-bulk")
+    @PreAuthorize("@auth.allows('report_template.read')")
     public ResponseEntity<?> generatePdfBulk(@RequestBody Map<String, Object> request) throws Exception {
         Long templateId = ((Number) request.get("templateId")).longValue();
         Long assessmentId = ((Number) request.get("assessmentId")).longValue();

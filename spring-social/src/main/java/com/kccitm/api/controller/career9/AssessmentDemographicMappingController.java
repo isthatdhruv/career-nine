@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,12 +32,14 @@ public class AssessmentDemographicMappingController {
     private DemographicFieldDefinitionRepository fieldDefinitionRepository;
 
     @GetMapping("/getByAssessment/{assessmentId}")
+    @PreAuthorize("@auth.allows('assessment_demographic_mapping.read')")
     public List<AssessmentDemographicMapping> getByAssessment(@PathVariable Long assessmentId) {
         return mappingRepository.findByAssessmentIdOrderByDisplayOrderAsc(assessmentId);
     }
 
     @PostMapping("/save")
     @Transactional
+    @PreAuthorize("@auth.allows('assessment_demographic_mapping.create')")
     public ResponseEntity<?> save(@RequestBody Map<String, Object> request) {
         try {
             Long assessmentId = Long.valueOf(request.get("assessmentId").toString());
@@ -89,6 +92,7 @@ public class AssessmentDemographicMappingController {
 
     @DeleteMapping("/remove/{assessmentId}/{fieldId}")
     @Transactional
+    @PreAuthorize("@auth.allows('assessment_demographic_mapping.delete')")
     public ResponseEntity<String> remove(@PathVariable Long assessmentId, @PathVariable Long fieldId) {
         mappingRepository.deleteByAssessmentIdAndFieldDefinitionFieldId(assessmentId, fieldId);
         return ResponseEntity.ok("Mapping removed successfully");

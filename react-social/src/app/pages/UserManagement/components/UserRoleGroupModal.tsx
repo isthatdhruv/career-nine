@@ -9,7 +9,13 @@ const API_URL = process.env.REACT_APP_API_URL;
 interface Props {
   show: boolean;
   onHide: () => void;
-  user: { id: number; name: string } | null;
+  user:
+    | {
+        id: number;
+        name: string;
+        userRoleGroupMappings?: { id: number; roleGroup: { id: number; name: string } }[];
+      }
+    | null;
 }
 
 interface RoleGroupOption {
@@ -28,36 +34,25 @@ const UserRoleGroupModal = ({ show, onHide, user }: Props) => {
     if (!show || !user) return;
     setLoading(true);
 
-    Promise.all([
-      axios.get(`${API_URL}/rolegroup/get`),
-      axios.get(`${API_URL}/userrolegroupmapping/get`),
-    ])
-      .then(([groupsRes, mappingsRes]) => {
-        // Build role group options
+    // Derive current assignments from the user object passed in by the parent —
+    // /user/registered-users already returns userRoleGroupMappings, so we don't
+    // need a second round-trip.
+    const assigned: RoleGroupOption[] = (user.userRoleGroupMappings || [])
+      .filter((m) => m.roleGroup)
+      .map((m) => ({ label: m.roleGroup.name, value: m.roleGroup.id }));
+    setCurrentAssignments(assigned);
+    setSelectedGroups(assigned);
+
+    axios
+      .get(`${API_URL}/rolegroup/get`)
+      .then((groupsRes) => {
         const groups = (groupsRes.data || []).map((g: any) => ({
           label: g.name,
           value: g.id,
         }));
         setRoleGroupOptions(groups);
-
-        // Find current assignments for this user
-        const allMappings = mappingsRes.data || [];
-        const userMapping = allMappings.find((m: any) => m.id === user.id);
-        const assigned: RoleGroupOption[] = [];
-        if (userMapping?.userRoleGroupMappings) {
-          for (const m of userMapping.userRoleGroupMappings) {
-            if (m.roleGroup) {
-              assigned.push({ label: m.roleGroup.name, value: m.roleGroup.id });
-            }
-          }
-        }
-        setCurrentAssignments(assigned);
-        setSelectedGroups(assigned);
       })
-      .catch(() => {
-        setRoleGroupOptions([]);
-        setCurrentAssignments([]);
-      })
+      .catch(() => setRoleGroupOptions([]))
       .finally(() => setLoading(false));
   }, [show, user]);
 
@@ -93,8 +88,8 @@ const UserRoleGroupModal = ({ show, onHide, user }: Props) => {
     >
       <div
         style={{
-          backgroundColor: "#fff", borderRadius: "16px", maxWidth: "550px",
-          width: "94%", maxHeight: "80vh", overflow: "hidden",
+          backgroundColor: "#fff", borderRadius: "16px", maxWidth: "720px",
+          width: "94%", maxHeight: "85vh", display: "flex", flexDirection: "column",
           boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -116,7 +111,7 @@ const UserRoleGroupModal = ({ show, onHide, user }: Props) => {
         </div>
 
         {/* Body */}
-        <div style={{ padding: "1.25rem 1.5rem" }}>
+        <div style={{ padding: "1.25rem 1.5rem", overflowY: "auto", flex: 1 }}>
           {loading ? (
             <div className="text-center py-4">
               <div className="spinner-border spinner-border-sm text-primary"></div>
@@ -156,9 +151,14 @@ const UserRoleGroupModal = ({ show, onHide, user }: Props) => {
                   onChange={(opt: any) => setSelectedGroups(opt || [])}
                   placeholder="Choose role groups..."
                   noOptionsMessage={() => "No role groups available"}
+                  menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+                  menuPosition="fixed"
                   styles={{
-                    control: (base) => ({ ...base, borderRadius: "8px", fontSize: "0.85rem" }),
+                    control: (base) => ({ ...base, borderRadius: "8px", fontSize: "0.85rem", minHeight: "42px" }),
                     multiValue: (base) => ({ ...base, fontSize: "0.82rem" }),
+                    valueContainer: (base) => ({ ...base, maxHeight: "140px", overflowY: "auto" }),
+                    menuPortal: (base) => ({ ...base, zIndex: 10000 }),
+                    menu: (base) => ({ ...base, zIndex: 10000 }),
                   }}
                 />
               </div>

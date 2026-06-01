@@ -12,12 +12,22 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 
+import org.hibernate.annotations.Filter;
+
 
 
 /**
  * The persistent class for the institute_branch database table.
- * 
+ *
+ * <p>Phase 15-06 — ABAC row-level filter (scopeFilter). The institute_branch
+ * table has only a {@code course_id} scope-dim column (verified Task 0); there
+ * is no direct institute_id column on this table — branches are linked to
+ * institutes via a join through institute_courses. The scope filter narrows
+ * by course_id only; the institute/session/section dimensions of the filter
+ * degenerate to no-op on this entity.
  */
+@Filter(name = "scopeFilter", condition =
+        "(course_id IN (:courseCodes) OR course_id IS NULL)")
 @Entity
 @Table(name="institute_branch")
 // @NamedQuery(name="InstituteBranch.findAll", query="SELECT i FROM InstituteBranch i")

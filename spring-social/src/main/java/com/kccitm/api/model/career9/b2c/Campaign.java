@@ -14,9 +14,22 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import org.hibernate.annotations.Filter;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+/**
+ * Phase 15-06 — ABAC row-level filter (scopeFilter). The campaigns table
+ * carries an {@code institute_code} column (FK to institute_detail.institute_code).
+ * The other scope dimensions are not represented on this table.
+ *
+ * <p>NULL-tolerant: legacy campaigns may have null institute_code (b2c campaigns
+ * pre-date the institute backfill); those rows are treated as wildcard and
+ * remain visible to every caller.
+ */
+@Filter(name = "scopeFilter", condition =
+        "(institute_code IN (:instituteIds) OR institute_code IS NULL)")
 @Entity
 @Table(name = "campaigns")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})

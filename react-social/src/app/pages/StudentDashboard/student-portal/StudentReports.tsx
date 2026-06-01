@@ -4,6 +4,7 @@ import {
   GeneratedReport,
 } from '../../ReportGeneration/API/GeneratedReport_APIs'
 import { useAutoRefresh } from '../../../utils/useAutoRefresh'
+import { useAuth } from '../../../modules/auth/core/Auth'
 import './StudentPortal.css'
 
 function getReportLabel(type: string): string {
@@ -41,14 +42,16 @@ function formatDate(dateStr: string | null | undefined): string {
 }
 
 const StudentReports: React.FC = () => {
+  const { currentUser } = useAuth()
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
+  // Phase 19 (19-02): userStudentId now sourced from useAuth().currentUser instead
+  // of localStorage.studentPortalProfile. The field is not yet declared on the
+  // canonical User type (Phase 16 surface gap); cast to any to peek at it.
   const userStudentId = useMemo<number | null>(() => {
-    try {
-      const profile = JSON.parse(localStorage.getItem('studentPortalProfile') || 'null')
-      return profile?.userStudentId ?? null
-    } catch { return null }
-  }, [])
+    const u = currentUser as any
+    return (u?.userStudentId as number | undefined) ?? null
+  }, [currentUser])
 
   const { data, loading } = useAutoRefresh<GeneratedReport[]>(
     async () => {

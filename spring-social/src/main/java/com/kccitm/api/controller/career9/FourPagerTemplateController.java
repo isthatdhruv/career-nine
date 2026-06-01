@@ -39,6 +39,8 @@ public class FourPagerTemplateController {
     @Autowired
     private DigitalOceanSpacesService spacesService;
 
+    // @PreAuthorize-Exempt: operator-run template publish; gated by network access only.
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS.
     @PostMapping("/upload")
     public ResponseEntity<?> uploadTemplates() {
         List<String> uploaded = new ArrayList<>();

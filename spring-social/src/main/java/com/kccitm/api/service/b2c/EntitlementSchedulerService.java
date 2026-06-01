@@ -19,6 +19,8 @@ import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.model.reminder.ReminderServiceType;
+import com.kccitm.api.service.reminder.ReminderConfigService;
 
 /**
  * MVP scheduler: nudge unstarted assessments. Expiry / final-report polls layer in later.
@@ -38,9 +40,15 @@ public class EntitlementSchedulerService {
     @Autowired private NotificationDispatcher notificationDispatcher;
     @Autowired private LinkBuilder linkBuilder;
     @Autowired private EntitlementService entitlementService;
+    @Autowired(required = false) private ReminderConfigService reminderConfigService;
 
     @Scheduled(cron = "0 23 * * * *") // 23 minutes past every hour to avoid clustering
     public void nudgeUnstartedAssessments() {
+        // Honour central reminder config when present (Phase: Reminder Management).
+        if (reminderConfigService != null
+                && !reminderConfigService.isEnabled(ReminderServiceType.ASSESSMENT_INVITE_B2C)) {
+            return;
+        }
         Date cutoff = hoursAgo(FIRST_NUDGE_AFTER_HOURS);
         List<StudentEntitlement> candidates = entitlementRepository.findActiveOlderThan(cutoff);
         if (candidates.isEmpty()) return;
@@ -51,7 +59,12 @@ public class EntitlementSchedulerService {
                 if (e.getUserStudentId() == null || e.getAssessmentId() == null) continue;
 
                 long nudgesSent = notificationDispatcher.countSent(e.getEntitlementId(), "nudge");
-                if (nudgesSent >= MAX_NUDGES_PER_ENTITLEMENT) continue;
+                int cap = MAX_NUDGES_PER_ENTITLEMENT;
+                if (reminderConfigService != null) {
+                    Integer dynCap = reminderConfigService.getMaxSendsPerRecipient(ReminderServiceType.ASSESSMENT_INVITE_B2C);
+                    if (dynCap != null && dynCap > 0) cap = dynCap;
+                }
+                if (nudgesSent >= cap) continue;
 
                 Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
                         .findFirstByUserStudentUserStudentIdAndAssessmentId(

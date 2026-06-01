@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,6 +31,7 @@ public class InstituteBatchController {
 	@Autowired
 	private InstituteBranchBatchMappingRepository instituteBranchBatchMappingRepository;
 
+	@PreAuthorize("@auth.allows('institute_batch.read.all')")
 	@GetMapping(value = "instituteBatch/get", headers = "Accept=application/json")
 	public List<InstituteBatch> getallInstituteBatch() {
 		List<InstituteBatch> allInstitutbatch = instituteBatchRepository.findAll();
@@ -49,12 +51,14 @@ public class InstituteBatchController {
 		return allInstitutbatch;
 	}
 
+	@PreAuthorize("@auth.allows('institute_batch.read')")
 	@GetMapping(value = "instituteBatch/getbyid/{id}", headers = "Accept=application/json")
 	public InstituteBatch getInstituteBatchById(@PathVariable("id") int instituteBatchId) {
 		InstituteBatch instituteBatch = instituteBatchRepository.findById(instituteBatchId);
 		return instituteBatch;
 	}
 
+	@PreAuthorize("@auth.allows('institute_batch.update')")
 	@PostMapping(value = "instituteBatch/update", headers = "Accept=application/json")
 	public List<InstituteBatch> updateInstituteBatch(@RequestBody Map<String, InstituteBatch> inputData) {
 		InstituteBatch r = inputData.get("values");
@@ -62,6 +66,7 @@ public class InstituteBatchController {
 		return instituteBatchRepository.findByBatchId(r.getBatchId());
 	}
 
+	@PreAuthorize("@auth.allows('institute_batch.delete')")
 	@GetMapping(value = "instituteBatch/delete/{id}", headers = "Accept=application/json")
 	public InstituteBatch deleteUser(@PathVariable("id") int instituteBatchId) {
 		InstituteBatch instituteBatch = instituteBatchRepository.getOne(instituteBatchId);

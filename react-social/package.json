@@ -12,7 +12,7 @@
     "@formatjs/intl-relativetimeformat": "10.0.1",
     "@fortawesome/fontawesome-free": "6.1.1",
     "@mediapipe/tasks-vision": "^0.10.18",
-    "@mui/icons-material": "^7.3.7",
+    "@mui/icons-material": "^5.18.0",
     "@mui/material": "^5.10.11",
     "@popperjs/core": "2.11.6",
     "ajv": "^8.17.1",
@@ -107,6 +107,9 @@
     "webpack-cli": "4.10.0"
   },
   "scripts": {
+    "gen:perms": "node scripts/extract-perm-routes.js",
+    "prestart": "npm run gen:perms",
+    "prebuild": "npm run gen:perms",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
@@ -115,6 +118,8 @@
     "format": "prettier --write .",
     "rtl": "webpack --config=rtl.config.js",
     "start:staging": "env-cmd -f staging.env npm start",
+    "start:staging:local": "HOST=127.0.0.1 PORT=3000 WDS_SOCKET_PORT=0 env-cmd -f staging.env npm start",
+    "start:production:local": "HOST=127.0.0.1 PORT=3000 WDS_SOCKET_PORT=0 env-cmd -f production.env npm start",
     "build:stage": " env-cmd -f staging.env npm run-script build",
     "build:production": " env-cmd -f production.env npm run-script build"
   },

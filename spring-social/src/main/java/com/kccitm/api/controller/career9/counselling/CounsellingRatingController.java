@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,6 +46,8 @@ public class CounsellingRatingController {
         public String review;
     }
 
+    // no scope arg: body is DTO; student creates rating for their session
+    @PreAuthorize("@auth.allows('counselling.rating.create')")
     @PostMapping("/create")
     public ResponseEntity<?> create(@RequestBody CreateRatingRequest req) {
         if (req.appointmentId == null) {
@@ -86,6 +89,8 @@ public class CounsellingRatingController {
         return ResponseEntity.ok(saved);
     }
 
+    // no scope arg: identifies by appointmentId
+    @PreAuthorize("@auth.allows('counselling.rating.read')")
     @GetMapping("/by-appointment/{appointmentId}")
     public ResponseEntity<?> getByAppointment(@PathVariable Long appointmentId) {
         return ratingRepository.findByAppointmentId(appointmentId)
@@ -93,6 +98,8 @@ public class CounsellingRatingController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    // no scope arg: identifies by studentId
+    @PreAuthorize("@auth.allows('counselling.rating.read')")
     @GetMapping("/pending-for-student/{studentId}")
     public ResponseEntity<?> pendingForStudent(@PathVariable Long studentId) {
         List<CounsellingAppointment> unrated =
@@ -100,6 +107,8 @@ public class CounsellingRatingController {
         return ResponseEntity.ok(unrated);
     }
 
+    // no scope arg: cross-counsellor admin stats
+    @PreAuthorize("@auth.allows('counselling.rating.read')")
     @GetMapping("/summary-by-counsellor")
     public ResponseEntity<List<Map<String, Object>>> summaryByCounsellor() {
         List<Object[]> rows = ratingRepository.summaryByCounsellor();
@@ -114,6 +123,8 @@ public class CounsellingRatingController {
         return ResponseEntity.ok(out);
     }
 
+    // no scope arg: identifies by counsellorId
+    @PreAuthorize("@auth.allows('counselling.rating.read')")
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<?> byCounsellor(@PathVariable Long counsellorId) {
         Optional<Counsellor> c = counsellorRepository.findById(counsellorId);

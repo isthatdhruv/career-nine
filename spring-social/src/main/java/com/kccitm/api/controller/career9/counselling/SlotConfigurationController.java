@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,6 +47,8 @@ public class SlotConfigurationController {
     private AvailabilityTemplateRepository templateRepository;
 
     /** Save a new slot configuration */
+    // no scope arg: body is SlotConfiguration entity; admin-only
+    @PreAuthorize("@auth.allows('counselling.slot_configuration.create')")
     @PostMapping("/create")
     public ResponseEntity<SlotConfiguration> create(@RequestBody SlotConfiguration config) {
         SlotConfiguration saved = configRepository.save(config);
@@ -54,6 +57,8 @@ public class SlotConfigurationController {
     }
 
     /** Get all saved configurations */
+    // no scope arg: cross-counsellor admin list
+    @PreAuthorize("@auth.allows('counselling.slot_configuration.read')")
     @GetMapping("/getAll")
     public ResponseEntity<List<SlotConfiguration>> getAll() {
         return ResponseEntity.ok(configRepository.findAllOrderByCreatedAtDesc());
@@ -64,6 +69,8 @@ public class SlotConfigurationController {
      * auto-generated AVAILABLE slots. Booked/requested slots are preserved
      * (their template_id is nullified first to avoid FK violations).
      */
+    // no scope arg: cleanup utility; admin-only
+    @PreAuthorize("@auth.allows('counselling.slot_configuration.update')")
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.web.bind.annotation.PostMapping("/cleanup-legacy")
     public ResponseEntity<?> cleanupLegacy() {
@@ -93,6 +100,8 @@ public class SlotConfigurationController {
     }
 
     /** Delete a configuration */
+    // no scope arg: delete by id; admin-only
+    @PreAuthorize("@auth.allows('counselling.slot_configuration.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         configRepository.deleteById(id);
@@ -106,6 +115,8 @@ public class SlotConfigurationController {
      *
      * Body: { configId: Long, counsellorIds: [Long] }
      */
+    // no scope arg: body is raw Map; admin applies config to counsellors
+    @PreAuthorize("@auth.allows('counselling.slot_configuration.update')")
     @SuppressWarnings("unchecked")
     @PostMapping("/apply")
     public ResponseEntity<?> applyToCounsellors(@RequestBody Map<String, Object> body) {

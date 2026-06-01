@@ -4,6 +4,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +24,8 @@ public class HeartbeatController {
     @Autowired
     private AssessmentSessionService assessmentSessionService;
 
+    // PUBLIC?: already in 15-02 baseline EXCLUSIONS — anonymous health probe per SecurityConfig
+    @PreAuthorize("@auth.allows('heartbeat.ping')")
     @PostMapping("/heartbeat")
     public ResponseEntity<Void> heartbeat(@RequestBody Map<String, Object> body) {
         Long studentId = toLong(body.get("userStudentId"));

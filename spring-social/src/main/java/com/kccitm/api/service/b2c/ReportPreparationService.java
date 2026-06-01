@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.controller.career9.BetReportDataController;
 import com.kccitm.api.controller.career9.NavigatorReportDataController;
+import com.kccitm.api.controller.career9.PagerReportDataController;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.StudentInfo;
@@ -40,6 +41,7 @@ public class ReportPreparationService {
     @Autowired private ReportGenerationLogService reportGenerationLogService;
     @Autowired private BetReportDataController betReportDataController;
     @Autowired private NavigatorReportDataController navigatorReportDataController;
+    @Autowired private PagerReportDataController pagerReportDataController;
 
     public static class PreparationResult {
         public final String reportType;
@@ -65,12 +67,27 @@ public class ReportPreparationService {
 
         Long userStudentId = entitlement.getUserStudentId();
         Integer studentClass = lookupStudentClass(userStudentId);
-        String reportType = resolveReportType(assessmentId);
+        String reportType = resolveReportType(assessmentId, studentClass);
 
         try {
-            String reportUrl = "navigator".equals(reportType)
-                    ? navigatorReportDataController.prepareAndUploadForEntitlement(userStudentId, assessmentId)
-                    : betReportDataController.prepareAndUploadForEntitlement(userStudentId, assessmentId);
+            String reportUrl;
+            switch (reportType) {
+                case "navigator":
+                    // Legacy 18-page Navigator. Kept for backwards-compat with historical
+                    // generated_report rows; new pipelines use "pager".
+                    reportUrl = navigatorReportDataController.prepareAndUploadForEntitlement(
+                            userStudentId, assessmentId);
+                    break;
+                case "pager":
+                    reportUrl = pagerReportDataController.prepareAndUploadForEntitlement(
+                            userStudentId, assessmentId);
+                    break;
+                case "bet":
+                default:
+                    reportUrl = betReportDataController.prepareAndUploadForEntitlement(
+                            userStudentId, assessmentId);
+                    break;
+            }
 
             entitlement.setReportPreparedAt(new Date());
             entitlementRepository.save(entitlement);
@@ -93,29 +110,45 @@ public class ReportPreparationService {
         Long userStudentId = entitlementRepository.findById(entitlementId)
                 .map(StudentEntitlement::getUserStudentId).orElse(null);
         Integer studentClass = lookupStudentClass(userStudentId);
-        String reportType = resolveReportType(assessmentId);
+        String reportType = resolveReportType(assessmentId, studentClass);
         return reportGenerationLogService.log(
                 entitlementId, assessmentId, reportType, studentClass, attemptType, err);
     }
 
-    private String resolveReportType(Long assessmentId) {
-        if (assessmentId == null) return "bet";
+    /**
+     * Resolution priority:
+     *   1. Questionnaire.reportType FK (new, set by manual backfill) — wins.
+     *   2. Admin explicit override (assessment.reportType column) — preserved
+     *      as escape hatch until {@code AssessmentTable.reportType} is removed.
+     *   3. Legacy fallback: questionnaire.type boolean → "bet" else "pager".
+     *
+     * The legacy {@code "navigator"} string was renamed to {@code "legacy"} in
+     * V20260526005; new code uses {@code "legacy"}.
+     */
+    private String resolveReportType(Long assessmentId, Integer studentClass) {
+        if (assessmentId == null) return "pager";
         Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
-        if (!opt.isPresent()) return "bet";
+        if (!opt.isPresent()) return "pager";
         AssessmentTable assessment = opt.get();
 
-        String explicit = assessment.getReportType();
-        if (explicit != null && !explicit.trim().isEmpty()) {
-            return explicit.trim().toLowerCase();
+        // 1. New: read from Questionnaire.reportType FK.
+        if (assessment.getQuestionnaire() != null
+                && assessment.getQuestionnaire().getReportType() != null) {
+            return assessment.getQuestionnaire().getReportType().getCode();
         }
 
-        // No explicit report_type set: fall back to the same rule the frontend
-        // uses to decide which generator applies — questionnaire.type === true
-        // is the legacy BET marker; everything else (false / null) is Navigator.
+        // 2. Legacy admin override on AssessmentTable.
+        String explicit = assessment.getReportType();
+        if (explicit != null && !explicit.trim().isEmpty()) {
+            String norm = explicit.trim().toLowerCase();
+            return "navigator".equals(norm) ? "legacy" : norm;
+        }
+
+        // 3. Final fallback.
         return assessment.getQuestionnaire() != null
                 && Boolean.TRUE.equals(assessment.getQuestionnaire().getType())
                 ? "bet"
-                : "navigator";
+                : "pager";
     }
 
     private Integer lookupStudentClass(Long userStudentId) {

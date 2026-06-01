@@ -11,11 +11,11 @@ import {
   detachAssessment,
   detachTierFromMapping,
   getCampaign,
-  getInstituteList,
   InstituteOption,
   updateAssessmentMapping,
   updateCampaign,
 } from "../API/Campaign_APIs";
+import { useInstitutes } from "../../../lib/queries/lookups";
 import { getActivePricingTiers, PricingTier } from "../API/PricingTier_APIs";
 import { getAssessmentSummariesByInstitute } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
 import RegistrationLinks from "./components/RegistrationLinks";
@@ -43,7 +43,7 @@ const CampaignEditPage = () => {
   const [assessmentRows, setAssessmentRows] = useState<CampaignAssessmentRow[]>([]);
   const [allAssessments, setAllAssessments] = useState<{ id: number; name: string }[]>([]);
   const [allTiers, setAllTiers] = useState<PricingTier[]>([]);
-  const [allInstitutes, setAllInstitutes] = useState<InstituteOption[]>([]);
+  const { data: allInstitutes = [] } = useInstitutes<InstituteOption>();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -79,15 +79,6 @@ const CampaignEditPage = () => {
     }
   };
 
-  const loadInstitutes = async () => {
-    try {
-      const res = await getInstituteList();
-      setAllInstitutes(res.data || []);
-    } catch (e: any) {
-      showErrorToast(e?.response?.data || "Failed to load institutes");
-    }
-  };
-
   const loadCampaign = async () => {
     if (!isEdit) return;
     setLoading(true);
@@ -115,7 +106,7 @@ const CampaignEditPage = () => {
     }
   };
 
-  useEffect(() => { loadTiers(); loadInstitutes(); loadCampaign(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { loadTiers(); loadCampaign(); /* eslint-disable-next-line */ }, [id]);
 
   useEffect(() => { loadAssessments(campaign.instituteCode); /* eslint-disable-next-line */ }, [campaign.instituteCode]);
 

@@ -1,11 +1,12 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button, Form } from "react-bootstrap-v5";
 import { AiOutlineCheck } from "react-icons/ai";
 import * as Yup from "yup";
 import { RoleTable } from "./RoleTable";
-import { readRoleData, upsertRoleData } from "./components/core/Role_APIs";
+import { upsertRoleData } from "./components/core/Role_APIs";
+import { useRoles } from "../../lib/queries/lookups";
 import { Role } from "./components/core/_models";
 
 const roleValidation = Yup.object().shape({
@@ -16,22 +17,7 @@ const roleValidation = Yup.object().shape({
 });
 
 const RolePage = () => {
-  const [roleData, setRoleData] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-
-    try {
-      readRoleData().then((data) => {
-        setRoleData(data.data);
-        setLoading(false);
-      });
-    } catch (error) {
-      console.error(error);
-      window.location.replace("/error");
-    }
-  }, []);
+  const { data: roleData = [], isLoading: loading } = useRoles<any>();
 
   var initialValues: Role = {
     name: "",
@@ -44,7 +30,6 @@ const RolePage = () => {
     initialValues,
     validationSchema: roleValidation,
     onSubmit: (values) => {
-      setLoading(true);
       upsertRoleData(values)
         .then((data) => {
         })

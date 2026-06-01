@@ -6,6 +6,7 @@ import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.service.b2c.report.ReportAutoGenerationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,9 @@ public class AssessmentCompletionService {
 
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+
+    @Autowired
+    private ReportAutoGenerationService reportAutoGenerationService;
 
     /**
      * Returns the total number of questions in the questionnaire linked to this assessment,
@@ -97,11 +101,23 @@ public class AssessmentCompletionService {
             resolved = "ongoing";
         }
 
+        String previousStatus = mapping.getStatus();
         mapping.setStatus(resolved);
         studentAssessmentMappingRepository.save(mapping);
 
         logger.info("Completion check: student={} assessment={} answered={}/{} → status={}",
                 studentId, assessmentId, answered, total, resolved);
+
+        // On a fresh transition to completed, kick off default-template report
+        // generation in the background (no-op if no template is mapped).
+        if ("completed".equals(resolved) && !"completed".equals(previousStatus)) {
+            try {
+                reportAutoGenerationService.generateDefaultReportAsync(studentId, assessmentId);
+            } catch (Exception ex) {
+                logger.warn("Failed to schedule auto report generation student={} assessment={}",
+                        studentId, assessmentId, ex);
+            }
+        }
         return resolved;
     }
 }

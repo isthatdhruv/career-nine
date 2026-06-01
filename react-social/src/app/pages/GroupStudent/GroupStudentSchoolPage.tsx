@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
-import { ReadCollegeList, GetSessionsByInstituteCode, GetInstituteMappings } from "../College/API/College_APIs";
+import { GetSessionsByInstituteCode, GetInstituteMappings } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
@@ -19,6 +20,7 @@ import {
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 import { ActionIcon } from "../../components/ActionIcon";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 
 type Student = {
   id: number;
@@ -45,13 +47,15 @@ type StudentAssessmentInfo = {
 export default function GroupStudentSchoolPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [] } = useInstitutes<any>();
   const instituteIdParam = searchParams.get("instituteId");
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">(
     instituteIdParam ? Number(instituteIdParam) : ""
   );
   const [students, setStudents] = useState<Student[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  // Narrow assessments to those mapped to the selected institute.
+  const { assessments } = useAssessmentsForInstitute(selectedInstitute, allAssessments);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(
@@ -520,18 +524,11 @@ export default function GroupStudentSchoolPage() {
   };
 
   useEffect(() => {
-    ReadCollegeList()
-      .then((res: any) => {
-        const list = Array.isArray(res.data) ? res.data : [];
-        setInstitutes(list);
-      })
-      .catch((err: any) => console.error("Failed to fetch institutes", err));
-
-    // Fetch assessments (only active ones)
+    // Fetch assessments (only active ones) — hook narrows per institute.
     getAllAssessments()
       .then((response) => {
         const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
+        setAllAssessments(activeOnly);
       })
       .catch((error) => {
         console.error("Error fetching assessments:", error);
@@ -2016,7 +2013,7 @@ export default function GroupStudentSchoolPage() {
                           >
                             <button
                               className="btn btn-sm d-flex align-items-center gap-1"
-                              onClick={() => navigate(`/student-dashboard/${student.userStudentId}`)}
+                              onClick={() => window.open(`/student/dashboard/view/${student.userStudentId}`, '_blank')}
                               style={{
                                 background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                                 color: "#fff",

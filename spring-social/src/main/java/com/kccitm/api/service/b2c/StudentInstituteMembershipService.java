@@ -18,6 +18,7 @@ import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentInstituteHistoryRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
+import com.kccitm.api.service.StudentProvisioningService;
 
 /**
  * Owns the relationship between a UserStudent and one or more InstituteDetail
@@ -42,6 +43,7 @@ public class StudentInstituteMembershipService {
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
     @Autowired private StudentInfoRepository studentInfoRepository;
+    @Autowired private StudentProvisioningService studentProvisioningService;
 
     /**
      * Single write entry point for "set the student's primary institute".
@@ -65,6 +67,7 @@ public class StudentInstituteMembershipService {
         }
         userStudent.setInstitute(inst);
         userStudentRepository.save(userStudent);
+        studentProvisioningService.provision(userStudent);
         upsertMembership(userStudent.getUserStudentId(), instituteCode, campaignId, source);
     }
 

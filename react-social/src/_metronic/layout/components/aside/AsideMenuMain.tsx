@@ -2,30 +2,36 @@
 import { useIntl } from "react-intl";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../../../app/modules/auth";
+import { urlAllowed } from "../../../../app/modules/auth/core/permissions";
 import { AsideMenuItem } from "./AsideMenuItem";
 import { AsideMenuItemWithSub } from "./AsideMenuItemWithSub";
 
-/** Check whether a given path is allowed by the user's authorityUrls (supports * wildcards) */
-function isUrlAllowed(path: string, authorityUrls: string[]): boolean {
-  return authorityUrls.some((pattern) => {
-    if (pattern.includes("*")) {
-      const regexStr =
-        "^" +
-        pattern
-          .replace(/([.+?^${}()|[\]\\])/g, "\\$1")
-          .replace(/\*/g, ".*") +
-        "$";
-      return new RegExp(regexStr).test(path);
-    }
-    return path === pattern || path.startsWith(pattern + "/");
-  });
-}
-
+/**
+ * Phase 5 (Task 5.1): the aside menu is now driven by the role group's allowed-URL whitelist
+ * (the `urls[]` delivered by GET /auth/me), NOT by permission codes. An item is shown iff its
+ * destination path is in the user's URL whitelist — exactly the same signal the route guard
+ * (RequirePermission) uses — so the menu and the route guard can no longer disagree (a user
+ * never sees a menu item that then bounces them to RequestAccessPage). Super-admins bypass the
+ * whitelist and see everything. The Student Portal section stays role-gated because the student
+ * app uses a role-string guard (StudentAuthGuard), not the admin URL whitelist.
+ */
 export function AsideMenuMain() {
   const intl = useIntl();
   const { pathname, search } = useLocation();
   const { currentUser } = useAuth();
-  const authorityUrls: string[] = currentUser?.authorityUrls ?? [];
+
+  const isSuperAdmin = currentUser?.superAdmin === true;
+
+  // An item/section is visible iff its path is in the role group's allowed-URL list
+  // (super-admins see everything). Query strings are stripped — the whitelist is path-based.
+  const allowed = (path: string): boolean => {
+    if (isSuperAdmin) return true;
+    const bare = path.split("?")[0];
+    return urlAllowed(currentUser?.urls, bare);
+  };
+
+  // Path-context flags (routing state, not authorization — preserved from the
+  // pre-permission-aware menu so the institute-dashboard nested links still work):
   const isInstituteDashboard = pathname.startsWith("/school/principal/dashboard/");
   const isSchoolPage = pathname.startsWith("/school/");
   const showSchoolGroupStudent = isSchoolPage;
@@ -34,47 +40,61 @@ export function AsideMenuMain() {
   const schoolGroupStudentInstituteId = isInstituteDashboard
     ? (pathname.split('/')[4] || "")
     : (new URLSearchParams(search).get("instituteId") || "");
-  const allowed = (path: string) => {
-    const normalized = path.startsWith("/") ? path : "/" + path;
-    return isUrlAllowed(normalized, authorityUrls);
-  };
 
-  // Section visibility: show section header + submenu only if at least one child is allowed
+  // Section-visibility flags — a section header is shown iff at least one of its child menu
+  // items is in the user's URL whitelist. The path list per section MUST match the child
+  // AsideMenuItem `to` values below.
   const showInstitute =
-    allowed("/college") || allowed("/contact-person") || allowed("/group-student") ||
-    allowed("/admin/group-student") || allowed("/school/group-student") ||
-    allowed("/school/assigned-students") ||
-    allowed("/board") || allowed("/upload-excel") || allowed("/assessment-mapping");
+    allowed("/college") ||
+    allowed("/contact-person") ||
+    allowed("/group-student") ||
+    allowed("/student-management") ||
+    allowed("/student-list") ||
+    allowed("/board") ||
+    allowed("/upload-excel") ||
+    allowed("/assessment-mapping");
 
   const showQuestionnaire =
-    allowed("/questionare/create") || allowed("/questionaire/List") ||
-    allowed("/tools") || allowed("/game-list");
+    allowed("/questionare/create") ||
+    allowed("/questionaire/List") ||
+    allowed("/tools") ||
+    allowed("/game-list");
 
   const showQualities =
-    allowed("/measured-qualities") || allowed("/measured-quality-types");
+    allowed("/measured-qualities") ||
+    allowed("/measured-quality-types");
 
   const showAssessment =
-    allowed("/assessments") || allowed("/assessment-sections") ||
-    allowed("/assessment-questions") || allowed("/question-sections") ||
+    allowed("/assessments") ||
+    allowed("/assessment-questions") ||
+    allowed("/question-sections") ||
+    allowed("/demographic-fields") ||
     allowed("/text-response-mapping");
 
   const showAssessmentManagement = showQuestionnaire || showQualities || showAssessment;
 
-  const showRegistration = allowed("/user-registrations");
-
   const showDataUpload =
-    allowed("/offline-assessment-upload") || allowed("/omr-data-upload") ||
-    allowed("/live-tracking") || allowed("/payment-tracking") || allowed("/promo-codes") ||
+    allowed("/offline-assessment-upload") ||
+    allowed("/omr-data-upload") ||
+    allowed("/live-tracking") ||
     allowed("/communication-logs");
 
-  const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
+  const showB2C =
+    allowed("/b2c/campaigns") ||
+    allowed("/b2c/pricing-tiers") ||
+    allowed("/b2c/tracker") ||
+    allowed("/payment-tracking") ||
+    allowed("/promo-codes");
+
+  const showReports = allowed("/reports-hub") || allowed("/admin/report-types") || allowed("/admin/report-templates");
 
   const showRoles =
-    allowed("/roles/role") ||
-    allowed("/roles/role_roleGroup") || allowed("/roles/roleUser") ||
-    allowed("/user-registrations");
+    allowed("/user-management/roles/manage") ||
+    allowed("/user-management/users/manage");
 
   const showActivityLog = allowed("/activity-log");
+  // JWT Token console is super-admin-only — backend enforces via @PreAuthorize("principal.superAdmin")
+  const showJwtTokens = isSuperAdmin;
   const showLeads = allowed("/leads");
   const showOldDataMapping = allowed("/old-data-mapping");
   const showScoreDebug = allowed("/score-debug");
@@ -84,12 +104,22 @@ export function AsideMenuMain() {
 
   const showCounselling =
     allowed("/admin/counsellors") ||
-    allowed("/admin/counselling-slots") || allowed("/admin/counselling-students") || allowed("/admin/counselling-notifications");
+    allowed("/admin/counselling-students") ||
+    allowed("/admin/counselling-slots") ||
+    allowed("/admin/counselling-notifications");
 
+  // Student Portal section — role-gated (the student app uses StudentAuthGuard, not the admin
+  // URL whitelist). Shown for users holding a student role, or for super admins.
+  const userRoles = currentUser?.roles ?? [];
   const showStudentPortal =
-    allowed("/student/dashboard") || allowed("/student/navigator-360") ||
-    allowed("/student/assessments") || allowed("/student/reports") ||
-    allowed("/student/counselling") || allowed("/student/student-info");
+    isSuperAdmin ||
+    userRoles.some(
+      (r) => r === "STUDENT" || r === "B2C_STUDENT" || r === "ROLE_STUDENT" || r === "ROLE_B2C_STUDENT"
+    );
+
+  const showCounsellorPortal =
+    isSuperAdmin ||
+    userRoles.some((r) => r === "COUNSELLOR" || r === "ROLE_COUNSELLOR");
 
   return (
     <>
@@ -140,6 +170,30 @@ export function AsideMenuMain() {
                 fontIcon="bi-app-indicator"
               />
             )}
+            {allowed("/reminders") && (
+              <AsideMenuItem
+                to="/reminders"
+                icon="/media/icons/duotune/communication/com003.svg"
+                title="Reminders"
+                fontIcon="bi-bell"
+              />
+            )}
+            {allowed("/student-management") && (
+              <AsideMenuItem
+                to="/student-management"
+                icon="/media/icons/duotune/general/gen049.svg"
+                title="Student Management"
+                fontIcon="bi-app-indicator"
+              />
+            )}
+            {allowed("/student-list") && (
+              <AsideMenuItem
+                to="/student-list"
+                icon="/media/icons/duotune/general/gen044.svg"
+                title="Student List"
+                fontIcon="bi-app-indicator"
+              />
+            )}
             {showSchoolGroupStudent && allowed("/school/group-student") && (
               <AsideMenuItem
                 to={`/school/group-student?instituteId=${schoolGroupStudentInstituteId}`}
@@ -168,7 +222,7 @@ export function AsideMenuMain() {
               <AsideMenuItem
                 to="/upload-excel"
                 icon="/media/icons/duotune/general/gen044.svg"
-                title="Add Students in Bulk"
+                title="Upload Students"
                 fontIcon="bi-app-indicator"
               />
             )}
@@ -294,12 +348,14 @@ export function AsideMenuMain() {
                   fontIcon="bi-app-indicator"
                 />
               )}
-              <AsideMenuItem
-                to="/demographic-fields"
-                icon="/media/icons/duotune/general/gen019.svg"
-                title="Demographic Fields"
-                fontIcon="bi-app-indicator"
-              />
+              {allowed("/demographic-fields") && (
+                <AsideMenuItem
+                  to="/demographic-fields"
+                  icon="/media/icons/duotune/general/gen019.svg"
+                  title="Demographic Fields"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
               {allowed("/text-response-mapping") && (
                 <AsideMenuItem
                   to="/text-response-mapping"
@@ -361,27 +417,11 @@ export function AsideMenuMain() {
                 fontIcon="bi-envelope-paper"
               />
             )}
-            {allowed("/payment-tracking") && (
-              <AsideMenuItem
-                to="/payment-tracking"
-                icon="/media/icons/duotune/finance/fin002.svg"
-                title="Payment Tracking"
-                fontIcon="bi-credit-card"
-              />
-            )}
-            {allowed("/promo-codes") && (
-              <AsideMenuItem
-                to="/promo-codes"
-                icon="/media/icons/duotune/ecommerce/ecm001.svg"
-                title="Promo Codes"
-                fontIcon="bi-tag"
-              />
-            )}
           </AsideMenuItemWithSub>
         </>
       )}
 
-      {(allowed("/b2c/campaigns") || allowed("/b2c/pricing-tiers") || allowed("/b2c/tracker")) && (
+      {showB2C && (
         <>
           <div className="menu-item">
             <div className="menu-content pt-8 pb-2">
@@ -420,6 +460,22 @@ export function AsideMenuMain() {
                 fontIcon="bi-clipboard-data"
               />
             )}
+            {allowed("/payment-tracking") && (
+              <AsideMenuItem
+                to="/payment-tracking"
+                icon="/media/icons/duotune/finance/fin002.svg"
+                title="Payment Tracking"
+                fontIcon="bi-credit-card"
+              />
+            )}
+            {allowed("/promo-codes") && (
+              <AsideMenuItem
+                to="/promo-codes"
+                icon="/media/icons/duotune/ecommerce/ecm001.svg"
+                title="Promo Codes"
+                fontIcon="bi-tag"
+              />
+            )}
           </AsideMenuItemWithSub>
         </>
       )}
@@ -434,7 +490,7 @@ export function AsideMenuMain() {
             </div>
           </div>
 
-          {allowed("/reports") && (
+          {allowed("/reports-hub") && (
             <AsideMenuItem
               to="/reports-hub"
               icon="/media/icons/duotune/graphs/gra010.svg"
@@ -442,98 +498,24 @@ export function AsideMenuMain() {
               fontIcon="bi-grid-3x3-gap"
             />
           )}
-          {/* {allowed("/reports") && (
+          {allowed("/admin/report-types") && (
             <AsideMenuItem
-              to="/reports"
+              to="/admin/report-types"
               icon="/media/icons/duotune/files/fil003.svg"
-              title="Unified Score Export"
+              title="Report Types"
               fontIcon="bi-file-earmark-text"
             />
           )}
-          {allowed("/reports") && (
+          {(allowed("/admin/report-templates") || allowed("/admin/report-types")) && (
             <AsideMenuItem
-              to="/bet-report-generation"
-              icon="/media/icons/duotune/general/gen005.svg"
-              title="BET Report Generation"
-              fontIcon="bi-file-earmark-bar-graph"
+              to="/admin/report-templates"
+              icon="/media/icons/duotune/files/fil003.svg"
+              title="Report Templates"
+              fontIcon="bi-file-earmark-text"
             />
           )}
-          {allowed("/reports") && (
-            <AsideMenuItem
-              to="/navigator-report-generation"
-              icon="/media/icons/duotune/maps/map001.svg"
-              title="Navigator Report Generation"
-              fontIcon="bi-compass"
-            />
-          )}
-          {allowed("/reports") && (
-            <AsideMenuItem
-              to="/unified-report-management"
-              icon="/media/icons/duotune/graphs/gra010.svg"
-              title="Unified Report Management"
-              fontIcon="bi-grid-3x3-gap"
-            />
-          )}
-          {(allowed("/reports") || allowed("/send-reports")) && (
-            <AsideMenuItem
-              to="/send-reports"
-              icon="/media/icons/duotune/general/gen016.svg"
-              title="Send Reports"
-              fontIcon="bi-envelope"
-            />
-          )} */}
         </>
       )}
-
-      {/* <AsideMenuItem
-        to="/student/university/result-list"
-        icon="/media/icons/duotune/communication/com014.svg"
-        title="Students University Result"
-        fontIcon="bi-app-indicator"
-      /> */}
-
-      {/* <AsideMenuItem
-        to="/student/university/result-dashboard"
-        icon="/media/icons/duotune/communication/com014.svg"
-        title="Students University Dashboard"
-        fontIcon="bi-app-indicator"
-      /> */}
-
-      {/* <AsideMenuItem
-        to="/student/university/all-result-dashboard"
-        icon="/media/icons/duotune/communication/com014.svg"
-        title="Students Result By Rollno Dashboard"
-        fontIcon="bi-app-indicator"
-      /> */}
-
-      {/* <AsideMenuItem
-        to="forgotpassword"
-        icon="/media/icons/duotune/communication/com014.svg"
-        title="Reset Password"
-        fontIcon="bi-app-indicator"
-      /> */}
-
-      {/* <AsideMenuItem
-        to="google-groups"
-        icon="/media/icons/duotune/communication/com014.svg"
-        title="Google Groups"
-        fontIcon="bi-app-indicator"
-      />
-
-      <AsideMenuItem
-        to="groups"
-        icon="/media/icons/duotune/communication/com014.svg"
-        title="Groups"
-        fontIcon="bi-app-indicator"
-      /> */}
-
-      {/* <AsideMenuItem
-        to="group"
-        icon="/media/icons/duotune/communication/com014.svg"
-        title="Group"
-        fontIcon="bi-app-indicator"
-      /> */}
-
 
       {showRoles && (
         <>
@@ -550,14 +532,14 @@ export function AsideMenuMain() {
             fontIcon="bi-shield-lock"
             icon="/media/icons/duotune/general/gen019.svg"
           >
-            {(allowed("/roles/role") || allowed("/roles/role_roleGroup")) && (
+            {allowed("/user-management/roles/manage") && (
               <AsideMenuItem
                 to="/user-management/roles/manage"
                 title="Roles & Permissions"
                 hasBullet={true}
               />
             )}
-            {(allowed("/roles/roleUser") || allowed("/user-registrations")) && (
+            {allowed("/user-management/users/manage") && (
               <AsideMenuItem
                 to="/user-management/users/manage"
                 title="User Management"
@@ -569,7 +551,7 @@ export function AsideMenuMain() {
       )}
 
 
-      {showActivityLog && (
+      {(showActivityLog || showJwtTokens) && (
         <>
           <div className="menu-item">
             <div className="menu-content pt-8 pb-2">
@@ -578,12 +560,22 @@ export function AsideMenuMain() {
               </span>
             </div>
           </div>
-          <AsideMenuItem
-            to="/activity-log"
-            icon="/media/icons/duotune/general/gen019.svg"
-            title="Activity Log"
-            fontIcon="bi-journal-text"
-          />
+          {allowed("/activity-log") && (
+            <AsideMenuItem
+              to="/activity-log"
+              icon="/media/icons/duotune/general/gen019.svg"
+              title="Activity Log"
+              fontIcon="bi-journal-text"
+            />
+          )}
+          {showJwtTokens && (
+            <AsideMenuItem
+              to="/admin/jwt-tokens"
+              icon="/media/icons/duotune/general/gen047.svg"
+              title="JWT Tokens"
+              fontIcon="bi-shield-lock"
+            />
+          )}
         </>
       )}
       {showLeads && (
@@ -705,29 +697,41 @@ export function AsideMenuMain() {
             </div>
           </div>
           <AsideMenuItemWithSub
-            to="/student"
+            to="/student/dashboard"
             title="Student Portal"
             fontIcon="bi-app-indicator"
             icon="/media/icons/duotune/general/gen049.svg"
           >
-            {allowed("/student/dashboard") && (
-              <AsideMenuItem to="/student/dashboard" title="Dashboard" hasBullet={true} />
-            )}
-            {allowed("/student/student-info") && (
-              <AsideMenuItem to="/student/student-info" title="My Info" hasBullet={true} />
-            )}
-            {allowed("/student/navigator-360") && (
-              <AsideMenuItem to="/student/navigator-360" title="Navigator 360" hasBullet={true} />
-            )}
-            {allowed("/student/assessments") && (
-              <AsideMenuItem to="/student/assessments" title="My Assessments" hasBullet={true} />
-            )}
-            {allowed("/student/reports") && (
-              <AsideMenuItem to="/student/reports" title="My Reports" hasBullet={true} />
-            )}
-            {allowed("/student/counselling") && (
-              <AsideMenuItem to="/student/counselling" title="Counselling" hasBullet={true} />
-            )}
+            <AsideMenuItem to="/student/dashboard" title="Dashboard" hasBullet={true} />
+            <AsideMenuItem to="/student/dashboard/student-info" title="My Info" hasBullet={true} />
+            <AsideMenuItem to="/student/dashboard/navigator-360" title="Navigator 360" hasBullet={true} />
+            <AsideMenuItem to="/student/dashboard/assessments" title="My Assessments" hasBullet={true} />
+            <AsideMenuItem to="/student/dashboard/reports" title="My Reports" hasBullet={true} />
+            <AsideMenuItem to="/student/dashboard/counselling" title="Counselling" hasBullet={true} />
+          </AsideMenuItemWithSub>
+        </>
+      )}
+
+      {showCounsellorPortal && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                Counsellor Portal
+              </span>
+            </div>
+          </div>
+          <AsideMenuItemWithSub
+            to="/counsellor/dashboard"
+            title="Counsellor Portal"
+            fontIcon="bi-app-indicator"
+            icon="/media/icons/duotune/general/gen049.svg"
+          >
+            <AsideMenuItem to="/counsellor/dashboard" title="Dashboard" hasBullet={true} />
+            <AsideMenuItem to="/counsellor/appointments" title="Appointments" hasBullet={true} />
+            <AsideMenuItem to="/counsellor/notes" title="Session Notes" hasBullet={true} />
+            <AsideMenuItem to="/counsellor/availability" title="Availability" hasBullet={true} />
+            <AsideMenuItem to="/counsellor/profile" title="Profile" hasBullet={true} />
           </AsideMenuItemWithSub>
         </>
       )}

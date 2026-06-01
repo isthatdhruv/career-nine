@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,6 +29,7 @@ public class QuestionMediaController {
      * Returns: { "url": "https://storage-c9.sgp1.digitaloceanspaces.com/question-media/..." }
      */
     @PostMapping("/upload")
+    @PreAuthorize("@auth.allows('question_media.create')")
     public ResponseEntity<Map<String, String>> uploadMedia(@RequestBody Map<String, String> request) {
         String base64Data = request.get("base64Data");
         String mediaType = request.getOrDefault("mediaType", "image");
@@ -54,6 +56,7 @@ public class QuestionMediaController {
      * Expects query param: ?url=https://storage-c9.sgp1.digitaloceanspaces.com/...
      */
     @DeleteMapping("/delete")
+    @PreAuthorize("@auth.allows('question_media.delete')")
     public ResponseEntity<Map<String, String>> deleteMedia(@RequestParam String url) {
         spacesService.deleteFileByUrl(url);
         return ResponseEntity.ok(Map.of("status", "deleted"));

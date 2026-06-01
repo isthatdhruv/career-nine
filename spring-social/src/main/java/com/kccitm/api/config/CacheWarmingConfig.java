@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 
 import com.kccitm.api.controller.career9.AssessmentQuestionController;
 import com.kccitm.api.controller.career9.MeasuredQualityTypesController;
@@ -45,6 +46,11 @@ public class CacheWarmingConfig implements ApplicationListener<ApplicationReadyE
             logger.info("Warmed measuredQualityTypes cache");
 
             logger.info("Cache warming completed successfully");
+        } catch (AuthenticationCredentialsNotFoundException e) {
+            // Expected at startup: the warmed controller methods carry @PreAuthorize,
+            // and no Authentication is present in the SecurityContext during boot.
+            // Caches will populate on the first authenticated request — by design.
+            logger.info("Cache warming skipped (no Authentication at startup) — caches will populate on first request");
         } catch (Exception e) {
             logger.warn("Cache warming failed — application will continue, caches will populate on first request", e);
         }

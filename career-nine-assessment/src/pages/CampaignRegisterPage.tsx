@@ -132,8 +132,10 @@ const CampaignRegisterPage = () => {
 
   const isTryFirst = selectedAssessment?.purchasePath === "B"
   const isPaid = !isTryFirst && (selectedTier?.priceInr ?? 0) > 0
+  // Match backend integer-truncation math (Java long division) so the price
+  // shown here equals the amount actually charged by Razorpay.
   const discountedPriceInr = promoApplied && selectedTier
-    ? selectedTier.priceInr * (100 - promoApplied.discountPercent) / 100
+    ? Math.floor(selectedTier.priceInr * (100 - promoApplied.discountPercent) / 100)
     : (selectedTier?.priceInr ?? 0)
 
   const handleDobChange = (value: string) => {
@@ -185,6 +187,12 @@ const CampaignRegisterPage = () => {
       showErrorToast("Please enter a valid email address.")
       return
     }
+    // Allow optional leading +, digits, spaces, hyphens. 7-15 chars covers the
+    // E.164 length range (intl) and common Indian 10-digit forms.
+    if (!/^[+]?[\d\s-]{7,15}$/.test(phone.trim())) {
+      showErrorToast("Please enter a valid phone number (7–15 digits).")
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -219,6 +227,9 @@ const CampaignRegisterPage = () => {
         localStorage.clear()
         localStorage.setItem("userStudentId", String(res.data.userStudentId))
         localStorage.setItem("allottedAssessments", JSON.stringify(res.data.assessments))
+        // Required by mintAssessmentSessionCookie — /auth/assessment-session
+        // verifies DOB against the stored record before issuing cn_at_asmnt.
+        localStorage.setItem("studentDob", dob)
         if (res.data.entitlementId) {
           localStorage.setItem("entitlementId", String(res.data.entitlementId))
         }

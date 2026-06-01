@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { downloadReportAsPdf, htmlToPdfBlob } from "../ReportGeneration/utils/htmlToPdf";
 import JSZip from "jszip";
-import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
@@ -12,19 +13,17 @@ import {
 import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import {
   getReportType,
-  getReportTypes,
-  generateDataForAssessment,
-  getReportDataByAssessment,
-  generateReportsForAssessment,
-  downloadReport,
-  getReportUrls,
   ReportType,
 } from "../UnifiedReportManagement/API/UnifiedReport_APIs";
 import {
-  createOrUpdateGeneratedReport,
   getGeneratedReportsByAssessment,
   toggleReportVisibility,
 } from "../ReportGeneration/API/GeneratedReport_APIs";
+import {
+  ReadAssessmentTemplates,
+  GenerateUnifiedReport,
+  QuestionnaireTemplateMappingDto,
+} from "../ReportTemplates/API/Report_Templates_APIs";
 import { generateAndExportNavigatorExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
 import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
 import {
@@ -37,11 +36,13 @@ import MiraDesaiModal from "./components/MiraDesaiModal";
 import BulkSendModal from "./components/BulkSendModal";
 import EmailComposeModal from "./components/EmailComposeModal";
 import DownloadsModal, { ZipJob } from "./components/DownloadsModal";
+import GenerateReportsModal, { ModalStudent } from "./components/GenerateReportsModal";
 import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
 import { buildFourPagerHtml } from "./fourPager/FourPagerAPI";
 import PageHeader from "../../components/PageHeader";
+import { useAuth, Scope } from "../../modules/auth";
 
 // ═══════════════════════ TYPES ═══════════════════════
 
@@ -59,7 +60,13 @@ type StudentRow = {
   assignedAssessmentIds?: number[];
 };
 
-type SectionInfo = { className: string; sectionName: string };
+type SectionInfo = {
+  className: string;
+  sectionName: string;
+  sessionId?: number;
+  classId?: number;
+  sectionId?: number;
+};
 
 type ReportData = {
   userStudent?: { userStudentId: number };
@@ -72,10 +79,36 @@ type ReportData = {
 // ═══════════════════════ COMPONENT ═══════════════════════
 
 const ReportsHubPage: React.FC = () => {
-  // ── Institute ──
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  // ── Current user (for ABAC scope-based filtering) ──
+  // dhruv.kccsw@gmail.com mapped to KVS means scopes carry an `i` for that
+  // institute; we filter the dropdown and the student list to honour it so the
+  // user can only see what they're allotted to.
+  const { currentUser } = useAuth();
+  // Pull a stable reference to the scope array so downstream useMemos don't
+  // re-fire every render (currentUser is a new object on each provider update,
+  // but currentUser.scopes is referentially stable across renders).
+  const userScopes: Scope[] = useMemo(() => currentUser?.scopes ?? [], [currentUser]);
+  const isSuperAdmin = currentUser?.superAdmin === true;
+
+  // null = no restriction (super-admin OR at least one scope row is institute-wildcard).
+  const allowedInstituteIds = useMemo<Set<number> | null>(() => {
+    if (isSuperAdmin) return null;
+    if (!userScopes.length) return null; // no scope rows = legacy/unscoped session, don't restrict
+    if (userScopes.some((s) => s.i == null)) return null;
+    return new Set(userScopes.map((s) => s.i!).filter((v) => v != null));
+  }, [isSuperAdmin, userScopes]);
+
+  // ── Institute (server already scope-filters; we apply the client-side
+  // allowedInstituteIds filter as a defensive belt-and-braces step) ──
+  const { data: allInstitutes = [], isLoading: institutesLoading } = useInstitutes<any>();
+  const institutes = useMemo(
+    () =>
+      allowedInstituteIds == null
+        ? allInstitutes
+        : allInstitutes.filter((inst: any) => allowedInstituteIds.has(Number(inst.instituteCode))),
+    [allInstitutes, allowedInstituteIds]
+  );
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
-  const [institutesLoading, setInstitutesLoading] = useState(false);
 
   // ── Assessment (URM approach: filtered by institute mapping) ──
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
@@ -83,6 +116,10 @@ const ReportsHubPage: React.FC = () => {
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
   const [mappedAssessmentIds, setMappedAssessmentIds] = useState<Set<number> | null>(null);
+
+  // Report templates mapped to the selected assessment's questionnaire.
+  const [templates, setTemplates] = useState<QuestionnaireTemplateMappingDto[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | "">("");
 
   // ── Students ──
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -111,8 +148,8 @@ const ReportsHubPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<"" | "completed" | "ongoing" | "notstarted">("");
 
   // ── Action states ──
-  const [generating, setGenerating] = useState(false);
-  const [generateProgress, setGenerateProgress] = useState<{ step: string; current: number; total: number } | null>(null);
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
+  const [modalStudents, setModalStudents] = useState<ModalStudent[]>([]);
   const [exportingMQT, setExportingMQT] = useState(false);
   const [exportingDataExcel, setExportingDataExcel] = useState(false);
   // downloadingZip / zipProgress removed — replaced by zipJobs
@@ -156,12 +193,15 @@ const ReportsHubPage: React.FC = () => {
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
+  // Auto-select if the user is scoped to exactly one institute so they
+  // don't have to pick from a single-item dropdown.
   useEffect(() => {
-    setInstitutesLoading(true);
-    ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
-      .catch(() => setInstitutes([]))
-      .finally(() => setInstitutesLoading(false));
+    if (institutes.length === 1 && selectedInstitute === "") {
+      setSelectedInstitute(Number(institutes[0].instituteCode));
+    }
+  }, [institutes, selectedInstitute]);
+
+  useEffect(() => {
     getAllAssessments()
       .then((res) => setAllAssessments(res.data || []))
       .catch(() => setAllAssessments([]));
@@ -207,7 +247,13 @@ const ReportsHubPage: React.FC = () => {
         for (const session of sessionsRes.data || []) {
           for (const cls of session.schoolClasses || []) {
             for (const sec of cls.schoolSections || []) {
-              if (!lookup.has(sec.id)) lookup.set(sec.id, { className: cls.className, sectionName: sec.sectionName });
+              if (!lookup.has(sec.id)) lookup.set(sec.id, {
+                className: cls.className,
+                sectionName: sec.sectionName,
+                sessionId: session.id,
+                classId: cls.id,
+                sectionId: sec.id,
+              });
             }
           }
         }
@@ -236,20 +282,37 @@ const ReportsHubPage: React.FC = () => {
   }, [assessments, selectedAssessment]);
 
   const reportType: ReportType = selectedAssessmentObj ? getReportType(selectedAssessmentObj) : "bet";
-  const applicableTypes: ReportType[] = selectedAssessmentObj ? getReportTypes(selectedAssessmentObj) : ["bet"];
   const isBet = reportType === "bet";
   const isNavigator = !isBet;
-  const hasFourPager = applicableTypes.includes("fourPager");
+
+  // Source report status/URL from the unified generated_report rows, filtered
+  // to the selected template (or any, when none is selected). Keeps the rest of
+  // the hub — reportStats, row preview/download, ZIP, email/WhatsApp — working
+  // unchanged off reportDataMap.
+  const matchesTemplate = useCallback((gr: { reportTemplateId?: number | null }) => {
+    if (selectedTemplateId === "") return true;
+    return gr.reportTemplateId === selectedTemplateId;
+  }, [selectedTemplateId]);
 
   const refreshReportData = useCallback(async (): Promise<Map<number, ReportData>> => {
     if (!selectedAssessmentObj) return new Map();
     setReportDataLoading(true);
     try {
-      const res = await getReportDataByAssessment(selectedAssessmentObj);
+      const res = await getGeneratedReportsByAssessment(selectedAssessmentObj.id);
       const map = new Map<number, ReportData>();
-      for (const r of res.data || []) {
-        const id = r.userStudent?.userStudentId;
-        if (id) map.set(id, r);
+      for (const gr of res.data || []) {
+        if (!matchesTemplate(gr)) continue;
+        const id = gr.userStudent?.userStudentId;
+        if (!id) continue;
+        const existing = map.get(id);
+        // Prefer a generated row if a student somehow has multiple.
+        if (!existing || gr.reportStatus === "generated") {
+          map.set(id, {
+            userStudent: { userStudentId: id },
+            reportStatus: gr.reportStatus,
+            reportUrl: gr.reportUrl,
+          });
+        }
       }
       setReportDataMap(map);
       return map;
@@ -259,7 +322,7 @@ const ReportsHubPage: React.FC = () => {
     } finally {
       setReportDataLoading(false);
     }
-  }, [selectedAssessmentObj]);
+  }, [selectedAssessmentObj, matchesTemplate]);
 
   const refreshVisibility = useCallback(async () => {
     if (!selectedAssessmentObj) return;
@@ -267,18 +330,37 @@ const ReportsHubPage: React.FC = () => {
       const res = await getGeneratedReportsByAssessment(selectedAssessmentObj.id);
       const map = new Map<number, { id: number; visible: boolean }>();
       for (const gr of res.data || []) {
-        if (gr.typeOfReport === reportType) {
-          map.set(gr.userStudent.userStudentId, {
-            id: gr.generatedReportId,
-            visible: gr.visibleToStudent ?? false,
-          });
-        }
+        if (!matchesTemplate(gr)) continue;
+        map.set(gr.userStudent.userStudentId, {
+          id: gr.generatedReportId,
+          visible: gr.visibleToStudent ?? false,
+        });
       }
       setVisibilityMap(map);
     } catch {
       setVisibilityMap(new Map());
     }
-  }, [selectedAssessmentObj, reportType]);
+  }, [selectedAssessmentObj, matchesTemplate]);
+
+  // Load the templates mapped to this assessment's questionnaire; preselect the
+  // default (else the first) so generation has a target.
+  useEffect(() => {
+    if (!selectedAssessmentObj) { setTemplates([]); setSelectedTemplateId(""); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await ReadAssessmentTemplates(selectedAssessmentObj.id);
+        if (cancelled) return;
+        const rows = res.data || [];
+        setTemplates(rows);
+        const def = rows.find((r) => r.isDefault) || rows[0];
+        setSelectedTemplateId(def ? def.template.reportTemplateId : "");
+      } catch {
+        if (!cancelled) { setTemplates([]); setSelectedTemplateId(""); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedAssessmentObj]);
 
   useEffect(() => { if (selectedAssessmentObj) { refreshReportData(); refreshVisibility(); } }, [selectedAssessmentObj, refreshReportData, refreshVisibility]);
 
@@ -289,26 +371,52 @@ const ReportsHubPage: React.FC = () => {
     return students.filter((s) => (s.assignedAssessmentIds || []).includes(selectedAssessmentObj.id));
   }, [students, selectedAssessmentObj]);
 
+  // Apply the user's ABAC scopes (session/class/section) within the chosen
+  // institute. Mirrors the backend predicate in AccessScopeJpqlBuilder: a
+  // student is visible iff at least one of the user's scope rows matches every
+  // non-null dimension. Super-admin / no scopes / institute-only-wildcard
+  // scopes fall through and show all rows for the institute.
+  const scopedStudents = useMemo(() => {
+    if (isSuperAdmin) return assessmentStudents;
+    if (!userScopes.length) return assessmentStudents;
+    const instCode = selectedInstitute === "" ? null : Number(selectedInstitute);
+    const matches = (scope: Scope, info: SectionInfo | undefined) => {
+      if (scope.i != null && instCode != null && scope.i !== instCode) return false;
+      if (scope.s != null && info?.sessionId !== scope.s) return false;
+      if (scope.c != null && info?.classId !== scope.c) return false;
+      if (scope.x != null && info?.sectionId !== scope.x) return false;
+      return true;
+    };
+    // If every scope row constrains only the institute dimension, no further
+    // filtering is needed inside this institute.
+    const anyNarrower = userScopes.some((s) => s.s != null || s.c != null || s.x != null);
+    if (!anyNarrower) return assessmentStudents;
+    return assessmentStudents.filter((s) => {
+      const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+      return userScopes.some((scope) => matches(scope, info));
+    });
+  }, [assessmentStudents, isSuperAdmin, userScopes, selectedInstitute, sectionLookup]);
+
   const uniqueGrades = useMemo(() => {
     const g = new Set<string>();
-    for (const s of assessmentStudents) {
+    for (const s of scopedStudents) {
       const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
       if (info?.className) g.add(info.className);
     }
     return Array.from(g).sort();
-  }, [assessmentStudents, sectionLookup]);
+  }, [scopedStudents, sectionLookup]);
 
   const uniqueSections = useMemo(() => {
     const sec = new Set<string>();
-    for (const s of assessmentStudents) {
+    for (const s of scopedStudents) {
       const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
       if (info?.sectionName) sec.add(info.sectionName);
     }
     return Array.from(sec).sort();
-  }, [assessmentStudents, sectionLookup]);
+  }, [scopedStudents, sectionLookup]);
 
   const displayedStudents = useMemo(() => {
-    let result = assessmentStudents;
+    let result = scopedStudents;
     if (nameQuery.trim()) {
       const q = nameQuery.toLowerCase();
       result = result.filter((s) =>
@@ -337,7 +445,7 @@ const ReportsHubPage: React.FC = () => {
       });
     }
     return result;
-  }, [assessmentStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
+  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -399,64 +507,29 @@ const ReportsHubPage: React.FC = () => {
   const ready = selectedInstitute !== "" && selectedAssessment !== "";
   const accentColor = isBet ? "#4361ee" : "#0d9488";
 
-  // ═══════════════════════ GENERATE ALL (data + reports) ═══════════════════════
+  // ═══════════════════════ GENERATE (opens modal) ═══════════════════════
 
-  const handleGenerate = async () => {
+  const openGenerateModal = () => {
     if (!selectedAssessmentObj) return;
-    let ids = getSelectedOrAllIds();
-    if (ids.length === 0) return;
-    setGenerating(true);
-    setGenerateProgress({ step: "Generating data...", current: 0, total: ids.length });
-
-    try {
-      const dataRes = await generateDataForAssessment(selectedAssessmentObj, ids);
-      const dataGenerated = dataRes.data.generated || 0;
-      const dataErrors = dataRes.data.errors || [];
-
-      setGenerateProgress({ step: "Data complete. Generating reports...", current: dataGenerated, total: ids.length });
-
-      const freshMap = await refreshReportData();
-      let reportIds = ids.filter((id) => freshMap.has(id));
-      if (isNavigator) {
-        reportIds = reportIds.filter((id) => {
-          const rd = freshMap.get(id);
-          return rd && rd.eligible !== false;
-        });
-      }
-
-      if (reportIds.length === 0) {
-        showSuccessToast(`Generated data for ${dataGenerated} student(s). No eligible students for reports.`);
-        setGenerating(false); setGenerateProgress(null);
-        return;
-      }
-
-      setGenerateProgress({ step: "Generating reports...", current: 0, total: reportIds.length });
-      const reportRes = await generateReportsForAssessment(selectedAssessmentObj, reportIds);
-      const reportsGenerated = reportRes.data.generated || 0;
-
-      // Sync to centralized table
-      for (const r of (reportRes.data.reports || []).filter((r: any) => r.reportUrl)) {
-        createOrUpdateGeneratedReport({
-          userStudentId: r.userStudentId,
-          assessmentId: selectedAssessmentObj.id,
-          typeOfReport: reportType,
-          reportStatus: "generated",
-          reportUrl: r.reportUrl,
-        }).catch(() => {});
-      }
-
-      setGenerateProgress({ step: "Complete!", current: reportsGenerated, total: reportIds.length });
-      const allErrors = [...dataErrors, ...(reportRes.data.errors || [])];
-      showSuccessToast(`Data: ${dataGenerated} | Reports: ${reportsGenerated}${allErrors.length > 0 ? ` | ${allErrors.length} error(s)` : ""}`);
-      await refreshReportData();
-      await refreshVisibility();
-    } catch (err: any) {
-      showErrorToast("Failed: " + (err?.response?.data?.error || err.message));
-    } finally {
-      setGenerating(false);
-      setTimeout(() => setGenerateProgress(null), 2000);
+    const ids = getSelectedOrAllIds();
+    if (ids.length === 0) { showErrorToast("Select at least one student."); return; }
+    if (templates.length === 0) {
+      showErrorToast("No report template is mapped to this assessment's questionnaire. Map one in Report Templates first.");
+      return;
     }
+    const list: ModalStudent[] = ids.map((id) => {
+      const s = students.find((st) => st.userStudentId === id);
+      return { userStudentId: id, name: s?.name || `Student ${id}`, username: s?.username };
+    });
+    setModalStudents(list);
+    setGenerateModalOpen(true);
   };
+
+  // Refresh page maps after generation inside the modal (component refresh, no reload).
+  const onModalGenerated = useCallback(() => {
+    refreshReportData();
+    refreshVisibility();
+  }, [refreshReportData, refreshVisibility]);
 
   // ═══════════════════════ VISIBILITY ═══════════════════════
 
@@ -508,23 +581,6 @@ const ReportsHubPage: React.FC = () => {
     setZipNamePromptOpen(true);
   };
 
-  // 4-Pager bulk ZIP — builds HTML client-side from Navigator 360 scores,
-  // converts each to PDF, packages into ZIP, uploads to DO Spaces.
-  const handleFourPagerZipClick = () => {
-    if (!selectedAssessmentObj) return;
-    const assessmentId = selectedAssessmentObj.id;
-    const ids = getSelectedOrAllIds().filter((id) => {
-      const s = students.find((st) => st.userStudentId === id);
-      const status = s?.assessments?.find((a) => a.assessmentId === assessmentId)?.status;
-      return status === "completed";
-    });
-    if (ids.length === 0) { showErrorToast("No completed assessments to package."); return; }
-    pendingZipIds.current = ids;
-    pendingZipKind.current = "fourPager";
-    setZipNameInput(`fourPager_reports_${selectedAssessmentObj.assessmentName.replace(/[^a-zA-Z0-9]/g, "_")}`);
-    setZipNamePromptOpen(true);
-  };
-
   // Step 2: Confirm name → start async background job
   const startZipJob = (zipName: string) => {
     if (!selectedAssessmentObj) return;
@@ -552,8 +608,8 @@ const ReportsHubPage: React.FC = () => {
     // Fire and forget
     (async () => {
       try {
-        // Phase 1: Build the list of students with a filename for each
-        let studs: { userStudentId: number; fileName: string }[];
+        // Phase 1: Build the list of students with a filename + report URL for each
+        let studs: { userStudentId: number; fileName: string; reportUrl?: string | null }[];
         if (kind === "fourPager") {
           studs = ids.map((id) => {
             const s = students.find((st) => st.userStudentId === id);
@@ -561,8 +617,15 @@ const ReportsHubPage: React.FC = () => {
             return { userStudentId: id, fileName: `${safe}_4pager` };
           });
         } else {
-          const res = await getReportUrls(assessment, ids);
-          studs = res.data.reports.map((r: any) => ({ userStudentId: r.userStudentId, fileName: r.fileName }));
+          // Unified reports: pull the rendered URL from the generated_report map.
+          studs = ids
+            .map((id) => {
+              const s = students.find((st) => st.userStudentId === id);
+              const safe = (s?.name || `student_${id}`).replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
+              const rd = reportDataMap.get(id);
+              return { userStudentId: id, fileName: `${safe}_report`, reportUrl: rd?.reportUrl ?? null };
+            })
+            .filter((s) => !!s.reportUrl);
         }
         const total = studs.length;
 
@@ -586,8 +649,7 @@ const ReportsHubPage: React.FC = () => {
                 });
                 htmlResults[idx] = { fileName: student.fileName, html };
               } else {
-                const r = await downloadReport(assessment, student.userStudentId);
-                const html = typeof r.data === "string" ? r.data : await new Blob([r.data]).text();
+                const html = student.reportUrl ? await (await fetch(student.reportUrl)).text() : null;
                 htmlResults[idx] = { fileName: student.fileName, html };
               }
             } catch {
@@ -814,11 +876,11 @@ const ReportsHubPage: React.FC = () => {
         }
         actions={[
           {
-            label: generating ? "Generating..." : `Generate${countLabel}`,
+            label: `Generate${countLabel}`,
             iconClass: "bi-play-circle",
-            onClick: handleGenerate,
+            onClick: openGenerateModal,
             variant: "primary",
-            disabled: !ready || displayedStudents.length === 0 || generating,
+            disabled: !ready || displayedStudents.length === 0,
           },
           {
             label: "Download ZIP",
@@ -1025,15 +1087,35 @@ const ReportsHubPage: React.FC = () => {
                     Mira Desai
                   </button>
 
-                  {/* Generate All */}
-                  <button className="btn btn-sm" disabled={displayedStudents.length === 0 || generating}
-                    onClick={handleGenerate}
+                  {/* Report template picker (default preselected) */}
+                  <select
+                    className="form-select form-select-sm"
+                    style={{ width: "auto", minWidth: 200, borderRadius: 8, fontSize: "0.85rem" }}
+                    value={selectedTemplateId}
+                    onChange={(e) => setSelectedTemplateId(e.target.value === "" ? "" : Number(e.target.value))}
+                    disabled={templates.length === 0}
+                    title={templates.length === 0 ? "No template mapped to this assessment's questionnaire" : "Template to generate"}
+                  >
+                    {templates.length === 0 ? (
+                      <option value="">No template mapped</option>
+                    ) : (
+                      templates.map((m) => (
+                        <option key={m.template.reportTemplateId} value={m.template.reportTemplateId}>
+                          {m.template.displayName}{m.isDefault ? " (default)" : ""}
+                        </option>
+                      ))
+                    )}
+                  </select>
+
+                  {/* Generate All → opens the generation modal */}
+                  <button className="btn btn-sm" disabled={displayedStudents.length === 0}
+                    onClick={openGenerateModal}
                     style={{
-                      background: generating ? "#6c757d" : `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)`,
+                      background: `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)`,
                       border: "none", borderRadius: 8, padding: "8px 20px",
                       fontWeight: 600, color: "white", fontSize: "0.85rem",
                     }}>
-                    {generating ? "Generating..." : `Generate${countLabel}`}
+                    {`Generate${countLabel}`}
                   </button>
 
                   {/* Download ZIP */}
@@ -1046,19 +1128,6 @@ const ReportsHubPage: React.FC = () => {
                     }}>
                     Download ZIP
                   </button>
-
-                  {/* 4-Pager ZIP (only when 4-pager applies to this assessment) */}
-                  {hasFourPager && (
-                    <button className="btn btn-sm" disabled={reportStats.completed === 0}
-                      onClick={handleFourPagerZipClick}
-                      style={{
-                        background: reportStats.completed === 0 ? "#6c757d" : "linear-gradient(135deg, #2D4A3E 0%, #1f3229 100%)",
-                        border: "none", borderRadius: 8, padding: "8px 20px",
-                        fontWeight: 600, color: "white", fontSize: "0.85rem",
-                      }}>
-                      4-Pager ZIP
-                    </button>
-                  )}
 
                   {/* Downloads Manager */}
                   <button className="btn btn-sm" onClick={() => setDownloadsOpen(true)}
@@ -1120,23 +1189,6 @@ const ReportsHubPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Progress bars */}
-              {generateProgress && (
-                <div style={{ marginBottom: 12, padding: "10px 16px", background: "#f0f4ff", borderRadius: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ fontSize: "0.8rem", color: "#4361ee", fontWeight: 600 }}>{generateProgress.step}</span>
-                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{generateProgress.current}/{generateProgress.total}</span>
-                  </div>
-                  <div style={{ height: 6, background: "#e0e7ff", borderRadius: 3, overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%", borderRadius: 3, transition: "width 0.3s",
-                      background: "linear-gradient(90deg, #4361ee, #7c3aed)",
-                      width: generateProgress.total > 0 ? `${(generateProgress.current / generateProgress.total) * 100}%` : "0%",
-                    }} />
-                  </div>
-                </div>
-              )}
-
               {/* Table */}
               <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e5e7eb" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1163,7 +1215,6 @@ const ReportsHubPage: React.FC = () => {
                       <th style={thStyle}>Report</th>
                       <th style={thStyle}>Visible</th>
                       <th style={thStyle}>Preview / Download</th>
-                      <th style={thStyle}>Nav 360</th>
                       <th style={{ ...thStyle, textAlign: "center" }}>Send</th>
                       {adminEditMode && (
                         <th style={{ ...thStyle, textAlign: "center" }}>Admin</th>
@@ -1255,60 +1306,21 @@ const ReportsHubPage: React.FC = () => {
                                     border: "none", cursor: downloadingStudentId === s.userStudentId ? "not-allowed" : "pointer",
                                   }}
                                   onClick={async () => {
-                                    if (!selectedAssessmentObj) return;
+                                    if (!reportUrl) return;
                                     setDownloadingStudentId(s.userStudentId);
                                     try {
                                       const safeName = (s.name || "student").replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
-                                      const reportLabel = isBet ? "BET_Report" : "Career_Navigator";
                                       await downloadReportAsPdf(
-                                        () => downloadReport(selectedAssessmentObj, s.userStudentId),
-                                        `${safeName}_${reportLabel}.pdf`
+                                        async () => ({ data: await (await fetch(reportUrl)).text() }),
+                                        `${safeName}_report.pdf`
                                       );
-                                    } catch { showErrorToast("Download failed"); }
+                                    } catch { showErrorToast("Download failed (the report may need to be opened directly)"); }
                                     finally { setDownloadingStudentId(null); }
                                   }}>
                                   {downloadingStudentId === s.userStudentId ? "..." : "Download"}
                                 </button>
                               </div>
                             ) : (
-                              <span style={{ color: "#d1d5db", fontSize: "0.75rem" }}>-</span>
-                            )}
-                          </td>
-                          <td style={tdStyle}>
-                            {asmtStatus === "completed" && (
-                              <div style={{ display: "flex", gap: 4 }}>
-                                <button
-                                  onClick={() => setNav360Preview({ studentId: s.userStudentId, studentName: s.name || "Student" })}
-                                  style={{
-                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
-                                    background: "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
-                                    color: "#fff", border: "none", cursor: "pointer",
-                                    boxShadow: "0 2px 6px rgba(124,58,237,0.3)",
-                                  }}>
-                                  Preview
-                                </button>
-                                {hasFourPager && (
-                                  <button
-                                    onClick={() => {
-                                      const section = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
-                                      setFourPagerPreview({
-                                        studentId: s.userStudentId,
-                                        studentName: s.name || "Student",
-                                        studentClass: section?.className || "",
-                                      });
-                                    }}
-                                    style={{
-                                      padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
-                                      background: "linear-gradient(135deg, #2D4A3E 0%, #1f3229 100%)",
-                                      color: "#fff", border: "none", cursor: "pointer",
-                                      boxShadow: "0 2px 6px rgba(45,74,62,0.3)",
-                                    }}>
-                                    4-Pager
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                            {asmtStatus !== "completed" && (
                               <span style={{ color: "#d1d5db", fontSize: "0.75rem" }}>-</span>
                             )}
                           </td>
@@ -1473,6 +1485,19 @@ const ReportsHubPage: React.FC = () => {
         onDelete={handleDeleteZipJob}
         deleting={deletingJobs}
       />
+
+      {generateModalOpen && selectedAssessmentObj && (
+        <GenerateReportsModal
+          open={generateModalOpen}
+          onClose={() => setGenerateModalOpen(false)}
+          assessmentId={selectedAssessmentObj.id}
+          assessmentName={selectedAssessmentName}
+          templates={templates}
+          initialTemplateId={selectedTemplateId}
+          students={modalStudents}
+          onGenerated={onModalGenerated}
+        />
+      )}
 
       {/* ZIP Name Prompt Modal */}
       {zipNamePromptOpen && (

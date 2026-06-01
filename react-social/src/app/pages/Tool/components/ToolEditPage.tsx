@@ -2,10 +2,12 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "react-query";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadToolByIdData, UpdateToolData } from "../API/Tool_APIs";
+import { lookupKeys } from "../../../lib/queries/lookups";
 import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
@@ -33,6 +35,7 @@ const ToolEditPage = (props?: {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
 
   // Fetch tool data when component mounts
   useEffect(() => {
@@ -97,6 +100,7 @@ const ToolEditPage = (props?: {
         };
 
         await UpdateToolData(values.id, payload);
+        queryClient.invalidateQueries(lookupKeys.tools);
 
         navigate("/tools");
 

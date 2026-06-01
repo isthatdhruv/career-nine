@@ -107,8 +107,9 @@ export interface InstituteOption {
   instituteName: string;
 }
 
-export const getInstituteList = () =>
-  axios.get<InstituteOption[]>(`${process.env.REACT_APP_API_URL}/instituteDetail/get/list`);
+// Note: institute list is now fetched via the centralized `useInstitutes`
+// hook in `src/app/lib/queries/lookups.ts`. `getInstituteList` was removed
+// to avoid bypassing the React Query cache.
 
 export const assignStudentInstitute = (userStudentId: number, instituteCode: number) =>
   axios.post<{ status: string; instituteCode: number }>(
@@ -241,4 +242,24 @@ export type AdminAnswersResponse = {
 export const getStudentAssessmentAnswers = (userStudentId: number, assessmentId: number) =>
   axios.get<AdminAnswersResponse>(
     `${API_URL}/assessment-answer/admin-view/${userStudentId}/${assessmentId}`,
+  );
+
+// Enriched view of one StudentEntitlement, returned by /entitlement/by-student/{id}.
+// Drives the "Thank You" picker on the Group Students page — when a student
+// owns more than one entitlement (multi-campaign or multi-assessment), the
+// admin needs enough context to pick the right Thank-You destination.
+export type EntitlementSummary = {
+  entitlementId: number;
+  assessmentId: number | null;
+  assessmentName?: string;
+  campaignId?: number | null;
+  campaignName?: string;
+  status: string;
+  alreadyActive: boolean;
+  createdAt?: string;
+};
+
+export const getEntitlementsByStudent = (userStudentId: number) =>
+  axios.get<EntitlementSummary[]>(
+    `${API_URL}/entitlement/by-student/${userStudentId}`,
   );

@@ -1,51 +1,22 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ReadToolData } from "./API/Tool_APIs";
+import { useQueryClient } from "react-query";
+import { useTools, lookupKeys } from "../../lib/queries/lookups";
 import { ToolTable } from "./components";
 import PageHeader from "../../components/PageHeader";
 
 const ToolPage = () => {
-  const [toolsData, setToolsData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
+  const { data: toolsData = [], isLoading: loading } = useTools<any>();
+  const queryClient = useQueryClient();
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
 
-
-  const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const response = await ReadToolData();
-      setToolsData(response.data);
-    } catch (error) {
-      console.error("Failed to fetch tools:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-      const fetchSections = async () => {
-        setLoading(true);
-        try {
-          const response = await ReadToolData();
-          setSections(response.data);
-        } catch (error) {
-          console.error("Error fetching sections:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchSections();
-    }, []);
-
-  useEffect(() => {
-    fetchQuestions();
-
     if (pageLoading[0] === "true") {
+      queryClient.invalidateQueries(lookupKeys.tools);
       setPageLoading(["false"]);
     }
-  }, [pageLoading[0]]);
+  }, [pageLoading, queryClient]);
 
 
   return (

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import Select, { components } from "react-select";
-import { ReadToolData } from "../../Tool/API/Tool_APIs";
+import { useTools } from "../../../lib/queries/lookups";
 
 /* -------------------- VALIDATION -------------------- */
 const validationSchema = Yup.object().shape({
@@ -48,7 +48,7 @@ const CheckboxOption = (props: any) => (
 
 const GroupCreatePage = () => {
   const [loading, setLoading] = useState(false);
-  const [assessments, setAssessments] = useState<any[]>([]);
+  const { data: assessments = [] } = useTools<any>();
   const navigate = useNavigate();
 
   const initialValues = {
@@ -60,21 +60,6 @@ const GroupCreatePage = () => {
     admin: "",
   };
 
-  /* -------------------- FETCH ASSESSMENTS -------------------- */
-  useEffect(() => {
-    const fetchAssessments = async () => {
-      try {
-        const res = await ReadToolData();
-
-        // 👉 Adjust if API structure differs
-        setAssessments(res.data);
-      } catch (error) {
-        console.error("Error fetching assessments:", error);
-      }
-    };
-
-    fetchAssessments();
-  }, []);
 
   return (
     <div className="container py-5">

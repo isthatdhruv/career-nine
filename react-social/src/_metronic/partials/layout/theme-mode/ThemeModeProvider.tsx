@@ -61,33 +61,30 @@ const ThemeModeContext = createContext<ThemeModeContextType>({
 const useThemeMode = () => useContext(ThemeModeContext);
 
 const ThemeModeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [mode, setMode] = useState<ThemeModeType>(defaultThemeMode.mode);
-  const [menuMode, setMenuMode] = useState<ThemeModeType>(
-    defaultThemeMode.menuMode
-  );
+  // Theme is force-locked to "light" — the switcher button in the topbar is
+  // hidden and the OS dark-mode preference is ignored. To re-enable user
+  // theme switching, restore the original useState + updateMode logic.
+  const [mode] = useState<ThemeModeType>("light");
+  const [menuMode] = useState<ThemeModeType>("light");
 
   const updateMode = (_mode: ThemeModeType) => {
-    const updatedMode = _mode === "system" ? systemMode : _mode;
-    setMode(updatedMode);
-    // themeModeSwitchHelper(updatedMode)
+    // Forced light — ignore the requested mode.
     if (localStorage) {
-      localStorage.setItem(themeModeLSKey, updatedMode);
+      localStorage.setItem(themeModeLSKey, "light");
     }
-
-    document.documentElement.setAttribute("data-theme", updatedMode);
+    document.documentElement.setAttribute("data-theme", "light");
     ThemeModeComponent.init();
   };
 
   const updateMenuMode = (_menuMode: ThemeModeType) => {
-    setMenuMode(_menuMode);
     if (localStorage) {
-      localStorage.setItem(themeMenuModeLSKey, _menuMode);
+      localStorage.setItem(themeMenuModeLSKey, "light");
     }
   };
 
   useEffect(() => {
-    updateMode(mode);
-    updateMenuMode(menuMode);
+    updateMode("light");
+    updateMenuMode("light");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

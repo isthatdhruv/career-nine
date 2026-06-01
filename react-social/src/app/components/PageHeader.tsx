@@ -175,7 +175,7 @@ const PageHeaderStyles: FC = () => (
         linear-gradient(135deg, #0f172a 0%, #1a2238 50%, #1e293b 100%);
       color: #ffffff;
       padding: 26px 30px;
-      margin-bottom: 20px;
+      margin-bottom: 8px;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     .ph-grid {
@@ -316,7 +316,7 @@ const PageHeaderStyles: FC = () => (
       background: #fafafa;
       min-height: 100vh;
       margin: -30px -40px -60px;
-      padding: 28px 32px 56px;
+      padding: 4px 32px 56px;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: #0f172a;
     }
@@ -329,6 +329,30 @@ const PageHeaderStyles: FC = () => (
     body:has(.ph-page) .container-xxl,
     body:has(.ph-page) .container-fluid {
       max-width: none !important;
+    }
+    /* Hide Metronic's empty default toolbar (Toolbar1 inner content is fully
+       commented out, leaving just a styled empty bar) on pages that use
+       PageHeader — they have their own header and don't need it. */
+    body:has(.ph-page) #kt_toolbar,
+    body:has(.ph-page) .toolbar {
+      display: none !important;
+    }
+    /* Kill the top padding/margin that Metronic adds to its content wrappers to
+       reserve space for the now-hidden toolbar. Without this, the ph-page's
+       negative margin-top isn't enough to climb past the wrapper padding and
+       you get a noticeable empty gap above the dark PageHeader. */
+    body:has(.ph-page) #kt_content,
+    body:has(.ph-page) .content {
+      padding-top: 0 !important;
+    }
+    body:has(.ph-page) #kt_post,
+    body:has(.ph-page) .post {
+      padding-top: 0 !important;
+      margin-top: 0 !important;
+    }
+    body:has(.ph-page) #kt_content_container {
+      padding-top: 0 !important;
+      margin-top: 0 !important;
     }
   `}</style>
 );

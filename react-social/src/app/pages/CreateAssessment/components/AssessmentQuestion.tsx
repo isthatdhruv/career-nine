@@ -4,7 +4,7 @@ import { IconContext } from "react-icons";
 import { showSuccessToast } from '../../../utils/toast';
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
-import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
+import { useQuestionSections } from "../../../lib/queries/lookups";
 import { ReadQuestionsDataList } from "../../AssesmentQuestions/API/Question_APIs";
 import { QuestionTable } from "../../AssesmentQuestions/components";
 import QuestionCreateModal from "../../AssesmentQuestions/components/QuestionCreateModal"; // Import modal
@@ -12,7 +12,7 @@ import QuestionCreateModal from "../../AssesmentQuestions/components/QuestionCre
 const AssessmentQuestionsPage = () => {
   const [questionsData, setQuestionsData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
+  const { data: sections = [] } = useQuestionSections<any>();
   const [pageLoading, setPageLoading] = useState(["false"]);
   const [showModal, setShowModal] = useState(false); // State for modal visibility
   const navigate = useNavigate();
@@ -29,21 +29,6 @@ const AssessmentQuestionsPage = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    const fetchSections = async () => {
-      setLoading(true);
-      try {
-        const response = await ReadQuestionSectionData();
-        setSections(response.data);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSections();
-  }, []);
 
   useEffect(() => {
     fetchQuestions();

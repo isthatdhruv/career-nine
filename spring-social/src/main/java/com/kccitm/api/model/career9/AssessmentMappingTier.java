@@ -39,6 +39,9 @@ public class AssessmentMappingTier implements Serializable {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
+    @Column(name = "description", length = 200)
+    private String description;
+
     @Column(name = "amount")
     private Long amount;
 
@@ -87,6 +90,9 @@ public class AssessmentMappingTier implements Serializable {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
     public Long getAmount() { return amount; }
     public void setAmount(Long amount) { this.amount = amount; }

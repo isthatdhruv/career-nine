@@ -28,6 +28,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -106,6 +107,9 @@ public class BetReportDataController {
      * as a downloadable PDF. No frontend page is needed — the browser
      * downloads the PDF directly from the email link.
      */
+    // Phase 2 (Task 2.1 / HIGH-B): anonymous token-gated public report download. @PreAuthorize
+    // removed so the enforce flip won't 403 the public viewer; permitAll + CSRF-exempt via
+    // PUBLIC_PATHS (/bet-report-data/public/**). The access token is the gate. Coverage-excluded.
     @GetMapping("/public/final")
     public ResponseEntity<?> publicFinalReportPdf(
             @org.springframework.web.bind.annotation.RequestParam("t") String token,
@@ -248,6 +252,7 @@ public class BetReportDataController {
      */
     @PostMapping("/one-click-report")
     @Transactional
+    @PreAuthorize("@auth.allows('bet_report_data.create')")
     public ResponseEntity<?> oneClickReport(@RequestBody Map<String, Object> request) {
         Long assessmentId = ((Number) request.get("assessmentId")).longValue();
         Long userStudentId = ((Number) request.get("userStudentId")).longValue();
@@ -317,11 +322,13 @@ public class BetReportDataController {
     // ═══════════════════════ CRUD ═══════════════════════
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('bet_report_data.read.all')") // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06)
     public ResponseEntity<?> getAll() {
         return ResponseEntity.ok(betReportDataRepository.findAll());
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('bet_report_data.read')")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         return betReportDataRepository.findById(id)
                 .map(ResponseEntity::ok)
@@ -329,16 +336,19 @@ public class BetReportDataController {
     }
 
     @GetMapping("/by-assessment/{assessmentId}")
+    @PreAuthorize("@auth.allows('bet_report_data.read', #assessmentId)")
     public ResponseEntity<?> getByAssessment(@PathVariable Long assessmentId) {
         return ResponseEntity.ok(betReportDataRepository.findByAssessmentId(assessmentId));
     }
 
     @GetMapping("/by-student/{userStudentId}")
+    @PreAuthorize("@auth.allows('bet_report_data.read', #userStudentId)")
     public ResponseEntity<?> getByStudent(@PathVariable Long userStudentId) {
         return ResponseEntity.ok(betReportDataRepository.findByUserStudentUserStudentId(userStudentId));
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('bet_report_data.delete')")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         if (!betReportDataRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
@@ -350,6 +360,7 @@ public class BetReportDataController {
     // ═══════════════════════ DOWNLOAD REPORT (HTML) ═══════════════════════
 
     @GetMapping("/download/{userStudentId}/{assessmentId}")
+    @PreAuthorize("@auth.allows('bet_report_data.read', #userStudentId, #assessmentId)")
     public ResponseEntity<?> downloadReport(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId) {
@@ -386,6 +397,7 @@ public class BetReportDataController {
      * Returns report URLs for the given students (frontend handles PDF conversion + ZIP).
      */
     @PostMapping("/download-zip")
+    @PreAuthorize("@auth.allows('bet_report_data.read')")
     public ResponseEntity<?> downloadZipInfo(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
             return ResponseEntity.badRequest()
@@ -421,6 +433,7 @@ public class BetReportDataController {
     // ═══════════════════════ EXCEL EXPORT ═══════════════════════
 
     @GetMapping("/export-excel/{assessmentId}")
+    @PreAuthorize("@auth.allows('report.export', #assessmentId)")
     public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) throws Exception {
         List<BetReportData> reports = betReportDataRepository.findByAssessmentId(assessmentId);
         if (reports.isEmpty()) {
@@ -501,6 +514,7 @@ public class BetReportDataController {
      * Student Name | Roll No | Grade | Section | [MQ1: MQT1] | [MQ1: MQT2] | ... | [MQ2: MQT3] | ...
      */
     @PostMapping("/export-mqt-scores")
+    @PreAuthorize("@auth.allows('report.export')")
     public ResponseEntity<?> exportMqtScores(@RequestBody Map<String, Object> request) throws Exception {
         if (!request.containsKey("assessmentId")) {
             return ResponseEntity.badRequest()
@@ -655,6 +669,7 @@ public class BetReportDataController {
      * Returns aggregated MQ/MQT statistics for a school-level report.
      */
     @PostMapping("/school-report")
+    @PreAuthorize("@auth.allows('bet_report_data.read')")
     public ResponseEntity<?> schoolReport(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("assessmentId")) {
             return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
@@ -810,6 +825,7 @@ public class BetReportDataController {
      *         "assessmentName": "...", "reportData": {...}, "aiInsights": {...} }
      */
     @PostMapping("/school-report/save")
+    @PreAuthorize("@auth.allows('bet_report_data.create')")
     public ResponseEntity<?> saveSchoolReport(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("instituteCode") || !request.containsKey("assessmentId")) {
             return ResponseEntity.badRequest().body(Map.of("error", "instituteCode and assessmentId are required"));
@@ -869,6 +885,7 @@ public class BetReportDataController {
      * Retrieves a saved school report from the database.
      */
     @GetMapping("/school-report/get/{instituteCode}/{assessmentId}")
+    @PreAuthorize("@auth.allows('bet_report_data.read', #instituteCode, #assessmentId)")
     public ResponseEntity<?> getSchoolReportFromDb(
             @PathVariable Long instituteCode,
             @PathVariable Long assessmentId) {
@@ -924,6 +941,7 @@ public class BetReportDataController {
      */
     @PostMapping("/generate")
     @Transactional
+    @PreAuthorize("@auth.allows('bet_report_data.create')")
     public ResponseEntity<?> generateAndSave(@RequestBody Map<String, Object> request) {
         // 1. Parse request
         if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
@@ -989,6 +1007,7 @@ public class BetReportDataController {
      */
     @PostMapping("/generate-live")
     @Transactional
+    @PreAuthorize("@auth.allows('bet_report_data.create')")
     public ResponseEntity<?> generateLiveAndSave(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
             return ResponseEntity.badRequest()
@@ -1174,6 +1193,7 @@ public class BetReportDataController {
      */
     @PostMapping("/generate-reports")
     @Transactional
+    @PreAuthorize("@auth.allows('bet_report_data.create')")
     public ResponseEntity<?> generateHtmlReports(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
             return ResponseEntity.badRequest()
@@ -1266,6 +1286,7 @@ public class BetReportDataController {
      * and uploads them to DigitalOcean Spaces under bet-template-assets/.
      */
     @PostMapping("/upload-template-assets")
+    @PreAuthorize("@auth.allows('bet_report_data.update')")
     public ResponseEntity<?> uploadTemplateAssets() {
         String[] assetPaths = {
             "assets/cover/img.png",
@@ -1413,6 +1434,7 @@ public class BetReportDataController {
      */
     @PostMapping("/fill-missing-ranks")
     @Transactional
+    @PreAuthorize("@auth.allows('assessment_answer.update')")
     public ResponseEntity<?> fillMissingRanks(@RequestBody Map<String, Object> request) {
         Long assessmentId = ((Number) request.get("assessmentId")).longValue();
         Long qqId = ((Number) request.get("questionnaireQuestionId")).longValue();
@@ -1525,6 +1547,7 @@ public class BetReportDataController {
      */
     @PostMapping("/recalculate-raw-scores")
     @Transactional
+    @PreAuthorize("@auth.allows('assessment_answer.update')")
     public ResponseEntity<?> recalculateRawScores(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("assessmentId")) {
             return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));

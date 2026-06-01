@@ -27,6 +27,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,6 +46,7 @@ import com.kccitm.api.model.userDefinedModel.ExcelOptionData;
 import com.kccitm.api.model.userDefinedModel.MeasuredQualityList;
 import com.kccitm.api.model.userDefinedModel.QuestionOptionID;
 import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
@@ -52,6 +54,7 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
+import com.kccitm.api.security.AuthorizationService;
 import javax.transaction.Transactional;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
@@ -63,6 +66,8 @@ import com.kccitm.api.model.career9.AssessmentAdminAction;
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.service.LoginCredentialsEmailService;
+import com.kccitm.api.service.StudentProvisioningService;
 
 @RestController
 @RequestMapping("/student-info")
@@ -71,6 +76,9 @@ public class StudentInfoController {
     private UserRepository userRepository;
     @Autowired
     private StudentInfoRepository studentInfoRepository;
+    // Phase 1 (Task 1.6): used to re-authorize /update against the PERSISTED institute.
+    @Autowired
+    private AuthorizationService authorizationService;
     @Autowired
     private UserStudentRepository userStudentRepository;
     @Autowired
@@ -92,6 +100,8 @@ public class StudentInfoController {
     @Autowired
     private com.kccitm.api.service.AssessmentSessionService assessmentSessionService;
     @Autowired
+    private StudentProvisioningService studentProvisioningService;
+    @Autowired
     private com.kccitm.api.repository.Career9.School.SchoolSectionsRepository schoolSectionsRepository;
     @Autowired
     private AssessmentSubmissionFailureRepository submissionFailureRepository;
@@ -101,12 +111,27 @@ public class StudentInfoController {
     private com.kccitm.api.repository.Career9.DemographicFieldDefinitionRepository demographicFieldDefinitionRepository;
     @Autowired
     private com.kccitm.api.repository.Career9.StudentDemographicResponseRepository studentDemographicResponseRepository;
+    @Autowired
+    private LoginCredentialsEmailService loginCredentialsEmailService;
+    @Autowired
+    private com.kccitm.api.repository.UserRoleGroupMappingRepository userRoleGroupMappingRepository;
+    // Dossier endpoint dependencies — spotlight detail view bundles these into
+    // a single payload so the frontend can render the panel from one call
+    // instead of a chatty waterfall.
+    @Autowired
+    private com.kccitm.api.repository.Career9.PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired
+    private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
 
+    // no scope arg: cross-institute list — scope-filter (Plan 15-06) narrows result set
+    @PreAuthorize("@auth.allows('student_info.read.all')")
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
         return studentInfoRepository.findAll();
     }
 
+    // no scope arg: identifies student by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping("/getStudentAnswersWithDetails")
     public List<Map<String, Object>> getStudentAnswersWithDetails(
             @RequestParam Long userStudentId,
@@ -189,6 +214,8 @@ public class StudentInfoController {
                 .collect(Collectors.toList());
     }
 
+    // no scope arg: body is list of id-pairs; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.read')")
     @PostMapping("/getBulkStudentAnswersWithDetails")
     public List<Map<String, Object>> getBulkStudentAnswersWithDetails(
             @RequestBody List<Map<String, Long>> studentAssessmentPairs) {
@@ -283,6 +310,7 @@ public class StudentInfoController {
         return allRows;
     }
 
+    @PreAuthorize("@auth.allows('student_info.create', #studentInfo.instituteId, null, null, null)")
     @PostMapping("/add")
     public StudentAssessmentMapping addStudentInfo(@RequestBody StudentInfo studentInfo) {
         try {
@@ -312,6 +340,7 @@ public class StudentInfoController {
             UserStudent userStudent = new UserStudent(user, studentInfoRepository.save(studentInfo),
                     instituteDetailRepository.getById(instituteId));
             UserStudent userStudentSAVED = userStudentRepository.save(userStudent);
+            studentProvisioningService.provision(userStudentSAVED);
 
             var assessmentId = Long.parseLong(studentInfo.getAssesment_id());
 
@@ -333,12 +362,16 @@ public class StudentInfoController {
         }
     }
 
+    // no scope arg: mapping body has only ids; scope enforcement via filter
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/alotAssessmentToStudent")
     public StudentAssessmentMapping alotAssessmentToStudent(
             @RequestBody StudentAssessmentMapping studentAssessmentMapping) {
         return studentAssessmentMappingRepository.save(studentAssessmentMapping);
     }
 
+    // no scope arg: body is raw id-pair list; scope enforced via filter
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/bulkAlotAssessment")
     @org.springframework.transaction.annotation.Transactional
     public synchronized ResponseEntity<?> bulkAlotAssessment(
@@ -419,11 +452,13 @@ public class StudentInfoController {
         return ResponseEntity.ok(savedMappings);
     }
 
+    @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")
     @GetMapping("/getByInstituteId/{instituteId}")
     public List<StudentInfo> getByInstituteId(@PathVariable("instituteId") Integer instituteId) {
         return studentInfoRepository.findByInstituteId(instituteId);
     }
 
+    @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")
     @Transactional
     @GetMapping("/getStudentsWithMappingByInstituteId/{instituteId}")
     public List<java.util.Map<String, Object>> getStudentsWithMappingByInstituteId(
@@ -438,6 +473,8 @@ public class StudentInfoController {
         }
     }
 
+    // no scope arg: cross-institute list — scope-filter narrows result set
+    @PreAuthorize("@auth.allows('student_info.read.all')")
     @Transactional
     @GetMapping("/getAllStudentsWithMapping")
     public List<java.util.Map<String, Object>> getAllStudentsWithMapping() {
@@ -451,7 +488,395 @@ public class StudentInfoController {
         }
     }
 
-    private List<java.util.Map<String, Object>> assembleStudentsWithMapping(List<StudentInfo> students) {
+    /**
+     * Spotlight-style global search across {@code student_info} metadata
+     * (name, email, phone, school roll number, control number, address,
+     * family, school board, gender) plus {@code student_demographic_response}
+     * (free-form values like father name, mother name, religion, caste).
+     *
+     * <p>Scope is enforced exclusively by the {@code scopeFilter} declared on
+     * {@link StudentInfo}: the demographic hits are funnelled back through
+     * {@link StudentInfoRepository#findAllByIdInScoped} so a caller scoped to
+     * institute X cannot surface a match on a student belonging to institute Y
+     * even if their father's name matches the query.
+     *
+     * <p>The {@code .read.all} permission acts as a "may run a cross-institute
+     * search" gate; the row-level filter still narrows the result set for
+     * non-super-admin callers. Empty/whitespace queries short-circuit to an
+     * empty list so the modal can show its idle state cheaply.
+     */
+    @PreAuthorize("@auth.allows('student_info.read.all')")
+    @Transactional
+    @GetMapping("/global-search")
+    public List<java.util.Map<String, Object>> globalSearch(
+            @RequestParam("q") String rawQuery,
+            @RequestParam(value = "limit", defaultValue = "50") int limit) {
+        try {
+            if (rawQuery == null) return new ArrayList<>();
+            String trimmed = rawQuery.trim();
+            // Require at least 2 chars — a single character flood would scan
+            // the whole demographic table and the UX gain is negligible.
+            if (trimmed.length() < 2) return new ArrayList<>();
+            // Cap limit at a sane upper bound; the modal is meant for top hits,
+            // not full pagination.
+            int safeLimit = Math.max(1, Math.min(limit, 200));
+            String like = "%" + trimmed + "%";
+
+            // 1. Direct metadata hits on student_info — already scope-filtered.
+            List<StudentInfo> directHits = studentInfoRepository.globalSearch(like);
+
+            // 2. Demographic-table hits → resolve to studentInfoIds via the
+            //    UserStudent bridge, then re-fetch through the scope-filtered
+            //    repo method so cross-institute leakage is impossible.
+            List<Object[]> demoHits = studentDemographicResponseRepository.searchByResponseValue(like);
+            Map<Long, String> matchedFieldByUserStudent = new LinkedHashMap<>();
+            Map<Long, String> matchedValueByUserStudent = new LinkedHashMap<>();
+            for (Object[] row : demoHits) {
+                Long usId = (Long) row[0];
+                if (usId == null) continue;
+                // Keep the FIRST demographic match per student (stable, predictable).
+                matchedFieldByUserStudent.putIfAbsent(usId, (String) row[1]);
+                matchedValueByUserStudent.putIfAbsent(usId, (String) row[2]);
+            }
+
+            List<StudentInfo> demoMatchedStudents = new ArrayList<>();
+            if (!matchedFieldByUserStudent.isEmpty()) {
+                // userStudentId → studentInfoId
+                List<UserStudent> bridge = userStudentRepository.findAllById(matchedFieldByUserStudent.keySet());
+                List<Integer> studentInfoIds = bridge.stream()
+                        .filter(us -> us.getStudentInfo() != null)
+                        .map(us -> us.getStudentInfo().getId())
+                        .distinct()
+                        .collect(Collectors.toList());
+                if (!studentInfoIds.isEmpty()) {
+                    demoMatchedStudents = studentInfoRepository.findAllByIdInScoped(studentInfoIds);
+                }
+            }
+
+            // 3. Dedupe by studentInfo.id, preserving direct-hit order first
+            //    (those are usually the more obvious matches).
+            LinkedHashMap<Integer, StudentInfo> merged = new LinkedHashMap<>();
+            for (StudentInfo si : directHits) merged.putIfAbsent(si.getId(), si);
+            for (StudentInfo si : demoMatchedStudents) merged.putIfAbsent(si.getId(), si);
+
+            List<StudentInfo> top = merged.values().stream()
+                    .limit(safeLimit)
+                    .collect(Collectors.toList());
+
+            // 4. Use the existing helper to produce the same row shape the
+            //    Reports Hub table consumes (name, email, phone, section, etc.).
+            List<Map<String, Object>> rows = assembleStudentsWithMapping(top);
+
+            // 5. Decorate each row with a "matched on" hint so the spotlight UI
+            //    can show why a row surfaced when the query didn't hit the
+            //    visible columns directly.
+            Map<Integer, UserStudent> idToUserStudent = new HashMap<>();
+            if (!top.isEmpty()) {
+                List<Integer> ids = top.stream().map(StudentInfo::getId).collect(Collectors.toList());
+                for (UserStudent us : userStudentRepository.findByStudentInfoIdIn(ids)) {
+                    if (us.getStudentInfo() != null) {
+                        idToUserStudent.putIfAbsent(us.getStudentInfo().getId(), us);
+                    }
+                }
+            }
+            String lower = trimmed.toLowerCase();
+            for (Map<String, Object> row : rows) {
+                Object idObj = row.get("id");
+                if (!(idObj instanceof Integer)) continue;
+                UserStudent us = idToUserStudent.get((Integer) idObj);
+                Long usId = us != null ? us.getUserStudentId() : null;
+                String matchHint = buildMatchHint(row, lower);
+                if (matchHint == null && usId != null && matchedFieldByUserStudent.containsKey(usId)) {
+                    matchHint = matchedFieldByUserStudent.get(usId) + ": "
+                            + safeTrim(matchedValueByUserStudent.get(usId), 60);
+                }
+                row.put("matchHint", matchHint != null ? matchHint : "");
+                // Stash institute name if available — handy for the modal's
+                // sub-line so the user can tell two same-named students apart.
+                if (us != null && us.getInstitute() != null) {
+                    row.put("instituteName", us.getInstitute().getInstituteName());
+                }
+            }
+            return rows;
+        } catch (Exception e) {
+            System.out.println("Error in globalSearch: " + e.getMessage());
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Spotlight detail-view dossier: everything we know about a single
+     * student, in one payload. Powers the panel that opens when the operator
+     * clicks a row in the global-search modal.
+     *
+     * <p>Scope is enforced by resolving the {@code userStudentId} → {@code
+     * studentInfo.id} via {@link UserStudentRepository#findById} and then
+     * re-fetching the StudentInfo row through the scope-filtered repository
+     * method. If the caller can't see the student, the lookup yields empty and
+     * we return 404. Demographic/assessment/payment/report data are joined
+     * only AFTER scope passes, so cross-tenant leaks are structurally
+     * impossible.
+     *
+     * <p>The payload is intentionally flat (Map) rather than a typed DTO —
+     * matches the rest of this controller's idiom and keeps the frontend free
+     * to render additions without a backend type change.
+     */
+    @PreAuthorize("@auth.allows('student_info.read.all')")
+    @Transactional
+    @GetMapping("/global-search/detail/{userStudentId}")
+    public ResponseEntity<Map<String, Object>> globalSearchDetail(
+            @PathVariable("userStudentId") Long userStudentId) {
+        try {
+            Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+            if (!usOpt.isPresent() || usOpt.get().getStudentInfo() == null) {
+                return ResponseEntity.notFound().build();
+            }
+            UserStudent us = usOpt.get();
+            Integer studentInfoId = us.getStudentInfo().getId();
+
+            // Scope gate: re-fetch through the scope-filtered query so a
+            // caller outside the student's institute scope gets a 404, not a
+            // leak. If the list comes back empty the row was filtered out.
+            List<StudentInfo> scoped = studentInfoRepository.findAllByIdInScoped(
+                    java.util.Collections.singletonList(studentInfoId));
+            if (scoped.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            StudentInfo si = scoped.get(0);
+
+            Map<String, Object> dossier = new LinkedHashMap<>();
+
+            // ── 1. Core profile ──
+            Map<String, Object> profile = new LinkedHashMap<>();
+            profile.put("userStudentId", us.getUserStudentId());
+            profile.put("studentInfoId", si.getId());
+            profile.put("name", si.getName());
+            profile.put("email", si.getEmail());
+            profile.put("phoneNumber", si.getPhoneNumber());
+            profile.put("schoolRollNumber", si.getSchoolRollNumber());
+            profile.put("controlNumber", si.getControlNumber());
+            profile.put("studentDob", si.getStudentDob());
+            profile.put("address", si.getAddress());
+            profile.put("gender", si.getGender());
+            profile.put("family", si.getFamily());
+            profile.put("sibling", si.getSibling());
+            profile.put("schoolBoard", si.getSchoolBoard());
+            profile.put("studentClass", si.getStudentClass());
+            try {
+                profile.put("username", si.getUser() != null ? si.getUser().getUsername() : null);
+                profile.put("careerNineRollNumber",
+                        si.getUser() != null ? si.getUser().getCareerNineRollNumber() : null);
+            } catch (Exception e) {
+                profile.put("username", null);
+                profile.put("careerNineRollNumber", null);
+            }
+            profile.put("infoCompleted", us.getInfoCompleted());
+            profile.put("counsellingAllowed", us.getCounsellingAllowed());
+            profile.put("reportsVisible", us.getReportsVisible());
+            dossier.put("profile", profile);
+
+            // ── 2. Institute ──
+            if (us.getInstitute() != null) {
+                Map<String, Object> inst = new LinkedHashMap<>();
+                inst.put("instituteCode", us.getInstitute().getInstituteCode());
+                inst.put("instituteName", us.getInstitute().getInstituteName());
+                dossier.put("institute", inst);
+            } else {
+                dossier.put("institute", null);
+            }
+
+            // ── 3. School class + section ──
+            if (si.getSchoolSectionId() != null) {
+                try {
+                    Optional<com.kccitm.api.model.career9.school.SchoolSections> secOpt =
+                            schoolSectionsRepository.findById(si.getSchoolSectionId());
+                    if (secOpt.isPresent()) {
+                        com.kccitm.api.model.career9.school.SchoolSections sec = secOpt.get();
+                        Map<String, Object> section = new LinkedHashMap<>();
+                        section.put("schoolSectionId", sec.getId());
+                        section.put("sectionName", sec.getSectionName());
+                        if (sec.getSchoolClasses() != null) {
+                            section.put("className", sec.getSchoolClasses().getClassName());
+                            section.put("classId", sec.getSchoolClasses().getId());
+                        }
+                        dossier.put("schoolSection", section);
+                    }
+                } catch (Exception e) {
+                    // section lookup is best-effort; missing section shouldn't kill the dossier
+                }
+            }
+
+            // ── 4. Demographic responses (Father Name, Mother Name, …) ──
+            //    Cross-assessment lookup so we surface every custom field the
+            //    student has answered, not just one assessment's slice.
+            List<com.kccitm.api.model.career9.StudentDemographicResponse> demoResponses =
+                    studentDemographicResponseRepository.findByUserStudentId(userStudentId);
+            List<Map<String, Object>> demoList = new ArrayList<>();
+            // Dedupe by fieldId — the same field across multiple assessments
+            // is conceptually one fact about the student. Keep the most-recent
+            // one (the list is unordered, so iterate twice).
+            Map<Long, com.kccitm.api.model.career9.StudentDemographicResponse> bestByField = new LinkedHashMap<>();
+            for (com.kccitm.api.model.career9.StudentDemographicResponse r : demoResponses) {
+                if (r.getFieldDefinition() == null) continue;
+                Long fid = r.getFieldDefinition().getFieldId();
+                com.kccitm.api.model.career9.StudentDemographicResponse cur = bestByField.get(fid);
+                if (cur == null || (r.getSubmittedAt() != null
+                        && (cur.getSubmittedAt() == null
+                            || r.getSubmittedAt().after(cur.getSubmittedAt())))) {
+                    bestByField.put(fid, r);
+                }
+            }
+            for (com.kccitm.api.model.career9.StudentDemographicResponse r : bestByField.values()) {
+                Map<String, Object> d = new LinkedHashMap<>();
+                d.put("fieldId", r.getFieldDefinition().getFieldId());
+                d.put("fieldName", r.getFieldDefinition().getFieldName());
+                d.put("displayLabel", r.getFieldDefinition().getDisplayLabel());
+                d.put("dataType", r.getFieldDefinition().getDataType());
+                // Resolve dropdown/radio values to their human label when the
+                // field has options — otherwise the UI shows raw ids like "3".
+                String raw = r.getResponseValue();
+                String resolved = raw;
+                try {
+                    if (raw != null && r.getFieldDefinition().getOptions() != null) {
+                        for (com.kccitm.api.model.career9.DemographicFieldOption opt
+                                : r.getFieldDefinition().getOptions()) {
+                            if (raw.equals(opt.getOptionValue())) {
+                                resolved = opt.getOptionLabel();
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception ex) { /* fall back to raw */ }
+                d.put("value", resolved);
+                d.put("rawValue", raw);
+                d.put("submittedAt", r.getSubmittedAt());
+                demoList.add(d);
+            }
+            dossier.put("demographics", demoList);
+
+            // ── 5. Assessments + per-assessment generated reports ──
+            List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                    .findByUserStudentUserStudentIdIn(java.util.Collections.singletonList(userStudentId));
+            // Dedupe by assessmentId (the same assessment can have multiple
+            // mapping rows if it was re-allotted).
+            Map<Long, StudentAssessmentMapping> uniqueMappings = new LinkedHashMap<>();
+            for (StudentAssessmentMapping m : mappings) {
+                uniqueMappings.putIfAbsent(m.getAssessmentId(), m);
+            }
+            Set<Long> assessmentIds = uniqueMappings.keySet();
+            Map<Long, String> assessmentNames = new HashMap<>();
+            if (!assessmentIds.isEmpty()) {
+                for (AssessmentTable a : assessmentTableRepository.findAllById(assessmentIds)) {
+                    assessmentNames.put(a.getId(), a.getAssessmentName());
+                }
+            }
+            // Bulk load every generated report for this student in ONE query,
+            // then group by assessmentId so we can attach the per-assessment
+            // report rows below.
+            List<com.kccitm.api.model.career9.GeneratedReport> reports =
+                    generatedReportRepository.findByUserStudentUserStudentId(userStudentId);
+            Map<Long, List<com.kccitm.api.model.career9.GeneratedReport>> reportsByAssessment = new HashMap<>();
+            for (com.kccitm.api.model.career9.GeneratedReport r : reports) {
+                reportsByAssessment.computeIfAbsent(r.getAssessmentId(), k -> new ArrayList<>()).add(r);
+            }
+            List<Map<String, Object>> assessmentsOut = new ArrayList<>();
+            for (StudentAssessmentMapping m : uniqueMappings.values()) {
+                Map<String, Object> a = new LinkedHashMap<>();
+                a.put("assessmentId", m.getAssessmentId());
+                a.put("assessmentName", assessmentNames.getOrDefault(m.getAssessmentId(), "Unknown"));
+                a.put("status", m.getStatus());
+                List<Map<String, Object>> reportRows = new ArrayList<>();
+                for (com.kccitm.api.model.career9.GeneratedReport r
+                        : reportsByAssessment.getOrDefault(m.getAssessmentId(), java.util.Collections.emptyList())) {
+                    Map<String, Object> rr = new LinkedHashMap<>();
+                    rr.put("generatedReportId", r.getGeneratedReportId());
+                    rr.put("typeOfReport", r.getTypeOfReport());
+                    rr.put("reportStatus", r.getReportStatus());
+                    rr.put("reportUrl", r.getReportUrl());
+                    rr.put("visibleToStudent", r.getVisibleToStudent());
+                    reportRows.add(rr);
+                }
+                a.put("reports", reportRows);
+                assessmentsOut.add(a);
+            }
+            dossier.put("assessments", assessmentsOut);
+
+            // ── 6. Payment transactions ──
+            //    Surface everything: paid, failed, abandoned. The UI can
+            //    style status badges so the operator can answer "did this
+            //    student pay?" at a glance.
+            List<PaymentTransaction> txns =
+                    paymentTransactionRepository.findByUserStudentIdOrderByCreatedAtDesc(userStudentId);
+            List<Map<String, Object>> payments = new ArrayList<>();
+            for (PaymentTransaction t : txns) {
+                Map<String, Object> p = new LinkedHashMap<>();
+                p.put("transactionId", t.getTransactionId());
+                p.put("amount", t.getAmount());
+                p.put("originalAmount", t.getOriginalAmount());
+                p.put("currency", t.getCurrency());
+                p.put("status", t.getStatus());
+                p.put("assessmentId", t.getAssessmentId());
+                p.put("assessmentName", t.getAssessmentId() != null
+                        ? assessmentNames.get(t.getAssessmentId()) : null);
+                p.put("campaignId", t.getCampaignId());
+                p.put("promoCode", t.getPromoCode());
+                p.put("promoDiscountPercent", t.getPromoDiscountPercent());
+                p.put("shortUrl", t.getShortUrl());
+                p.put("paymentLinkUrl", t.getPaymentLinkUrl());
+                p.put("razorpayPaymentId", t.getRazorpayPaymentId());
+                p.put("failureReason", t.getFailureReason());
+                p.put("createdAt", t.getCreatedAt());
+                p.put("updatedAt", t.getUpdatedAt());
+                payments.add(p);
+            }
+            dossier.put("payments", payments);
+
+            return ResponseEntity.ok(dossier);
+        } catch (Exception e) {
+            System.out.println("Error in globalSearchDetail: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /** Pick the first row column whose value contains the query — drives the
+     *  "matched on: Email — foo@bar.com" hint shown under each result. */
+    private String buildMatchHint(Map<String, Object> row, String lowerQuery) {
+        String[][] candidates = {
+                {"name", "Name"},
+                {"email", "Email"},
+                {"phoneNumber", "Phone"},
+                {"schoolRollNumber", "Roll No."},
+                {"controlNumber", "Control No."},
+                {"address", "Address"},
+                {"family", "Family"},
+                {"schoolBoard", "School Board"},
+                {"gender", "Gender"},
+        };
+        for (String[] c : candidates) {
+            Object v = row.get(c[0]);
+            if (v == null) continue;
+            String s = String.valueOf(v);
+            if (s.toLowerCase().contains(lowerQuery)) {
+                return c[1] + ": " + safeTrim(s, 60);
+            }
+        }
+        return null;
+    }
+
+    private String safeTrim(String s, int max) {
+        if (s == null) return "";
+        return s.length() <= max ? s : s.substring(0, max) + "…";
+    }
+
+    /**
+     * Build the {@code studentMappings} JSON shape from a (possibly already
+     * filtered) list of StudentInfo rows. Visibility widened from private to
+     * public so {@code DashboardDataService} can call it with a scope-narrowed
+     * list instead of pulling everything through {@code findAll()}.
+     */
+    public List<java.util.Map<String, Object>> assembleStudentsWithMapping(List<StudentInfo> students) {
         try {
             if (students.isEmpty()) return new java.util.ArrayList<>();
 
@@ -463,11 +888,39 @@ public class StudentInfoController {
             // 3. Bulk load all UserStudents for these studentInfo IDs (1 query instead of N)
             Map<Integer, UserStudent> studentInfoToUserStudent = new HashMap<>();
             List<Long> allUserStudentIds = new ArrayList<>();
+            Set<Long> allUserIds = new java.util.HashSet<>();
             List<UserStudent> allUserStudents = userStudentRepository.findByStudentInfoIdIn(studentInfoIds);
             for (UserStudent us : allUserStudents) {
                 if (us.getStudentInfo() != null) {
                     studentInfoToUserStudent.putIfAbsent(us.getStudentInfo().getId(), us);
                     allUserStudentIds.add(us.getUserStudentId());
+                    if (us.getUserId() != null) {
+                        allUserIds.add(us.getUserId());
+                    }
+                }
+            }
+
+            // 3b. Bulk load role-group mappings for every userId in one query (avoids N+1
+            //     when rendering the Role Group column on the Data Download page).
+            Map<Long, List<Map<String, Object>>> roleGroupsByUserId = new HashMap<>();
+            if (!allUserIds.isEmpty()) {
+                try {
+                    List<com.kccitm.api.model.UserRoleGroupMapping> rgMappings =
+                            userRoleGroupMappingRepository.findByUserIn(allUserIds);
+                    if (rgMappings != null) {
+                        for (com.kccitm.api.model.UserRoleGroupMapping m : rgMappings) {
+                            if (Boolean.FALSE.equals(m.getDisplay())) continue;
+                            if (m.getRoleGroup() == null) continue;
+                            Map<String, Object> rg = new LinkedHashMap<>();
+                            rg.put("id", m.getRoleGroup().getId());
+                            rg.put("name", m.getRoleGroup().getName());
+                            roleGroupsByUserId
+                                    .computeIfAbsent(m.getUser(), k -> new ArrayList<>())
+                                    .add(rg);
+                        }
+                    }
+                } catch (Exception ex) {
+                    System.out.println("Warning: failed to bulk-load role groups: " + ex.getMessage());
                 }
             }
 
@@ -588,6 +1041,10 @@ public class StudentInfoController {
                 UserStudent us = studentInfoToUserStudent.get(si.getId());
                 if (us != null) {
                     studentData.put("userStudentId", us.getUserStudentId());
+                    studentData.put("roleGroups",
+                            us.getUserId() != null
+                                    ? roleGroupsByUserId.getOrDefault(us.getUserId(), new ArrayList<>())
+                                    : new ArrayList<>());
 
                     List<StudentAssessmentMapping> mappings = mappingsByStudent
                             .getOrDefault(us.getUserStudentId(), new ArrayList<>());
@@ -622,6 +1079,7 @@ public class StudentInfoController {
                     studentData.put("assessmentId", null);
                     studentData.put("assignedAssessmentIds", new java.util.ArrayList<>());
                     studentData.put("assessments", new java.util.ArrayList<>());
+                    studentData.put("roleGroups", new java.util.ArrayList<>());
                 }
 
                 result.add(studentData);
@@ -635,16 +1093,46 @@ public class StudentInfoController {
         }
     }
 
+    // Phase 1 (Task 1.6 / audit HIGH-D): previously `return studentInfoRepository.save(studentInfo)`
+    // — a blind upsert of the full client-supplied entity. The caller controlled the primary `id`
+    // (overwrite or create any row) AND `instituteId` (which was also the ABAC scope arg), so an
+    // attacker could pick the institute their own request was scope-checked against and rewrite an
+    // arbitrary student in any tenant. Now: require an existing id, load the persisted row,
+    // re-authorize against the PERSISTED institute, and pin `id` + `instituteId` from the persisted
+    // row so this endpoint can neither move a student across tenants nor mint a new row. The
+    // annotation drops the body-supplied scope arg (it was attacker-controlled and meaningless);
+    // the real scope check happens in-method below.
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/update")
-    public StudentInfo updateStudentInfo(@RequestBody StudentInfo studentInfo) {
-        return studentInfoRepository.save(studentInfo);
+    public ResponseEntity<?> updateStudentInfo(@RequestBody StudentInfo studentInfo) {
+        if (studentInfo.getId() == null) {
+            return ResponseEntity.badRequest().body("id is required to update a student");
+        }
+        StudentInfo existing = studentInfoRepository.findById(studentInfo.getId().longValue())
+                .orElse(null);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        // Authorize against the institute on the PERSISTED row, not the client-supplied one.
+        if (!authorizationService.allows("student_info.update", existing.getInstituteId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Not permitted to update a student in this institute");
+        }
+        // Pin tenant + identity from the persisted row regardless of what the client sent.
+        studentInfo.setId(existing.getId());
+        studentInfo.setInstituteId(existing.getInstituteId());
+        return ResponseEntity.ok(studentInfoRepository.save(studentInfo));
     }
 
+    // no scope arg: delete by id alone; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.delete')")
     @PostMapping("/delete/{id}")
     public void deleteStudentInfo(@PathVariable("id") Long id) {
         studentInfoRepository.deleteById(id);
     }
 
+    // no scope arg: identifies by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping("/getDemographics/{userStudentId}")
     public ResponseEntity<?> getDemographics(@PathVariable("userStudentId") Long userStudentId) {
         UserStudent userStudent = userStudentRepository.findById(userStudentId)
@@ -683,6 +1171,8 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    // no scope arg: body is raw Map<String,Object>; SpEL cannot address its keys
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/updateDemographics")
     public ResponseEntity<?> updateDemographics(@RequestBody Map<String, Object> request) {
         Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
@@ -751,6 +1241,8 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    // no scope arg: body is raw Map<String,Object>; admin-only operation, scope enforced via filter
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/resetAssessment")
     @javax.transaction.Transactional
     public ResponseEntity<?> resetAssessment(@RequestBody Map<String, Object> request) {
@@ -852,6 +1344,8 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    // no scope arg: identifies student by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping("/getStudentScores")
     public ResponseEntity<?> getStudentScores(
             @RequestParam Long userStudentId,
@@ -905,6 +1399,7 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")
     @GetMapping("/exportScoresByInstitute/{instituteId}")
     public ResponseEntity<?> exportScoresByInstitute(
             @PathVariable("instituteId") Integer instituteId,
@@ -1143,6 +1638,7 @@ public class StudentInfoController {
         }
     }
 
+    @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")
     @GetMapping("/bet-report/{instituteId}/{assessmentId}")
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<?> getBetReport(
@@ -1288,6 +1784,121 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Send login credentials (username = User.username, password = student DOB
+     * formatted dd-MM-yyyy) by email to one or more students.
+     *
+     * <p>Request body: {@code { "userStudentIds": [1, 2, 3] }}.
+     *
+     * <p>Returns a per-row outcome list plus aggregate counts so the frontend
+     * can show which students succeeded and which failed (missing email, no
+     * dob, no username, send error).
+     *
+     * <p>Authorization: {@code student_info.update} — sending credentials is a
+     * mutation of the student's outbox/state, not a read. Scope filter narrows
+     * access (Plan 15-06) so KVS-scoped users can only send for KVS students.
+     */
+    @PreAuthorize("@auth.allows('student_info.update')")
+    @PostMapping("/send-login-credentials")
+    public ResponseEntity<?> sendLoginCredentials(@RequestBody Map<String, Object> payload) {
+        @SuppressWarnings("unchecked")
+        List<Object> rawIds = (List<Object>) payload.get("userStudentIds");
+        if (rawIds == null || rawIds.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "userStudentIds is required"));
+        }
+
+        List<Long> userStudentIds = new ArrayList<>();
+        for (Object o : rawIds) {
+            if (o instanceof Number) userStudentIds.add(((Number) o).longValue());
+        }
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        int sent = 0;
+        int failed = 0;
+
+        for (Long usid : userStudentIds) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("userStudentId", usid);
+
+            Optional<UserStudent> usOpt = userStudentRepository.findById(usid);
+            if (!usOpt.isPresent()) {
+                row.put("status", "failed");
+                row.put("reason", "UserStudent not found");
+                results.add(row); failed++;
+                continue;
+            }
+            UserStudent us = usOpt.get();
+            StudentInfo info = us.getStudentInfo();
+            if (info == null) {
+                row.put("status", "failed");
+                row.put("reason", "StudentInfo missing");
+                results.add(row); failed++;
+                continue;
+            }
+
+            String email = info.getEmail();
+            if (email == null || email.trim().isEmpty()) {
+                row.put("status", "failed");
+                row.put("reason", "No email on file");
+                results.add(row); failed++;
+                continue;
+            }
+
+            // Username lives on User (not StudentInfo). Walk via userId; tolerate
+            // students whose User row was never linked (legacy / B2C-only flows).
+            String username = null;
+            if (us.getUserId() != null) {
+                Optional<User> userOpt = userRepository.findById(us.getUserId());
+                if (userOpt.isPresent()) username = userOpt.get().getUsername();
+            }
+            if (username == null || username.trim().isEmpty()) {
+                row.put("status", "failed");
+                row.put("reason", "No username assigned");
+                results.add(row); failed++;
+                continue;
+            }
+
+            if (info.getStudentDob() == null) {
+                row.put("status", "failed");
+                row.put("reason", "No DOB on file (used as password)");
+                results.add(row); failed++;
+                continue;
+            }
+            String dob = new SimpleDateFormat("dd-MM-yyyy").format(info.getStudentDob());
+
+            // Hand off to the Odoo-backed templated email service. Note that
+            // OdooEmailService is @Async fire-and-forget — the actual SMTP
+            // dispatch happens later; eventual send success/failure shows up
+            // only in OdooEmailService logs. So per-row status here is
+            // "queued" once validation passes, not "sent". Anything thrown
+            // synchronously (validation guard or pre-queue error) is reported
+            // as "failed" with the reason.
+            try {
+                loginCredentialsEmailService.send(info.getName(), email, username, dob);
+                row.put("status", "queued");
+                row.put("email", email);
+                sent++;
+            } catch (Exception e) {
+                row.put("status", "failed");
+                row.put("reason", "Email queue failed: " + e.getMessage());
+                failed++;
+            }
+            results.add(row);
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("requested", userStudentIds.size());
+        // `sent` here means "queued for Odoo dispatch" — the FE label reads
+        // "Sent to N students" which matches user expectation even though the
+        // actual SMTP handshake happens asynchronously.
+        resp.put("sent", sent);
+        resp.put("failed", failed);
+        resp.put("results", results);
+        return ResponseEntity.ok(resp);
+    }
+
+    // no scope arg: body is raw id-pair list; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.delete')")
     @PostMapping("/bulkRemoveAssessment")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> bulkRemoveAssessment(@RequestBody List<Map<String, Long>> removals) {

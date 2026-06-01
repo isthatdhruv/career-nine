@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,9 +27,13 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireLanguage;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSectionInstruction;
+import com.kccitm.api.model.career9.report.ReportSubtype;
+import com.kccitm.api.model.career9.report.ReportType;
 import com.kccitm.api.repository.Career9.LanguagesSupportedRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireSectionRepository;
+import com.kccitm.api.repository.Career9.report.ReportSubtypeRepository;
+import com.kccitm.api.repository.Career9.report.ReportTypeRepository;
 
 @RestController
 @RequestMapping("/api/questionnaire")
@@ -43,18 +48,53 @@ public class QuestionnaireController {
     @Autowired
     private LanguagesSupportedRepository languagesSupportedRepository;
 
+    @Autowired
+    private ReportTypeRepository reportTypeRepository;
+
+    @Autowired
+    private ReportSubtypeRepository reportSubtypeRepository;
+
     @PersistenceContext
     private EntityManager entityManager;
 
+    /**
+     * Replace the {report_type, report_subtype} stubs in the incoming payload
+     * with their managed entities. Mirrors the existing language-resolution
+     * pattern at lines 67-73. Both FKs are optional — admins can leave them
+     * NULL during the backfill window, and ReportService falls back to
+     * grade-based inference.
+     */
+    private void resolveReportRouting(Questionnaire q) {
+        if (q == null) return;
+        if (q.getReportType() != null && q.getReportType().getReportTypeId() != null) {
+            ReportType managed = reportTypeRepository
+                    .findById(q.getReportType().getReportTypeId()).orElse(null);
+            q.setReportType(managed);
+        } else {
+            q.setReportType(null);
+        }
+        if (q.getReportSubtype() != null && q.getReportSubtype().getReportSubtypeId() != null) {
+            ReportSubtype managed = reportSubtypeRepository
+                    .findById(q.getReportSubtype().getReportSubtypeId()).orElse(null);
+            q.setReportSubtype(managed);
+        } else {
+            q.setReportSubtype(null);
+        }
+    }
+
     @PostMapping("/questionnaire-lelo")
+    @PreAuthorize("@auth.allows('questionnaire.read')")
     public Questionnaire questionnaireLelo(@RequestBody Long assessmentTableId) {
         return questionnaireRepository.findById(assessmentTableId)
                 .orElse(null);
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('questionnaire.create')")
     public ResponseEntity<Questionnaire> create(
             @RequestBody Questionnaire questionnaire) {
+
+        resolveReportRouting(questionnaire);
 
         // Set bidirectional relationships for languages
         if (questionnaire.getLanguages() != null) {
@@ -106,17 +146,22 @@ public class QuestionnaireController {
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
+    // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06) — non-super-admin callers see narrowed result set.
     @GetMapping(value = "/get", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('questionnaire.read.all')")
     public List<Questionnaire> getallQuestionnaire() {
         return questionnaireRepository.findByDisplayTrueOrDisplayIsNull();
     }
 
+    // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06).
     @GetMapping(value = "/get/list", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('questionnaire.read.all')")
     public List<Questionnaire> getAllQuestionnaires() {
         return questionnaireRepository.findQuestionnaireList();
     }
 
     @GetMapping("/getbyid/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.read')")
     @Transactional(readOnly = true)
     public ResponseEntity<Questionnaire> getById(
             @PathVariable Long id) {
@@ -129,10 +174,13 @@ public class QuestionnaireController {
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.update')")
     @Transactional
     public ResponseEntity<Questionnaire> update(
             @PathVariable Long id,
             @RequestBody Questionnaire questionnaire) {
+
+        resolveReportRouting(questionnaire);
 
         // Resolve language references for questionnaire languages
         if (questionnaire.getLanguages() != null) {
@@ -197,6 +245,7 @@ public class QuestionnaireController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.delete')")
     public ResponseEntity<String> delete(@PathVariable Long id) {
         Optional<Questionnaire> opt = questionnaireRepository.findById(id);
         if (!opt.isPresent()) {
@@ -209,11 +258,13 @@ public class QuestionnaireController {
     }
 
     @GetMapping("/deleted")
+    @PreAuthorize("@auth.allows('questionnaire.read.all')")
     public ResponseEntity<List<Questionnaire>> getDeletedQuestionnaires() {
         return ResponseEntity.ok(questionnaireRepository.findByDisplayFalse());
     }
 
     @PutMapping("/restore/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.update')")
     public ResponseEntity<String> restoreQuestionnaire(@PathVariable Long id) {
         Optional<Questionnaire> opt = questionnaireRepository.findById(id);
         if (!opt.isPresent()) return ResponseEntity.notFound().build();
@@ -224,6 +275,7 @@ public class QuestionnaireController {
     }
 
     @DeleteMapping("/permanent-delete/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.delete')")
     public ResponseEntity<String> permanentDeleteQuestionnaire(@PathVariable Long id) {
         questionnaireRepository.deleteById(id);
         return ResponseEntity.ok("Permanently deleted.");

@@ -4,6 +4,7 @@ import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import { getCounsellorAppointments } from '../Counselling/API/AppointmentAPI'
 import { getSessionNotes, createSessionNotes } from '../Counselling/API/SessionNotesAPI'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import './CounsellorPortal.css'
 
@@ -75,8 +76,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
   },
 ]
 
-const COUNSELLOR_STORAGE_KEYS = ['counsellorPortalToken', 'counsellorPortalUser', 'counsellorPortalLoggedIn']
-
 interface NotesFormState {
   keyDiscussionPoints: string
   actionItems: string
@@ -121,6 +120,7 @@ function getStudentName(appt: any): string {
 
 const CounsellorNotesPage: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [appointments, setAppointments] = useState<any[]>([])
   const [userId, setUserId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,71 +157,50 @@ const CounsellorNotesPage: React.FC = () => {
   }, { skip: !counsellorId })
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
-    if (!isLoggedIn) {
-      navigate('/counsellor/login')
+    // Phase 19: use useAuth().currentUser instead of localStorage.
+    // TODO(phase-19-followup): /auth/me does not yet expose counsellorId; resolve
+    // it via getCounsellorByUserId until the backend payload includes it.
+    if (!currentUser) {
+      navigate('/counsellor/login', { replace: true })
       return
     }
-    try {
-      const userStr = localStorage.getItem('counsellorPortalUser')
-      if (!userStr) {
-        setLoading(false)
-        return
-      }
-      const user = JSON.parse(userStr)
-      setUserId(user.counsellorId || user.id)
+    setUserId(currentUser.id)
 
-      const loadForCounsellor = async (cId: number) => {
-        const apptRes = await getCounsellorAppointments(cId)
-        const allAppts: any[] = apptRes.data || []
-        const completed = allAppts.filter(
-          (a) => (a.status || '').toUpperCase() === 'COMPLETED'
-        )
-        setAppointments(completed)
-        const notesResults: Record<number, any> = {}
-        await Promise.all(
-          completed.map(async (appt) => {
-            try {
-              const nr = await getSessionNotes(appt.id, false)
-              if (nr.data) notesResults[appt.id] = nr.data
-            } catch {
-              // No notes yet
-            }
-          })
-        )
-        setNotesMap(notesResults)
-      }
-
-      // New login flow stores counsellorId directly
-      const cId = user.counsellorId || null
-      if (cId) {
-        setCounsellorId(cId)
-        loadForCounsellor(cId)
-          .catch(() => setError('Failed to load session notes.'))
-          .finally(() => setLoading(false))
-      } else if (user.id) {
-        // Legacy flow — resolve counsellorId from userId
-        getCounsellorByUserId(user.id)
-          .then((res) => {
-            const resolvedId = res.data?.id
-            if (!resolvedId) {
-              setError('Counsellor profile not found. Please contact admin to set up your profile.')
-              setLoading(false)
-              return
-            }
-            setCounsellorId(resolvedId)
-            return loadForCounsellor(resolvedId)
-          })
-          .catch(() => setError('Counsellor profile not found. Please contact admin to set up your profile.'))
-          .finally(() => setLoading(false))
-      } else {
-        setError('Counsellor profile not found. Please contact admin to set up your profile.')
-        setLoading(false)
-      }
-    } catch {
-      navigate('/counsellor/login')
+    const loadForCounsellor = async (cId: number) => {
+      const apptRes = await getCounsellorAppointments(cId)
+      const allAppts: any[] = apptRes.data || []
+      const completed = allAppts.filter(
+        (a) => (a.status || '').toUpperCase() === 'COMPLETED'
+      )
+      setAppointments(completed)
+      const notesResults: Record<number, any> = {}
+      await Promise.all(
+        completed.map(async (appt) => {
+          try {
+            const nr = await getSessionNotes(appt.id, false)
+            if (nr.data) notesResults[appt.id] = nr.data
+          } catch {
+            // No notes yet
+          }
+        })
+      )
+      setNotesMap(notesResults)
     }
-  }, [navigate])
+
+    getCounsellorByUserId(currentUser.id)
+      .then((res) => {
+        const resolvedId = res.data?.id
+        if (!resolvedId) {
+          setError('Counsellor profile not found. Please contact admin to set up your profile.')
+          setLoading(false)
+          return
+        }
+        setCounsellorId(resolvedId)
+        return loadForCounsellor(resolvedId)
+      })
+      .catch(() => setError('Counsellor profile not found. Please contact admin to set up your profile.'))
+      .finally(() => setLoading(false))
+  }, [currentUser, navigate])
 
   const toggleForm = (appointmentId: number) => {
     setExpandedForms((prev) => {
@@ -268,7 +247,7 @@ const CounsellorNotesPage: React.FC = () => {
     <PortalLayout
       title='Counsellor Dashboard'
       menuItems={COUNSELLOR_MENU_ITEMS}
-      storageKeys={COUNSELLOR_STORAGE_KEYS}
+      storageKeys={[]}
       loginPath='/counsellor/login'
     >
       <div className='cp-welcome'>

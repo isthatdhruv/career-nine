@@ -50,6 +50,57 @@ export function updateLinkMaxRegistrations(linkId: number, maxRegistrations: num
   return axios.put(`${API_URL}/school-registration/link/${linkId}/max-registrations`, { maxRegistrations });
 }
 
+// ── Pricing tiers per (institute, session, assessment) ──
+
+export interface SchoolAssessmentTier {
+  tierId?: number;
+  instituteCode?: number;
+  sessionId?: number;
+  assessmentId?: number;
+  name: string;
+  description: string;
+  amount: number | null;
+  sortOrder: number;
+  maxRegistrations: number | null;
+  currentCount?: number;
+  isActive?: boolean;
+}
+
+export function getSchoolTiers(instituteCode: number, sessionId: number, assessmentId: number) {
+  return axios.get<SchoolAssessmentTier[]>(
+    `${API_URL}/school-registration/tiers/${instituteCode}/${sessionId}/${assessmentId}`
+  );
+}
+
+export function createSchoolTier(
+  instituteCode: number,
+  sessionId: number,
+  assessmentId: number,
+  tier: SchoolAssessmentTier
+) {
+  return axios.post<SchoolAssessmentTier>(
+    `${API_URL}/school-registration/tiers/${instituteCode}/${sessionId}/${assessmentId}`,
+    tier
+  );
+}
+
+export function updateSchoolTier(tierId: number, tier: Partial<SchoolAssessmentTier>) {
+  return axios.put<SchoolAssessmentTier>(
+    `${API_URL}/school-registration/tiers/${tierId}`,
+    tier
+  );
+}
+
+export function toggleSchoolTier(tierId: number) {
+  return axios.patch<SchoolAssessmentTier>(
+    `${API_URL}/school-registration/tiers/${tierId}/toggle`
+  );
+}
+
+export function deleteSchoolTier(tierId: number) {
+  return axios.delete(`${API_URL}/school-registration/tiers/${tierId}`);
+}
+
 // ── Public APIs ──
 
 export function getSchoolInfo(token: string) {

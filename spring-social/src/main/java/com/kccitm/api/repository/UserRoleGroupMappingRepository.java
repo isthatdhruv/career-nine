@@ -18,6 +18,9 @@ public interface UserRoleGroupMappingRepository extends JpaRepository<UserRoleGr
 
     public List<UserRoleGroupMapping> findByUser(Long id);
 
+    /** Bulk-load mappings for many users at once — used by student list assembly to avoid N+1. */
+    public List<UserRoleGroupMapping> findByUserIn(java.util.Collection<Long> userIds);
+
     public UserRoleGroupMapping getOne(int id);
     
     @Transactional

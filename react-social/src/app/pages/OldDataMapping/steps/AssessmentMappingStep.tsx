@@ -4,7 +4,6 @@ import {
   getAssessmentsByInstitute,
   fetchFirebaseUserData,
   fetchFirebaseSchoolData,
-  getAllInstitutes,
   saveMapping,
   saveBatchMappings,
   getMappingsByType,
@@ -13,6 +12,7 @@ import {
   clearFirebaseFetchCache,
   invalidateFirebaseBackendCache,
 } from "../API/OldDataMapping_APIs";
+import { useInstitutes } from "../../../lib/queries/lookups";
 
 export interface DetailedResponse {
   question: string;
@@ -128,7 +128,17 @@ const AssessmentMappingStep = ({
   onDone,
 }: Props) => {
   const [assessments, setAssessments] = useState<any[]>([]);
-  const [institutes, setInstitutes] = useState<Institute[]>([]);
+  const { data: rawInstitutes = [] } = useInstitutes<any>();
+  const institutes = useMemo<Institute[]>(
+    () =>
+      rawInstitutes
+        .map((i: any) => ({
+          instituteCode: Number(i.instituteCode ?? i.id),
+          instituteName: i.instituteName ?? i.name ?? "",
+        }))
+        .sort((a: Institute, b: Institute) => a.instituteName.localeCompare(b.instituteName)),
+    [rawInstitutes]
+  );
   const [firebaseUsers, setFirebaseUsers] = useState<FirebaseUser[]>([]);
   const [firebaseSchools, setFirebaseSchools] = useState<FirebaseSchool[]>([]);
   const [alreadyMappedSchools, setAlreadyMappedSchools] = useState<Set<string>>(new Set());
@@ -186,11 +196,10 @@ const AssessmentMappingStep = ({
         try { await invalidateFirebaseBackendCache(); } catch { /* non-fatal */ }
       }
 
-      const [assessRes, usersRes, schoolDataRes, instRes, mappedRes] = await Promise.all([
+      const [assessRes, usersRes, schoolDataRes, mappedRes] = await Promise.all([
         getAllAssessments(),
         fetchFirebaseUserData(undefined, { force }),
         fetchFirebaseSchoolData(undefined, { force }),
-        getAllInstitutes(),
         getMappingsByType("SCHOOL"),
       ]);
 
@@ -202,16 +211,6 @@ const AssessmentMappingStep = ({
 
       const schoolData = schoolDataRes.data?.schools || [];
       setFirebaseSchools(schoolData);
-
-      const instList = instRes.data || [];
-      setInstitutes(
-        instList
-          .map((i: any) => ({
-            instituteCode: Number(i.instituteCode ?? i.id),
-            instituteName: i.instituteName ?? i.name ?? "",
-          }))
-          .sort((a: Institute, b: Institute) => a.instituteName.localeCompare(b.instituteName))
-      );
 
       const mapped = new Set<string>();
       const s2i = new Map<string, number>();

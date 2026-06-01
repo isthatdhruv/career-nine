@@ -2,13 +2,15 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useState } from "react";
 import { Modal } from "react-bootstrap-v5";
+import { useQueryClient } from "react-query";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { UpdateCollegeData } from "../API/College_APIs";
+import { lookupKeys } from "../../../lib/queries/lookups";
 
 const validationSchema = Yup.object().shape({
-  instituteName: Yup.string().required("College Name is required"),
+  instituteName: Yup.string().required("Institute Name is required"),
   instituteAddress: Yup.string().required("Institute Address is required"),
   instituteCode: Yup.string().required("Institute Code is required"),
   maxStudents: Yup.string().required("Maximum Students is required"),
@@ -28,6 +30,7 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const initialValues = {
     instituteName: "",
@@ -80,6 +83,7 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
           payload.schoolLogo = await fileToBase64(logoFile);
         }
         await UpdateCollegeData(payload);
+        queryClient.invalidateQueries(lookupKeys.institutes);
 
         onHide();
         setPageLoading(["true"]);
@@ -98,7 +102,7 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
     <Modal show={show} onHide={onHide} aria-labelledby="contained-modal-title-vcenter" centered>
       <Modal.Header>
         <Modal.Title>
-          <h1>Add College</h1>
+          <h1>Add Institute</h1>
         </Modal.Title>
 
         <div className="btn btn-sm btn-icon btn-active-color-primary" onClick={onHide}>
@@ -119,11 +123,11 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
               data-kt-scroll-wrappers="#kt_modal_add_scroll"
               data-kt-scroll-offset="300px"
             >
-              {/* College Name */}
+              {/* Institute Name */}
               <div className="fv-row mb-7">
-                <label className="required fs-6 fw-bold mb-2">College Name :</label>
+                <label className="required fs-6 fw-bold mb-2">Institute Name :</label>
                 <input
-                  placeholder="Enter College Name"
+                  placeholder="Enter Institute Name"
                   type="text"
                   autoComplete="off"
                   {...formik.getFieldProps("instituteName")}
@@ -231,7 +235,7 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
 
               {/* School Logo */}
               <div className="fv-row mb-7">
-                <label className="fs-6 fw-bold mb-2">School Logo :</label>
+                <label className="fs-6 fw-bold mb-2">Institute Logo :</label>
                 <input
                   type="file"
                   accept="image/*"

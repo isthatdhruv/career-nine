@@ -25,14 +25,21 @@ const CounsellorLoginPanel: React.FC<CounsellorLoginPanelProps> = ({ onSwitchToR
     setLoading(true)
     setError('')
     try {
-      const { data } = await axios.post(
-        `${API_BASE_URL}/api/counsellor/login`,
+      // Phase 19: counsellors are normal users with role COUNSELLOR.
+      // Post to the unified /auth/login endpoint — backend sets the cn_at
+      // HttpOnly cookie + cn_csrf companion. AuthInit (Auth.tsx) then
+      // bootstraps currentUser from /auth/me on the next mount.
+      // No localStorage write — the legacy counsellor-portal JSON blobs are
+      // gone (every read/write removed from the react-social tree).
+      await axios.post(
+        `${API_BASE_URL}/auth/login`,
         { email: email.trim(), password },
-        { headers: { Accept: 'application/json', 'Content-Type': 'application/json' } }
+        {
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          withCredentials: true,
+        }
       )
-      localStorage.setItem('counsellorPortalUser', JSON.stringify(data))
-      localStorage.setItem('counsellorPortalLoggedIn', 'true')
-      navigate('/counsellor/dashboard')
+      navigate('/counsellor/dashboard', { replace: true })
     } catch (err: any) {
       if (err.response?.status === 401) setError('Invalid email or password.')
       else if (err.response?.status === 403) setError(err.response?.data?.error || 'Your account is not active.')

@@ -4,6 +4,19 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { compression } from 'vite-plugin-compression2'
 
 export default defineConfig({
+  server: {
+    host: process.env.VITE_DEV_HOST || undefined,
+    port: process.env.VITE_DEV_PORT ? Number(process.env.VITE_DEV_PORT) : undefined,
+    hmr: process.env.VITE_HMR_HOST
+      ? {
+          host: process.env.VITE_HMR_HOST,
+          protocol: (process.env.VITE_HMR_PROTOCOL as 'ws' | 'wss') || 'wss',
+          clientPort: process.env.VITE_HMR_CLIENT_PORT
+            ? Number(process.env.VITE_HMR_CLIENT_PORT)
+            : 443,
+        }
+      : undefined,
+  },
   plugins: [
     // Remove PNG files from assessment-cache after build (webp versions are used instead)
     // {

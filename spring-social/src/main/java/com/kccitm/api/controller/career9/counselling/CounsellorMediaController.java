@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,6 +28,8 @@ public class CounsellorMediaController {
      * Expects JSON body: { "base64Data": "data:image/webp;base64,...", "mediaType": "profile" }
      * Returns: { "url": "https://storage-c9.sgp1.digitaloceanspaces.com/counsellor-media/..." }
      */
+    // no scope arg: body is base64 payload; counsellor uploads own media
+    @PreAuthorize("@auth.allows('counsellor_media.create')")
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> uploadMedia(@RequestBody Map<String, String> request) {
         String base64Data = request.get("base64Data");
@@ -53,6 +56,8 @@ public class CounsellorMediaController {
      * Delete counsellor media from DigitalOcean Spaces.
      * Expects query param: ?url=https://storage-c9.sgp1.digitaloceanspaces.com/...
      */
+    // no scope arg: delete by URL query param
+    @PreAuthorize("@auth.allows('counsellor_media.delete')")
     @DeleteMapping("/delete")
     public ResponseEntity<Map<String, String>> deleteMedia(@RequestParam String url) {
         spacesService.deleteFileByUrl(url);

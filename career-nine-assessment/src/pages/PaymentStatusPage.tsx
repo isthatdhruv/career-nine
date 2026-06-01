@@ -178,6 +178,11 @@ const PaymentStatusPage = () => {
             localStorage.clear()
             localStorage.setItem("userStudentId", String(data.userStudentId))
             localStorage.setItem("allottedAssessments", JSON.stringify(data.assessments))
+            // Required by mintAssessmentSessionCookie on cookie expiry or
+            // when the student starts an assessment other than the one paid for.
+            if (data.studentDob) {
+              localStorage.setItem("studentDob", String(data.studentDob))
+            }
             setStatus("paid")
             setTimeout(() => navigate("/allotted-assessment"), 1500)
             return
@@ -192,7 +197,8 @@ const PaymentStatusPage = () => {
               setStatus("created")
             } else {
               // Provisioning didn't catch up. Show the "Payment Successful!" card
-              // without auto-redirect. Email with credentials has already been sent.
+              // without auto-redirect. Email with credentials has already been sent
+              // (Path A: from welcome email; covered by issue #5 in the audit).
               setStatus("paid")
             }
             return
@@ -209,6 +215,14 @@ const PaymentStatusPage = () => {
             pollTimer.current = setTimeout(pollStatus, 2000)
             setStatus("created")
           } else if (!navigateToCompletedIfUpgrade()) {
+            // Path A fallback: polling exhausted without the txn ever flipping
+            // to "paid" in DB. If Razorpay's redirect URL says paid, the
+            // webhook is just delayed and the welcome email with credentials
+            // is already sent — surface a graceful "we're confirming, check
+            // your email" state with a Continue-to-Login CTA (rendered below).
+            // If the URL doesn't say paid, fall back to the original
+            // "verifying" state so the student knows the payment isn't
+            // confirmed.
             setStatus(urlSaysPaid ? "paid" : "created")
           }
         })
@@ -534,9 +548,44 @@ const PaymentStatusPage = () => {
                   <path d="M22 2L11 13" /><path d="M22 2L15 22L11 13L2 9L22 2Z" />
                 </svg>
                 <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "#065f46" }}>
-                  Login credentials sent to your email
+                  Sign-in link & credentials sent to your email
                 </span>
               </div>
+              {/* Path A fallback CTA: when polling exhausted without webhook
+                  provisioning, the auto-redirect to /allotted-assessment never
+                  fires. Give the student a clear way forward — they can sign
+                  in with the credentials we already emailed (welcome email is
+                  fired from EntitlementService.sendWelcomeAssessmentLink
+                  before the webhook even returns). */}
+              {pollCount.current >= 15 && (
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    onClick={() => navigate("/student-login", { replace: true })}
+                    style={{
+                      padding: "10px 22px",
+                      borderRadius: 10,
+                      border: "none",
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      color: "#fff",
+                      fontSize: "0.88rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      boxShadow: "0 4px 14px rgba(16, 185, 129, 0.32)",
+                    }}
+                  >
+                    Continue to sign-in
+                  </button>
+                  <p style={{
+                    margin: "10px 0 0",
+                    color: "#94a3b8",
+                    fontSize: "0.75rem",
+                    lineHeight: 1.5,
+                  }}>
+                    Use the credentials from your welcome email, or click the
+                    magic link in the email to skip sign-in.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
-import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { useInstitutes } from "../../lib/queries/lookups";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
@@ -20,8 +21,15 @@ import {
   generateBetReportOneClick,
   generateNavigatorReportOneClick,
   updateStudentBasicInfo,
+  getStudentRoleGroups,
+  updateStudentRoleGroups,
+  getRoleGroupCatalog,
+  StudentRoleGroupRef,
+  StudentRoleGroupDetail,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
+import { getEntitlementsByStudent, EntitlementSummary } from "../B2C/API/Tracker_APIs";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 import * as XLSX from "xlsx";
 
 // Convert DOB from API (ISO timestamp or dd-MM-yyyy) to dd-MM-yyyy
@@ -56,6 +64,7 @@ type Student = {
   gender?: string;
   assessments?: StudentAssessmentInfo[];
   assignedAssessmentIds: number[];
+  roleGroups?: StudentRoleGroupRef[];
 };
 
 type StudentAssessmentInfo = {
@@ -66,10 +75,13 @@ type StudentAssessmentInfo = {
 
 export default function GroupStudentPage() {
   const navigate = useNavigate();
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  const { data: institutes = [] } = useInstitutes<any>();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [students, setStudents] = useState<Student[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  // Narrow to assessments mapped to the selected institute (falls back to all when
+  // nothing is picked or the institute has no mappings).
+  const { assessments } = useAssessmentsForInstitute(selectedInstitute, allAssessments);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(
@@ -80,7 +92,7 @@ export default function GroupStudentPage() {
 
   // ── Modal manager (consolidates 5 modals into one state object) ──
   type ModalState = {
-    type: "none" | "assessment" | "download" | "bulkDownload" | "reset" | "demographics" | "edit";
+    type: "none" | "assessment" | "download" | "bulkDownload" | "reset" | "demographics" | "edit" | "roleGroup";
     student: Student | null;
     assessmentId: number | null;
     assessmentName: string;
@@ -92,6 +104,15 @@ export default function GroupStudentPage() {
   // Edit student modal data
   const [editForm, setEditForm] = useState({ name: "", email: "", phoneNumber: "", studentDob: "" });
   const [editSaving, setEditSaving] = useState(false);
+
+  // Role-group modal data
+  const [roleGroupCatalog, setRoleGroupCatalog] = useState<StudentRoleGroupRef[]>([]);
+  const [roleGroupDetails, setRoleGroupDetails] = useState<StudentRoleGroupDetail[]>([]);
+  const [roleGroupEffective, setRoleGroupEffective] = useState<string[]>([]);
+  const [roleGroupSelectedIds, setRoleGroupSelectedIds] = useState<Set<number>>(new Set());
+  const [roleGroupLoading, setRoleGroupLoading] = useState(false);
+  const [roleGroupSaving, setRoleGroupSaving] = useState(false);
+  const [roleGroupError, setRoleGroupError] = useState<string>("");
 
   // Assessment modal data
   const [studentAssessments, setStudentAssessments] = useState<StudentAssessmentInfo[]>([]);
@@ -441,6 +462,7 @@ export default function GroupStudentPage() {
             gender: student.gender || "",
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
+            roleGroups: Array.isArray(student.roleGroups) ? student.roleGroups : [],
           };
         });
         setStudents(studentData);
@@ -568,6 +590,7 @@ export default function GroupStudentPage() {
             gender: student.gender || "",
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
+            roleGroups: Array.isArray(student.roleGroups) ? student.roleGroups : [],
           };
         });
         setStudents(studentData);
@@ -594,18 +617,11 @@ export default function GroupStudentPage() {
   };
 
   useEffect(() => {
-    ReadCollegeList()
-      .then((res: any) => {
-        const list = Array.isArray(res.data) ? res.data : [];
-        setInstitutes(list);
-      })
-      .catch((err: any) => console.error("Failed to fetch institutes", err));
-
-    // Fetch assessments (only active ones)
+    // Fetch assessments (only active ones) — the hook narrows this down per institute.
     getAllAssessments()
       .then((response) => {
         const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
+        setAllAssessments(activeOnly);
       })
       .catch((error) => {
         console.error("Error fetching assessments:", error);
@@ -654,6 +670,7 @@ export default function GroupStudentPage() {
               gender: student.gender || "",
               assessments: student.assessments || [],
               assignedAssessmentIds: assignedIds,
+              roleGroups: Array.isArray(student.roleGroups) ? student.roleGroups : [],
             };
           });
           setStudents(studentData);
@@ -1226,6 +1243,59 @@ export default function GroupStudentPage() {
     }
   };
 
+  // ── Thank-You picker state + handler ──
+  // Opens the assessment SPA's /studentAssessment/completed page for a chosen
+  // entitlement. When the student owns more than one entitlement (multi-
+  // assessment or multi-campaign) we surface a picker; with a single match we
+  // skip the picker and open the URL directly. Pre-checks on zero entitlements
+  // so we don't drop the admin onto an empty Thank-You shell.
+  const [thankYouLoadingFor, setThankYouLoadingFor] = useState<number | null>(null);
+  const [thankYouPicker, setThankYouPicker] = useState<{
+    student: Student;
+    options: EntitlementSummary[];
+  } | null>(null);
+  // Per-assessment Thank-You button inside the assessment modal. Cached
+  // entitlements avoid re-hitting the API for each click within the same modal
+  // session. assessmentThankYouLoadingFor tracks which assessment row's button
+  // is currently spinning.
+  const [modalEntitlements, setModalEntitlements] = useState<EntitlementSummary[] | null>(null);
+  const [assessmentThankYouLoadingFor, setAssessmentThankYouLoadingFor] = useState<number | null>(null);
+
+  const buildThankYouUrl = useCallback((student: Student, ent: EntitlementSummary) => {
+    const base = process.env.REACT_APP_ASSESSMENT_APP_URL || "https://assessment.career-9.com";
+    const params = new URLSearchParams({
+      e: String(ent.entitlementId),
+      userStudentId: String(student.userStudentId),
+    });
+    if (ent.assessmentId != null) params.set("assessmentId", String(ent.assessmentId));
+    return `${base}/studentAssessment/completed?${params.toString()}`;
+  }, []);
+
+  const handleOpenThankYou = async (student: Student) => {
+    if (!student?.userStudentId) return;
+    setThankYouLoadingFor(student.userStudentId);
+    try {
+      const { data } = await getEntitlementsByStudent(student.userStudentId);
+      const options = Array.isArray(data) ? data : [];
+      if (options.length === 0) {
+        showErrorToast(`No Thank-You page available — ${student.name || "this student"} doesn't have any campaign entitlements.`);
+        return;
+      }
+      if (options.length === 1) {
+        window.open(buildThankYouUrl(student, options[0]), "_blank", "noopener,noreferrer");
+        return;
+      }
+      setThankYouPicker({ student, options });
+    } catch (err) {
+      console.error("Failed to load entitlements for student", err);
+      showErrorToast("Could not load Thank-You options. Please try again.");
+    } finally {
+      setThankYouLoadingFor(null);
+    }
+  };
+
+  const closeThankYouPicker = () => setThankYouPicker(null);
+
   const handleEditStudent = (student: Student) => {
     setEditForm({
       name: student.name || "",
@@ -1270,6 +1340,87 @@ export default function GroupStudentPage() {
     }
   };
 
+  const handleViewRoleGroups = async (student: Student) => {
+    setModal({ type: "roleGroup", student, assessmentId: null, assessmentName: "", showConfirm: false });
+    setRoleGroupLoading(true);
+    setRoleGroupError("");
+    setRoleGroupDetails([]);
+    setRoleGroupEffective([]);
+    setRoleGroupSelectedIds(new Set());
+    try {
+      const [detailRes, catalogRes] = await Promise.all([
+        getStudentRoleGroups(student.userStudentId),
+        // Catalog is small and unlikely to change mid-session — cache after first load.
+        roleGroupCatalog.length === 0
+          ? getRoleGroupCatalog().then((r) => {
+              setRoleGroupCatalog(r.data || []);
+              return r;
+            })
+          : Promise.resolve({ data: roleGroupCatalog }),
+      ]);
+      const payload = detailRes.data;
+      setRoleGroupDetails(payload?.roleGroups || []);
+      setRoleGroupEffective(payload?.effectivePermissions || []);
+      setRoleGroupSelectedIds(
+        new Set((payload?.roleGroups || []).map((rg) => rg.id))
+      );
+    } catch (err: any) {
+      console.error("Failed to load role groups", err);
+      setRoleGroupError(
+        err?.response?.data || "Failed to load role groups for this student."
+      );
+    } finally {
+      setRoleGroupLoading(false);
+    }
+  };
+
+  const toggleRoleGroupSelection = (id: number) => {
+    setRoleGroupSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSaveRoleGroups = async () => {
+    if (!modal.student) return;
+    const studentId = modal.student.userStudentId;
+    setRoleGroupSaving(true);
+    setRoleGroupError("");
+    try {
+      const res = await updateStudentRoleGroups(
+        studentId,
+        Array.from(roleGroupSelectedIds)
+      );
+      const payload = res.data;
+      setRoleGroupDetails(payload?.roleGroups || []);
+      setRoleGroupEffective(payload?.effectivePermissions || []);
+      // Reflect in the table row so the chip updates without a full refetch.
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.userStudentId === studentId
+            ? {
+                ...s,
+                roleGroups: (payload?.roleGroups || []).map((rg) => ({
+                  id: rg.id,
+                  name: rg.name,
+                })),
+              }
+            : s
+        )
+      );
+      showSuccessToast("Role groups updated");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data || err?.message || "Failed to update role groups";
+      setRoleGroupError(typeof msg === "string" ? msg : "Failed to update role groups");
+      showErrorToast(typeof msg === "string" ? msg : "Failed to update role groups");
+    } finally {
+      setRoleGroupSaving(false);
+    }
+  };
+
   const handleViewAssessments = (student: Student) => {
     setModal({ type: "assessment", student, assessmentId: null, assessmentName: "", showConfirm: false });
     // Filter out deactivated assessments and deduplicate by assessmentId
@@ -1284,6 +1435,50 @@ export default function GroupStudentPage() {
       return true;
     });
     setStudentAssessments(deduplicated);
+    // Reset and prefetch entitlements for the per-assessment Thank-You buttons.
+    // Pre-fetching here means clicks on individual rows feel instant.
+    setModalEntitlements(null);
+    if (student?.userStudentId) {
+      getEntitlementsByStudent(student.userStudentId)
+        .then((res) => setModalEntitlements(Array.isArray(res.data) ? res.data : []))
+        .catch(() => setModalEntitlements([]));
+    }
+  };
+
+  // Per-assessment Thank-You navigation used from inside the assessment modal.
+  // Resolves the entitlement whose assessmentId matches the row's assessment
+  // and opens the assessment-app Thank-You page in a new tab. Falls back to a
+  // toast when no matching entitlement exists (student hasn't been issued one
+  // for this assessment yet).
+  const handleOpenThankYouForAssessment = async (
+    student: Student,
+    assessmentId: number,
+  ) => {
+    if (!student?.userStudentId) return;
+    setAssessmentThankYouLoadingFor(assessmentId);
+    try {
+      let entitlements = modalEntitlements;
+      if (!entitlements) {
+        const res = await getEntitlementsByStudent(student.userStudentId);
+        entitlements = Array.isArray(res.data) ? res.data : [];
+        setModalEntitlements(entitlements);
+      }
+      const match = entitlements.find(
+        (e) => Number(e.assessmentId) === Number(assessmentId),
+      );
+      if (!match) {
+        showErrorToast(
+          "No entitlement found for this assessment — the student hasn't been issued a campaign entitlement for it.",
+        );
+        return;
+      }
+      window.open(buildThankYouUrl(student, match), "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error("Failed to open Thank-You page for assessment", err);
+      showErrorToast("Could not open Thank-You page. Please try again.");
+    } finally {
+      setAssessmentThankYouLoadingFor(null);
+    }
   };
 
   const handleViewDemographics = async (student: Student, assessmentId: number, assessmentName: string) => {
@@ -2201,9 +2396,24 @@ export default function GroupStudentPage() {
                   </p>
                 </div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
-                    <thead>
+                <div
+                  className="table-responsive"
+                  style={{
+                    maxHeight: "calc(100vh - 320px)",
+                    overflowX: "auto",
+                    overflowY: "auto",
+                  }}
+                >
+                  <table
+                    className="table align-middle mb-0"
+                    style={{
+                      minWidth: "1280px",
+                      width: "100%",
+                      tableLayout: "auto",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                       <tr style={{ background: "#f8f9fa" }}>
                         <th
                           style={{
@@ -2270,6 +2480,17 @@ export default function GroupStudentPage() {
                           }}
                         >
                           DOB
+                        </th>
+                        <th
+                          style={{
+                            padding: "10px 12px",
+                            fontWeight: 600,
+                            color: "#1a1a2e",
+                            borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Role Group
                         </th>
                         <th
                           style={{
@@ -2438,6 +2659,43 @@ export default function GroupStudentPage() {
                               fontSize: "0.85rem",
                             }}
                           >
+                            <button
+                              type="button"
+                              className="btn btn-sm d-flex align-items-center gap-1 flex-wrap"
+                              onClick={() => handleViewRoleGroups(student)}
+                              title="View / edit role groups and permissions"
+                              style={{
+                                background: (student.roleGroups || []).length > 0
+                                  ? "rgba(76, 175, 80, 0.1)"
+                                  : "rgba(158, 158, 158, 0.12)",
+                                color: (student.roleGroups || []).length > 0 ? "#2e7d32" : "#666",
+                                border: (student.roleGroups || []).length > 0
+                                  ? "1px solid rgba(76, 175, 80, 0.3)"
+                                  : "1px dashed #bdbdbd",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
+                                fontWeight: 500,
+                                fontSize: "0.78rem",
+                                maxWidth: "220px",
+                                textAlign: "left",
+                                whiteSpace: "normal",
+                              }}
+                            >
+                              <i className="bi bi-shield-lock"></i>
+                              {(student.roleGroups || []).length > 0
+                                ? (student.roleGroups || [])
+                                    .map((rg) => rg.name)
+                                    .join(", ")
+                                : "None — assign"}
+                            </button>
+                          </td>
+                          <td
+                            style={{
+                              padding: "10px 12px",
+                              borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
+                            }}
+                          >
                             <select
                               value={student.selectedAssessment}
                               onChange={(e) =>
@@ -2512,7 +2770,14 @@ export default function GroupStudentPage() {
                               </button>
                               <button
                                 className="btn btn-sm d-flex align-items-center gap-1"
-                                onClick={() => navigate(`/student-dashboard/${student.userStudentId}`)}
+                                onClick={() => {
+                                  const params = new URLSearchParams({
+                                    studentId: String(student.userStudentId ?? ""),
+                                    name: student.name ?? "",
+                                    dob: student.studentDob ?? "",
+                                  });
+                                  window.open(`/student/dashboard-preview?${params.toString()}`, "_blank");
+                                }}
                                 style={{
                                   background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                                   color: "#fff",
@@ -2528,6 +2793,28 @@ export default function GroupStudentPage() {
                               >
                                 <i className="bi bi-speedometer2"></i>
                                 Dashboard
+                              </button>
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                onClick={() => handleOpenThankYou(student)}
+                                disabled={thankYouLoadingFor === student.userStudentId}
+                                title="Open the student's Thank-You page (assessment-app view)"
+                                style={{
+                                  background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+                                  color: "#fff",
+                                  border: "none",
+                                  padding: "5px 10px",
+                                  borderRadius: "6px",
+                                  fontWeight: 600,
+                                  fontSize: "0.78rem",
+                                  transition: "all 0.2s",
+                                  boxShadow: "0 2px 8px rgba(139, 92, 246, 0.3)",
+                                  whiteSpace: "nowrap",
+                                  opacity: thankYouLoadingFor === student.userStudentId ? 0.6 : 1,
+                                }}
+                              >
+                                <i className="bi bi-heart-fill"></i>
+                                {thankYouLoadingFor === student.userStudentId ? "Loading…" : "Thank You"}
                               </button>
                             </div>
                           </td>
@@ -2904,6 +3191,54 @@ export default function GroupStudentPage() {
                           <ActionIcon type="refresh" size="sm" />
                           Reset
                         </button>
+                        {/* Testing-only: open the assessment-app Thank-You page
+                            for this specific assessment. Resolves the matching
+                            entitlement under the hood. */}
+                        {(() => {
+                          const isThankYouLoading =
+                            assessmentThankYouLoadingFor === assessment.assessmentId;
+                          const hasEntitlement =
+                            modalEntitlements === null
+                              ? true
+                              : modalEntitlements.some(
+                                  (e) => Number(e.assessmentId) === Number(assessment.assessmentId),
+                                );
+                          return (
+                            <button
+                              className="btn btn-sm d-flex align-items-center gap-1"
+                              disabled={isThankYouLoading || !hasEntitlement}
+                              title={
+                                !hasEntitlement
+                                  ? "No campaign entitlement for this assessment"
+                                  : "Open the assessment-app Thank-You page (testing only)"
+                              }
+                              onClick={() =>
+                                handleOpenThankYouForAssessment(
+                                  modalStudent,
+                                  assessment.assessmentId,
+                                )
+                              }
+                              style={{
+                                borderRadius: "6px",
+                                padding: "5px 10px",
+                                fontWeight: 600,
+                                fontSize: "0.78rem",
+                                background: hasEntitlement
+                                  ? "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)"
+                                  : "#f1f5f9",
+                                color: hasEntitlement ? "#fff" : "#94a3b8",
+                                border: hasEntitlement ? "none" : "1px solid #e2e8f0",
+                                boxShadow: hasEntitlement
+                                  ? "0 2px 8px rgba(139, 92, 246, 0.3)"
+                                  : "none",
+                                opacity: isThankYouLoading ? 0.6 : 1,
+                              }}
+                            >
+                              <i className="bi bi-heart-fill"></i>
+                              {isThankYouLoading ? "Loading…" : "Thank You"}
+                            </button>
+                          );
+                        })()}
 
                         {/* Report actions group — only for completed */}
                         {isCompleted && (
@@ -4479,6 +4814,263 @@ export default function GroupStudentPage() {
       )}
 
       {/* Edit Student Modal */}
+      {modal.type === "roleGroup" && modal.student && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10060,
+          }}
+          onClick={closeModal}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              borderRadius: "20px",
+              maxWidth: "720px",
+              width: "92%",
+              maxHeight: "88vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                background: "linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)",
+                padding: "1rem 1.25rem",
+                borderRadius: "20px 20px 0 0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h5 className="mb-0 text-white fw-bold" style={{ fontSize: "1.1rem" }}>
+                <i className="bi bi-shield-lock me-2"></i>
+                Role Groups &amp; Permissions
+              </h5>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={closeModal}
+              ></button>
+            </div>
+
+            <div style={{ padding: "1.25rem", overflowY: "auto" }}>
+              <p className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>
+                Student:&nbsp;
+                <strong>#{modal.student.userStudentId}</strong>
+                &nbsp;&mdash;&nbsp;
+                {modal.student.name || modal.student.username || "Unnamed"}
+              </p>
+
+              {roleGroupError && (
+                <div className="alert alert-danger" style={{ fontSize: "0.85rem" }}>
+                  {roleGroupError}
+                </div>
+              )}
+
+              {roleGroupLoading ? (
+                <div className="text-center py-4">
+                  <span className="spinner-border spinner-border-sm me-2" />
+                  Loading role groups…
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <h6 className="fw-bold mb-2" style={{ fontSize: "0.9rem" }}>
+                      <i className="bi bi-list-check me-1"></i>
+                      Assign role groups
+                    </h6>
+                    {roleGroupCatalog.length === 0 ? (
+                      <p className="text-muted mb-0" style={{ fontSize: "0.85rem" }}>
+                        No role groups available in this system.
+                      </p>
+                    ) : (
+                      <div
+                        style={{
+                          maxHeight: "200px",
+                          overflowY: "auto",
+                          border: "1px solid #e0e0e0",
+                          borderRadius: "10px",
+                          padding: "0.5rem 0.75rem",
+                          background: "#fafbfc",
+                        }}
+                      >
+                        {roleGroupCatalog.map((rg) => {
+                          const checked = roleGroupSelectedIds.has(rg.id);
+                          return (
+                            <label
+                              key={rg.id}
+                              className="d-flex align-items-center gap-2 py-1"
+                              style={{ cursor: "pointer", fontSize: "0.88rem" }}
+                            >
+                              <input
+                                type="checkbox"
+                                className="form-check-input m-0"
+                                checked={checked}
+                                onChange={() => toggleRoleGroupSelection(rg.id)}
+                              />
+                              <span style={{ fontWeight: checked ? 600 : 400 }}>
+                                {rg.name}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mb-4">
+                    <h6 className="fw-bold mb-2" style={{ fontSize: "0.9rem" }}>
+                      <i className="bi bi-collection me-1"></i>
+                      Currently assigned ({roleGroupDetails.length})
+                    </h6>
+                    {roleGroupDetails.length === 0 ? (
+                      <p className="text-muted mb-0" style={{ fontSize: "0.85rem" }}>
+                        This student has no role groups assigned.
+                      </p>
+                    ) : (
+                      <div className="d-flex flex-column gap-2">
+                        {roleGroupDetails.map((rg) => (
+                          <div
+                            key={rg.id}
+                            style={{
+                              border: "1px solid #e0e0e0",
+                              borderRadius: "10px",
+                              padding: "0.6rem 0.75rem",
+                              background: "#fff",
+                            }}
+                          >
+                            <div className="d-flex align-items-center justify-content-between mb-1">
+                              <span className="fw-bold" style={{ fontSize: "0.88rem", color: "#1a1a2e" }}>
+                                {rg.name}
+                              </span>
+                              <span
+                                className="badge"
+                                style={{
+                                  background: "rgba(76, 175, 80, 0.12)",
+                                  color: "#2e7d32",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {rg.permissionCodes.length} perms
+                              </span>
+                            </div>
+                            {rg.permissionCodes.length > 0 ? (
+                              <div className="d-flex flex-wrap gap-1">
+                                {rg.permissionCodes.map((code) => (
+                                  <span
+                                    key={code}
+                                    className="badge"
+                                    style={{
+                                      background: "rgba(67, 97, 238, 0.08)",
+                                      color: "#3a0ca3",
+                                      fontWeight: 500,
+                                      fontSize: "0.72rem",
+                                    }}
+                                  >
+                                    {code}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted" style={{ fontSize: "0.78rem" }}>
+                                No permissions on this role group.
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h6 className="fw-bold mb-2" style={{ fontSize: "0.9rem" }}>
+                      <i className="bi bi-key me-1"></i>
+                      Effective permissions ({roleGroupEffective.length})
+                    </h6>
+                    {roleGroupEffective.length === 0 ? (
+                      <p className="text-muted mb-0" style={{ fontSize: "0.85rem" }}>
+                        No permissions granted through the current role groups.
+                      </p>
+                    ) : (
+                      <div className="d-flex flex-wrap gap-1">
+                        {roleGroupEffective.map((code) => (
+                          <span
+                            key={code}
+                            className="badge"
+                            style={{
+                              background: "rgba(67, 97, 238, 0.1)",
+                              color: "#4361ee",
+                              fontWeight: 500,
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            {code}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div
+              style={{
+                padding: "0.75rem 1.25rem",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "8px",
+              }}
+            >
+              <button
+                className="btn btn-secondary"
+                onClick={closeModal}
+                style={{ borderRadius: "10px" }}
+                disabled={roleGroupSaving}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                onClick={handleSaveRoleGroups}
+                disabled={roleGroupSaving || roleGroupLoading}
+                style={{
+                  background: "#2e7d32",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                }}
+              >
+                {roleGroupSaving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <ActionIcon type="approve" size="sm" className="me-1" />
+                    Save Role Groups
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal.type === "edit" && modal.student && (
         <div
           style={{
@@ -4622,6 +5214,190 @@ export default function GroupStudentPage() {
                     Save Changes
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Thank-You picker — surfaces only when a student owns multiple entitlements.
+          A single-entitlement student bypasses the modal and opens the URL directly
+          from handleOpenThankYou. Each row links to the assessment SPA's
+          /studentAssessment/completed page with the matching entitlement ID. */}
+      {thankYouPicker && (
+        <div
+          onClick={closeThankYouPicker}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.55)",
+            zIndex: 1050,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              width: "100%",
+              maxWidth: 560,
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div
+              style={{
+                background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+                color: "#fff",
+                padding: "1.1rem 1.4rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>
+                  Open Thank-You page
+                </h2>
+                <div style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: 2 }}>
+                  {thankYouPicker.student.name} · ID #{thankYouPicker.student.userStudentId}
+                </div>
+                <div style={{ fontSize: "0.78rem", opacity: 0.85, marginTop: 4 }}>
+                  This student has {thankYouPicker.options.length} assessments. Pick one to open.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeThankYouPicker}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#fff",
+                  fontSize: "1.5rem",
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  padding: 4,
+                }}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem 1rem 1rem" }}>
+              {thankYouPicker.options.map((opt) => {
+                const created = opt.createdAt
+                  ? new Date(opt.createdAt).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null;
+                return (
+                  <button
+                    key={opt.entitlementId}
+                    type="button"
+                    onClick={() => {
+                      window.open(
+                        buildThankYouUrl(thankYouPicker.student, opt),
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                      closeThankYouPicker();
+                    }}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      background: "#F8FAFC",
+                      border: "1px solid #E2E8F0",
+                      borderRadius: 10,
+                      padding: "0.75rem 0.9rem",
+                      marginBottom: 8,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#F1F5F9";
+                      e.currentTarget.style.borderColor = "#C4B5FD";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#F8FAFC";
+                      e.currentTarget.style.borderColor = "#E2E8F0";
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "0.92rem",
+                        color: "#0F172A",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {opt.assessmentName || `Assessment #${opt.assessmentId}`}
+                    </div>
+                    <div style={{ fontSize: "0.8rem", color: "#475569" }}>
+                      {opt.campaignName ? (
+                        <>
+                          <span style={{ fontWeight: 500 }}>{opt.campaignName}</span>
+                          <span style={{ margin: "0 6px", color: "#CBD5E1" }}>·</span>
+                        </>
+                      ) : null}
+                      <span
+                        style={{
+                          textTransform: "capitalize",
+                          color: opt.alreadyActive ? "#059669" : "#92400E",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {opt.status}
+                      </span>
+                      {created && (
+                        <>
+                          <span style={{ margin: "0 6px", color: "#CBD5E1" }}>·</span>
+                          <span>{created}</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                padding: "0.85rem 1.4rem",
+                borderTop: "1px solid #E5E7EB",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                onClick={closeThankYouPicker}
+                style={{
+                  background: "#F1F5F9",
+                  color: "#1E293B",
+                  border: "1px solid #CBD5E1",
+                  padding: "0.5rem 1rem",
+                  borderRadius: 10,
+                  fontSize: "0.9rem",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
               </button>
             </div>
           </div>

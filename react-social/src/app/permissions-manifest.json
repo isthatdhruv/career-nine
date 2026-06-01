@@ -1,0 +1,167 @@
+{
+  "assessment.create": [
+    "/admin-assessment-edit/:assessmentId/:studentId",
+    "/assessment-mapping",
+    "/assessment-questions/create",
+    "/assessment-questions/duplicates",
+    "/assessment-questions/edit/:id",
+    "/assessments/create",
+    "/assessments/create/step-2",
+    "/assessments/create/step-3",
+    "/assessments/create/step-4",
+    "/assessments/create/step-5",
+    "/assessments/edit/:id",
+    "/demographic-fields/create",
+    "/demographic-fields/edit/:id",
+    "/list/create",
+    "/list/edit/:id",
+    "/measured-qualities/create",
+    "/measured-qualities/edit/:id",
+    "/measured-quality-types/create",
+    "/measured-quality-types/edit/:id",
+    "/offline-assessment-upload",
+    "/old-data-mapping",
+    "/omr-data-upload",
+    "/question-sections/create",
+    "/question-sections/edit/:id",
+    "/questionare/create",
+    "/questionare/edit/:id",
+    "/score-debug",
+    "/text-response-mapping",
+    "/tools/create",
+    "/tools/edit/:id"
+  ],
+  "assessment.read": [
+    "/assessment-questions",
+    "/assessments",
+    "/demographic-fields",
+    "/list",
+    "/measured-qualities",
+    "/measured-quality-types",
+    "/question-sections",
+    "/student-dashboard/:studentId",
+    "/student/dashboard/assessments",
+    "/tools"
+  ],
+  "campaign.read": [
+    "/b2c/campaigns",
+    "/b2c/tracker"
+  ],
+  "campaign.write": [
+    "/b2c/campaigns/create",
+    "/b2c/campaigns/edit/:id",
+    "/b2c/pricing-tiers"
+  ],
+  "career.read": [
+    "/career",
+    "/career-suggestion"
+  ],
+  "career.write": [
+    "/career/create",
+    "/career/edit/:id"
+  ],
+  "counselling.read": [
+    "/counsellor/dashboard"
+  ],
+  "generated_report.read": [
+    "/student/dashboard/navigator-360",
+    "/student/dashboard/reports"
+  ],
+  "group.read": [
+    "/forgotpassword",
+    "group",
+    "groups"
+  ],
+  "group.write": [
+    "/batchgoogle"
+  ],
+  "institute.read": [
+    "/batch",
+    "/board",
+    "/branch",
+    "/college",
+    "/contact-person",
+    "/course",
+    "/dashboard/school-combined/:id",
+    "/dashboard/school-navigator/:id",
+    "/dashboard/school/:id",
+    "/section",
+    "/session"
+  ],
+  "institute.write": [
+    "/college/create",
+    "/contact-person/create"
+  ],
+  "payment.refund": [
+    "/payment-tracking",
+    "/promo-codes"
+  ],
+  "permission.grant": [
+    "/activity-log",
+    "/communication-logs"
+  ],
+  "report.export": [
+    "/send-reports"
+  ],
+  "report.read": [
+    "/bet-report-generation",
+    "/navigator-report-generation",
+    "/report-generation",
+    "/reports-hub",
+    "/roles/role",
+    "/unified-report-management"
+  ],
+  "report_template.read": [
+    "/admin/report-templates"
+  ],
+  "report_type.create": [
+    "/admin/report-types/create"
+  ],
+  "report_type.read": [
+    "/admin/report-types"
+  ],
+  "report_type.update": [
+    "/admin/report-types/edit/:id"
+  ],
+  "role.assign": [
+    "/user-management/roles/manage"
+  ],
+  "student.read": [
+    "/admin/jwt-tokens",
+    "/login/reset-password/enter-email",
+    "/school/assigned-students",
+    "/school/group-student",
+    "/student-list",
+    "/student/dashboard/counselling",
+    "/student/dashboard/view/:studentId",
+    "/student/registration-details",
+    "/student/university/result",
+    "/studentlist",
+    "/studentprofile",
+    "/teacher/class-dashboard"
+  ],
+  "student.write": [
+    "/registrar/verification",
+    "/student/registrar/page",
+    "/upload-excel"
+  ],
+  "student_management.read": [
+    "auth}\n        <Route path="
+  ],
+  "user.read": [
+    "/faculty/registration-details",
+    "/leads",
+    "/old-student-email"
+  ],
+  "user.write": [
+    "/admin/counselling-notifications",
+    "/admin/counselling-slots",
+    "/admin/counselling-students",
+    "/admin/counsellors",
+    "/counsellor/availability",
+    "/counsellor/session-notes/:id",
+    "/faculty/registration-form",
+    "/registrar/verification/faculty",
+    "/user-management/users/manage"
+  ]
+}

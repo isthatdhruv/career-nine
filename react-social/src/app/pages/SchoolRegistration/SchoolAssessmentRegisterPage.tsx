@@ -93,9 +93,10 @@ const SchoolAssessmentRegisterPage = () => {
   const selectedClassConfig = classes.find((c: any) => String(c.classId) === selectedClassId);
   const sections: any[] = selectedClassConfig?.sections || [];
   const assessmentName: string = selectedClassConfig?.assessmentName || "";
-  const amountPaise: number = selectedClassConfig?.amount || 0;
-  const amountRupees = amountPaise / 100;
-  const isPaid = amountPaise > 0;
+  // Backend /public/info returns the active tier amount already in rupees
+  // (SchoolAssessmentTier.amount; RazorpayService converts to paise at the API edge).
+  const amountRupees: number = selectedClassConfig?.amount || 0;
+  const isPaid = amountRupees > 0;
 
   const discountedAmountRupees = promoApplied
     ? amountRupees * (100 - promoApplied.discountPercent) / 100

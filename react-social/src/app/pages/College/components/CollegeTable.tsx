@@ -2,23 +2,19 @@
 import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiOutlineInfoCircle } from "react-icons/ai";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { Button, Dropdown } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdSchool, MdOutlineDashboard } from "react-icons/md";
+import { Dropdown } from "react-bootstrap";
+import { MdOutlineDashboard } from "react-icons/md";
 import { ActionIcon } from "../../../components/ActionIcon";
 
 import { DeleteCollegeData } from "../API/College_APIs";
-import CollegeEditModal from "./CollegeEditModal";
+import InstituteWizardModal from "./InstituteWizardModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
 import { showErrorToast } from '../../../utils/toast';
-import CollegeDetailModal from "./CollegeSectionSessionGradeModal";
-import AssessmentMappingModal from "./AssessmentMappingModal";
-import SchoolAssessmentMappingModal from "./SchoolAssessmentMappingModal";
-import InstituteStudentsModal from "./InstituteStudentsModal";
+// import InstituteStudentsModal from "./InstituteStudentsModal"; // disabled: see "Students at this institute" below
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
@@ -52,27 +48,87 @@ type ModalData = {
   contactPersons?: any[];
 };
 
+/**
+ * Generate institute initials for the placeholder badge.
+ * - "GL BAJAJ"      → "GB"   (first letter of first two words)
+ * - "Career-9"      → "CA"   (first two chars)
+ * - "KCC"           → "KC"
+ * - "" / undefined  → "?"
+ */
+function initialsFor(name?: string): string {
+  if (!name) return "?";
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const words = trimmed.split(/\s+/);
+  if (words.length >= 2 && words[0][0] && words[1][0]) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return trimmed.substring(0, 2).toUpperCase();
+}
+
+/**
+ * Square avatar shown in the Name column.
+ * - If the institute has a `schoolLogo` (base64 or URL), render that.
+ * - Otherwise fall back to a dark-teal placeholder badge with the institute's initials.
+ */
+const InstituteLogo: React.FC<{ logoUrl?: string; name?: string }> = ({
+  logoUrl,
+  name,
+}) => {
+  const baseStyle: React.CSSProperties = {
+    width: 36,
+    height: 36,
+    borderRadius: "50%",
+    flexShrink: 0,
+  };
+
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt={`${name ?? "Institute"} logo`}
+        style={{ ...baseStyle, objectFit: "contain" }}
+        className="shadow-sm"
+      />
+    );
+  }
+
+  return (
+    <div
+      aria-label={`${name ?? "Institute"} placeholder`}
+      title={name}
+      style={{
+        ...baseStyle,
+        background: "linear-gradient(135deg, #0c6b5a, #084a3e)",
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 700,
+        fontSize: 12,
+        letterSpacing: 0.5,
+        fontFamily:
+          "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      }}
+      className="shadow-sm"
+    >
+      {initialsFor(name)}
+    </div>
+  );
+};
+
 const CollegeTable = (props: {
   data?: CollegeRow[];
   setLoading: (v: boolean) => void;
   setPageLoading: (v: any) => void;
   onUploadClick?: (college: CollegeRow) => void;
 }) => {
-  const [modalShowEdit, setModalShowEdit] = useState(false);
-  const [editModalData, setEditModalData] = useState<CollegeRow>({
-    instituteName: "",
-    instituteAddress: "",
-    instituteCode: "",
-  });
+  const [wizardShow, setWizardShow] = useState(false);
+  const [wizardExisting, setWizardExisting] = useState<CollegeRow | null>(null);
 
   // Info modal state: typed as ModalData | undefined
   const [infoModalShow, setInfoModalShow] = useState(false);
   const [infoModalData, setInfoModalData] = useState<ModalData | undefined>(
-    undefined
-  );
-
-  const [detailModalShow, setDetailModalShow] = useState(false);
-  const [detailModalData, setDetailModalData] = useState<ModalData | undefined>(
     undefined
   );
 
@@ -81,18 +137,12 @@ const CollegeTable = (props: {
     undefined
   );
 
-  const [assessmentMappingModalShow, setAssessmentMappingModalShow] = useState(false);
-  const [schoolMappingModalShow, setSchoolMappingModalShow] = useState(false);
-  const [assessmentMappingInstitute, setAssessmentMappingInstitute] = useState<{
-    code: number;
-    name: string;
-  }>({ code: 0, name: "" });
-
-  const [studentsModalShow, setStudentsModalShow] = useState(false);
-  const [studentsModalInstitute, setStudentsModalInstitute] = useState<{
-    code: number;
-    name: string;
-  }>({ code: 0, name: "" });
+  // Students-at-this-institute flow disabled per product request.
+  // const [studentsModalShow, setStudentsModalShow] = useState(false);
+  // const [studentsModalInstitute, setStudentsModalInstitute] = useState<{
+  //   code: number;
+  //   name: string;
+  // }>({ code: 0, name: "" });
 
   const navigate = useNavigate();
   // convert a table row into the modal-compatible partial form shape
@@ -139,17 +189,25 @@ const CollegeTable = (props: {
         return Boolean(d.display);
       })
       .map((data) => ({
-        name: data.instituteName ?? "",
+        name: (
+          <div className="d-flex align-items-center gap-2">
+            <InstituteLogo
+              logoUrl={(data as { schoolLogo?: string }).schoolLogo}
+              name={data.instituteName}
+            />
+            <span>{data.instituteName ?? ""}</span>
+          </div>
+        ),
         code: data.instituteCode ?? "",
         address: data.instituteAddress ?? "",
         actions: (
-          <>
-            {/* Edit Button */}
+          <div className="d-flex align-items-center justify-content-center gap-1">
+            {/* Edit Button — opens the institute wizard pre-filled */}
             <button
               type="button"
               onClick={() => {
-                setEditModalData(data);
-                setModalShowEdit(true);
+                setWizardExisting(data);
+                setWizardShow(true);
               }}
               className="btn btn-icon btn-primary btn-sm me-3"
             >
@@ -213,21 +271,6 @@ const CollegeTable = (props: {
                 popperConfig={{ strategy: 'fixed' }}
                 renderOnMount
               >
-                {/* Add Course */}
-                <Link
-                  to="/course"
-                  state={{
-                    collegeId: data.instituteCode,
-                    college: data.instituteName,
-                  }}
-                  style={{ textDecoration: 'none' }}
-                >
-                  <Dropdown.Item as="button">
-                    <AiOutlineInfoCircle size={18} className="me-2" />
-                    Add Course
-                  </Dropdown.Item>
-                </Link>
-
                 {/* Info */}
                 <Dropdown.Item
                   onClick={() => {
@@ -237,17 +280,6 @@ const CollegeTable = (props: {
                 >
                   <AiOutlineInfoCircle size={18} className="me-2" />
                   Info
-                </Dropdown.Item>
-
-                {/* Add Details */}
-                <Dropdown.Item
-                  onClick={() => {
-                    setDetailModalData(toModalData(data));
-                    setDetailModalShow(true);
-                  }}
-                >
-                  <AiOutlineInfoCircle size={18} className="me-2" />
-                  Add Details
                 </Dropdown.Item>
 
                 {/* Assign Role */}
@@ -261,33 +293,49 @@ const CollegeTable = (props: {
                   Assign Roles
                 </Dropdown.Item>
 
-                {/* Assessment Mapping */}
+                {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx (opens in new tab) */}
                 <Dropdown.Item
-                  onClick={() => {
-                    setAssessmentMappingInstitute({
-                      code: Number(data.instituteCode),
-                      name: data.instituteName || "",
-                    });
-                    setAssessmentMappingModalShow(true);
-                  }}
+                  onClick={() =>
+                    window.open(
+                      `/dashboard/school/${data.instituteCode || data.id}`,
+                      "_blank",
+                      "noopener,noreferrer"
+                    )
+                  }
                 >
-                  <MdSchool size={18} className="me-2" />
-                  Assessment Mapping
-                </Dropdown.Item>
-                <Dropdown.Item
-                  onClick={() => {
-                    setAssessmentMappingInstitute({
-                      code: Number(data.instituteCode),
-                      name: data.instituteName || "",
-                    });
-                    setSchoolMappingModalShow(true);
-                  }}
-                >
-                  <MdSchool size={18} className="me-2" />
-                  School Registration Setup
+                  <MdOutlineDashboard size={18} className="me-2" />
+                  Dashboard 1
                 </Dropdown.Item>
 
-                {/* Manage student memberships for this institute */}
+                {/* Dashboard 2 -> Dashboards/SchoolNavigatorDashboardPage.tsx (opens in new tab) */}
+                <Dropdown.Item
+                  onClick={() =>
+                    window.open(
+                      `/dashboard/school-navigator/${data.instituteCode || data.id}`,
+                      "_blank",
+                      "noopener,noreferrer"
+                    )
+                  }
+                >
+                  <MdOutlineDashboard size={18} className="me-2" />
+                  Dashboard 2
+                </Dropdown.Item>
+
+                {/* Dashboard 3 -> Dashboards/SchoolCombinedDashboardPage.tsx (opens in new tab) */}
+                <Dropdown.Item
+                  onClick={() =>
+                    window.open(
+                      `/dashboard/school-combined/${data.instituteCode || data.id}`,
+                      "_blank",
+                      "noopener,noreferrer"
+                    )
+                  }
+                >
+                  <MdOutlineDashboard size={18} className="me-2" />
+                  Dashboard 3
+                </Dropdown.Item>
+
+                {/* Students at this institute — disabled per product request
                 <Dropdown.Item
                   onClick={() => {
                     setStudentsModalInstitute({
@@ -300,37 +348,10 @@ const CollegeTable = (props: {
                   <MdSchool size={18} className="me-2" />
                   Students at this institute
                 </Dropdown.Item>
+                */}
               </Dropdown.Menu>
             </Dropdown>
-
-            {/* Upload students excel for this institute */}
-            {/* <Button
-              variant="outline-success"
-              size="sm"
-              onClick={() => {
-                if (props.onUploadClick) {
-                  props.onUploadClick(editModalData);
-                }
-              }}
-              onClickCapture={() => {
-                if (typeof ({} as any) === "undefined") {}
-              }}
-            >
-            </Button> */}
-            {/* School Dashboard */}
-            <Button
-              variant="outline-info"
-              size="sm"
-              className="me-2"
-              onClick={() => navigate(`/school/principal/dashboard/${data.instituteCode || data.id}`)}
-            >
-              <IconContext.Provider value={{ style: { paddingBottom: "3px" } }}>
-                <MdOutlineDashboard />
-              </IconContext.Provider>
-              <span style={{ marginLeft: 6 }}>Dashboard</span>
-            </Button>
-
-          </>
+          </div>
         ),
       })) ?? [];
 
@@ -339,7 +360,7 @@ const CollegeTable = (props: {
       {
         label: "Name",
         field: "name",
-        width: 150,
+        width: 260,
         attributes: {
           "aria-controls": "DataTable",
           "aria-label": "Name",
@@ -349,18 +370,18 @@ const CollegeTable = (props: {
         label: "Code",
         field: "code",
         sort: "asc",
-        width: 100,
+        width: 140,
       },
       {
         label: "Address",
         field: "address",
-        width: 100,
+        width: 260,
       },
       {
         label: "Actions",
         field: "actions",
         sort: "disabled",
-        width: 150,
+        width: 220,
       },
     ],
     rows: rows,
@@ -379,6 +400,12 @@ const CollegeTable = (props: {
           position: fixed !important;
           z-index: 1050 !important;
         }
+        /* Center both the "Actions" header and the buttons below it so the
+           values sit directly underneath the column heading. */
+        .college-table-wrapper table thead th:last-child,
+        .college-table-wrapper table tbody td:last-child {
+          text-align: center !important;
+        }
       `}</style>
       <div className="college-table-wrapper" style={{ overflow: 'visible' }}>
         <MDBDataTableV5
@@ -390,12 +417,12 @@ const CollegeTable = (props: {
         />
       </div>
 
-      {/* Edit modal (existing) */}
-      <CollegeEditModal
-        show={modalShowEdit}
-        onHide={() => setModalShowEdit(false)}
-        data={editModalData}
+      {/* Institute wizard — used for both edit and manage actions */}
+      <InstituteWizardModal
+        show={wizardShow}
+        onHide={() => setWizardShow(false)}
         setPageLoading={props.setPageLoading}
+        existing={wizardExisting}
       />
 
       {/* Info modal */}
@@ -405,13 +432,6 @@ const CollegeTable = (props: {
         data={infoModalData}
         setPageLoading={props.setPageLoading}
       />
-      {/* Detail modal */}
-      <CollegeDetailModal
-        show={detailModalShow}
-        onHide={() => setDetailModalShow(false)}
-        data={detailModalData}
-        setPageLoading={props.setPageLoading}
-      />
 
       {/* Assign Roles */}
       <CollegeAssignRoleModal
@@ -419,30 +439,6 @@ const CollegeTable = (props: {
         onHide={() => setInfoRolesModalShow(false)}
         data={infoRolesModalData}
         setPageLoading={props.setPageLoading}
-      />
-
-      {/* Assessment Mapping */}
-      <AssessmentMappingModal
-        show={assessmentMappingModalShow}
-        onHide={() => setAssessmentMappingModalShow(false)}
-        instituteCode={assessmentMappingInstitute.code}
-        instituteName={assessmentMappingInstitute.name}
-      />
-
-      {/* School Registration Setup */}
-      <SchoolAssessmentMappingModal
-        show={schoolMappingModalShow}
-        onHide={() => setSchoolMappingModalShow(false)}
-        instituteCode={assessmentMappingInstitute.code}
-        instituteName={assessmentMappingInstitute.name}
-      />
-
-      {/* Student memberships for this institute */}
-      <InstituteStudentsModal
-        show={studentsModalShow}
-        onHide={() => setStudentsModalShow(false)}
-        instituteCode={studentsModalInstitute.code}
-        instituteName={studentsModalInstitute.name}
       />
     </>
   );

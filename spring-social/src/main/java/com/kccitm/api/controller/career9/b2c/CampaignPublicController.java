@@ -44,9 +44,13 @@ import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
 import com.kccitm.api.repository.Career9.b2c.PromoCodeCampaignRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.security.AuthCookieService;
+import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.RazorpayService;
+import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.StudentSessionService;
 
+import javax.servlet.http.HttpServletResponse;
 import java.text.SimpleDateFormat;
 
 @RestController
@@ -70,25 +74,38 @@ public class CampaignPublicController {
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private RazorpayService razorpayService;
     @Autowired private StudentSessionService studentSessionService;
+    @Autowired private StudentProvisioningService studentProvisioningService;
     @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
     @Autowired(required = false) private com.kccitm.api.service.b2c.EntitlementService entitlementService;
     @Autowired(required = false) private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
     @Autowired(required = false) private com.kccitm.api.service.b2c.LinkBuilder linkBuilder;
+    @Autowired private AuthCookieService authCookieService;
+    @Autowired private TokenProvider tokenProvider;
+    @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
 
+    @org.springframework.beans.factory.annotation.Value("${app.auth.assessmentTokenExpirationMsec:14400000}")
+    private long assessmentTokenExpirationMsec;
+
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @GetMapping("/info/{slug}")
     public ResponseEntity<?> infoBySlug(@PathVariable String slug) {
         return buildInfo(slug, null, null);
     }
 
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @GetMapping("/info/{slug}/{assessmentId}")
     public ResponseEntity<?> infoByAssessment(@PathVariable String slug,
                                               @PathVariable Long assessmentId) {
         return buildInfo(slug, assessmentId, null);
     }
 
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @GetMapping("/info/{slug}/{assessmentId}/{tierMappingId}")
     public ResponseEntity<?> infoByTier(@PathVariable String slug,
                                         @PathVariable Long assessmentId,
@@ -195,12 +212,15 @@ public class CampaignPublicController {
         return ResponseEntity.ok(response);
     }
 
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @PostMapping("/register/{slug}/{assessmentId}/{tierMappingId}")
     @Transactional
     public ResponseEntity<?> register(@PathVariable String slug,
                                       @PathVariable Long assessmentId,
                                       @PathVariable Long tierMappingId,
-                                      @RequestBody Map<String, Object> body) {
+                                      @RequestBody Map<String, Object> body,
+                                      HttpServletResponse httpResponse) {
 
         // 1. Resolve campaign
         Optional<Campaign> campaignOpt = campaignRepository.findBySlugIgnoreCaseAndIsDeletedFalse(slug);
@@ -247,6 +267,9 @@ public class CampaignPublicController {
         if (name == null || email == null || dobStr == null || phone == null) {
             return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
         }
+        if (!phone.matches("^[+]?[\\d\\s-]{7,15}$")) {
+            return ResponseEntity.badRequest().body("Please enter a valid phone number (7–15 digits)");
+        }
         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
         Date dob;
         try { dob = sdf.parse(dobStr); }
@@ -279,6 +302,14 @@ public class CampaignPublicController {
             promoCodeSaved = promo.getCode();
         }
 
+        // Defensive clamp — guards against >100% promo configs or negative
+        // priceOverrideInr. A 0-priced row routes to the free-path branch
+        // below; nothing in this flow should ever charge negative money.
+        if (finalInr < 0L) {
+            logger.warn("Promo math produced negative finalInr={} — clamping to 0", finalInr);
+            finalInr = 0L;
+        }
+
         // 5. Email-DOB duplicate check (impersonation block)
         List<StudentInfo> existingByEmail = studentInfoRepository.findByEmail(email);
         StudentInfo existing = existingByEmail.isEmpty() ? null : existingByEmail.get(0);
@@ -294,7 +325,7 @@ public class CampaignPublicController {
         if (finalInr == 0L) {
             return provisionFreeAndRespond(campaign, mapping, tierMapping, pricingTier,
                     existing, name, email, dob, dobStr, phone, gender,
-                    promoCodeSaved, promoDiscountPercent, originalInr);
+                    promoCodeSaved, promoDiscountPercent, originalInr, httpResponse);
         }
 
         // 7. Paid path → create Razorpay payment link + PaymentTransaction
@@ -308,6 +339,8 @@ public class CampaignPublicController {
      * lets the student start the assessment immediately. They pay for the report
      * later via /pay-for-report.
      */
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @PostMapping("/register-trial/{slug}/{assessmentId}")
     @Transactional
     public ResponseEntity<?> registerTrial(@PathVariable String slug,
@@ -346,6 +379,9 @@ public class CampaignPublicController {
         if (name == null || email == null || dobStr == null || phone == null) {
             return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
         }
+        if (!phone.matches("^[+]?[\\d\\s-]{7,15}$")) {
+            return ResponseEntity.badRequest().body("Please enter a valid phone number (7–15 digits)");
+        }
         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
         Date dob;
         try { dob = sdf.parse(dobStr); }
@@ -379,6 +415,7 @@ public class CampaignPublicController {
             userStudent = us.isEmpty()
                     ? userStudentRepository.save(new UserStudent(user, existing, null))
                     : us.get(0);
+            if (userStudent != null) studentProvisioningService.provision(userStudent);
         } else {
             user = new User((int) (Math.random() * 100000), dob);
             user.setName(name);
@@ -396,6 +433,7 @@ public class CampaignPublicController {
             info = studentInfoRepository.save(info);
 
             userStudent = userStudentRepository.save(new UserStudent(user, info, null));
+            studentProvisioningService.provision(userStudent);
         }
 
         // Set the campaign's institute as primary + record membership.
@@ -433,6 +471,8 @@ public class CampaignPublicController {
      * entitlement. Used by the thank-you page to decide what to render and by the
      * pay-for-report page to render its form.
      */
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @GetMapping("/upgrade-info/{entitlementId}")
     public ResponseEntity<?> upgradeInfo(@PathVariable Long entitlementId) {
         Optional<StudentEntitlement> eOpt = studentEntitlementRepository.findById(entitlementId);
@@ -514,6 +554,17 @@ public class CampaignPublicController {
         response.put("finalReportUrl", finalReportUrl);
         response.put("accessToken", e.getAccessToken());
         response.put("finalReportActive", e.getFinalReportActive());
+        // Entitlement-level service flags consumed by the assessment Thank-You
+        // page to drive (a) conditional outcome CTAs and (b) per-feature
+        // "Add <feature>" upsell cards. Sourced from StudentEntitlement (the
+        // denormalised snapshot of the PricingTier the student paid for) so
+        // they reflect what THIS student actually has, not the campaign as a
+        // whole. Counselling seat counts let the client gate the inline slot
+        // picker on remaining sessions without a second round-trip.
+        response.put("dashboardActive", e.getDashboardActive());
+        response.put("counsellingActive", e.getCounsellingActive());
+        response.put("counsellingSessionsTotal", e.getCounsellingSessionsTotal());
+        response.put("counsellingSessionsUsed", e.getCounsellingSessionsUsed());
         response.put("careerLibraryUrl", "https://library.career-9.com");
         return ResponseEntity.ok(response);
     }
@@ -523,6 +574,8 @@ public class CampaignPublicController {
      * assessment. Creates a PaymentTransaction + Razorpay link. The webhook chain
      * (activateOnPayment) finds the existing pending entitlement and upgrades it.
      */
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @PostMapping("/pay-for-report")
     @Transactional
     public ResponseEntity<?> payForReport(@RequestBody Map<String, Object> body) {
@@ -590,6 +643,14 @@ public class CampaignPublicController {
             promo.setCurrentUses(promo.getCurrentUses() + 1);
             promoCodeRepository.save(promo);
             promoCodeSaved = promo.getCode();
+        }
+
+        // Defensive clamp — guards against >100% promo configs or negative
+        // priceOverrideInr. A 0-priced row routes to the free-path branch
+        // below; nothing in this flow should ever charge negative money.
+        if (finalInr < 0L) {
+            logger.warn("Promo math produced negative finalInr={} — clamping to 0", finalInr);
+            finalInr = 0L;
         }
 
         StudentInfo studentInfo = null;
@@ -693,7 +754,15 @@ public class CampaignPublicController {
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier, StudentInfo existing,
             String name, String email, Date dob, String dobStr, String phone, String gender,
-            String promoCodeSaved, Integer promoDiscountPercent, long originalInr) {
+            String promoCodeSaved, Integer promoDiscountPercent, long originalInr,
+            HttpServletResponse httpResponse) {
+
+        // Re-check campaign expiry here. The /register entry already validated
+        // it, but the form may have sat open for hours — we don't want to
+        // mint an entitlement against an expired campaign.
+        if (campaign.getValidTo() != null && campaign.getValidTo().before(new Date())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Campaign has expired");
+        }
 
         // Create or reuse User+StudentInfo+UserStudent
         UserStudent userStudent;
@@ -712,6 +781,7 @@ public class CampaignPublicController {
             if (us.isEmpty()) {
                 UserStudent newUs = new UserStudent(user, existing, null);
                 userStudent = userStudentRepository.save(newUs);
+                studentProvisioningService.provision(userStudent);
             } else {
                 userStudent = us.get(0);
             }
@@ -733,6 +803,7 @@ public class CampaignPublicController {
 
             userStudent = new UserStudent(user, studentInfo, null);
             userStudent = userStudentRepository.save(userStudent);
+            studentProvisioningService.provision(userStudent);
         }
 
         membershipService.assignFromCampaign(userStudent, campaign, "campaign-register");
@@ -765,18 +836,54 @@ public class CampaignPublicController {
         }
         txn = paymentTransactionRepository.save(txn);
 
-        // Trigger entitlement activation (welcome email + tier service delivery)
-        if (entitlementService != null) {
-            try { entitlementService.activateOnPayment(txn.getTransactionId()); }
-            catch (Exception e) { logger.error("Entitlement activation failed (free path) for txn {}", txn.getTransactionId(), e); }
+        // Entitlement activation must succeed for the free path — it produces
+        // the access token, sends the welcome email, and is the row the
+        // thank-you page later resolves to decide what CTA to render. If it
+        // fails we MUST surface that to the caller rather than silently
+        // returning success: a free-path student without an entitlement has no
+        // way to ever get their report.
+        if (entitlementService == null) {
+            logger.error("Free path: entitlementService bean unavailable for txn {}", txn.getTransactionId());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Registration partially succeeded but entitlement activation is unavailable. Contact support.");
+        }
+        StudentEntitlement entitlement;
+        try {
+            entitlement = entitlementService.activateOnPayment(txn.getTransactionId());
+        } catch (Exception e) {
+            logger.error("Free path entitlement activation failed for txn {}", txn.getTransactionId(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Registration failed during entitlement activation. Please contact support — your transaction reference is "
+                            + txn.getTransactionId());
+        }
+        if (entitlement == null) {
+            logger.error("Free path activateOnPayment returned null for txn {}", txn.getTransactionId());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Registration failed during entitlement activation. Please contact support — your transaction reference is "
+                            + txn.getTransactionId());
         }
 
-        // Build session payload
+        // Issue the cn_at_asmnt cookie so the student is genuinely
+        // authenticated server-side when they land on /allotted-assessment.
+        // Without this, the assessment SPA was running purely on
+        // localStorage.userStudentId trust.
+        String sessionJwt = tokenProvider.createAssessmentSessionToken(
+                userStudent.getUserStudentId(), mapping.getAssessmentId(), userStudent.getUserId());
+        authCookieService.issueAssessmentSessionCookie(httpResponse, sessionJwt,
+                (int) (assessmentTokenExpirationMsec / 1000));
+
+        // Build session payload — keeps frontend-visible fields aligned with
+        // the trial / paid-callback responses (CampaignRegisterPage looks for
+        // each of these to seed localStorage before navigating).
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
-        response.put("message", "Registration successful! Please save your login credentials.");
+        response.put("message", "Registration successful.");
         response.put("username", user.getUsername());
         response.put("dob", dobStr);
+        response.put("entitlementId", entitlement.getEntitlementId());
+        response.put("campaignId", campaign.getCampaignId());
+        response.put("campaignSlug", campaign.getSlug());
+        response.put("purchasePath", entitlement.getPurchasePath());
         response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
         return ResponseEntity.ok(response);
     }
@@ -786,6 +893,11 @@ public class CampaignPublicController {
             PricingTier pricingTier,
             String name, String email, Date dob, String dobStr, String phone, String gender,
             long finalInr, long originalInr, String promoCodeSaved, Integer promoDiscountPercent) {
+
+        // Re-check campaign expiry — see provisionFreeAndRespond comment.
+        if (campaign.getValidTo() != null && campaign.getValidTo().before(new Date())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Campaign has expired");
+        }
 
         try {
             String description = pricingTier.getName() + " — " + campaign.getName();
@@ -833,6 +945,174 @@ public class CampaignPublicController {
             logger.error("Failed to create campaign payment link", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to create payment link. Please try again.");
+        }
+    }
+
+    // ── Counselling — slot list + booking, tokenised public endpoints ──────────
+    // These let the assessment SPA Thank-You page render an inline counselling
+    // slot picker without forcing the student through the dashboard login flow.
+    // Auth model: the entitlement accessToken issued at registration time is
+    // the only credential — same pattern as /entitlement/redeem-token and
+    // /campaign/public/pay-for-report. The token is read from the request body
+    // (not the URL) to keep it out of access logs.
+
+    /**
+     * Lists available counselling slots for the entitlement's student, filtered
+     * to counsellors allocated to the student's institute. Token-validated; no
+     * session cookie required. Read-only.
+     *
+     * <p>Body: {@code { token, entitlementId, from? (yyyy-MM-dd, default=today) }}.
+     * Response: {@code { slots: [...], sessionsRemaining: int }}.
+     */
+    // @PreAuthorize-Exempt: public b2c funnel — anonymous, gated by entitlement accessToken.
+    @PostMapping("/counselling/slots")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> listCounsellingSlots(@RequestBody Map<String, Object> body) {
+        String token = strFromBody(body, "token");
+        Long entitlementId = longFromBody(body, "entitlementId");
+        String fromStr = strFromBody(body, "from");
+
+        StudentEntitlement e = entitlementService == null
+                ? null : entitlementService.redeemAccessToken(token, entitlementId);
+        if (e == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
+        if (!Boolean.TRUE.equals(e.getCounsellingActive())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Counselling is not included in your plan");
+        }
+        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
+        int remaining = total - used;
+        if (remaining <= 0) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("No counselling sessions remaining");
+        }
+
+        Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
+        if (!usOpt.isPresent() || usOpt.get().getInstitute() == null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Student is not allotted to an institute");
+        }
+        Integer instituteCode = usOpt.get().getInstitute().getInstituteCode();
+
+        java.time.LocalDate from;
+        try {
+            from = (fromStr == null) ? java.time.LocalDate.now() : java.time.LocalDate.parse(fromStr);
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body("Invalid 'from' date (expected yyyy-MM-dd)");
+        }
+
+        if (bookingService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Counselling booking is not configured on this instance");
+        }
+        List<com.kccitm.api.model.career9.counselling.CounsellingSlot> slots =
+                bookingService.getAvailableSlotsForInstitute(from, instituteCode);
+
+        List<Map<String, Object>> slotDtos = new ArrayList<>();
+        for (com.kccitm.api.model.career9.counselling.CounsellingSlot s : slots) {
+            Map<String, Object> dto = new HashMap<>();
+            dto.put("slotId", s.getId());
+            dto.put("date", s.getDate().toString());
+            dto.put("startTime", s.getStartTime().toString());
+            dto.put("endTime", s.getEndTime().toString());
+            dto.put("durationMinutes", s.getDurationMinutes());
+            if (s.getCounsellor() != null) {
+                dto.put("counsellorName", s.getCounsellor().getName());
+            }
+            slotDtos.add(dto);
+        }
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("slots", slotDtos);
+        out.put("sessionsRemaining", remaining);
+        return ResponseEntity.ok(out);
+    }
+
+    /**
+     * Books one of the slots returned by {@link #listCounsellingSlots}.
+     * Decrements {@code counsellingSessionsUsed} on the entitlement in the same
+     * transaction as the booking, so seat exhaustion is honoured even under
+     * concurrent clicks.
+     *
+     * <p>Body: {@code { token, entitlementId, slotId, reason? }}.
+     */
+    // @PreAuthorize-Exempt: public b2c funnel — anonymous, gated by entitlement accessToken.
+    @PostMapping("/counselling/book")
+    @Transactional
+    public ResponseEntity<?> bookCounsellingSlot(@RequestBody Map<String, Object> body) {
+        String token = strFromBody(body, "token");
+        Long entitlementId = longFromBody(body, "entitlementId");
+        Long slotId = longFromBody(body, "slotId");
+        String reason = strFromBody(body, "reason");
+
+        if (slotId == null) {
+            return ResponseEntity.badRequest().body("slotId is required");
+        }
+
+        StudentEntitlement e = entitlementService == null
+                ? null : entitlementService.redeemAccessToken(token, entitlementId);
+        if (e == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
+        if (!Boolean.TRUE.equals(e.getCounsellingActive())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Counselling is not included in your plan");
+        }
+        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
+        if (total - used <= 0) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("No counselling sessions remaining");
+        }
+
+        Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
+        if (!usOpt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Student not found");
+        }
+        UserStudent student = usOpt.get();
+
+        if (bookingService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Counselling booking is not configured on this instance");
+        }
+
+        try {
+            com.kccitm.api.model.career9.counselling.CounsellingAppointment appt =
+                    bookingService.bookSlot(slotId, student, reason);
+            // Decrement the seat counter on the entitlement. Runs in the same
+            // transaction as the booking via Spring's default REQUIRED propagation
+            // — if the post-booking save fails, the slot transition rolls back too.
+            entitlementService.consumeCounsellingSession(entitlementId);
+
+            Map<String, Object> out = new HashMap<>();
+            out.put("appointmentId", appt.getId());
+            out.put("status", appt.getStatus());
+            if (appt.getSlot() != null) {
+                out.put("slotDate", appt.getSlot().getDate().toString());
+                out.put("slotStartTime", appt.getSlot().getStartTime().toString());
+                if (appt.getSlot().getCounsellor() != null) {
+                    out.put("counsellorName", appt.getSlot().getCounsellor().getName());
+                }
+            }
+            out.put("sessionsRemaining", total - used - 1);
+            return ResponseEntity.ok(out);
+        } catch (com.kccitm.api.exception.BadRequestException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        } catch (RuntimeException ex) {
+            logger.warn("Counselling booking failed for entitlement {}: {}", entitlementId, ex.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        }
+    }
+
+    private static Long longFromBody(Map<String, Object> body, String key) {
+        Object v = body.get(key);
+        if (v == null) return null;
+        try {
+            return Long.valueOf(v.toString());
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
 

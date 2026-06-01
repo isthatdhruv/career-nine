@@ -12,9 +12,19 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import org.hibernate.annotations.Filter;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 
+/**
+ * Phase 15-06 — ABAC row-level filter (scopeFilter). The user_student table
+ * has only an {@code institute_id} column (FK to institute_detail.institute_code);
+ * the session/course/section dimensions of the scopeFilter degenerate to no-op
+ * on this entity because those columns don't exist on user_student.
+ */
+@Filter(name = "scopeFilter", condition =
+        "(institute_id IN (:instituteIds) OR institute_id IS NULL)")
 @Entity
 @Table(name = "user_student")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})

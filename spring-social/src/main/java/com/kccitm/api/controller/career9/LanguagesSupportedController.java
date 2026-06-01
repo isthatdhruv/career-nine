@@ -3,6 +3,7 @@ package com.kccitm.api.controller.career9;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,17 +23,20 @@ public class LanguagesSupportedController {
     private LanguagesSupportedRepository LanguageRepository;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('language_supported.read')")
     public List<LanguagesSupported> getAllLanguages(){
         return LanguageRepository.findAll();
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('language_supported.read')")
     public LanguagesSupported getLanguageById(@PathVariable Long id){
         return LanguageRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("LanguagesSupported", "id", id));
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('language_supported.create')")
     public LanguagesSupported createLanguagesSupported(@RequestBody LanguagesSupported language){
         return LanguageRepository.save(language);
     }

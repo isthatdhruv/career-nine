@@ -10,10 +10,10 @@ import * as Yup from "yup";
 import { useAuth } from "../../modules/auth";
 import { Role_RoleGroupTable } from "./Role_RoleGroupTable";
 import {
-  readRoleData,
   readRole_RoleGroupData,
   upsertRole_RoleGroupData,
 } from "./components/core/Role_RoleGroup_APIs";
+import { useRoles } from "../../lib/queries/lookups";
 import { Role_RoleGroupCreateInput } from "./components/core/_models";
 
 const role_roleGroupValidation = Yup.object().shape({
@@ -24,34 +24,18 @@ const Role_RoleGroupPage = () => {
   const [role_roleGroupData, setRole_roleGroupData] = useState([]);
   const [loading, setloading] = useState(false);
   const [autorized, setAutorized] = useState(false);
-  const [options, setoptions] = useState([
-    { label: "Loading", value: 0, disabled: true },
-  ]);
+  const { data: rolesData = [] } = useRoles<any>();
+  const options = rolesData.map((r: any) => ({ label: r.name, value: r.id }));
 
   const location = useLocation();
   const currentUser = useAuth().currentUser;
-  // const authUser = currentUser?.authorityUrls?.includes(location.pathname)
 
   useEffect(() => {
-    // if (_.contains(currentUser!.authorityUrls!, location.pathname)) {
-    //   setAutorized(true);
-    // }
     setloading(true);
     try {
-      readRoleData().then((data) => {
-        var roleOptions = data.data.map((data: any) => {
-          return { label: data.name, value: data.id };
-        });
-        setoptions(roleOptions);
-        try {
-          readRole_RoleGroupData().then((data1) => {
-            setRole_roleGroupData(data1.data);
-            setloading(false);
-          });
-        } catch (error) {
-          console.error(error);
-          window.location.replace("/error");
-        }
+      readRole_RoleGroupData().then((data1) => {
+        setRole_roleGroupData(data1.data);
+        setloading(false);
       });
     } catch (error) {
       console.error(error);

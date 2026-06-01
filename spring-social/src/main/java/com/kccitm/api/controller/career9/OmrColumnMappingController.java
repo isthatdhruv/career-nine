@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.kccitm.api.model.career9.OmrColumnMapping;
@@ -25,6 +26,7 @@ public class OmrColumnMappingController {
     private AssessmentTableRepository assessmentTableRepository;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('omr_column_mapping.read')")
     public ResponseEntity<?> getAllMappings() {
         List<OmrColumnMapping> mappings = repository.findAll();
 
@@ -74,6 +76,7 @@ public class OmrColumnMappingController {
     }
 
     @GetMapping("/get/{assessmentId}/{instituteId}")
+    @PreAuthorize("@auth.allows('omr_column_mapping.read', #instituteId, null, null, null)")
     public ResponseEntity<?> getMapping(
             @PathVariable Long assessmentId,
             @PathVariable Long instituteId) {
@@ -85,11 +88,13 @@ public class OmrColumnMappingController {
     }
 
     @GetMapping("/get-by-assessment/{assessmentId}")
+    @PreAuthorize("@auth.allows('omr_column_mapping.read')")
     public ResponseEntity<List<OmrColumnMapping>> getByAssessment(@PathVariable Long assessmentId) {
         return ResponseEntity.ok(repository.findByAssessmentId(assessmentId));
     }
 
     @GetMapping("/get-by-questionnaire/{questionnaireId}")
+    @PreAuthorize("@auth.allows('omr_column_mapping.read')")
     public ResponseEntity<?> getByQuestionnaire(@PathVariable Long questionnaireId) {
         // 1. Try direct match on questionnaireId column
         Optional<OmrColumnMapping> mapping = repository.findFirstByQuestionnaireIdOrderByUpdatedAtDesc(questionnaireId);
@@ -110,6 +115,7 @@ public class OmrColumnMappingController {
     }
 
     @PostMapping("/save")
+    @PreAuthorize("@auth.allows('omr_column_mapping.create')")
     public ResponseEntity<?> saveMapping(@RequestBody Map<String, Object> body) {
         Long assessmentId = Long.valueOf(body.get("assessmentId").toString());
         Long instituteId = Long.valueOf(body.get("instituteId").toString());
@@ -140,6 +146,7 @@ public class OmrColumnMappingController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('omr_column_mapping.delete')")
     public ResponseEntity<?> deleteMapping(@PathVariable Long id) {
         repository.deleteById(id);
         return ResponseEntity.ok().build();

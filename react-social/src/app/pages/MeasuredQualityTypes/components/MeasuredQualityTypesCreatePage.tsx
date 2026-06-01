@@ -2,8 +2,10 @@ import clsx from "clsx";
 import { Field, Form, Formik } from "formik";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "react-query";
 import * as Yup from "yup";
-import { CreateMeasuredQualityTypesData, ReadMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
+import { CreateMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
+import { useMeasuredQualityTypes, lookupKeys } from "../../../lib/queries/lookups";
 
 const validationSchema = Yup.object().shape({
   measuredQualityTypeName: Yup.string().required("Quality Type name is required"),
@@ -13,26 +15,15 @@ const validationSchema = Yup.object().shape({
 
 const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
+  const { data: sections = [] } = useMeasuredQualityTypes<any>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const initialValues = {
     measuredQualityTypeName: "",
     measuredQualityTypeDescription: "",
     measuredQualityTypeDisplayName: "",
   };
-
-  useEffect(() => {
-    const fetchSections = async () => {
-      try {
-        const response = await ReadMeasuredQualityTypesData();
-        setSections(response.data);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      }
-    };
-    fetchSections();
-  }, []);
 
   return (
     <div className="container py-5">
@@ -49,6 +40,7 @@ const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading?: a
             setLoading(true);
             try {
               await CreateMeasuredQualityTypesData(values);
+              queryClient.invalidateQueries(lookupKeys.measuredQualityTypes);
               resetForm();
               navigate("/measured-quality-types");
             } catch (error) {

@@ -8,8 +8,9 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
-import { CreateQuestionData, UpdateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData, UploadQuestionMedia } from "../API/Question_APIs";
+import { useQuestionSections } from "../../../lib/queries/lookups";
+import { CreateQuestionData, UpdateQuestionData, ReadQuestionByIdData, UploadQuestionMedia } from "../API/Question_APIs";
+import { useMeasuredQualityTypes } from "../../../lib/queries/lookups";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 import { CheckLockedByQuestion } from "../../CreateAssessment/API/Create_Assessment_APIs";
 import { convertImageToWebP, generateVideoThumbnail, compressVideo } from "../../../utils/imageUtils";
@@ -39,8 +40,8 @@ interface Option {
 const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(true);
   const [isAssessmentLocked, setIsAssessmentLocked] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
-  const [mqt, setMqt] = useState<any[]>([]);
+  const { data: sections = [] } = useQuestionSections<any>();
+  const { data: mqt = [] } = useMeasuredQualityTypes<any>();
   const [questionData, setQuestionData] = useState<any>({
     questionText: "",
     questionType: "",
@@ -377,25 +378,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           initializeDerivedState(questionDataResult);
         }
 
-        // Fetch sections
-        let sectionsResult: any[] = [];
-        try {
-          const response = await ReadQuestionSectionDataList();
-          sectionsResult = response.data;
-        } catch (error) {
-          console.error("Error fetching sections:", error);
-        }
-        setSections(sectionsResult);
-
-        // Fetch measured quality types
-        let mqtResult: any[] = [];
-        try {
-          const response = await ReadMeasuredQualityTypes();
-          mqtResult = response.data;
-        } catch (error) {
-          console.error("Error fetching measured quality types:", error);
-        }
-        setMqt(mqtResult);
 
         // Fetch games
         let gamesResult: any[] = [];
@@ -547,8 +529,12 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
               const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'image');
               questionImageUrl = uploadResult.url;
             } catch (uploadErr) {
-              console.error("Media upload failed:", uploadErr);
-              showErrorToast("Image upload failed. Question will be saved without the image.");
+              // DO Spaces upload failed (often missing credentials in dev).
+              // Fall back to storing the base64 data URL inline on the question —
+              // the DB column is now LONGTEXT to hold it. The image still renders
+              // because <img src="data:image/..."> works natively.
+              console.warn("Media upload to DO Spaces failed; saving base64 inline.", uploadErr);
+              questionImageUrl = questionMediaBase64;
             }
           } else {
             questionImageUrl = questionMediaBase64;

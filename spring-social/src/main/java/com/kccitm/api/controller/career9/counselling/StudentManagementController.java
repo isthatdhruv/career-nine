@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -20,6 +21,7 @@ import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.service.StudentProvisioningService;
 
 /**
  * Admin endpoints for the "Manage Students" page — list students by institute
@@ -37,7 +39,11 @@ public class StudentManagementController {
     @Autowired
     private GeneratedReportRepository generatedReportRepository;
 
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
+
     /** Get all students for an institute with their flags */
+    @PreAuthorize("@auth.allows('counselling.student_management.read', #instituteCode, null, null, null)")
     @GetMapping("/by-institute/{instituteCode}")
     public ResponseEntity<List<Map<String, Object>>> getByInstitute(@PathVariable Integer instituteCode) {
         List<UserStudent> students = userStudentRepository.findByInstituteInstituteCode(instituteCode);
@@ -67,6 +73,8 @@ public class StudentManagementController {
     }
 
     /** Toggle the counsellingAllowed flag for a student */
+    // no scope arg: identifies by userStudentId; admin flag update
+    @PreAuthorize("@auth.allows('counselling.student_management.update')")
     @PutMapping("/counselling-allowed/{userStudentId}")
     public ResponseEntity<?> setCounsellingAllowed(
             @PathVariable Long userStudentId,
@@ -76,6 +84,7 @@ public class StudentManagementController {
         boolean value = Boolean.TRUE.equals(body.get("value"));
         student.setCounsellingAllowed(value);
         userStudentRepository.save(student);
+        studentProvisioningService.provision(student);
         logger.info("Set counsellingAllowed={} for student {}", value, userStudentId);
         return ResponseEntity.ok(Map.of("userStudentId", userStudentId, "counsellingAllowed", value));
     }
@@ -84,6 +93,8 @@ public class StudentManagementController {
      * Toggle report visibility for a student by flipping GeneratedReport.visibleToStudent
      * on every generated report that belongs to them — identical to the /reports-hub toggle.
      */
+    // no scope arg: identifies by userStudentId; admin report visibility update
+    @PreAuthorize("@auth.allows('counselling.student_management.update')")
     @PutMapping("/reports-visible/{userStudentId}")
     public ResponseEntity<?> setReportsVisible(
             @PathVariable Long userStudentId,

@@ -18,6 +18,9 @@ public interface GeneratedReportRepository extends JpaRepository<GeneratedReport
     Optional<GeneratedReport> findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(
             Long userStudentId, Long assessmentId, String typeOfReport);
 
+    Optional<GeneratedReport> findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+            Long userStudentId, Long assessmentId, Long reportTemplateId);
+
     List<GeneratedReport> findByUserStudentUserStudentId(Long userStudentId);
 
     List<GeneratedReport> findByUserStudentUserStudentIdAndTypeOfReport(Long userStudentId, String typeOfReport);

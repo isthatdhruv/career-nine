@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,18 +32,20 @@ public class RoleRoleGroupMappingController {
 	@Autowired
 	private RoleRepository roleRepository;
 
+	@PreAuthorize("@auth.allows('role_role_group_mapping.read.all')")
 	@GetMapping(value = "rolerolegroupmapping/get", headers = "Accept=application/json")
 	public List<RoleRoleGroupMapping> getAllRoles() {
 		List<RoleRoleGroupMapping> allRoleroleGroupMapping = roleRoleGroupMappingRepository.findByDisplay(true);
 		return allRoleroleGroupMapping;
 	}
 
+	@PreAuthorize("@auth.allows('role_role_group_mapping.update')")
 	@PostMapping(value = "rolerolegroupmapping/update", headers = "Accept=application/json")
 	public RoleGroup updateRoleRoleGroup(@RequestBody Map<String, RoleGroup> currentRoleGroupMapping) {
 		RoleGroup r = currentRoleGroupMapping.get("values");
 		RoleGroup rSaved = roleGroupRepository.save(r);
 		List<RoleGroup> t = roleGroupRepository.findByName(rSaved.getName());
-		int roleGroupID = t.get(t.size() - 1).getId();
+		Long roleGroupID = t.get(t.size() - 1).getId();
 		List<RoleRoleGroupMapping> rrList = new ArrayList<>();
 		Iterator<RoleRoleGroupMapping> rrIterators = r.getRoleRoleGroupMappings().iterator();
 		while (rrIterators.hasNext()) {
@@ -52,7 +55,7 @@ public class RoleRoleGroupMappingController {
 			rol.forEach(p -> {
 				if (p.getId() == y) {
 					rr.setRole(p);
-					rr.setRoleGroup((long) roleGroupID);
+					rr.setRoleGroup(roleGroupID);
 					rr.setDisplay(true);
 					rrList.add(rr);
 				}
@@ -68,12 +71,13 @@ public class RoleRoleGroupMappingController {
 		return roleGroupRepository.findByName(rSaved.getName()).get(0);
 	}
 
+	@PreAuthorize("@auth.allows('role_role_group_mapping.update')")
 	@PostMapping(value = "rolerolegroupmapping/update/{id}", headers = "Accept=application/json")
 	public RoleGroup updateRoleRoleGroup(@RequestBody Map<String, RoleGroup> currentRoleGroupMapping,
-			@PathVariable int id) {
+			@PathVariable Long id) {
 		RoleGroup r = currentRoleGroupMapping.get("values");
 		if (roleGroupRepository.findById(id) != null) {
-			roleRoleGroupMappingRepository.deleteAll(roleRoleGroupMappingRepository.findByRoleGroup((long) id));
+			roleRoleGroupMappingRepository.deleteAll(roleRoleGroupMappingRepository.findByRoleGroup(id));
 			roleGroupRepository.deleteById(id);
 		}
 
@@ -85,7 +89,7 @@ public class RoleRoleGroupMappingController {
 
 		for (RoleRoleGroupMapping d : rrRoleMapping) {
 			d.setId(dumID++);
-			d.setRoleGroup((long) rSaved.getId());
+			d.setRoleGroup(rSaved.getId());
 
 		}
 		;
@@ -94,6 +98,7 @@ public class RoleRoleGroupMappingController {
 		return roleGroupRepository.findByName(rSaved.getName()).get(0);
 	}
 
+	@PreAuthorize("@auth.allows('role_role_group_mapping.delete')")
 	@GetMapping(value = "rolerolegroupmapping/delete/{id}", headers = "Accept=application/json")
 	public RoleRoleGroupMapping deleteRoleRoleGroup(@PathVariable("id") int roleGroupId) {
 		RoleRoleGroupMapping roleGroup = roleRoleGroupMappingRepository.getOne(roleGroupId);

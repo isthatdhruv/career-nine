@@ -24,8 +24,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @Entity
 @Table(name = "generated_report",
     uniqueConstraints = @UniqueConstraint(
-        name = "uk_student_assessment_type",
-        columnNames = {"user_student_id", "assessment_id", "type_of_report"}
+        name = "uk_student_assessment_template",
+        columnNames = {"user_student_id", "assessment_id", "report_template_id"}
     ),
     indexes = {
         @Index(name = "idx_gr_assessment", columnList = "assessment_id"),
@@ -51,9 +51,25 @@ public class GeneratedReport implements Serializable {
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
 
-    // "bet" or "navigator"
+    // "bet"    = BET report (grades 3-5, single template)
+    // "legacy" = legacy 18-page Navigator report (kept for historical rows; was "navigator" pre-V20260526005)
+    // "pager"  = 4-pager Navigator report (grades 6+, three subtypes: insight / subject / career)
     @Column(name = "type_of_report", nullable = false, length = 50)
     private String typeOfReport;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "report_template_id", referencedColumnName = "report_template_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private ReportTemplate reportTemplate;
+
+    public ReportTemplate getReportTemplate() { return reportTemplate; }
+    public void setReportTemplate(ReportTemplate reportTemplate) { this.reportTemplate = reportTemplate; }
+
+    /** Convenience id for clients (filter generated reports by template). */
+    @com.fasterxml.jackson.annotation.JsonProperty("reportTemplateId")
+    public Long getReportTemplateId() {
+        return reportTemplate != null ? reportTemplate.getReportTemplateId() : null;
+    }
 
     // "notGenerated", "generated", "failed"
     @Column(name = "report_status", nullable = false, length = 50)

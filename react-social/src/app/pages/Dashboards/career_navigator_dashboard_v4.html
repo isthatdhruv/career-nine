@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Career Navigator 360 — School Dashboard v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --p:#0C6B5A;--pd:#084A3E;--pl:#E0F2EE;
+  --s:#36B37E;--acc:#F59E0B;--danger:#EF4444;
+  --info:#3B82F6;--purple:#7C3AED;
+  --bg:#F2F7F5;--card:#fff;--text:#1A2B28;
+  --muted:#5C7A72;--border:#D1E5DF;
+  --sh:0 2px 8px rgba(0,0,0,0.07);
+  --r:10px;--rs:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+
+/* ── TOP BAR ── */
+.topbar{background:var(--pd);color:#fff;padding:0 20px;display:flex;align-items:center;gap:16px;height:54px;position:sticky;top:0;z-index:100}
+.brand{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.brand-dot{width:8px;height:8px;background:var(--s);border-radius:50%}
+.role-nav{display:flex;gap:2px;flex:1}
+.rbtn{padding:7px 16px;background:transparent;color:rgba(255,255,255,0.6);border:none;cursor:pointer;font-size:12px;font-weight:500;border-radius:var(--rs);transition:all .2s;white-space:nowrap}
+.rbtn.active{background:rgba(255,255,255,0.16);color:#fff}
+.rbtn:hover:not(.active){background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.85)}
+.school-badge{font-size:11px;background:rgba(255,255,255,0.12);padding:3px 10px;border-radius:20px;white-space:nowrap;color:rgba(255,255,255,0.75)}
+.notif-bell{position:relative;cursor:pointer;font-size:16px;color:rgba(255,255,255,0.75);padding:4px}
+.notif-count{position:absolute;top:-2px;right:-2px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;padding:1px 4px;border-radius:8px;min-width:14px;text-align:center}
+
+/* ── DASH PANELS ── */
+.dash{display:none;padding:18px 20px 40px;max-width:1200px;margin:0 auto}
+.dash.active{display:block}
+
+/* ── SECTION LABELS ── */
+.section-header{margin-bottom:14px}
+.section-title{font-size:17px;font-weight:600;color:var(--pd)}
+.section-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.section-divider{display:flex;align-items:center;gap:10px;margin:18px 0 10px}
+.section-divider-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;padding:3px 10px;border-radius:12px}
+.school-potential-label{background:#E0F2EE;color:var(--pd)}
+.external-mapping-label{background:#FEF3C7;color:#92400E}
+.section-divider-line{flex:1;height:1px;background:var(--border)}
+
+/* ── NEP SECTION ── */
+.nep-section{margin-bottom:18px}
+.nep-section-header{background:var(--pd);color:#fff;border-radius:var(--r) var(--r) 0 0;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.nep-section-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+.nep-score-pill{background:rgba(255,255,255,0.18);padding:3px 12px;border-radius:12px;font-size:12px;font-weight:700}
+.nep-score-pill.warn{background:rgba(245,158,11,0.4);color:#FDE68A}
+.nep-section-legend{display:flex;gap:14px;font-size:10px}
+.nep-section-legend span{color:rgba(255,255,255,0.7);display:flex;align-items:center;gap:4px}
+.nep-cards-grid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r) var(--r);overflow:hidden;box-shadow:var(--sh)}
+.nep-card{background:var(--card);padding:14px 16px;border-right:1px solid var(--border);position:relative}
+.nep-card:last-child{border-right:none}
+.nep-card.warn-card{background:#FFFBEB}
+.nep-card.warn-card:hover{background:#FEF3C7}
+.nep-card:hover{background:#FAFCFB}
+.nep-card-status{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.nep-status-ok{width:20px;height:20px;border-radius:50%;background:#D1FAE5;display:flex;align-items:center;justify-content:center;font-size:10px;color:#065F46;flex-shrink:0;font-weight:700}
+.nep-status-warn{width:20px;height:20px;border-radius:50%;background:#FEF3C7;display:flex;align-items:center;justify-content:center;font-size:10px;color:#92400E;flex-shrink:0;font-weight:700}
+.nep-card-label{font-size:11px;font-weight:700;color:var(--text);flex:1}
+.nep-card-ref{font-size:9px;background:#E0F2EE;color:var(--pd);padding:1px 6px;border-radius:8px;white-space:nowrap}
+.nep-card-ref.warn-ref{background:#FDE68A;color:#92400E}
+.nep-card-body{font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:8px}
+.nep-card-guideline{background:#F0FDF4;border-left:3px solid var(--s);padding:7px 10px;border-radius:0 var(--rs) var(--rs) 0;font-size:11px;color:var(--pd);line-height:1.5;margin-bottom:6px}
+.nep-card-guideline.warn-gl{background:#FFFBEB;border-left-color:var(--acc);color:#92400E}
+.nep-card-guideline.danger-gl{background:#FEF2F2;border-left-color:var(--danger);color:#991B1B}
+.nep-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.nep-action-tag{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600}
+/* compact banner retained for other uses */
+.nep-banner{background:var(--pd);color:#fff;border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.nep-item-inline{display:flex;align-items:center;gap:6px;font-size:11px}
+.nep-ok{color:#6EE7B7}
+.nep-warn{color:#FCD34D}
+.nep-score{background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600}
+.nep-legend{margin-left:auto;display:flex;gap:10px;font-size:10px}
+.nep-legend-item{display:flex;align-items:center;gap:4px;color:rgba(255,255,255,0.7)}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--sh)}
+.card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px}
+
+/* ── KPI CARDS ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--sh);cursor:pointer;transition:all .18s;position:relative;overflow:hidden}
+.kpi-card:hover{border-color:var(--p);box-shadow:0 4px 16px rgba(12,107,90,0.15);transform:translateY(-1px)}
+.kpi-card::after{content:'↗';position:absolute;bottom:8px;right:10px;font-size:10px;color:var(--muted);opacity:0;transition:opacity .2s}
+.kpi-card:hover::after{opacity:1}
+.kpi-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.kpi-value{font-size:26px;font-weight:700;color:var(--pd);margin:5px 0 2px;line-height:1}
+.kpi-value.red{color:var(--danger)}
+.kpi-delta{font-size:11px;color:var(--muted)}
+.kpi-delta.up{color:var(--s)}
+.kpi-delta.warn{color:var(--acc)}
+.kpi-delta.danger{color:var(--danger)}
+.kpi-bar{height:3px;border-radius:2px;margin-top:10px}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.g12{display:grid;grid-template-columns:1fr 2fr;gap:14px;margin-bottom:14px}
+.g21{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}
+.mb14{margin-bottom:14px}
+
+/* ── CHART WRAP ── */
+.cw canvas{max-height:200px}
+.cw.tall canvas{max-height:260px}
+.cw.md canvas{max-height:230px}
+
+/* ── TABLE ── */
+.dtable{width:100%;border-collapse:collapse;font-size:12px}
+.dtable th{text-align:left;padding:7px 9px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:1px solid var(--border);background:#FAFCFB}
+.dtable td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:middle}
+.dtable tr:last-child td{border-bottom:none}
+.dtable tr:hover td{background:#F8FDFB}
+.tscroll{overflow-x:auto}
+
+/* ── BADGES ── */
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600}
+.bh{background:#D1FAE5;color:#065F46}
+.bm{background:#FEF3C7;color:#92400E}
+.bl{background:#FEE2E2;color:#991B1B}
+.bn{background:#F3F4F6;color:#6B7280}
+.bb{background:#DBEAFE;color:#1E40AF}
+.bp{background:#EDE9FE;color:#5B21B6}
+.bt{background:var(--pl);color:var(--pd)}
+.br{background:#FFE4E6;color:#9F1239}
+
+/* ── DOTS ── */
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+.dr{background:var(--danger)}.dy{background:var(--acc)}.dg{background:var(--s)}
+
+/* ── PROGRESS ── */
+.pb{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.pf{height:100%;border-radius:3px}
+
+/* ── INSIGHT BOX ── */
+.insight{background:var(--pl);border:1px solid rgba(12,107,90,0.2);border-radius:var(--rs);padding:9px 11px;font-size:11px;color:var(--pd);display:flex;gap:8px;margin-top:10px}
+
+/* ── LEGEND ── */
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)}
+.ld{width:9px;height:9px;border-radius:50%}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px}
+.modal-bg.open{display:flex}
+.modal{background:var(--card);border-radius:var(--r);padding:0;max-width:820px;width:100%;max-height:85vh;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.2);display:flex;flex-direction:column}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#FAFCFB}
+.modal-head h3{font-size:15px;font-weight:600;color:var(--pd)}
+.modal-body{padding:18px 20px;overflow-y:auto;flex:1}
+.modal-close{background:none;border:1px solid var(--border);border-radius:var(--rs);padding:4px 10px;cursor:pointer;font-size:12px;color:var(--muted)}
+.modal-close:hover{background:var(--border)}
+
+/* ── TOOLTIP ── */
+.tt-wrap{position:relative;display:inline-block;cursor:pointer}
+.tt-box{display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--pd);color:#fff;border-radius:var(--rs);padding:10px 13px;font-size:11px;z-index:200;width:240px;line-height:1.5;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.2)}
+.tt-box::before{content:'';position:absolute;top:-5px;left:50%;transform:translateX(-50%);border:5px solid transparent;border-bottom-color:var(--pd);border-top:none}
+.tt-wrap:hover .tt-box{display:block}
+
+/* ── TEACHER ── */
+.filter-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.fsel{padding:6px 10px;border:1px solid var(--border);border-radius:var(--rs);font-size:12px;background:var(--card);color:var(--text);cursor:pointer}
+.flabel{font-size:11px;color:var(--muted)}
+.btn{padding:6px 12px;border-radius:var(--rs);border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:12px;font-weight:500;transition:all .15s}
+.btn:hover{background:var(--pl);border-color:var(--p);color:var(--pd)}
+.btn-primary{background:var(--p);color:#fff;border-color:var(--p)}
+.btn-primary:hover{background:var(--pd);color:#fff}
+.btn-sm{padding:4px 9px;font-size:11px}
+.btn-danger{background:#FEE2E2;color:#991B1B;border-color:#FECACA}
+.btn-danger:hover{background:#FCA5A5;color:#7F1D1D}
+
+/* ── SECTION COMPARISON ── */
+.comp-bar-wrap{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.comp-bar-label{font-size:11px;width:50px;color:var(--text);flex-shrink:0}
+.comp-bar-inner{flex:1}
+.comp-bar-val{font-size:11px;font-weight:600;color:var(--pd);width:32px;text-align:right}
+.my-section{font-weight:700;color:var(--pd)}
+
+/* ── NOTE BOX ── */
+.note-area{width:100%;min-height:72px;padding:9px;border:1px solid var(--border);border-radius:var(--rs);font-size:12px;resize:vertical;font-family:inherit;color:var(--text);outline:none}
+.note-area:focus{border-color:var(--p)}
+.note-item{background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;font-size:12px;margin-bottom:6px}
+.note-meta{font-size:10px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:3px}
+.note-reply{background:#EEF2FF;border:1px solid #C7D2FE;border-radius:var(--rs);padding:7px 10px;font-size:11px;margin-top:5px;color:#3730A3}
+.note-reply-meta{font-size:10px;color:#6366F1;margin-bottom:2px}
+
+/* ── COUNSELLOR ── */
+.cl-layout{display:grid;grid-template-columns:280px 1fr;gap:14px}
+.slist-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;display:flex;flex-direction:column}
+.slist-head{padding:10px 12px;border-bottom:1px solid var(--border);background:#FAFCFB;flex-shrink:0}
+.ssearch{width:100%;padding:6px 9px;border:1px solid var(--border);border-radius:var(--rs);font-size:12px;background:#fff;color:var(--text);outline:none}
+.ssearch:focus{border-color:var(--p)}
+.slist{overflow-y:auto;flex:1;max-height:480px}
+.sitem{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;transition:background .15s}
+.sitem:hover{background:var(--pl)}
+.sitem.active{background:var(--pl);border-left:3px solid var(--p)}
+.sitem-name{font-size:12px;font-weight:500}
+.sitem-cls{font-size:10px;color:var(--muted)}
+.cci-tabs{display:flex;gap:3px;margin-top:7px;flex-wrap:wrap}
+.ctab{padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.ctab-all{background:var(--p);color:#fff}
+.ctab-high{background:#D1FAE5;color:#065F46}
+.ctab-mod{background:#FEF3C7;color:#92400E}
+.ctab-low{background:#FEE2E2;color:#991B1B}
+.ctab-none{background:#F3F4F6;color:#6B7280}
+.sdetail{display:flex;flex-direction:column;gap:12px}
+
+/* ── MSG/NOTIF ── */
+.notif-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--sh);margin-bottom:14px}
+.notif-panel-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.msg-item{background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px;margin-bottom:8px}
+.msg-from{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--p);margin-bottom:3px}
+.msg-from.from-principal{color:#7C3AED}
+.msg-from.from-teacher{color:#0891B2}
+.msg-body{font-size:12px;color:var(--text);line-height:1.5}
+.msg-time{font-size:10px;color:var(--muted)}
+.reply-to{font-style:italic;color:var(--muted);font-size:11px;margin-top:5px;padding-top:5px;border-top:1px solid var(--border)}
+.unread-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);margin-right:4px;vertical-align:middle}
+
+/* ── STUDENT DASH ── */
+.prof-header{background:linear-gradient(135deg,var(--pd),var(--p));border-radius:var(--r);padding:16px;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:14px}
+.avatar{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0}
+.prof-name{font-size:17px;font-weight:600}
+.prof-info{font-size:11px;opacity:.8;margin-top:2px}
+.stags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.stag{background:rgba(255,255,255,0.18);padding:2px 7px;border-radius:10px;font-size:10px}
+
+/* ── PILLARS ── */
+.prow{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.plabel{width:120px;font-size:11px;color:var(--muted);flex-shrink:0}
+.pval{width:36px;text-align:right;font-size:11px;font-weight:600;color:var(--pd)}
+
+/* ── QR ── */
+.qr-box{background:var(--pd);border-radius:var(--rs);padding:14px;text-align:center;color:#fff}
+.qr-code{width:90px;height:90px;background:#fff;border-radius:4px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.qr-code canvas{width:90px!important;height:90px!important}
+
+/* ── STRATEGY ── */
+.strat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.strat-card{background:var(--pl);border:1px solid rgba(12,107,90,0.2);border-radius:var(--rs);padding:10px}
+.strat-icon{font-size:16px;margin-bottom:3px}
+.strat-title{font-size:11px;font-weight:600;color:var(--pd)}
+.strat-desc{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.4}
+
+/* ── GRADE BADGE TABLE ── */
+.grade-comp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.grade-comp-card{background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px;text-align:center}
+.grade-comp-grade{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.grade-comp-val{font-size:20px;font-weight:700;color:var(--pd)}
+.grade-comp-bar{margin-top:5px}
+
+/* ── NEP BUTTON BAR ── */
+.nep-btn-bar{background:var(--pd);border-radius:var(--r);padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.nep-btn-bar-title{font-size:12px;font-weight:700;color:#fff;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.nep-btn{padding:6px 14px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .18s;display:flex;align-items:center;gap:5px}
+.nep-btn-ok{background:rgba(110,231,183,0.2);color:#6EE7B7;border:1px solid rgba(110,231,183,0.35)}
+.nep-btn-ok:hover{background:rgba(110,231,183,0.3);color:#fff}
+.nep-btn-warn{background:rgba(252,211,77,0.2);color:#FCD34D;border:1px solid rgba(252,211,77,0.35)}
+.nep-btn-warn:hover{background:rgba(252,211,77,0.3);color:#fff}
+.nep-overall{background:rgba(255,255,255,0.12);padding:3px 12px;border-radius:12px;font-size:11px;font-weight:700;color:#fff;margin-left:auto}
+
+/* ── CALENDAR ── */
+.cal-wrap{user-select:none}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-nav{background:none;border:1px solid var(--border);border-radius:var(--rs);padding:4px 9px;cursor:pointer;font-size:12px;color:var(--text)}
+.cal-nav:hover{background:var(--pl)}
+.cal-month{font-size:13px;font-weight:600;color:var(--pd)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-day-label{text-align:center;font-size:10px;font-weight:700;color:var(--muted);padding:4px 0}
+.cal-day{text-align:center;padding:6px 0;font-size:12px;border-radius:var(--rs);cursor:pointer;border:1px solid transparent;transition:all .15s;position:relative}
+.cal-day:hover{background:var(--pl);border-color:var(--p)}
+.cal-day.today{background:var(--p);color:#fff;font-weight:700}
+.cal-day.has-appt{background:#EDE9FE;color:var(--purple);font-weight:600}
+.cal-day.has-appt::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--purple)}
+.cal-day.empty{cursor:default}
+.appt-list{margin-top:12px;max-height:160px;overflow-y:auto}
+.appt-item{background:#F8FDFB;border:1px solid var(--border);border-left:3px solid var(--p);border-radius:var(--rs);padding:7px 9px;margin-bottom:6px;font-size:11px}
+.appt-time{font-weight:600;color:var(--pd)}
+.appt-student{color:var(--text);margin-top:1px}
+.appt-type{font-size:10px;color:var(--muted)}
+
+/* ── DOWNLOAD BUTTON ── */
+.dl-btn{display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--pd);color:#fff;border:none;border-radius:var(--rs);cursor:pointer;font-size:12px;font-weight:600;transition:all .18s}
+.dl-btn:hover{background:var(--p)}
+
+/* ── REPORT CARD SUMMARY ── */
+.rc-modal-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#EDE9FE;color:var(--purple);border:1px solid #C4B5FD;border-radius:var(--rs);font-size:10px;font-weight:600;cursor:pointer;transition:all .15s}
+.rc-modal-btn:hover{background:#DDD6FE}
+
+/* ── BOOK APPT CARD ── */
+.appt-book-card{background:var(--pd);border-radius:var(--rs);padding:12px 14px;color:#fff;margin-top:10px}
+.appt-book-title{font-size:12px;font-weight:700;margin-bottom:6px}
+.appt-book-body{font-size:11px;opacity:.85;margin-bottom:10px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand"><div class="brand-dot"></div>Career Navigator 360</div>
+  <div class="role-nav">
+    <button class="rbtn active" onclick="switchRole('principal',this)">🏫 Principal</button>
+    <button class="rbtn" onclick="switchRole('teacher',this)">📖 Teacher</button>
+    <button class="rbtn" onclick="switchRole('counsellor',this)">🧠 Counsellor</button>
+    <button class="rbtn" onclick="switchRole('student',this)">🎓 Student</button>
+  </div>
+  <div class="school-badge">Sunrise Public School, Nashik</div>
+  <div class="notif-bell" onclick="switchRole('counsellor',document.querySelectorAll('.rbtn')[2])">
+    🔔<span class="notif-count" id="notifCount">3</span>
+  </div>
+</div>
+
+<!-- ════════════════ PRINCIPAL ════════════════ -->
+<div id="dash-principal" class="dash active">
+  <div class="section-header">
+    <div class="section-title">School Intelligence Overview</div>
+    <div class="section-sub">Navigator 360 · AY 2024-25 · Grades 6–12 · NEP 2020 &amp; CBSE Career Guidance Framework</div>
+  </div>
+
+  <!-- NEP & CBSE BUTTON BAR -->
+  <div class="nep-btn-bar">
+    <div class="nep-btn-bar-title">
+      📋 NEP 2020 &amp; CBSE Compliance
+    </div>
+    <button class="nep-btn nep-btn-ok" onclick="openModal('nep1')">✔ Career Guidance Gr 6–12</button>
+    <button class="nep-btn nep-btn-ok" onclick="openModal('nep2')">✔ Holistic Assessment</button>
+    <button class="nep-btn nep-btn-ok" onclick="openModal('nep3')">✔ Multiple Intelligences</button>
+    <button class="nep-btn nep-btn-ok" onclick="openModal('nep4')">✔ CBSE Guidance Cell</button>
+    <button class="nep-btn nep-btn-warn" onclick="openModal('nep5')">! Vocational Integration (34%)</button>
+    <button class="nep-btn nep-btn-warn" onclick="openModal('nep6')">! Experiential Field Trips</button>
+    <div class="nep-overall">6 / 8 Compliant</div>
+  </div>
+
+  <!-- NEP MODALS -->
+  <div class="modal-bg" id="modal-nep1">
+    <div class="modal"><div class="modal-head"><h3>✔ Career Guidance Gr 6–12 — NEP §15.6</h3><button class="modal-close" onclick="closeModal('nep1')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="insight" style="margin-bottom:14px"><span>📌</span><span>NEP 2020 mandates age-appropriate career counselling from Grade 6 onward as a <strong>continuous journey</strong>, not a one-time test. The policy explicitly moves away from stream-selection pressure in Grade 10–11 toward gradual, informed career awareness built year by year.</span></div>
+      <div style="font-size:13px;font-weight:600;color:var(--pd);margin-bottom:10px">What the policy requires</div>
+      <ul style="font-size:12px;line-height:1.8;color:var(--text);padding-left:18px;margin-bottom:14px">
+        <li>Career exposure and exploration activities for Grades 6, 7, and 8 — age-appropriate, interest-based</li>
+        <li>Subject-awareness counselling in Grades 9–10 to inform stream selection</li>
+        <li>Professional career guidance and college readiness support in Grades 11–12</li>
+        <li>Counsellor-to-student ratio: recommended 1:150 by NEP (CBSE guideline)</li>
+        <li>Documentation of each student's career journey — updated annually</li>
+      </ul>
+      <div style="font-size:13px;font-weight:600;color:var(--s);margin-bottom:8px">How your school complies</div>
+      <div style="background:#F0FDF4;border-left:3px solid var(--s);padding:10px 14px;border-radius:0 var(--rs) var(--rs) 0;font-size:12px;line-height:1.7;color:var(--text)">
+        Navigator 360 is active across all three stages: <strong>Insight Navigator (Gr 6–8)</strong> builds self-awareness through interests, values, and learning styles; <strong>Subject Navigator (Gr 9–10)</strong> links learning styles to subject selection; <strong>Career Navigator (Gr 11–12)</strong> provides suitability scoring and college readiness guidance. All 487 students are covered. Digital records are maintained per student in the Counsellor dashboard.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <span class="badge bh">487 students covered</span>
+        <span class="badge bb">3-stage pipeline active</span>
+        <span class="badge bt">Counsellor dashboard live</span>
+        <span class="badge bp">Annual records maintained</span>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="modal-bg" id="modal-nep2">
+    <div class="modal"><div class="modal-head"><h3>✔ Holistic Progress Assessment — NEP §4.37 &amp; CBSE HP Card</h3><button class="modal-close" onclick="closeModal('nep2')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="insight" style="margin-bottom:14px"><span>📌</span><span>NEP 2020 §4.37 requires that assessment move beyond marks and grades to capture the whole child — including character, competencies, creativity, and collaboration. CBSE's Holistic Progress Card (introduced 2023) operationalises this for Classes 3–8 and is being extended through Class 12.</span></div>
+      <div style="font-size:13px;font-weight:600;color:var(--pd);margin-bottom:10px">What the policy requires</div>
+      <ul style="font-size:12px;line-height:1.8;color:var(--text);padding-left:18px;margin-bottom:14px">
+        <li>Assessment across cognitive, emotional, social, and physical domains</li>
+        <li>No ranking or comparison between students — individual growth tracking</li>
+        <li>Student self-assessment and peer feedback components</li>
+        <li>Portfolio-based evidence in addition to written examinations</li>
+        <li>360-degree feedback involving teachers, parents, and the student</li>
+      </ul>
+      <div style="font-size:13px;font-weight:600;color:var(--s);margin-bottom:8px">How your school complies</div>
+      <div style="background:#F0FDF4;border-left:3px solid var(--s);padding:10px 14px;border-radius:0 var(--rs) var(--rs) 0;font-size:12px;line-height:1.7;color:var(--text)">
+        Navigator 360's <strong>6-pillar framework</strong> directly maps to the CBSE Holistic Progress Card parameters. The six pillars — Career Personality, Learning Styles (MI), Ability, Values, Subjects of Interest, and Aspirations — capture cognitive (Ability, MI), character (Values), and aspirational (Aspirations, Personality) dimensions. Reports are student-specific, non-comparative, and updated each assessment cycle. Teacher dashboards provide individual growth tracking per student.
+      </div>
+      <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--pd);margin-bottom:5px">Navigator 360 Pillar → HP Card Mapping</div>
+          <div style="font-size:11px;line-height:1.7;color:var(--text)">Career Personality → Social-Emotional competency<br>Learning Styles → Cognitive competency<br>Ability → Academic performance<br>Values → Character &amp; ethics<br>Subjects of Interest → Co-curricular participation<br>Aspirations → Self-awareness &amp; goal-setting</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span class="badge bh" style="font-size:11px;padding:5px 10px">6 pillars → CBSE HP Card aligned</span>
+          <span class="badge bb" style="font-size:11px;padding:5px 10px">Non-comparative, growth-based</span>
+          <span class="badge bt" style="font-size:11px;padding:5px 10px">360° data: student + teacher view</span>
+          <span class="badge bp" style="font-size:11px;padding:5px 10px">Individual report per student</span>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="modal-bg" id="modal-nep3">
+    <div class="modal"><div class="modal-head"><h3>✔ Multiple Intelligences — NEP §4.6 &amp; Howard Gardner Model</h3><button class="modal-close" onclick="closeModal('nep3')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="insight" style="margin-bottom:14px"><span>📌</span><span>NEP 2020 §4.6 explicitly states that the traditional focus on linguistic and logical intelligences must give way to recognition of diverse forms of intelligence. Schools are directed to identify and nurture each child's unique intelligence profile across arts, sports, languages, music, and other domains.</span></div>
+      <div style="font-size:13px;font-weight:600;color:var(--pd);margin-bottom:10px">What the policy requires</div>
+      <ul style="font-size:12px;line-height:1.8;color:var(--text);padding-left:18px;margin-bottom:14px">
+        <li>Recognition that every child has a unique combination of strengths — not just academic ability</li>
+        <li>Classroom strategies tailored to diverse learning styles, not one-size-fits-all teaching</li>
+        <li>Extracurricular integration for students strong in artistic, kinesthetic, musical, and naturalistic domains</li>
+        <li>Teacher training in identifying and supporting non-traditional intelligences</li>
+        <li>Parent communication about their child's specific intelligence profile</li>
+      </ul>
+      <div style="font-size:13px;font-weight:600;color:var(--s);margin-bottom:8px">How your school complies &amp; what the data shows</div>
+      <div style="background:#F0FDF4;border-left:3px solid var(--s);padding:10px 14px;border-radius:0 var(--rs) var(--rs) 0;font-size:12px;line-height:1.7;color:var(--text);margin-bottom:10px">
+        All 8 Gardner intelligences are assessed per student. The Teacher Dashboard auto-generates class-level learning style profiles and recommends specific teaching strategies. Notable finding: <strong>Bodily-Kinesthetic intelligence is the highest in Grades 6–8 (72%)</strong>, yet receives the least classroom attention — prime area for growth. Linguistic intelligence is dropping across grades (71% → 58%) indicating a curriculum gap.
+      </div>
+      <div style="background:#FEF3C7;border-left:3px solid var(--acc);padding:10px 14px;border-radius:0 var(--rs) var(--rs) 0;font-size:12px;line-height:1.7;color:#92400E">
+        <strong>Action recommended:</strong> Schedule MI-based parent communication sessions this term. Share each child's top 3 intelligence areas with parents to align home support. Teacher training on differentiated instruction needed for Musical and Linguistic domains — both declining across grades.
+      </div>
+    </div></div>
+  </div>
+
+  <div class="modal-bg" id="modal-nep4">
+    <div class="modal"><div class="modal-head"><h3>✔ CBSE Career Guidance Cell — CBSE Circular 2023</h3><button class="modal-close" onclick="closeModal('nep4')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="insight" style="margin-bottom:14px"><span>📌</span><span>CBSE's 2023 circular mandates every affiliated school to establish a functional Career Guidance Cell with a designated trained counsellor, student-accessible resources, documented session records, and integration with the school's academic calendar.</span></div>
+      <div style="font-size:13px;font-weight:600;color:var(--pd);margin-bottom:10px">What the policy requires</div>
+      <ul style="font-size:12px;line-height:1.8;color:var(--text);padding-left:18px;margin-bottom:14px">
+        <li>Designated school counsellor trained in career guidance (CBSE-approved certification)</li>
+        <li>Minimum 2 career guidance sessions per student per year — documented</li>
+        <li>Career resource library accessible to students (physical or digital)</li>
+        <li>Annual Career Fair or Career Day event</li>
+        <li>Collaboration with external colleges, universities, and industry for student exposure</li>
+        <li>Individual student counselling records maintained for audit</li>
+        <li>Parent involvement in at least 1 career session per year</li>
+      </ul>
+      <div style="font-size:13px;font-weight:600;color:var(--s);margin-bottom:8px">How your school complies</div>
+      <div style="background:#F0FDF4;border-left:3px solid var(--s);padding:10px 14px;border-radius:0 var(--rs) var(--rs) 0;font-size:12px;line-height:1.7;color:var(--text);margin-bottom:10px">
+        The Counsellor Dashboard provides individual student profiles, session note tracking, cross-role communication (teacher → counsellor → principal), and searchable student records filterable by grade, section, personality type, and CCI status. All session notes are date-stamped and per-student. Red-flag alerts from teachers arrive directly in the counsellor's message inbox.
+      </div>
+      <div style="background:#FEF3C7;border-left:3px solid var(--acc);padding:10px 14px;border-radius:0 var(--rs) var(--rs) 0;font-size:12px;line-height:1.7;color:#92400E">
+        <strong>Recommended next steps:</strong> (1) Schedule the Annual Career Fair — no date set yet. (2) Document parent involvement sessions in the counsellor records. (3) Verify counsellor's CBSE certification is current. (4) Ensure career resource library (physical or Career-9 digital) is communicated to all students.
+      </div>
+    </div></div>
+  </div>
+
+  <div class="modal-bg" id="modal-nep5">
+    <div class="modal"><div class="modal-head"><h3>⚠ Vocational Integration — NEP §16 &amp; CBSE Skill Education Framework</h3><button class="modal-close" onclick="closeModal('nep5')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="insight" style="margin-bottom:14px;background:#FEF2F2;border-color:#FECACA"><span style="color:#991B1B">⚠</span><span style="color:#991B1B"><strong>Current status: 34% of students exposed to vocational fields. NEP target: 50% by 2025, 100% by 2030.</strong> This is the most significant compliance gap in your school's NEP implementation.</span></div>
+      <div style="font-size:13px;font-weight:600;color:var(--pd);margin-bottom:10px">What the policy requires</div>
+      <ul style="font-size:12px;line-height:1.8;color:var(--text);padding-left:18px;margin-bottom:14px">
+        <li>At least 50% of all students must have exposure to at least one vocational skill by 2025</li>
+        <li>Vocational education must be treated as <em>equal</em> to academic education — not a fallback option</li>
+        <li>CBSE Skill subjects available from Class 6: IT, Agriculture, Home Science, Retail, Healthcare, Beauty &amp; Wellness, Tourism, BFSI</li>
+        <li>10-day vocational internship for students in Classes 6–8 (bagless day format)</li>
+        <li>NSQF-aligned certification for students completing skill modules in Grades 9–12</li>
+        <li>Integration into timetable — not only as an add-on but as a regular subject option</li>
+      </ul>
+      <div style="font-size:13px;font-weight:600;color:#92400E;margin-bottom:10px">What your Navigator data reveals — and what to do</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--rs);padding:10px">
+          <div style="font-size:11px;font-weight:700;color:#92400E;margin-bottom:6px">📊 Data-Driven Student Targets</div>
+          <ul style="font-size:11px;line-height:1.75;color:var(--text);padding-left:14px">
+            <li><strong>~58 students</strong> with Realistic personality + Kinesthetic learning style are ideal vocational candidates but are not being counselled toward those paths</li>
+            <li><strong>34% of school</strong> (Realistic personality type) maps directly to trades, manufacturing, construction, sports science, and culinary arts</li>
+            <li>Students with low Computational ability are being directed toward academic tracks despite having strong Manual + Technical abilities — a systematic mismatch</li>
+            <li>Naturalistic intelligence students (70% in Gr 6–8) have high Agriculture / Environmental suitability, yet fewer than 10% aspire to those fields</li>
+          </ul>
+        </div>
+        <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--rs);padding:10px">
+          <div style="font-size:11px;font-weight:700;color:#92400E;margin-bottom:6px">🗓 Action Plan — by Timeline</div>
+          <div style="font-size:11px;font-weight:600;color:var(--pd);margin-bottom:3px">This week:</div>
+          <ul style="font-size:11px;line-height:1.65;color:var(--text);padding-left:12px;margin-bottom:6px">
+            <li>Survey teachers: which vocational skill can each integrate into their subject?</li>
+            <li>Brief counsellor to identify 58 Realistic/Kinesthetic students for targeted sessions</li>
+          </ul>
+          <div style="font-size:11px;font-weight:600;color:var(--pd);margin-bottom:3px">This term:</div>
+          <ul style="font-size:11px;line-height:1.65;color:var(--text);padding-left:12px;margin-bottom:6px">
+            <li>Contact local ITI / polytechnic for joint open day or guest speaker series</li>
+            <li>Review timetable: identify SUPW periods for vocational exploration activities</li>
+            <li>Add CBSE Skill subject as 6th subject option in Grade 9–12</li>
+          </ul>
+          <div style="font-size:11px;font-weight:600;color:var(--pd);margin-bottom:3px">This year:</div>
+          <ul style="font-size:11px;line-height:1.65;color:var(--text);padding-left:12px">
+            <li>Run 10-day vocational immersion camp in vacation (NSQF Level 1–2 certification)</li>
+            <li>Feature vocational professionals in the monthly career talk series</li>
+            <li>Track improvement: aim to move from 34% → 50% by end of academic year</li>
+          </ul>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge bm">Current: 34% exposure</span>
+        <span class="badge bl">NEP Target: 50% by 2025</span>
+        <span class="badge bb">~58 students to counsel now</span>
+        <span class="badge bp">NSQF alignment recommended</span>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="modal-bg" id="modal-nep6">
+    <div class="modal"><div class="modal-head"><h3>⚠ Experiential Learning &amp; Field Trips — NEP §4.6, §7.9</h3><button class="modal-close" onclick="closeModal('nep6')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="insight" style="margin-bottom:14px;background:#FEF2F2;border-color:#FECACA"><span style="color:#991B1B">⚠</span><span style="color:#991B1B"><strong>No experiential field trips scheduled this academic year.</strong> NEP mandates a minimum of 10 bagless days per year. CBSE requires career-exploration events in the Annual Activity Calendar.</span></div>
+      <div style="font-size:13px;font-weight:600;color:var(--pd);margin-bottom:10px">What the policy requires</div>
+      <ul style="font-size:12px;line-height:1.8;color:var(--text);padding-left:18px;margin-bottom:14px">
+        <li>Minimum 10 bagless days per year — hands-on, activity-based learning inside or outside school</li>
+        <li>At least 2 career-exploration visits per academic year per grade group</li>
+        <li>Annual Activity Calendar submitted to CBSE must include career-linked field trip dates</li>
+        <li>Community engagement activities — local craftspeople, farmers, healthcare workers visiting school</li>
+        <li>Reflection documentation: what did students learn? How did it change their understanding?</li>
+      </ul>
+      <div style="font-size:13px;font-weight:600;color:var(--pd);margin-bottom:8px">Profile-matched trip planning — why counsellor involvement is mandatory</div>
+      <div style="background:#FEF2F2;border-left:3px solid var(--danger);padding:10px 14px;border-radius:0 var(--rs) var(--rs) 0;font-size:12px;line-height:1.7;color:#991B1B;margin-bottom:10px">
+        Generic tours (e.g., "everyone visits a factory") have minimal career-clarity impact. Navigator data shows that students with Medical aspiration need to visit a hospital; Realistic students need to visit a manufacturing plant; Artistic students need an art studio or media house. A counsellor-planned trip, matched to class profiles, produces measurably higher CCI improvement in the following assessment cycle.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--pd);margin-bottom:6px">🗺 Navigator-Aligned Trip Ideas</div>
+          <div style="font-size:11px;line-height:1.7;color:var(--text)">
+            <strong>Gr 6–8:</strong> Science museum, agricultural farm, art gallery, newspaper printing press, crafts centre<br><br>
+            <strong>Gr 9–10:</strong> Hospital / medical college, IT company campus, court visit, college open days, engineering workshop<br><br>
+            <strong>Gr 11 Science:</strong> Research institute, pharmacy, IIT/NIT open day, environmental field station, biotech lab<br><br>
+            <strong>Gr 11 Commerce/Arts:</strong> Stock exchange, ad agency, art institute, NGO headquarters, hotel management college
+          </div>
+        </div>
+        <div style="background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--pd);margin-bottom:6px">🧠 Counsellor's Role — 3-Step Process</div>
+          <div style="font-size:11px;line-height:1.75;color:var(--text)">
+            <strong>Step 1 — Before the trip:</strong> Counsellor reviews class Navigator data, identifies which students benefit most, selects destination, conducts 15-min orientation session connecting the visit to personal profiles.<br><br>
+            <strong>Step 2 — During the trip:</strong> Counsellor provides each student a 3-question observation card linked to their top career match. Encourages them to look for specific things.<br><br>
+            <strong>Step 3 — After the trip:</strong> Counsellor facilitates 20-min reflection, updates aspiration notes, records CCI shifts. Tracks whether the visit raised, lowered, or clarified aspirations.
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--pd);color:#fff;border-radius:var(--rs);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:12px;font-weight:700;margin-bottom:3px">📩 Involve the counsellor to plan profile-matched field trips</div>
+          <div style="font-size:11px;opacity:.85">Select a grade group, add context, and send directly to the Counsellor's inbox. Counsellor will review Navigator data and suggest destinations.</div>
+        </div>
+        <button onclick="closeModal('nep6');openModal('fieldTripModal')" class="btn btn-primary" style="background:var(--s);border-color:var(--s);white-space:nowrap;font-size:12px">🗺 Plan Field Trip with Counsellor →</button>
+      </div>
+    </div></div>
+  </div>
+  </div>
+
+  <!-- Field Trip Modal -->
+  <div class="modal-bg" id="modal-fieldTripModal">
+    <div class="modal">
+      <div class="modal-head"><h3>🗺 Plan Experiential Field Trips — Counsellor Coordination</h3><button class="modal-close" onclick="closeModal('fieldTripModal')">✕ Close</button></div>
+      <div class="modal-body">
+        <div class="insight" style="margin-bottom:16px"><span>🧠</span><span>The counsellor has access to grade-level Navigator data including dominant personalities, learning styles, and career aspirations — essential for choosing the right destination for each class.</span></div>
+        <div style="background:#F8FDFB;border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px">
+          <div style="font-size:13px;font-weight:600;color:var(--pd);margin-bottom:10px">Step-by-step: How to Plan a Profile-Matched Field Trip</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">1</div>
+              <div><div style="font-size:12px;font-weight:600;color:var(--text)">Principal selects grade group &amp; tentative dates</div><div style="font-size:11px;color:var(--muted)">Decide which classes and how many bagless days to allocate. Inform counsellor at least 3 weeks in advance.</div></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">2</div>
+              <div><div style="font-size:12px;font-weight:600;color:var(--text)">Counsellor analyses Navigator data for the grade</div><div style="font-size:11px;color:var(--muted)">Reviews dominant personality, top aspirations, and suitability clusters to recommend 2–3 destination options that match the class profile.</div></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">3</div>
+              <div><div style="font-size:12px;font-weight:600;color:var(--text)">Counsellor conducts pre-trip orientation session (15 min)</div><div style="font-size:11px;color:var(--muted)">"Today we visit [X]. Your Navigator data shows you have strengths in [Y]. Look out for [Z] during the visit." Personalises the experience.</div></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">4</div>
+              <div><div style="font-size:12px;font-weight:600;color:var(--text)">Post-trip reflection &amp; CCI update</div><div style="font-size:11px;color:var(--muted)">Counsellor runs a 20-min debrief. Students update their aspiration checklist. Counsellor notes any clarity shifts in session records.</div></div>
+            </div>
+          </div>
+        </div>
+        <div style="background:#FEF3C7;border-radius:var(--rs);padding:12px;font-size:12px;color:#92400E;margin-bottom:14px">
+          <strong>Send a planning request to Counsellor now:</strong>
+        </div>
+        <select class="fsel" id="ftGrade" style="width:100%;margin-bottom:8px">
+          <option>Select Grade Group</option>
+          <option>Grade 6–8 (Insight Navigator)</option>
+          <option>Grade 9–10 (Subject Navigator)</option>
+          <option>Grade 11–12 (Career Navigator)</option>
+        </select>
+        <textarea class="note-area" id="ftNote" placeholder="Add context for counsellor — e.g. 'We have budget for 2 visits this semester. Class 9A has many students interested in engineering. Please suggest destinations and prepare a pre-trip orientation.'"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-primary btn-sm" onclick="sendFieldTripRequest()">📩 Send to Counsellor</button>
+          <button class="btn btn-sm" onclick="closeModal('fieldTripModal')">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid">
+    <div class="kpi-card" onclick="openModal('kpiStudents')">
+      <div class="kpi-label">Total Students Assessed</div>
+      <div class="kpi-value">487</div>
+      <div class="kpi-delta up">↑ 23% vs last year</div>
+      <div class="kpi-bar" style="background:var(--s)"></div>
+    </div>
+    <div class="kpi-card" onclick="openModal('kpiCompletion')">
+      <div class="kpi-label">Completion Rate</div>
+      <div class="kpi-value red">79%</div>
+      <div class="kpi-delta danger">⚠ Below 90% threshold — click to see</div>
+      <div class="kpi-bar" style="background:var(--danger)"></div>
+    </div>
+    <div class="kpi-card" onclick="openModal('kpiCCI')">
+      <div class="kpi-label">High Career Clarity (CCI)</div>
+      <div class="kpi-value">31%</div>
+      <div class="kpi-delta up">↑ 8% vs last cycle</div>
+      <div class="kpi-bar" style="background:var(--p)"></div>
+    </div>
+    <div class="kpi-card" onclick="openModal('kpiSupport')">
+      <div class="kpi-label">Students Needing Support</div>
+      <div class="kpi-value red">96</div>
+      <div class="kpi-delta danger">Low/No CCI — click to see</div>
+      <div class="kpi-bar" style="background:var(--danger)"></div>
+    </div>
+  </div>
+
+  <!-- SCHOOL POTENTIAL section -->
+  <div class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label school-potential-label">🏫 School's Potential</div>
+    <div class="section-divider-line"></div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="ld" style="background:#0C6B5A"></div>Grade 6–8</div>
+    <div class="legend-item"><div class="ld" style="background:#36B37E"></div>Grade 9–10</div>
+    <div class="legend-item"><div class="ld" style="background:#F59E0B"></div>Grade 11–12</div>
+    <div class="legend-item" style="margin-left:12px"><div class="ld" style="background:#D1FAE5;border:1px solid #059669"></div>Strong (≥70%)</div>
+    <div class="legend-item"><div class="ld" style="background:#FEF3C7;border:1px solid #D97706"></div>Moderate (50–70%)</div>
+    <div class="legend-item"><div class="ld" style="background:#FEE2E2;border:1px solid #DC2626"></div>Needs Attention (&lt;50%)</div>
+  </div>
+
+  <div class="g2 mb14">
+    <!-- PERSONALITY with hover tooltip + clickable -->
+    <div class="card" id="personalityChartCard" style="cursor:pointer" onclick="openModal('personalityDrill')">
+      <div class="card-title">
+        Career Personality Profile
+        <span style="font-size:9px;background:#EEF2FF;color:#3730A3;padding:2px 6px;border-radius:8px;margin-left:6px">hover for insight · click for guidelines</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="ld" style="background:#0C6B5A"></div>Gr 6–8</div>
+        <div class="legend-item"><div class="ld" style="background:#36B37E"></div>Gr 9–10</div>
+        <div class="legend-item"><div class="ld" style="background:#F59E0B"></div>Gr 11–12</div>
+      </div>
+      <div class="cw"><canvas id="personalityChart"></canvas></div>
+      <div id="personalityTooltipPanel" style="display:none;margin-top:10px;background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px;font-size:11px"></div>
+    </div>
+
+    <!-- LEARNING STYLES (renamed from Intelligence Domain) -->
+    <div class="card" onclick="openModal('learningStylesDrill')">
+      <div class="card-title">Learning Styles — Howard Gardner Model
+        <span style="font-size:9px;background:#EEF2FF;color:#3730A3;padding:2px 6px;border-radius:8px;margin-left:6px">click for details</span>
+      </div>
+      <div class="tscroll">
+        <table class="dtable">
+          <thead><tr><th>Learning Style</th><th>Gr 6–8</th><th>Gr 9–10</th><th>Gr 11–12</th><th>Trend</th></tr></thead>
+          <tbody id="lsHeatmap"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXTERNAL MAPPING section -->
+  <div class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label external-mapping-label">🗺 External Mapping</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="g2 mb14">
+    <!-- CCI chart with hover grade breakdown -->
+    <div class="card">
+      <div class="card-title">Career Clarity Index (CCI) by Grade Group
+        <span style="font-size:9px;background:#D1FAE5;color:#065F46;padding:2px 6px;border-radius:8px;margin-left:6px">hover bar for grade-wise split</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="ld" style="background:#059669"></div>High</div>
+        <div class="legend-item"><div class="ld" style="background:#D97706"></div>Moderate</div>
+        <div class="legend-item"><div class="ld" style="background:#DC2626"></div>Low/None</div>
+      </div>
+      <div class="cw md"><canvas id="cciChart"></canvas></div>
+      <div id="cciHoverPanel" style="display:none;margin-top:10px;background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px;font-size:11px"></div>
+      <div class="insight"><span>💡</span><span>Grade 11–12 has highest low-clarity (45%). Counselling before stream selection is critical per NEP 2020 §15.6.</span></div>
+    </div>
+
+    <!-- ASPIRATION vs SUITABILITY with click drill -->
+    <div class="card" style="cursor:pointer" onclick="openModal('aspirationDrill')">
+      <div class="card-title">Aspiration vs Suitability Gap
+        <span style="font-size:9px;background:#FEF3C7;color:#92400E;padding:2px 6px;border-radius:8px;margin-left:6px">click for grade-wise + activities</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="ld" style="background:#0C6B5A88"></div>Aspiration %</div>
+        <div class="legend-item"><div class="ld" style="background:#F59E0B88"></div>Suitability %</div>
+      </div>
+      <div class="cw tall"><canvas id="gapChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ TEACHER ════════════════ -->
+<div id="dash-teacher" class="dash">
+  <div class="section-header">
+    <div class="section-title">Classroom Intelligence Panel</div>
+    <div class="section-sub">Plan activities · Track flags · Compare sections · Send notes to counsellor</div>
+  </div>
+
+  <div class="filter-row">
+    <span class="flabel">Class:</span>
+    <select class="fsel" id="classSelector" onchange="updateTeacherDash()">
+      <option value="9A">Grade 9 – Section A</option>
+      <option value="9B">Grade 9 – Section B</option>
+      <option value="10A">Grade 10 – Section A</option>
+      <option value="10B">Grade 10 – Section B</option>
+      <option value="11A">Grade 11 – Section A</option>
+      <option value="11S">Grade 11 – Science</option>
+    </select>
+    <label style="font-size:11px;display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--danger);font-weight:600;margin-left:6px">
+      <input type="checkbox" id="redFlagOnly" onchange="updateTeacherDash()"> Red Flags Only
+    </label>
+    <div id="classSummaryBadges" style="margin-left:auto;display:flex;gap:5px;flex-wrap:wrap"></div>
+  </div>
+
+  <div class="g2 mb14">
+    <!-- Learning Styles of class -->
+    <div class="card">
+      <div class="card-title">Learning Styles of This Class</div>
+      <div class="cw"><canvas id="teacherIntelChart"></canvas></div>
+      <div id="lsClassInsight" class="insight" style="margin-top:10px"><span>💡</span><span></span></div>
+    </div>
+    <!-- Ability gaps -->
+    <div class="card">
+      <div class="card-title">Ability Strengths &amp; Gaps</div>
+      <div class="cw"><canvas id="teacherAbilChart"></canvas></div>
+      <div class="legend" style="margin-top:8px">
+        <div class="legend-item"><div class="ld" style="background:#36B37E"></div>Strong (≥60%)</div>
+        <div class="legend-item"><div class="ld" style="background:#F59E0B"></div>Moderate</div>
+        <div class="legend-item"><div class="ld" style="background:#EF4444"></div>Gap (&lt;40%)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION COMPARISON + total -->
+  <div class="g21 mb14">
+    <div class="card">
+      <div class="card-title">Students in <span id="classLabelH" style="color:var(--pd)">Grade 9A</span> &nbsp;
+        <span id="totalStudentsBadge" class="badge bt"></span>
+      </div>
+      <div class="tscroll">
+        <table class="dtable">
+          <thead>
+            <tr><th>Student</th><th>Personality</th><th>Learning Style</th><th>Ability Gap</th><th>CCI</th><th>Support</th><th>Report Card</th></tr>
+          </thead>
+          <tbody id="teacherStudentTable"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Section Comparison — Same Grade</div>
+      <div id="sectionComparison" style="margin-bottom:14px"></div>
+      <div class="card-title" style="margin-top:10px">My Section Ranks</div>
+      <div id="sectionRanks"></div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <!-- Strategies -->
+    <div class="card">
+      <div class="card-title">Recommended Classroom Strategies</div>
+      <div class="strat-grid" id="strategyGrid"></div>
+    </div>
+    <!-- Notes to counsellor -->
+    <div class="card">
+      <div class="card-title">📨 Notes to Counsellor</div>
+      <div id="teacherNotesSent" style="margin-bottom:10px;max-height:140px;overflow-y:auto"></div>
+      <select class="fsel" id="noteStudentSelect" style="width:100%;margin-bottom:7px">
+        <option value="">Select student (optional, for specific case)</option>
+      </select>
+      <textarea class="note-area" id="teacherNoteText" placeholder="Write a note to counsellor about a student or class concern..."></textarea>
+      <div style="display:flex;gap:7px;margin-top:7px">
+        <button class="btn btn-primary btn-sm" onclick="sendTeacherNote()">Send to Counsellor</button>
+        <button class="btn btn-sm" onclick="document.getElementById('teacherNoteText').value=''">Clear</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ COUNSELLOR ════════════════ -->
+<div id="dash-counsellor" class="dash">
+  <div class="section-header">
+    <div class="section-title">Counsellor's Command Centre</div>
+    <div class="section-sub">Grade &amp; section filter · Individual profiles · Session notes · Messages from principal &amp; teachers</div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-row" style="margin-bottom:14px">
+    <span class="flabel">Filter by Grade:</span>
+    <select class="fsel" id="cGradeFilter" onchange="counsellorFilter()">
+      <option value="all">All Grades</option>
+      <option value="6">Grade 6</option>
+      <option value="7">Grade 7</option>
+      <option value="8">Grade 8</option>
+      <option value="9">Grade 9</option>
+      <option value="10">Grade 10</option>
+      <option value="11">Grade 11</option>
+      <option value="12">Grade 12</option>
+    </select>
+    <span class="flabel">Section:</span>
+    <select class="fsel" id="cSectionFilter" onchange="counsellorFilter()">
+      <option value="all">All Sections</option>
+      <option value="A">Section A</option>
+      <option value="B">Section B</option>
+      <option value="S">Section S (Science)</option>
+    </select>
+    <span class="flabel">Personality:</span>
+    <select class="fsel" id="cPersonFilter" onchange="counsellorFilter()">
+      <option value="all">All Types</option>
+      <option value="Realistic">Realistic</option>
+      <option value="Investigative">Investigative</option>
+      <option value="Artistic">Artistic</option>
+      <option value="Social">Social</option>
+      <option value="Enterprising">Enterprising</option>
+      <option value="Conventional">Conventional</option>
+    </select>
+    <span id="filterCount" class="badge bt" style="margin-left:8px"></span>
+  </div>
+
+  <!-- NOTIFICATIONS from teachers/principal -->
+  <div class="notif-panel" id="counsellorNotifPanel">
+    <div class="notif-panel-title">
+      📬 Messages from Principal &amp; Teachers
+      <span class="badge br" id="unreadBadge">3 unread</span>
+    </div>
+    <div id="counsellorMessages"></div>
+    <div style="margin-top:10px">
+      <div class="card-title" style="margin-bottom:6px;font-size:10px">Send Reply to Principal / Teacher</div>
+      <select class="fsel" id="replyTarget" style="margin-bottom:6px;width:100%">
+        <option value="">Select recipient...</option>
+        <option value="principal">Principal</option>
+        <option value="teacher9A">Teacher – Grade 9A</option>
+        <option value="teacher9B">Teacher – Grade 9B</option>
+        <option value="teacher10A">Teacher – Grade 10A</option>
+        <option value="teacher10B">Teacher – Grade 10B</option>
+        <option value="teacher11A">Teacher – Grade 11A</option>
+        <option value="teacher11S">Teacher – Grade 11S</option>
+      </select>
+      <textarea class="note-area" id="replyText" placeholder="Type your reply or message..."></textarea>
+      <div style="display:flex;gap:7px;margin-top:7px">
+        <button class="btn btn-primary btn-sm" onclick="sendReply()">Send Reply</button>
+        <button class="btn btn-sm" onclick="document.getElementById('replyText').value=''">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AGGREGATE CHARTS -->
+  <div class="g3 mb14">
+    <div class="card">
+      <div class="card-title">Personality Distribution</div>
+      <div class="cw"><canvas id="cPersonChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">CCI — Filtered Students</div>
+      <div class="cw"><canvas id="cCCIChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Top Aspirations</div>
+      <div id="topAsp"></div>
+    </div>
+  </div>
+
+  <!-- STUDENT LIST + DETAIL -->
+  <div class="cl-layout">
+    <div class="slist-panel">
+      <div class="slist-head">
+        <input class="ssearch" type="text" placeholder="Search student..." oninput="filterSList(this.value)" id="sSearchInput">
+        <div class="cci-tabs">
+          <span class="ctab ctab-all" onclick="setCCIFilter('all',this)">All</span>
+          <span class="ctab" onclick="setCCIFilter('High',this)">High</span>
+          <span class="ctab" onclick="setCCIFilter('Moderate',this)">Moderate</span>
+          <span class="ctab" onclick="setCCIFilter('Low',this)">Low/None</span>
+        </div>
+      </div>
+      <div class="slist" id="studentList"></div>
+    </div>
+
+    <div class="sdetail">
+      <div class="card" id="studentDetailCard">
+        <div style="text-align:center;padding:40px;color:var(--muted)">
+          <div style="font-size:30px;margin-bottom:8px">🧠</div>
+          <div style="font-size:12px">Select a student to view their profile</div>
+        </div>
+      </div>
+      <div class="card" id="sessionNotesCard">
+        <div class="card-title">Session Notes</div>
+        <div id="notesList" style="margin-bottom:9px;max-height:160px;overflow-y:auto"></div>
+        <textarea class="note-area" id="newNoteText" placeholder="Add session note..."></textarea>
+        <div style="display:flex;gap:7px;margin-top:7px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="saveNote()">Save Note</button>
+          <button class="btn btn-sm" onclick="document.getElementById('newNoteText').value=''">Clear</button>
+          <button class="btn btn-sm" onclick="downloadReport('counsellor')" style="margin-left:auto;background:#084A3E;color:#fff;border-color:#084A3E">📥 Download Report</button>
+        </div>
+      </div>
+
+      <!-- APPOINTMENT CALENDAR -->
+      <div class="card">
+        <div class="card-title">📅 Appointment Calendar</div>
+        <div class="cal-wrap">
+          <div class="cal-header">
+            <button class="cal-nav" onclick="calNav(-1)">‹ Prev</button>
+            <div class="cal-month" id="calMonth"></div>
+            <button class="cal-nav" onclick="calNav(1)">Next ›</button>
+          </div>
+          <div class="cal-grid">
+            <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div>
+            <div class="cal-day-label">Tu</div><div class="cal-day-label">We</div>
+            <div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div>
+            <div class="cal-day-label">Sa</div>
+          </div>
+          <div class="cal-grid" id="calDays"></div>
+          <div class="appt-list" id="apptList">
+            <div style="font-size:11px;color:var(--muted);text-align:center;padding:10px">Click a date to view or add appointments</div>
+          </div>
+        </div>
+        <!-- Book new appointment form -->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+          <div class="card-title" style="margin-bottom:7px;font-size:10px">Book New Appointment</div>
+          <select class="fsel" id="apptStudentSel" style="width:100%;margin-bottom:6px">
+            <option value="">Select student...</option>
+          </select>
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <input type="date" id="apptDate" class="fsel" style="flex:1">
+            <select class="fsel" id="apptTime" style="flex:1">
+              <option value="9:00 AM">9:00 AM</option><option value="9:30 AM">9:30 AM</option>
+              <option value="10:00 AM">10:00 AM</option><option value="10:30 AM">10:30 AM</option>
+              <option value="11:00 AM">11:00 AM</option><option value="11:30 AM">11:30 AM</option>
+              <option value="12:00 PM">12:00 PM</option><option value="2:00 PM">2:00 PM</option>
+              <option value="2:30 PM">2:30 PM</option><option value="3:00 PM">3:00 PM</option>
+              <option value="3:30 PM">3:30 PM</option><option value="4:00 PM">4:00 PM</option>
+            </select>
+          </div>
+          <select class="fsel" id="apptType" style="width:100%;margin-bottom:7px">
+            <option>Career Counselling Session</option>
+            <option>CCI Review</option>
+            <option>Stream Selection Guidance</option>
+            <option>Parent + Student Session</option>
+            <option>Follow-up Session</option>
+            <option>Red Flag Intervention</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="bookAppt()" style="width:100%;justify-content:center;display:flex">📅 Book Appointment</button>
+          <div id="apptBookedMsg" style="display:none;margin-top:7px;background:#D1FAE5;border-radius:var(--rs);padding:7px 10px;font-size:11px;color:#065F46;font-weight:500"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ STUDENT ════════════════ -->
+<div id="dash-student" class="dash">
+  <div class="prof-header">
+    <div class="avatar">AS</div>
+    <div style="flex:1">
+      <div class="prof-name">Aarav Sharma</div>
+      <div class="prof-info">Grade 10A · Sunrise Public School · Navigator 360: Complete</div>
+      <div class="stags">
+        <span class="stag">Logical Thinking</span><span class="stag">Problem Solving</span>
+        <span class="stag">Curiosity</span><span class="stag">Creativity</span>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:10px;opacity:.7;margin-bottom:4px">Career Clarity Index</div>
+      <div style="font-size:20px;font-weight:700;background:rgba(255,255,255,0.2);padding:6px 12px;border-radius:8px">HIGH ⭐</div>
+    </div>
+  </div>
+
+  <div class="g2 mb14">
+    <div class="card">
+      <div class="card-title">Your Navigator 360 Profile</div>
+      <div class="cw" style="display:flex;justify-content:center"><canvas id="studentRadarChart" style="max-height:200px;max-width:260px"></canvas></div>
+      <div style="margin-top:12px">
+        <div class="prow"><span class="plabel">Career Personality</span><div style="flex:1"><div class="pb"><div class="pf" style="width:78%;background:var(--p)"></div></div></div><span class="pval">78%</span></div>
+        <div class="prow"><span class="plabel">Learning Styles</span><div style="flex:1"><div class="pb"><div class="pf" style="width:82%;background:var(--s)"></div></div></div><span class="pval">82%</span></div>
+        <div class="prow"><span class="plabel">Ability</span><div style="flex:1"><div class="pb"><div class="pf" style="width:71%;background:var(--p)"></div></div></div><span class="pval">71%</span></div>
+        <div class="prow"><span class="plabel">Values</span><div style="flex:1"><div class="pb"><div class="pf" style="width:85%;background:var(--acc)"></div></div></div><span class="pval">85%</span></div>
+        <div class="prow"><span class="plabel">Subjects Interest</span><div style="flex:1"><div class="pb"><div class="pf" style="width:74%;background:var(--s)"></div></div></div><span class="pval">74%</span></div>
+        <div class="prow"><span class="plabel">Aspirations</span><div style="flex:1"><div class="pb"><div class="pf" style="width:68%;background:var(--info)"></div></div></div><span class="pval">68%</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Top Career Matches</div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:10px">
+        <div style="border:1px solid var(--border);border-left:4px solid var(--p);border-radius:var(--rs);padding:11px">
+          <div style="font-size:10px;font-weight:700;color:var(--muted)">🥇 Best Match — 9/9</div>
+          <div style="font-size:14px;font-weight:600;color:var(--pd);margin:3px 0">Computer Science &amp; IT</div>
+          <div style="font-size:11px;color:var(--muted)">Logical-Mathematical · Technical · Investigative</div>
+          <div style="margin-top:6px;display:flex;gap:4px"><span class="badge bt">B.Tech CS</span><span class="badge bb">Data Science</span><span class="badge bp">AI/ML</span></div>
+        </div>
+        <div style="border:1px solid var(--border);border-left:4px solid var(--s);border-radius:var(--rs);padding:11px">
+          <div style="font-size:10px;font-weight:700;color:var(--muted)">🥈 Strong — 8/9</div>
+          <div style="font-size:14px;font-weight:600;color:var(--pd);margin:3px 0">Science &amp; Mathematics</div>
+          <div style="font-size:11px;color:var(--muted)">Computational · Logical reasoning · Realistic</div>
+        </div>
+        <div style="border:1px solid var(--border);border-left:4px solid var(--acc);border-radius:var(--rs);padding:11px">
+          <div style="font-size:10px;font-weight:700;color:var(--muted)">🥉 Good — 7/9</div>
+          <div style="font-size:14px;font-weight:600;color:var(--pd);margin:3px 0">Engineering &amp; Technology</div>
+          <div style="font-size:11px;color:var(--muted)">Technical · Form perception · Realistic</div>
+        </div>
+      </div>
+      <div class="insight"><span>💡</span><span>Your creativity opens doors in UX Design and Product Management alongside technical roles.</span></div>
+    </div>
+  </div>
+
+  <!-- STUDENT ACTION ROW: QR + Book Appointment + Download -->
+  <div class="g3 mb14">
+    <!-- Career Library QR -->
+    <div class="card" style="text-align:center">
+      <div class="card-title">📚 Explore Career Library</div>
+      <div style="margin:8px auto;width:110px;height:110px;background:#fff;border:2px solid var(--border);border-radius:var(--rs);display:flex;align-items:center;justify-content:center;padding:6px">
+        <svg width="96" height="96" viewBox="0 0 96 96">
+          <rect x="4" y="4" width="34" height="34" fill="none" stroke="#084A3E" stroke-width="4" rx="2"/>
+          <rect x="12" y="12" width="18" height="18" fill="#084A3E" rx="1"/>
+          <rect x="58" y="4" width="34" height="34" fill="none" stroke="#084A3E" stroke-width="4" rx="2"/>
+          <rect x="66" y="12" width="18" height="18" fill="#084A3E" rx="1"/>
+          <rect x="4" y="58" width="34" height="34" fill="none" stroke="#084A3E" stroke-width="4" rx="2"/>
+          <rect x="12" y="66" width="18" height="18" fill="#084A3E" rx="1"/>
+          <rect x="58" y="58" width="10" height="10" fill="#084A3E" rx="1"/>
+          <rect x="72" y="58" width="10" height="10" fill="#084A3E" rx="1"/>
+          <rect x="58" y="72" width="10" height="10" fill="#084A3E" rx="1"/>
+          <rect x="72" y="72" width="20" height="10" fill="#084A3E" rx="1"/>
+          <rect x="44" y="4" width="6" height="6" fill="#084A3E"/>
+          <rect x="44" y="14" width="6" height="6" fill="#084A3E"/>
+          <rect x="44" y="44" width="6" height="6" fill="#084A3E"/>
+          <rect x="4" y="44" width="6" height="6" fill="#084A3E"/>
+          <rect x="14" y="44" width="6" height="6" fill="#084A3E"/>
+          <rect x="24" y="44" width="6" height="6" fill="#084A3E"/>
+        </svg>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Scan to visit the Career-9 Library — explore 200+ career paths, college options, and day-in-the-life videos matched to your profile.</div>
+      <a href="https://www.career-9.com" target="_blank" class="btn btn-primary" style="font-size:11px;display:inline-flex;align-items:center;gap:5px;text-decoration:none">🔗 Open Career Library</a>
+    </div>
+
+    <!-- Book Counselling Appointment -->
+    <div class="card">
+      <div class="card-title">🗓 Book a Counselling Session</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px">Your Career Clarity Index is <strong style="color:var(--s)">HIGH</strong>, but a one-on-one session with your school counsellor can help you explore your top matches more deeply, compare college options, and create a concrete action plan for Grade 11 stream selection.</div>
+      <div style="background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--pd);margin-bottom:6px">Next Available Slots</div>
+        <div style="display:flex;flex-direction:column;gap:5px" id="studentApptSlots"></div>
+      </div>
+      <button onclick="bookStudentAppt()" class="btn btn-primary" style="width:100%;font-size:11px;justify-content:center;display:flex;gap:6px">📅 Request Appointment</button>
+      <div id="apptConfirm" style="display:none;margin-top:8px;background:#D1FAE5;border-radius:var(--rs);padding:8px 10px;font-size:11px;color:#065F46;font-weight:500"></div>
+    </div>
+
+    <!-- Download Report -->
+    <div class="card">
+      <div class="card-title">📥 Your Reports</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--pd)">Navigator 360 Full Report</div>
+          <div style="font-size:10px;color:var(--muted);margin:3px 0 8px">Complete 6-pillar profile · Career matches · Action plan</div>
+          <button onclick="downloadReport('full')" class="dl-btn" style="font-size:11px;width:100%;justify-content:center">📄 Download Full Report</button>
+        </div>
+        <div style="background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--pd)">Career Clarity Summary (1 page)</div>
+          <div style="font-size:10px;color:var(--muted);margin:3px 0 8px">Top 3 careers · Key strengths · 30-day actions</div>
+          <button onclick="downloadReport('summary')" class="dl-btn" style="font-size:11px;width:100%;justify-content:center">📄 Download Summary</button>
+        </div>
+        <div style="background:#F8FDFB;border:1px solid var(--border);border-radius:var(--rs);padding:10px">
+          <div style="font-size:11px;font-weight:600;color:var(--pd)">Share with Parents</div>
+          <div style="font-size:10px;color:var(--muted);margin:3px 0 8px">Parent-friendly version with next steps</div>
+          <button onclick="downloadReport('parent')" class="dl-btn" style="background:#7C3AED;font-size:11px;width:100%;justify-content:center">📤 Share with Parents</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- ════════════════ MODALS ════════════════ -->
+<!-- Total Students Modal -->
+<div class="modal-bg" id="modal-kpiStudents">
+  <div class="modal">
+    <div class="modal-head"><h3>Grade-wise Student Assessment Breakdown</h3><button class="modal-close" onclick="closeModal('kpiStudents')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="grade-comp-grid" id="kpiStudentsGrid"></div>
+      <div style="margin-top:18px"><canvas id="kpiStudentsChart" style="max-height:220px"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- Completion Rate Modal -->
+<div class="modal-bg" id="modal-kpiCompletion">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>⚠ Completion Rate Below 90% — Grade-wise Details</h3>
+      <button class="modal-close" onclick="closeModal('kpiCompletion')">✕ Close</button>
+    </div>
+    <div class="modal-body">
+      <div class="insight" style="margin-bottom:14px;background:#FEE2E2;border-color:#FECACA"><span>⚠</span><span style="color:#991B1B">Target is ≥90% completion. Grades highlighted in red are significantly below threshold. Counsellor and class teachers should follow up.</span></div>
+      <table class="dtable">
+        <thead><tr><th>Grade</th><th>Section</th><th>Total Students</th><th>Completed</th><th>Completion %</th><th>Missing Students</th><th>Status</th></tr></thead>
+        <tbody id="completionTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- CCI Drill Modal -->
+<div class="modal-bg" id="modal-kpiCCI">
+  <div class="modal">
+    <div class="modal-head"><h3>Career Clarity Index — Grade-wise Breakdown</h3><button class="modal-close" onclick="closeModal('kpiCCI')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="g2" style="margin-bottom:16px">
+        <div><canvas id="kpiCCIChart" style="max-height:220px"></canvas></div>
+        <div class="grade-comp-grid" id="kpiCCIGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Support Students Modal -->
+<div class="modal-bg" id="modal-kpiSupport">
+  <div class="modal">
+    <div class="modal-head"><h3>Students Needing Support — Grade-wise</h3><button class="modal-close" onclick="closeModal('kpiSupport')">✕ Close</button></div>
+    <div class="modal-body">
+      <div class="grade-comp-grid" id="kpiSupportGrid" style="margin-bottom:14px"></div>
+      <table class="dtable">
+        <thead><tr><th>Student</th><th>Grade</th><th>Class</th><th>CCI</th><th>Key Gap</th></tr></thead>
+        <tbody id="kpiSupportTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Personality Drill Modal -->
+<div class="modal-bg" id="modal-personalityDrill">
+  <div class="modal">
+    <div class="modal-head"><h3>Personality Insights — School Guidelines &amp; Workshops</h3><button class="modal-close" onclick="closeModal('personalityDrill')">✕ Close</button></div>
+    <div class="modal-body" id="personalityDrillBody"></div>
+  </div>
+</div>
+
+<!-- Learning Styles Drill Modal -->
+<div class="modal-bg" id="modal-learningStylesDrill">
+  <div class="modal">
+    <div class="modal-head"><h3>Learning Styles — Howard Gardner Model Details</h3><button class="modal-close" onclick="closeModal('learningStylesDrill')">✕ Close</button></div>
+    <div class="modal-body" id="lsDrillBody"></div>
+  </div>
+</div>
+
+<!-- Aspiration Drill Modal -->
+<div class="modal-bg" id="modal-aspirationDrill">
+  <div class="modal">
+    <div class="modal-head"><h3>Aspiration vs Suitability — Grade-wise Suggestions &amp; Activities</h3><button class="modal-close" onclick="closeModal('aspirationDrill')">✕ Close</button></div>
+    <div class="modal-body" id="aspirationDrillBody"></div>
+  </div>
+</div>
+
+<!-- Report Card Summary Modal -->
+<div class="modal-bg" id="modal-reportCard">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>📝 Academic Report Card — Career Navigator Summary</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="copyReportCard()">📋 Copy Text</button>
+        <button class="modal-close" onclick="closeModal('reportCard')">✕ Close</button>
+      </div>
+    </div>
+    <div class="modal-body" id="reportCardBody"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════ DATA ══════════════
+const mockStudents=[
+  {id:1,name:"Aarav Sharma",cls:"9A",grade:9,section:"A",personality:["Investigative","Realistic","Conventional"],intel:["Logical-Mathematical","Spatial-Visual","Intrapersonal"],abilities:["Logical reasoning","Computational","Form perception"],weakAbility:"Communication",cci:"High",redFlag:false,notes:[]},
+  {id:2,name:"Priya Menon",cls:"9A",grade:9,section:"A",personality:["Artistic","Social","Investigative"],intel:["Linguistic","Interpersonal","Musical"],abilities:["Communication","Creativity","Language"],weakAbility:"Technical",cci:"High",redFlag:false,notes:[]},
+  {id:3,name:"Rohan Patil",cls:"9A",grade:9,section:"A",personality:["Realistic","Conventional","Enterprising"],intel:["Bodily-Kinesthetic","Logical-Mathematical","Naturalistic"],abilities:["Technical","Motor movement","Form perception"],weakAbility:"Creativity",cci:"Moderate",redFlag:false,notes:[]},
+  {id:4,name:"Sneha Joshi",cls:"9A",grade:9,section:"A",personality:["Social","Conventional","Realistic"],intel:["Interpersonal","Intrapersonal","Linguistic"],abilities:["Communication","Decision making","Language"],weakAbility:"Technical",cci:"Moderate",redFlag:false,notes:[]},
+  {id:5,name:"Karan Desai",cls:"9A",grade:9,section:"A",personality:["Conventional","Realistic","Investigative"],intel:["Logical-Mathematical","Spatial-Visual","Naturalistic"],abilities:["Computational","Speed and accuracy","Form perception"],weakAbility:"Communication",cci:"Moderate",redFlag:false,notes:[]},
+  {id:6,name:"Meera Nair",cls:"9B",grade:9,section:"B",personality:["Artistic","Investigative","Social"],intel:["Musical","Spatial-Visual","Linguistic"],abilities:["Creativity","Communication","Language"],weakAbility:"Computational",cci:"High",redFlag:false,notes:[]},
+  {id:7,name:"Arjun Singh",cls:"9B",grade:9,section:"B",personality:["Enterprising","Conventional","Social"],intel:["Interpersonal","Logical-Mathematical","Intrapersonal"],abilities:["Decision making","Communication","Speed and accuracy"],weakAbility:"Creativity",cci:"High",redFlag:false,notes:[]},
+  {id:8,name:"Divya Sharma",cls:"9B",grade:9,section:"B",personality:["Social","Artistic","Enterprising"],intel:["Interpersonal","Linguistic","Musical"],abilities:["Communication","Language","Creativity"],weakAbility:"Computational",cci:"Low",redFlag:true,notes:["Aspiration matches suitability but student unsure. Need 2 more sessions."]},
+  {id:9,name:"Vikram Rao",cls:"9B",grade:9,section:"B",personality:["Realistic","Investigative","Conventional"],intel:["Spatial-Visual","Logical-Mathematical","Bodily-Kinesthetic"],abilities:["Technical","Form perception","Logical reasoning"],weakAbility:"Communication",cci:"Moderate",redFlag:false,notes:[]},
+  {id:10,name:"Ananya Pillai",cls:"9B",grade:9,section:"B",personality:["Investigative","Artistic","Social"],intel:["Naturalistic","Spatial-Visual","Logical-Mathematical"],abilities:["Logical reasoning","Creativity","Form perception"],weakAbility:"Technical",cci:"High",redFlag:false,notes:[]},
+  {id:11,name:"Rahul Kumar",cls:"10A",grade:10,section:"A",personality:["Conventional","Realistic","Investigative"],intel:["Logical-Mathematical","Intrapersonal","Spatial-Visual"],abilities:["Computational","Speed and accuracy","Logical reasoning"],weakAbility:"Motor movement",cci:"High",redFlag:false,notes:[]},
+  {id:12,name:"Pooja Iyer",cls:"10A",grade:10,section:"A",personality:["Social","Artistic","Investigative"],intel:["Linguistic","Interpersonal","Musical"],abilities:["Communication","Language","Creativity"],weakAbility:"Technical",cci:"Moderate",redFlag:false,notes:["Interested in journalism – explore IIMC, Symbiosis."]},
+  {id:13,name:"Amit Verma",cls:"10A",grade:10,section:"A",personality:["Realistic","Enterprising","Conventional"],intel:["Bodily-Kinesthetic","Logical-Mathematical","Spatial-Visual"],abilities:["Technical","Motor movement","Form perception"],weakAbility:"Creativity",cci:"Low",redFlag:true,notes:[]},
+  {id:14,name:"Riya Patel",cls:"10A",grade:10,section:"A",personality:["Investigative","Artistic","Realistic"],intel:["Logical-Mathematical","Spatial-Visual","Naturalistic"],abilities:["Logical reasoning","Creativity","Computational"],weakAbility:"Motor movement",cci:"High",redFlag:false,notes:[]},
+  {id:15,name:"Siddharth More",cls:"10A",grade:10,section:"A",personality:["Enterprising","Social","Conventional"],intel:["Interpersonal","Logical-Mathematical","Linguistic"],abilities:["Decision making","Communication","Speed and accuracy"],weakAbility:"Finger dexterity",cci:"Moderate",redFlag:false,notes:[]},
+  {id:16,name:"Kavita Reddy",cls:"10B",grade:10,section:"B",personality:["Social","Investigative","Artistic"],intel:["Interpersonal","Naturalistic","Linguistic"],abilities:["Communication","Decision making","Language"],weakAbility:"Computational",cci:"High",redFlag:false,notes:["Would excel in psychology – guide toward BA Psych path."]},
+  {id:17,name:"Nikhil Bhosle",cls:"10B",grade:10,section:"B",personality:["Realistic","Conventional","Enterprising"],intel:["Spatial-Visual","Bodily-Kinesthetic","Logical-Mathematical"],abilities:["Technical","Form perception","Speed and accuracy"],weakAbility:"Communication",cci:"Moderate",redFlag:false,notes:[]},
+  {id:18,name:"Shruti Kulkarni",cls:"10B",grade:10,section:"B",personality:["Artistic","Social","Investigative"],intel:["Musical","Linguistic","Interpersonal"],abilities:["Creativity","Communication","Language"],weakAbility:"Computational",cci:"Low",redFlag:true,notes:[]},
+  {id:19,name:"Tushar Shah",cls:"11A",grade:11,section:"A",personality:["Conventional","Investigative","Realistic"],intel:["Logical-Mathematical","Intrapersonal","Spatial-Visual"],abilities:["Computational","Logical reasoning","Speed and accuracy"],weakAbility:"Communication",cci:"High",redFlag:false,notes:[]},
+  {id:20,name:"Nisha Goswami",cls:"11A",grade:11,section:"A",personality:["Social","Enterprising","Conventional"],intel:["Interpersonal","Linguistic","Intrapersonal"],abilities:["Communication","Decision making","Language"],weakAbility:"Technical",cci:"Moderate",redFlag:false,notes:[]},
+  {id:21,name:"Deepak Malhotra",cls:"11A",grade:11,section:"A",personality:["Realistic","Investigative","Conventional"],intel:["Logical-Mathematical","Spatial-Visual","Bodily-Kinesthetic"],abilities:["Technical","Logical reasoning","Form perception"],weakAbility:"Communication",cci:"High",redFlag:false,notes:[]},
+  {id:22,name:"Anjali Tiwari",cls:"11A",grade:11,section:"A",personality:["Artistic","Investigative","Social"],intel:["Linguistic","Musical","Intrapersonal"],abilities:["Creativity","Language","Communication"],weakAbility:"Computational",cci:"Low",redFlag:true,notes:["Low CCI – aspiring journalism but matched to Art Design. Explore mass comm."]},
+  {id:23,name:"Suresh Patil",cls:"11S",grade:11,section:"S",personality:["Investigative","Realistic","Conventional"],intel:["Logical-Mathematical","Naturalistic","Spatial-Visual"],abilities:["Logical reasoning","Computational","Technical"],weakAbility:"Communication",cci:"High",redFlag:false,notes:[]},
+  {id:24,name:"Prachi Jain",cls:"11S",grade:11,section:"S",personality:["Investigative","Social","Artistic"],intel:["Naturalistic","Interpersonal","Linguistic"],abilities:["Decision making","Communication","Creativity"],weakAbility:"Technical",cci:"High",redFlag:false,notes:[]},
+];
+
+const personalityAdjectives={
+  Realistic:["Practical","Hands-on","Athletic","Mechanical","Stable","Persistent","Frank","Modest"],
+  Investigative:["Analytical","Intellectual","Curious","Precise","Independent","Reserved","Complex","Observant"],
+  Artistic:["Creative","Imaginative","Expressive","Sensitive","Open","Flexible","Intuitive","Idealistic"],
+  Social:["Helpful","Empathetic","Cooperative","Patient","Friendly","Generous","Idealistic","Responsible"],
+  Enterprising:["Ambitious","Energetic","Adventurous","Persuasive","Assertive","Confident","Goal-oriented","Risk-taking"],
+  Conventional:["Organized","Detail-oriented","Accurate","Systematic","Reliable","Careful","Efficient","Consistent"],
+};
+const personalityGuidelines={
+  Realistic:{career:"Engineering, Agriculture, Vocational, Sports, Defence",workshops:["Robotics & Maker Labs","Workshop visits to factories","Sports & fitness programs","Farm/environment trips"],low:"Low Realistic can be improved through hands-on lab projects, craft workshops, and physical education programs."},
+  Investigative:{career:"Research, Science, Medicine, Data Science, CS",workshops:["Science fair & research clubs","Coding bootcamps","Debate & questioning sessions","Math olympiad preparation"],low:"Low Investigative can be improved through curiosity challenges, 'why does this work?' classroom activities, and science documentaries."},
+  Artistic:{career:"Design, Media, Entertainment, Architecture, Arts",workshops:["Art & design exhibitions","Drama & theater club","Creative writing workshops","Music & dance performances"],low:"Low Artistic can be lifted through visual storytelling projects, school magazine design, and cultural fest organization."},
+  Social:{career:"Education, Healthcare, Social Work, Counselling, HR",workshops:["Peer mentoring programs","Community service activities","Communication skill workshops","Role-play in real-world scenarios"],low:"Low Social can be developed through group projects, buddy system between seniors and juniors, and community outreach."},
+  Enterprising:{career:"Management, Entrepreneurship, Law, Marketing, Politics",workshops:["Mini business challenge","Mock elections & debates","Leadership bootcamps","Sales & negotiation simulations"],low:"Low Enterprising can be boosted by assigning leadership roles, running school events, and entrepreneurship competitions."},
+  Conventional:{career:"Banking, Finance, Law, Government, Accounting",workshops:["Finance literacy sessions","Filing & record-keeping tasks","Data entry and spreadsheet challenges","Time management workshops"],low:"Low Conventional can be improved through structured daily planners, habit trackers, and organized project management tasks."},
+};
+const learningStyleData=[
+  {name:"Logical-Mathematical",g68:74,g910:78,g1112:72,trend:"stable",desc:"Learns through numbers, patterns, experiments",tip:"Use data projects, puzzles, and scientific method activities"},
+  {name:"Interpersonal",g68:68,g910:62,g1112:55,trend:"down",desc:"Learns through discussing and working with others",tip:"Group projects, peer teaching, collaborative assignments"},
+  {name:"Linguistic",g68:71,g910:61,g1112:58,trend:"down",desc:"Learns through reading, writing, storytelling",tip:"Essays, debates, school magazine – invest urgently"},
+  {name:"Spatial-Visual",g68:66,g910:70,g1112:68,trend:"stable",desc:"Learns through images, maps, visualization",tip:"Mind maps, diagrams, flowcharts, video content"},
+  {name:"Bodily-Kinesthetic",g68:72,g910:65,g1112:60,trend:"down",desc:"Learns through movement and hands-on activities",tip:"Lab experiments, role plays, craft, sports"},
+  {name:"Intrapersonal",g68:65,g910:69,g1112:74,trend:"up",desc:"Learns through self-reflection and self-pacing",tip:"Journaling, goal-setting, independent research projects"},
+  {name:"Musical",g68:58,g910:52,g1112:48,trend:"down",desc:"Learns through rhythms and patterns in sound",tip:"Use music in mnemonics, rhythm-based activities, school band"},
+  {name:"Naturalistic",g68:70,g910:66,g1112:63,trend:"stable",desc:"Learns through nature, classification, environment",tip:"Outdoor education, ecology projects, field trips"},
+];
+const aspirationGapData=[
+  {career:"Engineering",g68_asp:55,g68_suit:48,g910_asp:70,g910_suit:52,g1112_asp:75,g1112_suit:45,activities:["Robotics club","STEM fair","Industry visits to factories","Coding bootcamps"],extracurr:"Science quiz, maths olympiad, maker labs"},
+  {career:"Science/Math",g68_asp:60,g68_suit:62,g910_asp:58,g910_suit:65,g1112_asp:50,g1112_suit:60,activities:["Science fair","Research projects","Nature study","Astronomy club"],extracurr:"Science Olympiad, eco-club, NASA challenge"},
+  {career:"Computer Sci.",g68_asp:35,g68_suit:50,g910_asp:45,g910_suit:55,g1112_asp:55,g1112_suit:52,activities:["Coding clubs","App development challenge","Digital literacy sessions"],extracurr:"Hackathon, AI workshop, coding competition"},
+  {career:"Medicine",g68_asp:42,g68_suit:44,g910_asp:40,g910_suit:45,g1112_asp:38,g1112_suit:50,activities:["First aid training","Biology lab","Hospital visit","Health awareness drive"],extracurr:"Red Cross, health quiz, biology olympiad"},
+  {career:"Commerce/Finance",g68_asp:20,g68_suit:35,g910_asp:32,g910_suit:45,g1112_asp:40,g1112_suit:50,activities:["Finance literacy workshop","Mock stock market","Budget simulation"],extracurr:"Economics olympiad, junior CA club, finance quiz"},
+  {career:"Creative Arts",g68_asp:30,g68_suit:42,g910_asp:22,g910_suit:38,g1112_asp:18,g1112_suit:35,activities:["Art exhibitions","Performing arts festival","Design workshop"],extracurr:"Art competition, cultural fest, photography club"},
+  {career:"Social Service",g68_asp:22,g68_suit:32,g910_asp:20,g910_suit:35,g1112_asp:22,g1112_suit:38,activities:["Community service","NGO visits","Awareness campaigns"],extracurr:"NSS, eco drives, peer counselling program"},
+];
+
+// Section comparison data
+const sectionCompData={
+  "9":{sections:["9A","9B"],cci:{high:[42,50],mod:[33,30],low:[25,20]},avgAbility:[62,68],avgLS:[70,65]},
+  "10":{sections:["10A","10B"],cci:{high:[40,45],mod:[36,30],low:[24,25]},avgAbility:[65,60],avgLS:[68,72]},
+  "11":{sections:["11A","11S"],cci:{high:[45,60],mod:[30,28],low:[25,12]},avgAbility:[68,75],avgLS:[65,78]},
+};
+
+// Messages system
+let messages=[
+  {id:1,from:"principal",fromLabel:"Principal",student:null,body:"Please check on Grade 9B – Divya Sharma. Low CCI and seems disengaged. Schedule a session this week.",time:"Today 9:12am",read:false,replies:[]},
+  {id:2,from:"teacher9A",fromLabel:"Teacher – Grade 9A",student:"Aarav Sharma",body:"Aarav is doing very well in Science but struggles with communication tasks. Can we get his counsellor report?",time:"Yesterday 4:05pm",read:false,replies:[]},
+  {id:3,from:"teacher10A",fromLabel:"Teacher – Grade 10A",student:"Amit Verma",body:"Amit Verma (10A) has red flag – CCI is Low and seems uninterested in class. His sports ability is very strong. Can counsellor guide him toward sports/defence career?",time:"Yesterday 2:30pm",read:false,replies:[]},
+];
+let teacherNotes=[];
+let sessionNotes={};
+mockStudents.forEach(s=>{ sessionNotes[s.id]=[...s.notes]; });
+let selectedStudentId=null,cciFilter='all',currentGradeFilter='all',currentSectionFilter='all',currentPersonFilter='all';
+let cPersonChartI=null,cCCIChartI=null,teacherIntelI=null,teacherAbilI=null;
+
+// ══════════════ NAVIGATION ══════════════
+function switchRole(role,btn){
+  document.querySelectorAll('.dash').forEach(d=>d.classList.remove('active'));
+  document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('dash-'+role).classList.add('active');
+  btn.classList.add('active');
+  if(role==='counsellor'){renderStudentList();renderCounsellorAggr();renderMessages();initCalendar();}
+  if(role==='teacher')updateTeacherDash();
+}
+
+// ══════════════ MODAL ══════════════
+function openModal(id){
+  const m=document.getElementById('modal-'+id);
+  if(!m)return;
+  m.classList.add('open');
+  if(id==='kpiStudents')buildKPIStudents();
+  else if(id==='kpiCompletion')buildKPICompletion();
+  else if(id==='kpiCCI')buildKPICCI();
+  else if(id==='kpiSupport')buildKPISupport();
+  else if(id==='personalityDrill')buildPersonalityDrill();
+  else if(id==='aspirationDrill')buildAspirationDrill();
+  else if(id==='learningStylesDrill')buildLSDrill();
+}
+function closeModal(id){document.getElementById('modal-'+id).classList.remove('open');}
+document.addEventListener('click',e=>{if(e.target.classList.contains('modal-bg'))e.target.classList.remove('open');});
+
+// ══════════════ PRINCIPAL CHARTS ══════════════
+window.addEventListener('load',()=>{
+  renderPersonalityChart();
+  renderLSHeatmap();
+  renderCCIChart();
+  renderGapChart();
+  updateTeacherDash();
+  renderStudentList();
+  renderCounsellorAggr();
+  renderMessages();
+  renderStudentRadar();
+  updateNotifCount();
+  initCalendar();
+  // Populate student appointment slots
+  const slots = ['Mon 13 Jan · 10:00 AM','Tue 14 Jan · 11:30 AM','Thu 16 Jan · 3:00 PM'];
+  const slotsEl = document.getElementById('studentApptSlots');
+  if(slotsEl) slotsEl.innerHTML = slots.map(sl => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:11px;color:var(--text)">${sl}</span>
+      <button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="selectStudentSlot(this,'${sl}')">Select</button>
+    </div>`).join('');
+});
+
+function renderPersonalityChart(){
+  const ctx=document.getElementById('personalityChart');
+  const labels=['Realistic','Investigative','Artistic','Social','Enterprising','Conventional'];
+  new Chart(ctx,{
+    type:'radar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Gr 6–8',data:[62,58,70,65,55,60],borderColor:'#0C6B5A',backgroundColor:'rgba(12,107,90,0.1)',pointBackgroundColor:'#0C6B5A',borderWidth:2,pointRadius:3},
+        {label:'Gr 9–10',data:[70,65,55,60,62,68],borderColor:'#36B37E',backgroundColor:'rgba(54,179,126,0.08)',pointBackgroundColor:'#36B37E',borderWidth:2,pointRadius:3},
+        {label:'Gr 11–12',data:[75,68,45,55,65,72],borderColor:'#F59E0B',backgroundColor:'rgba(245,158,11,0.08)',pointBackgroundColor:'#F59E0B',borderWidth:2,pointRadius:3},
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const p=labels[ctx.dataIndex];const adj=personalityAdjectives[p]||[];return[`${ctx.dataset.label}: ${ctx.raw}%`,...adj.slice(0,3).map(a=>'  • '+a)];}}}},
+      scales:{r:{min:30,max:80,ticks:{display:false},grid:{color:'#E5E7EB'},pointLabels:{font:{size:10}}}}
+    }
+  });
+}
+
+function renderLSHeatmap(){
+  const colorFor=v=>v>=70?'#D1FAE5':v>=60?'#FEF3C7':'#FEE2E2';
+  const txtFor=v=>v>=70?'#065F46':v>=60?'#92400E':'#991B1B';
+  const trendIcon=t=>t==='up'?'↑':t==='down'?'↓':'—';
+  const trendCol=t=>t==='up'?'#059669':t==='down'?'#DC2626':'#6B7280';
+  const tb=document.getElementById('lsHeatmap');
+  learningStyleData.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.style.cursor='pointer';
+    tr.onclick=()=>openModal('learningStylesDrill');
+    tr.innerHTML=`<td style="font-size:11px">${r.name}</td>
+      <td><span style="background:${colorFor(r.g68)};color:${txtFor(r.g68)};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">${r.g68}%</span></td>
+      <td><span style="background:${colorFor(r.g910)};color:${txtFor(r.g910)};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">${r.g910}%</span></td>
+      <td><span style="background:${colorFor(r.g1112)};color:${txtFor(r.g1112)};padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">${r.g1112}%</span></td>
+      <td><span style="color:${trendCol(r.trend)};font-weight:700">${trendIcon(r.trend)}</span></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function renderCCIChart(){
+  const cciGradeData={
+    "Grade 6":{High:45,Mod:35,Low:20},
+    "Grade 7":{High:44,Mod:36,Low:20},
+    "Grade 8":{High:40,Mod:34,Low:26},
+    "Grade 9":{High:38,Mod:40,Low:22},
+    "Grade 10":{High:33,Mod:40,Low:27},
+    "Grade 11":{High:22,Mod:33,Low:45},
+    "Grade 12":{High:18,Mod:37,Low:45},
+  };
+  const labels=Object.keys(cciGradeData);
+  const c=new Chart(document.getElementById('cciChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'High',data:labels.map(l=>cciGradeData[l].High),backgroundColor:'#059669',stack:'s'},
+      {label:'Moderate',data:labels.map(l=>cciGradeData[l].Mod),backgroundColor:'#D97706',stack:'s'},
+      {label:'Low/None',data:labels.map(l=>cciGradeData[l].Low),backgroundColor:'#DC2626',stack:'s'},
+    ]},
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{afterBody:(items)=>{
+          const idx=items[0].dataIndex;
+          const grp=labels[idx];
+          const d=cciGradeData[grp];
+          return[`High: ${d.High}%`,`Moderate: ${d.Mod}%`,`Low/None: ${d.Low}%`];
+        }}}
+      },
+      onHover:(e,els)=>{
+        const panel=document.getElementById('cciHoverPanel');
+        if(els.length){
+          const idx=els[0].index;
+          const grp=labels[idx];const d=cciGradeData[grp];
+          panel.style.display='block';
+          panel.innerHTML=`<strong>${grp} Breakdown</strong>: High <span style="color:#059669;font-weight:700">${d.High}%</span> · Moderate <span style="color:#D97706;font-weight:700">${d.Mod}%</span> · Low/None <span style="color:#DC2626;font-weight:700">${d.Low}%</span>`;
+        } else panel.style.display='none';
+      },
+      scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},y:{stacked:true,max:100,ticks:{callback:v=>v+'%'},grid:{color:'#E5E7EB'}}}
+    }
+  });
+}
+
+function renderGapChart(){
+  const careerLabels=aspirationGapData.map(d=>d.career);
+  const asp=aspirationGapData.map(d=>Math.round((d.g68_asp+d.g910_asp+d.g1112_asp)/3));
+  const suit=aspirationGapData.map(d=>Math.round((d.g68_suit+d.g910_suit+d.g1112_suit)/3));
+  new Chart(document.getElementById('gapChart'),{
+    type:'bar',
+    data:{labels:careerLabels,datasets:[
+      {label:'Aspiration %',data:asp,backgroundColor:'#0C6B5A99',borderColor:'#0C6B5A',borderWidth:1},
+      {label:'Suitability %',data:suit,backgroundColor:'#F59E0B88',borderColor:'#D97706',borderWidth:1},
+    ]},
+    options:{responsive:true,indexAxis:'y',plugins:{legend:{position:'top',labels:{boxWidth:9,font:{size:10}}}},
+      scales:{x:{max:80,ticks:{callback:v=>v+'%'},grid:{color:'#E5E7EB'}},y:{grid:{display:false},ticks:{font:{size:11}}}}}
+  });
+}
+
+// ══════════════ MODAL BUILDERS ══════════════
+function buildKPIStudents(){
+  const grades=[6,7,8,9,10,11,12];
+  const counts=[42,48,55,85,78,89,90];
+  const grid=document.getElementById('kpiStudentsGrid');
+  grid.innerHTML=grades.map((g,i)=>`<div class="grade-comp-card">
+    <div class="grade-comp-grade">Grade ${g}</div>
+    <div class="grade-comp-val">${counts[i]}</div>
+    <div class="grade-comp-bar"><div class="pb"><div class="pf" style="width:${counts[i]/90*100}%;background:var(--p)"></div></div></div>
+  </div>`).join('');
+  new Chart(document.getElementById('kpiStudentsChart'),{
+    type:'bar',
+    data:{labels:grades.map(g=>'Gr '+g),datasets:[{label:'Students Assessed',data:counts,backgroundColor:'#0C6B5A',borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'#E5E7EB'}}}}
+  });
+}
+
+function buildKPICompletion(){
+  const rows=[
+    {grade:6,section:"A",total:22,completed:21,pct:95},
+    {grade:7,section:"A",total:24,completed:23,pct:96},
+    {grade:8,section:"A",total:28,completed:25,pct:89},
+    {grade:9,section:"A",total:42,completed:30,pct:71},
+    {grade:9,section:"B",total:43,completed:32,pct:74},
+    {grade:10,section:"A",total:38,completed:27,pct:71},
+    {grade:10,section:"B",total:40,completed:29,pct:73},
+    {grade:11,section:"A",total:45,completed:38,pct:84},
+    {grade:11,section:"S",total:44,completed:41,pct:93},
+    {grade:12,section:"A",total:90,completed:70,pct:78},
+  ];
+  const tb=document.getElementById('completionTable');
+  tb.innerHTML=rows.map(r=>{
+    const isBad=r.pct<90;
+    const badStyle=isBad?'background:#FEF2F2':'' ;
+    return`<tr style="${badStyle}">
+      <td>Grade ${r.grade}</td><td>Section ${r.section}</td><td>${r.total}</td><td>${r.completed}</td>
+      <td><span style="font-weight:700;color:${isBad?'#DC2626':'#059669'}">${r.pct}% ${isBad?'⚠':''}</span></td>
+      <td style="color:${isBad?'#DC2626':'#6B7280'};font-weight:${isBad?'700':'400'}">${r.total-r.completed} missing</td>
+      <td><span class="badge ${isBad?'bl':'bh'}">${isBad?'Below Target':'On Track'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function buildKPICCI(){
+  const grades=[6,7,8,9,10,11,12];
+  const highPct=[45,44,40,38,33,22,18];
+  const grid=document.getElementById('kpiCCIGrid');
+  grid.innerHTML=grades.map((g,i)=>`<div class="grade-comp-card">
+    <div class="grade-comp-grade">Grade ${g}</div>
+    <div class="grade-comp-val" style="color:${highPct[i]>=40?'var(--s)':highPct[i]>=25?'var(--acc)':'var(--danger)'}">${highPct[i]}%</div>
+    <div style="font-size:9px;color:var(--muted)">High CCI</div>
+    <div class="grade-comp-bar" style="margin-top:4px"><div class="pb"><div class="pf" style="width:${highPct[i]}%;background:${highPct[i]>=40?'var(--s)':highPct[i]>=25?'var(--acc)':'var(--danger)'}"></div></div></div>
+  </div>`).join('');
+  new Chart(document.getElementById('kpiCCIChart'),{
+    type:'line',
+    data:{labels:grades.map(g=>'Gr '+g),datasets:[{label:'High CCI %',data:highPct,borderColor:'#0C6B5A',backgroundColor:'rgba(12,107,90,0.1)',tension:.35,fill:true,pointBackgroundColor:'#0C6B5A'}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{max:60,ticks:{callback:v=>v+'%'},grid:{color:'#E5E7EB'}}}}
+  });
+}
+
+function buildKPISupport(){
+  const grades=[6,7,8,9,10,11,12];
+  const pct=[10,12,18,26,28,38,45];
+  const grid=document.getElementById('kpiSupportGrid');
+  grid.innerHTML=grades.map((g,i)=>`<div class="grade-comp-card">
+    <div class="grade-comp-grade">Grade ${g}</div>
+    <div class="grade-comp-val" style="color:${pct[i]>=30?'var(--danger)':pct[i]>=20?'var(--acc)':'var(--s)'}">${pct[i]}%</div>
+    <div style="font-size:9px;color:var(--muted)">needing support</div>
+    <div class="grade-comp-bar" style="margin-top:4px"><div class="pb"><div class="pf" style="width:${pct[i]/50*100}%;background:${pct[i]>=30?'var(--danger)':pct[i]>=20?'var(--acc)':'var(--s)'}"></div></div></div>
+  </div>`).join('');
+  const tb=document.getElementById('kpiSupportTable');
+  const lowStudents=mockStudents.filter(s=>s.cci==='Low'||s.redFlag);
+  tb.innerHTML=lowStudents.map(s=>`<tr>
+    <td style="font-weight:500">${s.name}</td>
+    <td>${s.grade}</td><td>${s.cls}</td>
+    <td><span class="badge bl">${s.cci}</span></td>
+    <td style="font-size:11px;color:var(--acc)">${s.weakAbility}</td>
+  </tr>`).join('');
+}
+
+function buildPersonalityDrill(){
+  const types=['Realistic','Investigative','Artistic','Social','Enterprising','Conventional'];
+  const schoolCounts={Realistic:34,Investigative:28,Artistic:19,Social:15,Enterprising:14,Conventional:32};
+  const body=document.getElementById('personalityDrillBody');
+  body.innerHTML=types.map(t=>{
+    const g=personalityGuidelines[t];
+    const adj=personalityAdjectives[t];
+    const count=schoolCounts[t];
+    const pct=Math.round(count/142*100);
+    return`<div style="border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--pd)">${t} Type</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${pct}% of school (${count} students)</div>
+        </div>
+        <button onclick="flagToAllCounsellors('${t}')" class="btn btn-danger btn-sm">🚩 Raise Flag to Counsellor</button>
+      </div>
+      <div style="margin-bottom:8px"><strong style="font-size:11px;text-transform:uppercase;color:var(--muted)">Adjectives:</strong>
+        <span style="font-size:12px;margin-left:6px">${adj.join(' · ')}</span></div>
+      <div style="margin-bottom:8px"><strong style="font-size:11px;text-transform:uppercase;color:var(--muted)">Career Paths:</strong>
+        <span style="font-size:12px;margin-left:6px;color:var(--pd)">${g.career}</span></div>
+      <div style="margin-bottom:8px"><strong style="font-size:11px;text-transform:uppercase;color:var(--muted)">Recommended Workshops:</strong>
+        <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">${g.workshops.map(w=>`<span class="badge bt">${w}</span>`).join('')}</div>
+      </div>
+      <div class="insight"><span>📌</span><span>${g.low}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function flagToAllCounsellors(type){
+  messages.unshift({id:Date.now(),from:"principal",fromLabel:"Principal (Auto-flag)",student:null,body:`School-wide flag: ${type} personality type students need workshop attention. Percentage below expected. Please plan targeted sessions.`,time:"Just now",read:false,replies:[]});
+  updateNotifCount();
+  closeModal('personalityDrill');
+  alert(`Flag sent to Counsellor regarding ${type} personality students.`);
+}
+
+function buildLSDrill(){
+  const body=document.getElementById('lsDrillBody');
+  body.innerHTML=`<div class="insight" style="margin-bottom:14px"><span>ℹ</span><span>Based on Howard Gardner's Theory of Multiple Intelligences. Each style represents how students learn best — not a fixed ability but a preference and strength.</span></div>`+
+  learningStyleData.map(r=>`<div style="border:1px solid var(--border);border-radius:var(--rs);padding:12px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-weight:600;font-size:13px;color:var(--pd)">${r.name}</div>
+      <div style="display:flex;gap:6px">
+        <span class="badge bt">Gr 6–8: ${r.g68}%</span>
+        <span class="badge bb">Gr 9–10: ${r.g910}%</span>
+        <span class="badge bp">Gr 11–12: ${r.g1112}%</span>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${r.desc}</div>
+    <div style="font-size:11px;color:var(--pd);font-weight:500">📌 ${r.tip}</div>
+  </div>`).join('');
+}
+
+function buildAspirationDrill(){
+  const body=document.getElementById('aspirationDrillBody');
+  // QR placeholder using canvas
+  const qrHtml=`<div class="qr-box" style="margin-top:14px">
+    <div style="font-size:12px;font-weight:600;margin-bottom:6px">📚 Career Library QR</div>
+    <div class="qr-code"><svg width="80" height="80" viewBox="0 0 80 80">
+      <rect x="5" y="5" width="28" height="28" fill="none" stroke="#084A3E" stroke-width="4" rx="2"/>
+      <rect x="12" y="12" width="14" height="14" fill="#084A3E" rx="1"/>
+      <rect x="47" y="5" width="28" height="28" fill="none" stroke="#084A3E" stroke-width="4" rx="2"/>
+      <rect x="54" y="12" width="14" height="14" fill="#084A3E" rx="1"/>
+      <rect x="5" y="47" width="28" height="28" fill="none" stroke="#084A3E" stroke-width="4" rx="2"/>
+      <rect x="12" y="54" width="14" height="14" fill="#084A3E" rx="1"/>
+      <rect x="47" y="47" width="8" height="8" fill="#084A3E" rx="1"/>
+      <rect x="58" y="47" width="8" height="8" fill="#084A3E" rx="1"/>
+      <rect x="47" y="58" width="8" height="8" fill="#084A3E" rx="1"/>
+      <rect x="58" y="58" width="17" height="8" fill="#084A3E" rx="1"/>
+    </svg></div>
+    <div style="font-size:10px;opacity:.8">Scan to access Career-9.com Library</div>
+  </div>`;
+
+  body.innerHTML=`<div class="insight" style="margin-bottom:14px"><span>💡</span><span>Use this data to plan extracurricular activities that bridge the aspiration–suitability gap by grade. Click any career for details.</span></div>`+
+  aspirationGapData.map(d=>{
+    const gap68=d.g68_asp-d.g68_suit;
+    const gap910=d.g910_asp-d.g910_suit;
+    const gap1112=d.g1112_asp-d.g1112_suit;
+    const worstGap=Math.max(gap68,gap910,gap1112);
+    const badgeClass=worstGap>15?'bl':worstGap>5?'bm':'bh';
+    return`<div style="border:1px solid var(--border);border-radius:var(--rs);padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:600;color:var(--pd)">${d.career}</div>
+        <span class="badge ${badgeClass}">${worstGap>0?'Gap: +'+worstGap+'% aspiration':'Balanced'}</span>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:8px;font-size:11px">
+        <div><strong>Gr 6–8:</strong> Asp ${d.g68_asp}% / Suit ${d.g68_suit}% <span style="color:${d.g68_asp>d.g68_suit?'#DC2626':'#059669'}">(${d.g68_asp>d.g68_suit?'+':''}${d.g68_asp-d.g68_suit}%)</span></div>
+        <div><strong>Gr 9–10:</strong> Asp ${d.g910_asp}% / Suit ${d.g910_suit}% <span style="color:${d.g910_asp>d.g910_suit?'#DC2626':'#059669'}">(${d.g910_asp>d.g910_suit?'+':''}${d.g910_asp-d.g910_suit}%)</span></div>
+        <div><strong>Gr 11–12:</strong> Asp ${d.g1112_asp}% / Suit ${d.g1112_suit}% <span style="color:${d.g1112_asp>d.g1112_suit?'#DC2626':'#059669'}">(${d.g1112_asp>d.g1112_suit?'+':''}${d.g1112_asp-d.g1112_suit}%)</span></div>
+      </div>
+      <div style="margin-bottom:5px"><strong style="font-size:10px;text-transform:uppercase;color:var(--muted)">Extracurricular Activities:</strong></div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">${d.activities.map(a=>`<span class="badge bt">${a}</span>`).join('')}</div>
+      <div style="font-size:11px;color:var(--muted)">${d.extracurr}</div>
+    </div>`;
+  }).join('')+qrHtml;
+}
+
+// ══════════════ TEACHER ══════════════
+const classStrategies={
+  "9A":[{i:"🤖",t:"Logic Challenges",d:"Puzzles & coding for Investigative-dominant class"},{i:"🌿",t:"Nature Projects",d:"Naturalistic strength – outdoor science observation"},{i:"📝",t:"Structured Debates",d:"Build Linguistic + Communication ability"},{i:"🏗",t:"Mini Build Projects",d:"Realistic students learn through making"}],
+  "9B":[{i:"🎵",t:"Creative Expression",d:"Artistic class – integrate art, music, drama"},{i:"🗣",t:"Team Presentations",d:"Interpersonal strength – collaborative projects"},{i:"📰",t:"Current Affairs",d:"Social + Enterprising – real-world problems"},{i:"💼",t:"Entrepreneurship Lab",d:"Mini-business simulation for E-types"}],
+  "10A":[{i:"📊",t:"Data Analysis Tasks",d:"Conventional + Logical-Math – structured analysis"},{i:"✍",t:"Essay Writing",d:"Build Communication – key class gap"},{i:"⏱",t:"Mock Test Sessions",d:"Speed & Accuracy weak – timed practice"},{i:"🎤",t:"Career Panel",d:"Invite professionals for interactive Q&A"}],
+  "10B":[{i:"🎨",t:"Design Thinking",d:"Artistic + weak Technical – bridge via design"},{i:"💬",t:"Communication Training",d:"Technical students need comm skills – ToastMasters"},{i:"🔬",t:"STEM + Art Fusion",d:"Realistic + Artistic combined exhibitions"},{i:"📔",t:"Reflection Journals",d:"Growing Intrapersonal – guided journaling"}],
+  "11A":[{i:"📈",t:"Exam Readiness",d:"Analytical types – JEE/NEET structured prep"},{i:"🤝",t:"Industry Mentors",d:"High-clarity students need pro connections"},{i:"🚀",t:"Leadership Projects",d:"Enterprising types – cross-class leadership"},{i:"📄",t:"Resume & Portfolio",d:"Build first professional documents"}],
+  "11S":[{i:"🔬",t:"Lab & Research",d:"Investigative – extended projects & papers"},{i:"🌱",t:"Biology Field Study",d:"Naturalistic intelligence – ecology projects"},{i:"🗣",t:"Science Communication",d:"Critical gap: low Communication – peer teaching"},{i:"🎯",t:"NEET/JEE Alignment",d:"Map aspirations to competitive exam strategy"}],
+};
+const lsLabels={"Logical-Mathematical":"Logical-Math","Interpersonal":"Interpersonal","Linguistic":"Linguistic","Spatial-Visual":"Spatial","Bodily-Kinesthetic":"Kinesthetic","Intrapersonal":"Intrapersonal","Musical":"Musical","Naturalistic":"Naturalistic"};
+
+function updateTeacherDash(){
+  const cls=document.getElementById('classSelector').value;
+  const redOnly=document.getElementById('redFlagOnly').checked;
+  document.getElementById('classLabelH').textContent='Grade '+cls;
+  const students=mockStudents.filter(s=>s.cls===cls);
+  const shown=redOnly?students.filter(s=>s.redFlag||s.cci==='Low'):students;
+
+  document.getElementById('totalStudentsBadge').textContent=students.length+' students';
+
+  // Badges
+  const hCCI=students.filter(s=>s.cci==='High').length;
+  const flags=students.filter(s=>s.redFlag||s.cci==='Low').length;
+  document.getElementById('classSummaryBadges').innerHTML=
+    `<span class="badge bh">${hCCI} High CCI</span><span class="badge bl">${flags} flags</span><span class="badge bn">${students.length-hCCI-flags} Moderate</span>`;
+
+  // Populate note student select
+  const sel=document.getElementById('noteStudentSelect');
+  sel.innerHTML='<option value="">Select student (optional)</option>'+students.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+
+  // Learning styles of class
+  const lsCounts={};
+  students.forEach(s=>s.intel.slice(0,1).forEach(i=>{lsCounts[i]=(lsCounts[i]||0)+1}));
+  const lsKeys=Object.keys(lsCounts).sort((a,b)=>lsCounts[b]-lsCounts[a]);
+  const lsVals=lsKeys.map(k=>Math.round(lsCounts[k]/students.length*100));
+  if(teacherIntelI)teacherIntelI.destroy();
+  teacherIntelI=new Chart(document.getElementById('teacherIntelChart'),{
+    type:'bar',
+    data:{labels:lsKeys.map(k=>lsLabels[k]||k),datasets:[{label:'% dominant style',data:lsVals,backgroundColor:'#0C6B5A',borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{max:80,ticks:{callback:v=>v+'%'},grid:{color:'#E5E7EB'}}}}
+  });
+  // Insight for learning styles
+  const topLS=lsKeys[0];
+  const lsInsights={
+    "Logical-Mathematical":"Logical-Mathematical is the dominant style. Use data problems, scientific method, and analytical tasks for best engagement.",
+    "Interpersonal":"Interpersonal style dominates. Group discussions, peer teaching, and collaborative projects work best.",
+    "Linguistic":"Linguistic learners dominate. Reading-based tasks, storytelling, and debate activities are highly effective.",
+    "Spatial-Visual":"Spatial-Visual is top style. Mind maps, diagrams, video content, and visual presentations engage this class.",
+    "Bodily-Kinesthetic":"Kinesthetic learners dominate. Hands-on labs, role-plays, and movement activities are best.",
+    "Intrapersonal":"Intrapersonal style is high. Individual reflection, self-paced projects, and journaling work well.",
+    "Musical":"Musical intelligence is present. Use rhythm, pattern, and music-based mnemonics in teaching.",
+    "Naturalistic":"Naturalistic learners are strong. Outdoor activities, field studies, and ecology projects suit this class.",
+  };
+  document.getElementById('lsClassInsight').querySelector('span:last-child').textContent=lsInsights[topLS]||"Use diverse teaching methods to reach all learning styles.";
+
+  // Abilities
+  const abilAll=['Computational','Communication','Technical','Logical reasoning','Creativity','Decision making'];
+  const abilScores=abilAll.map(a=>Math.round(students.filter(s=>s.abilities.includes(a)).length/students.length*100));
+  if(teacherAbilI)teacherAbilI.destroy();
+  teacherAbilI=new Chart(document.getElementById('teacherAbilChart'),{
+    type:'bar',
+    data:{labels:abilAll.map(a=>a.length>12?a.slice(0,12)+'…':a),datasets:[{label:'%',data:abilScores,backgroundColor:abilScores.map(v=>v>=60?'#36B37E':v>=40?'#F59E0B':'#EF4444'),borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{max:100,ticks:{callback:v=>v+'%'},grid:{color:'#E5E7EB'}}}}
+  });
+
+  // Student table
+  const tb=document.getElementById('teacherStudentTable');
+  tb.innerHTML='';
+  shown.forEach(s=>{
+    const cciCl=s.cci==='High'?'bh':s.cci==='Moderate'?'bm':'bl';
+    const flag=s.redFlag||s.cci==='Low';
+    const support=flag?'<span class="dot dr"></span>High':s.cci==='Moderate'?'<span class="dot dy"></span>Medium':'<span class="dot dg"></span>On Track';
+    const tr=document.createElement('tr');
+    if(flag)tr.style.background='#FFF5F5';
+    tr.innerHTML=`<td style="font-weight:500">${s.name}${flag?' <span class="badge bl" style="font-size:9px">⚠</span>':''}</td>
+      <td style="font-size:11px">${s.personality[0]}</td>
+      <td style="font-size:11px">${lsLabels[s.intel[0]]||s.intel[0]}</td>
+      <td style="font-size:11px;color:var(--acc)">${s.weakAbility}</td>
+      <td><span class="badge ${cciCl}">${s.cci}</span></td>
+      <td style="font-size:11px">${support}</td>
+      <td><button class="rc-modal-btn" onclick="openReportCardModal(${s.id})">📝 Summary</button></td>`;
+    tb.appendChild(tr);
+  });
+
+  // Section comparison
+  const gradeStr=cls.replace(/[AB S]/g,'');
+  const grade=parseInt(gradeStr)||parseInt(cls[0])||9;
+  buildSectionComparison(cls,grade);
+
+  // Strategies
+  const strats=classStrategies[cls]||classStrategies['9A'];
+  document.getElementById('strategyGrid').innerHTML=strats.map(st=>`<div class="strat-card"><div class="strat-icon">${st.i}</div><div class="strat-title">${st.t}</div><div class="strat-desc">${st.d}</div></div>`).join('');
+
+  // Show sent notes
+  renderTeacherNotes(cls);
+}
+
+function buildSectionComparison(myCls,grade){
+  const grp=String(grade);
+  const comp=sectionCompData[grp]||sectionCompData['9'];
+  const myIdx=comp.sections.indexOf(myCls);
+  const el=document.getElementById('sectionComparison');
+  el.innerHTML=`<div style="font-size:11px;color:var(--muted);margin-bottom:8px">High CCI % by Section — Grade ${grade}</div>`+
+  comp.sections.map((sec,i)=>`<div class="comp-bar-wrap">
+    <div class="comp-bar-label ${i===myIdx?'my-section':''}">${sec}${i===myIdx?' ★':''}</div>
+    <div class="comp-bar-inner"><div class="pb"><div class="pf" style="width:${comp.cci.high[i]}%;background:${i===myIdx?'var(--p)':'#36B37E88'}"></div></div></div>
+    <div class="comp-bar-val ${i===myIdx?'my-section':''}">${comp.cci.high[i]}%</div>
+  </div>`).join('');
+
+  const rank=comp.cci.high.map((v,i)=>({sec:comp.sections[i],val:v})).sort((a,b)=>b.val-a.val);
+  const myRank=rank.findIndex(r=>r.sec===myCls)+1;
+  const total=comp.sections.length;
+  document.getElementById('sectionRanks').innerHTML=`
+    <div style="font-size:11px;margin-bottom:6px">CCI Rank: <strong style="color:${myRank===1?'var(--s)':'var(--acc)'}">
+      ${myRank} / ${total}</strong> ${myRank===1?'🏆 Top section!':'— room to improve'}</div>
+    <div style="font-size:11px;color:var(--muted)">Avg Ability Score: <strong>${comp.avgAbility[myIdx]||65}%</strong></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:3px">Avg Learning Style Score: <strong>${comp.avgLS[myIdx]||68}%</strong></div>`;
+}
+
+function sendTeacherNote(){
+  const cls=document.getElementById('classSelector').value;
+  const text=document.getElementById('teacherNoteText').value.trim();
+  const sid=document.getElementById('noteStudentSelect').value;
+  if(!text)return;
+  const sName=sid?mockStudents.find(s=>s.id==sid)?.name:'General class note';
+  const note={from:'teacher'+cls,fromLabel:'Teacher – Grade '+cls,student:sName,body:text,time:'Just now',read:false,replies:[]};
+  messages.unshift({...note,id:Date.now()});
+  teacherNotes.unshift({cls,student:sName,body:text,time:'Just now'});
+  document.getElementById('teacherNoteText').value='';
+  updateNotifCount();
+  renderTeacherNotes(cls);
+  alert('Note sent to Counsellor.');
+}
+
+function renderTeacherNotes(cls){
+  const el=document.getElementById('teacherNotesSent');
+  const notes=teacherNotes.filter(n=>n.cls===cls);
+  el.innerHTML=notes.length?notes.map(n=>`<div class="note-item">
+    <div class="note-meta"><span>${n.student}</span><span>${n.time}</span></div>
+    <div>${n.body}</div>
+  </div>`).join(''):'<div style="font-size:11px;color:var(--muted)">No notes sent yet for this class.</div>';
+}
+
+// ══════════════ COUNSELLOR ══════════════
+function counsellorFilter(){
+  currentGradeFilter=document.getElementById('cGradeFilter').value;
+  currentSectionFilter=document.getElementById('cSectionFilter').value;
+  currentPersonFilter=document.getElementById('cPersonFilter').value;
+  renderStudentList();
+  renderCounsellorAggr();
+}
+
+function getFilteredStudents(){
+  return mockStudents.filter(s=>{
+    const gMatch=currentGradeFilter==='all'||String(s.grade)===currentGradeFilter;
+    const sMatch=currentSectionFilter==='all'||s.section===currentSectionFilter;
+    const pMatch=currentPersonFilter==='all'||s.personality[0]===currentPersonFilter;
+    const cMatch=cciFilter==='all'||s.cci===cciFilter;
+    const srch=document.getElementById('sSearchInput')?.value.toLowerCase()||'';
+    const nameMatch=!srch||s.name.toLowerCase().includes(srch);
+    return gMatch&&sMatch&&pMatch&&cMatch&&nameMatch;
+  });
+}
+
+function renderCounsellorAggr(){
+  const students=getFilteredStudents();
+  document.getElementById('filterCount').textContent=students.length+' students';
+
+  // Personality donut
+  const pCounts={};
+  students.forEach(s=>{const p=s.personality[0];pCounts[p]=(pCounts[p]||0)+1;});
+  const pKeys=Object.keys(pCounts).sort((a,b)=>pCounts[b]-pCounts[a]).slice(0,5);
+  if(cPersonChartI)cPersonChartI.destroy();
+  cPersonChartI=new Chart(document.getElementById('cPersonChart'),{
+    type:'doughnut',
+    data:{labels:pKeys,datasets:[{data:pKeys.map(k=>pCounts[k]),backgroundColor:['#0C6B5A','#36B37E','#F59E0B','#3B82F6','#EF4444'],borderWidth:2}]},
+    options:{responsive:true,plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:10}}}}}
+  });
+
+  // CCI donut
+  const cciC={High:0,Moderate:0,Low:0};
+  students.forEach(s=>{if(s.cci==='High')cciC.High++;else if(s.cci==='Moderate')cciC.Moderate++;else cciC.Low++;});
+  if(cCCIChartI)cCCIChartI.destroy();
+  cCCIChartI=new Chart(document.getElementById('cCCIChart'),{
+    type:'doughnut',
+    data:{labels:['High','Moderate','Low/None'],datasets:[{data:[cciC.High,cciC.Moderate,cciC.Low],backgroundColor:['#059669','#D97706','#DC2626'],borderWidth:2}]},
+    options:{responsive:true,plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:10}}}}}
+  });
+
+  // Top aspirations (mock for now)
+  const aspNames=['Engineering','Computer Science','Medicine','Science','Commerce','Creative Arts','Social Service','Law'];
+  const aspVals=[14,11,9,8,7,5,4,3];
+  const max=aspVals[0];
+  document.getElementById('topAsp').innerHTML=aspNames.map((n,i)=>`<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+    <div style="font-size:10px;width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${n}</div>
+    <div style="flex:1"><div class="pb"><div class="pf" style="width:${aspVals[i]/max*100}%;background:var(--p)"></div></div></div>
+    <div style="font-size:10px;font-weight:600;width:18px;text-align:right">${aspVals[i]}</div>
+  </div>`).join('');
+}
+
+function renderStudentList(){
+  const students=getFilteredStudents();
+  document.getElementById('studentList').innerHTML=students.map(s=>{
+    const cciCl=s.cci==='High'?'bh':s.cci==='Moderate'?'bm':'bl';
+    return`<div class="sitem ${selectedStudentId===s.id?'active':''}" onclick="selectStudent(${s.id})">
+      <div>
+        <div class="sitem-name">${s.name}${s.redFlag?'<span style="color:var(--danger);margin-left:3px;font-size:10px">●</span>':''}</div>
+        <div class="sitem-cls">${s.cls} · Gr ${s.grade}</div>
+      </div>
+      <span class="badge ${cciCl}" style="font-size:9px">${s.cci}</span>
+    </div>`;
+  }).join('');
+}
+
+function filterSList(v){renderStudentList();}
+function setCCIFilter(f,el){
+  cciFilter=f;
+  document.querySelectorAll('.ctab').forEach(t=>{t.className='ctab';});
+  const cls=f==='all'?'ctab-all':f==='High'?'ctab-high':f==='Moderate'?'ctab-mod':'ctab-low';
+  el.className='ctab '+cls;
+  renderStudentList();
+  renderCounsellorAggr();
+}
+
+function selectStudent(id){
+  selectedStudentId=id;
+  const s=mockStudents.find(st=>st.id===id);
+  renderStudentList();
+  const inits=s.name.split(' ').map(n=>n[0]).join('').slice(0,2);
+  const cciCl=s.cci==='High'?'bh':s.cci==='Moderate'?'bm':'bl';
+  document.getElementById('studentDetailCard').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+      <div style="width:40px;height:40px;border-radius:50%;background:var(--p);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0">${inits}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${s.name} ${s.redFlag?'<span class="badge bl" style="font-size:9px">⚠ Red Flag</span>':''}</div>
+        <div style="font-size:10px;color:var(--muted)">${s.cls} · Grade ${s.grade}</div>
+      </div>
+      <span class="badge ${cciCl}">${s.cci} CCI</span>
+    </div>
+    <div class="g2" style="margin-bottom:0;gap:10px">
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">6 Pillars</div>
+        <div style="font-size:11px;margin-bottom:2px"><strong>Personality:</strong> ${s.personality.join(', ')}</div>
+        <div style="font-size:11px;margin-bottom:2px"><strong>Learning Style:</strong> ${s.intel.join(', ')}</div>
+        <div style="font-size:11px;margin-bottom:2px"><strong>Top Abilities:</strong> ${s.abilities.join(', ')}</div>
+        <div style="font-size:11px;color:var(--danger)"><strong>Weak:</strong> ${s.weakAbility}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Direction</div>
+        <div style="font-size:11px;margin-bottom:4px"><strong>Aspirations:</strong></div>
+        <div style="display:flex;flex-wrap:wrap;gap:3px">${(s.aspirations||['Not set']).slice(0,3).map(a=>`<span class="badge bb">${a}</span>`).join('')}</div>
+      </div>
+    </div>`;
+  const notes=sessionNotes[id]||[];
+  document.getElementById('notesList').innerHTML=notes.length?notes.map((n,i)=>`<div class="note-item">
+    <div class="note-meta"><span>Note ${i+1}</span><span>Session</span></div>
+    <div>${n}</div>
+  </div>`).join(''):'<div style="font-size:11px;color:var(--muted)">No notes yet.</div>';
+}
+
+function saveNote(){
+  if(!selectedStudentId)return alert('Select a student first');
+  const text=document.getElementById('newNoteText').value.trim();
+  if(!text)return;
+  if(!sessionNotes[selectedStudentId])sessionNotes[selectedStudentId]=[];
+  sessionNotes[selectedStudentId].push(text);
+  selectStudent(selectedStudentId);
+  document.getElementById('newNoteText').value='';
+}
+
+// ══════════════ MESSAGES ══════════════
+function renderMessages(){
+  const el=document.getElementById('counsellorMessages');
+  el.innerHTML=messages.map(m=>`<div class="msg-item" id="msg-${m.id}">
+    <div class="msg-from ${m.from==='principal'?'from-principal':'from-teacher'}">${m.read?'':'<span class="unread-dot"></span>'}<strong>${m.fromLabel}</strong>${m.student?' · Re: '+m.student:''}</div>
+    <div class="msg-body">${m.body}</div>
+    <div class="msg-time">${m.time}</div>
+    ${m.replies.map(r=>`<div class="note-reply"><div class="note-reply-meta">↩ Counsellor replied · ${r.time}</div>${r.body}</div>`).join('')}
+    <div style="margin-top:6px">
+      <button class="btn btn-sm" onclick="quickReply(${m.id})">↩ Reply</button>
+      ${!m.read?`<button class="btn btn-sm" style="margin-left:4px" onclick="markRead(${m.id})">Mark Read</button>`:''}
+    </div>
+  </div>`).join('');
+  updateNotifCount();
+}
+
+function quickReply(msgId){
+  const text=prompt('Reply to this message:');
+  if(!text)return;
+  const msg=messages.find(m=>m.id===msgId);
+  if(msg){msg.replies.push({body:text,time:'Just now'});msg.read=true;}
+  renderMessages();
+}
+
+function markRead(id){
+  const m=messages.find(msg=>msg.id===id);
+  if(m)m.read=true;
+  renderMessages();
+  updateNotifCount();
+}
+
+function sendReply(){
+  const target=document.getElementById('replyTarget').value;
+  const text=document.getElementById('replyText').value.trim();
+  if(!target||!text)return alert('Select recipient and write a message');
+  alert(`Message sent to: ${target}`);
+  document.getElementById('replyText').value='';
+}
+
+function updateNotifCount(){
+  const unread=messages.filter(m=>!m.read).length;
+  const el=document.getElementById('notifCount');
+  el.textContent=unread;
+  el.style.display=unread?'block':'none';
+  const ub=document.getElementById('unreadBadge');
+  if(ub)ub.textContent=unread+' unread';
+  document.getElementById('unreadBadge').style.display=unread?'inline-block':'none';
+}
+
+// ══════════════ FIELD TRIP REQUEST ══════════════
+function sendFieldTripRequest(){
+  const grade=document.getElementById('ftGrade').value;
+  const note=document.getElementById('ftNote').value.trim();
+  if(grade==='Select Grade Group')return alert('Please select a grade group');
+  if(!note)return alert('Please add some context for the counsellor');
+  messages.unshift({
+    id:Date.now(),from:'principal',fromLabel:'Principal – Field Trip Request',
+    student:null,
+    body:`Field Trip Planning Request — ${grade}\n\n${note}\n\nPlease review Navigator data for this grade group and suggest 2–3 profile-matched destinations, then conduct pre-trip orientation sessions.`,
+    time:'Just now',read:false,replies:[]
+  });
+  updateNotifCount();
+  document.getElementById('ftNote').value='';
+  closeModal('fieldTripModal');
+  alert(`✅ Field trip planning request sent to Counsellor for ${grade}.\nCounsellor will receive this in their messages panel.`);
+}
+
+// ══════════════ REPORT CARD SUMMARY ══════════════
+let reportCardStudentId = null;
+
+function openReportCardModal(id) {
+  reportCardStudentId = id;
+  const s = mockStudents.find(st => st.id === id);
+  const cls = document.getElementById('classSelector').value;
+  const cciColor = s.cci === 'High' ? '#065F46' : s.cci === 'Moderate' ? '#92400E' : '#991B1B';
+  const today = new Date().toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'});
+
+  document.getElementById('reportCardBody').innerHTML = `
+    <div style="background:#FAFCFB;border:1px solid var(--border);border-radius:var(--rs);padding:14px;margin-bottom:14px;font-size:11px;color:var(--muted)">
+      💡 This summary is designed to be copied into the student's academic report card. It is concise, professional, and parent-friendly. You can edit the text before copying.
+    </div>
+    <div id="rcTextBlock" style="background:#fff;border:2px solid var(--border);border-radius:var(--r);padding:20px;font-family:Georgia,serif;line-height:1.75;font-size:13px;color:#1A2B28">
+      <div style="text-align:center;border-bottom:2px solid #D1E5DF;padding-bottom:12px;margin-bottom:16px">
+        <div style="font-size:16px;font-weight:700;color:#084A3E">Career Navigator 360 — Student Profile Summary</div>
+        <div style="font-size:11px;color:#5C7A72;margin-top:4px">Academic Year 2024–25 · Assessed via Navigator 360 · ${today}</div>
+      </div>
+
+      <table style="width:100%;margin-bottom:14px;border-collapse:collapse;font-size:12px">
+        <tr><td style="padding:4px 8px;font-weight:600;width:160px;color:#5C7A72">Student Name</td><td style="padding:4px 8px;font-weight:700;color:#084A3E">${s.name}</td>
+            <td style="padding:4px 8px;font-weight:600;width:140px;color:#5C7A72">Grade &amp; Section</td><td style="padding:4px 8px">${s.cls}</td></tr>
+        <tr><td style="padding:4px 8px;font-weight:600;color:#5C7A72">Career Clarity</td>
+            <td style="padding:4px 8px;font-weight:700;color:${cciColor}">${s.cci} Career Clarity</td>
+            <td style="padding:4px 8px;font-weight:600;color:#5C7A72">Assessment Stage</td>
+            <td style="padding:4px 8px">${s.grade<=8?'Insight Navigator (Gr 6–8)':s.grade<=10?'Subject Navigator (Gr 9–10)':'Career Navigator (Gr 11–12)'}</td></tr>
+      </table>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#084A3E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;border-left:3px solid #36B37E;padding-left:8px">Personality &amp; Learning Profile</div>
+        <p style="font-size:12px;margin:0;color:#1A2B28">
+          ${s.name} demonstrates a predominantly <strong>${s.personality[0]}</strong> personality type, supported by <strong>${s.personality[1]}</strong> tendencies.
+          As a learner, ${s.name.split(' ')[0]} shows the strongest aptitude through <strong>${s.intel[0]}</strong> and <strong>${s.intel[1]}</strong> learning styles,
+          reflecting a natural inclination toward ${s.intel[0]==='Logical-Mathematical'?'analytical thinking and problem-solving':
+          s.intel[0]==='Interpersonal'?'collaborative work and social engagement':
+          s.intel[0]==='Linguistic'?'language, reading, and communication':
+          s.intel[0]==='Spatial-Visual'?'visual thinking and creative design':
+          s.intel[0]==='Bodily-Kinesthetic'?'hands-on, practical activity':
+          s.intel[0]==='Intrapersonal'?'self-directed, reflective learning':
+          s.intel[0]==='Musical'?'pattern recognition and rhythm-based learning':
+          'nature, environment, and classification tasks'}.
+        </p>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#084A3E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;border-left:3px solid #36B37E;padding-left:8px">Key Strengths</div>
+        <p style="font-size:12px;margin:0;color:#1A2B28">
+          ${s.name.split(' ')[0]}'s assessed abilities highlight particular strength in <strong>${s.abilities[0]}</strong>, <strong>${s.abilities[1]}</strong>, and <strong>${s.abilities[2]}</strong>.
+          These competencies align well with academic performance and indicate readiness for career paths requiring these skills.
+          An identified area for development is <strong>${s.weakAbility}</strong>, and targeted activities in this area are recommended for the coming academic term.
+        </p>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#084A3E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;border-left:3px solid #36B37E;padding-left:8px">Career Direction &amp; Subjects of Interest</div>
+        <p style="font-size:12px;margin:0;color:#1A2B28">
+          Based on the Navigator 360 assessment, ${s.name.split(' ')[0]} has expressed interest in
+          <strong>${(s.aspirations||['career exploration']).slice(0,2).join(' and ')}</strong>.
+          The suitability analysis indicates strong alignment with <strong>${(s.suitability||['multiple career fields']).slice(0,2).join(' and ')}</strong>.
+          ${s.cci==='High'?`${s.name.split(' ')[0]} shows a high degree of career clarity and is well-positioned to make informed decisions for stream and subject selection.`:
+           s.cci==='Moderate'?`${s.name.split(' ')[0]} shows emerging career clarity. Continued guidance and exposure to relevant fields will support better alignment.`:
+           `Career clarity is still developing. A dedicated counselling session is recommended to help ${s.name.split(' ')[0]} explore and connect with suitable career paths.`}
+        </p>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#084A3E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;border-left:3px solid #36B37E;padding-left:8px">Teacher's Recommendations for the Coming Term</div>
+        <p style="font-size:12px;margin:0;color:#1A2B28">
+          1. Provide <strong>${s.weakAbility.toLowerCase()}</strong>-building opportunities through class activities and assignments.<br>
+          2. Encourage participation in extracurricular activities aligned with ${s.name.split(' ')[0]}'s <strong>${s.personality[0]}</strong> personality and <strong>${s.intel[0]}</strong> learning preference.<br>
+          3. ${s.cci==='Low'||s.redFlag?`<strong>Recommend a counselling session</strong> to address career clarity and identify concrete next steps.`:
+             `Continue to reinforce strengths and guide subject selection consistent with identified career interests.`}
+        </p>
+      </div>
+
+      <div style="background:#E0F2EE;border-radius:var(--rs);padding:10px 12px;font-size:11px;color:#084A3E;margin-top:14px">
+        <em>This summary has been generated using the Career Navigator 360 psychometric assessment. For detailed pillar-level scores and a full career suitability report, please refer to the student's individual Navigator 360 report available with the school counsellor.</em>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+      <button onclick="copyReportCard()" class="btn btn-primary btn-sm">📋 Copy to Clipboard</button>
+      <button onclick="downloadReport('reportcard')" class="dl-btn" style="font-size:11px">📥 Download as PDF</button>
+      <span id="rcCopyMsg" style="display:none;font-size:11px;color:var(--s);font-weight:600">✔ Copied!</span>
+    </div>`;
+
+  openModal('reportCard');
+}
+
+function copyReportCard() {
+  const el = document.getElementById('rcTextBlock');
+  const text = el ? el.innerText : '';
+  navigator.clipboard.writeText(text).then(() => {
+    const msg = document.getElementById('rcCopyMsg');
+    if(msg){msg.style.display='inline';setTimeout(()=>msg.style.display='none',2500);}
+  }).catch(()=>alert('Text ready — please use Ctrl+A / Ctrl+C on the report card text above.'));
+}
+
+// ══════════════ DOWNLOAD / EXPORT ══════════════
+function downloadReport(type) {
+  const labels = {
+    full: 'Navigator 360 Full Report — Aarav Sharma.pdf',
+    summary: 'Career Clarity Summary — Aarav Sharma.pdf',
+    parent: 'Parent Report — Aarav Sharma.pdf',
+    counsellor: 'Counsellor Report.pdf',
+    reportcard: 'Report Card Summary.pdf',
+  };
+  const label = labels[type] || 'Report.pdf';
+  // In production this would trigger a real PDF generation call.
+  // For this prototype we show a confirmation toast.
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#084A3E;color:#fff;padding:12px 18px;border-radius:10px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.25);display:flex;align-items:center;gap:8px';
+  toast.innerHTML = `📥 Generating <em>${label}</em>…`;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.innerHTML = `✔ ${label} ready — saved to Downloads`; }, 1400);
+  setTimeout(() => toast.remove(), 3800);
+}
+
+// ══════════════ STUDENT APPOINTMENTS ══════════════
+
+
+function selectStudentSlot(btn, slot) {
+  document.querySelectorAll('#studentApptSlots button').forEach(b => { b.textContent='Select'; b.style.background=''; b.style.color=''; });
+  btn.textContent = '✔ Selected';
+  btn.style.background = 'var(--p)';
+  btn.style.color = '#fff';
+  document.getElementById('apptConfirm').style.display = 'none';
+  window._selectedSlot = slot;
+}
+
+function bookStudentAppt() {
+  const slot = window._selectedSlot;
+  const conf = document.getElementById('apptConfirm');
+  if (!slot) { conf.style.display='block'; conf.style.background='#FEE2E2'; conf.style.color='#991B1B'; conf.textContent='Please select a slot first.'; return; }
+  conf.style.display = 'block';
+  conf.style.background = '#D1FAE5';
+  conf.style.color = '#065F46';
+  conf.textContent = `✔ Appointment requested for ${slot}. Your counsellor will confirm shortly.`;
+  // Push to counsellor messages
+  messages.unshift({id:Date.now(),from:'student',fromLabel:'Student Request',student:'Aarav Sharma',body:`Appointment booking request: ${slot} — Career Counselling Session.`,time:'Just now',read:false,replies:[]});
+  updateNotifCount();
+  window._selectedSlot = null;
+}
+
+// ══════════════ COUNSELLOR CALENDAR ══════════════
+let calYear, calMonth, calAppointments = {};
+
+function initCalendar() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  // Seed some demo appointments
+  const d = (day) => `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  calAppointments[d(8)]  = [{time:'10:00 AM',student:'Divya Sharma',type:'Red Flag Intervention'},{time:'2:30 PM',student:'Shruti Kulkarni',type:'CCI Review'}];
+  calAppointments[d(13)] = [{time:'11:30 AM',student:'Anjali Tiwari',type:'Career Counselling'}];
+  calAppointments[d(16)] = [{time:'3:00 PM',student:'Amit Verma',type:'Parent + Student Session'}];
+  calAppointments[d(21)] = [{time:'9:30 AM',student:'Pooja Iyer',type:'Stream Selection Guidance'}];
+  // Populate student dropdown
+  const sel = document.getElementById('apptStudentSel');
+  if(sel) sel.innerHTML = '<option value="">Select student...</option>' +
+    mockStudents.map(s=>`<option value="${s.id}">${s.name} (${s.cls})</option>`).join('');
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calMonth').textContent = `${months[calMonth]} ${calYear}`;
+  const grid = document.getElementById('calDays');
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const today = new Date();
+  let html = '';
+  for(let i=0;i<firstDay;i++) html += `<div class="cal-day empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const key = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = today.getDate()===d && today.getMonth()===calMonth && today.getFullYear()===calYear;
+    const hasAppt = calAppointments[key] && calAppointments[key].length > 0;
+    html += `<div class="cal-day ${isToday?'today':''} ${hasAppt&&!isToday?'has-appt':''}" onclick="showDayAppts('${key}',${d})">${d}</div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function calNav(dir) {
+  calMonth += dir;
+  if(calMonth < 0){ calMonth=11; calYear--; }
+  if(calMonth > 11){ calMonth=0; calYear++; }
+  renderCalendar();
+  document.getElementById('apptList').innerHTML = '<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px">Click a date to view appointments</div>';
+}
+
+function showDayAppts(key, day) {
+  const appts = calAppointments[key] || [];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dateStr = `${day} ${months[calMonth]} ${calYear}`;
+  const el = document.getElementById('apptList');
+  if(appts.length === 0){
+    el.innerHTML = `<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px">${dateStr} — No appointments scheduled.<br><span style="color:var(--p);cursor:pointer" onclick="focusBookForm('${key}')">+ Book one below</span></div>`;
+  } else {
+    el.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--pd);margin-bottom:6px">${dateStr}</div>` +
+      appts.map(a=>`<div class="appt-item">
+        <div class="appt-time">${a.time}</div>
+        <div class="appt-student">${a.student}</div>
+        <div class="appt-type">${a.type}</div>
+      </div>`).join('');
+  }
+}
+
+function focusBookForm(dateStr) {
+  const dateInput = document.getElementById('apptDate');
+  if(dateInput) dateInput.value = dateStr;
+  dateInput.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function bookAppt() {
+  const sid = document.getElementById('apptStudentSel').value;
+  const date = document.getElementById('apptDate').value;
+  const time = document.getElementById('apptTime').value;
+  const type = document.getElementById('apptType').value;
+  const msg = document.getElementById('apptBookedMsg');
+  if(!sid || !date){ msg.style.display='block'; msg.style.background='#FEE2E2'; msg.style.color='#991B1B'; msg.textContent='Please select a student and date.'; return; }
+  const student = mockStudents.find(s=>s.id==sid);
+  if(!calAppointments[date]) calAppointments[date] = [];
+  calAppointments[date].push({time, student:student.name, type});
+  renderCalendar();
+  showDayAppts(date, parseInt(date.split('-')[2]));
+  msg.style.display = 'block';
+  msg.style.background = '#D1FAE5';
+  msg.style.color = '#065F46';
+  msg.textContent = `✔ Appointment booked — ${student.name} · ${date} · ${time}`;
+  setTimeout(()=>msg.style.display='none', 3000);
+  document.getElementById('apptStudentSel').value = '';
+  document.getElementById('apptDate').value = '';
+}
+
+// ══════════════ STUDENT RADAR ══════════════
+function renderStudentRadar(){
+  new Chart(document.getElementById('studentRadarChart'),{
+    type:'radar',
+    data:{
+      labels:['Personality','Learning Style','Ability','Values','Subjects','Aspirations'],
+      datasets:[{label:'Your Profile',data:[78,82,71,85,74,68],borderColor:'#0C6B5A',backgroundColor:'rgba(12,107,90,0.15)',pointBackgroundColor:'#0C6B5A',borderWidth:2,pointRadius:4}]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{r:{min:50,max:100,ticks:{display:false},grid:{color:'#E5E7EB'},pointLabels:{font:{size:10}}}}}
+  });
+}
+</script>
+</body>
+</html>

@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,11 +23,13 @@ import org.springframework.web.bind.annotation.RestController;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.security.AuthorizationService;
 
 @RestController
 @RequestMapping("/generated-reports")
@@ -36,6 +39,8 @@ public class GeneratedReportController {
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
+    // Phase 2 (Task 2.4 / HIGH-F): used to scope-bind the report delete + visibility mutations.
+    @Autowired private AuthorizationService authorizationService;
 
     @Autowired private BetReportDataController betReportDataController;
     @Autowired private NavigatorReportDataController navigatorReportDataController;
@@ -43,21 +48,31 @@ public class GeneratedReportController {
     // ═══════════════════════ CRUD ═══════════════════════
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('generated_report.read.all')") // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06)
     public ResponseEntity<List<GeneratedReport>> getAll() {
         return ResponseEntity.ok(generatedReportRepository.findAll());
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('generated_report.read')")
     public ResponseEntity<GeneratedReport> getById(@PathVariable Long id) {
         return generatedReportRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // Phase 2 (Task 2.4 / HIGH-F): was a flat permission with no scope binding — any
+    // generated_report.delete holder could delete any student's report (the paid B2C deliverable).
+    // Now resolves the report's owning institute and re-authorizes against it.
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('generated_report.delete')")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        if (!generatedReportRepository.existsById(id)) {
+        Optional<GeneratedReport> opt = generatedReportRepository.findById(id);
+        if (opt.isEmpty()) {
             return ResponseEntity.notFound().build();
+        }
+        if (!authorizationService.allows("generated_report.delete", instituteOf(opt.get()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         generatedReportRepository.deleteById(id);
         return ResponseEntity.ok().build();
@@ -66,11 +81,13 @@ public class GeneratedReportController {
     // ═══════════════════════ QUERIES ═══════════════════════
 
     @GetMapping("/by-student/{userStudentId}")
+    @PreAuthorize("@auth.allows('generated_report.read', @auth.instituteOfStudent(#userStudentId))")
     public ResponseEntity<List<GeneratedReport>> getByStudent(@PathVariable Long userStudentId) {
         return ResponseEntity.ok(generatedReportRepository.findByUserStudentUserStudentId(userStudentId));
     }
 
     @GetMapping("/by-student/{userStudentId}/type/{typeOfReport}")
+    @PreAuthorize("@auth.allows('generated_report.read', @auth.instituteOfStudent(#userStudentId))")
     public ResponseEntity<List<GeneratedReport>> getByStudentAndType(
             @PathVariable Long userStudentId, @PathVariable String typeOfReport) {
         return ResponseEntity.ok(
@@ -78,11 +95,13 @@ public class GeneratedReportController {
     }
 
     @GetMapping("/by-assessment/{assessmentId}")
+    @PreAuthorize("@auth.allows('generated_report.read', #assessmentId)")
     public ResponseEntity<List<GeneratedReport>> getByAssessment(@PathVariable Long assessmentId) {
         return ResponseEntity.ok(generatedReportRepository.findByAssessmentId(assessmentId));
     }
 
     @GetMapping("/by-assessment/{assessmentId}/type/{typeOfReport}")
+    @PreAuthorize("@auth.allows('generated_report.read', #assessmentId)")
     public ResponseEntity<List<GeneratedReport>> getByAssessmentAndType(
             @PathVariable Long assessmentId, @PathVariable String typeOfReport) {
         return ResponseEntity.ok(
@@ -90,6 +109,7 @@ public class GeneratedReportController {
     }
 
     @GetMapping("/by-student/{userStudentId}/assessment/{assessmentId}/type/{typeOfReport}")
+    @PreAuthorize("@auth.allows('generated_report.read', @auth.instituteOfStudent(#userStudentId))")
     public ResponseEntity<GeneratedReport> getByStudentAssessmentType(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId,
@@ -103,6 +123,7 @@ public class GeneratedReportController {
     // ═══════════════════════ STUDENT-FACING (visibility-filtered) ═══════════════════════
 
     @GetMapping("/student/{userStudentId}")
+    @PreAuthorize("@auth.allows('generated_report.read', @auth.instituteOfStudent(#userStudentId))")
     public ResponseEntity<List<GeneratedReport>> getVisibleReportsForStudent(@PathVariable Long userStudentId) {
         return ResponseEntity.ok(
                 generatedReportRepository.findByUserStudentUserStudentIdAndVisibleToStudent(userStudentId, true));
@@ -116,6 +137,7 @@ public class GeneratedReportController {
      */
     @SuppressWarnings("unchecked")
     @PutMapping("/toggle-visibility")
+    @PreAuthorize("@auth.allows('generated_report.update')")
     public ResponseEntity<?> toggleVisibility(@RequestBody Map<String, Object> body) {
         List<Number> idNums = (List<Number>) body.get("ids");
         Boolean visible = (Boolean) body.get("visible");
@@ -129,12 +151,35 @@ public class GeneratedReportController {
         }
 
         List<GeneratedReport> reports = generatedReportRepository.findAllById(ids);
+        // Phase 2 (Task 2.4 / HIGH-F): report visibility controls whether a student/parent can see
+        // their paid report — was togglable across any tenant with a flat permission. Re-authorize
+        // each report against its owning institute; reject the whole batch if any is out of scope.
+        for (GeneratedReport r : reports) {
+            if (!authorizationService.allows("generated_report.update", instituteOf(r))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Not permitted to change visibility for one or more reports outside your scope");
+            }
+        }
         for (GeneratedReport r : reports) {
             r.setVisibleToStudent(visible);
         }
         generatedReportRepository.saveAll(reports);
 
         return ResponseEntity.ok(Map.of("updated", reports.size()));
+    }
+
+    /**
+     * Phase 2 (Task 2.4): resolve a report's owning institute (report -> UserStudent -> StudentInfo
+     * -> instituteId) for the ABAC scope check. Returns null when the report has no linked institute
+     * (e.g. a B2C student with no institute) — {@code @auth.allows(perm, null)} then passes on the
+     * permission alone, which is the intended behaviour for non-institute-scoped reports.
+     */
+    private Integer instituteOf(GeneratedReport r) {
+        if (r == null || r.getUserStudent() == null) {
+            return null;
+        }
+        StudentInfo si = r.getUserStudent().getStudentInfo();
+        return si != null ? si.getInstituteId() : null;
     }
 
     // ═══════════════════════ CREATE / UPSERT ═══════════════════════
@@ -145,6 +190,7 @@ public class GeneratedReportController {
      *         "reportStatus": "generated", "reportUrl": "https://..." }
      */
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('generated_report.create')")
     public ResponseEntity<?> create(@RequestBody Map<String, Object> body) {
         Long userStudentId = ((Number) body.get("userStudentId")).longValue();
         Long assessmentId = ((Number) body.get("assessmentId")).longValue();
@@ -185,6 +231,7 @@ public class GeneratedReportController {
      * Body: { "reportStatus": "generated", "reportUrl": "https://..." }
      */
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('generated_report.update')")
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Optional<GeneratedReport> opt = generatedReportRepository.findById(id);
         if (opt.isEmpty()) {
@@ -211,6 +258,7 @@ public class GeneratedReportController {
      * and returns a unified list of results.
      */
     @PostMapping("/one-click")
+    @PreAuthorize("@auth.allows('generated_report.create')")
     public ResponseEntity<?> oneClickAll(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("userStudentId")) {
             return ResponseEntity.badRequest().body(Map.of("error", "userStudentId is required"));
@@ -309,6 +357,7 @@ public class GeneratedReportController {
 
     @DeleteMapping("/by-student/{userStudentId}/assessment/{assessmentId}/type/{typeOfReport}")
     @Transactional
+    @PreAuthorize("@auth.allows('generated_report.delete', #userStudentId, #assessmentId)")
     public ResponseEntity<?> deleteByStudentAssessmentType(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId,
@@ -320,6 +369,7 @@ public class GeneratedReportController {
 
     @DeleteMapping("/by-assessment/{assessmentId}/type/{typeOfReport}")
     @Transactional
+    @PreAuthorize("@auth.allows('generated_report.delete', #assessmentId)")
     public ResponseEntity<?> deleteByAssessmentAndType(
             @PathVariable Long assessmentId, @PathVariable String typeOfReport) {
         generatedReportRepository.deleteByAssessmentIdAndTypeOfReport(assessmentId, typeOfReport);

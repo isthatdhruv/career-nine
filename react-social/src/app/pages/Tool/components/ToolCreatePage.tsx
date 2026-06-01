@@ -2,8 +2,10 @@ import clsx from "clsx";
 import { Field, Form, Formik } from "formik";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "react-query";
 import * as Yup from "yup";
 import { CreateToolData } from "../API/Tool_APIs";
+import { lookupKeys } from "../../../lib/queries/lookups";
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().required("Tool name is required"),
@@ -21,6 +23,7 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   // const [sections, setSections] = useState<any[]>([]);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const initialValues = {
     name: "",
@@ -49,6 +52,7 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 price: isFreeBool ? 0 : Number(values.price),
               };
               await CreateToolData(payload);
+              queryClient.invalidateQueries(lookupKeys.tools);
               resetForm();
               navigate("/tools");
             } catch (error) {

@@ -35,6 +35,9 @@ public class ReportPreparationController {
     @Autowired private EntitlementService entitlementService;
     @Autowired private ReportPreparationService reportPreparationService;
 
+    // Phase 2 (Task 2.1 / HIGH-B): anonymous report-prep, gated by the unguessable access token "t"
+    // validated in-handler. @PreAuthorize removed so the enforce flip won't 403 the public viewer;
+    // path is permitAll + CSRF-exempt via PUBLIC_PATHS (/bet-report-data/public/**). Coverage-excluded.
     @PostMapping("/prepare")
     public ResponseEntity<?> prepareReport(@RequestParam("t") String token,
                                            @RequestParam("e") Long entitlementId,
