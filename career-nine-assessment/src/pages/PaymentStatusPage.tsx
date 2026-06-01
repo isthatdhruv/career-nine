@@ -178,6 +178,11 @@ const PaymentStatusPage = () => {
             localStorage.clear()
             localStorage.setItem("userStudentId", String(data.userStudentId))
             localStorage.setItem("allottedAssessments", JSON.stringify(data.assessments))
+            // Required by mintAssessmentSessionCookie on cookie expiry or
+            // when the student starts an assessment other than the one paid for.
+            if (data.studentDob) {
+              localStorage.setItem("studentDob", String(data.studentDob))
+            }
             setStatus("paid")
             setTimeout(() => navigate("/allotted-assessment"), 1500)
             return

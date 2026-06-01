@@ -204,7 +204,8 @@ public class AssessmentSessionController {
         }
 
         // 3. Mint the assessment-scoped JWT.
-        String token = tokenProvider.createAssessmentSessionToken(req.userStudentId, req.assessmentId);
+        String token = tokenProvider.createAssessmentSessionToken(
+                req.userStudentId, req.assessmentId, student.getUserId());
 
         // 4. Issue the cookie via the centralised AuthCookieService — keeps
         // every Set-Cookie header construction in one place. Cookie attributes:

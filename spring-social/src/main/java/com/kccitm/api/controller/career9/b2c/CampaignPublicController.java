@@ -81,6 +81,7 @@ public class CampaignPublicController {
     @Autowired(required = false) private com.kccitm.api.service.b2c.LinkBuilder linkBuilder;
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
+    @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
@@ -553,6 +554,17 @@ public class CampaignPublicController {
         response.put("finalReportUrl", finalReportUrl);
         response.put("accessToken", e.getAccessToken());
         response.put("finalReportActive", e.getFinalReportActive());
+        // Entitlement-level service flags consumed by the assessment Thank-You
+        // page to drive (a) conditional outcome CTAs and (b) per-feature
+        // "Add <feature>" upsell cards. Sourced from StudentEntitlement (the
+        // denormalised snapshot of the PricingTier the student paid for) so
+        // they reflect what THIS student actually has, not the campaign as a
+        // whole. Counselling seat counts let the client gate the inline slot
+        // picker on remaining sessions without a second round-trip.
+        response.put("dashboardActive", e.getDashboardActive());
+        response.put("counsellingActive", e.getCounsellingActive());
+        response.put("counsellingSessionsTotal", e.getCounsellingSessionsTotal());
+        response.put("counsellingSessionsUsed", e.getCounsellingSessionsUsed());
         response.put("careerLibraryUrl", "https://library.career-9.com");
         return ResponseEntity.ok(response);
     }
@@ -856,7 +868,7 @@ public class CampaignPublicController {
         // Without this, the assessment SPA was running purely on
         // localStorage.userStudentId trust.
         String sessionJwt = tokenProvider.createAssessmentSessionToken(
-                userStudent.getUserStudentId(), mapping.getAssessmentId());
+                userStudent.getUserStudentId(), mapping.getAssessmentId(), userStudent.getUserId());
         authCookieService.issueAssessmentSessionCookie(httpResponse, sessionJwt,
                 (int) (assessmentTokenExpirationMsec / 1000));
 
@@ -933,6 +945,174 @@ public class CampaignPublicController {
             logger.error("Failed to create campaign payment link", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to create payment link. Please try again.");
+        }
+    }
+
+    // ── Counselling — slot list + booking, tokenised public endpoints ──────────
+    // These let the assessment SPA Thank-You page render an inline counselling
+    // slot picker without forcing the student through the dashboard login flow.
+    // Auth model: the entitlement accessToken issued at registration time is
+    // the only credential — same pattern as /entitlement/redeem-token and
+    // /campaign/public/pay-for-report. The token is read from the request body
+    // (not the URL) to keep it out of access logs.
+
+    /**
+     * Lists available counselling slots for the entitlement's student, filtered
+     * to counsellors allocated to the student's institute. Token-validated; no
+     * session cookie required. Read-only.
+     *
+     * <p>Body: {@code { token, entitlementId, from? (yyyy-MM-dd, default=today) }}.
+     * Response: {@code { slots: [...], sessionsRemaining: int }}.
+     */
+    // @PreAuthorize-Exempt: public b2c funnel — anonymous, gated by entitlement accessToken.
+    @PostMapping("/counselling/slots")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> listCounsellingSlots(@RequestBody Map<String, Object> body) {
+        String token = strFromBody(body, "token");
+        Long entitlementId = longFromBody(body, "entitlementId");
+        String fromStr = strFromBody(body, "from");
+
+        StudentEntitlement e = entitlementService == null
+                ? null : entitlementService.redeemAccessToken(token, entitlementId);
+        if (e == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
+        if (!Boolean.TRUE.equals(e.getCounsellingActive())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Counselling is not included in your plan");
+        }
+        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
+        int remaining = total - used;
+        if (remaining <= 0) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("No counselling sessions remaining");
+        }
+
+        Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
+        if (!usOpt.isPresent() || usOpt.get().getInstitute() == null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Student is not allotted to an institute");
+        }
+        Integer instituteCode = usOpt.get().getInstitute().getInstituteCode();
+
+        java.time.LocalDate from;
+        try {
+            from = (fromStr == null) ? java.time.LocalDate.now() : java.time.LocalDate.parse(fromStr);
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body("Invalid 'from' date (expected yyyy-MM-dd)");
+        }
+
+        if (bookingService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Counselling booking is not configured on this instance");
+        }
+        List<com.kccitm.api.model.career9.counselling.CounsellingSlot> slots =
+                bookingService.getAvailableSlotsForInstitute(from, instituteCode);
+
+        List<Map<String, Object>> slotDtos = new ArrayList<>();
+        for (com.kccitm.api.model.career9.counselling.CounsellingSlot s : slots) {
+            Map<String, Object> dto = new HashMap<>();
+            dto.put("slotId", s.getId());
+            dto.put("date", s.getDate().toString());
+            dto.put("startTime", s.getStartTime().toString());
+            dto.put("endTime", s.getEndTime().toString());
+            dto.put("durationMinutes", s.getDurationMinutes());
+            if (s.getCounsellor() != null) {
+                dto.put("counsellorName", s.getCounsellor().getName());
+            }
+            slotDtos.add(dto);
+        }
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("slots", slotDtos);
+        out.put("sessionsRemaining", remaining);
+        return ResponseEntity.ok(out);
+    }
+
+    /**
+     * Books one of the slots returned by {@link #listCounsellingSlots}.
+     * Decrements {@code counsellingSessionsUsed} on the entitlement in the same
+     * transaction as the booking, so seat exhaustion is honoured even under
+     * concurrent clicks.
+     *
+     * <p>Body: {@code { token, entitlementId, slotId, reason? }}.
+     */
+    // @PreAuthorize-Exempt: public b2c funnel — anonymous, gated by entitlement accessToken.
+    @PostMapping("/counselling/book")
+    @Transactional
+    public ResponseEntity<?> bookCounsellingSlot(@RequestBody Map<String, Object> body) {
+        String token = strFromBody(body, "token");
+        Long entitlementId = longFromBody(body, "entitlementId");
+        Long slotId = longFromBody(body, "slotId");
+        String reason = strFromBody(body, "reason");
+
+        if (slotId == null) {
+            return ResponseEntity.badRequest().body("slotId is required");
+        }
+
+        StudentEntitlement e = entitlementService == null
+                ? null : entitlementService.redeemAccessToken(token, entitlementId);
+        if (e == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
+        if (!Boolean.TRUE.equals(e.getCounsellingActive())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Counselling is not included in your plan");
+        }
+        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
+        if (total - used <= 0) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("No counselling sessions remaining");
+        }
+
+        Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
+        if (!usOpt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Student not found");
+        }
+        UserStudent student = usOpt.get();
+
+        if (bookingService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Counselling booking is not configured on this instance");
+        }
+
+        try {
+            com.kccitm.api.model.career9.counselling.CounsellingAppointment appt =
+                    bookingService.bookSlot(slotId, student, reason);
+            // Decrement the seat counter on the entitlement. Runs in the same
+            // transaction as the booking via Spring's default REQUIRED propagation
+            // — if the post-booking save fails, the slot transition rolls back too.
+            entitlementService.consumeCounsellingSession(entitlementId);
+
+            Map<String, Object> out = new HashMap<>();
+            out.put("appointmentId", appt.getId());
+            out.put("status", appt.getStatus());
+            if (appt.getSlot() != null) {
+                out.put("slotDate", appt.getSlot().getDate().toString());
+                out.put("slotStartTime", appt.getSlot().getStartTime().toString());
+                if (appt.getSlot().getCounsellor() != null) {
+                    out.put("counsellorName", appt.getSlot().getCounsellor().getName());
+                }
+            }
+            out.put("sessionsRemaining", total - used - 1);
+            return ResponseEntity.ok(out);
+        } catch (com.kccitm.api.exception.BadRequestException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        } catch (RuntimeException ex) {
+            logger.warn("Counselling booking failed for entitlement {}: {}", entitlementId, ex.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        }
+    }
+
+    private static Long longFromBody(Map<String, Object> body, String key) {
+        Object v = body.get(key);
+        if (v == null) return null;
+        try {
+            return Long.valueOf(v.toString());
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
 

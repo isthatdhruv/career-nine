@@ -227,6 +227,9 @@ const CampaignRegisterPage = () => {
         localStorage.clear()
         localStorage.setItem("userStudentId", String(res.data.userStudentId))
         localStorage.setItem("allottedAssessments", JSON.stringify(res.data.assessments))
+        // Required by mintAssessmentSessionCookie — /auth/assessment-session
+        // verifies DOB against the stored record before issuing cn_at_asmnt.
+        localStorage.setItem("studentDob", dob)
         if (res.data.entitlementId) {
           localStorage.setItem("entitlementId", String(res.data.entitlementId))
         }

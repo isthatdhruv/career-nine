@@ -18,6 +18,7 @@ interface Props {
 
 const emptyForm: AssessmentMappingTier = {
   name: "",
+  description: "",
   amount: 0,
   sortOrder: 1,
   maxRegistrations: null,
@@ -69,10 +70,19 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
       showErrorToast("Tier name is required");
       return;
     }
+    if (!form.description || !form.description.trim()) {
+      showErrorToast("Tier description is required");
+      return;
+    }
+    if (form.description.trim().length > 200) {
+      showErrorToast("Tier description must be 200 characters or fewer");
+      return;
+    }
     setSaving(true);
     try {
       const payload: AssessmentMappingTier = {
         name: form.name.trim(),
+        description: form.description.trim(),
         amount: form.amount === null || form.amount === undefined ? 0 : Math.round(Number(form.amount)),
         sortOrder: Number(form.sortOrder),
         maxRegistrations:
@@ -155,7 +165,7 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
-                  {["Order", "Name", "Amount", "Registrations", "Status", ""].map((h) => (
+                  {["Order", "Name", "Description", "Amount", "Registrations", "Status", ""].map((h) => (
                     <th key={h} style={{
                       padding: "10px 12px", fontWeight: 700, fontSize: "0.75rem",
                       color: "#64748b", textAlign: "left", borderBottom: "2px solid #e2e8f0",
@@ -175,6 +185,16 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
                           padding: "2px 8px", borderRadius: 12, fontSize: "0.65rem", fontWeight: 700,
                         }}>LIVE</span>
                       )}
+                    </td>
+                    <td
+                      title={t.description || ""}
+                      style={{
+                        padding: "10px 12px", borderBottom: "1px solid #f1f5f9",
+                        color: t.description ? "#475569" : "#94a3b8",
+                        maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}
+                    >
+                      {t.description || "—"}
                     </td>
                     <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
                       {t.amount && t.amount > 0 ? `INR ${t.amount}` : "Free"}
@@ -225,6 +245,24 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
               placeholder="e.g. Pilot"
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
+          </div>
+          <div>
+            <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem" }}>
+              Description <span style={{ color: "#ef4444" }}>*</span>
+              <span style={{ color: "#94a3b8", fontWeight: 400 }}> — short text, max 200 chars</span>
+            </Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={2}
+              maxLength={200}
+              required
+              value={form.description || ""}
+              placeholder="What this tier covers (e.g. Early Bird, Standard, Late)"
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+            <div style={{ textAlign: "right", fontSize: "0.7rem", color: "#94a3b8", marginTop: 2 }}>
+              {(form.description || "").length}/200
+            </div>
           </div>
           <div>
             <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem" }}>Amount (INR) — 0 = Free</Form.Label>

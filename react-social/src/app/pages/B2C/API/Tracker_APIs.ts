@@ -243,3 +243,23 @@ export const getStudentAssessmentAnswers = (userStudentId: number, assessmentId:
   axios.get<AdminAnswersResponse>(
     `${API_URL}/assessment-answer/admin-view/${userStudentId}/${assessmentId}`,
   );
+
+// Enriched view of one StudentEntitlement, returned by /entitlement/by-student/{id}.
+// Drives the "Thank You" picker on the Group Students page — when a student
+// owns more than one entitlement (multi-campaign or multi-assessment), the
+// admin needs enough context to pick the right Thank-You destination.
+export type EntitlementSummary = {
+  entitlementId: number;
+  assessmentId: number | null;
+  assessmentName?: string;
+  campaignId?: number | null;
+  campaignName?: string;
+  status: string;
+  alreadyActive: boolean;
+  createdAt?: string;
+};
+
+export const getEntitlementsByStudent = (userStudentId: number) =>
+  axios.get<EntitlementSummary[]>(
+    `${API_URL}/entitlement/by-student/${userStudentId}`,
+  );

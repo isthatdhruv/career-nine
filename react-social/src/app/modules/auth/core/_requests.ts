@@ -7,7 +7,8 @@ export const ME_URL = `${API_URL}/auth/me`;
 export const LOGIN_URL = `${API_URL}/auth/login`;
 export const LOGOUT_URL = `${API_URL}/auth/logout`;
 export const OAUTH_EXCHANGE_URL = `${API_URL}/auth/oauth-exchange`;
-export const REQUEST_PASSWORD_URL = `${API_URL}/forgot_password`;
+export const FORGOT_PASSWORD_URL = `${API_URL}/auth/forgot-password`;
+export const RESET_PASSWORD_URL = `${API_URL}/auth/reset-password`;
 
 // Phase 16/18 cookie-based auth:
 //   - The server sets cn_at (HttpOnly), cn_csrf (JS-readable), cn_rt (HttpOnly,
@@ -57,9 +58,21 @@ export function exchangeOAuthToken(token: string) {
   return axios.post(OAUTH_EXCHANGE_URL, { token });
 }
 
-// NOTE: backend endpoint for forgot-password is not yet implemented; this
-// currently 404s. Kept so ForgotPassword.tsx form compiles — when the server
-// endpoint lands, no FE change should be required.
-export function requestPassword(email: string) {
-  return axios.post<{ result: boolean }>(REQUEST_PASSWORD_URL, { email });
+// Request a single-use password reset link. Server emails the link via Odoo.
+// Returns 404 with { success: false, message: "This email is not registered." }
+// when the email is not a registered local-provider account.
+export function requestPasswordReset(email: string) {
+  return axios.post<{ success: boolean; message: string }>(
+    FORGOT_PASSWORD_URL,
+    { email }
+  );
+}
+
+// Consume the single-use token and set a new password. Server returns 400 if
+// the token is invalid, expired, or already used.
+export function resetPasswordWithToken(token: string, newPassword: string) {
+  return axios.post<{ success: boolean; message: string }>(
+    RESET_PASSWORD_URL,
+    { token, newPassword }
+  );
 }

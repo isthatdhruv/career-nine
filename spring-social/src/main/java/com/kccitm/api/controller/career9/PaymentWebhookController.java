@@ -238,8 +238,10 @@ public class PaymentWebhookController {
             // the same response so /allotted-assessment can authenticate on
             // its very first request.
             if ("paid".equals(txn.getStatus()) && txn.getAssessmentId() != null) {
+                Long ownerUserId = userStudentRepository.findById(txn.getUserStudentId())
+                        .map(UserStudent::getUserId).orElse(null);
                 String sessionJwt = tokenProvider.createAssessmentSessionToken(
-                        txn.getUserStudentId(), txn.getAssessmentId());
+                        txn.getUserStudentId(), txn.getAssessmentId(), ownerUserId);
                 authCookieService.issueAssessmentSessionCookie(httpResponse, sessionJwt,
                         (int) (assessmentTokenExpirationMsec / 1000));
             }

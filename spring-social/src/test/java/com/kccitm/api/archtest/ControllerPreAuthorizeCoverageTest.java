@@ -79,6 +79,10 @@ public class ControllerPreAuthorizeCoverageTest {
             // AuthController login/signup — these ESTABLISH the auth context, they don't consume it.
             "com.kccitm.api.controller.AuthController#authenticateUser",
             "com.kccitm.api.controller.AuthController#registerUser",
+            // Password reset funnel — anonymous-by-design; the reset-password endpoint is
+            // gated by a single-use server-issued token in the request body, not by Spring auth.
+            "com.kccitm.api.controller.AuthController#forgotPassword",
+            "com.kccitm.api.controller.AuthController#resetPassword",
             // --- 16-01 / 16-04 / 18-02 additions: cookie-session + token-lifecycle auth flow ---
             // logout — must succeed even with a missing/broken cookie; CSRF-exempt + permitAll.
             "com.kccitm.api.controller.AuthController#logout",

@@ -110,6 +110,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/auth/logout",
             "/auth/oauth-exchange",
             "/auth/refresh",
+            // Anonymous-by-design password reset funnel: /forgot-password takes an email
+            // and emails a single-use token; /reset-password consumes that token + new
+            // password. Gating is via token validity (single-use, 1h TTL) in-controller.
+            "/auth/forgot-password",
+            "/auth/reset-password",
             // Student username+DOB login endpoints — anonymous-by-design; previously 401'd
             // when callers carried an expired cn_at cookie because TokenAuthenticationFilter
             // silently fails to set auth on expired tokens and the @PreAuthorize gate then
@@ -126,6 +131,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/payment/webhook/**",
             "/campaign/public/**",
             "/entitlement/redeem-token",
+            // Dashboard auto-login from the assessment Thank-You page. Anonymous;
+            // gated by the same 30-byte SecureRandom entitlement accessToken used
+            // by /entitlement/redeem-token. On success the endpoint sets cn_at +
+            // cn_csrf so the dashboard route accepts the student session.
+            "/entitlement/redeem-dashboard-token",
             // Phase 2 (Task 2.1 / HIGH-B): corrected from the dead "/promo-code/validate" typo to
             // the real endpoint path; was CSRF-exempt-but-not-permitAll, so anonymous validation 401'd.
             "/promo-codes/public/validate",

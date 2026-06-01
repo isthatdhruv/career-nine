@@ -24,10 +24,10 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: dev
+    active: sandbox
   servlet:
     multipart:
-      max-file-size: 1GB
+      max-file-size: a1GB
       max-request-size: 1GB
   flyway:
     enabled: true
@@ -195,6 +195,10 @@ app:
     api-key: ${ODOO_API_KEY:}
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  # Base URL of the public-facing React app — used to build absolute links
+  # emailed to users (e.g. password-reset link). Each profile may override.
+  frontend:
+    url: ${APP_FRONTEND_URL:http://localhost:3000}
   firebase:
     project-id: career-9-assessment
     service-account-file: firebase-service-account.json
@@ -412,6 +416,8 @@ app:
   b2c:
     frontendBaseUrl: https://staging-dashboard.career-9.com
     assessmentBaseUrl: https://staging-assessment.career-9.com
+  frontend:
+    url: ${APP_FRONTEND_URL:https://staging-dashboard.career-9.com}
   # Phase 20-01: in-process rate limit (Bucket4j). Sandbox is a pre-prod soak
   # environment; per Phase 20 plan the upstream-proxy assumption is NOT yet
   # confirmed for this profile, so XFF stays fail-safe false. Flip to true
@@ -512,6 +518,8 @@ app:
   b2c:
     frontendBaseUrl: https://dashboard.career-9.com
     assessmentBaseUrl: https://assessment.career-9.com
+  frontend:
+    url: ${APP_FRONTEND_URL:https://dashboard.career-9.com}
   # Phase 20-01: in-process rate limit (Bucket4j). Production runs behind
   # DigitalOcean's reverse proxy which sets X-Forwarded-For and strips any
   # incoming XFF from untrusted clients — safe to trust here.
