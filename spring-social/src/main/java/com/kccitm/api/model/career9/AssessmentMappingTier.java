@@ -54,7 +54,7 @@ public class AssessmentMappingTier implements Serializable {
     @Column(name = "current_count", nullable = false, columnDefinition = "INT DEFAULT 0")
     private Integer currentCount = 0;
 
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "created_at")

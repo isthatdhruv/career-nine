@@ -24,7 +24,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: dev
+    active: production
   servlet:
     multipart:
       max-file-size: 1GB
@@ -436,7 +436,7 @@ spring:
   jpa:
     show-sql: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
   cache:
     redis:
       key-prefix: "career9:"

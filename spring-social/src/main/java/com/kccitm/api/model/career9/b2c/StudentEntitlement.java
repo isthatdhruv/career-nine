@@ -73,7 +73,7 @@ public class StudentEntitlement implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     private Date expiresAt;
 
-    @Column(name = "dashboard_active", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "dashboard_active")
     private Boolean dashboardActive = false;
 
     @Column(name = "dashboard_expires_at")
@@ -81,7 +81,7 @@ public class StudentEntitlement implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     private Date dashboardExpiresAt;
 
-    @Column(name = "counselling_active", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "counselling_active")
     private Boolean counsellingActive = false;
 
     @Column(name = "counselling_sessions_total", columnDefinition = "INT DEFAULT 0")
@@ -90,7 +90,7 @@ public class StudentEntitlement implements Serializable {
     @Column(name = "counselling_sessions_used", columnDefinition = "INT DEFAULT 0")
     private Integer counsellingSessionsUsed = 0;
 
-    @Column(name = "lms_active", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "lms_active")
     private Boolean lmsActive = false;
 
     @Column(name = "lms_expires_at")
@@ -98,7 +98,7 @@ public class StudentEntitlement implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     private Date lmsExpiresAt;
 
-    @Column(name = "final_report_active", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "final_report_active")
     private Boolean finalReportActive = false;
 
     @Column(name = "access_token", length = 64, unique = true)

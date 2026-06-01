@@ -49,7 +49,7 @@ public class CounsellingActivityLog implements Serializable {
     @Column(name = "actor_name")
     private String actorName;
 
-    @Column(name = "is_read", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_read")
     private Boolean isRead = false;
 
     @Column(name = "created_at")

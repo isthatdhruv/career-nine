@@ -58,19 +58,19 @@ public class AssessmentTable implements java.io.Serializable {
     private Questionnaire questionnaire;
 
     // Timer visibility flag
-    @Column(name = "show_timer", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "show_timer")
     private Boolean showTimer = true;
 
-    @Column(name = "is_locked", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_locked")
     private Boolean isLocked = false;
 
-    @Column(name = "save_later", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "save_later")
     private Boolean saveLater = true;
 
-    @Column(name = "is_deleted", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
-    @Column(name = "collect_email_and_phone", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "collect_email_and_phone")
     private Boolean collectEmailAndPhone = true;
 
     @Column(name = "default_purchase_path", length = 1, columnDefinition = "char(1) default 'B'")

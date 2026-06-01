@@ -47,7 +47,7 @@ public class CounsellorInstituteMapping implements Serializable {
     private InstituteDetail institute;
 
     @JsonProperty("isActive")
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "assigned_by")

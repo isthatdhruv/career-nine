@@ -49,7 +49,7 @@ public class Notification implements Serializable {
     private String referenceType;
 
     @JsonProperty("isRead")
-    @Column(name = "is_read", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_read")
     private Boolean isRead = false;
 
     @Column(name = "created_at")

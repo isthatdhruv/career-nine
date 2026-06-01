@@ -41,7 +41,7 @@ public class SessionNotes implements Serializable {
     @Column(name = "recommended_next_session")
     private String recommendedNextSession;
 
-    @Column(name = "followup_required", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "followup_required")
     private Boolean followupRequired = false;
 
     @Column(name = "public_remarks", columnDefinition = "TEXT")

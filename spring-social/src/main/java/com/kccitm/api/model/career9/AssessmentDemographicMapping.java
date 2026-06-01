@@ -35,7 +35,7 @@ public class AssessmentDemographicMapping implements Serializable {
     @JoinColumn(name = "field_id", referencedColumnName = "field_id", nullable = false)
     private DemographicFieldDefinition fieldDefinition;
 
-    @Column(name = "is_mandatory", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_mandatory")
     private Boolean isMandatory = true;
 
     @Column(name = "display_order", columnDefinition = "INT DEFAULT 0")

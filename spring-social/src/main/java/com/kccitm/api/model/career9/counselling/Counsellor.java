@@ -50,14 +50,14 @@ public class Counsellor implements Serializable {
     private String bio;
 
     @JsonProperty("isExternal")
-    @Column(name = "is_external", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_external")
     private Boolean isExternal = false;
 
     @Column(name = "onboarding_status", length = 20)
     private String onboardingStatus = "PENDING";
 
     @JsonProperty("isActive")
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "profile_image_url", length = 500)
