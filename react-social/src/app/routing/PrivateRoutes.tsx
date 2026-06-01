@@ -254,10 +254,7 @@ const PrivateRoutes = () => {
   const SlotManagementPage = lazy(() => import("../pages/Counselling/admin/SlotManagementPage"));
   const ManageStudentsPage = lazy(() => import("../pages/Counselling/admin/ManageStudentsPage"));
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
-  const ReportTypesPage = lazy(() => import("../pages/ReportTypes/ReportTypesPage"));
   const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
-  const ReportTypesCreatePage = lazy(() => import("../pages/ReportTypes/components/ReportTypesCreatePage"));
-  const ReportTypesEditPage = lazy(() => import("../pages/ReportTypes/components/ReportTypesEditPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
   const PaymentRegisterPage = lazy(() => import("../pages/PaymentTracking/PaymentRegisterPage"));
@@ -1490,36 +1487,6 @@ const PrivateRoutes = () => {
             <RequirePermission perm="user.write">
               <SuspensedView>
                 <CounsellingNotificationsPage />
-              </SuspensedView>
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/admin/report-types"
-          element={
-            <RequirePermission perm="report_type.read">
-              <SuspensedView>
-                <ReportTypesPage />
-              </SuspensedView>
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/admin/report-types/create"
-          element={
-            <RequirePermission perm="report_type.create">
-              <SuspensedView>
-                <ReportTypesCreatePage />
-              </SuspensedView>
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/admin/report-types/edit/:id"
-          element={
-            <RequirePermission perm="report_type.update">
-              <SuspensedView>
-                <ReportTypesEditPage />
               </SuspensedView>
             </RequirePermission>
           }
