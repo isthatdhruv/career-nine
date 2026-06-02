@@ -80,10 +80,10 @@ public class Campaign implements Serializable {
     @Column(name = "institute_code")
     private Integer instituteCode;
 
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "is_deleted", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
     @Column(name = "created_at")

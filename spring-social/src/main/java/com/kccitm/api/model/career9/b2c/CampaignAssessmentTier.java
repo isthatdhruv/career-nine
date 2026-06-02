@@ -38,10 +38,10 @@ public class CampaignAssessmentTier implements Serializable {
     @Column(name = "price_override_inr")
     private Long priceOverrideInr;
 
-    @Column(name = "is_default", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_default")
     private Boolean isDefault = false;
 
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "created_at")

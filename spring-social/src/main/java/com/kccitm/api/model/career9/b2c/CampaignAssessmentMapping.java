@@ -47,10 +47,10 @@ public class CampaignAssessmentMapping implements Serializable {
     @Column(name = "sort_order", columnDefinition = "INT DEFAULT 0")
     private Integer sortOrder = 0;
 
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "is_deleted", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
     @Column(name = "created_at")

@@ -35,7 +35,7 @@ public class PromoCode implements Serializable {
     @Column(length = 255)
     private String description;
 
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "expires_at")

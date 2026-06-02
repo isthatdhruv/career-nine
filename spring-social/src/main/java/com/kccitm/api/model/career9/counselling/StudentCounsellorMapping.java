@@ -46,7 +46,7 @@ public class StudentCounsellorMapping implements Serializable {
     private LocalDateTime assignedAt;
 
     @JsonProperty("isActive")
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "notes", columnDefinition = "TEXT")

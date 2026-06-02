@@ -40,19 +40,19 @@ public class PricingTier implements Serializable {
     @Column(name = "currency", length = 10, columnDefinition = "varchar(10) default 'INR'")
     private String currency = "INR";
 
-    @Column(name = "includes_final_report", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "includes_final_report")
     private Boolean includesFinalReport = false;
 
-    @Column(name = "includes_dashboard", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "includes_dashboard")
     private Boolean includesDashboard = false;
 
-    @Column(name = "includes_counselling", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "includes_counselling")
     private Boolean includesCounselling = false;
 
     @Column(name = "counselling_session_count")
     private Integer counsellingSessionCount;
 
-    @Column(name = "includes_lms", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "includes_lms")
     private Boolean includesLms = false;
 
     @Column(name = "lms_validity_days")
@@ -64,10 +64,10 @@ public class PricingTier implements Serializable {
     @Column(name = "sort_order", columnDefinition = "INT DEFAULT 0")
     private Integer sortOrder = 0;
 
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "is_deleted", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
     @Column(name = "created_at")
