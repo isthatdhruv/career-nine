@@ -18,8 +18,6 @@ import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.career9.Tool;
-import com.kccitm.api.model.career9.report.ReportSubtype;
-import com.kccitm.api.model.career9.report.ReportType;
 
 @Entity
 @Table(name = "Questionire")
@@ -70,24 +68,6 @@ public class Questionnaire implements Serializable {
     public void setReportCategory(String reportCategory) {
         this.reportCategory = reportCategory;
     }
-
-    // Report dispatch FKs. Manually backfilled by ops after migration; ReportService
-    // falls back to grade-based inference until populated (deprecation window).
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "report_type_id", referencedColumnName = "report_type_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private ReportType reportType;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "report_subtype_id", referencedColumnName = "report_subtype_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private ReportSubtype reportSubtype;
-
-    public ReportType getReportType() { return reportType; }
-    public void setReportType(ReportType reportType) { this.reportType = reportType; }
-
-    public ReportSubtype getReportSubtype() { return reportSubtype; }
-    public void setReportSubtype(ReportSubtype reportSubtype) { this.reportSubtype = reportSubtype; }
 
     // Mode id
     @Column(name = "mode_id")

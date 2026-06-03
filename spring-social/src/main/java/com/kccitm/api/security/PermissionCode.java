@@ -537,17 +537,13 @@ public enum PermissionCode {
     REMINDERS_SEND_TEST           ("reminders.send.test",           "Send a test reminder from the template editor"),
 
     // ── Unified report pipeline (V20260526008 seed) ─────────────────────
-    REPORT_TYPE_READ                  ("report_type.read",                "View report types catalog"),
-    REPORT_TYPE_CREATE                ("report_type.create",              "Create a new report type"),
-    REPORT_TYPE_UPDATE                ("report_type.update",              "Update report type metadata"),
-    REPORT_TYPE_DELETE                ("report_type.delete",              "Delete a report type"),
-    REPORT_SUBTYPE_READ               ("report_subtype.read",             "View report subtypes catalog"),
-    REPORT_SUBTYPE_CREATE             ("report_subtype.create",           "Create a new report subtype"),
-    REPORT_SUBTYPE_UPDATE             ("report_subtype.update",           "Update subtype metadata"),
-    REPORT_SUBTYPE_UPLOAD_TEMPLATE    ("report_subtype.upload_template",  "Upload / replace the HTML template for a subtype"),
-    REPORT_SUBTYPE_DELETE             ("report_subtype.delete",           "Delete a report subtype"),
     CALCULATED_REPORT_DATA_READ       ("calculated_report_data.read",     "View persisted calculated report payloads"),
-    INTERMEDIARY_SCORES_READ          ("intermediary_scores.read",        "View persisted intermediary score payloads");
+    INTERMEDIARY_SCORES_READ          ("intermediary_scores.read",        "View persisted intermediary score payloads"),
+
+    // ── Collapsed report_template system (V20260601007 seed) ────────────
+    // report_template.{read,create,update,delete} already exist above (~L356).
+    REPORT_TEMPLATE_UPLOAD_TEMPLATE   ("report_template.upload_template", "Upload / replace a report template HTML"),
+    REPORT_TEMPLATE_MAP               ("report_template.map",             "Map templates to questionnaires and set the default");
 
     private final String code;
     private final String description;

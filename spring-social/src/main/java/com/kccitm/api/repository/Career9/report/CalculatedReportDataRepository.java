@@ -10,6 +10,6 @@ import com.kccitm.api.model.career9.report.CalculatedReportData;
 @Repository
 public interface CalculatedReportDataRepository extends JpaRepository<CalculatedReportData, Long> {
 
-    Optional<CalculatedReportData> findByUserStudentIdAndAssessmentIdAndReportType_CodeAndReportSubtype_Code(
-            Long userStudentId, Long assessmentId, String reportTypeCode, String reportSubtypeCode);
+    Optional<CalculatedReportData> findByUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+            Long userStudentId, Long assessmentId, Long reportTemplateId);
 }

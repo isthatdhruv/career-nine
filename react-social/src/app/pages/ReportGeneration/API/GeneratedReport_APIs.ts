@@ -7,7 +7,8 @@ export interface GeneratedReport {
   generatedReportId: number;
   userStudent: { userStudentId: number };
   assessmentId: number;
-  typeOfReport: string; // "bet" | "navigator"
+  typeOfReport: string; // engineCode: "bet" | "pager" | "legacy"
+  reportTemplateId?: number | null;
   reportStatus: string; // "notGenerated" | "generated" | "failed"
   reportUrl: string | null;
   visibleToStudent: boolean;

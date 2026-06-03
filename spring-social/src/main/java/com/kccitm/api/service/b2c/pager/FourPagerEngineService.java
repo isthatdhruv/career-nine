@@ -105,6 +105,210 @@ public class FourPagerEngineService {
         VALUE_CREATIVE.put("Variety / Adventure", "The Explorer");
     }
 
+    // ═════════════ "Things to do" action recommendations (home / school) ═════════════
+    // Keyed by top RIASEC type, one map per pager variant. Value = {schoolActions, homeActions}.
+
+    private static final Map<RiasecType, String[][]> ACTION_INSIGHT = new LinkedHashMap<>();
+    private static final Map<RiasecType, String[][]> ACTION_SUBJECT = new LinkedHashMap<>();
+    private static final Map<RiasecType, String[][]> ACTION_CAREER  = new LinkedHashMap<>();
+
+    static {
+        // ── R (Realistic) ──
+        ACTION_INSIGHT.put(RiasecType.R, new String[][]{
+            {"Help maintain the school garden.",
+             "Assist in setting up sports events.",
+             "Organize classroom clean-up activities.",
+             "Volunteer to help with equipment in the sports room."},
+            {"Help fix small household items (e.g., bike repairs).",
+             "Set up a bird feeder or plant a small garden at home.",
+             "Help parents organize groceries.",
+             "Help set up and maintain a pet's living space."}});
+        ACTION_SUBJECT.put(RiasecType.R, new String[][]{
+            {"Join the school's robotics or mechanical club.",
+             "Organize inter-house sports competitions.",
+             "Assist in setting up school labs for practical sessions.",
+             "Volunteer for setting up audio/visual equipment during events."},
+            {"Take charge of organizing the kitchen or storage spaces.",
+             "Build a simple project using DIY kits (e.g., circuits).",
+             "Maintain home tools and assist in fixing minor issues.",
+             "Help manage and organize a small vegetable or herb garden."}});
+        ACTION_CAREER.put(RiasecType.R, new String[][]{
+            {"Lead the robotics or engineering club projects.",
+             "Mentor juniors in the school workshop or lab.",
+             "Take charge of technical setup for major school events.",
+             "Represent the school at state-level technical or sports competitions."},
+            {"Take on a real DIY project at home (electrical, carpentry, repair).",
+             "Pursue a sport or fitness goal seriously alongside studies.",
+             "Set up and maintain a home garden or aquarium.",
+             "Learn to drive or service a two-wheeler / car basics."}});
+
+        // ── I (Investigative) ──
+        ACTION_INSIGHT.put(RiasecType.I, new String[][]{
+            {"Join the science club and participate in lab experiments.",
+             "Take part in quiz competitions.",
+             "Participate in small coding or programming challenges.",
+             "Help in collecting data for school research projects."},
+            {"Watch educational documentaries and write down observations.",
+             "Set up a small home science lab.",
+             "Build simple machines or models from everyday materials.",
+             "Learn to program using free coding tutorials."}});
+        ACTION_SUBJECT.put(RiasecType.I, new String[][]{
+            {"Join a school-level research competition.",
+             "Lead a project in the science lab involving data analysis.",
+             "Participate in mathematics Olympiads or science fairs.",
+             "Write for the school's science magazine or blog."},
+            {"Explore online courses (coding, astronomy, physics).",
+             "Solve puzzles or brain teasers to improve problem-solving.",
+             "Participate in online science competitions.",
+             "Learn to use a telescope or microscope at home."}});
+        ACTION_CAREER.put(RiasecType.I, new String[][]{
+            {"Conduct an independent research project under a teacher's guidance.",
+             "Compete in national-level Olympiads or science fairs.",
+             "Present a paper at an inter-school science seminar.",
+             "Tutor juniors in advanced science or maths topics."},
+            {"Take advanced online courses (Coursera, NPTEL, edX).",
+             "Read and review research papers in your area of interest.",
+             "Build a personal project (app, experiment, data study).",
+             "Prepare seriously for entrance exams (JEE, NEET, etc.)."}});
+
+        // ── A (Artistic) ──
+        ACTION_INSIGHT.put(RiasecType.A, new String[][]{
+            {"Join the school's art and craft club.",
+             "Participate in painting or drawing competitions.",
+             "Help design posters for school events.",
+             "Join the school choir or music group."},
+            {"Create handmade greeting cards for family and friends.",
+             "Write and illustrate your own short story.",
+             "Try clay modelling or sculpture at home.",
+             "Learn a new musical instrument or practice an existing one."}});
+        ACTION_SUBJECT.put(RiasecType.A, new String[][]{
+            {"Participate in the school's annual art exhibition.",
+             "Help design stage sets or props for school dramas.",
+             "Join a photography club and capture school events.",
+             "Write scripts and direct short plays for school functions."},
+            {"Create a portfolio of your artwork or photography.",
+             "Try digital art using free design software.",
+             "Start a blog or Instagram page to showcase your creativity.",
+             "Take up video editing or filmmaking as a hobby."}});
+        ACTION_CAREER.put(RiasecType.A, new String[][]{
+            {"Curate the school's annual cultural festival.",
+             "Direct a full-length play or short film for the school.",
+             "Lead the editorial team of the school magazine.",
+             "Showcase work at inter-school art or design exhibitions."},
+            {"Build a strong portfolio for design / arts college applications.",
+             "Take on freelance creative work (logos, photos, content).",
+             "Learn a professional creative tool (Photoshop, Premiere, Canva Pro).",
+             "Publish work online — blog, Instagram, YouTube."}});
+
+        // ── S (Social) ──
+        ACTION_INSIGHT.put(RiasecType.S, new String[][]{
+            {"Join the school's peer mentoring program.",
+             "Volunteer to help new students settle in.",
+             "Join the student council to represent your class.",
+             "Take part in school health awareness campaigns."},
+            {"Help younger siblings with their homework.",
+             "Organize a neighbourhood cleanliness drive.",
+             "Volunteer at a local community centre.",
+             "Teach basic skills to younger children in the neighbourhood."}});
+        ACTION_SUBJECT.put(RiasecType.S, new String[][]{
+            {"Lead or join a social service club.",
+             "Organize blood donation or health camps with the school.",
+             "Volunteer as a tutor for younger students.",
+             "Lead an anti-bullying awareness campaign."},
+            {"Plan and lead a community service project (e.g., tree planting).",
+             "Volunteer to teach skills to underprivileged children.",
+             "Organize a donation drive for a local charity.",
+             "Mentor younger cousins or friends with their studies."}});
+        ACTION_CAREER.put(RiasecType.S, new String[][]{
+            {"Lead a large-scale community service project through school.",
+             "Head the peer counselling or student wellness committee.",
+             "Mentor junior students in academics and life skills.",
+             "Organise inter-school discussions on social issues."},
+            {"Volunteer regularly with an NGO or old-age home.",
+             "Teach a weekly class for underprivileged children.",
+             "Lead a community awareness campaign (health, safety, environment).",
+             "Mentor a younger student or cousin through their studies."}});
+
+        // ── E (Enterprising) ──
+        ACTION_INSIGHT.put(RiasecType.E, new String[][]{
+            {"Participate in student council elections.",
+             "Lead a group project in class.",
+             "Plan a class or house event for annual day.",
+             "Lead a team in class debates or discussions."},
+            {"Start a small business selling handmade crafts.",
+             "Help parents with managing finances (tracking expenses).",
+             "Start a small savings plan for personal purchases.",
+             "Organize neighbourhood sales for unwanted items."}});
+        ACTION_SUBJECT.put(RiasecType.E, new String[][]{
+            {"Organize an entrepreneurship workshop for classmates.",
+             "Start a student-led business club.",
+             "Lead an inter-house competition.",
+             "Manage marketing for school events (posters, social media)."},
+            {"Set up a small online business (e.g., selling crafts).",
+             "Help manage family expenses and plan a savings strategy.",
+             "Start a blog or YouTube channel to share skills or hobbies.",
+             "Help local businesses with simple marketing ideas."}});
+        ACTION_CAREER.put(RiasecType.E, new String[][]{
+            {"Run for school head / house captain.",
+             "Pitch and lead a student startup or social enterprise.",
+             "Represent the school at model UN, business, or debate competitions.",
+             "Lead fundraising and sponsorship drives for school events."},
+            {"Run a small online business or service (tutoring, reselling).",
+             "Manage your own savings, expenses, and a basic investment plan.",
+             "Build a personal brand on LinkedIn / Instagram / YouTube.",
+             "Take an internship or shadow a professional in your field."}});
+
+        // ── C (Conventional) ──
+        ACTION_INSIGHT.put(RiasecType.C, new String[][]{
+            {"Help organize class notes for your classmates.",
+             "Join the library club and help organize books.",
+             "Manage attendance and record-keeping for group projects.",
+             "Help teachers with organizing files and documents."},
+            {"Organize family documents and important papers.",
+             "Create a daily schedule for household chores.",
+             "Help with making grocery lists and budgeting.",
+             "Track personal savings and expenses in a notebook."}});
+        ACTION_SUBJECT.put(RiasecType.C, new String[][]{
+            {"Take responsibility for maintaining school inventory.",
+             "Assist in preparing the class timetable or duty roster.",
+             "Help teachers with data entry and record-keeping.",
+             "Assist in cataloguing school library resources."},
+            {"Create a monthly family budget and track expenses.",
+             "Help manage and file household bills and utilities.",
+             "Set up a personal filing system for important documents.",
+             "Create a household inventory of items and supplies."}});
+        ACTION_CAREER.put(RiasecType.C, new String[][]{
+            {"Manage the finance or logistics committee for the annual fest.",
+             "Maintain digital records and reports for the student council.",
+             "Help coordinate exam schedules and admin tasks.",
+             "Build and maintain a digital archive of school activities."},
+            {"Maintain a complete household budget and bill tracker.",
+             "Plan and manage logistics for a family trip end-to-end.",
+             "Build a personal academic and career planner.",
+             "Organise and digitise family documents and records."}});
+    }
+
+    /** {school, home} action arrays for a top RIASEC type in the given variant; null if unknown. */
+    private static String[][] actionsFor(PagerVariant variant, RiasecType top) {
+        if (top == null) return null;
+        Map<RiasecType, String[][]> map =
+            variant == PagerVariant.INSIGHT ? ACTION_INSIGHT
+          : variant == PagerVariant.SUBJECT ? ACTION_SUBJECT
+          : ACTION_CAREER;
+        return map.get(top);
+    }
+
+    /** Render an action list as the numbered, &lt;br&gt;-joined text the template's &lt;p&gt; expects. */
+    private static String joinActions(String[] actions) {
+        if (actions == null || actions.length == 0) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < actions.length; i++) {
+            if (i > 0) sb.append("<br>");
+            sb.append(i + 1).append(". ").append(actions[i]);
+        }
+        return sb.toString();
+    }
+
     // ═════════════════════════════ Helpers ═════════════════════════════════════
 
     private static String levelLabel(AbsoluteLevel level) {
@@ -225,7 +429,7 @@ public class FourPagerEngineService {
         "ab_4", "ab_4_level", "ab_4_desc",
         "value_1", "value_2", "value_3", "value_4", "value_5", "values_basis",
         "subject_1", "subject_2", "subject_3", "subject_alignment",
-        "aspiration_1", "aspiration_2", "aspiration_3", "aspiration_coherence",
+        "aspiration_1", "aspiration_2", "aspiration_3", "aspiration_4", "aspiration_coherence",
         "strength_profile_1", "strength_profile_2", "strength_profile_3", "strength_profile_4",
         "clarity_index", "clarity_description", "alignment_score",
         "career_1_name", "career_1_score", "career_1_pct", "career_1_desc", "career_1_tags",
@@ -243,7 +447,12 @@ public class FourPagerEngineService {
         "growth_3_name", "growth_3_level",
         "growth_4_name", "growth_4_level",
         "growth_5_name", "growth_5_level",
-        "growth_note"
+        "growth_note",
+        // ── Keys added for the redesigned pager templates (2026-05) ──
+        "cci", "most_suited_1", "most_suited_2",
+        "home_action", "school_action",
+        "achievements", "hobbies_interests",
+        "p1%", "p2%", "p3%", "p4%", "p5%", "p6%", "p7%", "p8%", "p9%"
     );
 
     public Map<String, String> buildPlaceholders(Navigator360Result r, StudentMeta s) {
@@ -329,14 +538,26 @@ public class FourPagerEngineService {
                 .collect(Collectors.toList());
         out.put("subject_alignment", subjectAlignment(subjects, top3Riasec));
 
-        // Aspirations (up to 3)
+        // Aspirations (up to 4)
         if (r.careerAspirations != null) {
-            int max = Math.min(r.careerAspirations.size(), 3);
+            int max = Math.min(r.careerAspirations.size(), 4);
             for (int i = 0; i < max; i++) {
                 out.put("aspiration_" + (i + 1), r.careerAspirations.get(i));
             }
         }
         out.put("aspiration_coherence", coherenceLabel(r.preferenceScore.p2Aspirations));
+
+        // Demographic free-text profile fields (fallback strings already applied upstream).
+        out.put("achievements", nz(s.achievements, ""));
+        out.put("hobbies_interests", nz(s.hobbiesInterests, ""));
+
+        // "Things to do" actions — keyed by the student's primary RIASEC type and the variant.
+        RiasecType topType = riasecTop.isEmpty() ? null : safeRiasec(riasecTop.get(0).name);
+        String[][] actions = actionsFor(resolveVariant(r.gradeGroup), topType);
+        if (actions != null) {
+            out.put("school_action", joinActions(actions[0]));
+            out.put("home_action", joinActions(actions[1]));
+        }
 
         // Strength profile — top item per pillar + top value
         if (!riasecTop.isEmpty()) {
@@ -382,10 +603,30 @@ public class FourPagerEngineService {
             out.put("career_" + n + "_name", m.career.name != null ? m.career.name : "");
             out.put("career_" + n + "_score", m.suitability + "%");
             out.put("career_" + n + "_pct", String.valueOf(m.suitability));
+            // Redesigned template renders the per-career percentage via {{p1%}}..{{p9%}}.
+            // The % is inside the braces (consumed by substitution), so the value carries it.
+            out.put("p" + n + "%", m.suitability + "%");
             out.put("career_" + n + "_desc", careerShortDesc(m));
             out.put("career_" + n + "_tags", careerTags(m));
         }
         out.put("career_cluster_count", String.valueOf(r.careerMatches != null ? r.careerMatches.size() : 0));
+
+        // Top two career matches, echoed into the AI-intro line.
+        out.put("most_suited_1", out.get("career_1_name"));
+        out.put("most_suited_2", out.get("career_2_name"));
+
+        // CCI% = (aspirations whose career is among the top-9 shown) / (aspirations selected) × 100.
+        Set<String> top9Ids = topCareers.stream()
+                .map(m -> m.career.id)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        List<String> asps = r.careerAspirations != null ? r.careerAspirations : new ArrayList<>();
+        long matched = asps.stream()
+                .map(Navigator360CareerData.ASPIRATION_TO_CAREER::get)
+                .filter(id -> id != null && top9Ids.contains(id))
+                .count();
+        int cciPct = asps.isEmpty() ? 0 : (int) Math.round((double) matched / asps.size() * 100.0);
+        out.put("cci", String.valueOf(cciPct));
 
         // Growth areas (5 lowest)
         List<String[]> growth = pickGrowthAreas(r.riasec, r.mi, r.abilities);
@@ -417,8 +658,8 @@ public class FourPagerEngineService {
                 break;
             }
             String key = template.substring(open + 2, close).trim();
-            // Only match the [a-zA-Z0-9_]+ form the TS engine produces; anything else passes through verbatim.
-            if (key.matches("[a-zA-Z0-9_]+") && data.containsKey(key)) {
+            // Match the [a-zA-Z0-9_%]+ form ('%' covers career-percentage keys like p1%); anything else passes through verbatim.
+            if (key.matches("[a-zA-Z0-9_%]+") && data.containsKey(key)) {
                 String v = data.get(key);
                 out.append(v != null ? v : "");
             } else {

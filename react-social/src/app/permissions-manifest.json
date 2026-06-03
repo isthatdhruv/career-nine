@@ -114,6 +114,9 @@
     "/roles/role",
     "/unified-report-management"
   ],
+  "report_template.read": [
+    "/admin/report-templates"
+  ],
   "report_type.create": [
     "/admin/report-types/create"
   ],

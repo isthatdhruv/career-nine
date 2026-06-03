@@ -38,7 +38,7 @@ public class BetPlaceholderCalculator implements PlaceholderCalculator {
 
     @Override
     public Map<String, Object> calculate(Long userStudentId, Long assessmentId,
-                                         String subtypeCode, IntermediaryScoresPayload intermediary) {
+                                         IntermediaryScoresPayload intermediary) {
         Optional<BetReportData> opt = betReportDataRepository
                 .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
         return flatten(opt.orElse(null));

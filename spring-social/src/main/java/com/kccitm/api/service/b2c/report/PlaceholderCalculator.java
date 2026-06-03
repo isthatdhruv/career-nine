@@ -26,13 +26,15 @@ public interface PlaceholderCalculator {
     boolean usesIntermediary();
 
     /**
-     * Compute the placeholder map for a single (student, assessment, subtype) triple.
+     * Compute the placeholder map for a single (student, assessment) pair.
+     * Routing is purely by {@link #typeCode()} (the template's engineCode); the
+     * former {@code subtypeCode} only ever selected a different template HTML,
+     * never different data, so it is no longer passed here.
      *
      * @param userStudentId   student PK
      * @param assessmentId    assessment PK
-     * @param subtypeCode     {@code insight} / {@code subject} / {@code career} / {@code default}
      * @param intermediary    pre-computed intermediary scores; {@code null} if {@link #usesIntermediary()} returns false
      */
     Map<String, Object> calculate(Long userStudentId, Long assessmentId,
-                                  String subtypeCode, IntermediaryScoresPayload intermediary);
+                                  IntermediaryScoresPayload intermediary);
 }

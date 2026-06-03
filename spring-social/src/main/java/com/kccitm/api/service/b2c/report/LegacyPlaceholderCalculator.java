@@ -31,7 +31,7 @@ public class LegacyPlaceholderCalculator implements PlaceholderCalculator {
 
     @Override
     public Map<String, Object> calculate(Long userStudentId, Long assessmentId,
-                                         String subtypeCode, IntermediaryScoresPayload intermediary) {
+                                         IntermediaryScoresPayload intermediary) {
         // Runs the full Navigator pipeline (also writes navigator_report_data row).
         NavigatorReportData data = navigatorReportGenerationService.generateForStudent(
                 userStudentId, assessmentId, /*skipAI=*/ false);

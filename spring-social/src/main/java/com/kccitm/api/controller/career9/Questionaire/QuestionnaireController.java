@@ -27,13 +27,9 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireLanguage;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSectionInstruction;
-import com.kccitm.api.model.career9.report.ReportSubtype;
-import com.kccitm.api.model.career9.report.ReportType;
 import com.kccitm.api.repository.Career9.LanguagesSupportedRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireSectionRepository;
-import com.kccitm.api.repository.Career9.report.ReportSubtypeRepository;
-import com.kccitm.api.repository.Career9.report.ReportTypeRepository;
 
 @RestController
 @RequestMapping("/api/questionnaire")
@@ -48,39 +44,8 @@ public class QuestionnaireController {
     @Autowired
     private LanguagesSupportedRepository languagesSupportedRepository;
 
-    @Autowired
-    private ReportTypeRepository reportTypeRepository;
-
-    @Autowired
-    private ReportSubtypeRepository reportSubtypeRepository;
-
     @PersistenceContext
     private EntityManager entityManager;
-
-    /**
-     * Replace the {report_type, report_subtype} stubs in the incoming payload
-     * with their managed entities. Mirrors the existing language-resolution
-     * pattern at lines 67-73. Both FKs are optional — admins can leave them
-     * NULL during the backfill window, and ReportService falls back to
-     * grade-based inference.
-     */
-    private void resolveReportRouting(Questionnaire q) {
-        if (q == null) return;
-        if (q.getReportType() != null && q.getReportType().getReportTypeId() != null) {
-            ReportType managed = reportTypeRepository
-                    .findById(q.getReportType().getReportTypeId()).orElse(null);
-            q.setReportType(managed);
-        } else {
-            q.setReportType(null);
-        }
-        if (q.getReportSubtype() != null && q.getReportSubtype().getReportSubtypeId() != null) {
-            ReportSubtype managed = reportSubtypeRepository
-                    .findById(q.getReportSubtype().getReportSubtypeId()).orElse(null);
-            q.setReportSubtype(managed);
-        } else {
-            q.setReportSubtype(null);
-        }
-    }
 
     @PostMapping("/questionnaire-lelo")
     @PreAuthorize("@auth.allows('questionnaire.read')")
@@ -93,8 +58,6 @@ public class QuestionnaireController {
     @PreAuthorize("@auth.allows('questionnaire.create')")
     public ResponseEntity<Questionnaire> create(
             @RequestBody Questionnaire questionnaire) {
-
-        resolveReportRouting(questionnaire);
 
         // Set bidirectional relationships for languages
         if (questionnaire.getLanguages() != null) {
@@ -179,8 +142,6 @@ public class QuestionnaireController {
     public ResponseEntity<Questionnaire> update(
             @PathVariable Long id,
             @RequestBody Questionnaire questionnaire) {
-
-        resolveReportRouting(questionnaire);
 
         // Resolve language references for questionnaire languages
         if (questionnaire.getLanguages() != null) {

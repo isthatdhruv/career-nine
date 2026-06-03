@@ -24,10 +24,10 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: sandbox
+    active: dev
   servlet:
     multipart:
-      max-file-size: a1GB
+      max-file-size: 1GB
       max-request-size: 1GB
   flyway:
     enabled: true
@@ -238,7 +238,7 @@ spring:
       - optional:file:./.env.staging[.properties]
       - optional:file:../.env.staging[.properties]
   datasource:
-    url: jdbc:mysql://localhost:3307/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW
     hikari:
@@ -309,6 +309,10 @@ app:
   b2c:
     frontendBaseUrl: http://localhost:3000
     assessmentBaseUrl: http://localhost:5173
+  digitalocean:
+    spaces:
+      access-key: ${DO_SPACES_ACCESS_KEY:DO801TH68APHQF8DFA4J}
+      secret-key: ${DO_SPACES_SECRET_KEY:sr6jJMFt83bI9nyA8jaQDVjhFKt9ltQPJEWejDNLgAA}
   # Phase 20-01: in-process rate limit (Bucket4j). Dev profile runs against
   # localhost with no upstream proxy — getRemoteAddr() is authoritative.
   # XFF would be client-controlled / spoofable, so trust-xff is fail-safe false.

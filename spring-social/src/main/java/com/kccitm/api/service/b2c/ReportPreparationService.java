@@ -131,13 +131,7 @@ public class ReportPreparationService {
         if (!opt.isPresent()) return "pager";
         AssessmentTable assessment = opt.get();
 
-        // 1. New: read from Questionnaire.reportType FK.
-        if (assessment.getQuestionnaire() != null
-                && assessment.getQuestionnaire().getReportType() != null) {
-            return assessment.getQuestionnaire().getReportType().getCode();
-        }
-
-        // 2. Legacy admin override on AssessmentTable.
+        // 1. Admin override on AssessmentTable (escape hatch).
         String explicit = assessment.getReportType();
         if (explicit != null && !explicit.trim().isEmpty()) {
             String norm = explicit.trim().toLowerCase();

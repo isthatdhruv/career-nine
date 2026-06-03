@@ -127,5 +127,7 @@ public final class Navigator360Models {
         public String schoolName;
         public String schoolCity;
         public String reportUrl;
+        public String achievements;        // from demographic field_id 19
+        public String hobbiesInterests;    // from demographic field_id 18
     }
 }

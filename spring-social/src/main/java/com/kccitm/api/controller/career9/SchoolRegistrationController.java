@@ -318,12 +318,28 @@ public class SchoolRegistrationController {
             }
             existing.setDescription(trimmed);
         }
+        boolean priceChanged = updated.getAmount() != null
+                && !updated.getAmount().equals(existing.getAmount());
         if (updated.getAmount() != null) existing.setAmount(updated.getAmount());
         if (updated.getSortOrder() != null) existing.setSortOrder(updated.getSortOrder());
         // maxRegistrations is nullable-meaningful: always copy it through
         existing.setMaxRegistrations(updated.getMaxRegistrations());
         if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
-        return ResponseEntity.ok(schoolTierRepository.save(existing));
+        SchoolAssessmentTier saved = schoolTierRepository.save(existing);
+
+        // A price change must not leave already-issued links payable at the old amount.
+        // Cancel every outstanding "created" school link for this institute + assessment
+        // so students are forced onto a freshly-priced link on their next attempt.
+        if (priceChanged) {
+            List<PaymentTransaction> outstanding = paymentTransactionRepository
+                    .findByAssessmentIdOrderByCreatedAtDesc(saved.getAssessmentId());
+            outstanding.removeIf(t -> t.getSchoolConfigId() == null
+                    || t.getInstituteCode() == null
+                    || saved.getInstituteCode() == null
+                    || t.getInstituteCode().longValue() != saved.getInstituteCode().longValue());
+            cancelOutstandingLinks(outstanding);
+        }
+        return ResponseEntity.ok(saved);
     }
 
     @PreAuthorize("@auth.allows('school_registration.update')")
@@ -752,6 +768,31 @@ public class SchoolRegistrationController {
         logger.info("School tier increment: tierId={}, rowsAffected={}", tierId, rows);
     }
 
+    /**
+     * Best-effort cancellation of outstanding unpaid Razorpay links. A Razorpay link is
+     * an immutable price snapshot, so when a fresher link is issued (re-registration) or
+     * the tier price changes, any still-"created" link must be cancelled — otherwise a
+     * student can reopen an old link/email and pay the stale amount.
+     *
+     * <p>Only transactions our DB still considers "created" are touched, and a row is
+     * marked "cancelled" locally only when the Razorpay cancel actually succeeds. A link
+     * Razorpay reports as already paid/expired/cancelled simply fails the call (logged and
+     * swallowed) and keeps its current local status, so a missed webhook can't be masked.
+     */
+    private void cancelOutstandingLinks(List<PaymentTransaction> txns) {
+        for (PaymentTransaction t : txns) {
+            if (!"created".equals(t.getStatus()) || t.getRazorpayLinkId() == null) continue;
+            try {
+                razorpayService.cancelPaymentLink(t.getRazorpayLinkId());
+                t.setStatus("cancelled");
+                paymentTransactionRepository.save(t);
+            } catch (Exception e) {
+                logger.warn("Could not cancel stale payment link {} (txn {}): {}",
+                        t.getRazorpayLinkId(), t.getTransactionId(), e.getMessage());
+            }
+        }
+    }
+
     private ResponseEntity<?> createPaymentAndRedirect(Long schoolConfigId, Long mappingTierId,
             Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
@@ -801,7 +842,17 @@ public class SchoolRegistrationController {
                 txn.setPromoDiscountPercent(promoDiscountPercent);
             }
 
-            paymentTransactionRepository.save(txn);
+            txn = paymentTransactionRepository.save(txn);
+
+            // The freshly-issued link is now the only one that should be payable. Kill any
+            // older still-"created" links for this same student + assessment so a reopened
+            // old link/email can't be paid at a stale price (Razorpay links are immutable
+            // price snapshots — re-pricing only takes effect on a brand-new link).
+            List<PaymentTransaction> prior = paymentTransactionRepository
+                    .findByStudentEmailAndAssessmentId(email, assessmentId);
+            final Long newTxnId = txn.getTransactionId();
+            prior.removeIf(t -> t.getTransactionId().equals(newTxnId));
+            cancelOutstandingLinks(prior);
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "payment_required");
