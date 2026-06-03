@@ -78,6 +78,7 @@ public class PaymentWebhookController {
     @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
     @Autowired private SchoolRegistrationLinkRepository schoolRegistrationLinkRepository;
     @Autowired private AssessmentMappingTierRepository assessmentMappingTierRepository;
+    @Autowired private com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository schoolAssessmentTierRepository;
     @Autowired private StudentInstituteMembershipService membershipService;
     @Autowired private StudentProvisioningService studentProvisioningService;
 
@@ -708,8 +709,6 @@ public class PaymentWebhookController {
             UserStudent newUs = new UserStudent(existingUser, existingStudent, institute);
             newUs = userStudentRepository.save(newUs);
             studentProvisioningService.provision(newUs);
-            tryIncrementSchoolLink(txn);
-            tryIncrementMappingTier(txn);
             userStudents = List.of(newUs);
         }
 
@@ -723,6 +722,11 @@ public class PaymentWebhookController {
             StudentAssessmentMapping sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
             studentAssessmentMappingRepository.save(sam);
+            // Count the paid seat once per newly-assigned assessment — covers both a freshly
+            // backfilled UserStudent and an existing one buying an additional assessment.
+            // A webhook retry where the mapping already exists must NOT double-count.
+            tryIncrementSchoolLink(txn);
+            tryIncrementMappingTier(txn);
         }
 
         txn.setUserStudentId(userStudent.getUserStudentId());
@@ -770,27 +774,39 @@ public class PaymentWebhookController {
 
     private void tryIncrementMappingTier(PaymentTransaction txn) {
         if (txn == null || txn.getMappingTierId() == null) return;
-        int rows = assessmentMappingTierRepository.tryIncrementCount(txn.getMappingTierId());
-        logger.info("Mapping tier increment (webhook): tierId={}, rowsAffected={}",
-                txn.getMappingTierId(), rows);
+        // The single mappingTierId column is overloaded: for the school flow it is a
+        // SchoolAssessmentTier id; for the assessment-mapping flow an AssessmentMappingTier id.
+        // Route to the correct table so school caps are actually enforced for paid students.
+        boolean school = txn.getSchoolConfigId() != null;
+        int rows = school
+                ? schoolAssessmentTierRepository.tryIncrementCount(txn.getMappingTierId())
+                : assessmentMappingTierRepository.tryIncrementCount(txn.getMappingTierId());
+        logger.info("{} tier increment (webhook): tierId={}, rowsAffected={}",
+                school ? "School" : "Mapping", txn.getMappingTierId(), rows);
         if (rows == 0) {
-            logger.warn("Cap already hit on AssessmentMappingTier {} when processing paid txn {}; allowing this paid registration through.",
-                    txn.getMappingTierId(), txn.getTransactionId());
+            logger.warn("Cap already hit on {} tier {} when processing paid txn {}; allowing this paid registration through.",
+                    school ? "school" : "mapping", txn.getMappingTierId(), txn.getTransactionId());
         }
     }
 
     private Integer parseClassNumber(Integer classId) {
         if (classId == null) return null;
-        try {
-            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
-            if (classOpt.isPresent()) {
-                String className = classOpt.get().getClassName();
-                return Integer.parseInt(className.replaceAll("[^0-9]", ""));
+        Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
+        if (classOpt.isPresent()) {
+            String className = classOpt.get().getClassName();
+            if (className != null) {
+                String digits = className.replaceAll("[^0-9]", "");
+                if (!digits.isEmpty()) {
+                    try {
+                        return Integer.parseInt(digits);
+                    } catch (NumberFormatException e) {
+                        logger.warn("Could not parse class number from className for classId: {}", classId);
+                    }
+                }
             }
-        } catch (NumberFormatException e) {
-            logger.warn("Could not parse class number from className for classId: {}", classId);
         }
-        return classId;
+        // Never fall back to classId (a DB primary key) — that would corrupt studentClass.
+        return null;
     }
 
 }

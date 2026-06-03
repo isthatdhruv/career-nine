@@ -55,8 +55,9 @@ const AssessmentRegisterPage = () => {
   const amountInr: number = mappingInfo?.amount || 0
   const isPaid = amountInr > 0
 
+  // Mirror the backend's integer (floor) division so the displayed price matches the charge.
   const discountedAmountInr = promoApplied
-    ? amountInr * (100 - promoApplied.discountPercent) / 100
+    ? Math.floor(amountInr * (100 - promoApplied.discountPercent) / 100)
     : amountInr
 
   const handleDobChange = (value: string) => {

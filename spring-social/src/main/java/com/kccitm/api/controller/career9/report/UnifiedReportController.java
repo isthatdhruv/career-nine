@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,6 +42,8 @@ public class UnifiedReportController {
 
     @Autowired private ReportService reportService;
     @Autowired private AuthorizationService auth;
+    @Autowired private com.kccitm.api.service.b2c.report.pdf.PdfRenderEnqueueService pdfRenderEnqueueService;
+    @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
 
     @PostMapping("/generate-report-unified")
     @PreAuthorize("@auth.allows('generated_report.create', @auth.instituteOfStudent(#req.userStudentId))")
@@ -57,7 +60,8 @@ public class UnifiedReportController {
                     req.getUserStudentId(), req.getAssessmentId(), req.getReportTemplateId(), force);
             return ResponseEntity.ok(UnifiedReportResponse.ok(
                     r.typeCode, r.subtypeCode, r.reportUrl,
-                    r.calculatedAt, r.renderedAt, r.alreadyExisted));
+                    r.calculatedAt, r.renderedAt, r.alreadyExisted,
+                    r.pdfUrl, r.pdfStatus));
         } catch (ScoresNotReadyException ex) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(UnifiedReportResponse.transient_("SCORES_NOT_READY", ex.getMessage()));
@@ -110,6 +114,8 @@ public class UnifiedReportController {
                 ReportResult r = reportService.generate(sid, req.getAssessmentId(), req.getReportTemplateId(), force);
                 row.put("status", "ok");
                 row.put("reportUrl", r.reportUrl);
+                row.put("pdfUrl", r.pdfUrl);
+                row.put("pdfStatus", r.pdfStatus);
                 row.put("code", r.subtypeCode);
                 row.put("typeCode", r.typeCode);
             } catch (ScoresNotReadyException ex) {
@@ -126,5 +132,26 @@ public class UnifiedReportController {
         }
         response.put("results", results);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Re-enqueue PDF rendering for a report whose async render previously failed
+     * (or to force a re-render). Resets the report to pending and refreshes its
+     * single render job; the poller picks it up on the next tick.
+     */
+    @PostMapping("/generate-report-unified/{generatedReportId}/retry-pdf")
+    @PreAuthorize("@auth.allows('generated_report.create')")
+    public ResponseEntity<Map<String, Object>> retryPdf(@PathVariable Long generatedReportId) {
+        return generatedReportRepository.findById(generatedReportId).map(gr -> {
+            if (gr.getReportUrl() == null) {
+                return ResponseEntity.badRequest().body(Map.<String, Object>of(
+                        "status", "error", "message", "Report has no HTML to render"));
+            }
+            gr.setPdfStatus("pending");
+            generatedReportRepository.save(gr);
+            pdfRenderEnqueueService.enqueue(gr.getGeneratedReportId(), gr.getReportUrl());
+            return ResponseEntity.ok(Map.<String, Object>of("status", "ok", "pdfStatus", "pending"));
+        }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.<String, Object>of(
+                "status", "error", "message", "Report not found")));
     }
 }

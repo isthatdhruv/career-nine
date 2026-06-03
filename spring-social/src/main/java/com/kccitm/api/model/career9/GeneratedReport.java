@@ -78,6 +78,13 @@ public class GeneratedReport implements Serializable {
     @Column(name = "report_url", length = 4096)
     private String reportUrl;
 
+    @Column(name = "pdf_url", length = 4096)
+    private String pdfUrl;
+
+    // notRequested | pending | rendering | ready | failed
+    @Column(name = "pdf_status", nullable = false, length = 50)
+    private String pdfStatus = "notRequested";
+
     @Column(name = "visible_to_student", nullable = false, columnDefinition = "boolean default false")
     private Boolean visibleToStudent = false;
 
@@ -149,6 +156,22 @@ public class GeneratedReport implements Serializable {
 
     public void setReportUrl(String reportUrl) {
         this.reportUrl = reportUrl;
+    }
+
+    public String getPdfUrl() {
+        return pdfUrl;
+    }
+
+    public void setPdfUrl(String pdfUrl) {
+        this.pdfUrl = pdfUrl;
+    }
+
+    public String getPdfStatus() {
+        return pdfStatus;
+    }
+
+    public void setPdfStatus(String pdfStatus) {
+        this.pdfStatus = pdfStatus;
     }
 
     public Date getCreatedAt() {

@@ -75,6 +75,7 @@ public class ReportService {
     @Autowired private TemplateRenderer templateRenderer;
     @Autowired private DigitalOceanSpacesService spacesService;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private com.kccitm.api.service.b2c.report.pdf.PdfRenderEnqueueService pdfRenderEnqueueService;
 
     @Autowired private List<PlaceholderCalculator> allStrategies;
 
@@ -175,7 +176,8 @@ public class ReportService {
         GeneratedReport gr = upsertGeneratedReport(userStudentId, assessmentId, template, reportUrl);
 
         return new ReportResult(reportUrl, template.getEngineCode(), templateLabel(template),
-                calcRow.getCalculatedAt(), gr.getUpdatedAt(), reusedCalc);
+                calcRow.getCalculatedAt(), gr.getUpdatedAt(), reusedCalc,
+                gr.getPdfUrl(), gr.getPdfStatus());
     }
 
     // ───────────────────────────────────────────────────────── helpers ──
@@ -298,8 +300,12 @@ public class ReportService {
         gr.setReportTemplate(template);
         gr.setReportStatus("generated");
         gr.setReportUrl(reportUrl);
+        gr.setPdfStatus("pending");   // async render will flip to ready/failed
+        gr.setPdfUrl(null);           // stale PDF invalidated; re-rendered from new HTML
         gr.setUpdatedAt(new Date());
-        return generatedReportRepository.save(gr);
+        GeneratedReport saved = generatedReportRepository.save(gr);
+        pdfRenderEnqueueService.enqueue(saved.getGeneratedReportId(), reportUrl);
+        return saved;
     }
 
     private static String renderedFileName(Long userStudentId, ReportTemplate template) {

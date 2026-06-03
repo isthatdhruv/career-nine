@@ -120,6 +120,8 @@ export interface UnifiedReportResponse {
   typeCode?: string;
   subtypeCode?: string;
   reportUrl?: string;
+  pdfUrl?: string | null;
+  pdfStatus?: string;   // notRequested | pending | rendering | ready | failed
   code?: string;
   message?: string;
 }
@@ -142,6 +144,8 @@ export interface BulkResultItem {
   userStudentId: number;
   status: "ok" | "error" | "forbidden";
   reportUrl?: string;
+  pdfUrl?: string | null;
+  pdfStatus?: string;   // notRequested | pending | rendering | ready | failed
   code?: string;
   typeCode?: string;
   message?: string;

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
-import { downloadReportAsPdf, htmlToPdfBlob } from "../ReportGeneration/utils/htmlToPdf";
-import JSZip from "jszip";
+import { zipStoredPdfs } from "../ReportGeneration/utils/pdfZip";
 import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import { useInstitutes } from "../../lib/queries/lookups";
 import {
@@ -40,7 +39,6 @@ import GenerateReportsModal, { ModalStudent } from "./components/GenerateReports
 import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
-import { buildFourPagerHtml } from "./fourPager/FourPagerAPI";
 import PageHeader from "../../components/PageHeader";
 import { useAuth, Scope } from "../../modules/auth";
 
@@ -72,9 +70,24 @@ type ReportData = {
   userStudent?: { userStudentId: number };
   reportStatus: string;
   reportUrl?: string | null;
+  pdfUrl?: string | null;
+  pdfStatus?: string; // notRequested | pending | rendering | ready | failed
   eligible?: boolean;
   [key: string]: any;
 };
+
+// Fetch a Spaces URL and force-download it with a friendly filename. Cross-origin
+// <a download> is ignored by browsers, so we go via a blob (bucket CORS allows GET).
+async function downloadSpacesFile(url: string, fileName: string) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("fetch failed");
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl; a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(objectUrl);
+}
 
 // ═══════════════════════ COMPONENT ═══════════════════════
 
@@ -311,6 +324,8 @@ const ReportsHubPage: React.FC = () => {
             userStudent: { userStudentId: id },
             reportStatus: gr.reportStatus,
             reportUrl: gr.reportUrl,
+            pdfUrl: gr.pdfUrl ?? null,
+            pdfStatus: gr.pdfStatus ?? "notRequested",
           });
         }
       }
@@ -572,19 +587,20 @@ const ReportsHubPage: React.FC = () => {
     if (!selectedAssessmentObj) return;
     let ids = getSelectedOrAllIds().filter((id) => {
       const rd = reportDataMap.get(id);
-      return rd && rd.reportStatus === "generated" && rd.reportUrl;
+      return rd && rd.pdfStatus === "ready" && rd.pdfUrl;
     });
-    if (ids.length === 0) { showErrorToast("No generated reports to download."); return; }
+    if (ids.length === 0) { showErrorToast("No rendered PDFs to download yet."); return; }
     pendingZipIds.current = ids;
     pendingZipKind.current = "navigator";
     setZipNameInput(`${reportType}_reports_${selectedAssessmentObj.assessmentName.replace(/[^a-zA-Z0-9]/g, "_")}`);
     setZipNamePromptOpen(true);
   };
 
-  // Step 2: Confirm name → start async background job
+  // Step 2: Confirm name → start async background job.
+  // PDFs are pre-rendered server-side and stored on Spaces, so this just bundles
+  // the existing pdfUrls (fetch + zip) and uploads the ZIP — no client conversion.
   const startZipJob = (zipName: string) => {
     if (!selectedAssessmentObj) return;
-    const assessment = selectedAssessmentObj;
     const ids = [...pendingZipIds.current];
     const jobId = `zip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const fileName = zipName.endsWith(".zip") ? zipName : zipName + ".zip";
@@ -593,7 +609,7 @@ const ReportsHubPage: React.FC = () => {
       id: jobId,
       name: fileName,
       status: "zipping",
-      phase: "Fetching reports...",
+      phase: "Bundling PDFs...",
       progress: 0,
       createdAt: Date.now(),
     };
@@ -603,89 +619,44 @@ const ReportsHubPage: React.FC = () => {
       setZipJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, ...patch } : j));
     };
 
-    const kind = pendingZipKind.current;
-
     // Fire and forget
     (async () => {
       try {
-        // Phase 1: Build the list of students with a filename + report URL for each
-        let studs: { userStudentId: number; fileName: string; reportUrl?: string | null }[];
-        if (kind === "fourPager") {
-          studs = ids.map((id) => {
+        // Build the bundle list from the stored PDF URLs.
+        const items = ids
+          .map((id) => {
             const s = students.find((st) => st.userStudentId === id);
             const safe = (s?.name || `student_${id}`).replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
-            return { userStudentId: id, fileName: `${safe}_4pager` };
-          });
-        } else {
-          // Unified reports: pull the rendered URL from the generated_report map.
-          studs = ids
-            .map((id) => {
-              const s = students.find((st) => st.userStudentId === id);
-              const safe = (s?.name || `student_${id}`).replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
-              const rd = reportDataMap.get(id);
-              return { userStudentId: id, fileName: `${safe}_report`, reportUrl: rd?.reportUrl ?? null };
-            })
-            .filter((s) => !!s.reportUrl);
-        }
-        const total = studs.length;
+            const rd = reportDataMap.get(id);
+            return { fileName: `${safe}_report`, pdfUrl: rd?.pdfUrl ?? null };
+          })
+          .filter((x) => !!x.pdfUrl);
 
-        // Phase 2: Fetch / build HTML in parallel
-        const CONCURRENCY = 5;
-        const htmlResults: { fileName: string; html: string | null }[] = new Array(total);
-        let fetchDone = 0;
-        const fetchQueue = studs.map((s, i) => [i, s] as [number, typeof studs[0]]);
-
-        const fetchWorker = async () => {
-          while (fetchQueue.length > 0) {
-            const [idx, student] = fetchQueue.shift()!;
-            try {
-              if (kind === "fourPager") {
-                const row = students.find((st) => st.userStudentId === student.userStudentId);
-                const section = row?.schoolSectionId ? sectionLookup.get(row.schoolSectionId) : undefined;
-                const { html } = await buildFourPagerHtml(student.userStudentId, assessment.id, {
-                  studentName: row?.name || `Student ${student.userStudentId}`,
-                  studentClass: section?.className || "",
-                  schoolName: selectedInstituteName,
-                });
-                htmlResults[idx] = { fileName: student.fileName, html };
-              } else {
-                const html = student.reportUrl ? await (await fetch(student.reportUrl)).text() : null;
-                htmlResults[idx] = { fileName: student.fileName, html };
-              }
-            } catch {
-              htmlResults[idx] = { fileName: student.fileName, html: null };
-            }
-            fetchDone++;
-            updateJob({ phase: `Fetching ${fetchDone}/${total}...`, progress: (fetchDone / total) * 30 });
-          }
-        };
-        await Promise.all(Array.from({ length: Math.min(CONCURRENCY, total) }, () => fetchWorker()));
-
-        // Phase 3: Convert to PDF
-        const zip = new JSZip();
-        let convertDone = 0;
-        for (const { fileName: fn, html } of htmlResults) {
-          if (html) {
-            try {
-              const pdfBlob = await htmlToPdfBlob(html);
-              zip.file(`${fn}.pdf`, pdfBlob);
-            } catch { /* skip */ }
-          }
-          convertDone++;
-          updateJob({ phase: `Converting ${convertDone}/${total}...`, progress: 30 + (convertDone / total) * 40 });
+        if (items.length === 0) {
+          updateJob({ status: "error", phase: undefined, error: "No rendered PDFs to bundle (still generating?)" });
+          showErrorToast("No rendered PDFs to bundle yet.");
+          return;
         }
 
-        // Phase 4: Create ZIP blob
-        updateJob({ phase: "Creating ZIP...", progress: 75 });
-        const zipBlob = await zip.generateAsync({ type: "blob" });
+        updateJob({ phase: `Bundling ${items.length} PDF(s)...`, progress: 40 });
+        const { blob: zipBlob, added, skipped } = await zipStoredPdfs(items);
+        if (added === 0) {
+          updateJob({ status: "error", phase: undefined, error: "No PDFs could be downloaded" });
+          showErrorToast("No PDFs could be downloaded.");
+          return;
+        }
 
-        // Phase 5: Upload to DO Spaces
+        // Upload the ZIP to DO Spaces (unchanged).
         updateJob({ status: "uploading", phase: "Uploading to cloud...", progress: 80 });
         const uploadRes = await uploadReportZip(zipBlob, fileName);
         const cdnUrl = uploadRes.data.url;
 
         updateJob({ status: "done", phase: undefined, progress: 100, url: cdnUrl });
-        showSuccessToast(`"${fileName}" ready for download!`);
+        showSuccessToast(
+          skipped.length
+            ? `"${fileName}" ready — ${added} PDF(s), ${skipped.length} skipped (not ready)`
+            : `"${fileName}" ready for download!`
+        );
       } catch (err: any) {
         updateJob({
           status: "error",
@@ -1298,26 +1269,45 @@ const ReportsHubPage: React.FC = () => {
                                   Preview
                                 </a>
                                 <button
-                                  disabled={downloadingStudentId === s.userStudentId}
+                                  disabled={downloadingStudentId === s.userStudentId || rd?.pdfStatus !== "ready" || !rd?.pdfUrl}
+                                  title={rd?.pdfStatus !== "ready" ? `PDF ${rd?.pdfStatus ?? "not ready"}` : "Download PDF"}
                                   style={{
                                     padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
                                     background: downloadingStudentId === s.userStudentId ? "#d1d5db" : "#f0fdf4",
                                     color: downloadingStudentId === s.userStudentId ? "#6b7280" : "#059669",
-                                    border: "none", cursor: downloadingStudentId === s.userStudentId ? "not-allowed" : "pointer",
+                                    border: "none",
+                                    cursor: (rd?.pdfStatus !== "ready" || !rd?.pdfUrl) ? "not-allowed" : "pointer",
+                                    opacity: (rd?.pdfStatus !== "ready" || !rd?.pdfUrl) ? 0.6 : 1,
+                                  }}
+                                  onClick={async () => {
+                                    if (!rd?.pdfUrl) return;
+                                    setDownloadingStudentId(s.userStudentId);
+                                    try {
+                                      const safeName = (s.name || "student").replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
+                                      await downloadSpacesFile(rd.pdfUrl, `${safeName}_report.pdf`);
+                                    } catch { showErrorToast("Download failed (try Preview to open directly)"); }
+                                    finally { setDownloadingStudentId(null); }
+                                  }}>
+                                  {downloadingStudentId === s.userStudentId ? "..."
+                                    : rd?.pdfStatus === "ready" ? "PDF"
+                                    : rd?.pdfStatus === "failed" ? "PDF ✗" : "PDF…"}
+                                </button>
+                                <button
+                                  disabled={downloadingStudentId === s.userStudentId}
+                                  style={{
+                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
+                                    background: "#f3f4f6", color: "#374151", border: "none", cursor: "pointer",
                                   }}
                                   onClick={async () => {
                                     if (!reportUrl) return;
                                     setDownloadingStudentId(s.userStudentId);
                                     try {
                                       const safeName = (s.name || "student").replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
-                                      await downloadReportAsPdf(
-                                        async () => ({ data: await (await fetch(reportUrl)).text() }),
-                                        `${safeName}_report.pdf`
-                                      );
-                                    } catch { showErrorToast("Download failed (the report may need to be opened directly)"); }
+                                      await downloadSpacesFile(reportUrl, `${safeName}_report.html`);
+                                    } catch { showErrorToast("Download failed"); }
                                     finally { setDownloadingStudentId(null); }
                                   }}>
-                                  {downloadingStudentId === s.userStudentId ? "..." : "Download"}
+                                  HTML
                                 </button>
                               </div>
                             ) : (

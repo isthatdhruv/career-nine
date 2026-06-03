@@ -52,6 +52,26 @@ services:
       retries: 3
       start_period: 5s
 
+  # Headless-Chromium HTML→PDF microservice for server-rendered report PDFs.
+  # Published on 3000 so a host-run backend reaches it at GOTENBERG_URL=http://localhost:3000.
+  # When the backend runs inside this compose network, set GOTENBERG_URL=http://gotenberg:3000
+  # and you can drop the published port.
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=false"   # reports draw charts client-side
+      - "--api-timeout=120s"
+    ports:
+      - '3000:3000'
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+    networks:
+      - career_shared_net
+
 #   api:
 #     container_name: api
 #     build:

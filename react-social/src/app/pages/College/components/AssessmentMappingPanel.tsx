@@ -143,8 +143,9 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
     }
   };
 
-  const getFreeRegistrationUrl = (token: string) => `${process.env.REACT_APP_ASSESSMENT_APP_URL}/assessment-register/${token}`;
-  const getPaidRegistrationUrl = (token: string) => `${process.env.REACT_APP_ASSESSMENT_APP_URL}/assessment-register/${token}`;
+  const assessmentAppBase = process.env.REACT_APP_ASSESSMENT_APP_URL || "https://assessment.career-9.com";
+  const getFreeRegistrationUrl = (token: string) => `${assessmentAppBase}/assessment-register/${token}`;
+  const getPaidRegistrationUrl = (token: string) => `${assessmentAppBase}/assessment-register/${token}`;
 
   const copyToClipboard = (url: string, key: string) => {
     navigator.clipboard.writeText(url);

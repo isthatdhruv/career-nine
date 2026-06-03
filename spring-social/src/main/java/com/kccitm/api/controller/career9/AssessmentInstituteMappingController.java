@@ -101,6 +101,9 @@ public class AssessmentInstituteMappingController {
     private StudentProvisioningService studentProvisioningService;
 
     @Autowired
+    private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
+
+    @Autowired
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
 
     @Autowired
@@ -497,6 +500,12 @@ public class AssessmentInstituteMappingController {
             }
             promoDiscountPercent = promo.getDiscountPercent();
             finalAmount = mappingAmount * (100 - promoDiscountPercent) / 100;
+            // Integer (floor) division can drive a low price to 0 for a non-100% discount,
+            // which would wrongly route the student onto the free path. Only a true 100%
+            // discount (or a 0 base amount) may reach the free flow.
+            if (promoDiscountPercent < 100 && finalAmount < 1L) {
+                finalAmount = 1L;
+            }
 
             // Increment usage
             promo.setCurrentUses(promo.getCurrentUses() + 1);
@@ -603,6 +612,9 @@ public class AssessmentInstituteMappingController {
         UserStudent userStudent = new UserStudent(user, studentInfo, institute);
         userStudent = userStudentRepository.save(userStudent);
         studentProvisioningService.provision(userStudent);
+        // Write the institute-membership row so free-path students appear in the roster and are
+        // manageable via the membership API (the paid webhook path already does this).
+        membershipService.setPrimaryInstitute(userStudent, instituteCode, null, "mapping-free-provision");
 
         // Create StudentAssessmentMapping
         StudentAssessmentMapping sam = new StudentAssessmentMapping(
@@ -637,7 +649,8 @@ public class AssessmentInstituteMappingController {
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
 
             String callbackUrl = callbackBaseUrl + "/payment-status";
-            String referenceId = "MAP-" + mappingId + "-" + System.currentTimeMillis();
+            String referenceId = "MAP-" + mappingId + "-" + System.currentTimeMillis()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
 
             Map<String, String> notes = new HashMap<>();
             notes.put("mappingId", String.valueOf(mappingId));
@@ -753,6 +766,7 @@ public class AssessmentInstituteMappingController {
             UserStudent newUs = new UserStudent(existingUser, existingStudentInfo, institute);
             newUs = userStudentRepository.save(newUs);
             studentProvisioningService.provision(newUs);
+            membershipService.setPrimaryInstitute(newUs, instituteCode, null, "mapping-free-provision");
             userStudents = List.of(newUs);
         }
 
