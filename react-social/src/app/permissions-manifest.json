@@ -117,15 +117,6 @@
   "report_template.read": [
     "/admin/report-templates"
   ],
-  "report_type.create": [
-    "/admin/report-types/create"
-  ],
-  "report_type.read": [
-    "/admin/report-types"
-  ],
-  "report_type.update": [
-    "/admin/report-types/edit/:id"
-  ],
   "role.assign": [
     "/user-management/roles/manage"
   ],

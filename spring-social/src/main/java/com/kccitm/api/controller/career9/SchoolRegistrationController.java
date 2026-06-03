@@ -82,6 +82,7 @@ public class SchoolRegistrationController {
     @Autowired private SmtpEmailService emailService;
     @Autowired private CareerNineRollNumberService rollNumberService;
     @Autowired private StudentProvisioningService studentProvisioningService;
+    @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
     private String callbackBaseUrl;
@@ -333,10 +334,12 @@ public class SchoolRegistrationController {
         if (priceChanged) {
             List<PaymentTransaction> outstanding = paymentTransactionRepository
                     .findByAssessmentIdOrderByCreatedAtDesc(saved.getAssessmentId());
+            // Cancel only links priced under THIS tier. Each school txn stamps the tier id in
+            // mappingTierId, so scoping by it avoids cancelling in-flight payments for other
+            // sessions/classes of the same institute that share this assessment.
             outstanding.removeIf(t -> t.getSchoolConfigId() == null
-                    || t.getInstituteCode() == null
-                    || saved.getInstituteCode() == null
-                    || t.getInstituteCode().longValue() != saved.getInstituteCode().longValue());
+                    || t.getMappingTierId() == null
+                    || !t.getMappingTierId().equals(saved.getTierId()));
             cancelOutstandingLinks(outstanding);
         }
         return ResponseEntity.ok(saved);
@@ -609,6 +612,12 @@ public class SchoolRegistrationController {
         }
 
         SchoolAssessmentConfig config = configOpt.get();
+        // A deactivated class config must not be registrable even if a client posts its classId
+        // directly (getSchoolInfo hides it, but the register action has to enforce the flag too).
+        if (!Boolean.TRUE.equals(config.getIsActive())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Registration is closed for the selected class");
+        }
         Long assessmentId = config.getAssessmentId();
 
         // 4b. Resolve active pricing tier for this assessment. No active tier → registration closed.
@@ -646,6 +655,12 @@ public class SchoolRegistrationController {
             }
             promoDiscountPercent = promo.getDiscountPercent();
             finalAmount = mappingAmount * (100 - promoDiscountPercent) / 100;
+            // Integer (floor) division can drive a low price to 0 for a non-100% discount,
+            // which would wrongly route the student onto the free path. Only a true 100%
+            // discount (or a 0 base amount) may reach the free flow.
+            if (promoDiscountPercent < 100 && finalAmount < 1L) {
+                finalAmount = 1L;
+            }
 
             promo.setCurrentUses(promo.getCurrentUses() + 1);
             promoCodeRepository.save(promo);
@@ -733,6 +748,9 @@ public class SchoolRegistrationController {
         UserStudent userStudent = new UserStudent(user, studentInfo, institute);
         userStudent = userStudentRepository.save(userStudent);
         studentProvisioningService.provision(userStudent);
+        // Write the institute-membership row so free-path students appear in the roster and are
+        // manageable via the membership API (the paid webhook path already does this).
+        membershipService.setPrimaryInstitute(userStudent, instituteCode, null, "school-free-provision");
 
         incrementSchoolTierCount(activeTierId);
 
@@ -803,7 +821,8 @@ public class SchoolRegistrationController {
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
 
             String callbackUrl = callbackBaseUrl + "/payment-status";
-            String referenceId = "SCHOOL-" + schoolConfigId + "-" + System.currentTimeMillis();
+            String referenceId = "SCHOOL-" + schoolConfigId + "-" + System.currentTimeMillis()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
 
             Map<String, String> notes = new HashMap<>();
             notes.put("schoolConfigId", String.valueOf(schoolConfigId));
@@ -912,6 +931,7 @@ public class SchoolRegistrationController {
             UserStudent newUs = new UserStudent(existingUser, existingStudentInfo, institute);
             newUs = userStudentRepository.save(newUs);
             studentProvisioningService.provision(newUs);
+            membershipService.setPrimaryInstitute(newUs, instituteCode, null, "school-free-provision");
             incrementSchoolTierCount(activeTierId);
             userStudents = List.of(newUs);
         }
@@ -953,16 +973,22 @@ public class SchoolRegistrationController {
 
     private Integer parseClassNumber(Integer classId) {
         if (classId == null) return null;
-        try {
-            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
-            if (classOpt.isPresent()) {
-                String className = classOpt.get().getClassName();
-                return Integer.parseInt(className.replaceAll("[^0-9]", ""));
+        Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
+        if (classOpt.isPresent()) {
+            String className = classOpt.get().getClassName();
+            if (className != null) {
+                String digits = className.replaceAll("[^0-9]", "");
+                if (!digits.isEmpty()) {
+                    try {
+                        return Integer.parseInt(digits);
+                    } catch (NumberFormatException e) {
+                        logger.warn("Could not parse class number from className for classId: {}", classId);
+                    }
+                }
             }
-        } catch (NumberFormatException e) {
-            logger.warn("Could not parse class number from className for classId: {}", classId);
         }
-        return classId;
+        // Never fall back to classId (a DB primary key) — that would corrupt studentClass.
+        return null;
     }
 
     private void sendRegistrationEmail(String toEmail, String studentName, String username, String dob, String assessmentName) {
