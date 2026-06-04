@@ -23,6 +23,12 @@ const StudentReports = lazy(
 const StudentNavigator360Page = lazy(
   () => import('../pages/StudentDashboard/student-portal/StudentNavigator360Page')
 )
+const InsightDashboard = lazy(
+  () => import('../pages/StudentDashboard/insight/InsightDashboard')
+)
+const StudentPaymentReturn = lazy(
+  () => import('../pages/StudentDashboard/student-portal/StudentPaymentReturn')
+)
 const StudentCounsellingPage = lazy(() => import('../pages/Counselling/student/StudentCounsellingPage'))
 const SlotBookingPage = lazy(() => import('../pages/Counselling/student/SlotBookingPage'))
 const PermissionDeniedPage = lazy(() => import('../components/PermissionDeniedPage'))
@@ -167,9 +173,16 @@ const StudentRoutes: FC = () => {
           {/* Student info form — always accessible when logged in */}
           <Route path='student-info' element={<StudentInfoForm />} />
 
+          {/* Post-Razorpay return for a dashboard purchase — confirms payment and
+              routes into the unlocked dashboard. Outside the info-completed guard
+              so a returning payer always reaches the confirmation. */}
+          <Route path='payment-return' element={<StudentPaymentReturn />} />
+
           {/* Pages that require info to be completed */}
           <Route element={<StudentInfoGuard />}>
             <Route path='dashboard' element={<StudentPortalDashboard />} />
+            {/* The student's own data-driven Insight Dashboard (self mode → /dashboard/insight/me). */}
+            <Route path='insight' element={<InsightDashboard self />} />
             <Route path='navigator-360' element={<StudentNavigator360Page />} />
             <Route path='assessments' element={<StudentAssessments />} />
             <Route path='reports' element={<StudentReports />} />

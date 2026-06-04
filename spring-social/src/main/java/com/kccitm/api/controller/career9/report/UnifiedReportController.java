@@ -42,7 +42,7 @@ public class UnifiedReportController {
 
     @Autowired private ReportService reportService;
     @Autowired private AuthorizationService auth;
-    @Autowired private com.kccitm.api.service.b2c.report.pdf.PdfRenderEnqueueService pdfRenderEnqueueService;
+    @Autowired private com.kccitm.api.service.b2c.report.pdf.PdfRenderService pdfRenderService;
     @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
 
     @PostMapping("/generate-report-unified")
@@ -135,9 +135,8 @@ public class UnifiedReportController {
     }
 
     /**
-     * Re-enqueue PDF rendering for a report whose async render previously failed
-     * (or to force a re-render). Resets the report to pending and refreshes its
-     * single render job; the poller picks it up on the next tick.
+     * Re-render the PDF for a report whose render previously failed (or to force a
+     * fresh PDF). Renders synchronously via Gotenberg and updates the row.
      */
     @PostMapping("/generate-report-unified/{generatedReportId}/retry-pdf")
     @PreAuthorize("@auth.allows('generated_report.create')")
@@ -147,10 +146,21 @@ public class UnifiedReportController {
                 return ResponseEntity.badRequest().body(Map.<String, Object>of(
                         "status", "error", "message", "Report has no HTML to render"));
             }
-            gr.setPdfStatus("pending");
-            generatedReportRepository.save(gr);
-            pdfRenderEnqueueService.enqueue(gr.getGeneratedReportId(), gr.getReportUrl());
-            return ResponseEntity.ok(Map.<String, Object>of("status", "ok", "pdfStatus", "pending"));
+            try {
+                String pdfUrl = pdfRenderService.renderAndUpload(gr.getReportUrl());
+                gr.setPdfUrl(pdfUrl);
+                gr.setPdfStatus("ready");
+                generatedReportRepository.save(gr);
+                return ResponseEntity.ok(Map.<String, Object>of(
+                        "status", "ok", "pdfStatus", "ready", "pdfUrl", pdfUrl));
+            } catch (Exception e) {
+                gr.setPdfStatus("failed");
+                generatedReportRepository.save(gr);
+                logger.error("Manual PDF re-render failed for generatedReportId={}", generatedReportId, e);
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.<String, Object>of(
+                        "status", "error", "pdfStatus", "failed",
+                        "message", e.getMessage() == null ? "PDF render failed" : e.getMessage()));
+            }
         }).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.<String, Object>of(
                 "status", "error", "message", "Report not found")));
     }

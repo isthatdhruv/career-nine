@@ -62,10 +62,9 @@ services:
   # staging backend lives on a DIFFERENT network, also attach that network below
   # (a service can join multiple networks) so both can resolve `gotenberg`.
   #
-  # Contention control (set in each backend's env, NOT here): keep the combined
-  # in-flight renders comfortable for one instance, e.g.
-  #   production : PDF_RENDER_MAX_CONCURRENT=4
-  #   staging    : PDF_RENDER_MAX_CONCURRENT=1   (so staging can't starve prod)
+  # PDFs render synchronously during report generation; concurrent load on this
+  # instance is just however many generate requests run at once across both
+  # backends. Bump the memory limit if you generate very large cohorts in parallel.
   gotenberg:
     image: gotenberg/gotenberg:8
     restart: unless-stopped

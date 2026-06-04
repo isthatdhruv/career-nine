@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../modules/auth/core/Auth";
 import { ReadStudentByIdData } from "../../StudentRegistration/Student_APIs";
+import {
+  getDashboardCheckoutOptions,
+  createDashboardCheckoutLink,
+  DashboardTierOption,
+} from "./checkoutApi";
 import "./StudentPortalDashboard.css";
 
 type Plan = {
@@ -197,8 +202,31 @@ const StudentPortalDashboard: React.FC = () => {
     price: string;
     priceNum: number;
     navigator: NavigatorId;
+    tierId?: number;
   } | null>(null);
+  // Real purchasable dashboard tiers for this logged-in student (empty when the
+  // student has no campaign context, e.g. school-funded). Drives whether the
+  // pricing buttons trigger a real Razorpay checkout vs. show an unavailable note.
+  const [dashboardTiers, setDashboardTiers] = useState<DashboardTierOption[]>([]);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const confettiCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getDashboardCheckoutOptions()
+      .then((res) => {
+        if (!cancelled) setDashboardTiers(res.data?.options || []);
+      })
+      .catch(() => {
+        // No options (not a B2C student / no campaign) — buttons fall back to an
+        // "online purchase unavailable" message rather than a fake success.
+        if (!cancelled) setDashboardTiers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const original = document.title;
@@ -260,35 +288,68 @@ const StudentPortalDashboard: React.FC = () => {
     }, 300);
   }
 
+  // Pick the real purchasable tier closest in price to the marketing plan the
+  // student clicked (the static plans are illustrative; the charge is always a
+  // real backend tier). Falls back to the only/first available tier.
+  function resolveTierFor(plan: Plan): DashboardTierOption | null {
+    if (dashboardTiers.length === 0) return null;
+    return dashboardTiers.reduce((best, t) =>
+      Math.abs(t.priceInr - plan.priceNum) < Math.abs(best.priceInr - plan.priceNum) ? t : best
+    );
+  }
+
   function openPayment(plan: Plan, nav: NavigatorId) {
-    setSelectedPlan({ name: plan.name, price: plan.price, priceNum: plan.priceNum, navigator: nav });
+    setCheckoutError(null);
+    const tier = resolveTierFor(plan);
+    // When a real tier exists, show its true name/price so the modal matches what
+    // will actually be charged; otherwise show the marketing plan as-is.
+    setSelectedPlan({
+      name: tier ? tier.name : plan.name,
+      price: tier ? tier.priceInr.toLocaleString("en-IN") : plan.price,
+      priceNum: tier ? tier.priceInr : plan.priceNum,
+      navigator: nav,
+      tierId: tier?.campaignAssessmentTierId,
+    });
     setPaymentOpen(true);
   }
 
   function processPayment() {
     if (!selectedPlan) return;
-    const w = window as unknown as { Razorpay?: new (opts: Record<string, unknown>) => { open: () => void } };
-    if (typeof w.Razorpay !== "undefined") {
-      const rzp = new w.Razorpay({
-        key: "rzp_live_XXXXXXXXXXXXXXX",
-        amount: selectedPlan.priceNum * 100,
-        currency: "INR",
-        name: "Career-9",
-        description: `${selectedPlan.name} Plan - ${
-          selectedPlan.navigator.charAt(0).toUpperCase() + selectedPlan.navigator.slice(1)
-        } Navigator`,
-        handler: () => {
-          setPaymentOpen(false);
-          showSuccess();
-        },
-        prefill: { name: studentName },
-        theme: { color: "#1a6b3c" },
-      });
-      rzp.open();
-    } else {
-      setPaymentOpen(false);
-      setTimeout(showSuccess, 400);
+    setCheckoutError(null);
+    if (!selectedPlan.tierId) {
+      setCheckoutError(
+        "Online purchase isn't available for your account yet. Please contact support to unlock your dashboard."
+      );
+      return;
     }
+    setCheckoutBusy(true);
+    const returnUrl = `${window.location.origin}/student/payment-return`;
+    createDashboardCheckoutLink(selectedPlan.tierId, returnUrl)
+      .then((res) => {
+        const url = res.data?.shortUrl;
+        if (url) {
+          // Stash the link id so the return page can confirm payment even if
+          // Razorpay's redirect query is stripped. The return page then polls
+          // until the entitlement activates and routes into the dashboard.
+          if (res.data?.razorpayLinkId) {
+            try {
+              localStorage.setItem("c9_pending_dashboard_checkout", res.data.razorpayLinkId);
+            } catch {
+              /* ignore storage failures */
+            }
+          }
+          // Hand off to Razorpay's hosted checkout. On return, the webhook will
+          // have activated the entitlement and the dashboard gate unlocks.
+          window.location.href = url;
+        } else {
+          setCheckoutBusy(false);
+          setCheckoutError("Could not start checkout. Please try again.");
+        }
+      })
+      .catch((err) => {
+        setCheckoutBusy(false);
+        setCheckoutError(err?.response?.data?.error || "Could not start checkout. Please try again.");
+      });
   }
 
   function showSuccess() {
@@ -952,8 +1013,12 @@ const StudentPortalDashboard: React.FC = () => {
             ideal career path.
           </p>
           <div className="popup-price-display">₹ {selectedPlan?.price || "3,599"}</div>
-          <button className="popup-pay-btn" onClick={processPayment}>
-            <i className="fas fa-lock" /> Proceed to Payment
+          {checkoutError && (
+            <div style={{ color: "#b91c1c", fontSize: 13, marginBottom: 10 }}>{checkoutError}</div>
+          )}
+          <button className="popup-pay-btn" onClick={processPayment} disabled={checkoutBusy}>
+            <i className="fas fa-lock" />{" "}
+            {checkoutBusy ? "Starting checkout…" : "Proceed to Payment"}
           </button>
           <div className="popup-secure">
             <i className="fas fa-shield-alt" /> Secured by Razorpay · 100% Safe Payment

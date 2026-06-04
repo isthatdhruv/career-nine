@@ -87,6 +87,12 @@ export function getAllStudentInfo() {
     return axios.get<StudentInfo[]>(`${STUDENT_INFO_BASE}/getAll`);
 }
 
+// Returns the subset of the given userStudentIds that have at least one successfully
+// generated report. Used to gate the "Dashboard" button on the group-student listing.
+export function getStudentsWithGeneratedReport(userStudentIds: number[]) {
+    return axios.post<number[]>(`${API_URL}/generated-reports/exists/by-students`, { userStudentIds });
+}
+
 export function addStudentInfo(student: StudentInfo) {
     return axios.post<StudentInfo>(`${STUDENT_INFO_BASE}/add`, student);
 }

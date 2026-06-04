@@ -26,6 +26,7 @@ import {
   getRoleGroupCatalog,
   StudentRoleGroupRef,
   StudentRoleGroupDetail,
+  getStudentsWithGeneratedReport,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
 import { getEntitlementsByStudent, EntitlementSummary } from "../B2C/API/Tracker_APIs";
@@ -145,6 +146,11 @@ export default function GroupStudentPage() {
   // Report generation (one-click)
   const [reportGeneratingFor, setReportGeneratingFor] = useState<number | null>(null); // assessmentId being generated
   const [generatedReportUrls, setGeneratedReportUrls] = useState<Map<string, string>>(new Map()); // key: "userStudentId-assessmentId" -> reportUrl
+
+  // userStudentIds that have at least one successfully generated report. Drives
+  // visibility of the row-level "Dashboard" button — students with no report don't
+  // get a dashboard. Refreshed (single bulk call) whenever the student list changes.
+  const [studentsWithReport, setStudentsWithReport] = useState<Set<number>>(new Set());
 
   // ── Send Email modal state ──
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -615,6 +621,30 @@ export default function GroupStudentPage() {
       setResetting(false);
     }
   };
+
+  // Whenever the student list changes, find which of them have a generated report
+  // (single bulk call) so we can show the "Dashboard" button only for those students.
+  useEffect(() => {
+    const ids = students.map((s) => s.userStudentId).filter((id): id is number => !!id);
+    if (ids.length === 0) {
+      setStudentsWithReport(new Set());
+      return;
+    }
+    let cancelled = false;
+    getStudentsWithGeneratedReport(ids)
+      .then((res) => {
+        if (!cancelled) setStudentsWithReport(new Set(res.data || []));
+      })
+      .catch((error) => {
+        console.error("Error checking report existence for students:", error);
+        // On failure, leave the set empty — buttons stay hidden rather than linking
+        // to an empty dashboard.
+        if (!cancelled) setStudentsWithReport(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [students]);
 
   useEffect(() => {
     // Fetch assessments (only active ones) — the hook narrows this down per institute.
@@ -2768,6 +2798,7 @@ export default function GroupStudentPage() {
                                 <ActionIcon type="edit" size="sm" />
                                 Edit
                               </button>
+                              {studentsWithReport.has(student.userStudentId) && (
                               <button
                                 className="btn btn-sm d-flex align-items-center gap-1"
                                 onClick={() => {
@@ -2776,7 +2807,7 @@ export default function GroupStudentPage() {
                                     name: student.name ?? "",
                                     dob: student.studentDob ?? "",
                                   });
-                                  window.open(`/student/dashboard-preview?${params.toString()}`, "_blank");
+                                  window.open(`/student/insight-dashboard?${params.toString()}`, "_blank");
                                 }}
                                 style={{
                                   background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
@@ -2794,6 +2825,7 @@ export default function GroupStudentPage() {
                                 <i className="bi bi-speedometer2"></i>
                                 Dashboard
                               </button>
+                              )}
                               <button
                                 className="btn btn-sm d-flex align-items-center gap-1"
                                 onClick={() => handleOpenThankYou(student)}
