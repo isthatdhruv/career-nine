@@ -115,6 +115,12 @@ export function bookCounsellingSlot(body: {
   entitlementId: number | string
   slotId: number
   reason?: string
+  // Basic contact details captured on the booking form. Name + phone are
+  // required by the backend; email and preferred method are optional.
+  contactName: string
+  contactPhone: string
+  contactEmail?: string
+  preferredContactMethod?: 'EMAIL' | 'PHONE' | 'WHATSAPP'
 }) {
   return http.post('/campaign/public/counselling/book', body)
 }

@@ -1018,6 +1018,7 @@ public class CampaignPublicController {
             dto.put("startTime", s.getStartTime().toString());
             dto.put("endTime", s.getEndTime().toString());
             dto.put("durationMinutes", s.getDurationMinutes());
+            dto.put("mode", s.getMode() != null ? s.getMode() : "ONLINE");
             if (s.getCounsellor() != null) {
                 dto.put("counsellorName", s.getCounsellor().getName());
             }
@@ -1047,8 +1048,18 @@ public class CampaignPublicController {
         Long slotId = longFromBody(body, "slotId");
         String reason = strFromBody(body, "reason");
 
+        // Basic contact details the student fills in when booking.
+        String contactName = strFromBody(body, "contactName");
+        String contactEmail = strFromBody(body, "contactEmail");
+        String contactPhone = strFromBody(body, "contactPhone");
+        String preferredContactMethod = strFromBody(body, "preferredContactMethod");
+
         if (slotId == null) {
             return ResponseEntity.badRequest().body("slotId is required");
+        }
+        if (contactName == null || contactName.trim().isEmpty()
+                || contactPhone == null || contactPhone.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Contact name and phone are required");
         }
 
         StudentEntitlement e = entitlementService == null
@@ -1079,8 +1090,14 @@ public class CampaignPublicController {
         }
 
         try {
+            com.kccitm.api.service.counselling.BookingService.BookingContact contact =
+                    new com.kccitm.api.service.counselling.BookingService.BookingContact(
+                            contactName != null ? contactName.trim() : null,
+                            contactEmail != null ? contactEmail.trim() : null,
+                            contactPhone != null ? contactPhone.trim() : null,
+                            preferredContactMethod != null ? preferredContactMethod.trim() : null);
             com.kccitm.api.model.career9.counselling.CounsellingAppointment appt =
-                    bookingService.bookSlot(slotId, student, reason);
+                    bookingService.bookSlot(slotId, student, reason, contact);
             // Decrement the seat counter on the entitlement. Runs in the same
             // transaction as the booking via Spring's default REQUIRED propagation
             // — if the post-booking save fails, the slot transition rolls back too.
@@ -1089,6 +1106,9 @@ public class CampaignPublicController {
             Map<String, Object> out = new HashMap<>();
             out.put("appointmentId", appt.getId());
             out.put("status", appt.getStatus());
+            out.put("mode", appt.getMode());
+            if (appt.getMeetingLink() != null) out.put("meetingLink", appt.getMeetingLink());
+            if (appt.getLocation() != null) out.put("location", appt.getLocation());
             if (appt.getSlot() != null) {
                 out.put("slotDate", appt.getSlot().getDate().toString());
                 out.put("slotStartTime", appt.getSlot().getStartTime().toString());

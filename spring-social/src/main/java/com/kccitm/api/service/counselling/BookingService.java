@@ -38,6 +38,9 @@ public class BookingService {
     private CounsellingNotificationService notificationService;
 
     @Autowired
+    private MeetingLinkService meetingLinkService;
+
+    @Autowired
     private AuditLogService auditLogService;
 
     @Autowired
@@ -92,13 +95,41 @@ public class BookingService {
     }
 
     /**
+     * Basic contact details the student supplies when booking. All fields are
+     * optional at the service layer; the controller decides what is required.
+     */
+    public static class BookingContact {
+        public String name;
+        public String email;
+        public String phone;
+        public String preferredContactMethod; // EMAIL | PHONE | WHATSAPP
+
+        public BookingContact() {}
+
+        public BookingContact(String name, String email, String phone, String preferredContactMethod) {
+            this.name = name;
+            this.email = email;
+            this.phone = phone;
+            this.preferredContactMethod = preferredContactMethod;
+        }
+    }
+
+    /** Backwards-compatible overload — books with no extra contact details. */
+    @Transactional
+    public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason) {
+        return bookSlot(slotId, student, reason, null);
+    }
+
+    /**
      * Books a slot for the given student.
      * Verifies the slot is AVAILABLE, transitions it to REQUESTED,
      * creates an appointment with the counsellor auto-assigned from the slot,
-     * and fires notifications.
+     * snapshots the delivery mode (ONLINE/OFFLINE) and the corresponding
+     * meeting link or office address, stores the student's contact details,
+     * and fires a mode-aware confirmation notification.
      */
     @Transactional
-    public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason) {
+    public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason, BookingContact contact) {
         logger.info("Student {} attempting to book slot {}", student.getUserStudentId(), slotId);
 
         CounsellingSlot slot = slotRepository.findById(slotId)
@@ -126,13 +157,38 @@ public class BookingService {
         appointment.setCounsellor(slot.getCounsellor());
         appointment.setStudentReason(reason);
         appointment.setStatus("CONFIRMED");
+
+        // Snapshot the delivery mode from the slot, then attach the channel the
+        // student needs: an auto-generated meeting link for ONLINE, the
+        // counsellor's office address for OFFLINE.
+        String mode = slot.getMode() != null ? slot.getMode() : "ONLINE";
+        appointment.setMode(mode);
+        if ("OFFLINE".equals(mode)) {
+            String address = slot.getCounsellor() != null ? slot.getCounsellor().getOfficeAddress() : null;
+            appointment.setLocation(address);
+        } else {
+            String link = meetingLinkService.generateMeetLink(appointment);
+            appointment.setMeetingLink(link);
+            appointment.setMeetingLinkSource("AUTO");
+        }
+
+        // Store the contact details the student filled in at booking.
+        if (contact != null) {
+            appointment.setStudentContactName(contact.name);
+            appointment.setStudentContactEmail(contact.email);
+            appointment.setStudentContactPhone(contact.phone);
+            appointment.setPreferredContactMethod(contact.preferredContactMethod);
+        }
+
         appointment = appointmentRepository.save(appointment);
 
-        logger.info("Created appointment {} for student {} on slot {}",
-                appointment.getId(), student.getUserStudentId(), slotId);
+        logger.info("Created appointment {} for student {} on slot {} (mode={})",
+                appointment.getId(), student.getUserStudentId(), slotId, mode);
 
-        // Send booking received email
-        notificationService.sendBookingReceivedEmail(appointment);
+        // Auto-confirmed at booking — send the mode-aware confirmation
+        // (meeting link for ONLINE / office address for OFFLINE) plus a calendar
+        // (.ics) invite by email and a best-effort WhatsApp confirmation.
+        notificationService.sendConfirmationWithCalendar(appointment);
 
         // Send in-app notification to student — UserStudent stores userId (Long),
         // not a User entity. We build a lightweight User reference using the stored userId.
@@ -141,9 +197,10 @@ public class BookingService {
             studentUser.setId(student.getUserId());
             notificationService.createInAppNotification(
                     studentUser,
-                    "BOOKING_RECEIVED",
-                    "Counselling Request Received",
-                    "Your counselling request has been received and is under review.",
+                    "BOOKING_CONFIRMED",
+                    "Counselling Session Confirmed",
+                    "Your counselling session has been booked. Check your email for the "
+                            + ("OFFLINE".equals(mode) ? "venue address." : "meeting link."),
                     appointment.getId(),
                     "APPOINTMENT");
         } catch (Exception e) {

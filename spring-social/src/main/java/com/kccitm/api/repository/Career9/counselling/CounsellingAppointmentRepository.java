@@ -48,6 +48,27 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
     @Query("SELECT COUNT(a) FROM CounsellingAppointment a WHERE a.status = :status")
     Long countByStatus(@Param("status") String status);
 
+    // Reminder scheduler: confirmed appointments whose slot date falls in the
+    // window [start, end]. The scheduler then computes minutes-until-start in
+    // Java and decides which offsets (12h/4h/2h/15m) are due. A 12h offset can
+    // reach into tomorrow, so callers pass [today, today+1].
+    @Query("SELECT a FROM CounsellingAppointment a WHERE a.status = 'CONFIRMED' " +
+           "AND a.slot.date BETWEEN :start AND :end")
+    List<CounsellingAppointment> findConfirmedBetween(
+            @Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    // 8pm day-before digest: all confirmed appointments for a given date.
+    @Query("SELECT a FROM CounsellingAppointment a WHERE a.status = 'CONFIRMED' " +
+           "AND a.slot.date = :date ORDER BY a.counsellor.id ASC, a.slot.startTime ASC")
+    List<CounsellingAppointment> findConfirmedOnDate(@Param("date") LocalDate date);
+
+    // Dashboard summary: count by counsellor + status across a date window.
+    @Query("SELECT COUNT(a) FROM CounsellingAppointment a WHERE a.counsellor.id = :counsellorId " +
+           "AND a.status = :status AND a.slot.date BETWEEN :start AND :end")
+    Long countByCounsellorAndStatusInRange(
+            @Param("counsellorId") Long counsellorId, @Param("status") String status,
+            @Param("start") LocalDate start, @Param("end") LocalDate end);
+
     @Query("SELECT COUNT(a) FROM CounsellingAppointment a WHERE a.status NOT IN ('CANCELLED', 'RESCHEDULED') " +
            "AND a.slot.date BETWEEN :start AND :end")
     Long countActiveInWeek(@Param("start") LocalDate start, @Param("end") LocalDate end);

@@ -24,6 +24,7 @@ interface ProfileForm {
   bio: string
   languagesSpoken: string
   modeCapability: string
+  officeAddress: string
   qualifications: string
   yearsOfExperience: string
   linkedinProfile: string
@@ -44,7 +45,7 @@ const CounsellorProfilePage: React.FC = () => {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null)
   const [form, setForm] = useState<ProfileForm>({
     name: '', email: '', phone: '', specializations: '', bio: '',
-    languagesSpoken: '', modeCapability: 'BOTH', qualifications: '',
+    languagesSpoken: '', modeCapability: 'BOTH', officeAddress: '', qualifications: '',
     yearsOfExperience: '', linkedinProfile: '', maxSessionsPerDay: '',
     hourlyRatePreference: '', govtIdLast4: '', bankName: '', bankAccount: '', bankIfsc: '', bankBranch: '',
   })
@@ -73,6 +74,7 @@ const CounsellorProfilePage: React.FC = () => {
             bio: d?.bio || '',
             languagesSpoken: d?.languagesSpoken || '',
             modeCapability: d?.modeCapability || 'BOTH',
+            officeAddress: d?.officeAddress || '',
             qualifications: d?.qualifications || '',
             yearsOfExperience: d?.yearsOfExperience ? String(d.yearsOfExperience) : '',
             linkedinProfile: d?.linkedinProfile || '',
@@ -121,6 +123,7 @@ const CounsellorProfilePage: React.FC = () => {
         bio: form.bio.trim(),
         languagesSpoken: form.languagesSpoken.trim(),
         modeCapability: form.modeCapability,
+        officeAddress: form.officeAddress.trim(),
         qualifications: form.qualifications.trim(),
         yearsOfExperience: form.yearsOfExperience ? Number(form.yearsOfExperience) : null,
         linkedinProfile: form.linkedinProfile.trim(),
@@ -299,6 +302,19 @@ const CounsellorProfilePage: React.FC = () => {
                 onChange={(e) => setForm({ ...form, yearsOfExperience: e.target.value })} style={inputStyle} />
             </div>
           </div>
+          {form.modeCapability !== 'ONLINE' && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>
+                Office Address {form.modeCapability === 'OFFLINE' ? '*' : ''}
+              </label>
+              <textarea value={form.officeAddress} placeholder='Full address shared with students for in-person (offline) sessions'
+                onChange={(e) => setForm({ ...form, officeAddress: e.target.value })}
+                style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} />
+              <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 5 }}>
+                Sent to the student in their confirmation email when they book an in-person session with you.
+              </div>
+            </div>
+          )}
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Qualifications</label>
             <textarea value={form.qualifications} placeholder='e.g. M.Ed in Counselling Psychology'

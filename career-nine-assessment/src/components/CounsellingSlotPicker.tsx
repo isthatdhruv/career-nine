@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { bookCounsellingSlot, listCounsellingSlots } from '../api-clients/campaignAPI'
 
+type SessionMode = 'ONLINE' | 'OFFLINE'
+
 type Slot = {
   slotId: number
   date: string         // yyyy-MM-dd
@@ -8,6 +10,7 @@ type Slot = {
   endTime: string      // HH:mm:ss
   durationMinutes: number
   counsellorName?: string
+  mode?: SessionMode   // delivery mode set by the counsellor on the slot
 }
 
 type BookingResult = {
@@ -17,7 +20,12 @@ type BookingResult = {
   slotStartTime?: string
   counsellorName?: string
   sessionsRemaining?: number
+  mode?: SessionMode
+  meetingLink?: string // present for ONLINE bookings
+  location?: string    // present for OFFLINE bookings
 }
+
+type ContactMethod = 'EMAIL' | 'PHONE' | 'WHATSAPP'
 
 type Props = {
   accessToken: string
@@ -27,6 +35,11 @@ type Props = {
   /** Called with the server response after a successful booking. The host page
    *  uses this to refresh upgradeInfo and swap the CTA tile for a confirmation. */
   onBooked: (result: BookingResult) => void
+  /** Optional prefill for the contact form, if the host page already knows the
+   *  student's details from the entitlement/registration. */
+  defaultName?: string
+  defaultEmail?: string
+  defaultPhone?: string
 }
 
 // Format yyyy-MM-dd as e.g. "Tue, 17 Jun".
@@ -72,6 +85,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   sessionsRemaining,
   onClose,
   onBooked,
+  defaultName = '',
+  defaultEmail = '',
+  defaultPhone = '',
 }) => {
   const [from, setFrom] = useState<string>(todayIso())
   const [slots, setSlots] = useState<Slot[]>([])
@@ -81,6 +97,17 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   const [reason, setReason] = useState<string>('')
   const [booking, setBooking] = useState<boolean>(false)
   const [bookError, setBookError] = useState<string>('')
+
+  // Basic contact details — captured once a slot is selected.
+  const [contactName, setContactName] = useState<string>(defaultName)
+  const [contactEmail, setContactEmail] = useState<string>(defaultEmail)
+  const [contactPhone, setContactPhone] = useState<string>(defaultPhone)
+  const [preferredMethod, setPreferredMethod] = useState<ContactMethod>('PHONE')
+
+  const selectedSlot = useMemo(
+    () => slots.find((s) => s.slotId === selectedSlotId) || null,
+    [slots, selectedSlotId],
+  )
 
   // Group slots by date for rendering. Preserves the server's ordering within a date.
   const grouped = useMemo(() => {
@@ -118,6 +145,10 @@ const CounsellingSlotPicker: React.FC<Props> = ({
 
   const handleConfirm = async () => {
     if (selectedSlotId == null || booking) return
+    if (!contactName.trim() || !contactPhone.trim()) {
+      setBookError('Please enter your name and phone number.')
+      return
+    }
     setBooking(true)
     setBookError('')
     try {
@@ -126,6 +157,10 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         entitlementId,
         slotId: selectedSlotId,
         reason: reason.trim() || undefined,
+        contactName: contactName.trim(),
+        contactPhone: contactPhone.trim(),
+        contactEmail: contactEmail.trim() || undefined,
+        preferredContactMethod: preferredMethod,
       })
       onBooked(res.data as BookingResult)
     } catch (err: any) {
@@ -268,6 +303,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                           {s.counsellorName}
                         </div>
                       )}
+                      <div style={modeBadgeStyle(s.mode === 'OFFLINE', isSelected)}>
+                        {s.mode === 'OFFLINE' ? 'In-person' : 'Online'}
+                      </div>
                     </button>
                   )
                 })}
@@ -275,15 +313,80 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             </div>
           ))}
 
-          {/* Reason textarea — shown once a slot is picked */}
+          {/* Contact details + reason — shown once a slot is picked */}
           {selectedSlotId != null && (
             <div style={{ marginTop: 8 }}>
+              {/* Mode notice — tells the student how the session will be delivered */}
+              <div style={modeNoticeStyle(selectedSlot?.mode === 'OFFLINE')}>
+                {selectedSlot?.mode === 'OFFLINE'
+                  ? '📍 In-person session — the venue address will be sent to you by email.'
+                  : '💻 Online session — the meeting link will be sent to you by email.'}
+              </div>
+
+              <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600, margin: '12px 0 8px' }}>
+                Your contact details
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Full name <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type='text'
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    placeholder='Your full name'
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Phone <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type='tel'
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder='10-digit mobile number'
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Email <span style={{ color: '#94A3B8' }}>(optional)</span>
+                  </label>
+                  <input
+                    type='email'
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder='you@example.com'
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={fieldLabelStyle}>Preferred contact method</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {(['PHONE', 'WHATSAPP', 'EMAIL'] as ContactMethod[]).map((m) => (
+                      <button
+                        key={m}
+                        type='button'
+                        onClick={() => setPreferredMethod(m)}
+                        style={methodChipStyle(preferredMethod === m)}
+                      >
+                        {m === 'PHONE' ? 'Phone call' : m === 'WHATSAPP' ? 'WhatsApp' : 'Email'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <label
                 style={{
                   display: 'block',
                   fontSize: '0.85rem',
                   color: '#334155',
-                  marginBottom: 6,
+                  margin: '14px 0 6px',
                   fontWeight: 500,
                 }}
               >
@@ -328,8 +431,8 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           <button
             type='button'
             onClick={handleConfirm}
-            disabled={selectedSlotId == null || booking}
-            style={btnPrimaryStyle(selectedSlotId == null || booking)}
+            disabled={selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim()}
+            style={btnPrimaryStyle(selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim())}
           >
             {booking ? 'Booking…' : 'Confirm booking'}
           </button>
@@ -368,6 +471,59 @@ function navBtnStyle(disabled: boolean): React.CSSProperties {
     borderRadius: 8,
     fontSize: '0.82rem',
     cursor: disabled ? 'not-allowed' : 'pointer',
+  }
+}
+
+function modeBadgeStyle(offline: boolean, selected: boolean): React.CSSProperties {
+  return {
+    display: 'inline-block',
+    marginTop: 6,
+    padding: '1px 7px',
+    borderRadius: 999,
+    fontSize: '0.66rem',
+    fontWeight: 700,
+    letterSpacing: '0.02em',
+    background: selected ? 'rgba(255,255,255,0.22)' : offline ? '#FEF3C7' : '#E0E7FF',
+    color: selected ? '#fff' : offline ? '#92400E' : '#3730A3',
+  }
+}
+
+const modeNoticeStyle = (offline: boolean): React.CSSProperties => ({
+  background: offline ? '#FFFBEB' : '#EEF2FF',
+  border: `1px solid ${offline ? '#FDE68A' : '#C7D2FE'}`,
+  color: offline ? '#92400E' : '#3730A3',
+  padding: '0.55rem 0.7rem',
+  borderRadius: 8,
+  fontSize: '0.8rem',
+})
+
+const fieldLabelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.8rem',
+  color: '#475569',
+  marginBottom: 4,
+  fontWeight: 500,
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0.55rem 0.7rem',
+  borderRadius: 8,
+  border: '1px solid #CBD5E1',
+  fontSize: '0.9rem',
+  fontFamily: 'inherit',
+}
+
+function methodChipStyle(selected: boolean): React.CSSProperties {
+  return {
+    background: selected ? 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' : '#fff',
+    color: selected ? '#fff' : '#334155',
+    border: selected ? '1px solid transparent' : '1px solid #CBD5E1',
+    padding: '0.4rem 0.8rem',
+    borderRadius: 8,
+    fontSize: '0.82rem',
+    fontWeight: 500,
+    cursor: 'pointer',
   }
 }
 

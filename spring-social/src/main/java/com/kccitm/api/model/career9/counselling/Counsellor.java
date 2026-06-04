@@ -71,6 +71,12 @@ public class Counsellor implements Serializable {
     @Column(name = "mode_capability", length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'BOTH'")
     private String modeCapability = "BOTH";
 
+    // Physical address shared with the student for OFFLINE sessions. Required
+    // before the counsellor can offer offline slots; copied onto the appointment
+    // (and into the confirmation email) at booking time.
+    @Column(name = "office_address", columnDefinition = "TEXT")
+    private String officeAddress;
+
     @Column(name = "qualifications", columnDefinition = "TEXT")
     private String qualifications;
 
@@ -246,6 +252,9 @@ public class Counsellor implements Serializable {
 
     public String getModeCapability() { return modeCapability; }
     public void setModeCapability(String modeCapability) { this.modeCapability = modeCapability; }
+
+    public String getOfficeAddress() { return officeAddress; }
+    public void setOfficeAddress(String officeAddress) { this.officeAddress = officeAddress; }
 
     public String getQualifications() { return qualifications; }
     public void setQualifications(String qualifications) { this.qualifications = qualifications; }

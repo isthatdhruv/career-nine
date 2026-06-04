@@ -70,6 +70,9 @@ public class AvailabilityTemplateController {
             if (updated.getDefaultSlotDuration() != null) {
                 existing.setDefaultSlotDuration(updated.getDefaultSlotDuration());
             }
+            if (updated.getMode() != null) {
+                existing.setMode(updated.getMode());
+            }
             logger.info("Updating availability template with id: {}", id);
             return ResponseEntity.ok(templateRepository.save(existing));
         }).orElse(ResponseEntity.notFound().build());

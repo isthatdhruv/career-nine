@@ -9,6 +9,9 @@ import {
   confirmAppointment,
   declineAppointment,
   cancelAppointment,
+  startSession,
+  verifyCheckin,
+  getDashboardSummary,
 } from '../API/AppointmentAPI'
 import { getCounsellorByUserId } from '../API/CounsellorAPI'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
@@ -22,9 +25,15 @@ const CounsellorDashboardPage: React.FC = () => {
 
   const [counsellor, setCounsellor] = useState<any>(null)
   const [appointments, setAppointments] = useState<any[]>([])
+  const [summary, setSummary] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('schedule')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Per-appointment check-in UI state: whether a code was sent + the typed code.
+  const [otpSent, setOtpSent] = useState<Record<number, boolean>>({})
+  const [otpCode, setOtpCode] = useState<Record<number, string>>({})
+  const [checkinMsg, setCheckinMsg] = useState<Record<number, string>>({})
 
   // Phase 19: userId resolves from useAuth().currentUser only — the legacy
   // localStorage JSON-blob fallback is gone.
@@ -44,6 +53,13 @@ const CounsellorDashboardPage: React.FC = () => {
 
         const apptRes = await getCounsellorAppointments(counsellorData.id)
         setAppointments(apptRes.data || [])
+
+        try {
+          const sumRes = await getDashboardSummary(counsellorData.id)
+          setSummary(sumRes.data)
+        } catch {
+          // summary is best-effort — fall back to client-computed stats
+        }
       } catch {
         setError('Failed to load dashboard data. Please refresh.')
       } finally {
@@ -66,8 +82,37 @@ const CounsellorDashboardPage: React.FC = () => {
     try {
       const res = await getCounsellorAppointments(counsellor.id)
       setAppointments(res.data || [])
+      getDashboardSummary(counsellor.id).then((r) => setSummary(r.data)).catch(() => {})
     } catch {
       // silent refresh failure
+    }
+  }
+
+  // ── Session check-in (OTP) ──
+  const handleStartSession = async (appointmentId: number) => {
+    try {
+      await startSession(appointmentId)
+      setOtpSent((p) => ({ ...p, [appointmentId]: true }))
+      setCheckinMsg((p) => ({ ...p, [appointmentId]: 'Code sent to the student. Ask them for it.' }))
+    } catch (e: any) {
+      const body = e?.response?.data
+      showErrorToast(typeof body === 'string' ? body : 'Could not start the session.')
+    }
+  }
+
+  const handleVerifyCheckin = async (appointmentId: number) => {
+    const code = (otpCode[appointmentId] || '').trim()
+    if (!code) {
+      setCheckinMsg((p) => ({ ...p, [appointmentId]: 'Enter the code shared with the student.' }))
+      return
+    }
+    try {
+      await verifyCheckin(appointmentId, code)
+      setCheckinMsg((p) => ({ ...p, [appointmentId]: '' }))
+      await refreshAppointments()
+    } catch (e: any) {
+      const body = e?.response?.data
+      setCheckinMsg((p) => ({ ...p, [appointmentId]: typeof body === 'string' ? body : 'Verification failed.' }))
     }
   }
 
@@ -129,13 +174,21 @@ const CounsellorDashboardPage: React.FC = () => {
 
   const pendingAppointments = appointments.filter((a) => a.status === 'ASSIGNED')
 
-  // ── Stats ──
-  const stats = [
-    { label: "Today's Sessions", value: todaySchedule.length },
-    { label: 'Pending Confirmation', value: pendingAppointments.length },
-    { label: 'Completed', value: appointments.filter((a) => a.status === 'COMPLETED').length },
-    { label: 'Total Assigned', value: appointments.length },
-  ]
+  // ── Stats ── (prefer the server summary; fall back to client-computed)
+  const stats = summary
+    ? [
+        { label: "Today's Sessions", value: summary.todayCount ?? todaySchedule.length },
+        { label: 'Booked Slots (7d)', value: summary.bookedSlotsThisWeek ?? 0 },
+        { label: 'Free Slots (7d)', value: summary.freeSlotsThisWeek ?? 0 },
+        { label: 'Upcoming', value: summary.upcomingCount ?? 0 },
+        { label: 'Completed', value: summary.completedCount ?? 0 },
+      ]
+    : [
+        { label: "Today's Sessions", value: todaySchedule.length },
+        { label: 'Pending Confirmation', value: pendingAppointments.length },
+        { label: 'Completed', value: appointments.filter((a) => a.status === 'COMPLETED').length },
+        { label: 'Total Assigned', value: appointments.length },
+      ]
 
   if (loading) {
     return (
@@ -221,13 +274,66 @@ const CounsellorDashboardPage: React.FC = () => {
           ) : (
             <div>
               {todaySchedule.map((appt) => (
-                <ScheduleCard
-                  key={appt.id}
-                  appointment={appt}
-                  onConfirm={handleConfirm}
-                  onDecline={handleDecline}
-                  onCancel={handleCancel}
-                />
+                <div key={appt.id} style={{ marginBottom: 12 }}>
+                  <ScheduleCard
+                    appointment={appt}
+                    onConfirm={handleConfirm}
+                    onDecline={handleDecline}
+                    onCancel={handleCancel}
+                  />
+                  {/* Session check-in (OTP) — only for confirmed sessions not yet checked in */}
+                  {(appt.status === 'CONFIRMED') && !appt.attended && (
+                    <div className='cl-card' style={{ marginTop: 6, padding: '12px 16px', background: 'var(--sp-bg, #F2F7F5)' }}>
+                      {!otpSent[appt.id] ? (
+                        <button
+                          className='cl-btn-primary'
+                          style={{ fontSize: 13, padding: '6px 14px' }}
+                          onClick={() => handleStartSession(appt.id)}
+                        >
+                          Start session (send check-in code)
+                        </button>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                          <input
+                            type='text'
+                            inputMode='numeric'
+                            maxLength={6}
+                            placeholder='6-digit code'
+                            value={otpCode[appt.id] || ''}
+                            onChange={(e) =>
+                              setOtpCode((p) => ({ ...p, [appt.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))
+                            }
+                            style={{ padding: '7px 10px', border: '1.5px solid var(--sp-border, #D1E5DF)', borderRadius: 8, fontSize: 14, width: 130 }}
+                          />
+                          <button
+                            className='cl-btn-primary'
+                            style={{ fontSize: 13, padding: '6px 14px' }}
+                            onClick={() => handleVerifyCheckin(appt.id)}
+                          >
+                            Verify &amp; start
+                          </button>
+                          <button
+                            className='cl-btn-secondary'
+                            style={{ fontSize: 12, padding: '6px 12px' }}
+                            onClick={() => handleStartSession(appt.id)}
+                          >
+                            Resend code
+                          </button>
+                        </div>
+                      )}
+                      {checkinMsg[appt.id] && (
+                        <div style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 6 }}>
+                          {checkinMsg[appt.id]}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {appt.status === 'IN_PROGRESS' && (
+                    <div style={{ fontSize: 12, color: 'var(--sp-primary, #0C6B5A)', margin: '6px 4px 0', fontWeight: 600 }}>
+                      ✓ Checked in — session in progress
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}

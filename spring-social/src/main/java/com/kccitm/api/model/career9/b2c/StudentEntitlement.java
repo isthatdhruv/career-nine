@@ -124,6 +124,13 @@ public class StudentEntitlement implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     private Date reportPreparedAt;
 
+    // Set when the "you have counselling sessions left to book" nudge has been
+    // sent, so the scheduler sends it at most once per entitlement.
+    @Column(name = "counselling_nudge_sent_at")
+    @Temporal(TemporalType.TIMESTAMP)
+    @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
+    private Date counsellingNudgeSentAt;
+
     @PrePersist
     public void prePersist() {
         Date now = new Date();
@@ -193,4 +200,6 @@ public class StudentEntitlement implements Serializable {
     public void setUpdatedAt(Date v) { this.updatedAt = v; }
     public Date getReportPreparedAt() { return reportPreparedAt; }
     public void setReportPreparedAt(Date v) { this.reportPreparedAt = v; }
+    public Date getCounsellingNudgeSentAt() { return counsellingNudgeSentAt; }
+    public void setCounsellingNudgeSentAt(Date v) { this.counsellingNudgeSentAt = v; }
 }

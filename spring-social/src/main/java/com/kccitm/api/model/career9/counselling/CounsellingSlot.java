@@ -54,6 +54,11 @@ public class CounsellingSlot implements Serializable {
     @Column(name = "status", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'AVAILABLE'")
     private String status = "AVAILABLE";
 
+    // Delivery mode for this slot: ONLINE | OFFLINE. Inherited from the
+    // availability template on materialization, or set directly for manual slots.
+    @Column(name = "mode", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'ONLINE'")
+    private String mode = "ONLINE";
+
     @JsonProperty("isManuallyCreated")
     @Column(name = "is_manually_created", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean isManuallyCreated = false;
@@ -77,6 +82,7 @@ public class CounsellingSlot implements Serializable {
         if (this.status == null) this.status = "AVAILABLE";
         if (this.isManuallyCreated == null) this.isManuallyCreated = false;
         if (this.isBlocked == null) this.isBlocked = false;
+        if (this.mode == null) this.mode = "ONLINE";
     }
 
     public CounsellingSlot() {
@@ -146,6 +152,14 @@ public class CounsellingSlot implements Serializable {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getMode() {
+        return mode;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode;
     }
 
     @JsonProperty("isManuallyCreated")

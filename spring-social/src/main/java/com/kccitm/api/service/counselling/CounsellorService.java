@@ -70,6 +70,9 @@ public class CounsellorService {
         if (updated.getModeCapability() != null) {
             existing.setModeCapability(updated.getModeCapability());
         }
+        if (updated.getOfficeAddress() != null) {
+            existing.setOfficeAddress(updated.getOfficeAddress());
+        }
         if (updated.getQualifications() != null) {
             existing.setQualifications(updated.getQualifications());
         }

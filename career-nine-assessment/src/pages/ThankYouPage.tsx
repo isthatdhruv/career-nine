@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
 import { TierCard, Tier } from '../components/TierCard';
@@ -106,6 +106,9 @@ const ThankYouPage: React.FC = () => {
     // remaining via /upgrade-info and re-renders the CTA correctly.
     const [isSlotPickerOpen, setIsSlotPickerOpen] = useState<boolean>(false);
     const [bookedAppointment, setBookedAppointment] = useState<BookedAppointment | null>(null);
+    // Ensures the slot picker auto-opens at most once per page mount (so the
+    // student isn't trapped re-opening it after they deliberately close it).
+    const autoOpenedPickerRef = useRef<boolean>(false);
     // Which per-feature upsell modal is open, if any. Set by the "Add <feature>"
     // cards; cleared on close / choose. Choosing a tier inside the modal reuses
     // the existing handleChoosePlan navigation — same /upgrade route, same
@@ -157,6 +160,22 @@ const ThankYouPage: React.FC = () => {
             .catch(() => setUpgradeInfo(null))
             .finally(() => setUpgradeInfoLoaded(true));
     }, []);
+
+    // Best-flow: when the student has active counselling with sessions still to
+    // book (paid-first Path A, or returning from payment on Path B), open the
+    // session picker automatically so choosing a time is a guided step rather
+    // than a button they might miss. Fires once per mount and is fully skippable
+    // — closing it leaves them on the thank-you page to book later.
+    useEffect(() => {
+        if (!upgradeInfoLoaded || !upgradeInfo || autoOpenedPickerRef.current) return;
+        const remaining =
+            (upgradeInfo.counsellingSessionsTotal ?? 0) - (upgradeInfo.counsellingSessionsUsed ?? 0);
+        const canBook = !!upgradeInfo.counsellingActive && !!upgradeInfo.accessToken && remaining > 0;
+        if (canBook && !bookedAppointment) {
+            autoOpenedPickerRef.current = true;
+            setIsSlotPickerOpen(true);
+        }
+    }, [upgradeInfoLoaded, upgradeInfo, bookedAppointment]);
 
     // Once upgrade-info is loaded, if the entitlement is already active (the
     // student paid in advance, Path A — or upgraded from Path B), eagerly
@@ -735,6 +754,19 @@ const ThankYouPage: React.FC = () => {
                                             }}
                                         >
                                             <div style={{
+                                                display: 'inline-block',
+                                                background: 'rgba(255,255,255,0.25)',
+                                                color: '#fff',
+                                                fontSize: '0.62rem',
+                                                fontWeight: 800,
+                                                letterSpacing: '0.08em',
+                                                padding: '2px 10px',
+                                                borderRadius: 999,
+                                                marginBottom: '0.6rem',
+                                            }}>
+                                                NEXT STEP
+                                            </div>
+                                            <div style={{
                                                 width: '42px',
                                                 height: '42px',
                                                 borderRadius: '10px',
@@ -752,7 +784,7 @@ const ThankYouPage: React.FC = () => {
                                                 </svg>
                                             </div>
                                             <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
-                                                Book Counselling
+                                                Choose your counselling time
                                             </h3>
                                             <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
                                                 {counsellingRemainingFromUpgradeInfo} session{counsellingRemainingFromUpgradeInfo === 1 ? '' : 's'} ready to book
@@ -885,6 +917,9 @@ const ThankYouPage: React.FC = () => {
                     sessionsRemaining={counsellingRemainingFromUpgradeInfo}
                     onClose={handleSlotPickerClose}
                     onBooked={handleSlotBooked}
+                    defaultName={upgradeInfo.student?.name}
+                    defaultEmail={upgradeInfo.student?.email}
+                    defaultPhone={upgradeInfo.student?.phone}
                 />
             )}
 

@@ -21,6 +21,7 @@ interface Template {
   startTime: string
   endTime: string
   slotDuration: number
+  mode?: 'ONLINE' | 'OFFLINE'
 }
 
 interface RecurringTemplateFormProps {
@@ -38,6 +39,7 @@ const RecurringTemplateForm: React.FC<RecurringTemplateFormProps> = ({
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('17:00')
   const [slotDuration, setSlotDuration] = useState(60)
+  const [mode, setMode] = useState<'ONLINE' | 'OFFLINE'>('ONLINE')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -59,11 +61,13 @@ const RecurringTemplateForm: React.FC<RecurringTemplateFormProps> = ({
         startTime,
         endTime,
         slotDuration,
+        mode,
       })
       setDayOfWeek('Monday')
       setStartTime('09:00')
       setEndTime('17:00')
       setSlotDuration(60)
+      setMode('ONLINE')
       onSaved()
     } catch {
       setError('Failed to save template. Please try again.')
@@ -111,7 +115,7 @@ const RecurringTemplateForm: React.FC<RecurringTemplateFormProps> = ({
                   {t.dayOfWeek}
                 </span>
                 <span style={{ fontSize: 13, color: 'var(--sp-muted, #5C7A72)', marginLeft: 8 }}>
-                  {t.startTime} – {t.endTime} &middot; {t.slotDuration} min slots
+                  {t.startTime} – {t.endTime} &middot; {t.slotDuration} min slots &middot; {t.mode === 'OFFLINE' ? 'In-person' : 'Online'}
                 </span>
               </div>
               <button
@@ -226,7 +230,37 @@ const RecurringTemplateForm: React.FC<RecurringTemplateFormProps> = ({
               }}
             />
           </div>
+
+          <div>
+            <label
+              style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--sp-muted, #5C7A72)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}
+            >
+              Session Mode
+            </label>
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as 'ONLINE' | 'OFFLINE')}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                border: '1.5px solid var(--sp-border, #D1E5DF)',
+                borderRadius: 8,
+                fontSize: 14,
+                background: '#fff',
+                color: 'var(--sp-text, #1A2B28)',
+              }}
+            >
+              <option value='ONLINE'>Online (auto meeting link)</option>
+              <option value='OFFLINE'>In-person (office address)</option>
+            </select>
+          </div>
         </div>
+
+        {mode === 'OFFLINE' && (
+          <p style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginBottom: 10 }}>
+            In-person slots share your office address with the student. Make sure it is set on your profile.
+          </p>
+        )}
 
         {error && (
           <p style={{ fontSize: 13, color: 'var(--sp-danger, #EF4444)', marginBottom: 10 }}>{error}</p>

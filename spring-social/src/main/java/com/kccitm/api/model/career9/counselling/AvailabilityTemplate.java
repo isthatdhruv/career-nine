@@ -46,6 +46,10 @@ public class AvailabilityTemplate implements Serializable {
     @Column(name = "default_slot_duration", nullable = false)
     private Integer defaultSlotDuration;
 
+    // Delivery mode for slots generated from this template: ONLINE | OFFLINE.
+    @Column(name = "mode", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'ONLINE'")
+    private String mode = "ONLINE";
+
     @JsonProperty("isActive")
     @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean isActive = true;
@@ -62,6 +66,7 @@ public class AvailabilityTemplate implements Serializable {
         if (this.createdAt == null) this.createdAt = now;
         this.updatedAt = now;
         if (this.isActive == null) this.isActive = true;
+        if (this.mode == null) this.mode = "ONLINE";
     }
 
     @PreUpdate
@@ -120,6 +125,14 @@ public class AvailabilityTemplate implements Serializable {
 
     public void setDefaultSlotDuration(Integer defaultSlotDuration) {
         this.defaultSlotDuration = defaultSlotDuration;
+    }
+
+    public String getMode() {
+        return mode;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode;
     }
 
     @JsonProperty("isActive")
