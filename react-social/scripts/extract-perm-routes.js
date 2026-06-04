@@ -43,9 +43,18 @@ function extract() {
     .replace(/\/\/[^\n]*/g, "");
 
   // <Route path="X" ... element={<RequirePermission perm="Y" ...>...
-  // The `[\s\S]*?` in the middle handles attribute reordering and line wraps.
-  const re =
-    /<Route\b[\s\S]*?\bpath\s*=\s*(["'`])([^"'`]+?)\1[\s\S]*?<RequirePermission\b[\s\S]*?\bperm\s*=\s*(["'`])([^"'`]+?)\3/g;
+  // The tempered `(?:(?!<Route\b)[\s\S])*?` segments handle attribute reordering
+  // and line wraps while refusing to cross into the *next* <Route. Without the
+  // tempering, a redirect route (<Route ... element={<Navigate/>}>, no
+  // RequirePermission) would borrow the following route's perm and mask the
+  // real route — e.g. the /reports route sitting after a block of /roles/*
+  // <Navigate> redirects.
+  const NOT_ROUTE = "(?:(?!<Route\\b)[\\s\\S])*?";
+  const re = new RegExp(
+    `<Route\\b${NOT_ROUTE}\\bpath\\s*=\\s*(["'\`])([^"'\`]+?)\\1` +
+    `${NOT_ROUTE}<RequirePermission\\b${NOT_ROUTE}\\bperm\\s*=\\s*(["'\`])([^"'\`]+?)\\3`,
+    "g"
+  );
 
   const map = {};
   let m;

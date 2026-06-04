@@ -171,6 +171,9 @@ const PrivateRoutes = () => {
   const StudentPortalDashboard = lazy(
     () => import("../pages/StudentDashboard/student-portal/StudentPortalDashboard")
   );
+  const InsightDashboard = lazy(
+    () => import("../pages/StudentDashboard/insight/InsightDashboard")
+  );
   const StudentInfoForm = lazy(
     () => import("../pages/StudentDashboard/student-portal/StudentInfoForm")
   );
@@ -296,6 +299,18 @@ const PrivateRoutes = () => {
         <RequirePermission perm="student.read">
           <SuspensedView>
             <StudentPortalDashboard />
+          </SuspensedView>
+        </RequirePermission>
+      } />
+
+      {/* Real per-student assessment Insight Dashboard (data-driven, per engine).
+          Opened by the admin group-student "Dashboard" button for students who have
+          a generated report. Layout-free (no Metronic aside) so the new tab shows
+          only the dashboard. Reads ?studentId=&assessmentId=&name= */}
+      <Route path="/student/insight-dashboard" element={
+        <RequirePermission perm="generated_report.read">
+          <SuspensedView>
+            <InsightDashboard />
           </SuspensedView>
         </RequirePermission>
       } />

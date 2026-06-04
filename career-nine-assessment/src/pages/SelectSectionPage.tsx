@@ -92,7 +92,7 @@ const SelectSectionPage: React.FC = () => {
             const partial = await restorePartialAnswers(
               Number(userStudentId), Number(assessmentId),
             );
-            const answeredIds = collectAnsweredQuestionIds(partial?.data);
+            const answeredIds = collectAnsweredQuestionIds(partial);
             const target = findNextUnansweredSection(assessmentData[0], answeredIds);
             if (target) {
               navigate(

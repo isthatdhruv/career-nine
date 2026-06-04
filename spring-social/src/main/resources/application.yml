@@ -191,14 +191,12 @@ app:
       cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
       endpoint: https://sgp1.digitaloceanspaces.com
   # Server-side report PDF rendering (Gotenberg = headless Chromium microservice).
+  # The PDF is rendered synchronously during report generation, so no poller/queue
+  # tuning is needed — just the renderer endpoint.
   gotenberg:
     url: ${GOTENBERG_URL:http://localhost:3000}
     # seconds Chromium waits after load for client-side charts to settle
     wait-delay: ${GOTENBERG_WAIT_DELAY:2}
-  pdf-render:
-    poll-ms: ${PDF_RENDER_POLL_MS:3000}              # poller tick
-    max-concurrent: ${PDF_RENDER_MAX_CONCURRENT:4}   # global in-flight cap (protect Gotenberg)
-    lease-seconds: ${PDF_RENDER_LEASE_SECONDS:180}   # stale-RENDERING recovery window
   rate-limit:
     enabled: true
     ip-per-minute: 10
