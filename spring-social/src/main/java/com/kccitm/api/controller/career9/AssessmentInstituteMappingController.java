@@ -116,6 +116,9 @@ public class AssessmentInstituteMappingController {
     private PaymentTransactionRepository paymentTransactionRepository;
 
     @Autowired
+    private com.kccitm.api.service.PaymentTransactionWriter paymentTransactionWriter;
+
+    @Autowired
     private PromoCodeRepository promoCodeRepository;
 
     @Autowired
@@ -209,9 +212,12 @@ public class AssessmentInstituteMappingController {
         return ResponseEntity.ok("Mapping deleted successfully");
     }
 
-    // ----- Pricing tiers (unprotected, matching sibling mapping admin endpoints) -----
+    // ----- Pricing tiers (admin) — protected with the same permission family as the
+    //       sibling mapping CRUD endpoints so the enforce-mode flip can't leave tier
+    //       pricing world-writable by any authenticated user. -----
 
     @GetMapping("/{mappingId}/tiers")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
     public ResponseEntity<?> listTiers(@PathVariable Long mappingId) {
         if (!mappingRepository.existsById(mappingId)) {
             return ResponseEntity.notFound().build();
@@ -220,6 +226,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @PostMapping("/{mappingId}/tiers")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.create')")
     public ResponseEntity<?> createTier(@PathVariable Long mappingId,
             @RequestBody AssessmentMappingTier tier) {
         if (!mappingRepository.existsById(mappingId)) {
@@ -245,6 +252,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @PutMapping("/tiers/{tierId}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.update')")
     public ResponseEntity<?> updateTier(@PathVariable Long tierId,
             @RequestBody AssessmentMappingTier updated) {
         Optional<AssessmentMappingTier> existingOpt = tierRepository.findById(tierId);
@@ -278,6 +286,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @PatchMapping("/tiers/{tierId}/toggle")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.update')")
     public ResponseEntity<?> toggleTier(@PathVariable Long tierId) {
         Optional<AssessmentMappingTier> existingOpt = tierRepository.findById(tierId);
         if (!existingOpt.isPresent()) {
@@ -289,6 +298,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @DeleteMapping("/tiers/{tierId}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.delete')")
     public ResponseEntity<?> deleteTier(@PathVariable Long tierId) {
         if (!tierRepository.existsById(tierId)) {
             return ResponseEntity.notFound().build();
@@ -298,6 +308,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @PostMapping("/tiers/{tierId}/recount")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.update')")
     public ResponseEntity<?> recountTier(@PathVariable Long tierId) {
         if (!tierRepository.existsById(tierId)) {
             return ResponseEntity.notFound().build();
@@ -499,6 +510,11 @@ public class AssessmentInstituteMappingController {
                 return ResponseEntity.badRequest().body("Promo code usage limit reached");
             }
             promoDiscountPercent = promo.getDiscountPercent();
+            // PROMO3: a misconfigured discount outside [0,100] would yield a
+            // negative/over-100% charge; reject rather than silently free-provision.
+            if (promoDiscountPercent == null || promoDiscountPercent < 0 || promoDiscountPercent > 100) {
+                return ResponseEntity.badRequest().body("Promo code is misconfigured");
+            }
             finalAmount = mappingAmount * (100 - promoDiscountPercent) / 100;
             // Integer (floor) division can drive a low price to 0 for a non-100% discount,
             // which would wrongly route the student onto the free path. Only a true 100%
@@ -506,10 +522,10 @@ public class AssessmentInstituteMappingController {
             if (promoDiscountPercent < 100 && finalAmount < 1L) {
                 finalAmount = 1L;
             }
-
-            // Increment usage
-            promo.setCurrentUses(promo.getCurrentUses() + 1);
-            promoCodeRepository.save(promo);
+            // A1/A2: do NOT consume the promo here. Consumption is deferred to the
+            // realized-redemption points (paid webhook success, or the free-commit
+            // below) via the atomic guarded tryConsume, so an abandoned/expired/
+            // failed attempt no longer burns a use.
         }
 
         // 6. Duplicate check by EMAIL
@@ -621,6 +637,10 @@ public class AssessmentInstituteMappingController {
                 userStudent.getUserStudentId(), assessmentId);
         studentAssessmentMappingRepository.save(sam);
 
+        // A1: the free registration is now realized — consume the promo (atomic,
+        // cap-guarded). No-op when no promo was applied.
+        consumePromoIfPresent(promoCodeStr);
+
         // Build response (auto-login session merged in)
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
@@ -649,21 +669,10 @@ public class AssessmentInstituteMappingController {
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
 
             String callbackUrl = callbackBaseUrl + "/payment-status";
-            String referenceId = "MAP-" + mappingId + "-" + System.currentTimeMillis()
-                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
 
-            Map<String, String> notes = new HashMap<>();
-            notes.put("mappingId", String.valueOf(mappingId));
-            notes.put("assessmentId", String.valueOf(assessmentId));
-            notes.put("instituteCode", String.valueOf(instituteCode));
-            notes.put("studentEmail", email);
-            notes.put("studentName", name);
-
-            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalAmountInr, "INR", assessmentName + " - Payment",
-                    callbackUrl, referenceId, notes);
-
-            // Create PaymentTransaction
+            // PAY1: persist a 'created' txn in its own committed transaction BEFORE
+            // the irreversible Razorpay link call, so a recoverable DB record always
+            // exists first (no orphan payable link if a later commit fails).
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mappingId);
             txn.setAmount(finalAmountInr);
@@ -674,18 +683,41 @@ public class AssessmentInstituteMappingController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
-            txn.setRazorpayLinkId((String) rzpResponse.get("linkId"));
-            txn.setPaymentLinkUrl((String) rzpResponse.get("shortUrl"));
-            txn.setShortUrl((String) rzpResponse.get("shortUrl"));
             txn.setStatus("created");
             txn.setMappingTierId(mappingTierId);
-
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
                 txn.setPromoCode(promoCodeStr.trim().toUpperCase());
                 txn.setPromoDiscountPercent(promoDiscountPercent);
             }
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
-            paymentTransactionRepository.save(txn);
+            String referenceId = "MAP-" + mappingId + "-" + txn.getTransactionId()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("mappingId", String.valueOf(mappingId));
+            notes.put("assessmentId", String.valueOf(assessmentId));
+            notes.put("instituteCode", String.valueOf(instituteCode));
+            notes.put("studentEmail", email);
+            notes.put("studentName", name);
+            // Lets the webhook recover this txn by id if the link-id update below
+            // never commits (PAY1 fallback).
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalAmountInr, "INR", assessmentName + " - Payment",
+                    callbackUrl, referenceId, notes);
+
+            // Stamp the link ids and commit again.
+            txn.setRazorpayLinkId((String) rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl((String) rzpResponse.get("shortUrl"));
+            txn.setShortUrl((String) rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            // A4: cancel any prior still-payable links for this student+assessment so a
+            // resubmit (price/promo changed) can't leave multiple chargeable links live
+            // at different amounts. Mirrors the school flow.
+            cancelPriorOutstandingLinks(email, assessmentId, txn.getTransactionId());
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "payment_required");
@@ -846,6 +878,41 @@ public class AssessmentInstituteMappingController {
     }
 
     /**
+     * A4: cancel prior still-payable ({@code created}) Razorpay links for this
+     * student+assessment (excluding the one just created), so a resubmit can't
+     * leave multiple simultaneously-chargeable links at stale prices. The
+     * cancelled status is committed in its own transaction so it survives even
+     * if the surrounding register transaction rolls back (the Razorpay cancel is
+     * irreversible regardless).
+     */
+    private void cancelPriorOutstandingLinks(String email, Long assessmentId, Long keepTxnId) {
+        if (email == null) return;
+        for (PaymentTransaction t : paymentTransactionRepository.findByStudentEmailAndAssessmentId(email, assessmentId)) {
+            if (t.getTransactionId().equals(keepTxnId)) continue;
+            if (!"created".equals(t.getStatus()) || t.getRazorpayLinkId() == null) continue;
+            try {
+                razorpayService.cancelPaymentLink(t.getRazorpayLinkId());
+                t.setStatus("cancelled");
+                paymentTransactionWriter.saveInNewTransaction(t);
+            } catch (Exception e) {
+                logger.warn("A4: could not cancel stale link {} (txn {}): {}",
+                        t.getRazorpayLinkId(), t.getTransactionId(), e.getMessage());
+            }
+        }
+    }
+
+    /** Atomically consume one promo use for a realized registration; no-op if absent/at-cap. */
+    private void consumePromoIfPresent(String promoCode) {
+        if (promoCode == null || promoCode.trim().isEmpty()) return;
+        promoCodeRepository.findByCodeIgnoreCase(promoCode.trim().toUpperCase()).ifPresent(p -> {
+            int rows = promoCodeRepository.tryConsume(p.getId());
+            if (rows == 0) {
+                logger.warn("Promo {} already at maxUses at redemption time — not consumed", promoCode);
+            }
+        });
+    }
+
+    /**
      * Send registration confirmation email with login credentials.
      */
     private void sendRegistrationEmail(String toEmail, String studentName, String username, String dob, String assessmentName) {
@@ -885,17 +952,23 @@ public class AssessmentInstituteMappingController {
      */
     private Integer parseClassNumber(Integer classId) {
         if (classId == null) return null;
-        try {
-            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
-            if (classOpt.isPresent()) {
-                String className = classOpt.get().getClassName();
-                // Try to parse as integer (e.g., "10", "12")
-                return Integer.parseInt(className.replaceAll("[^0-9]", ""));
+        Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
+        if (classOpt.isPresent()) {
+            String className = classOpt.get().getClassName();
+            if (className != null) {
+                String digits = className.replaceAll("[^0-9]", "");
+                if (!digits.isEmpty()) {
+                    try {
+                        return Integer.parseInt(digits);
+                    } catch (NumberFormatException e) {
+                        logger.warn("Could not parse class number from className for classId: {}", classId);
+                    }
+                }
             }
-        } catch (NumberFormatException e) {
-            logger.warn("Could not parse class number from className for classId: {}", classId);
         }
-        return classId; // fallback to the ID itself
+        // Never fall back to classId (a DB primary key) — that would corrupt studentClass
+        // (B2: a non-numeric class like "Nursery"/"LKG" used to persist the PK as the grade).
+        return null;
     }
 
     private static boolean sameDay(Date a, Date b) {

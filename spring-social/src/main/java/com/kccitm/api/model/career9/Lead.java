@@ -63,6 +63,13 @@ public class Lead implements Serializable {
     @Column(name = "classes_offered", length = 50)
     private String classesOffered;
 
+    // Student leads only: date of birth collected on the career-9.com student
+    // form. Becomes the student's login secret (username + DOB) when the lead is
+    // provisioned into a student account. NULL for SCHOOL/PARENT leads.
+    @Column(name = "dob")
+    @Temporal(TemporalType.DATE)
+    private Date dob;
+
     @Column(name = "extras", columnDefinition = "TEXT")
     private String extras;
 
@@ -195,6 +202,14 @@ public class Lead implements Serializable {
 
     public void setClassesOffered(String classesOffered) {
         this.classesOffered = classesOffered;
+    }
+
+    public Date getDob() {
+        return dob;
+    }
+
+    public void setDob(Date dob) {
+        this.dob = dob;
     }
 
     public String getExtras() {

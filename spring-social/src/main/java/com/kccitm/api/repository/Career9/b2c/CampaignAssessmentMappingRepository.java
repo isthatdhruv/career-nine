@@ -14,5 +14,10 @@ public interface CampaignAssessmentMappingRepository extends JpaRepository<Campa
 
     Optional<CampaignAssessmentMapping> findByCampaignIdAndAssessmentIdAndIsDeletedFalse(Long campaignId, Long assessmentId);
 
+    // Includes soft-deleted rows — used by attachAssessment to revive a previously
+    // detached mapping instead of inserting a duplicate that violates the
+    // UNIQUE(campaign_id, assessment_id) constraint (CRUD1).
+    Optional<CampaignAssessmentMapping> findByCampaignIdAndAssessmentId(Long campaignId, Long assessmentId);
+
     List<CampaignAssessmentMapping> findByAssessmentIdAndIsDeletedFalse(Long assessmentId);
 }

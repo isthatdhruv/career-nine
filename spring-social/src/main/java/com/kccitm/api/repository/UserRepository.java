@@ -37,6 +37,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.username = :username AND DATE(u.dobDate) = DATE(:dobDate)")
     Optional<User> findByUsernameAndDobDate(@Param("username") String username, @Param("dobDate") Date dobDate);
 
+    /**
+     * Lead -> student dedup key. A parent may register multiple children under
+     * the SAME email, so email alone is not unique; the (email, DOB) pair is the
+     * identity we treat as "the same student". Returns a list because the email
+     * column has no DB-level uniqueness constraint. DATE() truncation matches the
+     * day-granular semantics used by {@link #findByUsernameAndDobDate}.
+     */
+    @Query("SELECT u FROM User u WHERE u.email = :email AND DATE(u.dobDate) = DATE(:dobDate)")
+    List<User> findAllByEmailAndDobDate(@Param("email") String email, @Param("dobDate") Date dobDate);
+
     @Query(value = "SELECT u.career_nine_rollnumber FROM student_user u " +
            "JOIN student_info si ON si.user_id = u.id " +
            "WHERE si.institute_id = :instituteId AND si.school_section_id = :sectionId " +

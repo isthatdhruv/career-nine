@@ -82,6 +82,11 @@ public class StudentInfo implements Serializable {
 
     private String schoolBoard;
 
+    // The student's own school (free text from the signup form), distinct from the
+    // assigned InstituteDetail. Pre-filled from the lead; editable in the portal.
+    @Column(name = "school_name")
+    private String schoolName;
+
     private Long controlNumber;
 
     private Integer studentClass;
@@ -242,6 +247,14 @@ public class StudentInfo implements Serializable {
 
     public void setSchoolBoard(String schoolBoard) {
         this.schoolBoard = schoolBoard;
+    }
+
+    public String getSchoolName() {
+        return schoolName;
+    }
+
+    public void setSchoolName(String schoolName) {
+        this.schoolName = schoolName;
     }
 
     public Integer getStudentClass() {

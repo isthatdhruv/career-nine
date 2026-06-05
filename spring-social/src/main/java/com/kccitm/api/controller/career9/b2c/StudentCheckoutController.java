@@ -60,6 +60,7 @@ public class StudentCheckoutController {
     @Autowired private StudentEntitlementRepository studentEntitlementRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired private com.kccitm.api.service.PaymentTransactionWriter paymentTransactionWriter;
     @Autowired private RazorpayService razorpayService;
 
     @Autowired(required = false) private CampaignRepository campaignRepository;
@@ -173,8 +174,22 @@ public class StudentCheckoutController {
             String campaignName = campaignRepository.findById(ctx.campaignId)
                     .map(c -> c.getName()).orElse("Career-9");
             String description = "Career-9: " + campaignName + " — " + assessmentName + " (Dashboard)";
-            String referenceId = "DASH-" + ctx.userStudentId + "-" + tierId + "-" + System.currentTimeMillis()
-                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
+
+            // PAY1: commit a 'created' txn BEFORE the irreversible Razorpay link
+            // call so a recoverable DB record always exists first.
+            PaymentTransaction txn = new PaymentTransaction();
+            txn.setAssessmentId(ctx.assessmentId);
+            txn.setCampaignId(ctx.campaignId);
+            txn.setCampaignAssessmentTierId(tierId);
+            txn.setUserStudentId(ctx.userStudentId);
+            txn.setAmount(priceInr);
+            txn.setStudentName(studentName);
+            txn.setStudentEmail(studentEmail);
+            txn.setStudentPhone(studentPhone);
+            txn.setStatus("created");
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            String referenceId = "DASH-" + ctx.userStudentId + "-" + tierId + "-" + txn.getTransactionId();
 
             // Prefer a caller-supplied return URL so the student lands back in the
             // app they checked out from (the student portal lives on a different
@@ -197,24 +212,15 @@ public class StudentCheckoutController {
             notes.put("campaignAssessmentTierId", tierId.toString());
             notes.put("userStudentId", ctx.userStudentId.toString());
             notes.put("referenceId", referenceId);
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
 
             Map<String, String> linkResult = razorpayService.createPaymentLink(
                     priceInr, "INR", description, callbackUrl, referenceId, notes);
 
-            PaymentTransaction txn = new PaymentTransaction();
-            txn.setAssessmentId(ctx.assessmentId);
-            txn.setCampaignId(ctx.campaignId);
-            txn.setCampaignAssessmentTierId(tierId);
-            txn.setUserStudentId(ctx.userStudentId);
-            txn.setAmount(priceInr);
-            txn.setStudentName(studentName);
-            txn.setStudentEmail(studentEmail);
-            txn.setStudentPhone(studentPhone);
             txn.setRazorpayLinkId(linkResult.get("linkId"));
             txn.setPaymentLinkUrl(linkResult.get("paymentLinkUrl"));
             txn.setShortUrl(linkResult.get("shortUrl"));
-            txn.setStatus("created");
-            txn = paymentTransactionRepository.save(txn);
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
             Map<String, Object> response = new HashMap<>();
             response.put("transactionId", txn.getTransactionId());

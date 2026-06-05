@@ -37,6 +37,16 @@ public class MeResponse {
     private List<String> urls;
     private boolean superAdmin;
 
+    /**
+     * Student-portal fields — NULL for staff/admin users. Populated only when the
+     * authenticated user has a {@code UserStudent} row. The FE uses these to gate
+     * the post-login flow: {@code infoCompleted=false} routes the student to the
+     * one-time student-info form before the dashboard; {@code userStudentId} is
+     * the target id for the profile-update PUT.
+     */
+    private Long userStudentId;
+    private Boolean infoCompleted;
+
     public MeResponse() {}
 
     public MeResponse(Long id, String name, String email,
@@ -69,4 +79,8 @@ public class MeResponse {
     public void setUrls(List<String> urls) { this.urls = urls; }
     public boolean isSuperAdmin() { return superAdmin; }
     public void setSuperAdmin(boolean superAdmin) { this.superAdmin = superAdmin; }
+    public Long getUserStudentId() { return userStudentId; }
+    public void setUserStudentId(Long userStudentId) { this.userStudentId = userStudentId; }
+    public Boolean getInfoCompleted() { return infoCompleted; }
+    public void setInfoCompleted(Boolean infoCompleted) { this.infoCompleted = infoCompleted; }
 }
