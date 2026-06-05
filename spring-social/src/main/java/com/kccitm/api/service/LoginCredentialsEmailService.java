@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.kccitm.api.service.b2c.LinkBuilder;
+
 /**
  * Sends a styled "here are your login credentials" email to a student via
  * {@link OdooEmailService}.
@@ -28,6 +30,9 @@ public class LoginCredentialsEmailService {
     @Autowired
     private OdooEmailService odooEmailService;
 
+    @Autowired
+    private LinkBuilder linkBuilder;
+
     /**
      * Queue a login-credentials email to {@code recipientEmail}.
      *
@@ -47,12 +52,13 @@ public class LoginCredentialsEmailService {
             throw new IllegalArgumentException("dob (used as password) is required");
         }
         String subject = "Your Career-9 Login Credentials";
-        String html = buildEmailHtml(studentName, username, dob);
+        String dashboardLink = linkBuilder.studentLogin();
+        String html = buildEmailHtml(studentName, username, dob, dashboardLink);
         odooEmailService.sendHtmlEmail(recipientEmail, subject, html);
         logger.info("Login-credentials email queued via Odoo for {}", recipientEmail);
     }
 
-    private String buildEmailHtml(String studentName, String username, String dob) {
+    private String buildEmailHtml(String studentName, String username, String dob, String dashboardLink) {
         String safeName = escapeHtml(studentName == null || studentName.isBlank() ? "Student" : studentName);
         String firstName = safeName.contains(" ") ? safeName.substring(0, safeName.indexOf(' ')) : safeName;
 
@@ -186,7 +192,7 @@ public class LoginCredentialsEmailService {
 
             // — CTA Button —
             + "<tr><td align=\"center\" style=\"padding:28px 40px 32px;\">\n"
-            + "  <a href=\"https://dashboard.career-9.com/student/login\" style=\""
+            + "  <a href=\"" + dashboardLink + "\" style=\""
             + "    display:inline-block;padding:14px 36px;"
             + "    background:linear-gradient(135deg,#4ECDC4,#44B78B);"
             + "    color:#ffffff;font-size:15px;font-weight:700;"

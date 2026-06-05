@@ -71,7 +71,9 @@ const PayForReportPage = () => {
 
   const selectedTier = info?.tiers.find((t) => t.campaignAssessmentTierId === selectedTierId) ?? null
   const discountedPriceInr = promoApplied && selectedTier
-    ? Math.round((selectedTier.priceInr * (100 - promoApplied.discountPercent)) / 100)
+    // PRICE-FE1: floor (not round) to mirror the backend's Long integer-truncation
+    // (`originalInr * (100 - pct) / 100`), so the displayed price == the charged amount.
+    ? Math.floor((selectedTier.priceInr * (100 - promoApplied.discountPercent)) / 100)
     : (selectedTier?.priceInr ?? 0)
 
   const handleApplyPromo = async () => {

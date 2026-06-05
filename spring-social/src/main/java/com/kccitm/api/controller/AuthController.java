@@ -488,7 +488,7 @@ public class AuthController {
             urls = Collections.<String>emptyList();
         }
 
-        return ResponseEntity.ok(new MeResponse(
+        MeResponse body = new MeResponse(
                 principal.getId(),
                 displayName,
                 principal.getEmail(),
@@ -497,7 +497,17 @@ public class AuthController {
                 scopes,
                 urls,
                 principal.isSuperAdmin()
-        ));
+        );
+
+        // Student-portal gating fields (null for staff). The FE reads infoCompleted
+        // to route a freshly-provisioned student to the one-time student-info form
+        // before the dashboard, and userStudentId as the profile-update PUT target.
+        userStudentRepository.getByUserId(principal.getId()).ifPresent(us -> {
+            body.setUserStudentId(us.getUserStudentId());
+            body.setInfoCompleted(Boolean.TRUE.equals(us.getInfoCompleted()));
+        });
+
+        return ResponseEntity.ok(body);
     }
 
     private String resolveDisplayName(UserPrincipal principal) {

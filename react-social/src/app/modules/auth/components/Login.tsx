@@ -70,7 +70,11 @@ const Login = () => {
         const { data: user } = await getCurrentUser();
         setCurrentUser(user);
         if (values.mode === "student") {
-          navigate("/student/dashboard");
+          // One-time profile completion: a student whose info isn't completed yet
+          // (e.g. freshly provisioned from a website lead) fills the student-info
+          // form once before reaching the dashboard. infoCompleted comes from /auth/me.
+          const infoCompleted = (user as any)?.infoCompleted === true;
+          navigate(infoCompleted ? "/student/dashboard" : "/student/dashboard/student-info");
         }
       } catch (error: any) {
         const msg =

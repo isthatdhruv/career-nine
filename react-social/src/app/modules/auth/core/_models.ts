@@ -16,6 +16,12 @@ export interface User {
    */
   urls?: string[];
   superAdmin: boolean;
+  // Student-portal fields — present only for student users (null/absent for staff).
+  // Drive the post-login gate: infoCompleted=false routes the student to the
+  // one-time student-info form; userStudentId is the profile-update PUT target.
+  userStudentId?: number | null;
+  infoCompleted?: boolean | null;
+  phone?: string;
 }
 
 // ABAC scope row (institute / session / course / section).

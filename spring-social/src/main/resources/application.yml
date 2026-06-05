@@ -202,6 +202,15 @@ app:
     ip-per-minute: 10
     user-per-minute: 50
     window-seconds: 60
+  # Google reCAPTCHA v3 — server-side verification for public forms (/leads/capture).
+  # DISABLED until a secret is set: a blank secret makes RecaptchaService skip the
+  # check, so dev/existing traffic is unaffected. Set RECAPTCHA_SECRET to enforce.
+  # The site key is public (lives in the website form); only the SECRET goes here.
+  recaptcha:
+    secret: ${RECAPTCHA_SECRET:}
+    min-score: ${RECAPTCHA_MIN_SCORE:0.5}
+    expected-action: ${RECAPTCHA_EXPECTED_ACTION:}
+    fail-open: ${RECAPTCHA_FAIL_OPEN:true}
 
 # Phase 15 RBAC + ABAC authorization runtime mode (shared default; profiles may override).
 # `log-only` (the safe default for Phase 15 — Phase 17 flips to `enforce`):
@@ -298,6 +307,9 @@ app:
   b2c:
     frontendBaseUrl: http://localhost:3000
     assessmentBaseUrl: http://localhost:5173
+    # Institute that career-9.com student-form leads are enrolled into (LeadStudentService).
+    # Blank = create with no institute (B2C wildcard scope). Set to a valid institute_code per env.
+    leadInstituteCode: ${APP_LEAD_INSTITUTE_CODE:}
   digitalocean:
     spaces:
       access-key: ${DO_SPACES_ACCESS_KEY:DO801TH68APHQF8DFA4J}
@@ -409,6 +421,9 @@ app:
   b2c:
     frontendBaseUrl: https://staging-dashboard.career-9.com
     assessmentBaseUrl: https://staging-assessment.career-9.com
+    # Institute that career-9.com student-form leads are enrolled into (LeadStudentService).
+    # Blank = create with no institute (B2C wildcard scope). Set to a valid institute_code per env.
+    leadInstituteCode: ${APP_LEAD_INSTITUTE_CODE:}
   frontend:
     url: ${APP_FRONTEND_URL:https://staging-dashboard.career-9.com}
   # Phase 20-01: in-process rate limit (Bucket4j). Sandbox is a pre-prod soak
@@ -511,6 +526,9 @@ app:
   b2c:
     frontendBaseUrl: https://dashboard.career-9.com
     assessmentBaseUrl: https://assessment.career-9.com
+    # Institute that career-9.com student-form leads are enrolled into (LeadStudentService).
+    # Blank = create with no institute (B2C wildcard scope). Set to a valid institute_code per env.
+    leadInstituteCode: ${APP_LEAD_INSTITUTE_CODE:}
   frontend:
     url: ${APP_FRONTEND_URL:https://dashboard.career-9.com}
   # Phase 20-01: in-process rate limit (Bucket4j). Production runs behind

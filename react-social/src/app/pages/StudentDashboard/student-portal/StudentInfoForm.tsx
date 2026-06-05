@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toAbsoluteUrl } from '../../../../_metronic/helpers'
@@ -11,46 +11,82 @@ const EMAIL_REGEX = /^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 const PHONE_REGEX = /^[6-9]\d{9}$/
 const NAME_REGEX = /^[A-Za-z\s.'-]{2,60}$/
 
+const GRADES = ['6', '7', '8', '9', '10', '11', '12']
+const GENDERS = ['Male', 'Female', 'Other']
+const BOARDS = ['CBSE', 'ICSE', 'State Board', 'IB', 'IGCSE', 'NIOS', 'Other']
+
 interface FormErrors {
   name?: string
   email?: string
   phone?: string
+  grade?: string
+  gender?: string
+  schoolBoard?: string
 }
 
 const StudentInfoForm: React.FC = () => {
   const navigate = useNavigate()
   const { currentUser, setCurrentUser } = useAuth()
-  const [profile, setProfile] = useState<any>(null)
+  const [userStudentId, setUserStudentId] = useState<number | null>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [grade, setGrade] = useState('')
+  const [gender, setGender] = useState('')
+  const [schoolName, setSchoolName] = useState('')
+  const [schoolBoard, setSchoolBoard] = useState('')
   const [errors, setErrors] = useState<FormErrors>({})
+  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [apiError, setApiError] = useState('')
   const [isEditMode, setIsEditMode] = useState(false)
+  const fetchedRef = useRef(false)
 
   useEffect(() => {
-    // Phase 19 (19-02): auth gating moved to StudentAuthGuard / useAuth().
-    // We still need the student profile fields (userStudentId, infoCompleted, etc.)
-    // — these come from currentUser. Fields not yet on the canonical User type
-    // are accessed via `as any` until Phase 16 surfaces them on /auth/me.
+    // Auth gating is handled upstream (StudentInfoGate / useAuth). If somehow we
+    // land here without a session, bounce to the unified login.
     if (!currentUser) {
-      navigate('/student/login')
+      navigate('/auth')
       return
     }
 
-    const p = currentUser as any
-    setProfile(p)
-    setName(p.name || '')
-    setEmail(p.email || '')
-    setPhone(p.phone || '')
-    setIsEditMode(p.infoCompleted === true)
-
-    // Hide Metronic splash
+    // Hide Metronic splash + force light theme (student portal is standalone styled).
     const splash = document.getElementById('splash-screen')
     if (splash) splash.style.display = 'none'
     document.body.classList.remove('page-loading', 'splash-screen')
     document.documentElement.setAttribute('data-theme', 'light')
+
+    if (fetchedRef.current) return
+    fetchedRef.current = true
+
+    const usid = (currentUser as any).userStudentId ?? null
+    setUserStudentId(usid)
+
+    const prefillFrom = (p: any) => {
+      setName(p.name || '')
+      setEmail(p.email || '')
+      setPhone(p.phone || '')
+      setGrade(p.grade != null ? String(p.grade) : '')
+      setGender(p.gender || '')
+      setSchoolName(p.schoolName || '')
+      setSchoolBoard(p.schoolBoard || '')
+      setIsEditMode(p.infoCompleted === true)
+    }
+
+    if (!usid) {
+      // No userStudentId on /auth/me — pre-fill what we have and let the user fill the rest.
+      prefillFrom(currentUser)
+      setLoading(false)
+      return
+    }
+
+    // Pull the full editable profile (grade/gender/school/board pre-filled from
+    // the signup form/lead where available).
+    axios
+      .get(`${API_BASE_URL}/student-portal/my-info/${usid}`, { withCredentials: true })
+      .then(({ data }) => prefillFrom(data))
+      .catch(() => prefillFrom(currentUser))
+      .finally(() => setLoading(false))
   }, [navigate, currentUser])
 
   const validate = (): boolean => {
@@ -74,6 +110,10 @@ const StudentInfoForm: React.FC = () => {
       e.phone = 'Enter a valid 10-digit Indian mobile number'
     }
 
+    if (!grade) e.grade = 'Please select your class'
+    if (!gender) e.gender = 'Please select your gender'
+    if (!schoolBoard) e.schoolBoard = 'Please select your school board'
+
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -83,20 +123,31 @@ const StudentInfoForm: React.FC = () => {
     setApiError('')
     if (!validate()) return
 
+    if (!userStudentId) {
+      setApiError('Could not resolve your student record. Please sign in again.')
+      return
+    }
+
     setSubmitting(true)
     try {
       const res = await axios.put(
-        `${API_BASE_URL}/student-portal/update-info/${profile.userStudentId}`,
-        { name: name.trim(), email: email.trim(), phone: phone.trim() },
+        `${API_BASE_URL}/student-portal/update-info/${userStudentId}`,
+        {
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          grade,
+          gender,
+          schoolName: schoolName.trim(),
+          schoolBoard,
+        },
         { withCredentials: true }
       )
 
-      // Phase 19 (19-02): no localStorage.studentPortalProfile write. Update the
-      // in-memory currentUser via the auth context so downstream pages re-render
-      // with the new profile values. /auth/me on next bootstrap will re-hydrate
-      // from the server (the durable source of truth).
-      const updatedProfile = { ...(currentUser as any), ...profile, ...res.data }
-      setCurrentUser(updatedProfile)
+      // Update in-memory currentUser so the StudentInfoGate opens (infoCompleted=true)
+      // and downstream pages see the new values. /auth/me re-hydrates on next bootstrap.
+      const updated = { ...(currentUser as any), ...res.data, infoCompleted: true }
+      setCurrentUser(updated)
 
       navigate('/student/dashboard')
     } catch (err: any) {
@@ -107,7 +158,13 @@ const StudentInfoForm: React.FC = () => {
     }
   }
 
-  if (!profile) return null
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F7FA' }}>
+        <div style={{ color: '#6B7280', fontSize: 14 }}>Loading ...</div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#F5F7FA' }}>
@@ -198,7 +255,7 @@ const StudentInfoForm: React.FC = () => {
             </div>
 
             {/* Phone */}
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 18 }}>
               <label style={labelStyle}>
                 Phone Number <span style={{ color: '#DC2626' }}>*</span>
               </label>
@@ -206,7 +263,6 @@ const StudentInfoForm: React.FC = () => {
                 type='tel'
                 value={phone}
                 onChange={(e) => {
-                  // Only allow digits, max 10
                   const val = e.target.value.replace(/\D/g, '').slice(0, 10)
                   setPhone(val)
                   if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }))
@@ -215,6 +271,81 @@ const StudentInfoForm: React.FC = () => {
                 style={{ ...inputStyle, ...(errors.phone ? errorBorder : {}) }}
               />
               {errors.phone && <span style={errorText}>{errors.phone}</span>}
+            </div>
+
+            {/* Class / Grade */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={labelStyle}>
+                Class / Grade <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <select
+                value={grade}
+                onChange={(e) => {
+                  setGrade(e.target.value)
+                  if (errors.grade) setErrors((prev) => ({ ...prev, grade: undefined }))
+                }}
+                style={{ ...inputStyle, ...(errors.grade ? errorBorder : {}) }}
+              >
+                <option value=''>Select your class</option>
+                {GRADES.map((g) => (
+                  <option key={g} value={g}>Grade {g}</option>
+                ))}
+              </select>
+              {errors.grade && <span style={errorText}>{errors.grade}</span>}
+            </div>
+
+            {/* Gender */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={labelStyle}>
+                Gender <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <select
+                value={gender}
+                onChange={(e) => {
+                  setGender(e.target.value)
+                  if (errors.gender) setErrors((prev) => ({ ...prev, gender: undefined }))
+                }}
+                style={{ ...inputStyle, ...(errors.gender ? errorBorder : {}) }}
+              >
+                <option value=''>Select your gender</option>
+                {GENDERS.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+              {errors.gender && <span style={errorText}>{errors.gender}</span>}
+            </div>
+
+            {/* School Name */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={labelStyle}>School Name</label>
+              <input
+                type='text'
+                value={schoolName}
+                onChange={(e) => setSchoolName(e.target.value)}
+                placeholder='Enter your school name'
+                style={inputStyle}
+              />
+            </div>
+
+            {/* School Board */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={labelStyle}>
+                School Board <span style={{ color: '#DC2626' }}>*</span>
+              </label>
+              <select
+                value={schoolBoard}
+                onChange={(e) => {
+                  setSchoolBoard(e.target.value)
+                  if (errors.schoolBoard) setErrors((prev) => ({ ...prev, schoolBoard: undefined }))
+                }}
+                style={{ ...inputStyle, ...(errors.schoolBoard ? errorBorder : {}) }}
+              >
+                <option value=''>Select your board</option>
+                {BOARDS.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </select>
+              {errors.schoolBoard && <span style={errorText}>{errors.schoolBoard}</span>}
             </div>
 
             {/* Buttons */}
@@ -281,6 +412,7 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
   boxSizing: 'border-box',
   transition: 'border-color 0.15s',
+  background: '#fff',
 }
 
 const errorBorder: React.CSSProperties = {

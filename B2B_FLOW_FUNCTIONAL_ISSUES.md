@@ -68,6 +68,25 @@ The school (Flow B) registration page was moved off the dashboard app onto the a
 - **FE4 (MED) — verify fail-open** and **FE2 (LOW) — duplicate Free/Paid columns**: likely intended / cosmetic per the verifiers; left as-is.
 - **TM1–TM4** — admin tier-modal edge cases; low urgency.
 
+### Fixed this batch (2026-06-05) — shared with the B2C work (compile ✓, app context boots+serves ✓)
+| ID | Sev | Fix | File(s) |
+|---|---|---|---|
+| **W3 / W4** | HIGH | Reconcile path (`/status/{linkId}?reconcile=1` **and** the admin Tracker check-status) now routes through a proxied `@Transactional` method that takes the `findByRazorpayLinkIdForUpdate` pessimistic lock (`@Lazy self`) — no more proxy-bypass non-atomicity or double-provision race; webhook + poll + admin all serialise on one row | `PaymentWebhookController` (`reconcilePaidAndProvision`/`reconcileTerminalStatus` + `@Lazy self`), `TrackerController` |
+| **W5** | HIGH | Reconcile redrives `paid_provisioning_failed`; provisioning is idempotent (reuses an already-stamped `userStudentId` via `ensureAssessmentMapping`) so a crashed provision self-heals without duplicating the account/cap | `PaymentWebhookController` |
+| **PAY1** | HIGH | New `PaymentTransactionWriter` (`REQUIRES_NEW`) commits a `created` txn **before** the irreversible Razorpay link call; `transactionId` in `reference_id`/notes + a webhook fallback (`parseTransactionIdFromNotes`) recovers a row whose link-id update was lost | `PaymentTransactionWriter` (new), `AssessmentInstituteMappingController.createPaymentAndRedirect`, `PaymentWebhookController.handlePaymentLinkPaid` |
+| **A1 / A2** | MED | Promo `currentUses` no longer consumed at registration; deferred to realized redemption via the atomic guarded `PromoCodeRepository.tryConsume` (paid: `markPaidAndProvision` success; free: free-commit). Applied to **both** `AssessmentInstituteMappingController` and `SchoolRegistrationController` | `PromoCodeRepository` (new), `AssessmentInstituteMappingController`, `SchoolRegistrationController`, `PaymentWebhookController` |
+
+### Fixed (2026-06-05, batch 2) — B2B Tier-2 functional + authz
+| ID | Sev | Fix | File(s) |
+|---|---|---|---|
+| **A4** | HIGH | Public register now cancels prior `created` links for the same student+assessment (commit-in-own-tx) before returning — no multiple simultaneously-payable links | `AssessmentInstituteMappingController.cancelPriorOutstandingLinks` |
+| **B4** | HIGH | `batch-save` is authoritative for `(institute, session)` — deactivates every config whose class is absent from / cleared in the batch, so "unmapping" a class actually stops it being registrable | `SchoolRegistrationController.batchSaveConfigs` |
+| **B2** | MED | `parseClassNumber` null-guards `className` and returns `null` (never the PK) on a non-numeric class | `AssessmentInstituteMappingController.parseClassNumber` |
+| **PAY1 (school)** | HIGH | School `createPaymentAndRedirect` reordered to commit the txn before the Razorpay link (+ `transactionId` in notes) | `SchoolRegistrationController` |
+| **AUTH2 (partial)** | MED | The 6 tier-admin endpoints now carry `@PreAuthorize('assessment_institute_mapping.*')` (codes already seeded) → `ControllerPreAuthorizeCoverageTest` is green; the public funnel + login endpoints added to the test EXCLUSIONS with justification | `AssessmentInstituteMappingController`, `ControllerPreAuthorizeCoverageTest` |
+
+**Still deferred:** B1 (phone/email verify-vs-register key mismatch), P3/P4 (free-path recount drift / advisory cap), and the `auth.enforce-mode` flip itself (held — see B2C doc). Note `PermissionCatalogSeedCoverageTest` is **pre-existing red** on this branch (12 unseeded `reminders.*`/`report_template.*`/etc. enum codes — unrelated to this work; they need seed migrations). Also surfaced during verification: `ControllerPreAuthorizeCoverageTest` is red on this branch — the 6 tier-admin endpoints here (`createTier`/`updateTier`/`deleteTier`/`toggleTier`/`listTiers`/`recountTier`) have **no `@PreAuthorize`** (fold into the authz/enforce-mode rollout).
+
 ---
 
 ## Recommended fix order

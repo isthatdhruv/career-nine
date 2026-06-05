@@ -77,6 +77,7 @@ public class SchoolRegistrationController {
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired private com.kccitm.api.service.PaymentTransactionWriter paymentTransactionWriter;
     @Autowired private PromoCodeRepository promoCodeRepository;
     @Autowired private RazorpayService razorpayService;
     @Autowired private SmtpEmailService emailService;
@@ -131,11 +132,19 @@ public class SchoolRegistrationController {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> configs = (List<Map<String, Object>>) data.get("configs");
 
-        List<SchoolAssessmentConfig> saved = new ArrayList<>();
+        java.util.Set<Integer> submittedClassIds = new java.util.HashSet<>();
         for (Map<String, Object> c : configs) {
             Integer classId = Integer.valueOf(c.get("classId").toString());
-            Long assessmentId = Long.valueOf(c.get("assessmentId").toString());
+            Object aidObj = c.get("assessmentId");
+            // A cleared class ("-- No assessment --") is either dropped from the payload
+            // or sent with a null assessmentId — either way leave it OUT of the submitted
+            // set so the authoritative sweep below deactivates it (B4).
+            if (aidObj == null || aidObj.toString().trim().isEmpty()) {
+                continue;
+            }
+            Long assessmentId = Long.valueOf(aidObj.toString());
             Long amount = c.get("amount") != null ? Long.valueOf(c.get("amount").toString()) : null;
+            submittedClassIds.add(classId);
 
             Optional<SchoolAssessmentConfig> existing = configRepository
                     .findByInstituteCodeAndSessionIdAndClassId(instituteCode, sessionId, classId);
@@ -154,9 +163,21 @@ public class SchoolRegistrationController {
                 config.setAssessmentId(assessmentId);
                 config.setAmount(amount);
             }
-            saved.add(configRepository.save(config));
+            configRepository.save(config);
         }
-        return ResponseEntity.ok(saved);
+
+        // B4: batch-save is authoritative for (institute, session) — deactivate every
+        // existing config whose class is absent from this batch, so "unmapping" a class
+        // actually stops it being registrable (previously it stayed active + payable).
+        for (SchoolAssessmentConfig existing :
+                configRepository.findByInstituteCodeAndSessionIdOrderByClassIdAsc(instituteCode, sessionId)) {
+            if (!submittedClassIds.contains(existing.getClassId()) && Boolean.TRUE.equals(existing.getIsActive())) {
+                existing.setIsActive(false);
+                configRepository.save(existing);
+            }
+        }
+        return ResponseEntity.ok(
+                configRepository.findByInstituteCodeAndSessionIdOrderByClassIdAsc(instituteCode, sessionId));
     }
 
     @PreAuthorize("@auth.allows('school_registration.read', #instituteCode, #sessionId, null, null)")
@@ -654,6 +675,10 @@ public class SchoolRegistrationController {
                 return ResponseEntity.badRequest().body("Promo code usage limit reached");
             }
             promoDiscountPercent = promo.getDiscountPercent();
+            // PROMO3: reject a discount outside [0,100].
+            if (promoDiscountPercent == null || promoDiscountPercent < 0 || promoDiscountPercent > 100) {
+                return ResponseEntity.badRequest().body("Promo code is misconfigured");
+            }
             finalAmount = mappingAmount * (100 - promoDiscountPercent) / 100;
             // Integer (floor) division can drive a low price to 0 for a non-100% discount,
             // which would wrongly route the student onto the free path. Only a true 100%
@@ -661,9 +686,8 @@ public class SchoolRegistrationController {
             if (promoDiscountPercent < 100 && finalAmount < 1L) {
                 finalAmount = 1L;
             }
-
-            promo.setCurrentUses(promo.getCurrentUses() + 1);
-            promoCodeRepository.save(promo);
+            // A1/A2: consumption deferred to realized redemption (paid webhook
+            // success / free-commit) via atomic tryConsume — not burned here.
         }
 
         // 7. Duplicate check by email
@@ -758,6 +782,10 @@ public class SchoolRegistrationController {
                 userStudent.getUserStudentId(), assessmentId);
         studentAssessmentMappingRepository.save(sam);
 
+        // A1: the free registration is now realized — consume the promo (atomic,
+        // cap-guarded). No-op when no promo was applied.
+        consumePromoIfPresent(promoCodeStr);
+
         // 12. Build response + send email
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
@@ -821,24 +849,9 @@ public class SchoolRegistrationController {
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
 
             String callbackUrl = callbackBaseUrl + "/payment-status";
-            String referenceId = "SCHOOL-" + schoolConfigId + "-" + System.currentTimeMillis()
-                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
 
-            Map<String, String> notes = new HashMap<>();
-            notes.put("schoolConfigId", String.valueOf(schoolConfigId));
-            notes.put("assessmentId", String.valueOf(assessmentId));
-            notes.put("instituteCode", String.valueOf(instituteCode));
-            notes.put("studentEmail", email);
-            notes.put("studentName", name);
-            notes.put("classId", String.valueOf(classId));
-            if (schoolSectionId != null) notes.put("schoolSectionId", String.valueOf(schoolSectionId));
-            if (studentClass != null) notes.put("studentClass", String.valueOf(studentClass));
-
-            // BUG FIX: use correct key names from RazorpayService response
-            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalAmountInr, "INR", assessmentName + " - Payment",
-                    callbackUrl, referenceId, notes);
-
+            // PAY1: commit a 'created' txn in its own transaction BEFORE the irreversible
+            // Razorpay link call, so a recoverable DB record always exists first.
             PaymentTransaction txn = new PaymentTransaction();
             txn.setSchoolConfigId(schoolConfigId);
             txn.setMappingTierId(mappingTierId);
@@ -850,18 +863,35 @@ public class SchoolRegistrationController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
-            // BUG FIX: use "linkId" and "shortUrl" (not "id" / "short_url")
-            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
-            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
-            txn.setShortUrl(rzpResponse.get("shortUrl"));
             txn.setStatus("created");
-
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
                 txn.setPromoCode(promoCodeStr.trim().toUpperCase());
                 txn.setPromoDiscountPercent(promoDiscountPercent);
             }
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
-            txn = paymentTransactionRepository.save(txn);
+            String referenceId = "SCHOOL-" + schoolConfigId + "-" + txn.getTransactionId()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("schoolConfigId", String.valueOf(schoolConfigId));
+            notes.put("assessmentId", String.valueOf(assessmentId));
+            notes.put("instituteCode", String.valueOf(instituteCode));
+            notes.put("studentEmail", email);
+            notes.put("studentName", name);
+            notes.put("classId", String.valueOf(classId));
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+            if (schoolSectionId != null) notes.put("schoolSectionId", String.valueOf(schoolSectionId));
+            if (studentClass != null) notes.put("studentClass", String.valueOf(studentClass));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalAmountInr, "INR", assessmentName + " - Payment",
+                    callbackUrl, referenceId, notes);
+
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
             // The freshly-issued link is now the only one that should be payable. Kill any
             // older still-"created" links for this same student + assessment so a reopened
@@ -969,6 +999,17 @@ public class SchoolRegistrationController {
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    /** Atomically consume one promo use for a realized registration; no-op if absent/at-cap. */
+    private void consumePromoIfPresent(String promoCode) {
+        if (promoCode == null || promoCode.trim().isEmpty()) return;
+        promoCodeRepository.findByCodeIgnoreCase(promoCode.trim().toUpperCase()).ifPresent(p -> {
+            int rows = promoCodeRepository.tryConsume(p.getId());
+            if (rows == 0) {
+                logger.warn("Promo {} already at maxUses at redemption time — not consumed", promoCode);
+            }
+        });
     }
 
     private Integer parseClassNumber(Integer classId) {

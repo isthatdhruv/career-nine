@@ -147,13 +147,17 @@ http.interceptors.response.use(
   async (error: AxiosError) => {
     const config = error.config as (AxiosRequestConfig & { __retryCount?: number }) | undefined
 
-    console.log(
-      '[ASSESS-SESSION-DEBUG] interceptor error url=' + (config?.url ?? 'n/a') +
-      ' method=' + (config?.method ?? 'n/a') +
-      ' status=' + (error.response?.status ?? 'no-response') +
-      ' cookieAuthRuntimeActive=' + cookieAuthRuntimeActive +
-      ' cookies=' + (typeof document !== 'undefined' ? document.cookie : 'n/a')
-    )
+    // TOK2: never log document.cookie — it exposes the JS-readable cn_csrf token
+    // to anyone with console access (shared/kiosk assessment devices). Gate the
+    // remaining debug output behind DEV so it doesn't ship in production builds.
+    if (import.meta.env?.DEV) {
+      console.log(
+        '[ASSESS-SESSION-DEBUG] interceptor error url=' + (config?.url ?? 'n/a') +
+        ' method=' + (config?.method ?? 'n/a') +
+        ' status=' + (error.response?.status ?? 'no-response') +
+        ' cookieAuthRuntimeActive=' + cookieAuthRuntimeActive
+      )
+    }
 
     // 1) Retry on network / 5xx with exponential backoff.
     if (config) {

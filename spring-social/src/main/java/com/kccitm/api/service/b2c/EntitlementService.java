@@ -101,6 +101,20 @@ public class EntitlementService {
         StudentEntitlement entitlement = entitlementRepository.findByPaymentTransactionId(paymentTransactionId)
                 .orElseGet(() -> findOrCreateForUpgrade(txn));
 
+        // ENT-ACT / WEL1: idempotent — a webhook retry or reconcile race that re-runs
+        // activation for an entitlement already activated by THIS payment must not
+        // re-snapshot or re-send the welcome email.
+        if ("active".equals(entitlement.getStatus())
+                && paymentTransactionId.equals(entitlement.getPaymentTransactionId())) {
+            return entitlement;
+        }
+        // STATE1: never resurrect a revoked/refunded entitlement through a (re)payment webhook.
+        if ("revoked".equals(entitlement.getStatus()) || "refunded".equals(entitlement.getStatus())) {
+            logger.warn("activateOnPayment: refusing to reactivate {} entitlement {}",
+                    entitlement.getStatus(), entitlement.getEntitlementId());
+            return entitlement;
+        }
+
         applyTierSnapshot(entitlement, txn);
         entitlement.setStatus("active");
         entitlement.setGrantedAt(new Date());
@@ -110,7 +124,10 @@ public class EntitlementService {
         }
         entitlement = entitlementRepository.save(entitlement);
 
-        sendWelcomeAssessmentLink(entitlement, txn);
+        // WEL1: send the welcome email only once (guards against re-activation / redrive).
+        if (notificationDispatcher.countSent(entitlement.getEntitlementId(), "assessment_invite") == 0) {
+            sendWelcomeAssessmentLink(entitlement, txn);
+        }
         return entitlement;
     }
 
@@ -202,6 +219,10 @@ public class EntitlementService {
         Optional<StudentEntitlement> opt = entitlementRepository.findById(entitlementId);
         if (!opt.isPresent()) return null;
         StudentEntitlement e = opt.get();
+        // STATE1: idempotent — a refunded/already-revoked entitlement stays terminal.
+        if ("revoked".equals(e.getStatus()) || "refunded".equals(e.getStatus())) {
+            return e;
+        }
         e.setStatus("revoked");
         e.setDashboardActive(false);
         e.setCounsellingActive(false);
@@ -217,9 +238,21 @@ public class EntitlementService {
         Optional<StudentEntitlement> opt = entitlementRepository.findById(entitlementId);
         if (!opt.isPresent()) return null;
         StudentEntitlement e = opt.get();
+        // STATE1: only an active entitlement can be extended — silently writing future
+        // dates onto a revoked/refunded/expired row was misleading and ineffective.
+        if (!"active".equals(e.getStatus())) {
+            logger.warn("extendExpiry: refusing to extend {} entitlement {}", e.getStatus(), entitlementId);
+            return e;
+        }
         e.setExpiresAt(newExpiresAt);
         if (Boolean.TRUE.equals(e.getDashboardActive())) e.setDashboardExpiresAt(newExpiresAt);
         if (Boolean.TRUE.equals(e.getLmsActive())) e.setLmsExpiresAt(newExpiresAt);
+        // Keep the access token alive at least as long as the extended service window,
+        // otherwise the magic links 401 before the new expiry.
+        if (e.getAccessTokenExpiresAt() == null
+                || (newExpiresAt != null && e.getAccessTokenExpiresAt().before(newExpiresAt))) {
+            e.setAccessTokenExpiresAt(newExpiresAt);
+        }
         return entitlementRepository.save(e);
     }
 
@@ -229,6 +262,14 @@ public class EntitlementService {
         if (!opt.isPresent()) return new ResendResult(false, "Entitlement not found");
         StudentEntitlement e = opt.get();
         if (!"active".equals(e.getStatus())) return new ResendResult(false, "Entitlement not active");
+
+        // Always deliver to the entitlement's OWN student — never a caller-supplied
+        // recipient. These links embed a live access token (final report / dashboard
+        // SSO); emailing one to an arbitrary address would exfiltrate another
+        // student's report + a working bearer credential. The `recipient` arg is
+        // intentionally ignored.
+        String studentEmail = resolveStudentEmail(e);
+        if (studentEmail == null) return new ResendResult(false, "Student has no email on file");
 
         String token = e.getAccessToken();
         if (token == null) {
@@ -280,8 +321,16 @@ public class EntitlementService {
             default:
                 return new ResendResult(false, "Unknown service type: " + serviceType);
         }
-        notificationDispatcher.sendEmail(e, recipient, serviceType, subject, body, link);
+        notificationDispatcher.sendEmail(e, studentEmail, serviceType, subject, body, link);
         return new ResendResult(true, "Sent");
+    }
+
+    /** Resolves the entitlement's student email; null when no student/email is on file. */
+    private String resolveStudentEmail(StudentEntitlement e) {
+        if (e.getUserStudentId() == null) return null;
+        UserStudent us = userStudentRepository.findById(e.getUserStudentId()).orElse(null);
+        if (us == null || us.getStudentInfo() == null) return null;
+        return us.getStudentInfo().getEmail();
     }
 
     private StudentEntitlement findOrCreateForUpgrade(PaymentTransaction txn) {

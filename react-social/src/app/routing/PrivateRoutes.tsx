@@ -1,10 +1,11 @@
 import { FC, lazy, Suspense } from "react";
-import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 import { RequirePermission } from "../modules/auth";
+import { useAuth } from "../modules/auth/core/Auth";
 import CareerPage from "../pages/Career/CareerPage";
 import { CareerCreatePage, CareerEditPage } from "../pages/Career/components";
 import FacultyRegistrationDetails from "../pages/FacultyRegistration/FacultyRegistrationDetails";
@@ -119,6 +120,31 @@ const AuthorizedLayout = () => {
   // inside ALWAYS_ALLOWED simply have no <RequirePermission> wrapper — see route
   // definitions below).
   return <MasterLayout />;
+};
+
+/**
+ * Post-login gate: a student whose one-time profile step isn't done is routed to
+ * /student/dashboard/student-info before any dashboard page. `infoCompleted` comes
+ * from /auth/me (MeResponse). Non-students and super-admins pass through, and the
+ * info form itself is never gated (or it would loop).
+ */
+const StudentInfoGate: FC<WithChildren> = ({ children }) => {
+  const { currentUser } = useAuth();
+  const location = useLocation();
+  const roles = currentUser?.roles || [];
+  const isStudent = roles.some(
+    (r) => r === "STUDENT" || r === "B2C_STUDENT" || r === "ROLE_STUDENT" || r === "ROLE_B2C_STUDENT"
+  );
+  if (
+    currentUser &&
+    isStudent &&
+    !currentUser.superAdmin &&
+    currentUser.infoCompleted !== true &&
+    location.pathname !== "/student/dashboard/student-info"
+  ) {
+    return <Navigate to="/student/dashboard/student-info" replace />;
+  }
+  return <>{children}</>;
 };
 
 const PrivateRoutes = () => {
@@ -521,41 +547,53 @@ const PrivateRoutes = () => {
         } />
         <Route path="/student/dashboard" element={
           <RequirePermission perm="assessment.read">
-            <SuspensedView>
-              <StudentPortalDashboard />
-            </SuspensedView>
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalDashboard />
+              </SuspensedView>
+            </StudentInfoGate>
           </RequirePermission>
         } />
         <Route path="/student/dashboard/navigator-360" element={
           <RequirePermission perm="generated_report.read">
-            <SuspensedView>
-              <StudentPortalNavigator360 />
-            </SuspensedView>
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalNavigator360 />
+              </SuspensedView>
+            </StudentInfoGate>
           </RequirePermission>
         } />
         <Route path="/student/dashboard/assessments" element={
           <RequirePermission perm="assessment.read">
-            <SuspensedView>
-              <StudentPortalAssessments />
-            </SuspensedView>
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalAssessments />
+              </SuspensedView>
+            </StudentInfoGate>
           </RequirePermission>
         } />
         <Route path="/student/dashboard/reports" element={
           <RequirePermission perm="generated_report.read">
-            <SuspensedView>
-              <StudentPortalReports />
-            </SuspensedView>
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalReports />
+              </SuspensedView>
+            </StudentInfoGate>
           </RequirePermission>
         } />
         <Route path="/student/dashboard/counselling" element={
-          <SuspensedView>
-            <StudentCounsellingPage />
-          </SuspensedView>
+          <StudentInfoGate>
+            <SuspensedView>
+              <StudentCounsellingPage />
+            </SuspensedView>
+          </StudentInfoGate>
         } />
         <Route path="/student/dashboard/counselling/book" element={
-          <SuspensedView>
-            <SlotBookingPage />
-          </SuspensedView>
+          <StudentInfoGate>
+            <SuspensedView>
+              <SlotBookingPage />
+            </SuspensedView>
+          </StudentInfoGate>
         } />
 
         {/* Backwards-compat redirects: legacy /student/* and /dashboard/student/* paths -> new /student/dashboard/* */}

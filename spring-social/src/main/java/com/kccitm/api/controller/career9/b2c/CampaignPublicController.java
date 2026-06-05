@@ -67,6 +67,7 @@ public class CampaignPublicController {
     @Autowired private PromoCodeRepository promoCodeRepository;
     @Autowired private PromoCodeCampaignRepository promoCodeCampaignRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired private com.kccitm.api.service.PaymentTransactionWriter paymentTransactionWriter;
     @Autowired private StudentInfoRepository studentInfoRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private com.kccitm.api.repository.InstituteDetailRepository instituteDetailRepository;
@@ -296,15 +297,20 @@ public class CampaignPublicController {
                 return ResponseEntity.badRequest().body("Promo code usage limit reached");
             }
             promoDiscountPercent = promo.getDiscountPercent();
+            // PROMO3: reject a discount outside [0,100] rather than letting it
+            // produce a negative/over-100% charge that clamps into the free path.
+            if (promoDiscountPercent == null || promoDiscountPercent < 0 || promoDiscountPercent > 100) {
+                return ResponseEntity.badRequest().body("Promo code is misconfigured");
+            }
             finalInr = originalInr * (100 - promoDiscountPercent) / 100;
-            promo.setCurrentUses(promo.getCurrentUses() + 1);
-            promoCodeRepository.save(promo);
+            // A1/A2: consumption is deferred to realized redemption (paid webhook
+            // success / free-commit) via atomic tryConsume — not burned here.
             promoCodeSaved = promo.getCode();
         }
 
-        // Defensive clamp — guards against >100% promo configs or negative
-        // priceOverrideInr. A 0-priced row routes to the free-path branch
-        // below; nothing in this flow should ever charge negative money.
+        // Defensive clamp — guards against a negative priceOverrideInr. A 0-priced
+        // row routes to the free-path branch below; nothing in this flow should
+        // ever charge negative money.
         if (finalInr < 0L) {
             logger.warn("Promo math produced negative finalInr={} — clamping to 0", finalInr);
             finalInr = 0L;
@@ -639,15 +645,20 @@ public class CampaignPublicController {
                 return ResponseEntity.badRequest().body("Promo code usage limit reached");
             }
             promoDiscountPercent = promo.getDiscountPercent();
+            // PROMO3: reject a discount outside [0,100] rather than letting it
+            // produce a negative/over-100% charge that clamps into the free path.
+            if (promoDiscountPercent == null || promoDiscountPercent < 0 || promoDiscountPercent > 100) {
+                return ResponseEntity.badRequest().body("Promo code is misconfigured");
+            }
             finalInr = originalInr * (100 - promoDiscountPercent) / 100;
-            promo.setCurrentUses(promo.getCurrentUses() + 1);
-            promoCodeRepository.save(promo);
+            // A1/A2: consumption is deferred to realized redemption (paid webhook
+            // success / free-commit) via atomic tryConsume — not burned here.
             promoCodeSaved = promo.getCode();
         }
 
-        // Defensive clamp — guards against >100% promo configs or negative
-        // priceOverrideInr. A 0-priced row routes to the free-path branch
-        // below; nothing in this flow should ever charge negative money.
+        // Defensive clamp — guards against a negative priceOverrideInr. A 0-priced
+        // row routes to the free-path branch below; nothing in this flow should
+        // ever charge negative money.
         if (finalInr < 0L) {
             logger.warn("Promo math produced negative finalInr={} — clamping to 0", finalInr);
             finalInr = 0L;
@@ -666,18 +677,9 @@ public class CampaignPublicController {
             String description = pricingTier.getName() + " — " + campaign.getName();
             String callbackUrl = (callbackBaseUrl == null ? "" : callbackBaseUrl)
                     + "/payment-status?upgrade=1&eid=" + entitlement.getEntitlementId();
-            String referenceId = "UPG-" + entitlement.getEntitlementId() + "-" + System.currentTimeMillis();
 
-            Map<String, String> notes = new HashMap<>();
-            notes.put("entitlementId", String.valueOf(entitlement.getEntitlementId()));
-            notes.put("campaignId", String.valueOf(entitlement.getCampaignId()));
-            notes.put("assessmentId", String.valueOf(entitlement.getAssessmentId()));
-            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
-            notes.put("studentEmail", studentInfo.getEmail());
-
-            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalInr, "INR", description, callbackUrl, referenceId, notes);
-
+            // PAY1: commit a 'created' txn BEFORE the irreversible Razorpay link
+            // call so a recoverable DB record always exists first.
             PaymentTransaction txn = new PaymentTransaction();
             txn.setAmount(finalInr);
             txn.setOriginalAmount(originalInr);
@@ -690,15 +692,30 @@ public class CampaignPublicController {
             txn.setStudentEmail(studentInfo.getEmail());
             txn.setStudentDob(studentInfo.getStudentDob());
             txn.setStudentPhone(studentInfo.getPhoneNumber());
-            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
-            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
-            txn.setShortUrl(rzpResponse.get("shortUrl"));
             txn.setStatus("created");
             if (promoCodeSaved != null) {
                 txn.setPromoCode(promoCodeSaved);
                 txn.setPromoDiscountPercent(promoDiscountPercent);
             }
-            txn = paymentTransactionRepository.save(txn);
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            String referenceId = "UPG-" + entitlement.getEntitlementId() + "-" + txn.getTransactionId();
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("entitlementId", String.valueOf(entitlement.getEntitlementId()));
+            notes.put("campaignId", String.valueOf(entitlement.getCampaignId()));
+            notes.put("assessmentId", String.valueOf(entitlement.getAssessmentId()));
+            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
+            notes.put("studentEmail", studentInfo.getEmail());
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalInr, "INR", description, callbackUrl, referenceId, notes);
+
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "payment_required");
@@ -863,6 +880,10 @@ public class CampaignPublicController {
                             + txn.getTransactionId());
         }
 
+        // A1: the free registration is now realized — consume the promo (atomic,
+        // cap-guarded). No-op when no promo was applied.
+        consumePromoIfPresent(promoCodeSaved);
+
         // Issue the cn_at_asmnt cookie so the student is genuinely
         // authenticated server-side when they land on /allotted-assessment.
         // Without this, the assessment SPA was running purely on
@@ -902,19 +923,9 @@ public class CampaignPublicController {
         try {
             String description = pricingTier.getName() + " — " + campaign.getName();
             String callbackUrl = (callbackBaseUrl == null ? "" : callbackBaseUrl) + "/payment-status";
-            String referenceId = "CAM-" + campaign.getCampaignId() + "-" + tierMapping.getId() + "-" + System.currentTimeMillis();
 
-            Map<String, String> notes = new HashMap<>();
-            notes.put("campaignId", String.valueOf(campaign.getCampaignId()));
-            notes.put("assessmentId", String.valueOf(mapping.getAssessmentId()));
-            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
-            notes.put("studentEmail", email);
-            notes.put("customerName", name);
-            notes.put("customerDob", dobStr);
-
-            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalInr, "INR", description, callbackUrl, referenceId, notes);
-
+            // PAY1: commit a 'created' txn BEFORE the irreversible Razorpay link
+            // call so a recoverable DB record always exists first.
             PaymentTransaction txn = new PaymentTransaction();
             txn.setAmount(finalInr);
             txn.setOriginalAmount(originalInr);
@@ -925,15 +936,32 @@ public class CampaignPublicController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
-            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
-            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
-            txn.setShortUrl(rzpResponse.get("shortUrl"));
             txn.setStatus("created");
             if (promoCodeSaved != null) {
                 txn.setPromoCode(promoCodeSaved);
                 txn.setPromoDiscountPercent(promoDiscountPercent);
             }
-            txn = paymentTransactionRepository.save(txn);
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            String referenceId = "CAM-" + campaign.getCampaignId() + "-" + tierMapping.getId()
+                    + "-" + txn.getTransactionId();
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("campaignId", String.valueOf(campaign.getCampaignId()));
+            notes.put("assessmentId", String.valueOf(mapping.getAssessmentId()));
+            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
+            notes.put("studentEmail", email);
+            notes.put("customerName", name);
+            notes.put("customerDob", dobStr);
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalInr, "INR", description, callbackUrl, referenceId, notes);
+
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "payment_required");
@@ -971,6 +999,12 @@ public class CampaignPublicController {
         String token = strFromBody(body, "token");
         Long entitlementId = longFromBody(body, "entitlementId");
         String fromStr = strFromBody(body, "from");
+
+        // entitlementId is required so redeemAccessToken's token↔entitlement match
+        // is actually enforced (it is a no-op when entitlementId is null).
+        if (entitlementId == null) {
+            return ResponseEntity.badRequest().body("entitlementId is required");
+        }
 
         StudentEntitlement e = entitlementService == null
                 ? null : entitlementService.redeemAccessToken(token, entitlementId);
@@ -1047,6 +1081,11 @@ public class CampaignPublicController {
         Long slotId = longFromBody(body, "slotId");
         String reason = strFromBody(body, "reason");
 
+        // entitlementId is required so redeemAccessToken's token↔entitlement match
+        // is actually enforced (it is a no-op when entitlementId is null).
+        if (entitlementId == null) {
+            return ResponseEntity.badRequest().body("entitlementId is required");
+        }
         if (slotId == null) {
             return ResponseEntity.badRequest().body("slotId is required");
         }
@@ -1121,6 +1160,17 @@ public class CampaignPublicController {
         if (v == null) return null;
         String s = v.toString().trim();
         return s.isEmpty() ? null : s;
+    }
+
+    /** Atomically consume one promo use for a realized redemption; no-op if absent/at-cap. */
+    private void consumePromoIfPresent(String promoCode) {
+        if (promoCode == null || promoCode.trim().isEmpty()) return;
+        promoCodeRepository.findByCodeIgnoreCase(promoCode.trim().toUpperCase()).ifPresent(p -> {
+            int rows = promoCodeRepository.tryConsume(p.getId());
+            if (rows == 0) {
+                logger.warn("Promo {} already at maxUses at redemption time — not consumed", promoCode);
+            }
+        });
     }
 
     private static boolean sameDay(Date a, Date b) {
