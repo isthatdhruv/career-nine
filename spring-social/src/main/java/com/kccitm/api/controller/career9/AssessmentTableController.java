@@ -33,6 +33,8 @@ import com.kccitm.api.model.career9.AssessmentSession;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.service.AssessmentSessionService;
+import com.kccitm.api.service.branding.BrandingDto;
+import com.kccitm.api.service.branding.InstituteBrandingService;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
@@ -73,6 +75,9 @@ public class AssessmentTableController {
 
     @Autowired
     private AssessmentSessionService assessmentSessionService;
+
+    @Autowired
+    private InstituteBrandingService brandingService;
 
     // ─── Locked assessment JSON snapshot helpers ───
 
@@ -708,6 +713,21 @@ public class AssessmentTableController {
             logger.error("Error prefetching assessment data for student {}", userStudentId, e);
             return java.util.Collections.emptyList();
         }
+    }
+
+    /**
+     * Whitelabel branding for a student (post-login). Returns
+     * {@code { whitelabel, schoolName, logoUrl }} resolved from the student's institute,
+     * or the standard (whitelabel=false) payload when the student has no school or the
+     * school is not whitelabel. Gated identically to {@code /prefetch} so the assessment
+     * app — which already calls prefetch on this student — can fetch it. Drives the
+     * assessment legend logo + thank-you page logo. Not cached so an admin toggle takes
+     * effect immediately.
+     */
+    @GetMapping("/branding/{userStudentId}")
+    @PreAuthorize("@auth.allows('assessment.prefetch')")
+    public BrandingDto getStudentBranding(@PathVariable Long userStudentId) {
+        return brandingService.forUserStudent(userStudentId);
     }
 
     /**

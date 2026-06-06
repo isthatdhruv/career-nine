@@ -82,6 +82,16 @@ public class InstituteDetail implements Serializable {
     @Column(name = "school_logo", columnDefinition = "LONGBLOB")
     private byte[] schoolLogo;
 
+    /**
+     * Whitelabel: public CDN URL (DigitalOcean Spaces) of the school logo, uploaded
+     * at institute create/edit time. Used for student-facing co-branding (registration
+     * page, assessment legend, thank-you page) and emails. PNG/JPG only (email clients
+     * — notably Outlook — do not render WebP reliably). Supersedes the legacy
+     * {@link #schoolLogo} LONGBLOB, which is left untouched. Null = no school logo.
+     */
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
     // IMPORTANT FIX: Boolean instead of boolean
     @Column(name = "display")
     private Boolean display; // wrapper, can be null
@@ -101,6 +111,19 @@ public class InstituteDetail implements Serializable {
      */
     @Column(name = "assessment_cookie_auth_enabled")
     private Boolean assessmentCookieAuthEnabled;
+
+    /**
+     * Whitelabel toggle. TRUE → students linked to this institute see school co-branding
+     * (school logo replaces the Career-9 mark on the registration page, assessment legend,
+     * and thank-you page, with a grey "Powered by Career-9" subline retained) and receive
+     * co-branded credential/completion emails. NULL/FALSE → standard Career-9 experience.
+     *
+     * <p>Opt-in: defaults to FALSE (DB default 0). Unlike {@link #assessmentCookieAuthEnabled}
+     * there is intentionally NO {@code @PrePersist} default and no backfill runner — existing
+     * institutes stay non-whitelabel until an admin flips this on. Code treats NULL as FALSE.
+     */
+    @Column(name = "is_whitelabel")
+    private Boolean isWhitelabel;
 
     @PrePersist
     private void applyAssessmentCookieAuthDefault() {
@@ -292,6 +315,23 @@ public class InstituteDetail implements Serializable {
 
     public void setSchoolLogo(byte[] schoolLogo) {
         this.schoolLogo = schoolLogo;
+    }
+
+    public String getLogoUrl() {
+        return logoUrl;
+    }
+
+    public void setLogoUrl(String logoUrl) {
+        this.logoUrl = logoUrl;
+    }
+
+    /** Whitelabel toggle. NULL is treated as FALSE by callers. */
+    public Boolean getIsWhitelabel() {
+        return isWhitelabel;
+    }
+
+    public void setIsWhitelabel(Boolean isWhitelabel) {
+        this.isWhitelabel = isWhitelabel;
     }
 
     // public Integer getId() {

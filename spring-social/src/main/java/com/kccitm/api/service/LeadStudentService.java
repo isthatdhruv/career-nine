@@ -195,7 +195,7 @@ public class LeadStudentService {
 
             // 5. Email the credentials (username + DOB-as-password + dashboard link).
             String dobDisplay = new SimpleDateFormat(DOB_DISPLAY_PATTERN).format(dob);
-            loginCredentialsEmailService.send(fullName, email, user.getUsername(), dobDisplay);
+            loginCredentialsEmailService.send(fullName, email, user.getUsername(), dobDisplay, institute);
 
             logger.info("Lead {}: provisioned student userId={} userStudentId={} institute={} and queued credentials email to {}",
                     lead.getId(), user.getId(), userStudent.getUserStudentId(), instituteCode, email);

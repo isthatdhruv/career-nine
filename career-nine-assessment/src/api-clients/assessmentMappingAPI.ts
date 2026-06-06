@@ -1,4 +1,5 @@
 import http from '../api/http';
+import type { StudentBranding } from '../hooks/useStudentBranding';
 
 export type MappingInclusions = {
   includesFinalReport: boolean;
@@ -47,6 +48,7 @@ export type MappingInfo = {
   availableClasses?: MappingClass[];
   availableSections?: MappingSection[];
   availableSessions?: MappingSession[];
+  branding?: StudentBranding;
 };
 
 export function getMappingInfoByToken(token: string) {

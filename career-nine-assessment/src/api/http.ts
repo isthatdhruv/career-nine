@@ -114,6 +114,7 @@ const PUBLIC_ENDPOINT_PATTERNS: RegExp[] = [
   /\/payment\/webhook\/(status|info)\//,
   /\/auth\/(login|logout|refresh|assessment-session)/,
   /\/public\//,   // catches /bet-report-data/public/, /navigator-report-data/public/, etc.
+  /\/assessments\/branding\//,  // whitelabel branding is advisory — a 401/403 here must NOT eject a student mid-assessment
 ]
 
 function isPublicEndpoint(url: string | undefined): boolean {

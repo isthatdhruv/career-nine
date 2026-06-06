@@ -54,6 +54,7 @@ const AssessmentRegisterPage = () => {
     }
   }, [token])
 
+  const regBranding = mappingInfo?.branding
   const amountInr: number = mappingInfo?.amount || 0
   // Branch on the backend-resolved linkType, never on amount>0. A PAID link is
   // the single resolved wave price (one active tier — no picker).
@@ -440,6 +441,13 @@ const AssessmentRegisterPage = () => {
               Assessment Registration
             </span>
           </div>
+          {regBranding?.whitelabel && regBranding?.logoUrl && (
+            <img
+              src={regBranding.logoUrl}
+              alt={(regBranding.schoolName || "School") + " logo"}
+              style={{ maxHeight: 56, maxWidth: 180, objectFit: "contain", display: "block", marginBottom: 10 }}
+            />
+          )}
           <h2 style={{
             margin: 0, fontWeight: 800, fontSize: "clamp(1.3rem, 4vw, 1.6rem)",
             color: "#0f172a", lineHeight: 1.2,

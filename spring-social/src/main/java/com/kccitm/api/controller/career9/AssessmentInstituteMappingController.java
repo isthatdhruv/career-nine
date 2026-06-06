@@ -58,6 +58,7 @@ import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
 import com.kccitm.api.service.StudentProvisioningService;
+import com.kccitm.api.service.branding.InstituteBrandingService;
 
 @RestController
 @RequestMapping("/assessment-mapping")
@@ -73,6 +74,9 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private InstituteDetailRepository instituteDetailRepository;
+
+    @Autowired
+    private InstituteBrandingService brandingService;
 
     @Autowired
     private SchoolSessionRepository schoolSessionRepository;
@@ -613,6 +617,7 @@ public class AssessmentInstituteMappingController {
 
         InstituteDetail institute = instituteDetailRepository.findById(mapping.getInstituteCode().intValue());
         if (institute != null) info.put("instituteName", institute.getInstituteName());
+        info.put("branding", brandingService.forInstitute(institute));
 
         // Coordinates already fixed on the mapping.
         if (mapping.getSessionId() != null) {

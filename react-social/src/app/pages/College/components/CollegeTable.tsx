@@ -192,7 +192,7 @@ const CollegeTable = (props: {
         name: (
           <div className="d-flex align-items-center gap-2">
             <InstituteLogo
-              logoUrl={(data as { schoolLogo?: string }).schoolLogo}
+              logoUrl={(data as { logoUrl?: string }).logoUrl}
               name={data.instituteName}
             />
             <span>{data.instituteName ?? ""}</span>

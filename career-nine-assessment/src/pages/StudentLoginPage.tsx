@@ -158,13 +158,11 @@ const StudentLoginPage: React.FC = () => {
           <div className="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5">
             <div className="assessment-card card shadow-lg">
               <div className="card-body p-3 p-sm-4 p-md-5">
-                {/* Logo */}
-                <div className="login-logo-wrapper">
-                  <img src="/media/logos/kcc.webp" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
-                </div>
-
+                {/* Login is pre-auth / institute-agnostic, so no logo here — Career-9 stays
+                    present via the grey subline below (shown for everyone). */}
                 <h2 className="text-center assessment-heading">Assessment Login</h2>
                 <p className="text-center assessment-subheading">Sign in to continue to your assessment</p>
+                <p className="text-center" style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "-0.25rem", marginBottom: "1.25rem" }}>Powered by Career-9</p>
 
                 <form onSubmit={handleSubmit}>
                   {/* Username field */}

@@ -50,6 +50,7 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSessionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
+import com.kccitm.api.service.branding.InstituteBrandingService;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
@@ -70,6 +71,7 @@ public class SchoolRegistrationController {
     @Autowired private SchoolRegistrationLinkRepository linkRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
+    @Autowired private InstituteBrandingService brandingService;
     @Autowired private SchoolSessionRepository schoolSessionRepository;
     @Autowired private SchoolClassesRepository schoolClassesRepository;
     @Autowired private UserRepository userRepository;
@@ -423,6 +425,7 @@ public class SchoolRegistrationController {
         if (institute != null) {
             info.put("instituteName", institute.getInstituteName());
         }
+        info.put("branding", brandingService.forInstitute(institute));
         info.put("instituteCode", instituteCode);
         info.put("sessionId", sessionId);
 

@@ -11,6 +11,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -43,6 +44,7 @@ import com.kccitm.api.repository.InstituteCourseRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.security.access.AccessScope;
 import com.kccitm.api.security.access.AccessScopeService;
+import com.kccitm.api.service.DigitalOceanSpacesService;
 
 @RestController
 @RequestMapping("/instituteDetail")
@@ -52,6 +54,9 @@ public class InstituteDetailController {
 
 	@Autowired
 	private InstituteDetailRepository instituteDetailRepository;
+
+	@Autowired
+	private DigitalOceanSpacesService spacesService;
 
 	@Autowired
 	private InstituteCourseRepository instituteCourseRepository;
@@ -225,6 +230,83 @@ public class InstituteDetailController {
 		InstituteDetail saved = instituteDetailRepository.save(instituteDetail);
 
 		return saved;
+	}
+
+	/**
+	 * Whitelabel: upload a school logo to DigitalOcean Spaces and return its public
+	 * CDN URL. The frontend stores the returned URL into the institute's
+	 * {@code logoUrl} field and persists it via {@code /update}.
+	 *
+	 * <p>Body: {@code { "base64Data": "data:image/png;base64,...", "instituteCode": 123,
+	 * "previousUrl": "https://.../school-logos/..." }} — {@code instituteCode} and
+	 * {@code previousUrl} are optional (previousUrl, if present, is deleted on success).
+	 *
+	 * <p><b>PNG/JPEG only.</b> The logo is reused in transactional emails, and Outlook
+	 * does not render WebP — so non-PNG/JPEG uploads are rejected.
+	 */
+	@PreAuthorize("@auth.allows('institute_detail.update')")
+	@PostMapping(value = "/upload-logo", consumes = "application/json", produces = "application/json")
+	public ResponseEntity<Map<String, String>> uploadLogo(@RequestBody Map<String, Object> request) {
+		Object base64Obj = request.get("base64Data");
+		String base64Data = base64Obj == null ? null : base64Obj.toString();
+		if (base64Data == null || base64Data.isBlank()) {
+			return ResponseEntity.badRequest().body(Map.of("error", "base64Data is required"));
+		}
+
+		String head = base64Data.substring(0, Math.min(base64Data.length(), 30)).toLowerCase();
+		boolean isPng = head.startsWith("data:image/png");
+		boolean isJpeg = head.startsWith("data:image/jpeg") || head.startsWith("data:image/jpg");
+		if (!isPng && !isJpeg) {
+			return ResponseEntity.badRequest()
+					.body(Map.of("error", "Logo must be a PNG or JPG/JPEG image"));
+		}
+
+		// Defense-in-depth: the data: prefix is caller-declarable, so confirm the decoded
+		// bytes actually start with PNG/JPEG magic numbers (not just the claimed MIME type).
+		if (!hasPngOrJpegMagic(base64Data)) {
+			return ResponseEntity.badRequest()
+					.body(Map.of("error", "Logo content is not a valid PNG or JPG/JPEG image"));
+		}
+
+		Object codeObj = request.get("instituteCode");
+		String folder = codeObj != null ? "school-logos/institute-" + codeObj : "school-logos";
+
+		try {
+			String url = spacesService.uploadBase64File(base64Data, folder, null);
+			// Best-effort cleanup of the replaced logo. Scoped to the school-logos area so a
+			// crafted previousUrl cannot delete arbitrary objects elsewhere in the bucket.
+			Object previousUrl = request.get("previousUrl");
+			if (previousUrl != null && previousUrl.toString().contains("/school-logos/")) {
+				try {
+					spacesService.deleteFileByUrl(previousUrl.toString());
+				} catch (Exception ignore) {
+					// never fail the upload on a cleanup error
+				}
+			}
+			return ResponseEntity.ok(Map.of("url", url));
+		} catch (IllegalStateException e) {
+			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+					.body(Map.of("error", e.getMessage()));
+		}
+	}
+
+	/** True if the base64 data URL decodes to bytes starting with PNG or JPEG magic numbers. */
+	private boolean hasPngOrJpegMagic(String base64Data) {
+		try {
+			int comma = base64Data.indexOf(',');
+			String raw = comma >= 0 ? base64Data.substring(comma + 1) : base64Data;
+			byte[] bytes = java.util.Base64.getDecoder().decode(raw);
+			if (bytes.length < 4) {
+				return false;
+			}
+			boolean png = (bytes[0] & 0xFF) == 0x89 && (bytes[1] & 0xFF) == 0x50
+					&& (bytes[2] & 0xFF) == 0x4E && (bytes[3] & 0xFF) == 0x47;
+			boolean jpeg = (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8
+					&& (bytes[2] & 0xFF) == 0xFF;
+			return png || jpeg;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	@SuppressWarnings("unchecked")
