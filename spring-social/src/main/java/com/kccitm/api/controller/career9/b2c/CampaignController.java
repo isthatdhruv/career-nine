@@ -44,6 +44,8 @@ public class CampaignController {
     @Autowired private InstituteDetailRepository instituteDetailRepository;
     @Autowired private CampaignResolutionService campaignResolutionService;
 
+    @Autowired private com.kccitm.api.service.career9.InstituteAssessmentService instituteAssessmentService;
+
     @PreAuthorize("@auth.allows('campaign.read.all')")
     @GetMapping("/getAll")
     public ResponseEntity<List<Campaign>> getAll() {
@@ -143,7 +145,19 @@ public class CampaignController {
             return ResponseEntity.badRequest().body("validTo cannot be before validFrom");
         }
         normalizeDefaults(c);
-        return ResponseEntity.ok(campaignRepository.save(c));
+        Campaign savedCampaign = campaignRepository.save(c);
+        // If this edit set/changed the institute, sync the catalog for every live
+        // assessment on the campaign — covers "attach assessments first, map the
+        // institute later". Idempotent.
+        if (req.containsKey("instituteCode") && savedCampaign.getInstituteCode() != null) {
+            for (CampaignAssessmentMapping m :
+                    mappingRepository.findByCampaignIdAndIsDeletedFalseOrderBySortOrderAscIdAsc(id)) {
+                if (Boolean.TRUE.equals(m.getIsActive())) {
+                    instituteAssessmentService.ensure(savedCampaign.getInstituteCode(), m.getAssessmentId());
+                }
+            }
+        }
+        return ResponseEntity.ok(savedCampaign);
     }
 
     @PreAuthorize("@auth.allows('campaign.delete')")
@@ -187,7 +201,8 @@ public class CampaignController {
     @PostMapping("/{campaignId}/assessment")
     public ResponseEntity<?> attachAssessment(@PathVariable Long campaignId,
                                               @RequestBody Map<String, Object> req) {
-        if (!campaignRepository.findById(campaignId).isPresent()) {
+        Campaign campaign = campaignRepository.findById(campaignId).orElse(null);
+        if (campaign == null) {
             return ResponseEntity.notFound().build();
         }
         Long assessmentId = toLong(req.get("assessmentId"));
@@ -214,7 +229,14 @@ public class CampaignController {
         m.setPurchasePath(normalizePath((String) req.get("purchasePath")));
         m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
-        return ResponseEntity.ok(mappingRepository.save(m));
+        CampaignAssessmentMapping savedMapping = mappingRepository.save(m);
+        // Keep the institute<->assessment catalog in sync: an assessment attached to an
+        // institute-tied campaign is one that institute now has, so it shows in Reports
+        // Hub next to the B2B mappings. Idempotent; null-institute (legacy) campaigns skipped.
+        if (campaign.getInstituteCode() != null) {
+            instituteAssessmentService.ensure(campaign.getInstituteCode(), assessmentId);
+        }
+        return ResponseEntity.ok(savedMapping);
     }
 
     @PreAuthorize("@auth.allows('campaign.update')")

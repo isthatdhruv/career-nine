@@ -12,7 +12,6 @@ import {
   updateAssessmentMapping,
   getCatalog,
   enableCatalog,
-  toggleCatalog,
   deleteCatalog,
   toggleLink,
   AssessmentInstituteMapping,
@@ -20,6 +19,7 @@ import {
 } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
 import { showErrorToast } from "../../../utils/toast";
 import TierManagementModal from "./TierManagementModal";
+import CatalogSelector from "./CatalogSelector";
 
 interface Props {
   instituteCode: number;
@@ -42,8 +42,6 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [selectedSection, setSelectedSection] = useState<string>("");
 
-  // Catalog add control: multi-select of assessment ids to enable.
-  const [catalogToAdd, setCatalogToAdd] = useState<Set<number>>(new Set());
   const [catalogSaving, setCatalogSaving] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -94,56 +92,31 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
     }
   };
 
-  // ── Catalog handlers ──
-  const toggleCatalogPick = (id: number) => {
-    setCatalogToAdd((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleAddToCatalog = async () => {
-    if (catalogToAdd.size === 0) {
-      showErrorToast("Select at least one assessment to enable");
-      return;
-    }
+  // ── Catalog handlers (checkbox-dropdown driven) ──
+  const handleAddOneCatalog = async (assessmentId: number) => {
     setCatalogSaving(true);
     try {
-      const res = await enableCatalog(instituteCode, Array.from(catalogToAdd));
+      const res = await enableCatalog(instituteCode, [assessmentId]);
       setCatalog(res.data || []);
-      setCatalogToAdd(new Set());
     } catch (error: any) {
       // 400 body is a plain-string message (e.g. maxAssessments cap exceeded).
-      showErrorToast(String(error.response?.data || error.message || "Failed to enable assessments"));
+      showErrorToast(String(error.response?.data || error.message || "Failed to enable assessment"));
     } finally {
       setCatalogSaving(false);
     }
   };
 
-  const handleToggleCatalog = async (item: InstituteAssessment) => {
-    try {
-      const res = await toggleCatalog(item.id);
-      setCatalog((prev) => prev.map((c) => (c.id === item.id ? res.data : c)));
-    } catch (error) {
-      console.error("Failed to toggle catalog item:", error);
-    }
-  };
-
   const handleRemoveCatalog = async (item: InstituteAssessment) => {
-    if (!window.confirm("Remove this assessment from the institute's catalog?")) return;
+    setCatalogSaving(true);
     try {
       await deleteCatalog(item.id);
       setCatalog((prev) => prev.filter((c) => c.id !== item.id));
     } catch (error: any) {
       showErrorToast(String(error.response?.data || error.message || "Failed to remove from catalog"));
+    } finally {
+      setCatalogSaving(false);
     }
   };
-
-  // Assessment ids already in the catalog — hide them from the add picker.
-  const catalogAssessmentIds = new Set(catalog.map((c) => Number(c.assessmentId)));
-  const addableAssessments = assessments.filter((a: any) => !catalogAssessmentIds.has(Number(a.id)));
 
   const handleCreate = async () => {
     if (!selectedAssessment) {
@@ -301,123 +274,19 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
             border: "1px solid #e2e8f0", marginBottom: 32,
             boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
           }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
-                <h6 style={{ margin: 0, fontWeight: 700, fontSize: "1rem", color: "#1e293b" }}>
-                  Enabled Assessments
-                </h6>
-              </div>
-              <span style={{
-                background: "#fef3c7", color: "#92400e",
-                padding: "4px 14px", borderRadius: 20,
-                fontSize: "0.78rem", fontWeight: 600,
-              }}>
-                {catalog.length} enabled
-              </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f59e0b" }} />
+              <h6 style={{ margin: 0, fontWeight: 700, fontSize: "1rem", color: "#1e293b" }}>
+                Enabled Assessments
+              </h6>
             </div>
-
-            {/* Current catalog chips */}
-            {catalog.length === 0 ? (
-              <div style={{
-                padding: "20px 16px", textAlign: "center",
-                border: "2px dashed #e2e8f0", borderRadius: 12,
-                color: "#94a3b8", fontSize: "0.85rem", marginBottom: 18,
-              }}>
-                No assessments enabled for this institute yet. Add some below.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 18 }}>
-                {catalog.map((c) => (
-                  <span key={c.id} style={{
-                    display: "inline-flex", alignItems: "center", gap: 8,
-                    background: c.isActive ? "#ecfdf5" : "#f1f5f9",
-                    border: `1.5px solid ${c.isActive ? "#a7f3d0" : "#e2e8f0"}`,
-                    color: c.isActive ? "#065f46" : "#94a3b8",
-                    padding: "6px 12px", borderRadius: 999,
-                    fontSize: "0.82rem", fontWeight: 600,
-                  }}>
-                    <span style={{ textDecoration: c.isActive ? "none" : "line-through" }}>
-                      {getAssessmentName(c.assessmentId)}
-                    </span>
-                    <button
-                      onClick={() => handleToggleCatalog(c)}
-                      title={c.isActive ? "Disable" : "Enable"}
-                      style={{
-                        border: "none", background: "transparent", cursor: "pointer",
-                        fontSize: "0.72rem", fontWeight: 700,
-                        color: c.isActive ? "#059669" : "#64748b",
-                      }}
-                    >
-                      {c.isActive ? "On" : "Off"}
-                    </button>
-                    <button
-                      onClick={() => handleRemoveCatalog(c)}
-                      title="Remove from catalog"
-                      style={{
-                        border: "none", background: "transparent", cursor: "pointer",
-                        color: "#ef4444", fontWeight: 700, fontSize: "0.9rem", lineHeight: 1,
-                      }}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Add to catalog */}
-            <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16 }}>
-              <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem", color: "#475569", marginBottom: 8 }}>
-                Add assessments to this institute
-              </Form.Label>
-              {addableAssessments.length === 0 ? (
-                <div style={{ fontSize: "0.82rem", color: "#94a3b8" }}>
-                  All available assessments are already in the catalog.
-                </div>
-              ) : (
-                <>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-                    {addableAssessments.map((a: any) => {
-                      const picked = catalogToAdd.has(Number(a.id));
-                      return (
-                        <button
-                          key={a.id}
-                          type="button"
-                          onClick={() => toggleCatalogPick(Number(a.id))}
-                          style={{
-                            padding: "6px 14px", borderRadius: 999,
-                            border: picked ? "1.5px solid #4361ee" : "1.5px solid #e2e8f0",
-                            background: picked ? "#eef2ff" : "#fff",
-                            color: picked ? "#4361ee" : "#475569",
-                            fontWeight: 600, fontSize: "0.8rem", cursor: "pointer",
-                          }}
-                        >
-                          {picked ? "✓ " : "+ "}{a.AssessmentName || a.assessmentName}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    onClick={handleAddToCatalog}
-                    disabled={catalogSaving || catalogToAdd.size === 0}
-                    style={{
-                      background: catalogSaving || catalogToAdd.size === 0
-                        ? "#94a3b8"
-                        : "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                      border: "none", borderRadius: 10, padding: "9px 22px",
-                      fontWeight: 600, fontSize: "0.85rem",
-                    }}
-                  >
-                    {catalogSaving ? (
-                      <><Spinner animation="border" size="sm" style={{ marginRight: 8 }} />Enabling...</>
-                    ) : (
-                      `Enable ${catalogToAdd.size || ""} assessment${catalogToAdd.size === 1 ? "" : "s"}`.trim()
-                    )}
-                  </Button>
-                </>
-              )}
-            </div>
+            <CatalogSelector
+              assessments={assessments}
+              catalog={catalog}
+              busy={catalogSaving}
+              onAdd={handleAddOneCatalog}
+              onRemove={handleRemoveCatalog}
+            />
           </div>
 
           {/* ── Create New Mapping ── */}

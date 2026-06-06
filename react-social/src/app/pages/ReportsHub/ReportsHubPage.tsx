@@ -9,7 +9,7 @@ import {
   getAllAssessments,
   Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
-import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
+import { getCatalog } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import {
   getReportType,
   ReportType,
@@ -225,10 +225,12 @@ const ReportsHubPage: React.FC = () => {
   useEffect(() => {
     if (selectedInstitute === "") { setMappedAssessmentIds(null); return; }
     setAssessmentsLoading(true);
-    getAssessmentMappingsByInstitute(Number(selectedInstitute))
+    // Source of "this institute's assessments" = the institute_assessment catalog
+    // (every mapping — institute/session/class/section — appends to it).
+    getCatalog(Number(selectedInstitute))
       .then((res) => {
         const ids = new Set<number>(
-          (res.data || []).filter((m: any) => m.isActive !== false).map((m: any) => Number(m.assessmentId))
+          (res.data || []).filter((c: any) => c.isActive !== false).map((c: any) => Number(c.assessmentId))
         );
         setMappedAssessmentIds(ids);
       })
