@@ -1,6 +1,6 @@
 {
-  "version": "mpyyf908",
-  "generated": "2026-06-04T03:47:16.952Z",
+  "version": "mq2a4o6o",
+  "generated": "2026-06-06T11:38:17.328Z",
   "resources": [
     {
       "url": "/assessment-cache/43/config.json",
@@ -148,32 +148,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-CQq0pdg-.js",
+      "url": "/assets/HydroTubeGame-DgOUBONQ.js",
       "size": 23331,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-CjwqCCOk.js",
+      "url": "/assets/JungleSpotGame-Ct5QY3lT.js",
       "size": 23397,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-Dp3MW57Y.js",
+      "url": "/assets/RabbitPathGame-G8QPMWHx.js",
       "size": 26981,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-oZt80mV5.js",
+      "url": "/assets/SectionInstructionPage-CBUAALRU.js",
       "size": 4206,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-lSbNaIhD.js",
+      "url": "/assets/SectionQuestionPage-wDuXBws4.js",
       "size": 174235,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-CPgGCgxV.js",
+      "url": "/assets/SelectSectionPage-CxhujNLn.js",
       "size": 5255,
       "priority": "critical"
     },
@@ -183,13 +183,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/firebase-BgISDq8X.js",
-      "size": 360,
+      "url": "/assets/firebase-CpcMZrW1.js",
+      "size": 218632,
       "priority": "critical"
     },
     {
-      "url": "/assets/firebase-Illc6rc8.js",
-      "size": 218011,
+      "url": "/assets/firebase-HPl5kcu6.js",
+      "size": 360,
       "priority": "critical"
     },
     {
@@ -198,23 +198,23 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-CB9ncFiR.js",
+      "url": "/assets/index-BJK7OE60.js",
       "size": 1274010,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-CWvpOvqr.js",
-      "size": 1038312,
+      "url": "/assets/index-CiS0524F.js",
+      "size": 1049133,
       "priority": "critical"
     },
     {
-      "url": "/assets/index.es-C_OoOiCU.js",
-      "size": 158432,
+      "url": "/assets/index.es-BYNEhgeJ.js",
+      "size": 158825,
       "priority": "critical"
     },
     {
-      "url": "/assets/purify.es-BZstNxVn.js",
-      "size": 25426,
+      "url": "/assets/purify.es-DSHCW8nm.js",
+      "size": 26223,
       "priority": "critical"
     },
     {
@@ -223,8 +223,8 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/router-B4gyqhFH.js",
-      "size": 31101,
+      "url": "/assets/router-0QAyJNTE.js",
+      "size": 31066,
       "priority": "critical"
     },
     {
@@ -260,7 +260,7 @@
   ],
   "summary": {
     "total": 51,
-    "totalSize": 25463262,
+    "totalSize": 25475859,
     "byPriority": {
       "assessment": {
         "count": 6,
@@ -276,7 +276,7 @@
       },
       "critical": {
         "count": 18,
-        "size": 3309883
+        "size": 3322480
       },
       "other": {
         "count": 4,
