@@ -10,7 +10,7 @@ import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 import InstituteSessionDetailsPanel, {
   InstituteSessionDetailsPanelHandle,
 } from "./InstituteSessionDetailsPanel";
-import AssessmentMappingPanel from "./AssessmentMappingPanel";
+import InstituteCatalogPicker from "./InstituteCatalogPicker";
 
 type WizardStep = 1 | 2 | 3;
 
@@ -131,10 +131,16 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
         if (logoFile) {
           payload.schoolLogo = await fileToBase64(logoFile);
         }
-        await UpdateCollegeData(payload);
+        const res = await UpdateCollegeData(payload);
         showSuccessToast("Basic info saved");
-        setInstituteCode(String(values.instituteCode));
-        setInstituteName(values.instituteName);
+        // institute_code is an IDENTITY PK — the server may assign/override it on
+        // create. Adopt the saved entity's code so Steps 2 & 3 target the real PK
+        // instead of the value the admin typed.
+        const saved = res?.data;
+        const serverCode =
+          saved && saved.instituteCode != null ? String(saved.instituteCode) : String(values.instituteCode);
+        setInstituteCode(serverCode);
+        setInstituteName(saved?.instituteName || values.instituteName);
         setSavedStep1(true);
         setPageLoading(["true"]);
         setStep(2);
@@ -409,9 +415,8 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
         )}
 
         {step === 3 && (
-          <AssessmentMappingPanel
+          <InstituteCatalogPicker
             instituteCode={Number(instituteCode)}
-            instituteName={instituteName}
             active={true}
           />
         )}

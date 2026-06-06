@@ -11,6 +11,7 @@ import AllottedAssessmentPage from './pages/AllottedAssessmentPage'
 import GeneralInstructionsPage from './pages/GeneralInstructionsPage'
 import ThankYouPage from './pages/ThankYouPage'
 import AssessmentRegisterPage from './pages/AssessmentRegisterPage'
+import AssessmentUpgradePage from './pages/AssessmentUpgradePage'
 import SchoolAssessmentRegisterPage from './pages/SchoolAssessmentRegisterPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
 import CampaignRegisterPage from './pages/CampaignRegisterPage'
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="/studentAssessment/sections/:sectionId/questions/:questionIndex" element={<SectionQuestionPage />} />
               <Route path="/studentAssessment/completed" element={<ThankYouPage />} />
               <Route path="/assessment-register/:token" element={<AssessmentRegisterPage />} />
+              <Route path="/assessment-upgrade/:entitlementId" element={<AssessmentUpgradePage />} />
               <Route path="/school-register/:token" element={<SchoolAssessmentRegisterPage />} />
               <Route path="/assessment/start" element={<AssessmentStartPage />} />
               <Route path="/payment-status" element={<PaymentStatusPage />} />

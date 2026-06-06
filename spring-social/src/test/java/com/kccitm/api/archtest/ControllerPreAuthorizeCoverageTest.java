@@ -149,6 +149,10 @@ public class ControllerPreAuthorizeCoverageTest {
             "com.kccitm.api.controller.career9.b2c.EntitlementController#redeemDashboardToken",
             "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getMappingInfoByToken",
             "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#registerStudentByToken",
+            // B2B free→paid upgrade — same anonymous funnel, gated by the entitlementId
+            // (+ the resolved B2B entitlement / active wave) in-controller, not Spring auth.
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getUpgradeInfo",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#payForUpgrade",
 
             // Operator-run 4-pager HTML template publish to DigitalOcean Spaces — runs from
             // an authenticated operator shell, not user JWT; gated by network reachability only.

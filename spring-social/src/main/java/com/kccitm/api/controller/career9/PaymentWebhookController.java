@@ -470,11 +470,17 @@ public class PaymentWebhookController {
         txn.setStatus("paid");
         paymentTransactionRepository.save(txn);
 
-        // Branch: B2C (campaign-linked) vs legacy school payment.
+        // Branch: B2C (campaign-linked) vs B2B mapping / legacy school payment.
         if (txn.getCampaignId() != null && txn.getCampaignAssessmentTierId() != null) {
             provisionB2CStudentAndEntitlement(txn);
         } else {
             createStudentAndAllotAssessment(txn);
+            // B2B mapping payment → mint (first paid registration) or upgrade
+            // (free→paid) the service entitlement. No-op for legacy school txns
+            // (mappingId null) and for a failed provision (status flipped).
+            if (txn.getMappingId() != null && "paid".equals(txn.getStatus())) {
+                entitlementService.activateB2BOnPayment(txn.getTransactionId());
+            }
         }
         // Promo is consumed at realized redemption only (A1) — and only when
         // provisioning fully succeeded (status still "paid"; a failed provision
