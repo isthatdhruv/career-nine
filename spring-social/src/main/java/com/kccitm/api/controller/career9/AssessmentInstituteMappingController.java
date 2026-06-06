@@ -282,6 +282,13 @@ public class AssessmentInstituteMappingController {
         // maxRegistrations is nullable-meaningful: always copy it through
         existing.setMaxRegistrations(updated.getMaxRegistrations());
         if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
+        // Service toggles (report / counselling / LMS) — booleans copied when sent;
+        // the count/validity sub-fields are nullable-meaningful so always copied.
+        if (updated.getIncludesFinalReport() != null) existing.setIncludesFinalReport(updated.getIncludesFinalReport());
+        if (updated.getIncludesCounselling() != null) existing.setIncludesCounselling(updated.getIncludesCounselling());
+        existing.setCounsellingSessionCount(updated.getCounsellingSessionCount());
+        if (updated.getIncludesLms() != null) existing.setIncludesLms(updated.getIncludesLms());
+        existing.setLmsValidityDays(updated.getLmsValidityDays());
         return ResponseEntity.ok(tierRepository.save(existing));
     }
 

@@ -79,6 +79,12 @@ export interface AssessmentMappingTier {
   maxRegistrations: number | null;
   currentCount?: number;
   isActive?: boolean;
+  // Service-inclusion toggles (parity with the B2C PricingTier flags).
+  includesFinalReport?: boolean;
+  includesCounselling?: boolean;
+  counsellingSessionCount?: number | null;
+  includesLms?: boolean;
+  lmsValidityDays?: number | null;
 }
 
 export function getTiers(mappingId: number) {

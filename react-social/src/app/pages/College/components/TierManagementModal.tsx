@@ -23,6 +23,11 @@ const emptyForm: AssessmentMappingTier = {
   sortOrder: 1,
   maxRegistrations: null,
   isActive: true,
+  includesFinalReport: false,
+  includesCounselling: false,
+  counsellingSessionCount: null,
+  includesLms: false,
+  lmsValidityDays: null,
 };
 
 const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
@@ -92,6 +97,21 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
             ? null
             : Math.round(Number(form.maxRegistrations)),
         isActive: form.isActive,
+        includesFinalReport: !!form.includesFinalReport,
+        includesCounselling: !!form.includesCounselling,
+        counsellingSessionCount: form.includesCounselling
+          && form.counsellingSessionCount !== null
+          && form.counsellingSessionCount !== undefined
+          && String(form.counsellingSessionCount) !== ""
+            ? Math.round(Number(form.counsellingSessionCount))
+            : null,
+        includesLms: !!form.includesLms,
+        lmsValidityDays: form.includesLms
+          && form.lmsValidityDays !== null
+          && form.lmsValidityDays !== undefined
+          && String(form.lmsValidityDays) !== ""
+            ? Math.round(Number(form.lmsValidityDays))
+            : null,
       };
       if (editingId) {
         await updateTier(editingId, payload);
@@ -165,7 +185,7 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#f8fafc" }}>
-                  {["Order", "Name", "Description", "Amount", "Registrations", "Status", ""].map((h) => (
+                  {["Order", "Name", "Description", "Amount", "Registrations", "Services", "Status", ""].map((h) => (
                     <th key={h} style={{
                       padding: "10px 12px", fontWeight: 700, fontSize: "0.75rem",
                       color: "#64748b", textAlign: "left", borderBottom: "2px solid #e2e8f0",
@@ -201,6 +221,25 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
                     </td>
                     <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
                       {t.currentCount || 0} / {t.maxRegistrations && t.maxRegistrations > 0 ? t.maxRegistrations : "∞"}
+                    </td>
+                    <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
+                      {(() => {
+                        const chips: string[] = [];
+                        if (t.includesFinalReport) chips.push("Report");
+                        if (t.includesCounselling) chips.push(t.counsellingSessionCount ? `Counselling ×${t.counsellingSessionCount}` : "Counselling");
+                        if (t.includesLms) chips.push(t.lmsValidityDays ? `LMS ${t.lmsValidityDays}d` : "LMS");
+                        if (chips.length === 0) return <span style={{ color: "#94a3b8" }}>—</span>;
+                        return (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {chips.map((c) => (
+                              <span key={c} style={{
+                                background: "#eef2ff", color: "#4338ca", padding: "2px 8px",
+                                borderRadius: 10, fontSize: "0.65rem", fontWeight: 600, whiteSpace: "nowrap",
+                              }}>{c}</span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td style={{ padding: "10px 12px", borderBottom: "1px solid #f1f5f9" }}>
                       <Form.Check
@@ -296,6 +335,67 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
             checked={!!form.isActive}
             onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
           />
+
+          {/* Services included — parity with the B2C pricing tiers. */}
+          <div style={{
+            borderTop: "1px solid #f1f5f9", paddingTop: 16, display: "flex",
+            flexDirection: "column", gap: 12,
+          }}>
+            <div style={{ fontWeight: 700, fontSize: "0.8rem", color: "#1e293b" }}>
+              Services included
+            </div>
+
+            <Form.Check
+              type="switch"
+              label="Final report"
+              checked={!!form.includesFinalReport}
+              onChange={(e) => setForm({ ...form, includesFinalReport: e.target.checked })}
+            />
+
+            <Form.Check
+              type="switch"
+              label="Counselling"
+              checked={!!form.includesCounselling}
+              onChange={(e) => setForm({ ...form, includesCounselling: e.target.checked })}
+            />
+            {form.includesCounselling && (
+              <div style={{ marginLeft: 36 }}>
+                <Form.Label style={{ fontWeight: 600, fontSize: "0.78rem" }}>
+                  Counselling sessions <span style={{ color: "#94a3b8", fontWeight: 400 }}>— blank = unset</span>
+                </Form.Label>
+                <Form.Control
+                  type="number" min="0"
+                  value={form.counsellingSessionCount ?? ""}
+                  onChange={(e) => setForm({
+                    ...form,
+                    counsellingSessionCount: e.target.value === "" ? null : Number(e.target.value),
+                  })}
+                />
+              </div>
+            )}
+
+            <Form.Check
+              type="switch"
+              label="LMS access"
+              checked={!!form.includesLms}
+              onChange={(e) => setForm({ ...form, includesLms: e.target.checked })}
+            />
+            {form.includesLms && (
+              <div style={{ marginLeft: 36 }}>
+                <Form.Label style={{ fontWeight: 600, fontSize: "0.78rem" }}>
+                  LMS validity (days) <span style={{ color: "#94a3b8", fontWeight: 400 }}>— blank = unlimited</span>
+                </Form.Label>
+                <Form.Control
+                  type="number" min="0"
+                  value={form.lmsValidityDays ?? ""}
+                  onChange={(e) => setForm({
+                    ...form,
+                    lmsValidityDays: e.target.value === "" ? null : Number(e.target.value),
+                  })}
+                />
+              </div>
+            )}
+          </div>
         </Modal.Body>
         <Modal.Footer style={{ borderTop: "1px solid #f1f5f9" }}>
           <Button variant="light" onClick={() => setFormOpen(false)}>Cancel</Button>
