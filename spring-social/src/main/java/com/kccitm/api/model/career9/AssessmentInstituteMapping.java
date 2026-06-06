@@ -49,9 +49,35 @@ public class AssessmentInstituteMapping implements Serializable {
     @Column(name = "section_id")
     private Integer sectionId;
 
+    // Legacy single registration token. Retained for backward compatibility with
+    // already-distributed pre-redesign links; new rows set it = paidToken.
     @Column(name = "token", nullable = false, unique = true, length = 36)
     private String token;
 
+    // ── Dual links (redesign) ─────────────────────────────────────────────────
+    // Every mapping exposes TWO registration links: a paid link (priced via the
+    // wave tiers) and an always-free link (backed by the is_free tier). Each has
+    // its own token and its own active toggle.
+    @Column(name = "paid_token", unique = true, length = 36)
+    private String paidToken;
+
+    @Column(name = "free_token", unique = true, length = 36)
+    private String freeToken;
+
+    @Column(name = "paid_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean paidActive = true;
+
+    @Column(name = "free_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean freeActive = true;
+
+    // Idempotency marker for the one-time school-flow backfill: set to the source
+    // school_assessment_config.config_id when this CLASS-level mapping was created
+    // by migration, so the backfill never duplicates a config.
+    @Column(name = "migrated_from_school_config_id")
+    private Long migratedFromSchoolConfigId;
+
+    // Legacy single price. Deprecated by the redesign — every link is now
+    // tier-backed (free tier / paid waves). Kept only for old rows.
     @Column(name = "amount")
     private Long amount;
 
@@ -70,6 +96,12 @@ public class AssessmentInstituteMapping implements Serializable {
         }
         if (this.isActive == null) {
             this.isActive = true;
+        }
+        if (this.paidActive == null) {
+            this.paidActive = true;
+        }
+        if (this.freeActive == null) {
+            this.freeActive = true;
         }
     }
 
@@ -146,6 +178,46 @@ public class AssessmentInstituteMapping implements Serializable {
 
     public void setToken(String token) {
         this.token = token;
+    }
+
+    public String getPaidToken() {
+        return paidToken;
+    }
+
+    public void setPaidToken(String paidToken) {
+        this.paidToken = paidToken;
+    }
+
+    public String getFreeToken() {
+        return freeToken;
+    }
+
+    public void setFreeToken(String freeToken) {
+        this.freeToken = freeToken;
+    }
+
+    public Boolean getPaidActive() {
+        return paidActive;
+    }
+
+    public void setPaidActive(Boolean paidActive) {
+        this.paidActive = paidActive;
+    }
+
+    public Boolean getFreeActive() {
+        return freeActive;
+    }
+
+    public void setFreeActive(Boolean freeActive) {
+        this.freeActive = freeActive;
+    }
+
+    public Long getMigratedFromSchoolConfigId() {
+        return migratedFromSchoolConfigId;
+    }
+
+    public void setMigratedFromSchoolConfigId(Long migratedFromSchoolConfigId) {
+        this.migratedFromSchoolConfigId = migratedFromSchoolConfigId;
     }
 
     public Boolean getIsActive() {

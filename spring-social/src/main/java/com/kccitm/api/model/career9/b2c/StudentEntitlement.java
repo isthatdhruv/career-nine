@@ -42,6 +42,12 @@ public class StudentEntitlement implements Serializable {
     @Column(name = "campaign_id")
     private Long campaignId;
 
+    // B2B (assessment-mapping) source. Null for B2C (campaign) entitlements; set
+    // for B2B so the free→paid upgrade can resolve this mapping's active paid wave.
+    // Mirrors the payment_transaction discriminator pattern (campaign_id XOR mapping_id).
+    @Column(name = "mapping_id")
+    private Long mappingId;
+
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
 
@@ -149,6 +155,8 @@ public class StudentEntitlement implements Serializable {
     public void setUserStudentId(Long v) { this.userStudentId = v; }
     public Long getCampaignId() { return campaignId; }
     public void setCampaignId(Long v) { this.campaignId = v; }
+    public Long getMappingId() { return mappingId; }
+    public void setMappingId(Long v) { this.mappingId = v; }
     public Long getAssessmentId() { return assessmentId; }
     public void setAssessmentId(Long v) { this.assessmentId = v; }
     public Long getCampaignAssessmentTierId() { return campaignAssessmentTierId; }

@@ -15,6 +15,11 @@ public interface AssessmentInstituteMappingRepository extends JpaRepository<Asse
 
     Optional<AssessmentInstituteMapping> findByTokenAndIsActive(String token, Boolean isActive);
 
+    // Dual-link resolvers (redesign): a public token is either a paid link or a free link.
+    Optional<AssessmentInstituteMapping> findByPaidToken(String paidToken);
+
+    Optional<AssessmentInstituteMapping> findByFreeToken(String freeToken);
+
     List<AssessmentInstituteMapping> findByInstituteCode(Integer instituteCode);
 
     List<AssessmentInstituteMapping> findByInstituteCodeAndIsActive(Integer instituteCode, Boolean isActive);

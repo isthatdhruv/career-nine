@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.SimpleDateFormat;
 
 import com.kccitm.api.model.User;
+import com.kccitm.api.model.career9.AssessmentMappingTier;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.UserStudent;
@@ -23,6 +24,7 @@ import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
+import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
@@ -48,6 +50,7 @@ public class EntitlementService {
     @Autowired private CampaignAssessmentMappingRepository mappingRepository;
     @Autowired private CampaignAssessmentTierRepository tierMappingRepository;
     @Autowired private PricingTierRepository pricingTierRepository;
+    @Autowired private AssessmentMappingTierRepository assessmentMappingTierRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private UserStudentRepository userStudentRepository;
@@ -152,6 +155,121 @@ public class EntitlementService {
         e = entitlementRepository.save(e);
         sendWelcomeAssessmentLink(e, txn);
         return e;
+    }
+
+    // ===== B2B (assessment-mapping) entitlements =====
+    // Same StudentEntitlement + same gates as B2C, but sourced from an
+    // AssessmentMappingTier and scoped by mapping_id (campaign_id stays null).
+    // No email here — the B2B register/webhook paths own credential delivery
+    // and auto-login. This is purely the access GRANT.
+
+    /**
+     * Activate (or upgrade) a B2B entitlement from a paid/free/upgrade PaymentTransaction
+     * that carries mapping_id + mapping_tier_id. Works for first registration AND the
+     * free->paid upgrade: it find-or-creates the student's B2B entitlement for the
+     * assessment and UNIONs the tier's service flags (never dropping an already-granted
+     * service), extending each service window to the later expiry.
+     */
+    @Transactional
+    public StudentEntitlement activateB2BOnPayment(Long paymentTransactionId) {
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(paymentTransactionId);
+        if (!txnOpt.isPresent()) {
+            logger.warn("activateB2BOnPayment: txn {} not found", paymentTransactionId);
+            return null;
+        }
+        PaymentTransaction txn = txnOpt.get();
+        if (txn.getMappingId() == null || txn.getMappingTierId() == null) {
+            return null; // not a B2B mapping payment
+        }
+        Optional<AssessmentMappingTier> tierOpt =
+                assessmentMappingTierRepository.findById(txn.getMappingTierId());
+        if (!tierOpt.isPresent()) {
+            logger.warn("activateB2BOnPayment: mapping tier {} not found", txn.getMappingTierId());
+            return null;
+        }
+        AssessmentMappingTier tier = tierOpt.get();
+
+        StudentEntitlement entitlement = entitlementRepository.findByPaymentTransactionId(paymentTransactionId)
+                .orElseGet(() -> findOrCreateB2B(txn));
+
+        // Idempotent: same txn already activated → no-op (webhook retry / reconcile race).
+        if ("active".equals(entitlement.getStatus())
+                && paymentTransactionId.equals(entitlement.getPaymentTransactionId())) {
+            return entitlement;
+        }
+        // STATE1: never resurrect a revoked/refunded entitlement.
+        if ("revoked".equals(entitlement.getStatus()) || "refunded".equals(entitlement.getStatus())) {
+            logger.warn("activateB2BOnPayment: refusing to reactivate {} entitlement {}",
+                    entitlement.getStatus(), entitlement.getEntitlementId());
+            return entitlement;
+        }
+
+        applyMappingTierSnapshot(entitlement, tier);
+        entitlement.setMappingId(txn.getMappingId());
+        entitlement.setPaymentTransactionId(txn.getTransactionId());
+        entitlement.setStatus("active");
+        entitlement.setGrantedAt(new Date());
+        if (entitlement.getAccessToken() == null) {
+            entitlement.setAccessToken(generateToken());
+            entitlement.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
+        }
+        return entitlementRepository.save(entitlement);
+    }
+
+    /** Latest non-terminal B2B entitlement for (student, assessment), or a fresh row. */
+    private StudentEntitlement findOrCreateB2B(PaymentTransaction txn) {
+        if (txn.getUserStudentId() != null) {
+            for (StudentEntitlement e : entitlementRepository
+                    .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(
+                            txn.getUserStudentId(), txn.getAssessmentId())) {
+                if (e.getCampaignId() == null
+                        && !"revoked".equals(e.getStatus()) && !"refunded".equals(e.getStatus())) {
+                    e.setPaymentTransactionId(txn.getTransactionId());
+                    return e;
+                }
+            }
+        }
+        StudentEntitlement e = new StudentEntitlement();
+        e.setUserStudentId(txn.getUserStudentId());
+        e.setAssessmentId(txn.getAssessmentId());
+        e.setMappingId(txn.getMappingId());
+        e.setPaymentTransactionId(txn.getTransactionId());
+        return e;
+    }
+
+    /** Union the tier's service flags onto the entitlement (additive; never drops access). */
+    private void applyMappingTierSnapshot(StudentEntitlement e, AssessmentMappingTier tier) {
+        e.setFinalReportActive(Boolean.TRUE.equals(e.getFinalReportActive())
+                || Boolean.TRUE.equals(tier.getIncludesFinalReport()));
+        e.setDashboardActive(Boolean.TRUE.equals(e.getDashboardActive())
+                || Boolean.TRUE.equals(tier.getIncludesDashboard()));
+        e.setCounsellingActive(Boolean.TRUE.equals(e.getCounsellingActive())
+                || Boolean.TRUE.equals(tier.getIncludesCounselling()));
+        e.setLmsActive(Boolean.TRUE.equals(e.getLmsActive())
+                || Boolean.TRUE.equals(tier.getIncludesLms()));
+
+        int newSessions = tier.getCounsellingSessionCount() != null ? tier.getCounsellingSessionCount() : 0;
+        int curSessions = e.getCounsellingSessionsTotal() != null ? e.getCounsellingSessionsTotal() : 0;
+        e.setCounsellingSessionsTotal(Math.max(curSessions, newSessions));
+
+        if (Boolean.TRUE.equals(tier.getIncludesDashboard())
+                && tier.getDashboardValidityDays() != null && tier.getDashboardValidityDays() > 0) {
+            e.setDashboardExpiresAt(laterExpiry(e.getDashboardExpiresAt(), daysFromNow(tier.getDashboardValidityDays())));
+        }
+        if (Boolean.TRUE.equals(tier.getIncludesLms())
+                && tier.getLmsValidityDays() != null && tier.getLmsValidityDays() > 0) {
+            e.setLmsExpiresAt(laterExpiry(e.getLmsExpiresAt(), daysFromNow(tier.getLmsValidityDays())));
+        }
+
+        // Overall expiry = earliest active service window (services with no window never expire).
+        Date earliest = null;
+        if (Boolean.TRUE.equals(e.getDashboardActive()) && e.getDashboardExpiresAt() != null) {
+            earliest = earlier(earliest, e.getDashboardExpiresAt());
+        }
+        if (Boolean.TRUE.equals(e.getLmsActive()) && e.getLmsExpiresAt() != null) {
+            earliest = earlier(earliest, e.getLmsExpiresAt());
+        }
+        e.setExpiresAt(earliest);
     }
 
     /**
@@ -579,6 +697,12 @@ public class EntitlementService {
         if (a == null) return b;
         if (b == null) return a;
         return a.before(b) ? a : b;
+    }
+
+    private static Date laterExpiry(Date a, Date b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return a.after(b) ? a : b;
     }
 
     public static class ResendResult {
