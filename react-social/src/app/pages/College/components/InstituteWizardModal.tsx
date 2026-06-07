@@ -158,9 +158,10 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
         setSavedStep1(true);
         setPageLoading(["true"]);
         setStep(2);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to save institute basic info:", err);
-        showErrorToast("Failed to save basic info. Please try again.");
+        const serverMsg = err?.response?.data?.error;
+        showErrorToast(serverMsg || "Failed to save basic info. Please try again.");
       } finally {
         setLoading(false);
       }

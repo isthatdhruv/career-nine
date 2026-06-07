@@ -253,26 +253,42 @@ public class InstituteDetailController {
 			return ResponseEntity.badRequest().body(Map.of("error", "base64Data is required"));
 		}
 
-		String head = base64Data.substring(0, Math.min(base64Data.length(), 30)).toLowerCase();
-		boolean isPng = head.startsWith("data:image/png");
-		boolean isJpeg = head.startsWith("data:image/jpeg") || head.startsWith("data:image/jpg");
-		if (!isPng && !isJpeg) {
+		// Decode first (tolerating an optional data: URL prefix and any whitespace), then decide
+		// the type from the ACTUAL magic bytes — not the caller-declared MIME — so the check is
+		// both robust (works whether the client sends a "data:" URL or raw base64) and trustworthy.
+		byte[] bytes;
+		try {
+			int comma = base64Data.indexOf(',');
+			String raw = base64Data.startsWith("data:") && comma >= 0
+					? base64Data.substring(comma + 1)
+					: base64Data;
+			bytes = java.util.Base64.getMimeDecoder().decode(raw);
+		} catch (Exception e) {
+			log.warn("upload-logo rejected: undecodable base64 ({} chars)", base64Data.length());
+			return ResponseEntity.badRequest().body(Map.of("error", "Invalid base64 image data"));
+		}
+
+		String contentType;
+		String ext;
+		if (isPngBytes(bytes)) {
+			contentType = "image/png";
+			ext = ".png";
+		} else if (isJpegBytes(bytes)) {
+			contentType = "image/jpeg";
+			ext = ".jpg";
+		} else {
+			log.warn("upload-logo rejected: not PNG/JPEG (decoded {} bytes, head {})", bytes.length,
+					bytes.length >= 3 ? String.format("%02X %02X %02X", bytes[0], bytes[1], bytes[2]) : "n/a");
 			return ResponseEntity.badRequest()
 					.body(Map.of("error", "Logo must be a PNG or JPG/JPEG image"));
 		}
 
-		// Defense-in-depth: the data: prefix is caller-declarable, so confirm the decoded
-		// bytes actually start with PNG/JPEG magic numbers (not just the claimed MIME type).
-		if (!hasPngOrJpegMagic(base64Data)) {
-			return ResponseEntity.badRequest()
-					.body(Map.of("error", "Logo content is not a valid PNG or JPG/JPEG image"));
-		}
-
 		Object codeObj = request.get("instituteCode");
 		String folder = codeObj != null ? "school-logos/institute-" + codeObj : "school-logos";
+		String fileName = java.util.UUID.randomUUID().toString() + ext;
 
 		try {
-			String url = spacesService.uploadBase64File(base64Data, folder, null);
+			String url = spacesService.uploadBytes(bytes, contentType, folder, fileName);
 			// Best-effort cleanup of the replaced logo. Scoped to the school-logos area so a
 			// crafted previousUrl cannot delete arbitrary objects elsewhere in the bucket.
 			Object previousUrl = request.get("previousUrl");
@@ -290,23 +306,14 @@ public class InstituteDetailController {
 		}
 	}
 
-	/** True if the base64 data URL decodes to bytes starting with PNG or JPEG magic numbers. */
-	private boolean hasPngOrJpegMagic(String base64Data) {
-		try {
-			int comma = base64Data.indexOf(',');
-			String raw = comma >= 0 ? base64Data.substring(comma + 1) : base64Data;
-			byte[] bytes = java.util.Base64.getDecoder().decode(raw);
-			if (bytes.length < 4) {
-				return false;
-			}
-			boolean png = (bytes[0] & 0xFF) == 0x89 && (bytes[1] & 0xFF) == 0x50
-					&& (bytes[2] & 0xFF) == 0x4E && (bytes[3] & 0xFF) == 0x47;
-			boolean jpeg = (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8
-					&& (bytes[2] & 0xFF) == 0xFF;
-			return png || jpeg;
-		} catch (Exception e) {
-			return false;
-		}
+	private boolean isPngBytes(byte[] b) {
+		return b.length >= 4 && (b[0] & 0xFF) == 0x89 && (b[1] & 0xFF) == 0x50
+				&& (b[2] & 0xFF) == 0x4E && (b[3] & 0xFF) == 0x47;
+	}
+
+	private boolean isJpegBytes(byte[] b) {
+		return b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8
+				&& (b[2] & 0xFF) == 0xFF;
 	}
 
 	@SuppressWarnings("unchecked")
