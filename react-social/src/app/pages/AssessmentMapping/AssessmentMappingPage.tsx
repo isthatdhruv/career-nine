@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { Form, Spinner } from "react-bootstrap";
 import { useInstitutes } from "../../lib/queries/lookups";
+import SchoolAssessmentMappingPanel from "../College/components/SchoolAssessmentMappingPanel";
 import AssessmentMappingPanel from "../College/components/AssessmentMappingPanel";
+
+type Level = "SCHOOL" | "DETAIL";
 
 interface Institute {
   instituteCode: number;
@@ -12,6 +15,7 @@ const AssessmentMappingPage = () => {
   const { data: institutes = [], isLoading: loadingInstitutes } = useInstitutes<Institute>();
   const [search, setSearch] = useState("");
   const [selectedInstituteCode, setSelectedInstituteCode] = useState<string>("");
+  const [level, setLevel] = useState<Level>("SCHOOL");
 
   const selectedInstitute = useMemo(
     () => institutes.find((i) => String(i.instituteCode) === selectedInstituteCode) || null,
@@ -32,7 +36,7 @@ const AssessmentMappingPage = () => {
           Assessment Mapping
         </h2>
         <div style={{ fontSize: "0.85rem", color: "#64748b", marginTop: 4 }}>
-          Enable assessments for an institute, then map them at the institute, session, class or section level — each mapping gets a free &amp; a paid registration link.
+          Manage school-level mappings (class → assessment + registration link) and class/section/session-level assessment mappings (with free &amp; paid links). Both feed the institute's enabled-assessments catalog.
         </div>
       </div>
 
@@ -78,7 +82,36 @@ const AssessmentMappingPage = () => {
         </div>
       </div>
 
-      {/* Unified panel area */}
+      {/* Level toggle */}
+      {selectedInstitute && (
+        <div style={{
+          background: "#fff", borderRadius: 16, padding: "16px 24px",
+          border: "1px solid #e2e8f0", marginBottom: 16,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        }}>
+          <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem", color: "#475569", marginBottom: 10 }}>
+            Mapping Level
+          </Form.Label>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <LevelOption
+              label="School Level"
+              description="Class → assessment configs + single shareable registration link with cap"
+              active={level === "SCHOOL"}
+              onClick={() => setLevel("SCHOOL")}
+              accent="#059669"
+            />
+            <LevelOption
+              label="Class / Section / Session Level"
+              description="Per-mapping free & paid registration links at any level"
+              active={level === "DETAIL"}
+              onClick={() => setLevel("DETAIL")}
+              accent="#1e293b"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Panel area */}
       {!selectedInstitute ? (
         <div style={{
           background: "#fff", borderRadius: 16, padding: "64px 24px",
@@ -101,25 +134,75 @@ const AssessmentMappingPage = () => {
         }}>
           <div style={{
             padding: "16px 24px",
-            background: "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
+            background: level === "SCHOOL"
+              ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
+              : "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
             color: "#fff",
           }}>
             <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
-              Assessment Mapping
+              {level === "SCHOOL" ? "School Level Mapping" : "Class / Section / Session Level Mapping"}
             </div>
             <div style={{ fontSize: "0.8rem", opacity: 0.85, marginTop: 2 }}>
               {selectedInstitute.instituteName}
             </div>
           </div>
-          <AssessmentMappingPanel
-            instituteCode={selectedInstitute.instituteCode}
-            instituteName={selectedInstitute.instituteName}
-            active
-          />
+          {level === "SCHOOL" ? (
+            <SchoolAssessmentMappingPanel
+              instituteCode={selectedInstitute.instituteCode}
+              instituteName={selectedInstitute.instituteName}
+              active
+            />
+          ) : (
+            <AssessmentMappingPanel
+              instituteCode={selectedInstitute.instituteCode}
+              instituteName={selectedInstitute.instituteName}
+              active
+            />
+          )}
         </div>
       )}
     </div>
   );
 };
+
+interface LevelOptionProps {
+  label: string;
+  description: string;
+  active: boolean;
+  onClick: () => void;
+  accent: string;
+}
+
+const LevelOption = ({ label, description, active, onClick, accent }: LevelOptionProps) => (
+  <button
+    type="button"
+    onClick={onClick}
+    style={{
+      flex: "1 1 280px",
+      textAlign: "left",
+      padding: "14px 18px",
+      borderRadius: 12,
+      border: active ? `2px solid ${accent}` : "1.5px solid #e2e8f0",
+      background: active ? `${accent}10` : "#fff",
+      cursor: "pointer",
+      transition: "all 0.15s",
+    }}
+  >
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span style={{
+        width: 16, height: 16, borderRadius: "50%",
+        border: `2px solid ${accent}`,
+        background: active ? accent : "transparent",
+        flexShrink: 0,
+      }} />
+      <div style={{ fontWeight: 700, fontSize: "0.92rem", color: active ? accent : "#1e293b" }}>
+        {label}
+      </div>
+    </div>
+    <div style={{ fontSize: "0.78rem", color: "#64748b", marginTop: 6, marginLeft: 26 }}>
+      {description}
+    </div>
+  </button>
+);
 
 export default AssessmentMappingPage;

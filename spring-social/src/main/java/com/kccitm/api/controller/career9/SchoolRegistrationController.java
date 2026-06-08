@@ -58,6 +58,8 @@ import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
+import com.kccitm.api.service.career9.InstituteAssessmentService;
+import com.kccitm.api.service.b2c.EntitlementService;
 
 @RestController
 @RequestMapping("/school-registration")
@@ -86,6 +88,8 @@ public class SchoolRegistrationController {
     @Autowired private CareerNineRollNumberService rollNumberService;
     @Autowired private StudentProvisioningService studentProvisioningService;
     @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
+    @Autowired private InstituteAssessmentService instituteAssessmentService;
+    @Autowired private EntitlementService entitlementService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
     private String callbackBaseUrl;
@@ -122,6 +126,9 @@ public class SchoolRegistrationController {
         }
 
         configRepository.save(config);
+        // Feed the institute_assessment catalog (SSOT) — every school write enrols the
+        // assessment for the institute, idempotently, so both mapping areas converge here.
+        instituteAssessmentService.ensure(instituteCode, assessmentId);
         return ResponseEntity.ok(config);
     }
 
@@ -166,6 +173,8 @@ public class SchoolRegistrationController {
                 config.setAmount(amount);
             }
             configRepository.save(config);
+            // Feed the institute_assessment catalog (SSOT) for each saved assessment.
+            instituteAssessmentService.ensure(instituteCode, assessmentId);
         }
 
         // B4: batch-save is authoritative for (institute, session) — deactivate every
@@ -349,6 +358,15 @@ public class SchoolRegistrationController {
         // maxRegistrations is nullable-meaningful: always copy it through
         existing.setMaxRegistrations(updated.getMaxRegistrations());
         if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
+        // Service inclusions — copy through on every full-object PUT (booleans coerced
+        // non-null; validity/count nullable = not configured / unlimited window).
+        existing.setIncludesFinalReport(Boolean.TRUE.equals(updated.getIncludesFinalReport()));
+        existing.setIncludesDashboard(Boolean.TRUE.equals(updated.getIncludesDashboard()));
+        existing.setDashboardValidityDays(updated.getDashboardValidityDays());
+        existing.setIncludesCounselling(Boolean.TRUE.equals(updated.getIncludesCounselling()));
+        existing.setCounsellingSessionCount(updated.getCounsellingSessionCount());
+        existing.setIncludesLms(Boolean.TRUE.equals(updated.getIncludesLms()));
+        existing.setLmsValidityDays(updated.getLmsValidityDays());
         SchoolAssessmentTier saved = schoolTierRepository.save(existing);
 
         // A price change must not leave already-issued links payable at the old amount.
@@ -405,8 +423,9 @@ public class SchoolRegistrationController {
 
     // ============ PUBLIC ENDPOINTS ============
 
-    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public registration info by token
-    @PreAuthorize("@auth.allows('school_registration.read')")
+    // Truly public (parity with Area A's /assessment-mapping/public/**): @PreAuthorize
+    // removed so the enforce flip won't 403 the anonymous student; permitAll + CSRF-exempt
+    // via PUBLIC_PATHS (/school-registration/public/**). The path token is the gate.
     @GetMapping("/public/info/{token}")
     public ResponseEntity<?> getSchoolInfo(@PathVariable String token) {
         Optional<SchoolRegistrationLink> linkOpt = linkRepository.findByTokenAndIsActive(token, true);
@@ -488,8 +507,8 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(info);
     }
 
-    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public verify-details by token
-    @PreAuthorize("@auth.allows('school_registration.read')")
+    // Truly public (parity with Area A): @PreAuthorize removed; permitAll + CSRF-exempt
+    // via PUBLIC_PATHS. The path token is the gate.
     @PostMapping("/public/verify-details/{token}")
     public ResponseEntity<?> verifyDetails(@PathVariable String token,
             @RequestBody Map<String, Object> body) {
@@ -588,8 +607,8 @@ public class SchoolRegistrationController {
         response.put("dob", dobStr);
     }
 
-    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public student registration by token
-    @PreAuthorize("@auth.allows('school_registration.create')")
+    // Truly public (parity with Area A): @PreAuthorize removed; permitAll + CSRF-exempt
+    // via PUBLIC_PATHS. The path token is the gate.
     @PostMapping("/public/register/{token}")
     @Transactional
     public ResponseEntity<?> registerStudent(@PathVariable String token,
@@ -702,7 +721,8 @@ public class SchoolRegistrationController {
                         promoCodeStr, promoDiscountPercent,
                         name, email, dob, phone);
             }
-            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, activeTierId);
+            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, activeTierId,
+                    config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent);
         }
 
         // 8. Duplicate check by DOB + institute + class + name
@@ -716,7 +736,8 @@ public class SchoolRegistrationController {
                             promoCodeStr, promoDiscountPercent,
                             name, email, dob, phone);
                 }
-                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId);
+                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId,
+                        config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent);
             }
         }
 
@@ -727,26 +748,7 @@ public class SchoolRegistrationController {
                     name, email, dob, dobStr, phone, gender, classId, schoolSectionId, studentClass);
         }
 
-        // 10. Free path (amount=0, or 100% promo discount)
-        if (paymentRequired && finalAmount != null && finalAmount == 0 && promoCodeStr != null) {
-            PaymentTransaction txn = new PaymentTransaction();
-            txn.setSchoolConfigId(config.getConfigId());
-            txn.setMappingTierId(activeTierId);
-            txn.setAmount(0L);
-            txn.setOriginalAmount(originalAmount);
-            txn.setPromoCode(promoCodeStr.trim().toUpperCase());
-            txn.setPromoDiscountPercent(promoDiscountPercent);
-            txn.setStatus("paid");
-            txn.setAssessmentId(assessmentId);
-            txn.setInstituteCode(instituteCode);
-            txn.setStudentName(name);
-            txn.setStudentEmail(email);
-            txn.setStudentDob(dob);
-            txn.setStudentPhone(phone);
-            paymentTransactionRepository.save(txn);
-        }
-
-        // 11. Create student
+        // 10. Create student
         User user = new User((int) (Math.random() * 100000), dob);
         user.setName(name);
         user.setEmail(email);
@@ -784,6 +786,13 @@ public class SchoolRegistrationController {
         StudentAssessmentMapping sam = new StudentAssessmentMapping(
                 userStudent.getUserStudentId(), assessmentId);
         studentAssessmentMappingRepository.save(sam);
+
+        // Mint the school entitlement so this free student gets the tier's
+        // report/dashboard/counselling/LMS services through the same gates as the
+        // per-level B2B flow (a zero-amount "paid" txn is the ledger row + source).
+        mintFreeSchoolEntitlement(userStudent.getUserStudentId(), assessmentId, instituteCode,
+                config.getConfigId(), activeTierId, name, email, dob, phone,
+                originalAmount, promoCodeStr, promoDiscountPercent);
 
         // A1: the free registration is now realized — consume the promo (atomic,
         // cap-guarded). No-op when no promo was applied.
@@ -948,7 +957,8 @@ public class SchoolRegistrationController {
     }
 
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode, Long activeTierId) {
+            Integer instituteCode, Long activeTierId, Long schoolConfigId,
+            Long originalAmount, String promoCodeStr, Integer promoDiscountPercent) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (userStudents.isEmpty()) {
             InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
@@ -982,6 +992,12 @@ public class SchoolRegistrationController {
             StudentAssessmentMapping sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
             studentAssessmentMappingRepository.save(sam);
+            // Grant the school entitlement for this newly-assigned assessment too.
+            mintFreeSchoolEntitlement(userStudent.getUserStudentId(), assessmentId, instituteCode,
+                    schoolConfigId, activeTierId,
+                    existingStudentInfo.getName(), existingStudentInfo.getEmail(),
+                    existingStudentInfo.getStudentDob(), existingStudentInfo.getPhoneNumber(),
+                    originalAmount, promoCodeStr, promoDiscountPercent);
             response.put("status", "success");
             response.put("message", "Assessment assigned successfully. Please use your existing credentials to log in.");
         }
@@ -1002,6 +1018,39 @@ public class SchoolRegistrationController {
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Mint (or top-up) the school StudentEntitlement for a FREE registration. Writes a
+     * zero-amount "paid" PaymentTransaction (the ledger row AND the entitlement source,
+     * mirroring the per-level free path) carrying school_config_id + the resolved tier id,
+     * then grants the entitlement via the shared seam so the student receives the tier's
+     * report/dashboard/counselling/LMS services. Always minted (even an all-false tier) —
+     * the entitlement is the access record and the free→paid upgrade anchor.
+     */
+    private void mintFreeSchoolEntitlement(Long userStudentId, Long assessmentId, Integer instituteCode,
+            Long schoolConfigId, Long activeTierId, String name, String email, Date dob, String phone,
+            Long originalAmount, String promoCodeStr, Integer promoDiscountPercent) {
+        if (userStudentId == null || activeTierId == null) return;
+        PaymentTransaction txn = new PaymentTransaction();
+        txn.setSchoolConfigId(schoolConfigId);
+        txn.setMappingTierId(activeTierId);
+        txn.setAmount(0L);
+        txn.setOriginalAmount(originalAmount);
+        if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
+            txn.setPromoCode(promoCodeStr.trim().toUpperCase());
+            txn.setPromoDiscountPercent(promoDiscountPercent);
+        }
+        txn.setStatus("paid");
+        txn.setAssessmentId(assessmentId);
+        txn.setInstituteCode(instituteCode);
+        txn.setUserStudentId(userStudentId);
+        txn.setStudentName(name);
+        txn.setStudentEmail(email);
+        txn.setStudentDob(dob);
+        txn.setStudentPhone(phone);
+        txn = paymentTransactionRepository.save(txn);
+        entitlementService.activateSchoolOnPayment(txn.getTransactionId());
     }
 
     /** Atomically consume one promo use for a realized registration; no-op if absent/at-cap. */

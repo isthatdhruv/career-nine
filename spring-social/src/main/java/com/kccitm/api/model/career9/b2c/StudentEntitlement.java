@@ -48,6 +48,12 @@ public class StudentEntitlement implements Serializable {
     @Column(name = "mapping_id")
     private Long mappingId;
 
+    // B2B legacy-school source — set when the entitlement was minted from a
+    // school_assessment_config registration. With campaign_id (B2C) and mapping_id
+    // (per-level B2B), this forms a 3-way source discriminator: exactly one is set.
+    @Column(name = "school_config_id")
+    private Long schoolConfigId;
+
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
 
@@ -157,6 +163,8 @@ public class StudentEntitlement implements Serializable {
     public void setCampaignId(Long v) { this.campaignId = v; }
     public Long getMappingId() { return mappingId; }
     public void setMappingId(Long v) { this.mappingId = v; }
+    public Long getSchoolConfigId() { return schoolConfigId; }
+    public void setSchoolConfigId(Long v) { this.schoolConfigId = v; }
     public Long getAssessmentId() { return assessmentId; }
     public void setAssessmentId(Long v) { this.assessmentId = v; }
     public Long getCampaignAssessmentTierId() { return campaignAssessmentTierId; }

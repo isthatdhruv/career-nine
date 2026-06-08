@@ -16,6 +16,7 @@ import java.text.SimpleDateFormat;
 
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentMappingTier;
+import com.kccitm.api.model.career9.SchoolAssessmentTier;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.UserStudent;
@@ -25,6 +26,7 @@ import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
 import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
+import com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
@@ -51,6 +53,7 @@ public class EntitlementService {
     @Autowired private CampaignAssessmentTierRepository tierMappingRepository;
     @Autowired private PricingTierRepository pricingTierRepository;
     @Autowired private AssessmentMappingTierRepository assessmentMappingTierRepository;
+    @Autowired private SchoolAssessmentTierRepository schoolAssessmentTierRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private UserStudentRepository userStudentRepository;
@@ -237,28 +240,146 @@ public class EntitlementService {
         return e;
     }
 
-    /** Union the tier's service flags onto the entitlement (additive; never drops access). */
-    private void applyMappingTierSnapshot(StudentEntitlement e, AssessmentMappingTier tier) {
-        e.setFinalReportActive(Boolean.TRUE.equals(e.getFinalReportActive())
-                || Boolean.TRUE.equals(tier.getIncludesFinalReport()));
-        e.setDashboardActive(Boolean.TRUE.equals(e.getDashboardActive())
-                || Boolean.TRUE.equals(tier.getIncludesDashboard()));
-        e.setCounsellingActive(Boolean.TRUE.equals(e.getCounsellingActive())
-                || Boolean.TRUE.equals(tier.getIncludesCounselling()));
-        e.setLmsActive(Boolean.TRUE.equals(e.getLmsActive())
-                || Boolean.TRUE.equals(tier.getIncludesLms()));
+    // ===== Legacy-school entitlements (same StudentEntitlement + same gates) =====
+    // The school flow keeps its own school_assessment_config / school_assessment_tier
+    // tables, but a school registration now mints the same access-grant row as the
+    // per-level B2B flow so school students pass the report/dashboard/counselling/LMS
+    // gates. Sourced from a SchoolAssessmentTier and scoped by school_config_id
+    // (campaign_id AND mapping_id both stay null).
 
-        int newSessions = tier.getCounsellingSessionCount() != null ? tier.getCounsellingSessionCount() : 0;
+    /**
+     * Activate (or top-up) a school entitlement from a paid/free PaymentTransaction
+     * that carries school_config_id + mapping_tier_id (a school_assessment_tier id).
+     * Mirrors {@link #activateB2BOnPayment} — find-or-create the student's school
+     * entitlement for the assessment and UNION the tier's service flags (additive,
+     * never dropping an already-granted service).
+     */
+    @Transactional
+    public StudentEntitlement activateSchoolOnPayment(Long paymentTransactionId) {
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(paymentTransactionId);
+        if (!txnOpt.isPresent()) {
+            logger.warn("activateSchoolOnPayment: txn {} not found", paymentTransactionId);
+            return null;
+        }
+        PaymentTransaction txn = txnOpt.get();
+        if (txn.getSchoolConfigId() == null || txn.getMappingTierId() == null) {
+            return null; // not a school payment
+        }
+        Optional<SchoolAssessmentTier> tierOpt =
+                schoolAssessmentTierRepository.findById(txn.getMappingTierId());
+        if (!tierOpt.isPresent()) {
+            logger.warn("activateSchoolOnPayment: school tier {} not found", txn.getMappingTierId());
+            return null;
+        }
+        SchoolAssessmentTier tier = tierOpt.get();
+
+        StudentEntitlement entitlement = entitlementRepository.findByPaymentTransactionId(paymentTransactionId)
+                .orElseGet(() -> findOrCreateSchool(txn));
+
+        // Idempotent: same txn already activated → no-op (webhook retry / reconcile race).
+        if ("active".equals(entitlement.getStatus())
+                && paymentTransactionId.equals(entitlement.getPaymentTransactionId())) {
+            return entitlement;
+        }
+        // STATE1: never resurrect a revoked/refunded entitlement.
+        if ("revoked".equals(entitlement.getStatus()) || "refunded".equals(entitlement.getStatus())) {
+            logger.warn("activateSchoolOnPayment: refusing to reactivate {} entitlement {}",
+                    entitlement.getStatus(), entitlement.getEntitlementId());
+            return entitlement;
+        }
+
+        applyInclusionSnapshot(entitlement, ServiceInclusions.fromSchoolTier(tier));
+        entitlement.setSchoolConfigId(txn.getSchoolConfigId());
+        entitlement.setPaymentTransactionId(txn.getTransactionId());
+        entitlement.setStatus("active");
+        entitlement.setGrantedAt(new Date());
+        if (entitlement.getAccessToken() == null) {
+            entitlement.setAccessToken(generateToken());
+            entitlement.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
+        }
+        return entitlementRepository.save(entitlement);
+    }
+
+    /** Latest non-terminal school entitlement for (student, assessment), or a fresh row. */
+    private StudentEntitlement findOrCreateSchool(PaymentTransaction txn) {
+        if (txn.getUserStudentId() != null) {
+            for (StudentEntitlement e : entitlementRepository
+                    .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(
+                            txn.getUserStudentId(), txn.getAssessmentId())) {
+                if (e.getCampaignId() == null && e.getMappingId() == null
+                        && !"revoked".equals(e.getStatus()) && !"refunded".equals(e.getStatus())) {
+                    e.setPaymentTransactionId(txn.getTransactionId());
+                    return e;
+                }
+            }
+        }
+        StudentEntitlement e = new StudentEntitlement();
+        e.setUserStudentId(txn.getUserStudentId());
+        e.setAssessmentId(txn.getAssessmentId());
+        e.setSchoolConfigId(txn.getSchoolConfigId());
+        e.setPaymentTransactionId(txn.getTransactionId());
+        return e;
+    }
+
+    /** Union an AssessmentMappingTier's service flags onto the entitlement. */
+    private void applyMappingTierSnapshot(StudentEntitlement e, AssessmentMappingTier tier) {
+        applyInclusionSnapshot(e, ServiceInclusions.fromMappingTier(tier));
+    }
+
+    /**
+     * Tier-table-agnostic view of the service inclusions a tier grants. Both the
+     * per-level {@link AssessmentMappingTier} and the legacy {@link SchoolAssessmentTier}
+     * project into this so a single snapshot routine serves both flows.
+     */
+    private static final class ServiceInclusions {
+        final boolean finalReport, dashboard, counselling, lms;
+        final Integer dashboardValidityDays, counsellingSessionCount, lmsValidityDays;
+
+        private ServiceInclusions(boolean finalReport, boolean dashboard, Integer dashboardValidityDays,
+                                  boolean counselling, Integer counsellingSessionCount,
+                                  boolean lms, Integer lmsValidityDays) {
+            this.finalReport = finalReport;
+            this.dashboard = dashboard;
+            this.dashboardValidityDays = dashboardValidityDays;
+            this.counselling = counselling;
+            this.counsellingSessionCount = counsellingSessionCount;
+            this.lms = lms;
+            this.lmsValidityDays = lmsValidityDays;
+        }
+
+        static ServiceInclusions fromMappingTier(AssessmentMappingTier t) {
+            return new ServiceInclusions(
+                    Boolean.TRUE.equals(t.getIncludesFinalReport()),
+                    Boolean.TRUE.equals(t.getIncludesDashboard()), t.getDashboardValidityDays(),
+                    Boolean.TRUE.equals(t.getIncludesCounselling()), t.getCounsellingSessionCount(),
+                    Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays());
+        }
+
+        static ServiceInclusions fromSchoolTier(SchoolAssessmentTier t) {
+            return new ServiceInclusions(
+                    Boolean.TRUE.equals(t.getIncludesFinalReport()),
+                    Boolean.TRUE.equals(t.getIncludesDashboard()), t.getDashboardValidityDays(),
+                    Boolean.TRUE.equals(t.getIncludesCounselling()), t.getCounsellingSessionCount(),
+                    Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays());
+        }
+    }
+
+    /** Union a tier's service flags onto the entitlement (additive; never drops access). */
+    private void applyInclusionSnapshot(StudentEntitlement e, ServiceInclusions inc) {
+        e.setFinalReportActive(Boolean.TRUE.equals(e.getFinalReportActive()) || inc.finalReport);
+        e.setDashboardActive(Boolean.TRUE.equals(e.getDashboardActive()) || inc.dashboard);
+        e.setCounsellingActive(Boolean.TRUE.equals(e.getCounsellingActive()) || inc.counselling);
+        e.setLmsActive(Boolean.TRUE.equals(e.getLmsActive()) || inc.lms);
+
+        int newSessions = inc.counsellingSessionCount != null ? inc.counsellingSessionCount : 0;
         int curSessions = e.getCounsellingSessionsTotal() != null ? e.getCounsellingSessionsTotal() : 0;
         e.setCounsellingSessionsTotal(Math.max(curSessions, newSessions));
 
-        if (Boolean.TRUE.equals(tier.getIncludesDashboard())
-                && tier.getDashboardValidityDays() != null && tier.getDashboardValidityDays() > 0) {
-            e.setDashboardExpiresAt(laterExpiry(e.getDashboardExpiresAt(), daysFromNow(tier.getDashboardValidityDays())));
+        if (inc.dashboard && inc.dashboardValidityDays != null && inc.dashboardValidityDays > 0) {
+            e.setDashboardExpiresAt(laterExpiry(e.getDashboardExpiresAt(), daysFromNow(inc.dashboardValidityDays)));
         }
-        if (Boolean.TRUE.equals(tier.getIncludesLms())
-                && tier.getLmsValidityDays() != null && tier.getLmsValidityDays() > 0) {
-            e.setLmsExpiresAt(laterExpiry(e.getLmsExpiresAt(), daysFromNow(tier.getLmsValidityDays())));
+        if (inc.lms && inc.lmsValidityDays != null && inc.lmsValidityDays > 0) {
+            e.setLmsExpiresAt(laterExpiry(e.getLmsExpiresAt(), daysFromNow(inc.lmsValidityDays)));
         }
 
         // Overall expiry = earliest active service window (services with no window never expire).

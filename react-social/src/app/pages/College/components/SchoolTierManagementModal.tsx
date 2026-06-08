@@ -26,6 +26,13 @@ const emptyForm: SchoolAssessmentTier = {
   sortOrder: 1,
   maxRegistrations: null,
   isActive: true,
+  includesFinalReport: false,
+  includesDashboard: false,
+  dashboardValidityDays: null,
+  includesCounselling: false,
+  counsellingSessionCount: null,
+  includesLms: false,
+  lmsValidityDays: null,
 };
 
 const SchoolTierManagementModal = ({
@@ -102,6 +109,22 @@ const SchoolTierManagementModal = ({
             ? null
             : Math.round(Number(form.maxRegistrations)),
         isActive: form.isActive,
+        includesFinalReport: !!form.includesFinalReport,
+        includesDashboard: !!form.includesDashboard,
+        dashboardValidityDays: form.includesDashboard
+          ? (form.dashboardValidityDays == null || String(form.dashboardValidityDays) === ""
+              ? null : Math.round(Number(form.dashboardValidityDays)))
+          : null,
+        includesCounselling: !!form.includesCounselling,
+        counsellingSessionCount: form.includesCounselling
+          ? (form.counsellingSessionCount == null || String(form.counsellingSessionCount) === ""
+              ? null : Math.round(Number(form.counsellingSessionCount)))
+          : null,
+        includesLms: !!form.includesLms,
+        lmsValidityDays: form.includesLms
+          ? (form.lmsValidityDays == null || String(form.lmsValidityDays) === ""
+              ? null : Math.round(Number(form.lmsValidityDays)))
+          : null,
       };
       if (editingId) {
         await updateSchoolTier(editingId, payload);
@@ -305,6 +328,73 @@ const SchoolTierManagementModal = ({
               onChange={(e) => setForm({ ...form, maxRegistrations: e.target.value === "" ? null : Number(e.target.value) })}
             />
           </div>
+          {/* Included services — what a student who registers under this tier is granted */}
+          <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 14 }}>
+            <Form.Label style={{ fontWeight: 700, fontSize: "0.8rem", color: "#1e293b" }}>
+              Included services
+              <span style={{ color: "#94a3b8", fontWeight: 400 }}> — what students on this tier receive</span>
+            </Form.Label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+              <Form.Check
+                type="switch"
+                label="Final report"
+                checked={!!form.includesFinalReport}
+                onChange={(e) => setForm({ ...form, includesFinalReport: e.target.checked })}
+              />
+              <div>
+                <Form.Check
+                  type="switch"
+                  label="Dashboard"
+                  checked={!!form.includesDashboard}
+                  onChange={(e) => setForm({ ...form, includesDashboard: e.target.checked })}
+                />
+                {form.includesDashboard && (
+                  <Form.Control
+                    type="number" min="0" size="sm"
+                    style={{ marginTop: 6, maxWidth: 260 }}
+                    placeholder="Dashboard validity (days) — blank = no expiry"
+                    value={form.dashboardValidityDays ?? ""}
+                    onChange={(e) => setForm({ ...form, dashboardValidityDays: e.target.value === "" ? null : Number(e.target.value) })}
+                  />
+                )}
+              </div>
+              <div>
+                <Form.Check
+                  type="switch"
+                  label="Counselling"
+                  checked={!!form.includesCounselling}
+                  onChange={(e) => setForm({ ...form, includesCounselling: e.target.checked })}
+                />
+                {form.includesCounselling && (
+                  <Form.Control
+                    type="number" min="0" size="sm"
+                    style={{ marginTop: 6, maxWidth: 260 }}
+                    placeholder="Number of sessions — blank = unlimited"
+                    value={form.counsellingSessionCount ?? ""}
+                    onChange={(e) => setForm({ ...form, counsellingSessionCount: e.target.value === "" ? null : Number(e.target.value) })}
+                  />
+                )}
+              </div>
+              <div>
+                <Form.Check
+                  type="switch"
+                  label="LMS"
+                  checked={!!form.includesLms}
+                  onChange={(e) => setForm({ ...form, includesLms: e.target.checked })}
+                />
+                {form.includesLms && (
+                  <Form.Control
+                    type="number" min="0" size="sm"
+                    style={{ marginTop: 6, maxWidth: 260 }}
+                    placeholder="LMS validity (days) — blank = no expiry"
+                    value={form.lmsValidityDays ?? ""}
+                    onChange={(e) => setForm({ ...form, lmsValidityDays: e.target.value === "" ? null : Number(e.target.value) })}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
           <Form.Check
             type="switch"
             label="Active"

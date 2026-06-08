@@ -481,6 +481,13 @@ public class PaymentWebhookController {
             if (txn.getMappingId() != null && "paid".equals(txn.getStatus())) {
                 entitlementService.activateB2BOnPayment(txn.getTransactionId());
             }
+            // Legacy-school payment → mint (or upgrade) the school service entitlement
+            // through the same shared seam, so school students get report/dashboard/
+            // counselling/LMS per the school tier's inclusions. createStudentAndAllotAssessment
+            // has already stamped user_student_id on the txn (new + existing + redrive paths).
+            if (txn.getSchoolConfigId() != null && "paid".equals(txn.getStatus())) {
+                entitlementService.activateSchoolOnPayment(txn.getTransactionId());
+            }
         }
         // Promo is consumed at realized redemption only (A1) — and only when
         // provisioning fully succeeded (status still "paid"; a failed provision
