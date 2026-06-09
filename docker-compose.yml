@@ -134,27 +134,31 @@ services:
 
   # ── Kafka (KRaft, single broker) — report-on-completion pipeline queue ──────
   kafka:
-    image: bitnami/kafka:3.7
+    image: apache/kafka:latest
     container_name: kafka
     restart: unless-stopped
     expose:
       - "9092"
+    # apache/kafka official image → KAFKA_* env (NOT bitnami's KAFKA_CFG_*).
+    # Single-node KRaft (broker + controller in one process). CLUSTER_ID defaults
+    # deterministically in this image, so it's stable across restarts.
     environment:
-      - KAFKA_CFG_NODE_ID=1
-      - KAFKA_CFG_PROCESS_ROLES=broker,controller
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
-      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
-      - KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
     volumes:
-      - kafka_data:/bitnami/kafka
+      - kafka_data:/var/lib/kafka/data
     deploy:
       resources:
         limits:
@@ -172,12 +176,12 @@ services:
       dockerfile: dockerfile
     command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production,report-worker"]
     restart: always
-    volumes:
-      - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
     env_file:
       - .env.production
     environment:
-      - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+      # Worker only consumes Kafka → generates reports → emails. It uses NO Firebase,
+      # so we don't mount the service-account secret and disable Firebase init outright.
+      - APP_FIREBASE_ENABLED=false
       - GOTENBERG_URL=http://gotenberg:3000
       - KAFKA_BOOTSTRAP=kafka:9092
     deploy:

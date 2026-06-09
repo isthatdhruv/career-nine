@@ -6,6 +6,10 @@ spring:
   main:
     # No HTTP server in the worker — it only consumes Kafka + renders + emails.
     web-application-type: none
+  # The api container owns DB migrations; the worker must NOT run Flyway
+  # (avoids a redundant second migrator + the prod history-validation mismatch).
+  flyway:
+    enabled: false
 
 # Pipeline tuning (override per environment / during load testing via env vars, e.g.
 # REPORT_PIPELINE_GENERATE_CONCURRENCY=2). Defaults are tuned for one 8-vCPU box.
