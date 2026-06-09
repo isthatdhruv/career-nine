@@ -104,7 +104,8 @@ public class PaymentController {
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
 
             String description = "Payment for " + assessmentName;
-            String referenceId = "MAP-" + mappingId + "-" + System.currentTimeMillis();
+            String referenceId = "MAP-" + mappingId + "-" + System.currentTimeMillis()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
 
             String callbackUrl = null;
             if (callbackBaseUrl != null && !callbackBaseUrl.isEmpty()) {
@@ -206,7 +207,8 @@ public class PaymentController {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
             String description = "Career-9: " + campaignOpt.get().getName() + " — " + assessmentName;
-            String referenceId = "CAM-" + campaignId + "-" + campaignAssessmentTierId + "-" + System.currentTimeMillis();
+            String referenceId = "CAM-" + campaignId + "-" + campaignAssessmentTierId + "-" + System.currentTimeMillis()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
 
             String callbackUrl = null;
             if (callbackBaseUrl != null && !callbackBaseUrl.isEmpty()) {

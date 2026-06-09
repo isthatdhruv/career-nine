@@ -76,9 +76,22 @@ const CampaignLandingRedirect: FC = () => {
   );
 };
 
-const SchoolAssessmentRegisterPage = lazy(
-  () => import("../pages/SchoolRegistration/SchoolAssessmentRegisterPage")
-);
+// School registration was migrated to the assessment app. This bridge keeps
+// already-distributed dashboard-host links (REACT_APP_URL/school-register/:token)
+// working by forwarding them to the assessment app, preserving any query string.
+const SchoolRegisterRedirect: FC = () => {
+  const { token } = useParams<{ token: string }>();
+  useEffect(() => {
+    const base =
+      process.env.REACT_APP_ASSESSMENT_APP_URL || "https://assessment.career-9.com";
+    window.location.replace(`${base}/school-register/${token}${window.location.search}`);
+  }, [token]);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif", color: "#555" }}>
+      Redirecting…
+    </div>
+  );
+};
 const PaymentRegisterPage = lazy(
   () => import("../pages/PaymentTracking/PaymentRegisterPage")
 );
@@ -236,11 +249,7 @@ const AppRoutes: FC = () => {
             />
       <Route
               path="/school-register/:token"
-              element={
-                <SuspensedView>
-                  <SchoolAssessmentRegisterPage />
-                </SuspensedView>
-              }
+              element={<SchoolRegisterRedirect />}
             />
       <Route
               path="/payment-status"

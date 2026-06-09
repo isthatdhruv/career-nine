@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useStudentBranding, brandLogoSrc } from '../hooks/useStudentBranding';
 import { useNavigate } from 'react-router-dom';
 import { getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
 import { TierCard, Tier } from '../components/TierCard';
@@ -84,6 +85,7 @@ type ReportState = 'idle' | 'preparing' | 'ready' | 'failed';
 const ThankYouPage: React.FC = () => {
     const navigate = useNavigate();
 
+    const branding = useStudentBranding();
     const [hoveredRating, setHoveredRating] = useState<number>(0);
     const [submittedRating, setSubmittedRating] = useState<number>(0);
     const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
@@ -396,8 +398,8 @@ const ThankYouPage: React.FC = () => {
                                 </div>
 
                                 <img
-                                    src="/media/logos/kcc.webp"
-                                    alt="Career-9 Logo"
+                                    src={brandLogoSrc(branding)}
+                                    alt={branding.whitelabel ? (branding.schoolName || 'School') + ' logo' : 'Career-9 Logo'}
                                     style={{
                                         width: '80px',
                                         height: '80px',
@@ -408,6 +410,11 @@ const ThankYouPage: React.FC = () => {
                                         boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
                                     }}
                                 />
+                                {branding.whitelabel && (
+                                    <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#94a3b8', marginTop: '-0.75rem', marginBottom: '1rem' }}>
+                                        Powered by Career-9
+                                    </p>
+                                )}
 
                                 <h1
                                     style={{

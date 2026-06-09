@@ -120,6 +120,38 @@ public class GeneratedReportController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // Bulk existence check for the admin group-student listing: given a list of
+    // userStudentIds, return the subset that have at least one successfully generated
+    // report. Lets the frontend hide the "Dashboard" button for students with no report
+    // in a single round-trip (avoids one call per row). Scope-filtered like getAll.
+    @PostMapping("/exists/by-students")
+    @PreAuthorize("@auth.allows('generated_report.read.all')")
+    public ResponseEntity<List<Long>> existsByStudents(@RequestBody Map<String, Object> body) {
+        Object raw = body == null ? null : body.get("userStudentIds");
+        if (!(raw instanceof List)) {
+            return ResponseEntity.ok(new ArrayList<>());
+        }
+        List<Long> ids = new ArrayList<>();
+        for (Object o : (List<?>) raw) {
+            if (o instanceof Number) {
+                ids.add(((Number) o).longValue());
+            } else if (o != null) {
+                try { ids.add(Long.parseLong(o.toString().trim())); } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (ids.isEmpty()) {
+            return ResponseEntity.ok(new ArrayList<>());
+        }
+        List<Long> withReport = generatedReportRepository
+                .findByUserStudentUserStudentIdInAndReportStatus(ids, "generated")
+                .stream()
+                .map(r -> r.getUserStudent() == null ? null : r.getUserStudent().getUserStudentId())
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(withReport);
+    }
+
     // ═══════════════════════ STUDENT-FACING (visibility-filtered) ═══════════════════════
 
     @GetMapping("/student/{userStudentId}")

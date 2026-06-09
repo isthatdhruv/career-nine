@@ -98,6 +98,34 @@ public class OdooEmailService {
     }
 
     /**
+     * Send an HTML email via Odoo with a custom From <em>display name</em> (e.g. the
+     * whitelabel "{School} (via Career-9)"). The envelope sender stays the configured
+     * Odoo account so SPF/DKIM are unaffected — only the friendly name changes. A
+     * blank {@code fromName} falls back to the default Career-9 sender.
+     */
+    @Async
+    public void sendHtmlEmail(String to, String subject, String htmlContent, String fromName) {
+        try {
+            Integer uid = authenticate();
+            if (uid == null) {
+                logger.error("Odoo email: authentication failed");
+                return;
+            }
+
+            String emailFrom = (fromName != null && !fromName.isBlank())
+                    ? "\"" + fromName.replaceAll("[\"\\p{Cntrl}]", "").trim() + "\" <" + odooUsername + ">"
+                    : null;
+
+            Long mailId = createMailRecord(uid, to, null, null, subject, htmlContent, emailFrom);
+            sendMail(uid, mailId);
+            logger.info("Odoo HTML email sent to {} (mail.mail ID {}, from='{}')", to, mailId, fromName);
+
+        } catch (Exception e) {
+            logger.error("Odoo HTML email failed to {}: {}", to, e.getMessage());
+        }
+    }
+
+    /**
      * Send a full email using SmtpEmailRequest (supports multiple recipients, CC, BCC, attachments).
      */
     @Async

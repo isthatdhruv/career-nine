@@ -50,6 +50,7 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSessionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
+import com.kccitm.api.service.branding.InstituteBrandingService;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
@@ -57,6 +58,8 @@ import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
+import com.kccitm.api.service.career9.InstituteAssessmentService;
+import com.kccitm.api.service.b2c.EntitlementService;
 
 @RestController
 @RequestMapping("/school-registration")
@@ -70,6 +73,7 @@ public class SchoolRegistrationController {
     @Autowired private SchoolRegistrationLinkRepository linkRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
+    @Autowired private InstituteBrandingService brandingService;
     @Autowired private SchoolSessionRepository schoolSessionRepository;
     @Autowired private SchoolClassesRepository schoolClassesRepository;
     @Autowired private UserRepository userRepository;
@@ -77,11 +81,15 @@ public class SchoolRegistrationController {
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired private com.kccitm.api.service.PaymentTransactionWriter paymentTransactionWriter;
     @Autowired private PromoCodeRepository promoCodeRepository;
     @Autowired private RazorpayService razorpayService;
     @Autowired private SmtpEmailService emailService;
     @Autowired private CareerNineRollNumberService rollNumberService;
     @Autowired private StudentProvisioningService studentProvisioningService;
+    @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
+    @Autowired private InstituteAssessmentService instituteAssessmentService;
+    @Autowired private EntitlementService entitlementService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
     private String callbackBaseUrl;
@@ -118,6 +126,9 @@ public class SchoolRegistrationController {
         }
 
         configRepository.save(config);
+        // Feed the institute_assessment catalog (SSOT) — every school write enrols the
+        // assessment for the institute, idempotently, so both mapping areas converge here.
+        instituteAssessmentService.ensure(instituteCode, assessmentId);
         return ResponseEntity.ok(config);
     }
 
@@ -130,11 +141,19 @@ public class SchoolRegistrationController {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> configs = (List<Map<String, Object>>) data.get("configs");
 
-        List<SchoolAssessmentConfig> saved = new ArrayList<>();
+        java.util.Set<Integer> submittedClassIds = new java.util.HashSet<>();
         for (Map<String, Object> c : configs) {
             Integer classId = Integer.valueOf(c.get("classId").toString());
-            Long assessmentId = Long.valueOf(c.get("assessmentId").toString());
+            Object aidObj = c.get("assessmentId");
+            // A cleared class ("-- No assessment --") is either dropped from the payload
+            // or sent with a null assessmentId — either way leave it OUT of the submitted
+            // set so the authoritative sweep below deactivates it (B4).
+            if (aidObj == null || aidObj.toString().trim().isEmpty()) {
+                continue;
+            }
+            Long assessmentId = Long.valueOf(aidObj.toString());
             Long amount = c.get("amount") != null ? Long.valueOf(c.get("amount").toString()) : null;
+            submittedClassIds.add(classId);
 
             Optional<SchoolAssessmentConfig> existing = configRepository
                     .findByInstituteCodeAndSessionIdAndClassId(instituteCode, sessionId, classId);
@@ -153,9 +172,23 @@ public class SchoolRegistrationController {
                 config.setAssessmentId(assessmentId);
                 config.setAmount(amount);
             }
-            saved.add(configRepository.save(config));
+            configRepository.save(config);
+            // Feed the institute_assessment catalog (SSOT) for each saved assessment.
+            instituteAssessmentService.ensure(instituteCode, assessmentId);
         }
-        return ResponseEntity.ok(saved);
+
+        // B4: batch-save is authoritative for (institute, session) — deactivate every
+        // existing config whose class is absent from this batch, so "unmapping" a class
+        // actually stops it being registrable (previously it stayed active + payable).
+        for (SchoolAssessmentConfig existing :
+                configRepository.findByInstituteCodeAndSessionIdOrderByClassIdAsc(instituteCode, sessionId)) {
+            if (!submittedClassIds.contains(existing.getClassId()) && Boolean.TRUE.equals(existing.getIsActive())) {
+                existing.setIsActive(false);
+                configRepository.save(existing);
+            }
+        }
+        return ResponseEntity.ok(
+                configRepository.findByInstituteCodeAndSessionIdOrderByClassIdAsc(instituteCode, sessionId));
     }
 
     @PreAuthorize("@auth.allows('school_registration.read', #instituteCode, #sessionId, null, null)")
@@ -325,6 +358,15 @@ public class SchoolRegistrationController {
         // maxRegistrations is nullable-meaningful: always copy it through
         existing.setMaxRegistrations(updated.getMaxRegistrations());
         if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
+        // Service inclusions — copy through on every full-object PUT (booleans coerced
+        // non-null; validity/count nullable = not configured / unlimited window).
+        existing.setIncludesFinalReport(Boolean.TRUE.equals(updated.getIncludesFinalReport()));
+        existing.setIncludesDashboard(Boolean.TRUE.equals(updated.getIncludesDashboard()));
+        existing.setDashboardValidityDays(updated.getDashboardValidityDays());
+        existing.setIncludesCounselling(Boolean.TRUE.equals(updated.getIncludesCounselling()));
+        existing.setCounsellingSessionCount(updated.getCounsellingSessionCount());
+        existing.setIncludesLms(Boolean.TRUE.equals(updated.getIncludesLms()));
+        existing.setLmsValidityDays(updated.getLmsValidityDays());
         SchoolAssessmentTier saved = schoolTierRepository.save(existing);
 
         // A price change must not leave already-issued links payable at the old amount.
@@ -333,10 +375,12 @@ public class SchoolRegistrationController {
         if (priceChanged) {
             List<PaymentTransaction> outstanding = paymentTransactionRepository
                     .findByAssessmentIdOrderByCreatedAtDesc(saved.getAssessmentId());
+            // Cancel only links priced under THIS tier. Each school txn stamps the tier id in
+            // mappingTierId, so scoping by it avoids cancelling in-flight payments for other
+            // sessions/classes of the same institute that share this assessment.
             outstanding.removeIf(t -> t.getSchoolConfigId() == null
-                    || t.getInstituteCode() == null
-                    || saved.getInstituteCode() == null
-                    || t.getInstituteCode().longValue() != saved.getInstituteCode().longValue());
+                    || t.getMappingTierId() == null
+                    || !t.getMappingTierId().equals(saved.getTierId()));
             cancelOutstandingLinks(outstanding);
         }
         return ResponseEntity.ok(saved);
@@ -379,8 +423,9 @@ public class SchoolRegistrationController {
 
     // ============ PUBLIC ENDPOINTS ============
 
-    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public registration info by token
-    @PreAuthorize("@auth.allows('school_registration.read')")
+    // Truly public (parity with Area A's /assessment-mapping/public/**): @PreAuthorize
+    // removed so the enforce flip won't 403 the anonymous student; permitAll + CSRF-exempt
+    // via PUBLIC_PATHS (/school-registration/public/**). The path token is the gate.
     @GetMapping("/public/info/{token}")
     public ResponseEntity<?> getSchoolInfo(@PathVariable String token) {
         Optional<SchoolRegistrationLink> linkOpt = linkRepository.findByTokenAndIsActive(token, true);
@@ -399,6 +444,7 @@ public class SchoolRegistrationController {
         if (institute != null) {
             info.put("instituteName", institute.getInstituteName());
         }
+        info.put("branding", brandingService.forInstitute(institute));
         info.put("instituteCode", instituteCode);
         info.put("sessionId", sessionId);
 
@@ -461,8 +507,8 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(info);
     }
 
-    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public verify-details by token
-    @PreAuthorize("@auth.allows('school_registration.read')")
+    // Truly public (parity with Area A): @PreAuthorize removed; permitAll + CSRF-exempt
+    // via PUBLIC_PATHS. The path token is the gate.
     @PostMapping("/public/verify-details/{token}")
     public ResponseEntity<?> verifyDetails(@PathVariable String token,
             @RequestBody Map<String, Object> body) {
@@ -561,8 +607,8 @@ public class SchoolRegistrationController {
         response.put("dob", dobStr);
     }
 
-    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public student registration by token
-    @PreAuthorize("@auth.allows('school_registration.create')")
+    // Truly public (parity with Area A): @PreAuthorize removed; permitAll + CSRF-exempt
+    // via PUBLIC_PATHS. The path token is the gate.
     @PostMapping("/public/register/{token}")
     @Transactional
     public ResponseEntity<?> registerStudent(@PathVariable String token,
@@ -609,6 +655,12 @@ public class SchoolRegistrationController {
         }
 
         SchoolAssessmentConfig config = configOpt.get();
+        // A deactivated class config must not be registrable even if a client posts its classId
+        // directly (getSchoolInfo hides it, but the register action has to enforce the flag too).
+        if (!Boolean.TRUE.equals(config.getIsActive())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Registration is closed for the selected class");
+        }
         Long assessmentId = config.getAssessmentId();
 
         // 4b. Resolve active pricing tier for this assessment. No active tier → registration closed.
@@ -645,10 +697,19 @@ public class SchoolRegistrationController {
                 return ResponseEntity.badRequest().body("Promo code usage limit reached");
             }
             promoDiscountPercent = promo.getDiscountPercent();
+            // PROMO3: reject a discount outside [0,100].
+            if (promoDiscountPercent == null || promoDiscountPercent < 0 || promoDiscountPercent > 100) {
+                return ResponseEntity.badRequest().body("Promo code is misconfigured");
+            }
             finalAmount = mappingAmount * (100 - promoDiscountPercent) / 100;
-
-            promo.setCurrentUses(promo.getCurrentUses() + 1);
-            promoCodeRepository.save(promo);
+            // Integer (floor) division can drive a low price to 0 for a non-100% discount,
+            // which would wrongly route the student onto the free path. Only a true 100%
+            // discount (or a 0 base amount) may reach the free flow.
+            if (promoDiscountPercent < 100 && finalAmount < 1L) {
+                finalAmount = 1L;
+            }
+            // A1/A2: consumption deferred to realized redemption (paid webhook
+            // success / free-commit) via atomic tryConsume — not burned here.
         }
 
         // 7. Duplicate check by email
@@ -660,7 +721,8 @@ public class SchoolRegistrationController {
                         promoCodeStr, promoDiscountPercent,
                         name, email, dob, phone);
             }
-            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, activeTierId);
+            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, activeTierId,
+                    config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent);
         }
 
         // 8. Duplicate check by DOB + institute + class + name
@@ -674,7 +736,8 @@ public class SchoolRegistrationController {
                             promoCodeStr, promoDiscountPercent,
                             name, email, dob, phone);
                 }
-                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId);
+                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId,
+                        config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent);
             }
         }
 
@@ -685,26 +748,7 @@ public class SchoolRegistrationController {
                     name, email, dob, dobStr, phone, gender, classId, schoolSectionId, studentClass);
         }
 
-        // 10. Free path (amount=0, or 100% promo discount)
-        if (paymentRequired && finalAmount != null && finalAmount == 0 && promoCodeStr != null) {
-            PaymentTransaction txn = new PaymentTransaction();
-            txn.setSchoolConfigId(config.getConfigId());
-            txn.setMappingTierId(activeTierId);
-            txn.setAmount(0L);
-            txn.setOriginalAmount(originalAmount);
-            txn.setPromoCode(promoCodeStr.trim().toUpperCase());
-            txn.setPromoDiscountPercent(promoDiscountPercent);
-            txn.setStatus("paid");
-            txn.setAssessmentId(assessmentId);
-            txn.setInstituteCode(instituteCode);
-            txn.setStudentName(name);
-            txn.setStudentEmail(email);
-            txn.setStudentDob(dob);
-            txn.setStudentPhone(phone);
-            paymentTransactionRepository.save(txn);
-        }
-
-        // 11. Create student
+        // 10. Create student
         User user = new User((int) (Math.random() * 100000), dob);
         user.setName(name);
         user.setEmail(email);
@@ -733,12 +777,26 @@ public class SchoolRegistrationController {
         UserStudent userStudent = new UserStudent(user, studentInfo, institute);
         userStudent = userStudentRepository.save(userStudent);
         studentProvisioningService.provision(userStudent);
+        // Write the institute-membership row so free-path students appear in the roster and are
+        // manageable via the membership API (the paid webhook path already does this).
+        membershipService.setPrimaryInstitute(userStudent, instituteCode, null, "school-free-provision");
 
         incrementSchoolTierCount(activeTierId);
 
         StudentAssessmentMapping sam = new StudentAssessmentMapping(
                 userStudent.getUserStudentId(), assessmentId);
         studentAssessmentMappingRepository.save(sam);
+
+        // Mint the school entitlement so this free student gets the tier's
+        // report/dashboard/counselling/LMS services through the same gates as the
+        // per-level B2B flow (a zero-amount "paid" txn is the ledger row + source).
+        mintFreeSchoolEntitlement(userStudent.getUserStudentId(), assessmentId, instituteCode,
+                config.getConfigId(), activeTierId, name, email, dob, phone,
+                originalAmount, promoCodeStr, promoDiscountPercent);
+
+        // A1: the free registration is now realized — consume the promo (atomic,
+        // cap-guarded). No-op when no promo was applied.
+        consumePromoIfPresent(promoCodeStr);
 
         // 12. Build response + send email
         Map<String, Object> response = new HashMap<>();
@@ -803,23 +861,9 @@ public class SchoolRegistrationController {
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
 
             String callbackUrl = callbackBaseUrl + "/payment-status";
-            String referenceId = "SCHOOL-" + schoolConfigId + "-" + System.currentTimeMillis();
 
-            Map<String, String> notes = new HashMap<>();
-            notes.put("schoolConfigId", String.valueOf(schoolConfigId));
-            notes.put("assessmentId", String.valueOf(assessmentId));
-            notes.put("instituteCode", String.valueOf(instituteCode));
-            notes.put("studentEmail", email);
-            notes.put("studentName", name);
-            notes.put("classId", String.valueOf(classId));
-            if (schoolSectionId != null) notes.put("schoolSectionId", String.valueOf(schoolSectionId));
-            if (studentClass != null) notes.put("studentClass", String.valueOf(studentClass));
-
-            // BUG FIX: use correct key names from RazorpayService response
-            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalAmountInr, "INR", assessmentName + " - Payment",
-                    callbackUrl, referenceId, notes);
-
+            // PAY1: commit a 'created' txn in its own transaction BEFORE the irreversible
+            // Razorpay link call, so a recoverable DB record always exists first.
             PaymentTransaction txn = new PaymentTransaction();
             txn.setSchoolConfigId(schoolConfigId);
             txn.setMappingTierId(mappingTierId);
@@ -831,18 +875,35 @@ public class SchoolRegistrationController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
-            // BUG FIX: use "linkId" and "shortUrl" (not "id" / "short_url")
-            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
-            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
-            txn.setShortUrl(rzpResponse.get("shortUrl"));
             txn.setStatus("created");
-
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
                 txn.setPromoCode(promoCodeStr.trim().toUpperCase());
                 txn.setPromoDiscountPercent(promoDiscountPercent);
             }
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
-            txn = paymentTransactionRepository.save(txn);
+            String referenceId = "SCHOOL-" + schoolConfigId + "-" + txn.getTransactionId()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("schoolConfigId", String.valueOf(schoolConfigId));
+            notes.put("assessmentId", String.valueOf(assessmentId));
+            notes.put("instituteCode", String.valueOf(instituteCode));
+            notes.put("studentEmail", email);
+            notes.put("studentName", name);
+            notes.put("classId", String.valueOf(classId));
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+            if (schoolSectionId != null) notes.put("schoolSectionId", String.valueOf(schoolSectionId));
+            if (studentClass != null) notes.put("studentClass", String.valueOf(studentClass));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalAmountInr, "INR", assessmentName + " - Payment",
+                    callbackUrl, referenceId, notes);
+
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
             // The freshly-issued link is now the only one that should be payable. Kill any
             // older still-"created" links for this same student + assessment so a reopened
@@ -896,7 +957,8 @@ public class SchoolRegistrationController {
     }
 
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode, Long activeTierId) {
+            Integer instituteCode, Long activeTierId, Long schoolConfigId,
+            Long originalAmount, String promoCodeStr, Integer promoDiscountPercent) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (userStudents.isEmpty()) {
             InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
@@ -912,6 +974,7 @@ public class SchoolRegistrationController {
             UserStudent newUs = new UserStudent(existingUser, existingStudentInfo, institute);
             newUs = userStudentRepository.save(newUs);
             studentProvisioningService.provision(newUs);
+            membershipService.setPrimaryInstitute(newUs, instituteCode, null, "school-free-provision");
             incrementSchoolTierCount(activeTierId);
             userStudents = List.of(newUs);
         }
@@ -929,6 +992,12 @@ public class SchoolRegistrationController {
             StudentAssessmentMapping sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
             studentAssessmentMappingRepository.save(sam);
+            // Grant the school entitlement for this newly-assigned assessment too.
+            mintFreeSchoolEntitlement(userStudent.getUserStudentId(), assessmentId, instituteCode,
+                    schoolConfigId, activeTierId,
+                    existingStudentInfo.getName(), existingStudentInfo.getEmail(),
+                    existingStudentInfo.getStudentDob(), existingStudentInfo.getPhoneNumber(),
+                    originalAmount, promoCodeStr, promoDiscountPercent);
             response.put("status", "success");
             response.put("message", "Assessment assigned successfully. Please use your existing credentials to log in.");
         }
@@ -951,18 +1020,68 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Mint (or top-up) the school StudentEntitlement for a FREE registration. Writes a
+     * zero-amount "paid" PaymentTransaction (the ledger row AND the entitlement source,
+     * mirroring the per-level free path) carrying school_config_id + the resolved tier id,
+     * then grants the entitlement via the shared seam so the student receives the tier's
+     * report/dashboard/counselling/LMS services. Always minted (even an all-false tier) —
+     * the entitlement is the access record and the free→paid upgrade anchor.
+     */
+    private void mintFreeSchoolEntitlement(Long userStudentId, Long assessmentId, Integer instituteCode,
+            Long schoolConfigId, Long activeTierId, String name, String email, Date dob, String phone,
+            Long originalAmount, String promoCodeStr, Integer promoDiscountPercent) {
+        if (userStudentId == null || activeTierId == null) return;
+        PaymentTransaction txn = new PaymentTransaction();
+        txn.setSchoolConfigId(schoolConfigId);
+        txn.setMappingTierId(activeTierId);
+        txn.setAmount(0L);
+        txn.setOriginalAmount(originalAmount);
+        if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
+            txn.setPromoCode(promoCodeStr.trim().toUpperCase());
+            txn.setPromoDiscountPercent(promoDiscountPercent);
+        }
+        txn.setStatus("paid");
+        txn.setAssessmentId(assessmentId);
+        txn.setInstituteCode(instituteCode);
+        txn.setUserStudentId(userStudentId);
+        txn.setStudentName(name);
+        txn.setStudentEmail(email);
+        txn.setStudentDob(dob);
+        txn.setStudentPhone(phone);
+        txn = paymentTransactionRepository.save(txn);
+        entitlementService.activateSchoolOnPayment(txn.getTransactionId());
+    }
+
+    /** Atomically consume one promo use for a realized registration; no-op if absent/at-cap. */
+    private void consumePromoIfPresent(String promoCode) {
+        if (promoCode == null || promoCode.trim().isEmpty()) return;
+        promoCodeRepository.findByCodeIgnoreCase(promoCode.trim().toUpperCase()).ifPresent(p -> {
+            int rows = promoCodeRepository.tryConsume(p.getId());
+            if (rows == 0) {
+                logger.warn("Promo {} already at maxUses at redemption time — not consumed", promoCode);
+            }
+        });
+    }
+
     private Integer parseClassNumber(Integer classId) {
         if (classId == null) return null;
-        try {
-            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
-            if (classOpt.isPresent()) {
-                String className = classOpt.get().getClassName();
-                return Integer.parseInt(className.replaceAll("[^0-9]", ""));
+        Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
+        if (classOpt.isPresent()) {
+            String className = classOpt.get().getClassName();
+            if (className != null) {
+                String digits = className.replaceAll("[^0-9]", "");
+                if (!digits.isEmpty()) {
+                    try {
+                        return Integer.parseInt(digits);
+                    } catch (NumberFormatException e) {
+                        logger.warn("Could not parse class number from className for classId: {}", classId);
+                    }
+                }
             }
-        } catch (NumberFormatException e) {
-            logger.warn("Could not parse class number from className for classId: {}", classId);
         }
-        return classId;
+        // Never fall back to classId (a DB primary key) — that would corrupt studentClass.
+        return null;
     }
 
     private void sendRegistrationEmail(String toEmail, String studentName, String username, String dob, String assessmentName) {

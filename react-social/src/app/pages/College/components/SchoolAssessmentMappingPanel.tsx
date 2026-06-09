@@ -200,7 +200,11 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
 
   const getRegistrationUrl = () => {
     if (!link?.token) return "";
-    return `${process.env.REACT_APP_URL}/school-register/${link.token}`;
+    // Registration is served by the assessment app (migrated off the dashboard).
+    // Old dashboard-host links keep working via the redirect bridge in AppRoutes.
+    const assessmentAppUrl =
+      process.env.REACT_APP_ASSESSMENT_APP_URL || "https://assessment.career-9.com";
+    return `${assessmentAppUrl}/school-register/${link.token}`;
   };
 
   const copyToClipboard = () => {

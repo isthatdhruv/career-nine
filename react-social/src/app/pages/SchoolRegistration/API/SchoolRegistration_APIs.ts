@@ -64,6 +64,15 @@ export interface SchoolAssessmentTier {
   maxRegistrations: number | null;
   currentCount?: number;
   isActive?: boolean;
+  // Service inclusions — what this tier grants the student (parity with the
+  // per-level AssessmentMappingTier). Drives the StudentEntitlement at registration.
+  includesFinalReport?: boolean;
+  includesDashboard?: boolean;
+  dashboardValidityDays?: number | null;
+  includesCounselling?: boolean;
+  counsellingSessionCount?: number | null;
+  includesLms?: boolean;
+  lmsValidityDays?: number | null;
 }
 
 export function getSchoolTiers(instituteCode: number, sessionId: number, assessmentId: number) {

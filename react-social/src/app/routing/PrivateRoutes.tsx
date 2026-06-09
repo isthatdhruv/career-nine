@@ -1,10 +1,11 @@
 import { FC, lazy, Suspense } from "react";
-import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 import { RequirePermission } from "../modules/auth";
+import { useAuth } from "../modules/auth/core/Auth";
 import CareerPage from "../pages/Career/CareerPage";
 import { CareerCreatePage, CareerEditPage } from "../pages/Career/components";
 import FacultyRegistrationDetails from "../pages/FacultyRegistration/FacultyRegistrationDetails";
@@ -121,6 +122,31 @@ const AuthorizedLayout = () => {
   return <MasterLayout />;
 };
 
+/**
+ * Post-login gate: a student whose one-time profile step isn't done is routed to
+ * /student/dashboard/student-info before any dashboard page. `infoCompleted` comes
+ * from /auth/me (MeResponse). Non-students and super-admins pass through, and the
+ * info form itself is never gated (or it would loop).
+ */
+const StudentInfoGate: FC<WithChildren> = ({ children }) => {
+  const { currentUser } = useAuth();
+  const location = useLocation();
+  const roles = currentUser?.roles || [];
+  const isStudent = roles.some(
+    (r) => r === "STUDENT" || r === "B2C_STUDENT" || r === "ROLE_STUDENT" || r === "ROLE_B2C_STUDENT"
+  );
+  if (
+    currentUser &&
+    isStudent &&
+    !currentUser.superAdmin &&
+    currentUser.infoCompleted !== true &&
+    location.pathname !== "/student/dashboard/student-info"
+  ) {
+    return <Navigate to="/student/dashboard/student-info" replace />;
+  }
+  return <>{children}</>;
+};
+
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -170,6 +196,9 @@ const PrivateRoutes = () => {
   // );
   const StudentPortalDashboard = lazy(
     () => import("../pages/StudentDashboard/student-portal/StudentPortalDashboard")
+  );
+  const InsightDashboard = lazy(
+    () => import("../pages/StudentDashboard/insight/InsightDashboard")
   );
   const StudentInfoForm = lazy(
     () => import("../pages/StudentDashboard/student-portal/StudentInfoForm")
@@ -254,10 +283,7 @@ const PrivateRoutes = () => {
   const SlotManagementPage = lazy(() => import("../pages/Counselling/admin/SlotManagementPage"));
   const ManageStudentsPage = lazy(() => import("../pages/Counselling/admin/ManageStudentsPage"));
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
-  const ReportTypesPage = lazy(() => import("../pages/ReportTypes/ReportTypesPage"));
   const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
-  const ReportTypesCreatePage = lazy(() => import("../pages/ReportTypes/components/ReportTypesCreatePage"));
-  const ReportTypesEditPage = lazy(() => import("../pages/ReportTypes/components/ReportTypesEditPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
   const PaymentRegisterPage = lazy(() => import("../pages/PaymentTracking/PaymentRegisterPage"));
@@ -299,6 +325,18 @@ const PrivateRoutes = () => {
         <RequirePermission perm="student.read">
           <SuspensedView>
             <StudentPortalDashboard />
+          </SuspensedView>
+        </RequirePermission>
+      } />
+
+      {/* Real per-student assessment Insight Dashboard (data-driven, per engine).
+          Opened by the admin group-student "Dashboard" button for students who have
+          a generated report. Layout-free (no Metronic aside) so the new tab shows
+          only the dashboard. Reads ?studentId=&assessmentId=&name= */}
+      <Route path="/student/insight-dashboard" element={
+        <RequirePermission perm="generated_report.read">
+          <SuspensedView>
+            <InsightDashboard />
           </SuspensedView>
         </RequirePermission>
       } />
@@ -509,41 +547,53 @@ const PrivateRoutes = () => {
         } />
         <Route path="/student/dashboard" element={
           <RequirePermission perm="assessment.read">
-            <SuspensedView>
-              <StudentPortalDashboard />
-            </SuspensedView>
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalDashboard />
+              </SuspensedView>
+            </StudentInfoGate>
           </RequirePermission>
         } />
         <Route path="/student/dashboard/navigator-360" element={
           <RequirePermission perm="generated_report.read">
-            <SuspensedView>
-              <StudentPortalNavigator360 />
-            </SuspensedView>
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalNavigator360 />
+              </SuspensedView>
+            </StudentInfoGate>
           </RequirePermission>
         } />
         <Route path="/student/dashboard/assessments" element={
           <RequirePermission perm="assessment.read">
-            <SuspensedView>
-              <StudentPortalAssessments />
-            </SuspensedView>
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalAssessments />
+              </SuspensedView>
+            </StudentInfoGate>
           </RequirePermission>
         } />
         <Route path="/student/dashboard/reports" element={
           <RequirePermission perm="generated_report.read">
-            <SuspensedView>
-              <StudentPortalReports />
-            </SuspensedView>
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalReports />
+              </SuspensedView>
+            </StudentInfoGate>
           </RequirePermission>
         } />
         <Route path="/student/dashboard/counselling" element={
-          <SuspensedView>
-            <StudentCounsellingPage />
-          </SuspensedView>
+          <StudentInfoGate>
+            <SuspensedView>
+              <StudentCounsellingPage />
+            </SuspensedView>
+          </StudentInfoGate>
         } />
         <Route path="/student/dashboard/counselling/book" element={
-          <SuspensedView>
-            <SlotBookingPage />
-          </SuspensedView>
+          <StudentInfoGate>
+            <SuspensedView>
+              <SlotBookingPage />
+            </SuspensedView>
+          </StudentInfoGate>
         } />
 
         {/* Backwards-compat redirects: legacy /student/* and /dashboard/student/* paths -> new /student/dashboard/* */}
@@ -1490,36 +1540,6 @@ const PrivateRoutes = () => {
             <RequirePermission perm="user.write">
               <SuspensedView>
                 <CounsellingNotificationsPage />
-              </SuspensedView>
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/admin/report-types"
-          element={
-            <RequirePermission perm="report_type.read">
-              <SuspensedView>
-                <ReportTypesPage />
-              </SuspensedView>
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/admin/report-types/create"
-          element={
-            <RequirePermission perm="report_type.create">
-              <SuspensedView>
-                <ReportTypesCreatePage />
-              </SuspensedView>
-            </RequirePermission>
-          }
-        />
-        <Route
-          path="/admin/report-types/edit/:id"
-          element={
-            <RequirePermission perm="report_type.update">
-              <SuspensedView>
-                <ReportTypesEditPage />
               </SuspensedView>
             </RequirePermission>
           }

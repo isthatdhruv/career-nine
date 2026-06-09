@@ -39,7 +39,7 @@
     "/measured-qualities",
     "/measured-quality-types",
     "/question-sections",
-    "/student-dashboard/:studentId",
+    "/student/dashboard",
     "/student/dashboard/assessments",
     "/tools"
   ],
@@ -65,10 +65,11 @@
   ],
   "generated_report.read": [
     "/student/dashboard/navigator-360",
-    "/student/dashboard/reports"
+    "/student/dashboard/reports",
+    "/student/insight-dashboard"
   ],
   "group.read": [
-    "/forgotpassword",
+    "google-groups",
     "group",
     "groups"
   ],
@@ -107,35 +108,26 @@
     "/bet-report-generation",
     "/navigator-report-generation",
     "/report-generation",
+    "/reports",
     "/reports-hub",
-    "/roles/role",
     "/unified-report-management"
   ],
   "report_template.read": [
     "/admin/report-templates"
   ],
-  "report_type.create": [
-    "/admin/report-types/create"
-  ],
-  "report_type.read": [
-    "/admin/report-types"
-  ],
-  "report_type.update": [
-    "/admin/report-types/edit/:id"
-  ],
   "role.assign": [
     "/user-management/roles/manage"
   ],
   "student.read": [
-    "/admin/jwt-tokens",
-    "/login/reset-password/enter-email",
+    "/live-tracking",
     "/school/assigned-students",
     "/school/group-student",
     "/student-list",
-    "/student/dashboard/counselling",
+    "/student/dashboard-preview",
     "/student/dashboard/view/:studentId",
     "/student/registration-details",
     "/student/university/result",
+    "/student/university/result-dashboard",
     "/studentlist",
     "/studentprofile",
     "/teacher/class-dashboard"

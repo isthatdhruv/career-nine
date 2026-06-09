@@ -1,8 +1,13 @@
 package com.kccitm.api.controller.career9;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +28,9 @@ import com.kccitm.api.model.career9.Lead;
 import com.kccitm.api.model.career9.LeadType;
 import com.kccitm.api.model.career9.OdooSyncStatus;
 import com.kccitm.api.repository.Career9.LeadRepository;
+import com.kccitm.api.service.LeadStudentService;
 import com.kccitm.api.service.OdooLeadService;
+import com.kccitm.api.service.RecaptchaService;
 import com.kccitm.api.service.SmtpEmailService;
 
 @RestController
@@ -39,9 +46,20 @@ public class LeadController {
     private OdooLeadService odooLeadService;
 
     @Autowired
+    private LeadStudentService leadStudentService;
+
+    @Autowired
+    private RecaptchaService recaptchaService;
+
+    @Autowired
     private SmtpEmailService gmailApiEmailService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Accepted date-of-birth formats from the student form, tried in order.
+    // yyyy-MM-dd is the HTML <input type="date"> wire format; the dd-* variants
+    // cover manually-formatted submissions.
+    private static final String[] DOB_PATTERNS = { "yyyy-MM-dd", "dd-MM-yyyy", "dd/MM/yyyy" };
 
     /**
      * PUBLIC endpoint — accepts lead form submissions from external landing pages.
@@ -51,7 +69,7 @@ public class LeadController {
     // CSRF-exempt via PUBLIC_PATHS (/leads/capture) and rate-limited per-IP (Task 1.7). Coverage-excluded.
     // @CrossOrigin(origins = "*", maxAge = 3600)
     @PostMapping("/capture")
-    public ResponseEntity<?> captureLead(@RequestBody Map<String, Object> payload) throws Exception {
+    public ResponseEntity<?> captureLead(@RequestBody Map<String, Object> payload, HttpServletRequest request) throws Exception {
         String fullName = (String) payload.get("fullName");
         String email = (String) payload.get("email");
         String phone = (String) payload.get("phone");
@@ -63,6 +81,7 @@ public class LeadController {
         String cbseAffiliationNo = (String) payload.get("cbseAffiliationNo");
         String totalStudents = (String) payload.get("totalStudents");
         String classesOffered = (String) payload.get("classesOffered");
+        String dobStr = (String) payload.get("dob");
 
         if (fullName == null || fullName.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "fullName is required"));
@@ -82,6 +101,17 @@ public class LeadController {
                     Map.of("error", "Invalid leadType. Must be one of: SCHOOL, PARENT, STUDENT"));
         }
 
+        // Spam protection: verify the Google reCAPTCHA v3 token before doing any
+        // work. No-op until app.recaptcha.secret is configured (then it enforces).
+        String recaptchaToken = (String) payload.get("recaptchaToken");
+        RecaptchaService.RecaptchaResult captcha = recaptchaService.verify(recaptchaToken, request.getRemoteAddr());
+        if (!captcha.passed) {
+            logger.warn("Lead capture blocked by reCAPTCHA: reason={}, score={}, email={}",
+                    captcha.reason, captcha.score, email);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "reCAPTCHA verification failed. Please try again."));
+        }
+
         // Remaining fields go to extras JSON
         Map<String, Object> extras = new HashMap<>(payload);
         extras.remove("fullName");
@@ -95,6 +125,8 @@ public class LeadController {
         extras.remove("cbseAffiliationNo");
         extras.remove("totalStudents");
         extras.remove("classesOffered");
+        extras.remove("dob");
+        extras.remove("recaptchaToken");
 
         String extrasJson = extras.isEmpty() ? null : objectMapper.writeValueAsString(extras);
 
@@ -110,12 +142,20 @@ public class LeadController {
         lead.setCbseAffiliationNo(cbseAffiliationNo != null ? cbseAffiliationNo.trim() : null);
         lead.setTotalStudents(totalStudents != null ? totalStudents.trim() : null);
         lead.setClassesOffered(classesOffered != null ? classesOffered.trim() : null);
+        lead.setDob(parseDob(dobStr));
         lead.setExtras(extrasJson);
         lead.setOdooSyncStatus(OdooSyncStatus.PENDING);
 
         Lead savedLead = leadRepository.save(lead);
 
         odooLeadService.syncLeadToOdoo(savedLead);
+
+        // Student leads also get a real, loginable student account (username + DOB),
+        // ABAC authorization, and a credentials email. Async/fire-and-forget so a
+        // provisioning failure never breaks the public lead-capture response.
+        if (leadType == LeadType.STUDENT) {
+            leadStudentService.createStudentFromLead(savedLead);
+        }
 
         logger.info("Lead captured: id={}, type={}, email={}", savedLead.getId(), leadType, email);
 
@@ -160,5 +200,29 @@ public class LeadController {
 
         logger.info("Leads email sent via Gmail API to {}", to);
         return ResponseEntity.ok(Map.of("status", "success", "message", "Email sent successfully"));
+    }
+
+    /**
+     * Parse a date-of-birth string from the lead payload into a date-only value.
+     * Tries each accepted format in turn; returns null (and logs) if none match,
+     * so a malformed DOB degrades gracefully — the lead is still captured, but the
+     * student-provisioning step will skip it (DOB is the login password).
+     */
+    private Date parseDob(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        for (String pattern : DOB_PATTERNS) {
+            SimpleDateFormat fmt = new SimpleDateFormat(pattern);
+            fmt.setLenient(false);
+            try {
+                return fmt.parse(trimmed);
+            } catch (ParseException ignored) {
+                // try the next pattern
+            }
+        }
+        logger.warn("Lead capture: unparseable dob '{}' (accepted formats: yyyy-MM-dd, dd-MM-yyyy, dd/MM/yyyy)", raw);
+        return null;
     }
 }

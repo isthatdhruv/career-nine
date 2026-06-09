@@ -27,6 +27,12 @@ public interface GeneratedReportRepository extends JpaRepository<GeneratedReport
 
     List<GeneratedReport> findByAssessmentIdAndReportStatus(Long assessmentId, String reportStatus);
 
+    // Bulk existence check: which of these students have at least one successfully
+    // generated report. Used to gate the admin "Dashboard" button on the group-student
+    // listing (single round-trip instead of one call per student).
+    List<GeneratedReport> findByUserStudentUserStudentIdInAndReportStatus(
+            List<Long> userStudentIds, String reportStatus);
+
     void deleteByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(
             Long userStudentId, Long assessmentId, String typeOfReport);
 

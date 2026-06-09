@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import JSZip from "jszip";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
-import { htmlToPdfBlob } from "../../ReportGeneration/utils/htmlToPdf";
+import { zipStoredPdfs } from "../../ReportGeneration/utils/pdfZip";
 import {
   GenerateUnifiedReport,
   GenerateUnifiedReportsBulk,
@@ -29,7 +28,7 @@ interface Props {
   onGenerated: () => void;
 }
 
-type Entry = { reportUrl: string | null; status: string };
+type Entry = { reportUrl: string | null; status: string; pdfUrl: string | null; pdfStatus: string };
 
 const GenerateReportsModal: React.FC<Props> = ({
   open, onClose, assessmentId, assessmentName, templates, initialTemplateId, students, onGenerated,
@@ -57,7 +56,10 @@ const GenerateReportsModal: React.FC<Props> = ({
       for (const gr of res.data || []) {
         if (gr.reportTemplateId !== templateId) continue;
         const id = gr.userStudent?.userStudentId;
-        if (id) map.set(id, { reportUrl: gr.reportUrl, status: gr.reportStatus });
+        if (id) map.set(id, {
+          reportUrl: gr.reportUrl, status: gr.reportStatus,
+          pdfUrl: gr.pdfUrl ?? null, pdfStatus: gr.pdfStatus ?? "notRequested",
+        });
       }
       setEntries(map);
     } catch {
@@ -69,8 +71,19 @@ const GenerateReportsModal: React.FC<Props> = ({
 
   useEffect(() => { loadEntries(); }, [loadEntries]);
 
+  // While any PDF is still rendering server-side, poll so badges flip to ready live.
+  useEffect(() => {
+    if (!open) return;
+    const anyPending = Array.from(entries.values())
+      .some((e) => e.pdfStatus === "pending" || e.pdfStatus === "rendering");
+    if (!anyPending) return;
+    const t = setInterval(() => { loadEntries(); }, 4000);
+    return () => clearInterval(t);
+  }, [open, entries, loadEntries]);
+
+  // Count rows whose PDF is rendered and downloadable.
   const generatedCount = useMemo(
-    () => students.filter((s) => entries.get(s.userStudentId)?.status === "generated" && entries.get(s.userStudentId)?.reportUrl).length,
+    () => students.filter((s) => entries.get(s.userStudentId)?.pdfStatus === "ready" && entries.get(s.userStudentId)?.pdfUrl).length,
     [students, entries]
   );
 
@@ -85,7 +98,8 @@ const GenerateReportsModal: React.FC<Props> = ({
     setBusyIds((p) => new Set(p).add(sid));
     try {
       const res = await GenerateUnifiedReport(sid, assessmentId, tId, force);
-      setEntry(sid, { reportUrl: res.data.reportUrl ?? null, status: "generated" });
+      setEntry(sid, { reportUrl: res.data.reportUrl ?? null, status: "generated",
+        pdfUrl: res.data.pdfUrl ?? null, pdfStatus: res.data.pdfStatus ?? "pending" });
       showSuccessToast(force ? "Report regenerated" : "Report generated");
       onGenerated();
     } catch (e: any) {
@@ -108,7 +122,8 @@ const GenerateReportsModal: React.FC<Props> = ({
         const chunk = ids.slice(i, i + CHUNK);
         const res = await GenerateUnifiedReportsBulk(assessmentId, chunk, tId);
         for (const r of res.data.results || []) {
-          if (r.status === "ok") { ok++; setEntry(r.userStudentId, { reportUrl: r.reportUrl ?? null, status: "generated" }); }
+          if (r.status === "ok") { ok++; setEntry(r.userStudentId, { reportUrl: r.reportUrl ?? null, status: "generated",
+            pdfUrl: r.pdfUrl ?? null, pdfStatus: r.pdfStatus ?? "pending" }); }
         }
         done += chunk.length;
         setProgress({ current: done, total: ids.length });
@@ -123,7 +138,7 @@ const GenerateReportsModal: React.FC<Props> = ({
     }
   };
 
-  // ── downloads ──
+  // ── downloads (straight from Spaces — no client-side rasterization) ──
   const triggerDownload = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = fileName;
@@ -132,35 +147,43 @@ const GenerateReportsModal: React.FC<Props> = ({
 
   const safe = (s: string) => (s || "student").replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
 
-  const downloadOne = async (s: ModalStudent) => {
+  // Fetch a Spaces URL and force-download it with a friendly filename (cross-origin
+  // <a download> is ignored by browsers, so we go via a blob; bucket CORS allows GET).
+  const downloadUrlAsFile = async (url: string, fileName: string) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("fetch failed");
+    triggerDownload(await res.blob(), fileName);
+  };
+
+  const downloadOnePdf = async (s: ModalStudent) => {
+    const e = entries.get(s.userStudentId);
+    if (!e?.pdfUrl) { showErrorToast("PDF not ready yet"); return; }
+    setDownloadingId(s.userStudentId);
+    try { await downloadUrlAsFile(e.pdfUrl, `${safe(s.name)}_report.pdf`); }
+    catch { showErrorToast("Download failed (try Preview to open directly)"); }
+    finally { setDownloadingId(null); }
+  };
+
+  const downloadOneHtml = async (s: ModalStudent) => {
     const e = entries.get(s.userStudentId);
     if (!e?.reportUrl) return;
     setDownloadingId(s.userStudentId);
-    try {
-      const html = await (await fetch(e.reportUrl)).text();
-      const pdf = await htmlToPdfBlob(html);
-      triggerDownload(pdf, `${safe(s.name)}_report.pdf`);
-    } catch { showErrorToast("Download failed (try Preview to open directly)"); }
+    try { await downloadUrlAsFile(e.reportUrl, `${safe(s.name)}_report.html`); }
+    catch { showErrorToast("Download failed"); }
     finally { setDownloadingId(null); }
   };
 
   const downloadAllZip = async () => {
-    const targets = students
-      .map((s) => ({ s, e: entries.get(s.userStudentId) }))
-      .filter((x) => x.e?.status === "generated" && x.e?.reportUrl);
-    if (targets.length === 0) { showErrorToast("No generated reports to download"); return; }
+    const items = students
+      .map((s) => ({ fileName: `${safe(s.name)}_report`, pdfUrl: entries.get(s.userStudentId)?.pdfUrl ?? null }))
+      .filter((x) => !!x.pdfUrl);
+    if (items.length === 0) { showErrorToast("No ready PDFs to download"); return; }
     setDownloadingAll(true);
     try {
-      const zip = new JSZip();
-      for (const { s, e } of targets) {
-        try {
-          const html = await (await fetch(e!.reportUrl!)).text();
-          const pdf = await htmlToPdfBlob(html);
-          zip.file(`${safe(s.name)}_report.pdf`, pdf);
-        } catch { /* skip one */ }
-      }
-      const blob = await zip.generateAsync({ type: "blob" });
+      const { blob, added, skipped } = await zipStoredPdfs(items);
+      if (added === 0) { showErrorToast("No PDFs could be downloaded"); return; }
       triggerDownload(blob, `${safe(assessmentName)}_reports.zip`);
+      if (skipped.length) showErrorToast(`${skipped.length} report(s) skipped (PDF not ready)`);
     } catch { showErrorToast("ZIP download failed"); }
     finally { setDownloadingAll(false); }
   };
@@ -244,10 +267,17 @@ const GenerateReportsModal: React.FC<Props> = ({
                       {has ? (
                         <span style={{ display: "inline-flex", gap: 4 }}>
                           <a className="btn btn-sm btn-light-primary py-1" href={e!.reportUrl!} target="_blank" rel="noreferrer">Preview</a>
-                          <button className="btn btn-sm btn-light-success py-1" disabled={downloadingId === s.userStudentId}
-                            onClick={() => downloadOne(s)}>
-                            {downloadingId === s.userStudentId ? "…" : "Download"}
+                          <button className="btn btn-sm btn-light-success py-1"
+                            disabled={downloadingId === s.userStudentId || e!.pdfStatus !== "ready" || !e!.pdfUrl}
+                            title={e!.pdfStatus !== "ready" ? `PDF ${e!.pdfStatus}` : "Download PDF"}
+                            onClick={() => downloadOnePdf(s)}>
+                            {downloadingId === s.userStudentId ? "…"
+                              : e!.pdfStatus === "ready" ? "PDF"
+                              : e!.pdfStatus === "failed" ? "PDF ✗" : "PDF…"}
                           </button>
+                          <button className="btn btn-sm btn-light py-1"
+                            disabled={downloadingId === s.userStudentId}
+                            onClick={() => downloadOneHtml(s)}>HTML</button>
                           <button className="btn btn-sm btn-light py-1" disabled={busy || generating}
                             onClick={() => generateOne(s.userStudentId, true)}>
                             {busy ? "…" : "Regenerate"}
@@ -275,8 +305,8 @@ const GenerateReportsModal: React.FC<Props> = ({
             </button>
           )}
           <button className="btn btn-light-success" disabled={downloadingAll || generatedCount === 0}
-            onClick={downloadAllZip}>
-            {downloadingAll ? "Zipping…" : `Download ${single ? "" : "all "}as ${single ? "PDF" : "ZIP"} (${generatedCount})`}
+            onClick={() => (single ? downloadOnePdf(students[0]) : downloadAllZip())}>
+            {downloadingAll ? "Zipping…" : single ? "Download PDF" : `Download all as ZIP (${generatedCount})`}
           </button>
           <div style={{ flexGrow: 1 }} />
           <button className="btn btn-light" onClick={onClose}>Close</button>

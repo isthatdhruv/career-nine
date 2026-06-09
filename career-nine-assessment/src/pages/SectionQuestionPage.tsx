@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
 import { usePreventReload } from "../hooks/usePreventReload";
+import { useStudentBranding, brandLogoSrc } from "../hooks/useStudentBranding";
 import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
 import { useDebouncedLocalStorage } from "../hooks/useDebouncedLocalStorage";
 import QuestionNavigationGrid from "../components/QuestionNavigationGrid";
@@ -84,6 +85,7 @@ const SectionQuestionPage: React.FC = () => {
   const showTimer = assessmentConfig?.showTimer !== false;
   const saveLater = assessmentConfig?.saveLater !== false;
   usePreventReload();
+  const branding = useStudentBranding();
   const { scheduleWrite, flush: flushLocalStorage } =
     useDebouncedLocalStorage(500);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -1564,14 +1566,19 @@ const SectionQuestionPage: React.FC = () => {
             }}
           >
             <img
-              src="/media/logos/kcc.webp"
-              alt="KCC Logo"
+              src={brandLogoSrc(branding)}
+              alt={branding.whitelabel ? (branding.schoolName || "School") + " logo" : "Career-9 logo"}
               style={{
                 height: "48px",
                 objectFit: "contain",
               }}
             />
           </div>
+          {branding.whitelabel && (
+            <div style={{ textAlign: "center", fontSize: "0.62rem", color: "#94a3b8", marginTop: "-6px", marginBottom: "6px" }}>
+              Powered by Career-9
+            </div>
+          )}
           <h6
             style={{
               fontSize: "0.85rem",

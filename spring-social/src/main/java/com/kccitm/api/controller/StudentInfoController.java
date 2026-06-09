@@ -1874,7 +1874,7 @@ public class StudentInfoController {
             // synchronously (validation guard or pre-queue error) is reported
             // as "failed" with the reason.
             try {
-                loginCredentialsEmailService.send(info.getName(), email, username, dob);
+                loginCredentialsEmailService.send(info.getName(), email, username, dob, us.getInstitute());
                 row.put("status", "queued");
                 row.put("email", email);
                 sent++;

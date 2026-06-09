@@ -240,11 +240,34 @@ public class UserController {
         user.setEmail(email.trim());
         user.setPhone(phone.trim());
 
-        // Update StudentInfo entity
+        // Update StudentInfo entity. name/email/phone are always present (validated
+        // above); the richer profile fields (grade/gender/school/board) are saved
+        // when provided — the student-info form enforces which are required.
         if (userStudent.getStudentInfo() != null) {
             userStudent.getStudentInfo().setName(name.trim());
             userStudent.getStudentInfo().setEmail(email.trim());
             userStudent.getStudentInfo().setPhoneNumber(phone.trim());
+
+            String gender = body.get("gender");
+            String schoolName = body.get("schoolName");
+            String schoolBoard = body.get("schoolBoard");
+            String grade = body.get("grade");
+            if (gender != null && !gender.trim().isEmpty()) {
+                userStudent.getStudentInfo().setGender(gender.trim());
+            }
+            if (schoolName != null) {
+                userStudent.getStudentInfo().setSchoolName(schoolName.trim());
+            }
+            if (schoolBoard != null && !schoolBoard.trim().isEmpty()) {
+                userStudent.getStudentInfo().setSchoolBoard(schoolBoard.trim());
+            }
+            if (grade != null && !grade.trim().isEmpty()) {
+                try {
+                    userStudent.getStudentInfo().setStudentClass(Integer.valueOf(grade.trim()));
+                } catch (NumberFormatException ignored) {
+                    // non-numeric grade ignored
+                }
+            }
         }
 
         // Generate careerNineRollNumber if missing
@@ -274,6 +297,7 @@ public class UserController {
             profile.put("section", userStudent.getStudentInfo().getSchoolSectionId());
             profile.put("schoolBoard", userStudent.getStudentInfo().getSchoolBoard());
             profile.put("gender", userStudent.getStudentInfo().getGender());
+            profile.put("schoolName", userStudent.getStudentInfo().getSchoolName());
         }
         if (userStudent.getInstitute() != null) {
             profile.put("instituteName", userStudent.getInstitute().getInstituteName());
@@ -285,6 +309,38 @@ public class UserController {
         }
         profile.put("username", user.getUsername());
 
+        return ResponseEntity.ok(profile);
+    }
+
+    /**
+     * Returns the student's editable profile so the one-time student-info form can
+     * pre-fill it. Returns the same fields {@code update-info} accepts (incl.
+     * grade/gender/schoolName/schoolBoard pre-filled from the signup form/lead).
+     */
+    @PreAuthorize("@auth.allows('student_info.read')")
+    @GetMapping(value = "student-portal/my-info/{userStudentId}")
+    public ResponseEntity<?> getStudentPortalInfo(@PathVariable Long userStudentId) {
+        UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
+        User user = userRepository.findById(userStudent.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userStudent.getUserId()));
+
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("userStudentId", userStudentId);
+        profile.put("name", user.getName());
+        profile.put("email", user.getEmail());
+        profile.put("phone", user.getPhone());
+        profile.put("infoCompleted", Boolean.TRUE.equals(userStudent.getInfoCompleted()));
+        if (user.getDobDate() != null) {
+            profile.put("dob", new SimpleDateFormat("dd-MM-yyyy").format(user.getDobDate()));
+        }
+        if (userStudent.getStudentInfo() != null) {
+            profile.put("grade", userStudent.getStudentInfo().getStudentClass());
+            profile.put("gender", userStudent.getStudentInfo().getGender());
+            profile.put("schoolName", userStudent.getStudentInfo().getSchoolName());
+            profile.put("schoolBoard", userStudent.getStudentInfo().getSchoolBoard());
+            profile.put("section", userStudent.getStudentInfo().getSchoolSectionId());
+        }
         return ResponseEntity.ok(profile);
     }
 

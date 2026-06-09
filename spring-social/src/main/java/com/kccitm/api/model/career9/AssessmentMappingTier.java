@@ -57,6 +57,38 @@ public class AssessmentMappingTier implements Serializable {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    // Designates THE free tier for a mapping (exactly one per mapping; amount must
+    // be 0). The free registration link resolves to this tier for its inclusions +
+    // cap. Paid waves are is_free=false and resolve by sort_order. Free tiers use a
+    // reserved sort_order = -1 so they never collide with the wave ordering.
+    @Column(name = "is_free", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean isFree = false;
+
+    // ── Service-inclusion toggles (mirrors B2C PricingTier) ───────────────────
+    // What this paid B2B tier entitles the student to. Stored on the tier so the
+    // admin can configure report/counselling/LMS per tier, same as the campaign
+    // pricing tiers.
+    @Column(name = "includes_final_report", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean includesFinalReport = false;
+
+    @Column(name = "includes_dashboard", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean includesDashboard = false;
+
+    @Column(name = "dashboard_validity_days")
+    private Integer dashboardValidityDays;
+
+    @Column(name = "includes_counselling", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean includesCounselling = false;
+
+    @Column(name = "counselling_session_count")
+    private Integer counsellingSessionCount;
+
+    @Column(name = "includes_lms", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean includesLms = false;
+
+    @Column(name = "lms_validity_days")
+    private Integer lmsValidityDays;
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
@@ -73,6 +105,11 @@ public class AssessmentMappingTier implements Serializable {
         if (this.updatedAt == null) this.updatedAt = new Date();
         if (this.currentCount == null) this.currentCount = 0;
         if (this.isActive == null) this.isActive = true;
+        if (this.includesFinalReport == null) this.includesFinalReport = false;
+        if (this.includesDashboard == null) this.includesDashboard = false;
+        if (this.includesCounselling == null) this.includesCounselling = false;
+        if (this.includesLms == null) this.includesLms = false;
+        if (this.isFree == null) this.isFree = false;
     }
 
     @PreUpdate
@@ -108,6 +145,30 @@ public class AssessmentMappingTier implements Serializable {
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+
+    public Boolean getIsFree() { return isFree; }
+    public void setIsFree(Boolean isFree) { this.isFree = isFree; }
+
+    public Boolean getIncludesFinalReport() { return includesFinalReport; }
+    public void setIncludesFinalReport(Boolean includesFinalReport) { this.includesFinalReport = includesFinalReport; }
+
+    public Boolean getIncludesDashboard() { return includesDashboard; }
+    public void setIncludesDashboard(Boolean includesDashboard) { this.includesDashboard = includesDashboard; }
+
+    public Integer getDashboardValidityDays() { return dashboardValidityDays; }
+    public void setDashboardValidityDays(Integer dashboardValidityDays) { this.dashboardValidityDays = dashboardValidityDays; }
+
+    public Boolean getIncludesCounselling() { return includesCounselling; }
+    public void setIncludesCounselling(Boolean includesCounselling) { this.includesCounselling = includesCounselling; }
+
+    public Integer getCounsellingSessionCount() { return counsellingSessionCount; }
+    public void setCounsellingSessionCount(Integer counsellingSessionCount) { this.counsellingSessionCount = counsellingSessionCount; }
+
+    public Boolean getIncludesLms() { return includesLms; }
+    public void setIncludesLms(Boolean includesLms) { this.includesLms = includesLms; }
+
+    public Integer getLmsValidityDays() { return lmsValidityDays; }
+    public void setLmsValidityDays(Integer lmsValidityDays) { this.lmsValidityDays = lmsValidityDays; }
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }

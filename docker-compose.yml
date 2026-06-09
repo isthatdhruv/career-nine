@@ -52,6 +52,36 @@ services:
       retries: 3
       start_period: 5s
 
+  # Shared headless-Chromium HTML→PDF service for server-rendered report PDFs.
+  # Stateless, so ONE instance serves BOTH the production and staging backends over
+  # the internal Docker network — each reaches it by service name at
+  # GOTENBERG_URL=http://gotenberg:3000. No host port is published, so the render
+  # endpoint is never exposed outside the Docker network.
+  #
+  # Both backends are on this network, so one `networks` entry suffices. If the
+  # staging backend lives on a DIFFERENT network, also attach that network below
+  # (a service can join multiple networks) so both can resolve `gotenberg`.
+  #
+  # PDFs render synchronously during report generation; concurrent load on this
+  # instance is just however many generate requests run at once across both
+  # backends. Bump the memory limit if you generate very large cohorts in parallel.
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=false"   # reports draw charts client-side
+      - "--api-timeout=120s"
+    expose:
+      - "3000"          # internal-only; reachable as http://gotenberg:3000 on the Docker network
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+    networks:
+      - career_shared_net
+      - career_staging_net   # uncomment/add if the staging backend is on a different network
+
   api:
     container_name: api
     build:
@@ -69,6 +99,10 @@ services:
       - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
       - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
       - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
+      # HTML→PDF render service, reached by compose service name on the Docker network.
+      # Without this the backend falls back to the application.yml default localhost:3000
+      # (nothing listens there inside the container) and every PDF render fails.
+      - GOTENBERG_URL=http://gotenberg:3000
     deploy:
       resources:
         limits:
@@ -122,6 +156,10 @@ services:
       - .env.staging
     environment:
       - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+      # HTML→PDF render service, reached by compose service name on the Docker network.
+      # Without this the backend falls back to the application.yml default localhost:3000
+      # (nothing listens there inside the container) and every PDF render fails.
+      - GOTENBERG_URL=http://gotenberg:3000
     deploy:
       resources:
         limits:

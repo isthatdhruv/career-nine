@@ -11,6 +11,8 @@ export interface GeneratedReport {
   reportTemplateId?: number | null;
   reportStatus: string; // "notGenerated" | "generated" | "failed"
   reportUrl: string | null;
+  pdfUrl: string | null;
+  pdfStatus: string; // notRequested | pending | rendering | ready | failed
   visibleToStudent: boolean;
   createdAt: string;
   updatedAt: string;
@@ -119,4 +121,12 @@ export function deleteByStudentAssessmentType(
 
 export function deleteByAssessmentAndType(assessmentId: number, typeOfReport: string) {
   return axios.delete(`${BASE}/by-assessment/${assessmentId}/type/${typeOfReport}`);
+}
+
+// ═══════════════════════ PDF RE-RENDER (retry failed async render) ═══════════════════════
+
+export function retryReportPdf(generatedReportId: number) {
+  return axios.post<{ status: string; pdfStatus?: string; message?: string }>(
+    `${API_URL}/generate-report-unified/${generatedReportId}/retry-pdf`
+  );
 }

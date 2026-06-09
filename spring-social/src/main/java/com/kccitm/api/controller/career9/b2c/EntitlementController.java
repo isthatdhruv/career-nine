@@ -270,6 +270,13 @@ public class EntitlementController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("Dashboard access is not included in your plan");
         }
+        // EXP2: enforce the dashboard validity window directly — the hourly expiry
+        // sweep flips dashboardActive off, but check the date here too so a lapsed
+        // window can't grant SSO during the sweep's lag.
+        if (e.getDashboardExpiresAt() != null && e.getDashboardExpiresAt().before(new Date())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Your dashboard access window has expired");
+        }
 
         Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
         if (!usOpt.isPresent() || usOpt.get().getUserId() == null) {
@@ -363,12 +370,10 @@ public class EntitlementController {
                                     @RequestBody(required = false) Map<String, Object> body) {
         Optional<StudentEntitlement> opt = entitlementRepository.findById(id);
         if (!opt.isPresent()) return ResponseEntity.notFound().build();
-        String recipient = body != null && body.get("recipient") != null
-                ? body.get("recipient").toString() : null;
-        if (recipient == null || recipient.isEmpty()) {
-            return ResponseEntity.badRequest().body("recipient email is required");
-        }
-        EntitlementService.ResendResult r = entitlementService.resendServiceLink(id, serviceType, recipient);
+        // Recipient is resolved server-side from the entitlement's own student;
+        // any client-supplied recipient is ignored to prevent report/token
+        // exfiltration to an attacker-chosen address.
+        EntitlementService.ResendResult r = entitlementService.resendServiceLink(id, serviceType, null);
         if (!r.ok) return ResponseEntity.badRequest().body(r.message);
         return ResponseEntity.ok(Map.of("status", "sent"));
     }

@@ -63,6 +63,31 @@ public class SchoolAssessmentTier implements Serializable {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    // ── Service-inclusion toggles (mirrors AssessmentMappingTier) ──────────────
+    // What this school tier entitles the student to. Lets school registrations
+    // grant report/dashboard/counselling/LMS via the same StudentEntitlement
+    // contract as the per-level B2B flow.
+    @Column(name = "includes_final_report", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean includesFinalReport = false;
+
+    @Column(name = "includes_dashboard", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean includesDashboard = false;
+
+    @Column(name = "dashboard_validity_days")
+    private Integer dashboardValidityDays;
+
+    @Column(name = "includes_counselling", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean includesCounselling = false;
+
+    @Column(name = "counselling_session_count")
+    private Integer counsellingSessionCount;
+
+    @Column(name = "includes_lms", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean includesLms = false;
+
+    @Column(name = "lms_validity_days")
+    private Integer lmsValidityDays;
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
@@ -79,6 +104,10 @@ public class SchoolAssessmentTier implements Serializable {
         if (this.updatedAt == null) this.updatedAt = new Date();
         if (this.currentCount == null) this.currentCount = 0;
         if (this.isActive == null) this.isActive = true;
+        if (this.includesFinalReport == null) this.includesFinalReport = false;
+        if (this.includesDashboard == null) this.includesDashboard = false;
+        if (this.includesCounselling == null) this.includesCounselling = false;
+        if (this.includesLms == null) this.includesLms = false;
     }
 
     @PreUpdate
@@ -120,6 +149,27 @@ public class SchoolAssessmentTier implements Serializable {
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+
+    public Boolean getIncludesFinalReport() { return includesFinalReport; }
+    public void setIncludesFinalReport(Boolean includesFinalReport) { this.includesFinalReport = includesFinalReport; }
+
+    public Boolean getIncludesDashboard() { return includesDashboard; }
+    public void setIncludesDashboard(Boolean includesDashboard) { this.includesDashboard = includesDashboard; }
+
+    public Integer getDashboardValidityDays() { return dashboardValidityDays; }
+    public void setDashboardValidityDays(Integer dashboardValidityDays) { this.dashboardValidityDays = dashboardValidityDays; }
+
+    public Boolean getIncludesCounselling() { return includesCounselling; }
+    public void setIncludesCounselling(Boolean includesCounselling) { this.includesCounselling = includesCounselling; }
+
+    public Integer getCounsellingSessionCount() { return counsellingSessionCount; }
+    public void setCounsellingSessionCount(Integer counsellingSessionCount) { this.counsellingSessionCount = counsellingSessionCount; }
+
+    public Boolean getIncludesLms() { return includesLms; }
+    public void setIncludesLms(Boolean includesLms) { this.includesLms = includesLms; }
+
+    public Integer getLmsValidityDays() { return lmsValidityDays; }
+    public void setLmsValidityDays(Integer lmsValidityDays) { this.lmsValidityDays = lmsValidityDays; }
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }

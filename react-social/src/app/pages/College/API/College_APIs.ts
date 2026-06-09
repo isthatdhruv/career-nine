@@ -43,6 +43,21 @@ export function UpdateCollegeData(values: any) {
   });
 }
 
+// Whitelabel: upload a school logo (PNG/JPG only — reused in emails/reports) to
+// DigitalOcean Spaces. Returns { url } (CDN URL) to store in the institute's logoUrl.
+export function UploadInstituteLogo(
+  base64Data: string,
+  instituteCode?: number | string,
+  previousUrl?: string
+) {
+  return axios.post(`${API_URL}/instituteDetail/upload-logo`, {
+    base64Data,
+    instituteCode:
+      instituteCode != null && instituteCode !== "" ? Number(instituteCode) : undefined,
+    previousUrl: previousUrl || undefined,
+  });
+}
+
 export function DeleteCollegeData(id: any) {
   return axios.get(deleteCollege + id);
 }

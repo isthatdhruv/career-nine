@@ -10,6 +10,8 @@ import java.text.SimpleDateFormat;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.service.branding.BrandingDto;
+import com.kccitm.api.service.branding.InstituteBrandingService;
 
 /**
  * Sends a styled assessment-completion email to the student via Odoo.
@@ -21,6 +23,9 @@ public class AssessmentCompletionEmailService {
 
     @Autowired
     private OdooEmailService odooEmailService;
+
+    @Autowired
+    private InstituteBrandingService brandingService;
 
     /**
      * Send assessment completion email to the student.
@@ -61,11 +66,20 @@ public class AssessmentCompletionEmailService {
                     ? assessment.getAssessmentName()
                     : "Assessment";
 
-            String subject = "You've completed " + assessmentName + " — Career-9";
-            String html = buildEmailHtml(studentName, assessmentName, username, dob);
+            BrandingDto brand = brandingService.forInstitute(userStudent.getInstitute());
+            String subject = brand.isWhitelabel()
+                    ? "You've completed " + assessmentName + " — " + brand.getSchoolName()
+                    : "You've completed " + assessmentName + " — Career-9";
+            String html = buildEmailHtml(studentName, assessmentName, username, dob, brand);
 
-            odooEmailService.sendHtmlEmail(studentEmail, subject, html);
-            logger.info("Assessment completion email sent to {} for assessment '{}'", studentEmail, assessmentName);
+            if (brand.isWhitelabel()) {
+                odooEmailService.sendHtmlEmail(studentEmail, subject, html,
+                        brand.getSchoolName() + " (via Career-9)");
+            } else {
+                odooEmailService.sendHtmlEmail(studentEmail, subject, html);
+            }
+            logger.info("Assessment completion email sent to {} for assessment '{}' (whitelabel={})",
+                    studentEmail, assessmentName, brand.isWhitelabel());
 
         } catch (Exception e) {
             logger.error("Failed to send completion email for student={} assessment={}: {}",
@@ -74,7 +88,7 @@ public class AssessmentCompletionEmailService {
     }
 
     private String buildEmailHtml(String studentName, String assessmentName,
-                                   String username, String dob) {
+                                   String username, String dob, BrandingDto brand) {
         String firstName = studentName.contains(" ") ? studentName.substring(0, studentName.indexOf(' ')) : studentName;
 
         return "<!DOCTYPE html>\n"
@@ -96,14 +110,9 @@ public class AssessmentCompletionEmailService {
             // — Top gradient bar —
             + "<tr><td style=\"height:6px;background:linear-gradient(90deg,#4ECDC4,#44B78B,#A0D585);\"></td></tr>\n"
 
-            // — Logo row —
+            // — Logo row (co-branded with the school when whitelabel) —
             + "<tr><td align=\"center\" style=\"padding:32px 40px 16px;\">\n"
-            + "  <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n"
-            + "    <td style=\"background:linear-gradient(135deg,#4ECDC4,#44B78B);width:42px;height:42px;border-radius:12px;text-align:center;vertical-align:middle;\">\n"
-            + "      <span style=\"color:#fff;font-size:20px;font-weight:700;line-height:42px;\">C9</span>\n"
-            + "    </td>\n"
-            + "    <td style=\"padding-left:12px;font-size:20px;font-weight:700;color:#1a2a3a;letter-spacing:-0.3px;\">Career-9</td>\n"
-            + "  </tr></table>\n"
+            + brandingService.emailHeaderHtml(brand) + "\n"
             + "</td></tr>\n"
 
             // — Celebration icon —
@@ -229,8 +238,7 @@ public class AssessmentCompletionEmailService {
             + "<table role=\"presentation\" width=\"580\" cellpadding=\"0\" cellspacing=\"0\">\n"
             + "<tr><td align=\"center\" style=\"padding:24px 40px;\">\n"
             + "  <p style=\"margin:0;font-size:12px;color:#90a4ae;line-height:1.6;\">"
-            + "    Career-9 &mdash; AI-Powered &middot; NEP-Aligned &middot; Science-Backed<br/>"
-            + "    &copy; 2026 Career-9. All rights reserved."
+            + brandingService.emailFooterHtml(brand)
             + "  </p>\n"
             + "</td></tr>\n"
             + "</table>\n"

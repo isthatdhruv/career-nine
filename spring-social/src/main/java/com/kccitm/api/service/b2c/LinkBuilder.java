@@ -40,6 +40,16 @@ public class LinkBuilder {
         return assessmentBaseUrl + "/student-login";
     }
 
+    /**
+     * The student sign-in page (username + DOB) at {@code /auth}, surfaced in the
+     * login-credentials email. Built from app.b2c.frontendBaseUrl so the link is
+     * environment-correct (dev → localhost, sandbox → staging-dashboard,
+     * prod → dashboard) instead of a hardcoded production URL.
+     */
+    public String studentLogin() {
+        return frontendBaseUrl + "/auth";
+    }
+
     public String onePager(String accessToken, Long entitlementId) {
         return frontendBaseUrl + "/report/one-pager?t=" + accessToken + "&e=" + entitlementId;
     }

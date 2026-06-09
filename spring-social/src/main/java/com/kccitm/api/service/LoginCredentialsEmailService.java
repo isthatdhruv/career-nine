@@ -5,6 +5,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.kccitm.api.model.career9.school.InstituteDetail;
+import com.kccitm.api.service.b2c.LinkBuilder;
+import com.kccitm.api.service.branding.BrandingDto;
+import com.kccitm.api.service.branding.InstituteBrandingService;
+
 /**
  * Sends a styled "here are your login credentials" email to a student via
  * {@link OdooEmailService}.
@@ -28,6 +33,12 @@ public class LoginCredentialsEmailService {
     @Autowired
     private OdooEmailService odooEmailService;
 
+    @Autowired
+    private LinkBuilder linkBuilder;
+
+    @Autowired
+    private InstituteBrandingService brandingService;
+
     /**
      * Queue a login-credentials email to {@code recipientEmail}.
      *
@@ -36,7 +47,20 @@ public class LoginCredentialsEmailService {
      * @param username       login username (from {@code User.username})
      * @param dob            formatted DOB used as the initial password (e.g. "12-05-2008")
      */
+    /** Backwards-compatible overload — standard (non-whitelabel) Career-9 branding. */
     public void send(String studentName, String recipientEmail, String username, String dob) {
+        send(studentName, recipientEmail, username, dob, null);
+    }
+
+    /**
+     * Queue a login-credentials email, co-branded for the student's institute when it is
+     * whitelabel: school logo + name header, "{School}" in the subject, and "{School} (via
+     * Career-9)" as the From display name. Null / non-whitelabel institute → standard Career-9.
+     *
+     * @param institute the student's institute (may be null for B2C / lead students)
+     */
+    public void send(String studentName, String recipientEmail, String username, String dob,
+                     InstituteDetail institute) {
         if (recipientEmail == null || recipientEmail.isBlank()) {
             throw new IllegalArgumentException("recipientEmail is required");
         }
@@ -46,13 +70,24 @@ public class LoginCredentialsEmailService {
         if (dob == null || dob.isBlank()) {
             throw new IllegalArgumentException("dob (used as password) is required");
         }
-        String subject = "Your Career-9 Login Credentials";
-        String html = buildEmailHtml(studentName, username, dob);
-        odooEmailService.sendHtmlEmail(recipientEmail, subject, html);
-        logger.info("Login-credentials email queued via Odoo for {}", recipientEmail);
+        BrandingDto brand = brandingService.forInstitute(institute);
+        String subject = brand.isWhitelabel()
+                ? "Your " + brand.getSchoolName() + " Login Credentials"
+                : "Your Career-9 Login Credentials";
+        String dashboardLink = linkBuilder.studentLogin();
+        String html = buildEmailHtml(studentName, username, dob, dashboardLink, brand);
+        if (brand.isWhitelabel()) {
+            odooEmailService.sendHtmlEmail(recipientEmail, subject, html,
+                    brand.getSchoolName() + " (via Career-9)");
+        } else {
+            odooEmailService.sendHtmlEmail(recipientEmail, subject, html);
+        }
+        logger.info("Login-credentials email queued via Odoo for {} (whitelabel={})",
+                recipientEmail, brand.isWhitelabel());
     }
 
-    private String buildEmailHtml(String studentName, String username, String dob) {
+    private String buildEmailHtml(String studentName, String username, String dob, String dashboardLink,
+                                   BrandingDto brand) {
         String safeName = escapeHtml(studentName == null || studentName.isBlank() ? "Student" : studentName);
         String firstName = safeName.contains(" ") ? safeName.substring(0, safeName.indexOf(' ')) : safeName;
 
@@ -75,14 +110,9 @@ public class LoginCredentialsEmailService {
             // — Top gradient bar —
             + "<tr><td style=\"height:6px;background:linear-gradient(90deg,#4ECDC4,#44B78B,#A0D585);\"></td></tr>\n"
 
-            // — Logo row —
+            // — Logo row (co-branded with the school when whitelabel) —
             + "<tr><td align=\"center\" style=\"padding:32px 40px 16px;\">\n"
-            + "  <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n"
-            + "    <td style=\"background:linear-gradient(135deg,#4ECDC4,#44B78B);width:42px;height:42px;border-radius:12px;text-align:center;vertical-align:middle;\">\n"
-            + "      <span style=\"color:#fff;font-size:20px;font-weight:700;line-height:42px;\">C9</span>\n"
-            + "    </td>\n"
-            + "    <td style=\"padding-left:12px;font-size:20px;font-weight:700;color:#1a2a3a;letter-spacing:-0.3px;\">Career-9</td>\n"
-            + "  </tr></table>\n"
+            + brandingService.emailHeaderHtml(brand) + "\n"
             + "</td></tr>\n"
 
             // — Key icon —
@@ -186,7 +216,7 @@ public class LoginCredentialsEmailService {
 
             // — CTA Button —
             + "<tr><td align=\"center\" style=\"padding:28px 40px 32px;\">\n"
-            + "  <a href=\"https://dashboard.career-9.com/student/login\" style=\""
+            + "  <a href=\"" + dashboardLink + "\" style=\""
             + "    display:inline-block;padding:14px 36px;"
             + "    background:linear-gradient(135deg,#4ECDC4,#44B78B);"
             + "    color:#ffffff;font-size:15px;font-weight:700;"
@@ -204,8 +234,7 @@ public class LoginCredentialsEmailService {
             + "<table role=\"presentation\" width=\"580\" cellpadding=\"0\" cellspacing=\"0\">\n"
             + "<tr><td align=\"center\" style=\"padding:24px 40px;\">\n"
             + "  <p style=\"margin:0;font-size:12px;color:#90a4ae;line-height:1.6;\">"
-            + "    Career-9 &mdash; AI-Powered &middot; NEP-Aligned &middot; Science-Backed<br/>"
-            + "    &copy; 2026 Career-9. All rights reserved."
+            + brandingService.emailFooterHtml(brand)
             + "  </p>\n"
             + "</td></tr>\n"
             + "</table>\n"

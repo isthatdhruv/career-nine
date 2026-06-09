@@ -13,6 +13,8 @@ public class UnifiedReportResponse {
     public Boolean alreadyExisted;
     public String error;           // null on success
     public String errorCode;       // null on success — SanityFailedException.code for transient
+    public String pdfUrl;          // null until the async PDF render completes
+    public String pdfStatus;       // notRequested | pending | rendering | ready | failed
 
     public UnifiedReportResponse() {}
 
@@ -27,6 +29,17 @@ public class UnifiedReportResponse {
         r.calculatedAt = calculatedAt;
         r.renderedAt = renderedAt;
         r.alreadyExisted = alreadyExisted;
+        return r;
+    }
+
+    public static UnifiedReportResponse ok(String typeCode, String subtypeCode,
+                                           String reportUrl, Date calculatedAt,
+                                           Date renderedAt, boolean alreadyExisted,
+                                           String pdfUrl, String pdfStatus) {
+        UnifiedReportResponse r = ok(typeCode, subtypeCode, reportUrl,
+                calculatedAt, renderedAt, alreadyExisted);
+        r.pdfUrl = pdfUrl;
+        r.pdfStatus = pdfStatus;
         return r;
     }
 

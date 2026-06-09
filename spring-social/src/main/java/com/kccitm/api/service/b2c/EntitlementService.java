@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.SimpleDateFormat;
 
 import com.kccitm.api.model.User;
+import com.kccitm.api.model.career9.AssessmentMappingTier;
+import com.kccitm.api.model.career9.SchoolAssessmentTier;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.UserStudent;
@@ -23,6 +25,8 @@ import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
+import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
+import com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
@@ -48,6 +52,8 @@ public class EntitlementService {
     @Autowired private CampaignAssessmentMappingRepository mappingRepository;
     @Autowired private CampaignAssessmentTierRepository tierMappingRepository;
     @Autowired private PricingTierRepository pricingTierRepository;
+    @Autowired private AssessmentMappingTierRepository assessmentMappingTierRepository;
+    @Autowired private SchoolAssessmentTierRepository schoolAssessmentTierRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private UserStudentRepository userStudentRepository;
@@ -101,6 +107,20 @@ public class EntitlementService {
         StudentEntitlement entitlement = entitlementRepository.findByPaymentTransactionId(paymentTransactionId)
                 .orElseGet(() -> findOrCreateForUpgrade(txn));
 
+        // ENT-ACT / WEL1: idempotent — a webhook retry or reconcile race that re-runs
+        // activation for an entitlement already activated by THIS payment must not
+        // re-snapshot or re-send the welcome email.
+        if ("active".equals(entitlement.getStatus())
+                && paymentTransactionId.equals(entitlement.getPaymentTransactionId())) {
+            return entitlement;
+        }
+        // STATE1: never resurrect a revoked/refunded entitlement through a (re)payment webhook.
+        if ("revoked".equals(entitlement.getStatus()) || "refunded".equals(entitlement.getStatus())) {
+            logger.warn("activateOnPayment: refusing to reactivate {} entitlement {}",
+                    entitlement.getStatus(), entitlement.getEntitlementId());
+            return entitlement;
+        }
+
         applyTierSnapshot(entitlement, txn);
         entitlement.setStatus("active");
         entitlement.setGrantedAt(new Date());
@@ -110,7 +130,10 @@ public class EntitlementService {
         }
         entitlement = entitlementRepository.save(entitlement);
 
-        sendWelcomeAssessmentLink(entitlement, txn);
+        // WEL1: send the welcome email only once (guards against re-activation / redrive).
+        if (notificationDispatcher.countSent(entitlement.getEntitlementId(), "assessment_invite") == 0) {
+            sendWelcomeAssessmentLink(entitlement, txn);
+        }
         return entitlement;
     }
 
@@ -135,6 +158,239 @@ public class EntitlementService {
         e = entitlementRepository.save(e);
         sendWelcomeAssessmentLink(e, txn);
         return e;
+    }
+
+    // ===== B2B (assessment-mapping) entitlements =====
+    // Same StudentEntitlement + same gates as B2C, but sourced from an
+    // AssessmentMappingTier and scoped by mapping_id (campaign_id stays null).
+    // No email here — the B2B register/webhook paths own credential delivery
+    // and auto-login. This is purely the access GRANT.
+
+    /**
+     * Activate (or upgrade) a B2B entitlement from a paid/free/upgrade PaymentTransaction
+     * that carries mapping_id + mapping_tier_id. Works for first registration AND the
+     * free->paid upgrade: it find-or-creates the student's B2B entitlement for the
+     * assessment and UNIONs the tier's service flags (never dropping an already-granted
+     * service), extending each service window to the later expiry.
+     */
+    @Transactional
+    public StudentEntitlement activateB2BOnPayment(Long paymentTransactionId) {
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(paymentTransactionId);
+        if (!txnOpt.isPresent()) {
+            logger.warn("activateB2BOnPayment: txn {} not found", paymentTransactionId);
+            return null;
+        }
+        PaymentTransaction txn = txnOpt.get();
+        if (txn.getMappingId() == null || txn.getMappingTierId() == null) {
+            return null; // not a B2B mapping payment
+        }
+        Optional<AssessmentMappingTier> tierOpt =
+                assessmentMappingTierRepository.findById(txn.getMappingTierId());
+        if (!tierOpt.isPresent()) {
+            logger.warn("activateB2BOnPayment: mapping tier {} not found", txn.getMappingTierId());
+            return null;
+        }
+        AssessmentMappingTier tier = tierOpt.get();
+
+        StudentEntitlement entitlement = entitlementRepository.findByPaymentTransactionId(paymentTransactionId)
+                .orElseGet(() -> findOrCreateB2B(txn));
+
+        // Idempotent: same txn already activated → no-op (webhook retry / reconcile race).
+        if ("active".equals(entitlement.getStatus())
+                && paymentTransactionId.equals(entitlement.getPaymentTransactionId())) {
+            return entitlement;
+        }
+        // STATE1: never resurrect a revoked/refunded entitlement.
+        if ("revoked".equals(entitlement.getStatus()) || "refunded".equals(entitlement.getStatus())) {
+            logger.warn("activateB2BOnPayment: refusing to reactivate {} entitlement {}",
+                    entitlement.getStatus(), entitlement.getEntitlementId());
+            return entitlement;
+        }
+
+        applyMappingTierSnapshot(entitlement, tier);
+        entitlement.setMappingId(txn.getMappingId());
+        entitlement.setPaymentTransactionId(txn.getTransactionId());
+        entitlement.setStatus("active");
+        entitlement.setGrantedAt(new Date());
+        if (entitlement.getAccessToken() == null) {
+            entitlement.setAccessToken(generateToken());
+            entitlement.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
+        }
+        return entitlementRepository.save(entitlement);
+    }
+
+    /** Latest non-terminal B2B entitlement for (student, assessment), or a fresh row. */
+    private StudentEntitlement findOrCreateB2B(PaymentTransaction txn) {
+        if (txn.getUserStudentId() != null) {
+            for (StudentEntitlement e : entitlementRepository
+                    .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(
+                            txn.getUserStudentId(), txn.getAssessmentId())) {
+                if (e.getCampaignId() == null
+                        && !"revoked".equals(e.getStatus()) && !"refunded".equals(e.getStatus())) {
+                    e.setPaymentTransactionId(txn.getTransactionId());
+                    return e;
+                }
+            }
+        }
+        StudentEntitlement e = new StudentEntitlement();
+        e.setUserStudentId(txn.getUserStudentId());
+        e.setAssessmentId(txn.getAssessmentId());
+        e.setMappingId(txn.getMappingId());
+        e.setPaymentTransactionId(txn.getTransactionId());
+        return e;
+    }
+
+    // ===== Legacy-school entitlements (same StudentEntitlement + same gates) =====
+    // The school flow keeps its own school_assessment_config / school_assessment_tier
+    // tables, but a school registration now mints the same access-grant row as the
+    // per-level B2B flow so school students pass the report/dashboard/counselling/LMS
+    // gates. Sourced from a SchoolAssessmentTier and scoped by school_config_id
+    // (campaign_id AND mapping_id both stay null).
+
+    /**
+     * Activate (or top-up) a school entitlement from a paid/free PaymentTransaction
+     * that carries school_config_id + mapping_tier_id (a school_assessment_tier id).
+     * Mirrors {@link #activateB2BOnPayment} — find-or-create the student's school
+     * entitlement for the assessment and UNION the tier's service flags (additive,
+     * never dropping an already-granted service).
+     */
+    @Transactional
+    public StudentEntitlement activateSchoolOnPayment(Long paymentTransactionId) {
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(paymentTransactionId);
+        if (!txnOpt.isPresent()) {
+            logger.warn("activateSchoolOnPayment: txn {} not found", paymentTransactionId);
+            return null;
+        }
+        PaymentTransaction txn = txnOpt.get();
+        if (txn.getSchoolConfigId() == null || txn.getMappingTierId() == null) {
+            return null; // not a school payment
+        }
+        Optional<SchoolAssessmentTier> tierOpt =
+                schoolAssessmentTierRepository.findById(txn.getMappingTierId());
+        if (!tierOpt.isPresent()) {
+            logger.warn("activateSchoolOnPayment: school tier {} not found", txn.getMappingTierId());
+            return null;
+        }
+        SchoolAssessmentTier tier = tierOpt.get();
+
+        StudentEntitlement entitlement = entitlementRepository.findByPaymentTransactionId(paymentTransactionId)
+                .orElseGet(() -> findOrCreateSchool(txn));
+
+        // Idempotent: same txn already activated → no-op (webhook retry / reconcile race).
+        if ("active".equals(entitlement.getStatus())
+                && paymentTransactionId.equals(entitlement.getPaymentTransactionId())) {
+            return entitlement;
+        }
+        // STATE1: never resurrect a revoked/refunded entitlement.
+        if ("revoked".equals(entitlement.getStatus()) || "refunded".equals(entitlement.getStatus())) {
+            logger.warn("activateSchoolOnPayment: refusing to reactivate {} entitlement {}",
+                    entitlement.getStatus(), entitlement.getEntitlementId());
+            return entitlement;
+        }
+
+        applyInclusionSnapshot(entitlement, ServiceInclusions.fromSchoolTier(tier));
+        entitlement.setSchoolConfigId(txn.getSchoolConfigId());
+        entitlement.setPaymentTransactionId(txn.getTransactionId());
+        entitlement.setStatus("active");
+        entitlement.setGrantedAt(new Date());
+        if (entitlement.getAccessToken() == null) {
+            entitlement.setAccessToken(generateToken());
+            entitlement.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
+        }
+        return entitlementRepository.save(entitlement);
+    }
+
+    /** Latest non-terminal school entitlement for (student, assessment), or a fresh row. */
+    private StudentEntitlement findOrCreateSchool(PaymentTransaction txn) {
+        if (txn.getUserStudentId() != null) {
+            for (StudentEntitlement e : entitlementRepository
+                    .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(
+                            txn.getUserStudentId(), txn.getAssessmentId())) {
+                if (e.getCampaignId() == null && e.getMappingId() == null
+                        && !"revoked".equals(e.getStatus()) && !"refunded".equals(e.getStatus())) {
+                    e.setPaymentTransactionId(txn.getTransactionId());
+                    return e;
+                }
+            }
+        }
+        StudentEntitlement e = new StudentEntitlement();
+        e.setUserStudentId(txn.getUserStudentId());
+        e.setAssessmentId(txn.getAssessmentId());
+        e.setSchoolConfigId(txn.getSchoolConfigId());
+        e.setPaymentTransactionId(txn.getTransactionId());
+        return e;
+    }
+
+    /** Union an AssessmentMappingTier's service flags onto the entitlement. */
+    private void applyMappingTierSnapshot(StudentEntitlement e, AssessmentMappingTier tier) {
+        applyInclusionSnapshot(e, ServiceInclusions.fromMappingTier(tier));
+    }
+
+    /**
+     * Tier-table-agnostic view of the service inclusions a tier grants. Both the
+     * per-level {@link AssessmentMappingTier} and the legacy {@link SchoolAssessmentTier}
+     * project into this so a single snapshot routine serves both flows.
+     */
+    private static final class ServiceInclusions {
+        final boolean finalReport, dashboard, counselling, lms;
+        final Integer dashboardValidityDays, counsellingSessionCount, lmsValidityDays;
+
+        private ServiceInclusions(boolean finalReport, boolean dashboard, Integer dashboardValidityDays,
+                                  boolean counselling, Integer counsellingSessionCount,
+                                  boolean lms, Integer lmsValidityDays) {
+            this.finalReport = finalReport;
+            this.dashboard = dashboard;
+            this.dashboardValidityDays = dashboardValidityDays;
+            this.counselling = counselling;
+            this.counsellingSessionCount = counsellingSessionCount;
+            this.lms = lms;
+            this.lmsValidityDays = lmsValidityDays;
+        }
+
+        static ServiceInclusions fromMappingTier(AssessmentMappingTier t) {
+            return new ServiceInclusions(
+                    Boolean.TRUE.equals(t.getIncludesFinalReport()),
+                    Boolean.TRUE.equals(t.getIncludesDashboard()), t.getDashboardValidityDays(),
+                    Boolean.TRUE.equals(t.getIncludesCounselling()), t.getCounsellingSessionCount(),
+                    Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays());
+        }
+
+        static ServiceInclusions fromSchoolTier(SchoolAssessmentTier t) {
+            return new ServiceInclusions(
+                    Boolean.TRUE.equals(t.getIncludesFinalReport()),
+                    Boolean.TRUE.equals(t.getIncludesDashboard()), t.getDashboardValidityDays(),
+                    Boolean.TRUE.equals(t.getIncludesCounselling()), t.getCounsellingSessionCount(),
+                    Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays());
+        }
+    }
+
+    /** Union a tier's service flags onto the entitlement (additive; never drops access). */
+    private void applyInclusionSnapshot(StudentEntitlement e, ServiceInclusions inc) {
+        e.setFinalReportActive(Boolean.TRUE.equals(e.getFinalReportActive()) || inc.finalReport);
+        e.setDashboardActive(Boolean.TRUE.equals(e.getDashboardActive()) || inc.dashboard);
+        e.setCounsellingActive(Boolean.TRUE.equals(e.getCounsellingActive()) || inc.counselling);
+        e.setLmsActive(Boolean.TRUE.equals(e.getLmsActive()) || inc.lms);
+
+        int newSessions = inc.counsellingSessionCount != null ? inc.counsellingSessionCount : 0;
+        int curSessions = e.getCounsellingSessionsTotal() != null ? e.getCounsellingSessionsTotal() : 0;
+        e.setCounsellingSessionsTotal(Math.max(curSessions, newSessions));
+
+        if (inc.dashboard && inc.dashboardValidityDays != null && inc.dashboardValidityDays > 0) {
+            e.setDashboardExpiresAt(laterExpiry(e.getDashboardExpiresAt(), daysFromNow(inc.dashboardValidityDays)));
+        }
+        if (inc.lms && inc.lmsValidityDays != null && inc.lmsValidityDays > 0) {
+            e.setLmsExpiresAt(laterExpiry(e.getLmsExpiresAt(), daysFromNow(inc.lmsValidityDays)));
+        }
+
+        // Overall expiry = earliest active service window (services with no window never expire).
+        Date earliest = null;
+        if (Boolean.TRUE.equals(e.getDashboardActive()) && e.getDashboardExpiresAt() != null) {
+            earliest = earlier(earliest, e.getDashboardExpiresAt());
+        }
+        if (Boolean.TRUE.equals(e.getLmsActive()) && e.getLmsExpiresAt() != null) {
+            earliest = earlier(earliest, e.getLmsExpiresAt());
+        }
+        e.setExpiresAt(earliest);
     }
 
     /**
@@ -202,6 +458,10 @@ public class EntitlementService {
         Optional<StudentEntitlement> opt = entitlementRepository.findById(entitlementId);
         if (!opt.isPresent()) return null;
         StudentEntitlement e = opt.get();
+        // STATE1: idempotent — a refunded/already-revoked entitlement stays terminal.
+        if ("revoked".equals(e.getStatus()) || "refunded".equals(e.getStatus())) {
+            return e;
+        }
         e.setStatus("revoked");
         e.setDashboardActive(false);
         e.setCounsellingActive(false);
@@ -217,9 +477,21 @@ public class EntitlementService {
         Optional<StudentEntitlement> opt = entitlementRepository.findById(entitlementId);
         if (!opt.isPresent()) return null;
         StudentEntitlement e = opt.get();
+        // STATE1: only an active entitlement can be extended — silently writing future
+        // dates onto a revoked/refunded/expired row was misleading and ineffective.
+        if (!"active".equals(e.getStatus())) {
+            logger.warn("extendExpiry: refusing to extend {} entitlement {}", e.getStatus(), entitlementId);
+            return e;
+        }
         e.setExpiresAt(newExpiresAt);
         if (Boolean.TRUE.equals(e.getDashboardActive())) e.setDashboardExpiresAt(newExpiresAt);
         if (Boolean.TRUE.equals(e.getLmsActive())) e.setLmsExpiresAt(newExpiresAt);
+        // Keep the access token alive at least as long as the extended service window,
+        // otherwise the magic links 401 before the new expiry.
+        if (e.getAccessTokenExpiresAt() == null
+                || (newExpiresAt != null && e.getAccessTokenExpiresAt().before(newExpiresAt))) {
+            e.setAccessTokenExpiresAt(newExpiresAt);
+        }
         return entitlementRepository.save(e);
     }
 
@@ -229,6 +501,14 @@ public class EntitlementService {
         if (!opt.isPresent()) return new ResendResult(false, "Entitlement not found");
         StudentEntitlement e = opt.get();
         if (!"active".equals(e.getStatus())) return new ResendResult(false, "Entitlement not active");
+
+        // Always deliver to the entitlement's OWN student — never a caller-supplied
+        // recipient. These links embed a live access token (final report / dashboard
+        // SSO); emailing one to an arbitrary address would exfiltrate another
+        // student's report + a working bearer credential. The `recipient` arg is
+        // intentionally ignored.
+        String studentEmail = resolveStudentEmail(e);
+        if (studentEmail == null) return new ResendResult(false, "Student has no email on file");
 
         String token = e.getAccessToken();
         if (token == null) {
@@ -280,8 +560,16 @@ public class EntitlementService {
             default:
                 return new ResendResult(false, "Unknown service type: " + serviceType);
         }
-        notificationDispatcher.sendEmail(e, recipient, serviceType, subject, body, link);
+        notificationDispatcher.sendEmail(e, studentEmail, serviceType, subject, body, link);
         return new ResendResult(true, "Sent");
+    }
+
+    /** Resolves the entitlement's student email; null when no student/email is on file. */
+    private String resolveStudentEmail(StudentEntitlement e) {
+        if (e.getUserStudentId() == null) return null;
+        UserStudent us = userStudentRepository.findById(e.getUserStudentId()).orElse(null);
+        if (us == null || us.getStudentInfo() == null) return null;
+        return us.getStudentInfo().getEmail();
     }
 
     private StudentEntitlement findOrCreateForUpgrade(PaymentTransaction txn) {
@@ -530,6 +818,12 @@ public class EntitlementService {
         if (a == null) return b;
         if (b == null) return a;
         return a.before(b) ? a : b;
+    }
+
+    private static Date laterExpiry(Date a, Date b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return a.after(b) ? a : b;
     }
 
     public static class ResendResult {

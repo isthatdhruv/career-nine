@@ -75,6 +75,7 @@ public class ReportService {
     @Autowired private TemplateRenderer templateRenderer;
     @Autowired private DigitalOceanSpacesService spacesService;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private com.kccitm.api.service.b2c.report.pdf.PdfRenderService pdfRenderService;
 
     @Autowired private List<PlaceholderCalculator> allStrategies;
 
@@ -171,11 +172,27 @@ public class ReportService {
         String reportUrl = spacesService.uploadBytes(
                 filledHtml.getBytes(StandardCharsets.UTF_8), "text/html", folder, fileName);
 
-        // 7. Upsert generated_report
-        GeneratedReport gr = upsertGeneratedReport(userStudentId, assessmentId, template, reportUrl);
+        // 6b. Render the PDF synchronously so it exists the moment generation
+        // returns — uploaded to Spaces beside the HTML. A render failure does NOT
+        // fail generation (the HTML is already saved); the row is marked
+        // pdf_status=failed and can be re-rendered via the retry endpoint.
+        String pdfUrl = null;
+        String pdfStatus = "failed";
+        try {
+            pdfUrl = pdfRenderService.renderAndUpload(reportUrl);
+            pdfStatus = "ready";
+        } catch (Exception e) {
+            logger.error("PDF render failed for student {} assessment {} (HTML saved, pdf_status=failed): {}",
+                    userStudentId, assessmentId, e.getMessage());
+        }
+
+        // 7. Upsert generated_report with the rendered PDF state.
+        GeneratedReport gr = upsertGeneratedReport(userStudentId, assessmentId, template,
+                reportUrl, pdfUrl, pdfStatus);
 
         return new ReportResult(reportUrl, template.getEngineCode(), templateLabel(template),
-                calcRow.getCalculatedAt(), gr.getUpdatedAt(), reusedCalc);
+                calcRow.getCalculatedAt(), gr.getUpdatedAt(), reusedCalc,
+                gr.getPdfUrl(), gr.getPdfStatus());
     }
 
     // ───────────────────────────────────────────────────────── helpers ──
@@ -281,7 +298,8 @@ public class ReportService {
     }
 
     private GeneratedReport upsertGeneratedReport(Long userStudentId, Long assessmentId,
-                                                  ReportTemplate template, String reportUrl) {
+                                                  ReportTemplate template, String reportUrl,
+                                                  String pdfUrl, String pdfStatus) {
         Optional<GeneratedReport> opt = generatedReportRepository
                 .findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
                         userStudentId, assessmentId, template.getReportTemplateId());
@@ -298,6 +316,8 @@ public class ReportService {
         gr.setReportTemplate(template);
         gr.setReportStatus("generated");
         gr.setReportUrl(reportUrl);
+        gr.setPdfUrl(pdfUrl);         // synchronously rendered above (null if render failed)
+        gr.setPdfStatus(pdfStatus);   // "ready" on success, "failed" otherwise
         gr.setUpdatedAt(new Date());
         return generatedReportRepository.save(gr);
     }

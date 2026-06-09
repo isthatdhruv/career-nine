@@ -86,7 +86,7 @@ export function AsideMenuMain() {
     allowed("/payment-tracking") ||
     allowed("/promo-codes");
 
-  const showReports = allowed("/reports-hub") || allowed("/admin/report-types") || allowed("/admin/report-templates");
+  const showReports = allowed("/reports") || allowed("/reports-hub") || allowed("/admin/report-templates");
 
   const showRoles =
     allowed("/user-management/roles/manage") ||
@@ -498,20 +498,20 @@ export function AsideMenuMain() {
               fontIcon="bi-grid-3x3-gap"
             />
           )}
-          {allowed("/admin/report-types") && (
-            <AsideMenuItem
-              to="/admin/report-types"
-              icon="/media/icons/duotune/files/fil003.svg"
-              title="Report Types"
-              fontIcon="bi-file-earmark-text"
-            />
-          )}
-          {(allowed("/admin/report-templates") || allowed("/admin/report-types")) && (
+          {(allowed("/admin/report-templates") || allowed("/reports-hub")) && (
             <AsideMenuItem
               to="/admin/report-templates"
               icon="/media/icons/duotune/files/fil003.svg"
               title="Report Templates"
               fontIcon="bi-file-earmark-text"
+            />
+          )}
+          {allowed("/reports") && (
+            <AsideMenuItem
+              to="/reports"
+              icon="/media/icons/duotune/graphs/gra010.svg"
+              title="School Reports"
+              fontIcon="bi-mortarboard"
             />
           )}
         </>
