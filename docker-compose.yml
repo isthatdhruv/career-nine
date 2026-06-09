@@ -104,6 +104,19 @@ services:
       # Without this the backend falls back to the application.yml default localhost:3000
       # (nothing listens there inside the container) and every PDF render fails.
       - GOTENBERG_URL=http://gotenberg:3000
+      # ── TEMPORARY (2026-06-09): skip Flyway validation of already-applied
+      #    migrations on startup. Prod has migrations applied DIRECTLY to the DB
+      #    that are not in git — e.g. version 20260601008 on prod is a
+      #    "fix assessment demographic mapping is mandatory type" migration that
+      #    exists on no branch, while in the repo that same version number is
+      #    drop_legacy_report_type_subtype. Flyway's validation aborts boot on
+      #    that version/description/checksum mismatch.
+      #    validate-on-migrate=false lets Flyway run any PENDING migrations
+      #    without re-validating applied ones, so the backend starts. It does
+      #    NOT re-run version 20260601008 (already in history → skipped).
+      #    REMOVE once the migration history is reconciled (see repair-prod-flyway.sh
+      #    and the /tmp backup of flyway_schema_history).
+      - SPRING_FLYWAY_VALIDATE_ON_MIGRATE=false
       - KAFKA_BOOTSTRAP=kafka:9092
     deploy:
       resources:
