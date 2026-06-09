@@ -2,10 +2,13 @@
 # Activated on the dedicated worker container (SPRING_PROFILES_ACTIVE=production,report-worker).
 # Runs the report.generate / report.email Kafka consumers (gated by @Profile("report-worker"))
 # in their own JVM so report rendering never steals threads/heap from the live API.
+# NOTE: the worker runs as a normal servlet web app (Tomcat binds 8080 INTERNALLY —
+# the container does NOT publish the port, so it's unreachable from outside and just
+# idles). We do NOT use web-application-type=none because the shared Spring Security
+# OAuth2-client config needs the servlet web context (ClientRegistrationRepository);
+# a non-web context fails to start. Trimming this to a true headless worker requires
+# gating the web-security/OAuth2 config off for this profile — a later refactor.
 spring:
-  main:
-    # No HTTP server in the worker — it only consumes Kafka + renders + emails.
-    web-application-type: none
   # The api container owns DB migrations; the worker must NOT run Flyway
   # (avoids a redundant second migrator + the prod history-validation mismatch).
   flyway:
