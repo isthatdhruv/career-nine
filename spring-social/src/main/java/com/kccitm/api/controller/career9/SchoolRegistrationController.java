@@ -57,6 +57,7 @@ import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
+import com.kccitm.api.service.b2c.EntitlementService;
 
 @RestController
 @RequestMapping("/school-registration")
@@ -67,6 +68,7 @@ public class SchoolRegistrationController {
     @Autowired private SchoolAssessmentConfigRepository configRepository;
     @Autowired private SchoolAssessmentTierRepository schoolTierRepository;
     @Autowired private AssessmentMappingTierService tierService;
+    @Autowired private EntitlementService entitlementService;
     @Autowired private SchoolRegistrationLinkRepository linkRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
@@ -326,6 +328,14 @@ public class SchoolRegistrationController {
         // maxRegistrations is nullable-meaningful: always copy it through
         existing.setMaxRegistrations(updated.getMaxRegistrations());
         if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
+        // Feature inclusions — always copy through (false/null are meaningful edits).
+        existing.setIncludesFinalReport(Boolean.TRUE.equals(updated.getIncludesFinalReport()));
+        existing.setIncludesDashboard(Boolean.TRUE.equals(updated.getIncludesDashboard()));
+        existing.setDashboardValidityDays(updated.getDashboardValidityDays());
+        existing.setIncludesCounselling(Boolean.TRUE.equals(updated.getIncludesCounselling()));
+        existing.setCounsellingSessionCount(updated.getCounsellingSessionCount());
+        existing.setIncludesLms(Boolean.TRUE.equals(updated.getIncludesLms()));
+        existing.setLmsValidityDays(updated.getLmsValidityDays());
         SchoolAssessmentTier saved = schoolTierRepository.save(existing);
 
         // A price change must not leave already-issued links payable at the old amount.
@@ -758,6 +768,11 @@ public class SchoolRegistrationController {
                 userStudent.getUserStudentId(), assessmentId);
         studentAssessmentMappingRepository.save(sam);
 
+        // Grant the tier's services (counselling / report / dashboard) to this
+        // student so the assessment thank-you page can offer them. No-op when the
+        // tier is a plain assessment tier (unlocks nothing extra).
+        entitlementService.grantSchoolEntitlement(userStudent.getUserStudentId(), assessmentId, activeTier);
+
         // 12. Build response + send email
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
@@ -967,6 +982,13 @@ public class SchoolRegistrationController {
                         user.getUsername(), dobFormatted, assessmentName);
             }
         }
+
+        // Grant the tier's services (counselling / report / dashboard) for the
+        // existing student too, so a returning student on a counselling link still
+        // gets the booking option. No-op for plain assessment tiers.
+        final UserStudent grantStudent = userStudent;
+        schoolTierRepository.findById(activeTierId).ifPresent(t ->
+                entitlementService.grantSchoolEntitlement(grantStudent.getUserStudentId(), assessmentId, t));
 
         return ResponseEntity.ok(response);
     }

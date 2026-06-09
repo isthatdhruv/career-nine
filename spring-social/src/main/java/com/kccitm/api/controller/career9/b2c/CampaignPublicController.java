@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -965,6 +966,43 @@ public class CampaignPublicController {
      * Response: {@code { slots: [...], sessionsRemaining: int }}.
      */
     // @PreAuthorize-Exempt: public b2c funnel — anonymous, gated by entitlement accessToken.
+    /**
+     * Resolve a SCHOOL student's counselling for the assessment thank-you page.
+     * B2C students carry an entitlementId from registration; school students reach
+     * the thank-you page via a fresh login and have none — so the page resolves
+     * their counselling by (userStudentId, assessmentId) instead. Returns the
+     * entitlement's accessToken + session counts so the existing slot picker works
+     * unchanged. {@code counsellingActive:false} when there's nothing to offer.
+     */
+    // @PreAuthorize-Exempt: public funnel — mirrors the other /campaign/public endpoints.
+    @GetMapping("/student-counselling")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> studentCounselling(@RequestParam Long userStudentId,
+                                                @RequestParam Long assessmentId) {
+        Map<String, Object> out = new HashMap<>();
+        StudentEntitlement e = entitlementService == null ? null
+                : entitlementService.findActiveCounsellingForStudent(userStudentId, assessmentId);
+        if (e == null || e.getAccessToken() == null) {
+            out.put("counsellingActive", false);
+            return ResponseEntity.ok(out);
+        }
+        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
+        out.put("counsellingActive", true);
+        out.put("entitlementId", e.getEntitlementId());
+        out.put("accessToken", e.getAccessToken());
+        out.put("counsellingSessionsTotal", total);
+        out.put("counsellingSessionsUsed", used);
+        Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+        if (usOpt.isPresent() && usOpt.get().getStudentInfo() != null) {
+            StudentInfo si = usOpt.get().getStudentInfo();
+            out.put("studentName", si.getName());
+            out.put("studentEmail", si.getEmail());
+            out.put("studentPhone", si.getPhoneNumber());
+        }
+        return ResponseEntity.ok(out);
+    }
+
     @PostMapping("/counselling/slots")
     @Transactional(readOnly = true)
     public ResponseEntity<?> listCounsellingSlots(@RequestBody Map<String, Object> body) {

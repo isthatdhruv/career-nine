@@ -52,6 +52,19 @@ export function getUpgradeInfo(entitlementId: number | string) {
   return http.get(`/campaign/public/upgrade-info/${entitlementId}`)
 }
 
+// School/B2B students reach the thank-you page via a fresh login and have no
+// entitlementId. Resolve their counselling (if any) by (userStudentId, assessmentId)
+// so the booking step can still be offered. Returns { counsellingActive: false }
+// when there is nothing to offer.
+export function getStudentCounselling(
+  userStudentId: number | string,
+  assessmentId: number | string,
+) {
+  return http.get('/campaign/public/student-counselling', {
+    params: { userStudentId, assessmentId },
+  })
+}
+
 /**
  * Magic-link redemption for the welcome-email flow. Validates the access
  * token, issues the cn_at_asmnt cookie via Set-Cookie, and returns the

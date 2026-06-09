@@ -64,6 +64,15 @@ export interface SchoolAssessmentTier {
   maxRegistrations: number | null;
   currentCount?: number;
   isActive?: boolean;
+  // Feature inclusions — mirror the B2C pricing tier so a school tier can grant
+  // counselling / report / dashboard to students who register through its link.
+  includesFinalReport?: boolean;
+  includesDashboard?: boolean;
+  dashboardValidityDays?: number | null;
+  includesCounselling?: boolean;
+  counsellingSessionCount?: number | null;
+  includesLms?: boolean;
+  lmsValidityDays?: number | null;
 }
 
 export function getSchoolTiers(instituteCode: number, sessionId: number, assessmentId: number) {

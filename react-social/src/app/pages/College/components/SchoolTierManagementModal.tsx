@@ -102,6 +102,28 @@ const SchoolTierManagementModal = ({
             ? null
             : Math.round(Number(form.maxRegistrations)),
         isActive: form.isActive,
+        includesFinalReport: !!form.includesFinalReport,
+        includesDashboard: !!form.includesDashboard,
+        dashboardValidityDays:
+          form.dashboardValidityDays === null ||
+          form.dashboardValidityDays === undefined ||
+          String(form.dashboardValidityDays) === ""
+            ? null
+            : Math.round(Number(form.dashboardValidityDays)),
+        includesCounselling: !!form.includesCounselling,
+        counsellingSessionCount:
+          form.counsellingSessionCount === null ||
+          form.counsellingSessionCount === undefined ||
+          String(form.counsellingSessionCount) === ""
+            ? null
+            : Math.round(Number(form.counsellingSessionCount)),
+        includesLms: !!form.includesLms,
+        lmsValidityDays:
+          form.lmsValidityDays === null ||
+          form.lmsValidityDays === undefined ||
+          String(form.lmsValidityDays) === ""
+            ? null
+            : Math.round(Number(form.lmsValidityDays)),
       };
       if (editingId) {
         await updateSchoolTier(editingId, payload);
@@ -305,6 +327,61 @@ const SchoolTierManagementModal = ({
               onChange={(e) => setForm({ ...form, maxRegistrations: e.target.value === "" ? null : Number(e.target.value) })}
             />
           </div>
+
+          {/* Tier inclusions — what services a student gets by registering on this
+              tier's link. Counselling is the key one: when on, school students see
+              the booking step at the end of their assessment. */}
+          <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 12, marginTop: 4 }}>
+            <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem", display: "block", marginBottom: 8 }}>
+              This tier includes
+            </Form.Label>
+            <Form.Check
+              type="switch"
+              id="tier-includes-report"
+              label="Final report"
+              checked={!!form.includesFinalReport}
+              onChange={(e) => setForm({ ...form, includesFinalReport: e.target.checked })}
+            />
+            <Form.Check
+              type="switch"
+              id="tier-includes-dashboard"
+              label="Dashboard"
+              checked={!!form.includesDashboard}
+              onChange={(e) => setForm({ ...form, includesDashboard: e.target.checked })}
+            />
+            {form.includesDashboard && (
+              <div style={{ margin: "6px 0 10px 36px" }}>
+                <Form.Label style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                  Dashboard validity (days) <span style={{ color: "#94a3b8" }}>— blank = no expiry</span>
+                </Form.Label>
+                <Form.Control
+                  type="number" min="1"
+                  value={form.dashboardValidityDays ?? ""}
+                  onChange={(e) => setForm({ ...form, dashboardValidityDays: e.target.value === "" ? null : Number(e.target.value) })}
+                />
+              </div>
+            )}
+            <Form.Check
+              type="switch"
+              id="tier-includes-counselling"
+              label="Counselling"
+              checked={!!form.includesCounselling}
+              onChange={(e) => setForm({ ...form, includesCounselling: e.target.checked })}
+            />
+            {form.includesCounselling && (
+              <div style={{ margin: "6px 0 10px 36px" }}>
+                <Form.Label style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                  Number of counselling sessions
+                </Form.Label>
+                <Form.Control
+                  type="number" min="1"
+                  value={form.counsellingSessionCount ?? 1}
+                  onChange={(e) => setForm({ ...form, counsellingSessionCount: e.target.value === "" ? null : Number(e.target.value) })}
+                />
+              </div>
+            )}
+          </div>
+
           <Form.Check
             type="switch"
             label="Active"
