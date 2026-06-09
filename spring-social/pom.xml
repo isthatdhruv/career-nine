@@ -85,6 +85,18 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
+		<!-- Kafka — report-on-completion pipeline (report.generate → report.email).
+		     Version BOM-managed by spring-boot-starter-parent 2.5.5 (spring-kafka ~2.7.x,
+		     which provides @RetryableTopic / DLT). -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+		<!-- @RetryableTopic's @Backoff lives in spring-retry (optional transitive of spring-kafka). -->
+		<dependency>
+			<groupId>org.springframework.retry</groupId>
+			<artifactId>spring-retry</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.security</groupId>
 			<artifactId>spring-security-oauth2-client</artifactId>

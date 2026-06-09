@@ -75,6 +75,24 @@ spring:
           starttls:
             enable: true
             required: true
+  # Kafka — report-on-completion pipeline (report.generate → report.email).
+  # String (JSON) messages; consumers manual-commit after processing (at-least-once).
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: report-pipeline
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+      # Don't block app startup if the broker is briefly unreachable.
+      missing-topics-fatal: false
   security:
     oauth2:
       client:

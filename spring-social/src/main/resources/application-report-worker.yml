@@ -1,0 +1,23 @@
+# Profile: report-worker
+# Activated on the dedicated worker container (SPRING_PROFILES_ACTIVE=production,report-worker).
+# Runs the report.generate / report.email Kafka consumers (gated by @Profile("report-worker"))
+# in their own JVM so report rendering never steals threads/heap from the live API.
+spring:
+  main:
+    # No HTTP server in the worker — it only consumes Kafka + renders + emails.
+    web-application-type: none
+
+# Pipeline tuning (override per environment / during load testing via env vars, e.g.
+# REPORT_PIPELINE_GENERATE_CONCURRENCY=2). Defaults are tuned for one 8-vCPU box.
+report:
+  pipeline:
+    enabled: true
+    generate-concurrency: 3   # bounded to Gotenberg's CPU budget
+    email-concurrency: 2
+    partitions: 6             # ≥ max concurrency
+    max-attempts: 5
+    backoff-ms: 5000
+    pdf-attempts: 3           # PDF re-render attempts before link-only fallback
+    email-rate-per-sec: 0     # 0 = no pacing; set >0 to throttle Odoo sends
+    idem-lock-seconds: 300
+    idem-sent-days: 7
