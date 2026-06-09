@@ -85,13 +85,6 @@ public class GeneratedReport implements Serializable {
     @Column(name = "pdf_status", nullable = false, length = 50)
     private String pdfStatus = "notRequested";
 
-    @Column(name = "pdf_url", length = 4096)
-    private String pdfUrl;
-
-    // notRequested | pending | rendering | ready | failed
-    @Column(name = "pdf_status", nullable = false, length = 50)
-    private String pdfStatus = "notRequested";
-
     @Column(name = "visible_to_student", nullable = false)
     private Boolean visibleToStudent = false;
 
