@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import http, { setCookieAuthRuntimeActive } from '../api/http';
 import { getActiveCacheName } from '../components/ResourcePreloader';
+import { sanitizePayload } from '../utils/sanitizeText';
 
 type AssessmentContextType = {
   assessmentData: any;
@@ -68,14 +69,19 @@ async function loadAssessmentById(assessmentId: string): Promise<{ data: any; co
   ]);
 
   if (staticData && staticConfig) {
-    return { data: staticData, config: staticConfig };
+    // Static/cached files can be frozen copies built before the backend
+    // mojibake fix — clean them here so no garbled char (â€™) ever renders.
+    return { data: sanitizePayload(staticData), config: sanitizePayload(staticConfig) };
   }
 
   const [questionnaireRes, configRes] = await Promise.all([
     http.get(`/assessments/getby/${assessmentId}`),
     http.get(`/assessments/getById/${assessmentId}`),
   ]);
-  return { data: questionnaireRes.data, config: configRes.data };
+  return {
+    data: sanitizePayload(questionnaireRes.data),
+    config: sanitizePayload(configRes.data),
+  };
 }
 
 /**
@@ -185,7 +191,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const promise = http.get(`/assessments/prefetch/${userStudentId}`)
       .then(({ data }) => {
         if (data && Array.isArray(data) && data.length > 0) {
-          setPrefetchedAssessments(data);
+          setPrefetchedAssessments(sanitizePayload(data));
         }
       })
       .catch(() => {
