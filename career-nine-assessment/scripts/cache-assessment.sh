@@ -77,12 +77,18 @@ else
   LOCKED_IDS=$(curl -sf --connect-timeout 10 --max-time 30 "${BASE_URL}/assessments/locked-ids" 2>/dev/null || true)
 
   if [ -z "$LOCKED_IDS" ] || [ "$LOCKED_IDS" = "[]" ]; then
-    # If cache already exists (e.g. committed to git), keep it as-is
+    # API unreachable or no locked assessments — purge any existing cache so the
+    # build never ships stale or no-longer-locked assessment data.
     if [ -d "$CACHE_DIR" ] && [ "$(ls -A "$CACHE_DIR" 2>/dev/null)" ]; then
-      echo "  ⚠ API unreachable or no locked assessments. Keeping existing cache."
-      exit 0
+      if [ -z "$LOCKED_IDS" ]; then
+        echo "  ⚠ API unreachable. Deleting existing cache."
+      else
+        echo "  ⚠ No locked assessments. Deleting existing cache."
+      fi
+    else
+      echo "  No locked assessments found and no existing cache."
     fi
-    echo "  No locked assessments found and no existing cache."
+    rm -rf "$CACHE_DIR"
     mkdir -p "$CACHE_DIR"
     exit 0
   fi
