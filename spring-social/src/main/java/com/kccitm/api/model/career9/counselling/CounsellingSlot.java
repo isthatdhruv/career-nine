@@ -55,11 +55,11 @@ public class CounsellingSlot implements Serializable {
     private String status = "AVAILABLE";
 
     @JsonProperty("isManuallyCreated")
-    @Column(name = "is_manually_created", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_manually_created")
     private Boolean isManuallyCreated = false;
 
     @JsonProperty("isBlocked")
-    @Column(name = "is_blocked", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_blocked")
     private Boolean isBlocked = false;
 
     @Column(name = "block_reason")

@@ -41,6 +41,10 @@ public class AssessmentCompletionService {
     @Autowired
     private ReportAutoGenerationService reportAutoGenerationService;
 
+    // Whitelabel report-on-completion pipeline (optional — absent if disabled).
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.report.pipeline.ReportPipelineProducer reportPipelineProducer;
+
     /**
      * Returns the total number of questions in the questionnaire linked to this assessment,
      * or 0 if no questionnaire is linked. Uses a COUNT query — does not load entities.
@@ -111,11 +115,23 @@ public class AssessmentCompletionService {
         // On a fresh transition to completed, kick off default-template report
         // generation in the background (no-op if no template is mapped).
         if ("completed".equals(resolved) && !"completed".equals(previousStatus)) {
+            // Whitelabel students go through the new report pipeline (generate + email);
+            // everyone else keeps the legacy unbounded auto-gen (generate only).
+            boolean enqueued = false;
             try {
-                reportAutoGenerationService.generateDefaultReportAsync(studentId, assessmentId);
+                if (reportPipelineProducer != null) {
+                    enqueued = reportPipelineProducer.enqueueIfWhitelabel(mapping.getUserStudent(), assessmentId);
+                }
             } catch (Exception ex) {
-                logger.warn("Failed to schedule auto report generation student={} assessment={}",
-                        studentId, assessmentId, ex);
+                logger.warn("Report pipeline enqueue failed student={} assessment={}", studentId, assessmentId, ex);
+            }
+            if (!enqueued) {
+                try {
+                    reportAutoGenerationService.generateDefaultReportAsync(studentId, assessmentId);
+                } catch (Exception ex) {
+                    logger.warn("Failed to schedule auto report generation student={} assessment={}",
+                            studentId, assessmentId, ex);
+                }
             }
         }
         return resolved;

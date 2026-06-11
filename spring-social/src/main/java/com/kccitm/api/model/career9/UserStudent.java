@@ -52,13 +52,13 @@ public class UserStudent implements Serializable {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "info_completed", nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "info_completed", nullable = false)
     private Boolean infoCompleted = false;
 
-    @Column(name = "counselling_allowed", columnDefinition = "boolean default false")
+    @Column(name = "counselling_allowed")
     private Boolean counsellingAllowed = false;
 
-    @Column(name = "reports_visible", columnDefinition = "boolean default false")
+    @Column(name = "reports_visible")
     private Boolean reportsVisible = false;
 
     public UserStudent(com.kccitm.api.model.User user, StudentInfo studentInfo2, InstituteDetail institue_id) {

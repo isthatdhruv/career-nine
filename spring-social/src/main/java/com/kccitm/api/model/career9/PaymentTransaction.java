@@ -105,10 +105,10 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
-    @Column(name = "welcome_email_sent", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "welcome_email_sent")
     private Boolean welcomeEmailSent = false;
 
-    @Column(name = "nudge_email_sent", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "nudge_email_sent")
     private Boolean nudgeEmailSent = false;
 
     @Column(name = "created_at")

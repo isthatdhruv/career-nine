@@ -200,6 +200,37 @@ public class OdooEmailService {
         sendEmail(request);
     }
 
+    /**
+     * <b>Synchronous</b> HTML send with an optional single attachment — used by the
+     * report-on-completion pipeline worker. Unlike the {@code @Async} fire-and-forget
+     * methods above, this THROWS on any Odoo failure so the caller can mark-sent /
+     * retry deterministically (the "for sure" delivery guarantee). Reuses the same
+     * JSON-RPC helpers (authenticate → mail.mail create → ir.attachment → send).
+     *
+     * @param fromName           optional From display name (e.g. "{School} (via Career-9)"); null → default Career-9 sender.
+     * @param attachmentContent  optional attachment bytes; null/empty → link-only (no attachment).
+     */
+    public void sendHtmlSync(String to, String subject, String html, String fromName,
+                             String attachmentFilename, byte[] attachmentContent,
+                             String attachmentContentType) throws Exception {
+        Integer uid = authenticate();
+        if (uid == null) {
+            throw new ServiceException("Odoo authentication failed");
+        }
+        String emailFrom = (fromName != null && !fromName.isBlank())
+                ? "\"" + fromName.replaceAll("[\"\\p{Cntrl}]", "").trim() + "\" <" + odooUsername + ">"
+                : null;
+        Long mailId = createMailRecord(uid, to, null, null, subject, html, emailFrom);
+        if (attachmentContent != null && attachmentContent.length > 0 && attachmentFilename != null) {
+            Long attId = createAttachment(uid, attachmentFilename, attachmentContent, mailId);
+            if (attId != null) {
+                linkAttachmentsToMail(uid, mailId, Arrays.asList(attId));
+            }
+        }
+        sendMail(uid, mailId);
+        logger.info("Odoo (sync) email sent to {} (mail.mail ID {})", to, mailId);
+    }
+
     // ─── Odoo JSON-RPC helpers ───────────────────────────────────────────
 
     private Integer authenticate() {

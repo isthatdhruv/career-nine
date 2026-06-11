@@ -38,7 +38,9 @@ public class AssessmentMappingReminderSchedulerService {
     @Autowired private ReminderConfigService configService;
     @Autowired private ReminderSender sender;
 
-    @Scheduled(cron = "0 15 * * * *")
+    // Disabled: the "not started" assessment-mapping reminder no longer runs
+    // automatically. Re-enable by uncommenting the @Scheduled annotation below.
+    // @Scheduled(cron = "0 15 * * * *")
     public void runScheduledNudges() {
         ReminderConfig cfg = configService.get(ReminderServiceType.ASSESSMENT_MAPPING);
         if (cfg == null || !Boolean.TRUE.equals(cfg.getEnabled())) {

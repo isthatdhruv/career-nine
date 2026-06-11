@@ -48,7 +48,7 @@ public class SlotConfiguration implements Serializable {
     @Column(name = "slot_duration", nullable = false)
     private Integer slotDuration;
 
-    @Column(name = "has_break", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "has_break")
     private Boolean hasBreak = false;
 
     @Column(name = "break_start")

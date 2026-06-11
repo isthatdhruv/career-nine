@@ -49,10 +49,10 @@ public class User implements Serializable {
     @Column(nullable = true)
     private String name;
 
-    @Column(name="isActive", nullable = true, columnDefinition = "boolean default false")
+    @Column(name="isActive", nullable = true)
     private Boolean isActive = false;
 
-    @Column(name = "is_super_admin", nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "is_super_admin", nullable = false)
     private Boolean isSuperAdmin = false;
 
     @OneToOne

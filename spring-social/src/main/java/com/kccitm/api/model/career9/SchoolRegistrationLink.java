@@ -40,7 +40,7 @@ public class SchoolRegistrationLink implements Serializable {
     @Column(name = "token", nullable = false, unique = true, length = 36)
     private String token;
 
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "max_registrations", nullable = false, columnDefinition = "INTEGER NOT NULL DEFAULT 0")

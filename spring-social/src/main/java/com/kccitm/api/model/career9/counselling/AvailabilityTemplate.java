@@ -47,7 +47,7 @@ public class AvailabilityTemplate implements Serializable {
     private Integer defaultSlotDuration;
 
     @JsonProperty("isActive")
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @Column(name = "created_at")

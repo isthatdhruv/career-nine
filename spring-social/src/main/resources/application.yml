@@ -24,7 +24,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: dev
+    active: production
   servlet:
     multipart:
       max-file-size: 1GB
@@ -75,6 +75,24 @@ spring:
           starttls:
             enable: true
             required: true
+  # Kafka — report-on-completion pipeline (report.generate → report.email).
+  # String (JSON) messages; consumers manual-commit after processing (at-least-once).
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: report-pipeline
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+      # Don't block app startup if the broker is briefly unreachable.
+      missing-topics-fatal: false
   security:
     oauth2:
       client:
@@ -145,6 +163,7 @@ management:
     # (sandbox / production) where real creds are configured.
     mail:
       enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
+
 
 app:
   googleAPIJSON: classpath:google.json
@@ -458,7 +477,7 @@ spring:
   jpa:
     show-sql: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
   cache:
     redis:
       key-prefix: "career9:"
@@ -500,7 +519,7 @@ app:
     secure: true
     domain: career-9.com
   cors:
-    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com,https://dashboard.career-9.com/
   oauth2:
     authorizedRedirectUris:
       - https://dashboard.career-9.com/oauth2/redirect

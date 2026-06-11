@@ -22,7 +22,7 @@ public class Difficulty implements Serializable {
     @Column(name = "name")
     private String name;
 
-    @Column(name = "checked", columnDefinition = "BOOLEAN DEFAULT false")
+    @Column(name = "checked")
     private Boolean checked;
 
     public int getId() {

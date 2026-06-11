@@ -58,7 +58,7 @@ public class UserStudentInstituteHistory implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     private Date addedAt;
 
-    @Column(name = "is_dropped", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Column(name = "is_dropped", nullable = false)
     private Boolean isDropped = false;
 
     @Column(name = "dropped_at")

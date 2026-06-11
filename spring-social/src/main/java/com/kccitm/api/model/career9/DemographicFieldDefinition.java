@@ -67,7 +67,7 @@ public class DemographicFieldDefinition implements Serializable {
     @Column(name = "default_value", length = 255)
     private String defaultValue;
 
-    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    @Column(name = "is_active")
     private Boolean isActive = true;
 
     @OneToMany(mappedBy = "fieldDefinition", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)

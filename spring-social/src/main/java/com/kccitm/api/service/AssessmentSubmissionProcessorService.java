@@ -132,6 +132,10 @@ public class AssessmentSubmissionProcessorService {
     @Autowired
     private AssessmentSubmissionProcessorService self;
 
+    // Whitelabel report-on-completion pipeline (optional — absent if disabled).
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.report.pipeline.ReportPipelineProducer reportPipelineProducer;
+
     // ── Entry points ─────────────────────────────────────────────────────────
 
     /**
@@ -464,6 +468,17 @@ public class AssessmentSubmissionProcessorService {
         } catch (Exception entitlementErr) {
             logger.warn("B2C entitlement post-completion hook failed for student={} assessment={} (non-fatal)",
                     studentId, assessmentId, entitlementErr);
+        }
+
+        // 11. Whitelabel report pipeline (NEW) — enqueue generate+email job. Non-critical:
+        // a Kafka/producer hiccup must never fail completion.
+        try {
+            if (reportPipelineProducer != null) {
+                reportPipelineProducer.enqueueIfWhitelabel(userStudent, assessmentId);
+            }
+        } catch (Exception reportErr) {
+            logger.warn("Report pipeline enqueue failed for student={} assessment={} (non-fatal)",
+                    studentId, assessmentId, reportErr);
         }
 
         logger.info("Processing succeeded: student={} assessment={} answers={} scores={} warnings={}/{}",

@@ -85,7 +85,7 @@ public class GeneratedReport implements Serializable {
     @Column(name = "pdf_status", nullable = false, length = 50)
     private String pdfStatus = "notRequested";
 
-    @Column(name = "visible_to_student", nullable = false, columnDefinition = "boolean default false")
+    @Column(name = "visible_to_student", nullable = false)
     private Boolean visibleToStudent = false;
 
     @Temporal(TemporalType.TIMESTAMP)
