@@ -16,6 +16,24 @@ const CSRF_COOKIE_NAME = "cn_csrf";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 const STATE_CHANGING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+// Declares to TokenAuthenticationFilter that this client runs on the ADMIN
+// session (cn_at), so the backend must NOT prefer the assessment-scoped
+// cn_at_asmnt cookie on /assessments/** and /assessment-answer/** requests
+// (Live Tracking). In production all cookies share Domain=career-9.com, so an
+// assessment session opened in the same browser would otherwise hijack the
+// dashboard's calls (401 when expired, 403 cross-assessment when valid).
+const AUTH_SCOPE_HEADER = "X-Auth-Scope";
+const AUTH_SCOPE_VALUE = "session";
+
+// True for requests that target our own API (relative URLs or the configured
+// API base) — third-party calls must not receive our auth-routing header.
+function isOwnApiUrl(url: string | undefined): boolean {
+  if (!url) return true; // axios.request({url: undefined}) never targets a third party
+  if (!/^https?:\/\//i.test(url)) return true; // relative → our API base
+  const apiBase = process.env.REACT_APP_API_URL || "";
+  return apiBase !== "" && url.startsWith(apiBase);
+}
+
 /**
  * Phase 18: silent-refresh-and-retry-once.
  *
@@ -99,6 +117,10 @@ export function setupAxios(axios: any) {
           config.headers = config.headers || {};
           config.headers[CSRF_HEADER_NAME] = csrf;
         }
+      }
+      if (isOwnApiUrl(config.url)) {
+        config.headers = config.headers || {};
+        config.headers[AUTH_SCOPE_HEADER] = AUTH_SCOPE_VALUE;
       }
       // Ensure withCredentials at the per-call level too (defensive — some
       // call sites pass their own `config` and may have overridden defaults).

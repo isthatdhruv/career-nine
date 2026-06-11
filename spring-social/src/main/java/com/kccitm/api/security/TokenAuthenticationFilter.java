@@ -76,11 +76,25 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             "/assessment-proctoring/",
             "/student-info/");
 
+    /**
+     * Clients that operate the ADMIN surface on assessment-scope paths (the
+     * dashboard's Live Tracking page hits /assessments/** and
+     * /assessment-answer/**) send {@code X-Auth-Scope: session} to opt out of
+     * the cn_at_asmnt cookie preference below. Without this, a domain-shared
+     * ({@code Domain=career-9.com}) assessment cookie minted in the same
+     * browser hijacks the admin's requests: expired → 401 (no fallback to the
+     * valid cn_at), valid → authenticated as the student and 403'd by
+     * {@link AssessmentScopeOwnershipInterceptor} on any other assessmentId.
+     * The header is a routing hint only — it never grants anything; the
+     * selected token still has to validate like any other.
+     */
+    private static final String AUTH_SCOPE_HEADER = "X-Auth-Scope";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         try {
-            String jwt = getJwtFromRequest(request);
+            List<String> jwtCandidates = getJwtCandidatesFromRequest(request);
 
             Cookie[] dbgCookies = request.getCookies();
             StringBuilder dbgCookieNames = new StringBuilder();
@@ -96,13 +110,26 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                     + " referer=" + request.getHeader("Referer")
                     + " cookies=[" + dbgCookieNames + "]"
                     + " bearer=" + (request.getHeader("Authorization") != null)
-                    + " jwtExtracted=" + (jwt != null)
-                    + " jwtLen=" + (jwt == null ? 0 : jwt.length()));
+                    + " authScopeHeader=" + request.getHeader(AUTH_SCOPE_HEADER)
+                    + " candidates=" + jwtCandidates.size());
 
-            boolean dbgValid = StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt);
-            System.out.println("[SESSION-DEBUG] FILTER validateToken=" + dbgValid + " uri=" + request.getRequestURI());
+            // Use the FIRST candidate that passes signature+expiry validation.
+            // Candidate order encodes preference (assessment cookie first on
+            // assessment paths, then cn_at, then Bearer); validating here means a
+            // stale/expired assessment cookie no longer shadows a perfectly valid
+            // admin session on /assessments/** — the filter falls through to the
+            // next carrier instead of leaving the request unauthenticated.
+            String jwt = null;
+            for (String candidate : jwtCandidates) {
+                if (tokenProvider.validateToken(candidate)) {
+                    jwt = candidate;
+                    break;
+                }
+            }
+            System.out.println("[SESSION-DEBUG] FILTER validToken=" + (jwt != null)
+                    + " of " + jwtCandidates.size() + " candidate(s) uri=" + request.getRequestURI());
 
-            if (StringUtils.hasText(jwt) && dbgValid) {
+            if (StringUtils.hasText(jwt)) {
                 // Phase 18: consult the jti deny list AFTER signature/expiry validation
                 // and BEFORE populating the security context. A revoked jti causes us to
                 // skip setAuthentication entirely — the unauthenticated request falls
@@ -246,7 +273,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String getJwtFromRequest(HttpServletRequest request) {
+    private List<String> getJwtCandidatesFromRequest(HttpServletRequest request) {
         // Cookie-first: prefer the HttpOnly cn_at cookie (Phase 16). An HttpOnly
         // cookie cannot be set or read by JS, so it has a smaller attack surface
         // than an Authorization header that a phishing form or malicious script
@@ -259,42 +286,43 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         //     fall through to cn_at if the assessment cookie is absent / empty.
         //   - On every other request, ONLY cn_at is honoured — cn_at_asmnt is ignored
         //     (it would also be rejected later by the scope guard in doFilterInternal,
-        //     but reading it here lets us avoid the unnecessary parse/validate path).
+        //     but skipping it here avoids the unnecessary parse/validate path).
         // The Bearer header is the final fallback so external admin scripts keep working.
+        //
+        // Returns ALL carriers present on the request, in preference order;
+        // doFilterInternal picks the first one that actually validates, so an
+        // expired cn_at_asmnt cannot shadow a valid cn_at on assessment paths.
+        List<String> candidates = new java.util.ArrayList<>();
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             String uri = request.getRequestURI() == null ? "" : request.getRequestURI();
             boolean isAssessmentPath = isAssessmentScopePath(uri);
+            // Admin clients (dashboard Live Tracking etc.) declare X-Auth-Scope: session
+            // to skip the assessment-cookie preference entirely — see AUTH_SCOPE_HEADER.
+            boolean preferSession = "session".equalsIgnoreCase(request.getHeader(AUTH_SCOPE_HEADER));
 
-            // On assessment paths, prefer cn_at_asmnt first.
-            if (isAssessmentPath) {
-                for (Cookie c : cookies) {
-                    if (AuthCookieService.ASSESSMENT_SESSION_COOKIE.equals(c.getName())) {
-                        String value = c.getValue();
-                        if (StringUtils.hasText(value)) {
-                            return value;
-                        }
-                    }
-                }
+            if (isAssessmentPath && !preferSession) {
+                addCookieValue(candidates, cookies, AuthCookieService.ASSESSMENT_SESSION_COOKIE);
             }
-
             // Admin/staff/student/counsellor session cookie — accepted on every route.
-            for (Cookie c : cookies) {
-                if (AuthCookieService.ACCESS_COOKIE.equals(c.getName())) {
-                    String value = c.getValue();
-                    if (StringUtils.hasText(value)) {
-                        return value;
-                    }
-                }
-            }
+            addCookieValue(candidates, cookies, AuthCookieService.ACCESS_COOKIE);
         }
 
         // Fallback: Authorization: Bearer <jwt>
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
+            candidates.add(bearerToken.substring(7));
         }
-        return null;
+        return candidates;
+    }
+
+    private static void addCookieValue(List<String> candidates, Cookie[] cookies, String name) {
+        for (Cookie c : cookies) {
+            if (name.equals(c.getName()) && StringUtils.hasText(c.getValue())) {
+                candidates.add(c.getValue());
+                return;
+            }
+        }
     }
 
     /**
