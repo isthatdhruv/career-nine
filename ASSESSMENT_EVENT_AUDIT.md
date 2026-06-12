@@ -838,28 +838,28 @@ Investigated by adversarial verifiers and **not** problems; don't chase them:
 # Pre-event action plan (priority order)
 
 ## Tier 1 — config-only, ~1 hour, low risk, removes the event-stoppers
-1. **C1:** `ip-per-minute: 6000` in the production rate-limit block.
-2. **C3:** Add `X-Auth-Scope` to the CORS allowlist; deploy backend with the frontend.
-3. **C2/C6:** Redis → `noeviction`; `docker compose stop api-staging mysql_db_staging redis_staging sync_cron redisinsight`; add 8GB swap.
-4. **L8:** Revert `active: dev` in `application.yml`.
-5. **M17/M26 (operational):** freeze frontend deploys during the event; `docker stop report-worker` for the live window.
+1. ✅ **C1:** `ip-per-minute: 6000` in the production rate-limit block. *(done 2026-06-12)*
+2. ✅ **C3:** Add `X-Auth-Scope` to the CORS allowlist *(done 2026-06-12)*; ⬜ deploy backend with the frontend.
+3. ✅ **C2:** Redis → `noeviction` in compose *(done 2026-06-12; recreate the container to apply)*. ➖ **C6:** moot — staging/kafka/report-worker/redisinsight aren't running on the box.
+4. ⬜ **L8:** Revert `active: dev` in `application.yml` (still flipped in the working tree).
+5. ⬜ **M17 (operational):** freeze frontend deploys during the event. ➖ M26: moot — report-worker not running.
 
 ## Tier 2 — small code changes, before the event
-6. **C4:** Guard `startAssessment` against wiping pending submissions / resume snapshots.
-7. **C5 + M29:** Submit flow — treat 409 as success-pending, 30–60s feature-safe timeout, truthful error text, pre-submit partial save.
-8. **H1/H2:** Bounded submission executor + startup sweeper + lock re-check.
-9. **H4 + M24:** Real `answeredCount` from in-memory state; show offline/stale students in the admin UI.
-10. **C2 (code half) + M28 + H16:** Delete proctoring payloads after persist; fix `retryCount` write-back; `self.processAsync` proxy fix.
-11. **M5:** Strip the `[SESSION-DEBUG]` System.out logging from the auth hot path.
-12. **H13 + H14 + M15 + M6:** Registration/login dead-end fixes (magic-link DOB seed, typed mint errors, truthful login errors, questionnaire-load retry).
+6. ⬜ **C4:** Guard `startAssessment` against wiping pending submissions / resume snapshots. **← next up, highest-impact remaining**
+7. ✅ **C5 + M29:** Submit flow — 409 as success-pending, feature-safe 60s timeout, truthful error text, pre-submit partial save. *(done 2026-06-12)*
+8. ✅ **H1/H2:** Bounded submission executor + startup sweeper + lock re-check. *(done 2026-06-12)*
+9. ◐ **H4 + M24:** ✅ Real `answeredCount` from in-memory state *(done 2026-06-12)*; ⬜ M24 (offline/stale students in the admin UI) still open.
+10. ◐ **C2 (code half) + M28 + H16:** ✅ delete proctoring payloads after persist; ✅ `self.processAsync` proxy fix *(done 2026-06-12)*; ⬜ M28 (`retryCount` write-back) still open.
+11. ✅ **M5:** Strip the `[SESSION-DEBUG]` System.out logging from the auth hot path. *(done 2026-06-12)*
+12. ◐ **H13 + H14 + M15 + M6:** ✅ M6 questionnaire-load retry *(done 2026-06-12)*; ⬜ H13 (magic-link DOB seed), H14 (typed mint errors), M15 (truthful login errors) still open.
 
 ## Tier 3 — strongly recommended hardening if time allows
-13. **H3 + H5:** Batched live-tracking query + cached principal hydration.
-14. **H6/H7 + L4:** Flush dirty-check, submitted-guard inside the transaction, self-proxy fix.
-15. **H8/H9 + M8:** Answer-save reliability (success-checked saves, autosave, restore merge guard).
-16. **H10 + L10:** Firestore timeout + self-hosted mediapipe (school-firewall resilience).
-17. **H12 + M1 + M3:** Idempotent-only retries; collision-checked usernames + unique constraints.
-18. **M16 + M21 + M23:** SW NetworkFirst for JSON; longer assessment-token TTL; heartbeat exempt from auth-redirect.
+13. ✅ **H3 + H5:** Batched live-tracking query + cached principal hydration. *(done 2026-06-12)*
+14. ✅ **H6/H7 + L4:** Flush dirty-check, submitted-guard inside the transaction, self-proxy fix. *(done 2026-06-12)*
+15. ◐ **H8/H9 + M8:** ✅ H8 success-checked saves + pagehide flush *(done 2026-06-12)*; ⬜ H9 (restore merge guard) and M8's debounced autosave still open.
+16. ⬜ **H10 + L10:** Firestore timeout + self-hosted mediapipe (school-firewall resilience). *(Note: H15 kill-switch removes the L10 CDN risk whenever proctoring is off.)*
+17. ⬜ **H12 + M1 + M3:** Idempotent-only retries; collision-checked usernames + unique constraints.
+18. ⬜ **M16 + M21 + M23:** SW NetworkFirst for JSON; longer assessment-token TTL; heartbeat exempt from auth-redirect.
 
 ## Tier 4 — verify before event day (no code)
 - Load-test the login → mint → heartbeat → save-partial → submit path at a few hundred concurrent users on staging-like config.
@@ -872,14 +872,14 @@ Investigated by adversarial verifiers and **not** problems; don't chase them:
 
 # Severity summary
 
-| Severity | Workflow findings | Distinct issues |
-|---|---|---|
-| 🔴 Critical | 14 | 6 (C1–C6) |
-| 🟠 High | 38 | 18 (H1–H18) |
-| 🟡 Medium | 38 | 30 (M1–M30) |
-| 🟢 Low | 16 | 10 (L1–L10) |
-| **Total confirmed** | **106** | **64** |
-| Refuted / cleared | 18 | — |
+| Severity | Workflow findings | Distinct issues | Status (2026-06-12) |
+|---|---|---|---|
+| 🔴 Critical | 14 | 6 (C1–C6) | 4 fixed · 1 non-issue · **1 open (C4)** |
+| 🟠 High | 38 | 18 (H1–H18) | 11 fixed · 1 partial · 6 open |
+| 🟡 Medium | 38 | 30 (M1–M30) | 6 fixed · 3 partial · 1 non-issue · 20 open |
+| 🟢 Low | 16 | 10 (L1–L10) | 1 fixed · 9 open |
+| **Total confirmed** | **106** | **64** | **22 fixed · 4 partial · 2 non-issue · 36 open** |
+| Refuted / cleared | 18 | — | — |
 
 **Traceability:** duplicate reports are folded into their section ("reported N×"): C1 ←4 crit +1 high · C2 ←3 crit · C3 ←2 crit +2 high · C4/C5 ←2 crit each · H3 ←4 high · H4/H1/H5/H16/H15 ←3–4 each · H6 ←2 high +1 med · M5 ←6 med · M25 ←1 med +2 low · M18 ←2 med +1 low · M10 ←1 med +1 low · L8 ←2 low · M30→H15 · all remaining findings map 1:1.
 
