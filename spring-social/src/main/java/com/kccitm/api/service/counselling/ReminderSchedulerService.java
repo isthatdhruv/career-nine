@@ -88,6 +88,11 @@ public class ReminderSchedulerService {
     @Autowired
     private UserStudentRepository userStudentRepository;
 
+    // Phase 3b: used to email the tokenized counselling booking link alongside the
+    // WhatsApp/in-app nudge (the "slot selection link sent to the assessment email").
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+
     /**
      * Runs every 5 minutes. Sends any due student/counsellor reminders that
      * haven't already been sent.
@@ -188,6 +193,16 @@ public class ReminderSchedulerService {
                 }
 
                 notificationService.sendCounsellingBookingNudge(name, email, phone, userId, remaining);
+                // Phase 3b: also email the tokenized slot-selection link to the address the
+                // student used for the assessment (resendServiceLink resolves it internally).
+                if (entitlementService != null && email != null) {
+                    try {
+                        entitlementService.resendServiceLink(e.getEntitlementId(), "counselling_book", email);
+                    } catch (Exception mailEx) {
+                        logger.warn("Counselling booking-link email failed for entitlement {}: {}",
+                                e.getEntitlementId(), mailEx.getMessage());
+                    }
+                }
                 e.setCounsellingNudgeSentAt(new Date());
                 entitlementRepository.save(e);
                 sent++;

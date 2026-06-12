@@ -5,14 +5,16 @@ import { showErrorToast } from '../utils/toast'
 import {
   getMappingInfoByToken,
   registerStudentByToken,
+  MappingInfo,
 } from "../api-clients/assessmentMappingAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
+import { TierCard, Tier } from "../components/TierCard"
 
 const AssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
 
-  const [mappingInfo, setMappingInfo] = useState<any>(null)
+  const [mappingInfo, setMappingInfo] = useState<MappingInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -29,6 +31,7 @@ const AssessmentRegisterPage = () => {
   const [duplicateInfo, setDuplicateInfo] = useState<DuplicateEmailPayload | null>(null)
   const emailRef = useRef<HTMLInputElement | null>(null)
   const dobRef = useRef<HTMLInputElement | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState("")
   const [selectedClassId, setSelectedClassId] = useState("")
   const [selectedSectionId, setSelectedSectionId] = useState("")
 
@@ -52,8 +55,12 @@ const AssessmentRegisterPage = () => {
     }
   }, [token])
 
+  const regBranding = mappingInfo?.branding
   const amountInr: number = mappingInfo?.amount || 0
-  const isPaid = amountInr > 0
+  // Branch on the backend-resolved linkType, never on amount>0. A PAID link is
+  // the single resolved wave price (one active tier — no picker).
+  const isPaid = mappingInfo?.linkType === "PAID"
+  const registrationClosed = mappingInfo?.registrationClosed === true
 
   // Mirror the backend's integer (floor) division so the displayed price matches the charge.
   const discountedAmountInr = promoApplied
@@ -195,7 +202,76 @@ const AssessmentRegisterPage = () => {
 
   const availableClasses: any[] = mappingInfo?.availableClasses || []
   const availableSections: any[] = mappingInfo?.availableSections || []
+  const availableSessions: any[] = mappingInfo?.availableSessions || []
 
+  // INSTITUTE level: session → class → section cascade. The chosen session's
+  // classes drive the class dropdown; the chosen class's sections drive the
+  // section dropdown.
+  const selectedSession: any = selectedSessionId
+    ? availableSessions.find((sess: any) => String(sess.id) === selectedSessionId)
+    : null
+  const instituteClasses: any[] = selectedSession?.classes || []
+  const instituteClassSections: any[] = selectedClassId
+    ? (
+        instituteClasses.find(
+          (c: any) => String(c.id) === selectedClassId
+        )?.sections || []
+      )
+    : []
+
+  // Human-readable summary of what the link entitles the student to.
+  const inclusionLines: string[] = (() => {
+    const inc = mappingInfo?.inclusions
+    if (!inc) return []
+    const lines: string[] = []
+    if (inc.includesFinalReport) lines.push("Detailed report")
+    if (inc.includesDashboard) {
+      lines.push(
+        inc.dashboardValidityDays
+          ? `Dashboard (${inc.dashboardValidityDays} days)`
+          : "Dashboard access"
+      )
+    }
+    if (inc.includesCounselling && inc.counsellingSessionCount) {
+      lines.push(
+        `${inc.counsellingSessionCount}× counselling session${
+          inc.counsellingSessionCount > 1 ? "s" : ""
+        }`
+      )
+    }
+    if (inc.includesLms) {
+      lines.push(inc.lmsValidityDays ? `LMS (${inc.lmsValidityDays} days)` : "LMS access")
+    }
+    return lines
+  })()
+
+  // The single resolved tier for this link, rendered as a B2C-style "Your
+  // selection" card (one active tier — no picker on the B2B side).
+  const inc = mappingInfo?.inclusions
+  const selectionTier: Tier | null = mappingInfo
+    ? {
+        campaignAssessmentTierId: 0,
+        name: mappingInfo.activeTierName || mappingInfo.assessmentName || "Assessment",
+        basePriceInr: amountInr,
+        priceInr: discountedAmountInr,
+        isDefault: false,
+        includesFinalReport: !!inc?.includesFinalReport,
+        includesDashboard: !!inc?.includesDashboard,
+        includesCounselling: !!inc?.includesCounselling,
+        counsellingSessionCount: inc?.counsellingSessionCount ?? null,
+        includesLms: !!inc?.includesLms,
+        lmsValidityDays: inc?.lmsValidityDays ?? null,
+        dashboardValidityDays: inc?.dashboardValidityDays ?? null,
+      }
+    : null
+
+  // Show the selection card when there is anything meaningful to convey
+  // (a named tier, a price, or at least one included feature).
+  const showSelectionCard =
+    !!selectionTier && (!!mappingInfo?.activeTierName || isPaid || inclusionLines.length > 0)
+
+  // SESSION level: class dropdown from availableClasses, sections nested as
+  // schoolSections under the chosen class.
   const selectedClassSections: any[] = selectedClassId
     ? (
         availableClasses.find(
@@ -243,6 +319,41 @@ const AssessmentRegisterPage = () => {
             <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 12 }}>Link Unavailable</h3>
             <p style={{ color: "#64748b", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
               {error} Please contact your school administrator for a valid link.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Registration Closed / Sold Out ──
+  // HONOR registrationClosed from the backend. This fixes a bug where a
+  // sold-out PAID link used to fall through and render as a free registration.
+  if (registrationClosed) {
+    return (
+      <div style={s.page}>
+        <style>{keyframes}</style>
+        <div style={s.bgOrb1} />
+        <div style={s.bgOrb2} />
+        <div style={s.bgOrb3} />
+        <div style={s.glassCard}>
+          <div style={{ textAlign: "center", padding: "48px 32px" }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: "50%", margin: "0 auto 20px",
+              background: "linear-gradient(135deg, #fef3c7, #fde68a)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "2rem", color: "#92400e",
+            }}>
+              ⏳
+            </div>
+            <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 12 }}>
+              Registration Closed
+            </h3>
+            <p style={{ color: "#64748b", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
+              Registrations for{" "}
+              <strong>{mappingInfo?.assessmentName || "this assessment"}</strong>{" "}
+              are currently closed or sold out. Please contact your school
+              administrator for assistance.
             </p>
           </div>
         </div>
@@ -356,6 +467,13 @@ const AssessmentRegisterPage = () => {
               Assessment Registration
             </span>
           </div>
+          {regBranding?.whitelabel && regBranding?.logoUrl && (
+            <img
+              src={regBranding.logoUrl}
+              alt={(regBranding.schoolName || "School") + " logo"}
+              style={{ maxHeight: 56, maxWidth: 180, objectFit: "contain", display: "block", marginBottom: 10 }}
+            />
+          )}
           <h2 style={{
             margin: 0, fontWeight: 800, fontSize: "clamp(1.3rem, 4vw, 1.6rem)",
             color: "#0f172a", lineHeight: 1.2,
@@ -369,18 +487,12 @@ const AssessmentRegisterPage = () => {
             {mappingInfo?.sessionYear && ` · ${mappingInfo.sessionYear}`}
           </p>
 
-          {isPaid && (
-            <div style={s.priceBadge}>
-              {promoApplied && discountedAmountInr !== amountInr ? (
-                <>
-                  <span style={{ textDecoration: "line-through", opacity: 0.5, marginRight: 8, fontWeight: 500 }}>
-                    INR {amountInr}
-                  </span>
-                  <span style={{ fontWeight: 800, fontSize: "1.15rem" }}>INR {discountedAmountInr}</span>
-                </>
-              ) : (
-                <span style={{ fontWeight: 800, fontSize: "1.15rem" }}>INR {amountInr}</span>
-              )}
+          {/* Your selection — B2C-style tier card showing the resolved tier,
+              its price, and the included features as bullets. */}
+          {showSelectionCard && selectionTier && (
+            <div style={{ marginTop: 18 }}>
+              <div style={s.selectionLabel}>Your selection</div>
+              <TierCard tier={selectionTier} selected disabled onSelect={() => {}} />
             </div>
           )}
         </div>
@@ -492,6 +604,76 @@ const AssessmentRegisterPage = () => {
                 </select>
               </div>
             </div>
+
+            {/* Session → Class → Section cascade for INSTITUTE level */}
+            {mappingInfo?.mappingLevel === "INSTITUTE" && availableSessions.length > 0 && (
+              <>
+                <div>
+                  <label style={s.label}>
+                    Session <span style={{ color: "#f43f5e" }}>*</span>
+                  </label>
+                  <select
+                    value={selectedSessionId}
+                    onChange={(e) => {
+                      setSelectedSessionId(e.target.value)
+                      setSelectedClassId("")
+                      setSelectedSectionId("")
+                    }}
+                    required
+                    style={{ ...s.input, color: selectedSessionId ? "#1e293b" : "#94a3b8" }}
+                    onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                    onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                  >
+                    <option value="">Select Session</option>
+                    {availableSessions.map((sess: any) => (
+                      <option key={sess.id} value={sess.id}>{sess.sessionYear}</option>
+                    ))}
+                  </select>
+                </div>
+                {selectedSessionId && instituteClasses.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: instituteClassSections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
+                    <div>
+                      <label style={s.label}>
+                        Class <span style={{ color: "#f43f5e" }}>*</span>
+                      </label>
+                      <select
+                        value={selectedClassId}
+                        onChange={(e) => {
+                          setSelectedClassId(e.target.value)
+                          setSelectedSectionId("")
+                        }}
+                        required
+                        style={{ ...s.input, color: selectedClassId ? "#1e293b" : "#94a3b8" }}
+                        onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                        onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                      >
+                        <option value="">Select Class</option>
+                        {instituteClasses.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.className}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {instituteClassSections.length > 0 && (
+                      <div>
+                        <label style={s.label}>Section</label>
+                        <select
+                          value={selectedSectionId}
+                          onChange={(e) => setSelectedSectionId(e.target.value)}
+                          style={{ ...s.input, color: selectedSectionId ? "#1e293b" : "#94a3b8" }}
+                          onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                          onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                        >
+                          <option value="">Select Section (Optional)</option>
+                          {instituteClassSections.map((sc: any) => (
+                            <option key={sc.id} value={sc.id}>{sc.sectionName}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Class dropdown for SESSION level */}
             {mappingInfo?.mappingLevel === "SESSION" && availableClasses.length > 0 && (
@@ -799,6 +981,36 @@ const s: { [key: string]: React.CSSProperties } = {
     fontSize: "0.95rem",
     fontWeight: 700,
     border: "1px solid #6ee7b7",
+  },
+  selectionLabel: {
+    fontSize: "0.72rem",
+    fontWeight: 700,
+    color: "#10b981",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    marginBottom: 8,
+  },
+  inclusionsBox: {
+    marginTop: 16,
+    background: "rgba(255, 255, 255, 0.6)",
+    border: "1px solid #e2e8f0",
+    borderRadius: 12,
+    padding: "12px 18px",
+  },
+  inclusionsTitle: {
+    fontSize: "0.72rem",
+    fontWeight: 700,
+    color: "#10b981",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    marginBottom: 6,
+  },
+  inclusionsList: {
+    margin: 0,
+    paddingLeft: 18,
+    color: "#475569",
+    fontSize: "0.84rem",
+    lineHeight: 1.7,
   },
   label: {
     display: "block",

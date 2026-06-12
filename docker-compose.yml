@@ -4,15 +4,24 @@ services:
     image: mysql:latest
     restart: always
     environment:
-      MYSQL_DATABASE: 'career-9'
+      MYSQL_DATABASE: 'career-9-staging'
       MYSQL_USER: 'user'
       MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
       MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+    # MySQL listens on 3306 inside the container; host 3307 must map to it.
     ports:
-      - '3306:3306'
+      - '3307:3306'
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
+    # Settings passed as flags instead of mounting mysql-custom.cnf: Windows
+    # bind mounts arrive world-writable inside the container and MySQL ignores
+    # world-writable config files, so the cnf was silently skipped.
+    command:
+      - --max-connections=200
+      - --max-allowed-packet=512M
+      - --innodb-buffer-pool-size=1G
+      - --innodb-flush-log-at-trx-commit=2
+      - --innodb-flush-method=O_DIRECT
     deploy:
       resources:
         limits:
@@ -23,212 +32,218 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    networks:
-      - career_shared_net
+   
 
-  redis_cache:
-    image: redis:7.2-alpine
-    restart: always
-    command: >
-      redis-server
-      --maxmemory 2048mb
-      --maxmemory-policy allkeys-lru
-      --appendonly yes
-      --appendfsync everysec
-    ports:
-      - '6379:6379'
-    deploy:
-      resources:
-        limits:
-          memory: 2.5g
-    networks:
-      - career_shared_net
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
+  # redis_cache:
+  #   image: redis:7.2-alpine
+  #   restart: always
+  #   command: >
+  #     redis-server
+  #     --maxmemory 2048mb
+  #     --maxmemory-policy allkeys-lru
+  #     --appendonly yes
+  #     --appendfsync everysec
+  #   ports:
+  #     - '6379:6379'
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 2.5g
+    
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+  #     start_period: 5s
 
-  # Shared headless-Chromium HTML→PDF service for server-rendered report PDFs.
-  # Stateless, so ONE instance serves BOTH the production and staging backends over
-  # the internal Docker network — each reaches it by service name at
-  # GOTENBERG_URL=http://gotenberg:3000. No host port is published, so the render
-  # endpoint is never exposed outside the Docker network.
-  #
-  # Both backends are on this network, so one `networks` entry suffices. If the
-  # staging backend lives on a DIFFERENT network, also attach that network below
-  # (a service can join multiple networks) so both can resolve `gotenberg`.
-  #
-  # PDFs render synchronously during report generation; concurrent load on this
-  # instance is just however many generate requests run at once across both
-  # backends. Bump the memory limit if you generate very large cohorts in parallel.
-  gotenberg:
-    image: gotenberg/gotenberg:8
-    restart: unless-stopped
-    command:
-      - "gotenberg"
-      - "--chromium-disable-javascript=false"   # reports draw charts client-side
-      - "--api-timeout=120s"
-    expose:
-      - "3000"          # internal-only; reachable as http://gotenberg:3000 on the Docker network
-    deploy:
-      resources:
-        limits:
-          memory: 1.5g
-    networks:
-      - career_shared_net
-      # - career_staging_net   # uncomment/add if the staging backend is on a different network
+  # # Shared headless-Chromium HTML→PDF service for server-rendered report PDFs.
+  # # Stateless, so ONE instance serves BOTH the production and staging backends over
+  # # the internal Docker network — each reaches it by service name at
+  # # GOTENBERG_URL=http://gotenberg:3000. No host port is published, so the render
+  # # endpoint is never exposed outside the Docker network.
+  # #
+  # # Both backends are on this network, so one `networks` entry suffices. If the
+  # # staging backend lives on a DIFFERENT network, also attach that network below
+  # # (a service can join multiple networks) so both can resolve `gotenberg`.
+  # #
+  # # PDFs render synchronously during report generation; concurrent load on this
+  # # instance is just however many generate requests run at once across both
+  # # backends. Bump the memory limit if you generate very large cohorts in parallel.
+  # gotenberg:
+  #   image: gotenberg/gotenberg:8
+  #   restart: unless-stopped
+  #   command:
+  #     - "gotenberg"
+  #     - "--chromium-disable-javascript=false"   # reports draw charts client-side
+  #     - "--api-timeout=120s"
+  #   expose:
+  #     - "3000"          # internal-only; reachable as http://gotenberg:3000 on the Docker network
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1.5g
+  #   networks:
+  #     - career_shared_net
+  #     - career_staging_net   # uncomment/add if the staging backend is on a different network
 
-#   api:
-#     container_name: api
-#     build:
-#       context: ./spring-social
-#       dockerfile: dockerfile
-#     ports:
-#       - 8080:8080
-#     command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production"]
-#     restart: always
-#     volumes:
-#       - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
-#     env_file:
-#       - .env.production
-#     environment:
-#       - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
-#       - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
-#       - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
-#     deploy:
-#       resources:
-#         limits:
-#           memory: 3g
-#     depends_on:
-#       mysql_db_api:
-#         condition: service_started
-#       redis_cache:
-#         condition: service_healthy
-#     networks:
-#       - career_shared_net
+  # api:
+  #   container_name: api
+  #   build:
+  #     context: ./spring-social
+  #     dockerfile: dockerfile
+  #   ports:
+  #     - 8080:8080
+  #   command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production"]
+  #   restart: always
+  #   volumes:
+  #     - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
+  #   env_file:
+  #     - .env.production
+  #   environment:
+  #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+  #     - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
+  #     - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
+  #     # HTML→PDF render service, reached by compose service name on the Docker network.
+  #     # Without this the backend falls back to the application.yml default localhost:3000
+  #     # (nothing listens there inside the container) and every PDF render fails.
+  #     - GOTENBERG_URL=http://gotenberg:3000
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 3g
+  #   depends_on:
+  #     mysql_db_api:
+  #       condition: service_started
+  #     redis_cache:
+  #       condition: service_healthy
+  #   networks:
+  #     - career_shared_net
       
-#   redis_staging:
-#     image: redis:7.2-alpine
-#     restart: always
-#     command: >
-#       redis-server
-#       --maxmemory 384mb
-#       --maxmemory-policy allkeys-lru
-#       --appendonly yes
-#       --appendfsync everysec
-#     ports:
-#       - '6380:6379'
-#     deploy:
-#       resources:
-#         limits:
-#           memory: 768m
-#     networks:
-#       - career_staging_net
-#     volumes:
-#       - redis_staging_data:/data
-#     healthcheck:
-#       test: ["CMD", "redis-cli", "ping"]
-#       interval: 10s
-#       timeout: 3s
-#       retries: 3
-#       start_period: 5s
+  # redis_staging:
+  #   image: redis:7.2-alpine
+  #   restart: always
+  #   command: >
+  #     redis-server
+  #     --maxmemory 384mb
+  #     --maxmemory-policy allkeys-lru
+  #     --appendonly yes
+  #     --appendfsync everysec
+  #   ports:
+  #     - '6380:6379'
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 768m
+  #   networks:
+  #     - career_staging_net
+  #   volumes:
+  #     - redis_staging_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+  #     start_period: 5s
 
-#   api-staging:
-#     container_name: api-staging
-#     build:
-#       context: ./spring-social
-#       dockerfile: dockerfile
-#     ports:
-#       - 8081:8080
-#     command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
-#     restart: always
-#     volumes:
-#       - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
-#     env_file:
-#       - .env.staging
-#     environment:
-#       - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
-#     deploy:
-#       resources:
-#         limits:
-#           memory: 3g
-#     depends_on:
-#       mysql_db_staging:
-#         condition: service_healthy
-#       redis_staging:
-#         condition: service_healthy
-#     networks:
-#       - career_staging_net
+  # api-staging:
+  #   container_name: api-staging
+  #   build:
+  #     context: ./spring-social
+  #     dockerfile: dockerfile
+  #   ports:
+  #     - 8081:8080
+  #   command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
+  #   restart: always
+  #   volumes:
+  #     - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
+  #   env_file:
+  #     - .env.staging
+  #   environment:
+  #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+  #     # HTML→PDF render service, reached by compose service name on the Docker network.
+  #     # Without this the backend falls back to the application.yml default localhost:3000
+  #     # (nothing listens there inside the container) and every PDF render fails.
+  #     - GOTENBERG_URL=http://gotenberg:3000
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 3g
+  #   depends_on:
+  #     mysql_db_staging:
+  #       condition: service_healthy
+  #     redis_staging:
+  #       condition: service_healthy
+  #   networks:
+  #     - career_staging_net
 
-#   mysql_db_staging:
-#     image: mysql:latest
-#     restart: always
-#     environment:
-#       MYSQL_DATABASE: 'career-9-staging'
-#       MYSQL_USER: 'user'
-#       MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-#       MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
-#     ports:
-#       - '3307:3306'
-#     volumes:
-#       - mysql_staging_data:/var/lib/mysql
-#       - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
-#     deploy:
-#       resources:
-#         limits:
-#           memory: 1.5g
-#     healthcheck:
-#       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
-#       interval: 10s
-#       timeout: 5s
-#       retries: 5
-#       start_period: 30s
-#     networks:
-#       - career_staging_net
+  # mysql_db_staging:
+  #   image: mysql:latest
+  #   restart: always
+  #   environment:
+  #     MYSQL_DATABASE: 'career-9-staging'
+  #     MYSQL_USER: 'user'
+  #     MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
+  #     MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+  #   ports:
+  #     - '3307:3306'
+  #   volumes:
+  #     - mysql_staging_data:/var/lib/mysql
+  #     - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1.5g
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 30s
+  #   networks:
+  #     - career_staging_net
 
-#   sync_cron:
-#     build:
-#       context: .
-#       dockerfile: Dockerfile.cron
-#     restart: always
-#     environment:
-#       MASTER_HOST: 'mysql_db_api'
-#       STAGING_HOST: 'mysql_db_staging'
-#       DB_NAME: 'career-9'
-#       STAGING_DB_NAME: 'career-9-staging'
-#       DB_USER: 'root'
-#       DB_PASSWORD: 'Career-qCsfeuECc3MW'
-#     deploy:
-#       resources:
-#         limits:
-#           memory: 256m
-#     depends_on:
-#       mysql_db_api:
-#         condition: service_healthy
-#       mysql_db_staging:
-#         condition: service_healthy
-#     networks:
-#       - career_shared_net
-#   redisinsight:
-#     image: redis/redisinsight:latest
-#     restart: always
-#     deploy:
-#       resources:
-#         limits:
-#           memory: 1g
-#     ports:
-#       - '5540:5540'
-#     networks:
-#       - career_shared_net
-#     depends_on:
-#       redis_cache:
-#         condition: service_healthy
-#     volumes:
-#       - redisinsight_data:/data
+  # sync_cron:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.cron
+  #   restart: always
+  #   environment:
+  #     MASTER_HOST: 'mysql_db_api'
+  #     STAGING_HOST: 'mysql_db_staging'
+  #     DB_NAME: 'career-9'
+  #     STAGING_DB_NAME: 'career-9-staging'
+  #     DB_USER: 'root'
+  #     DB_PASSWORD: 'Career-qCsfeuECc3MW'
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256m
+  #   depends_on:
+  #     mysql_db_api:
+  #       condition: service_healthy
+  #     mysql_db_staging:
+  #       condition: service_healthy
+  #   networks:
+  #     - career_shared_net
+  # redisinsight:
+  #   image: redis/redisinsight:latest
+  #   restart: always
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1g
+  #   ports:
+  #     - '5540:5540'
+  #   networks:
+  #     - career_shared_net
+  #   depends_on:
+  #     redis_cache:
+  #       condition: service_healthy
+  #   volumes:
+  #     - redisinsight_data:/data
 
 volumes:
   mysql_data:
@@ -237,8 +252,8 @@ volumes:
   redis_staging_data:
   redisinsight_data:
 
-networks:
-  career_shared_net:
-    external: true
-  career_staging_net:
-    external: true
+# networks:
+#   career_shared_net:
+#     external: true
+#   career_staging_net:
+#     external: true

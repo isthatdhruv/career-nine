@@ -1,16 +1,16 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
 import { useEffect, useRef, useState } from "react";
-import { Modal } from "react-bootstrap-v5";
+import { Modal, Form } from "react-bootstrap-v5";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { UpdateCollegeData } from "../API/College_APIs";
+import { UpdateCollegeData, UploadInstituteLogo } from "../API/College_APIs";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 import InstituteSessionDetailsPanel, {
   InstituteSessionDetailsPanelHandle,
 } from "./InstituteSessionDetailsPanel";
-import AssessmentMappingPanel from "./AssessmentMappingPanel";
+import InstituteCatalogPicker from "./InstituteCatalogPicker";
 
 type WizardStep = 1 | 2 | 3;
 
@@ -72,6 +72,7 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
     maxContactPersons:
       existing?.maxContactPersons != null ? String(existing.maxContactPersons) : "",
     display: 1,
+    isWhitelabel: existing?.isWhitelabel ?? false,
   };
 
   // Reset whenever the modal is opened or the target institute changes.
@@ -95,13 +96,12 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
     }
   }, [show, isEdit, existing?.instituteCode, existing?.instituteName]);
 
-  const fileToBase64 = (file: File): Promise<string> =>
+  // Full data URL (incl. "data:image/png;base64," prefix) — the backend detects the
+  // content type from the prefix and rejects anything that isn't PNG/JPEG.
+  const fileToDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(",")[1]);
-      };
+      reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
@@ -109,6 +109,14 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setLogoError(null);
+    // PNG/JPG only — the logo is reused in emails (Outlook won't render WebP) and reports.
+    if (file && !["image/png", "image/jpeg"].includes(file.type)) {
+      setLogoError("Logo must be a PNG or JPG/JPEG image");
+      setLogoFile(null);
+      setLogoPreview(null);
+      e.target.value = "";
+      return;
+    }
     if (file && file.size > MAX_LOGO_SIZE) {
       setLogoError("Logo must be under 1 MB");
       setLogoFile(null);
@@ -128,19 +136,32 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
       setLoading(true);
       try {
         const payload: any = { ...values };
+        // Whitelabel logo → upload to DO Spaces, persist the returned CDN URL on logoUrl
+        // (replaces the legacy in-DB blob). Carry the existing URL forward when unchanged.
         if (logoFile) {
-          payload.schoolLogo = await fileToBase64(logoFile);
+          const dataUrl = await fileToDataUrl(logoFile);
+          const up = await UploadInstituteLogo(dataUrl, values.instituteCode, existing?.logoUrl);
+          payload.logoUrl = up?.data?.url ?? existing?.logoUrl ?? null;
+        } else if (existing?.logoUrl) {
+          payload.logoUrl = existing.logoUrl;
         }
-        await UpdateCollegeData(payload);
+        const res = await UpdateCollegeData(payload);
         showSuccessToast("Basic info saved");
-        setInstituteCode(String(values.instituteCode));
-        setInstituteName(values.instituteName);
+        // institute_code is an IDENTITY PK — the server may assign/override it on
+        // create. Adopt the saved entity's code so Steps 2 & 3 target the real PK
+        // instead of the value the admin typed.
+        const saved = res?.data;
+        const serverCode =
+          saved && saved.instituteCode != null ? String(saved.instituteCode) : String(values.instituteCode);
+        setInstituteCode(serverCode);
+        setInstituteName(saved?.instituteName || values.instituteName);
         setSavedStep1(true);
         setPageLoading(["true"]);
         setStep(2);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to save institute basic info:", err);
-        showErrorToast("Failed to save basic info. Please try again.");
+        const serverMsg = err?.response?.data?.error;
+        showErrorToast(serverMsg || "Failed to save basic info. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -375,17 +396,21 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
               <label className="fs-6 fw-bold mb-2">Institute Logo :</label>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/png,image/jpeg"
                 onChange={handleLogoChange}
                 className="form-control form-control-lg form-control-solid"
               />
+              <div className="text-muted small mt-1">
+                PNG or JPG/JPEG, under 1 MB. Used for white-label branding on student
+                screens, emails and reports.
+              </div>
               {logoError && (
                 <div className="text-danger small mt-1">{logoError}</div>
               )}
-              {logoPreview && (
+              {(logoPreview || existing?.logoUrl) && (
                 <div className="mt-3 text-center">
                   <img
-                    src={logoPreview}
+                    src={logoPreview || existing?.logoUrl}
                     alt="Logo preview"
                     style={{
                       maxWidth: "120px",
@@ -395,6 +420,24 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
                       border: "1px solid #e4e6ef",
                     }}
                   />
+                </div>
+              )}
+            </div>
+
+            <div className="fv-row mb-2 mt-6">
+              <label className="fs-6 fw-bold mb-2">White-label this school :</label>
+              <Form.Check
+                type="switch"
+                id="institute-whitelabel"
+                label="Show this school's logo + name to its students (registration, assessment, thank-you) and in their emails, with a small “Powered by Career-9”."
+                checked={!!formik.values.isWhitelabel}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  formik.setFieldValue("isWhitelabel", e.target.checked)
+                }
+              />
+              {formik.values.isWhitelabel && !logoFile && !existing?.logoUrl && (
+                <div className="text-warning small mt-1">
+                  Upload a logo above for white-labeling to take effect.
                 </div>
               )}
             </div>
@@ -409,9 +452,8 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
         )}
 
         {step === 3 && (
-          <AssessmentMappingPanel
+          <InstituteCatalogPicker
             instituteCode={Number(instituteCode)}
-            instituteName={instituteName}
             active={true}
           />
         )}

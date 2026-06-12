@@ -121,7 +121,7 @@ public class TrackerController {
 
         Query query = em.createQuery(jpql.toString());
         params.forEach(query::setParameter);
-        query.setFirstResult(page * size);
+        query.setFirstResult(Math.max(0, page) * size); // CRUD6: a negative page must not produce a negative offset (500)
         query.setMaxResults(size);
         @SuppressWarnings("unchecked")
         List<PaymentTransaction> txns = query.getResultList();
@@ -230,7 +230,7 @@ public class TrackerController {
 
         Query query = em.createQuery(jpql.toString());
         params.forEach(query::setParameter);
-        query.setFirstResult(page * size);
+        query.setFirstResult(Math.max(0, page) * size); // CRUD6: a negative page must not produce a negative offset (500)
         query.setMaxResults(size);
         @SuppressWarnings("unchecked")
         List<StudentEntitlement> ents = query.getResultList();
@@ -340,7 +340,7 @@ public class TrackerController {
 
         Query query = em.createQuery(jpql.toString());
         params.forEach(query::setParameter);
-        query.setFirstResult(page * size);
+        query.setFirstResult(Math.max(0, page) * size); // CRUD6: a negative page must not produce a negative offset (500)
         query.setMaxResults(size);
         @SuppressWarnings("unchecked")
         List<ReportGenerationLog> logs = query.getResultList();
@@ -466,7 +466,7 @@ public class TrackerController {
         size = clampPageSize(size);
         Query q = em.createQuery(
                 "SELECT s FROM ServiceDeliveryLog s ORDER BY s.createdAt DESC");
-        q.setFirstResult(page * size);
+        q.setFirstResult(Math.max(0, page) * size); // CRUD6: clamp negative page offset
         q.setMaxResults(size);
         return ResponseEntity.ok(q.getResultList());
     }
@@ -576,7 +576,11 @@ public class TrackerController {
                 message = "Marked paid (provisioning skipped — webhook controller not wired)";
             } else {
                 org.json.JSONObject notes = link.optJSONObject("notes");
-                changed = paymentWebhookController.markPaidAndProvision(txn, paymentEntity, notes);
+                // Route through the locked reconcile path (not markPaidAndProvision
+                // directly) so this admin action takes the same SELECT … FOR UPDATE
+                // row lock as the webhook — otherwise it races a concurrent webhook
+                // delivery and can double-provision (W4).
+                changed = paymentWebhookController.reconcilePaidAndProvision(linkId, paymentEntity, notes);
                 message = changed
                         ? "Razorpay reports paid — synced status and provisioned entitlement"
                         : "Already paid in DB; nothing changed";

@@ -305,6 +305,13 @@ const SchoolAssessmentRegisterPage = () => {
               Assessment Registration
             </span>
           </div>
+          {schoolInfo?.branding?.whitelabel && schoolInfo?.branding?.logoUrl && (
+            <img
+              src={schoolInfo.branding.logoUrl}
+              alt={(schoolInfo.branding.schoolName || "School") + " logo"}
+              style={{ maxHeight: 56, maxWidth: 180, objectFit: "contain", display: "block", marginBottom: 10 }}
+            />
+          )}
           <h2 style={{ margin: 0, fontWeight: 800, fontSize: "clamp(1.3rem, 4vw, 1.6rem)", color: "#0f172a", lineHeight: 1.2 }}>
             {schoolInfo?.instituteName || "School"}
           </h2>

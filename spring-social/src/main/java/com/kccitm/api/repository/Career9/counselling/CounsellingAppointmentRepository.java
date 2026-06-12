@@ -16,6 +16,9 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
 
     List<CounsellingAppointment> findByStatus(String status);
 
+    /** True if an appointment already exists for the slot (a hold became a real booking). */
+    boolean existsBySlot_Id(Long slotId);
+
     List<CounsellingAppointment> findByStudentUserStudentId(Long userStudentId);
 
     List<CounsellingAppointment> findByCounsellorId(Long counsellorId);
@@ -72,4 +75,11 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
     @Query("SELECT COUNT(a) FROM CounsellingAppointment a WHERE a.status NOT IN ('CANCELLED', 'RESCHEDULED') " +
            "AND a.slot.date BETWEEN :start AND :end")
     Long countActiveInWeek(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    // Lifecycle sweep (Counselling Phase 2): still-active sessions whose slot date is
+    // today or earlier. The scheduler computes the slot end datetime in Java and closes
+    // those whose end has passed — verified -> COMPLETED, never-checked-in -> MISSED.
+    @Query("SELECT a FROM CounsellingAppointment a WHERE a.status IN ('CONFIRMED', 'IN_PROGRESS') " +
+           "AND a.slot.date <= :today")
+    List<CounsellingAppointment> findActiveUpToDate(@Param("today") LocalDate today);
 }

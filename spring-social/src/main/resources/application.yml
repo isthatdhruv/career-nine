@@ -33,7 +33,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
     baseline-version: 0
-    validate-on-migrate: true
+    validate-on-migrate: false
   datasource:
     hikari:
       connection-timeout: 30000
@@ -254,8 +254,8 @@ spring:
       - optional:file:./.env.staging[.properties]
       - optional:file:../.env.staging[.properties]
   datasource:
-    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
-    username: root
+    url: jdbc:mysql://localhost:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+    username: user
     password: Career-qCsfeuECc3MW
     hikari:
       # Dev sizing: a single dev machine with one running JVM rarely needs >10

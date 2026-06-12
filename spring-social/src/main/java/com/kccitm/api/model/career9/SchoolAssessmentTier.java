@@ -104,6 +104,10 @@ public class SchoolAssessmentTier implements Serializable {
         if (this.updatedAt == null) this.updatedAt = new Date();
         if (this.currentCount == null) this.currentCount = 0;
         if (this.isActive == null) this.isActive = true;
+        if (this.includesFinalReport == null) this.includesFinalReport = false;
+        if (this.includesDashboard == null) this.includesDashboard = false;
+        if (this.includesCounselling == null) this.includesCounselling = false;
+        if (this.includesLms == null) this.includesLms = false;
     }
 
     @PreUpdate

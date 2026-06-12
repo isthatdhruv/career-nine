@@ -20,9 +20,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.model.AuthProvider;
+import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
+import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
+import com.kccitm.api.service.counselling.CounsellorProvisioningService;
 import com.kccitm.api.service.counselling.CounsellorService;
 
 @RestController
@@ -39,6 +43,12 @@ public class CounsellorController {
 
     @Autowired
     private DigitalOceanSpacesService spacesService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private CounsellorProvisioningService provisioningService;
 
     @Autowired
     private com.kccitm.api.service.counselling.CounsellingActivityLogService activityLogService;
@@ -79,6 +89,14 @@ public class CounsellorController {
                     .body(Map.of("error", "A counsellor with this email already exists"));
         }
 
+        // Counselling Phase 1: a counsellor authenticates via the unified /auth/login
+        // session, which resolves a local User by email. Reject if that email is already
+        // a local account so we never create an ambiguous duplicate identity.
+        if (userRepository.findByEmailAndProvider(email.trim(), AuthProvider.local) != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "An account with this email already exists"));
+        }
+
         Counsellor counsellor = new Counsellor();
         counsellor.setName(name.trim());
         counsellor.setEmail(email.trim());
@@ -103,6 +121,21 @@ public class CounsellorController {
         if (body.get("workTime") != null) counsellor.setWorkTime((String) body.get("workTime"));
         if (body.get("counsellorType") != null) counsellor.setCounsellorType((String) body.get("counsellorType"));
         if (body.get("profileImageUrl") != null) counsellor.setProfileImageUrl((String) body.get("profileImageUrl"));
+
+        // Counselling Phase 1: create the linked local User now (inactive until admin
+        // approval) so the counsellor can sign in via /auth/login once activated. The
+        // counsellor.password_hash is retained for backwards compatibility, but the User
+        // password is the credential the unified login actually checks. Role-group/scope
+        // provisioning happens on approval (CounsellorService.toggleActive).
+        User user = new User();
+        user.setName(name.trim());
+        user.setEmail(email.trim());
+        user.setPhone(phone != null ? phone.trim() : null);
+        user.setProvider(AuthProvider.local);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setIsActive(false);
+        User savedUser = userRepository.save(user);
+        counsellor.setUser(savedUser);
 
         Counsellor saved = counsellorService.create(counsellor);
         logger.info("Counsellor self-registered: {} ({})", saved.getName(), saved.getEmail());
@@ -286,7 +319,21 @@ public class CounsellorController {
     @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/get/by-user/{userId}")
     public ResponseEntity<Counsellor> getByUserId(@PathVariable Long userId) {
-        return counsellorService.getByUserId(userId)
+        Optional<Counsellor> counsellorOpt = counsellorService.getByUserId(userId);
+        // Counselling Phase 1: lazy self-heal. Counsellors created/linked before
+        // V20260610001 (and back-filled by it) have no role-group/scope yet. The first
+        // portal load idempotently provisions an active counsellor's User so future
+        // enforce-mode requests resolve the counsellor permission bundle.
+        counsellorOpt.ifPresent(c -> {
+            if (Boolean.TRUE.equals(c.getIsActive()) && c.getUser() != null) {
+                try {
+                    provisioningService.provision(c.getUser().getId(), null);
+                } catch (Exception e) {
+                    logger.warn("Lazy counsellor provisioning failed for user {}: {}", userId, e.getMessage());
+                }
+            }
+        });
+        return counsellorOpt
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

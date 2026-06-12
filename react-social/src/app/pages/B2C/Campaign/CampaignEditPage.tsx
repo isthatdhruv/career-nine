@@ -32,7 +32,11 @@ const emptyCampaign: Campaign = {
   isActive: true,
 };
 
-const slugify = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+// FE-SLUG: must mirror the backend exactly (`slug.trim().toLowerCase().replaceAll("[^a-z0-9-]","-")`)
+// — the backend does NOT collapse runs or trim edge dashes, so neither can we, or the slug shown/
+// copied here (e.g. "summer-2026") would diverge from what's stored ("summer-2026--") and the
+// generated registration link would 404 until reload.
+const slugify = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
 
 const CampaignEditPage = () => {
   const { id } = useParams();

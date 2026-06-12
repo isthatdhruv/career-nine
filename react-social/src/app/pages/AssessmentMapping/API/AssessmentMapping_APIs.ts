@@ -4,6 +4,24 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 // ============ ADMIN APIs ============
 
+// A saved mapping carries DISTINCT free & paid link tokens plus their independent
+// active flags. `token` mirrors `paidToken` for legacy callers.
+export interface AssessmentInstituteMapping {
+  mappingId: number;
+  assessmentId: number;
+  instituteCode: number;
+  mappingLevel: "INSTITUTE" | "SESSION" | "CLASS" | "SECTION";
+  sessionId?: number | null;
+  classId?: number | null;
+  sectionId?: number | null;
+  token: string;
+  freeToken: string;
+  paidToken: string;
+  isActive: boolean;
+  freeActive: boolean;
+  paidActive: boolean;
+}
+
 export function createAssessmentMapping(data: {
   assessmentId: number;
   instituteCode: number;
@@ -12,11 +30,11 @@ export function createAssessmentMapping(data: {
   classId?: number;
   sectionId?: number;
 }) {
-  return axios.post(`${API_URL}/assessment-mapping/create`, data);
+  return axios.post<AssessmentInstituteMapping>(`${API_URL}/assessment-mapping/create`, data);
 }
 
 export function getAssessmentMappingsByInstitute(instituteCode: number) {
-  return axios.get(
+  return axios.get<AssessmentInstituteMapping[]>(
     `${API_URL}/assessment-mapping/getByInstitute/${instituteCode}`
   );
 }
@@ -41,6 +59,52 @@ export function getAssessmentSummariesByInstitute(instituteCode: number) {
 // Lightweight: only id, assessmentName, isActive (no questionnaire cascade)
 export function getAssessmentSummaryList() {
   return axios.get(`${API_URL}/assessments/get/list-summary`);
+}
+
+// ============ INSTITUTE <-> ASSESSMENT CATALOG (admin) ============
+// "Which assessments this institute offers". Backend keeps it in sync on mapping
+// create; the catalog strip lets the admin add/toggle/remove independently.
+
+export interface InstituteAssessment {
+  id: number;
+  instituteCode: number;
+  assessmentId: number;
+  isActive: boolean;
+}
+
+export function getCatalog(instituteCode: number) {
+  return axios.get<InstituteAssessment[]>(
+    `${API_URL}/assessment-mapping/institute/${instituteCode}/catalog`
+  );
+}
+
+// Returns the updated catalog. On HTTP 400 the response body is a plain-string
+// message (e.g. maxAssessments cap exceeded) — surface it to the admin.
+export function enableCatalog(instituteCode: number, assessmentIds: number[]) {
+  return axios.post<InstituteAssessment[]>(
+    `${API_URL}/assessment-mapping/institute/${instituteCode}/catalog`,
+    { assessmentIds }
+  );
+}
+
+export function toggleCatalog(id: number) {
+  return axios.patch<InstituteAssessment>(
+    `${API_URL}/assessment-mapping/institute/catalog/${id}/toggle`
+  );
+}
+
+export function deleteCatalog(id: number) {
+  return axios.delete(`${API_URL}/assessment-mapping/institute/catalog/${id}`);
+}
+
+// ============ PER-LINK TOGGLES (admin) ============
+// Flip the free or paid link independently of the mapping's master isActive.
+// Returns the updated mapping (with freeActive / paidActive reflected).
+
+export function toggleLink(mappingId: number, linkType: "free" | "paid") {
+  return axios.patch<AssessmentInstituteMapping>(
+    `${API_URL}/assessment-mapping/${mappingId}/link/${linkType}/toggle`
+  );
 }
 
 // ============ PUBLIC APIs ============
@@ -79,6 +143,18 @@ export interface AssessmentMappingTier {
   maxRegistrations: number | null;
   currentCount?: number;
   isActive?: boolean;
+  // The auto-created free tier (sortOrder -1, amount 0) backing the free link.
+  isFree?: boolean;
+  // Service-inclusion toggles (parity with the B2C PricingTier flags).
+  includesFinalReport?: boolean;
+  includesDashboard?: boolean;
+  dashboardValidityDays?: number | null;
+  includesCounselling?: boolean;
+  counsellingSessionCount?: number | null;
+  // Price (in rupees) for counselling sessions beyond the included count.
+  counsellingPrice?: number | null;
+  includesLms?: boolean;
+  lmsValidityDays?: number | null;
 }
 
 export function getTiers(mappingId: number) {

@@ -36,7 +36,7 @@ const AssessmentMappingPage = () => {
           Assessment Mapping
         </h2>
         <div style={{ fontSize: "0.85rem", color: "#64748b", marginTop: 4 }}>
-          Manage school-level mappings (class → assessment + registration link) and class/section/session-level assessment mappings (with free &amp; paid links).
+          Manage school-level mappings (class → assessment + registration link) and class/section/session-level assessment mappings (with free &amp; paid links). Both feed the institute's enabled-assessments catalog.
         </div>
       </div>
 

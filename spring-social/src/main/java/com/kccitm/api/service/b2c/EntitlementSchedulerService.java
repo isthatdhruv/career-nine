@@ -85,6 +85,56 @@ public class EntitlementSchedulerService {
         }
     }
 
+    /**
+     * EXP1: expire entitlements whose paid service window has lapsed. {@code findExpired}
+     * had no caller, so dashboard/LMS access ran forever. This turns off the date-bound
+     * service flags whose expiry passed, advances {@code expiresAt} to the earliest still-
+     * active window (or null so the row stops re-appearing), and flips status to
+     * {@code expired} only once nothing usable remains — the final report is permanent, so a
+     * report-bearing entitlement stays redeemable with its dashboard/LMS switched off. The
+     * per-service gates also check these dates directly (EXP2), so access stops immediately
+     * rather than waiting up to an hour for this sweep.
+     */
+    @Scheduled(cron = "0 41 * * * *") // 41 minutes past the hour to avoid clustering with the nudge sweep
+    @org.springframework.transaction.annotation.Transactional
+    public void expireEntitlements() {
+        Date now = new Date();
+        List<StudentEntitlement> due = entitlementRepository.findExpired(now);
+        if (due.isEmpty()) return;
+        logger.info("B2C expiry sweep: {} entitlements past their service window", due.size());
+        for (StudentEntitlement e : due) {
+            try {
+                if (e.getDashboardExpiresAt() != null && e.getDashboardExpiresAt().before(now)
+                        && Boolean.TRUE.equals(e.getDashboardActive())) {
+                    e.setDashboardActive(false);
+                }
+                if (e.getLmsExpiresAt() != null && e.getLmsExpiresAt().before(now)
+                        && Boolean.TRUE.equals(e.getLmsActive())) {
+                    e.setLmsActive(false);
+                }
+                Date next = null;
+                if (Boolean.TRUE.equals(e.getDashboardActive())) next = earlier(next, e.getDashboardExpiresAt());
+                if (Boolean.TRUE.equals(e.getLmsActive())) next = earlier(next, e.getLmsExpiresAt());
+                e.setExpiresAt(next);
+
+                boolean anyActive = Boolean.TRUE.equals(e.getFinalReportActive())
+                        || Boolean.TRUE.equals(e.getDashboardActive())
+                        || Boolean.TRUE.equals(e.getLmsActive())
+                        || Boolean.TRUE.equals(e.getCounsellingActive());
+                if (!anyActive) e.setStatus("expired");
+                entitlementRepository.save(e);
+            } catch (Exception ex) {
+                logger.warn("Expiry sweep failed for entitlement {} (continuing)", e.getEntitlementId(), ex);
+            }
+        }
+    }
+
+    private static Date earlier(Date a, Date b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return a.before(b) ? a : b;
+    }
+
     private String resolveStudentEmail(StudentEntitlement e) {
         if (e.getPaymentTransactionId() != null) {
             Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(e.getPaymentTransactionId());

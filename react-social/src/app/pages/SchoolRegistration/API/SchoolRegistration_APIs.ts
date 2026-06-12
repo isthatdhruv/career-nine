@@ -64,8 +64,8 @@ export interface SchoolAssessmentTier {
   maxRegistrations: number | null;
   currentCount?: number;
   isActive?: boolean;
-  // Feature inclusions — mirror the B2C pricing tier so a school tier can grant
-  // counselling / report / dashboard to students who register through its link.
+  // Service inclusions — what this tier grants the student (parity with the
+  // per-level AssessmentMappingTier). Drives the StudentEntitlement at registration.
   includesFinalReport?: boolean;
   includesDashboard?: boolean;
   dashboardValidityDays?: number | null;

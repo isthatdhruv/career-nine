@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useStudentBranding, brandLogoSrc } from '../hooks/useStudentBranding';
 import { useNavigate } from 'react-router-dom';
 import { getStudentCounselling, getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
 import { TierCard, Tier } from '../components/TierCard';
 import CounsellingSlotPicker from '../components/CounsellingSlotPicker';
+import MappingCounsellingSection from '../components/MappingCounsellingSection';
 import FeatureUpsellModal, { UpsellFeature } from '../components/FeatureUpsellModal';
 import { downloadHtmlAsPdf } from '../utils/htmlToPdf';
 
@@ -98,6 +100,7 @@ type ReportState = 'idle' | 'preparing' | 'ready' | 'failed';
 const ThankYouPage: React.FC = () => {
     const navigate = useNavigate();
 
+    const branding = useStudentBranding();
     const [hoveredRating, setHoveredRating] = useState<number>(0);
     const [submittedRating, setSubmittedRating] = useState<number>(0);
     const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
@@ -468,8 +471,8 @@ const ThankYouPage: React.FC = () => {
                                 </div>
 
                                 <img
-                                    src="/media/logos/kcc.webp"
-                                    alt="Career-9 Logo"
+                                    src={brandLogoSrc(branding)}
+                                    alt={branding.whitelabel ? (branding.schoolName || 'School') + ' logo' : 'Career-9 Logo'}
                                     style={{
                                         width: '80px',
                                         height: '80px',
@@ -480,6 +483,11 @@ const ThankYouPage: React.FC = () => {
                                         boxShadow: '0 8px 25px rgba(0,0,0,0.1)',
                                     }}
                                 />
+                                {branding.whitelabel && (
+                                    <p style={{ textAlign: 'center', fontSize: '0.72rem', color: '#94a3b8', marginTop: '-0.75rem', marginBottom: '1rem' }}>
+                                        Powered by Career-9
+                                    </p>
+                                )}
 
                                 <h1
                                     style={{
@@ -615,6 +623,12 @@ const ThankYouPage: React.FC = () => {
                                         </p>
                                     </div>
                                 )}
+
+                                {/* B2B assessment-mapping: post-assessment counselling tier
+                                    selection. Self-gating — renders only when the mapping
+                                    student must pick a counselling-bearing tier (otherwise
+                                    the existing counselling flow books directly). */}
+                                {!isLoadingContent && <MappingCounsellingSection />}
 
                                 {/* Try-First landing — students who haven't paid yet */}
                                 {!isLoadingContent && showUpgradeCta && upgradeInfo && (

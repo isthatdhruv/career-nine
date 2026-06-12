@@ -1,6 +1,7 @@
 package com.kccitm.api.repository.Career9;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -16,6 +17,13 @@ public interface AssessmentMappingTierRepository extends JpaRepository<Assessmen
     List<AssessmentMappingTier> findByMappingIdOrderBySortOrderAsc(Long mappingId);
 
     List<AssessmentMappingTier> findByMappingIdAndIsActiveOrderBySortOrderAsc(Long mappingId, Boolean isActive);
+
+    // Free tier (the is_free=true row backing the free link). Expected: at most one per mapping.
+    Optional<AssessmentMappingTier> findFirstByMappingIdAndIsFreeTrue(Long mappingId);
+
+    // Paid waves only (is_free=false), for active-tier resolution on the paid link.
+    List<AssessmentMappingTier> findByMappingIdAndIsFreeAndIsActiveOrderBySortOrderAsc(
+            Long mappingId, Boolean isFree, Boolean isActive);
 
     void deleteByMappingId(Long mappingId);
 

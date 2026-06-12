@@ -281,7 +281,8 @@ public class CounsellingNotificationService {
             String date = appointment.getSlot().getDate().format(DATE_FMT);
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
             int duration = appointment.getSlot().getDurationMinutes();
-            String meetingLink = appointment.getMeetingLink();
+            // Phase 5: mode-aware — online shows the meeting link, offline shows the venue.
+            String attend = attendanceLine(appointment);
 
             // Send to student
             String studentEmail = appointment.getStudent().getStudentInfo().getEmail();
@@ -293,9 +294,7 @@ public class CounsellingNotificationService {
                     + "  Date: " + date + "\n"
                     + "  Time: " + time + "\n"
                     + "  Duration: " + duration + " minutes\n"
-                    + (meetingLink != null && !meetingLink.isEmpty()
-                            ? "  Meeting Link: " + meetingLink + "\n"
-                            : "")
+                    + "  " + attend + "\n"
                     + "\nPlease be prepared for your session.\n\n"
                     + "Regards,\nCareer-Nine Team";
             sendEmail(studentEmail, studentSubject, studentBody);
@@ -311,7 +310,8 @@ public class CounsellingNotificationService {
                         + "  Student: " + studentName + "\n"
                         + "  Date: " + date + "\n"
                         + "  Time: " + time + "\n"
-                        + "  Duration: " + duration + " minutes\n\n"
+                        + "  Duration: " + duration + " minutes\n"
+                        + "  " + attend + "\n\n"
                         + "Regards,\nCareer-Nine Team";
                 sendEmail(counsellorEmail, counsellorSubject, counsellorBody);
             }
@@ -390,13 +390,17 @@ public class CounsellingNotificationService {
                             : "Meeting link: to be shared");
 
             String subject = "Counselling Session Confirmed";
+            // Phase 6: one-click "Add to Google Calendar" link (no API/OAuth needed) in
+            // addition to the attached .ics invite.
+            String gcal = googleCalendarLink(appointment);
             String body = "Dear " + studentName + ",\n\n"
                     + "Your counselling session has been confirmed.\n\n"
                     + "  Date: " + date + "\n"
                     + "  Time: " + time + "\n"
                     + "  Mode: " + (offline ? "In-person" : "Online") + "\n"
                     + "  " + channelLabel + "\n\n"
-                    + "A calendar invite is attached so you can add this to your calendar.\n\n"
+                    + (gcal != null ? "Add to Google Calendar: " + gcal + "\n\n" : "")
+                    + "A calendar invite is also attached so you can add this to any calendar.\n\n"
                     + "Regards,\nCareer-Nine Team";
 
             // Email with .ics attachment (falls back to plain Mandrill text if
@@ -441,9 +445,12 @@ public class CounsellingNotificationService {
     public void notifyStudentReminder(CounsellingAppointment appointment, String whenLabel) {
         String date = appointment.getSlot().getDate().format(DATE_FMT);
         String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+        // Phase 5: mode-aware — append the meeting link (online) or venue (offline)
+        // to the date/time parameter so the reminder tells the student how to attend.
         boolean sent = whatsAppService.sendTemplate(
                 studentPhone(appointment), whatsAppService.reminderCampaign(),
-                Arrays.asList(studentName(appointment), whenLabel, date + " " + time));
+                Arrays.asList(studentName(appointment), whenLabel,
+                        date + " " + time + " — " + attendanceLine(appointment)));
         if (!sent) {
             sendReminderEmail(appointment, whenLabel);
         }
@@ -457,17 +464,66 @@ public class CounsellingNotificationService {
         String time = appointment.getSlot().getStartTime().format(TIME_FMT);
         boolean sent = whatsAppService.sendTemplate(
                 appointment.getCounsellor().getPhone(), whatsAppService.reminderCampaign(),
-                Arrays.asList(appointment.getCounsellor().getName(), whenLabel, date + " " + time));
+                Arrays.asList(appointment.getCounsellor().getName(), whenLabel,
+                        date + " " + time + " — " + attendanceLine(appointment)));
         if (!sent) {
             String subject = "Reminder: Counselling Session " + whenLabel;
             String body = "Dear " + appointment.getCounsellor().getName() + ",\n\n"
                     + "You have a counselling session " + whenLabel + " with "
                     + studentName(appointment) + ".\n\n"
                     + "  Date: " + date + "\n"
-                    + "  Time: " + time + "\n\n"
+                    + "  Time: " + time + "\n"
+                    + "  " + attendanceLine(appointment) + "\n\n"
                     + "Regards,\nCareer-Nine Team";
             sendEmail(appointment.getCounsellor().getEmail(), subject, body);
         }
+    }
+
+    /**
+     * Phase 6: build a one-click "Add to Google Calendar" template URL (no API/OAuth).
+     * Times are converted from IST (Asia/Kolkata) to the UTC instants Google expects.
+     * Returns null if the slot data is incomplete.
+     */
+    private String googleCalendarLink(CounsellingAppointment a) {
+        try {
+            if (a.getSlot() == null || a.getSlot().getDate() == null
+                    || a.getSlot().getStartTime() == null || a.getSlot().getEndTime() == null) return null;
+            java.time.ZoneId ist = java.time.ZoneId.of("Asia/Kolkata");
+            java.time.format.DateTimeFormatter f =
+                    java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'");
+            String start = java.time.ZonedDateTime.of(a.getSlot().getDate(), a.getSlot().getStartTime(), ist)
+                    .withZoneSameInstant(java.time.ZoneOffset.UTC).format(f);
+            String end = java.time.ZonedDateTime.of(a.getSlot().getDate(), a.getSlot().getEndTime(), ist)
+                    .withZoneSameInstant(java.time.ZoneOffset.UTC).format(f);
+            boolean offline = "OFFLINE".equals(a.getMode());
+            String location = offline
+                    ? (a.getLocation() != null ? a.getLocation() : "")
+                    : (a.getMeetingLink() != null ? a.getMeetingLink() : "");
+            return "https://calendar.google.com/calendar/render?action=TEMPLATE"
+                    + "&text=" + java.net.URLEncoder.encode("Career-9 Counselling Session", "UTF-8")
+                    + "&dates=" + start + "/" + end
+                    + "&details=" + java.net.URLEncoder.encode(attendanceLine(a), "UTF-8")
+                    + "&location=" + java.net.URLEncoder.encode(location, "UTF-8");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Phase 5: mode-aware "how to attend" line for reminders — the meeting link for
+     * ONLINE sessions, the venue/office address for OFFLINE ones, with safe fallbacks.
+     */
+    private String attendanceLine(CounsellingAppointment a) {
+        if ("OFFLINE".equals(a.getMode())) {
+            String loc = a.getLocation();
+            return (loc != null && !loc.isEmpty())
+                    ? "Venue: " + loc
+                    : "Venue: your counsellor will share the address shortly";
+        }
+        String link = a.getMeetingLink();
+        return (link != null && !link.isEmpty())
+                ? "Join online: " + link
+                : "Join online: the meeting link will be shared before the session";
     }
 
     /** Sends the check-in OTP to the student via WhatsApp; email fallback. */
@@ -547,6 +603,54 @@ public class CounsellingNotificationService {
             } catch (Exception e) {
                 logger.warn("Failed to create counselling-nudge in-app notification for user {}: {}", userId, e.getMessage());
             }
+        }
+    }
+
+    /**
+     * No-show notice (Counselling Phase 2): sent when a session's slot end time passes
+     * without the student ever checking in via OTP. Emails the student that they didn't
+     * attend and invites them to book a new session, plus an in-app notification.
+     * WhatsApp is attempted best-effort via the booking-nudge campaign.
+     */
+    @Async
+    public void notifyStudentNoShow(CounsellingAppointment appointment) {
+        try {
+            String name = studentName(appointment);
+            String email = studentEmail(appointment);
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+
+            // Best-effort WhatsApp (re-uses the booking-nudge template: name + a "1" count).
+            whatsAppService.sendTemplate(studentPhone(appointment), whatsAppService.bookingNudgeCampaign(),
+                    Arrays.asList(name, "1"));
+
+            if (email != null && !email.isEmpty()) {
+                String subject = "You missed your counselling session";
+                String body = "Dear " + name + ",\n\n"
+                        + "We noticed you didn't attend your counselling session scheduled on "
+                        + date + " at " + time + ".\n\n"
+                        + "If you'd still like to speak with a counsellor, log in to Career-9 and book "
+                        + "a new session at a time that works for you.\n\n"
+                        + "Regards,\nCareer-Nine Team";
+                sendEmail(email, subject, body);
+            }
+
+            try {
+                Long userId = appointment.getStudent() != null ? appointment.getStudent().getUserId() : null;
+                if (userId != null) {
+                    User u = new User();
+                    u.setId(userId);
+                    createInAppNotification(u, "COUNSELLING_NO_SHOW", "Missed counselling session",
+                            "You didn't attend your session on " + date + ". Book a new time if you'd still like counselling.",
+                            appointment.getId(), "APPOINTMENT");
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to create no-show in-app notification for appointment {}: {}",
+                        appointment.getId(), e.getMessage());
+            }
+        } catch (Exception e) {
+            logger.error("Failed to send no-show notice for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
         }
     }
 

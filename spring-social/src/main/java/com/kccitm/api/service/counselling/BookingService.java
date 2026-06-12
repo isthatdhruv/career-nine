@@ -1,6 +1,7 @@
 package com.kccitm.api.service.counselling;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +29,9 @@ public class BookingService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookingService.class);
 
+    /** Soft-hold TTL (minutes) for a slot reserved during the pick-slot -> pay window. */
+    private static final long SOFT_HOLD_MINUTES = 5;
+
     @Autowired
     private CounsellingSlotRepository slotRepository;
 
@@ -45,6 +49,9 @@ public class BookingService {
 
     @Autowired
     private CounsellorInstituteMappingService counsellorInstituteMappingService;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.counselling.CounsellorAssessmentAssignmentRepository assessmentAssignmentRepository;
 
     @Autowired
     private CounsellingActivityLogService activityLogService;
@@ -82,6 +89,41 @@ public class BookingService {
 
         logger.info("Fetching available slots from {} to {} for institute {} ({} counsellors)",
                 effectiveStart, weekEnd, instituteCode, counsellorIds.size());
+        return filterOutPastSlots(
+                slotRepository.findAvailableSlotsForCounsellors(counsellorIds, effectiveStart, weekEnd));
+    }
+
+    /**
+     * Counselling Phase 4: available slots for the institute, further restricted to the
+     * counsellor(s) the admin assigned to {@code assessmentId}. If the assessment has no
+     * active assignments, this is equivalent to {@link #getAvailableSlotsForInstitute}
+     * (institute filter only) so existing flows keep working. The two filters are
+     * intersected — a counsellor must serve the institute AND be assigned to the assessment.
+     */
+    public List<CounsellingSlot> getAvailableSlotsForInstitute(LocalDate weekStart, Integer instituteCode,
+                                                               Long assessmentId) {
+        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
+        if (effectiveStart.isAfter(weekEnd)) return List.of();
+
+        List<Long> counsellorIds = counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
+        if (counsellorIds.isEmpty()) {
+            logger.info("No counsellors allocated to institute {} — returning empty slots", instituteCode);
+            return List.of();
+        }
+
+        if (assessmentId != null) {
+            List<Long> assigned = assessmentAssignmentRepository.findActiveCounsellorIdsForAssessment(assessmentId);
+            if (!assigned.isEmpty()) {
+                counsellorIds = counsellorIds.stream().filter(assigned::contains).collect(Collectors.toList());
+                if (counsellorIds.isEmpty()) {
+                    logger.info("No counsellor both serves institute {} and is assigned to assessment {} — empty slots",
+                            instituteCode, assessmentId);
+                    return List.of();
+                }
+            }
+        }
         return filterOutPastSlots(
                 slotRepository.findAvailableSlotsForCounsellors(counsellorIds, effectiveStart, weekEnd));
     }
@@ -130,6 +172,16 @@ public class BookingService {
      */
     @Transactional
     public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason, BookingContact contact) {
+        return bookSlot(slotId, student, reason, contact, null);
+    }
+
+    /**
+     * As {@link #bookSlot(Long, UserStudent, String, BookingContact)} but records the
+     * entitlement the session is drawn from, so a later no-show can credit it back.
+     */
+    @Transactional
+    public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason,
+                                           BookingContact contact, Long entitlementId) {
         logger.info("Student {} attempting to book slot {}", student.getUserStudentId(), slotId);
 
         CounsellingSlot slot = slotRepository.findById(slotId)
@@ -150,6 +202,88 @@ public class BookingService {
         slot.setStatus("REQUESTED");
         slotRepository.save(slot);
 
+        return createAppointmentForSlot(slot, student, reason, contact, entitlementId);
+    }
+
+    /**
+     * Holds an AVAILABLE slot (AVAILABLE -> REQUESTED) WITHOUT creating an
+     * appointment. Used by the PAY_LATER flow to reserve the slot while the
+     * student completes payment; {@link #confirmHeldSlot} finalises it on the
+     * webhook, or it is released back to AVAILABLE if payment fails/expires.
+     */
+    @Transactional
+    public CounsellingSlot holdSlot(Long slotId) {
+        return holdSlot(slotId, SOFT_HOLD_MINUTES);
+    }
+
+    /**
+     * As {@link #holdSlot(Long)} but with an explicit hold TTL in minutes. Used by the
+     * pay-before-book flow, which needs a longer window than the default soft-hold so the
+     * student has time to complete the Razorpay payment before the slot is auto-released.
+     */
+    public CounsellingSlot holdSlot(Long slotId, long ttlMinutes) {
+        CounsellingSlot slot = slotRepository.findById(slotId)
+                .orElseThrow(() -> new ResourceNotFoundException("Slot", "id", slotId));
+        if (!"AVAILABLE".equals(slot.getStatus())) {
+            throw new BadRequestException(
+                    "Slot " + slotId + " is not available. Current status: " + slot.getStatus());
+        }
+        LocalDate today = LocalDate.now();
+        if (slot.getDate().isBefore(today)
+                || (slot.getDate().equals(today) && !slot.getStartTime().isAfter(LocalTime.now()))) {
+            throw new BadRequestException("Slot " + slotId + " is in the past and cannot be held.");
+        }
+        slot.setStatus("REQUESTED");
+        // Soft-hold TTL: the slot is reserved only for the payment window. A sweep
+        // (CounsellingLifecycleService.releaseExpiredHolds) frees it if the student
+        // abandons payment without it ever becoming a confirmed appointment.
+        slot.setHeldUntil(LocalDateTime.now().plusMinutes(ttlMinutes));
+        return slotRepository.save(slot);
+    }
+
+    /** Releases a held (REQUESTED) slot back to AVAILABLE — payment failed/expired. */
+    @Transactional
+    public void releaseHeldSlot(Long slotId) {
+        slotRepository.findById(slotId).ifPresent(slot -> {
+            if ("REQUESTED".equals(slot.getStatus())) {
+                slot.setStatus("AVAILABLE");
+                slotRepository.save(slot);
+            }
+        });
+    }
+
+    /**
+     * Finalises a previously {@link #holdSlot held} slot into a confirmed
+     * appointment (PAY_LATER, after payment succeeds). The slot is expected to be
+     * in REQUESTED state already.
+     */
+    @Transactional
+    public CounsellingAppointment confirmHeldSlot(Long slotId, UserStudent student, String reason,
+                                                  BookingContact contact) {
+        return confirmHeldSlot(slotId, student, reason, contact, null);
+    }
+
+    /**
+     * As {@link #confirmHeldSlot(Long, UserStudent, String, BookingContact)} but records
+     * the entitlement the session is drawn from (PAY flow, post-payment).
+     */
+    @Transactional
+    public CounsellingAppointment confirmHeldSlot(Long slotId, UserStudent student, String reason,
+                                                  BookingContact contact, Long entitlementId) {
+        CounsellingSlot slot = slotRepository.findById(slotId)
+                .orElseThrow(() -> new ResourceNotFoundException("Slot", "id", slotId));
+        if (!"REQUESTED".equals(slot.getStatus())) {
+            throw new BadRequestException(
+                    "Held slot " + slotId + " is not in REQUESTED state (was " + slot.getStatus() + ")");
+        }
+        return createAppointmentForSlot(slot, student, reason, contact, entitlementId);
+    }
+
+    /** Shared appointment creation for an already-reserved (REQUESTED) slot. */
+    private CounsellingAppointment createAppointmentForSlot(CounsellingSlot slot, UserStudent student,
+                                                            String reason, BookingContact contact,
+                                                            Long entitlementId) {
+        Long slotId = slot.getId();
         // Create appointment — auto-assign counsellor from the slot
         CounsellingAppointment appointment = new CounsellingAppointment();
         appointment.setSlot(slot);
@@ -157,6 +291,12 @@ public class BookingService {
         appointment.setCounsellor(slot.getCounsellor());
         appointment.setStudentReason(reason);
         appointment.setStatus("CONFIRMED");
+        appointment.setEntitlementId(entitlementId);
+
+        // The slot is now a confirmed booking, not an open hold — clear any soft-hold TTL
+        // so the release sweep never reclaims it.
+        slot.setHeldUntil(null);
+        slotRepository.save(slot);
 
         // Snapshot the delivery mode from the slot, then attach the channel the
         // student needs: an auto-generated meeting link for ONLINE, the

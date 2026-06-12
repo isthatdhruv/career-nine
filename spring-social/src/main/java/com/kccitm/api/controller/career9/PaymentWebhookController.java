@@ -12,6 +12,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,6 +36,7 @@ import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
+import com.kccitm.api.repository.Career9.PromoCodeRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
@@ -78,6 +80,7 @@ public class PaymentWebhookController {
     @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
     @Autowired private SchoolRegistrationLinkRepository schoolRegistrationLinkRepository;
     @Autowired private AssessmentMappingTierRepository assessmentMappingTierRepository;
+    @Autowired private PromoCodeRepository promoCodeRepository;
     @Autowired private com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository schoolAssessmentTierRepository;
     @Autowired private StudentInstituteMembershipService membershipService;
     @Autowired private StudentProvisioningService studentProvisioningService;
@@ -86,11 +89,19 @@ public class PaymentWebhookController {
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
 
+    @Autowired private com.kccitm.api.service.counselling.BookingService bookingService;
+
     @Autowired
     private com.kccitm.api.service.StudentSessionService studentSessionService;
 
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
+
+    // Self-reference through the Spring proxy so the reconcile entry points
+    // (public status poll + admin Tracker check-status) actually engage
+    // @Transactional + the pessimistic row lock. A plain this.* call would
+    // bypass the proxy (the W3 bug). @Lazy breaks the self-injection cycle.
+    @Autowired @Lazy private PaymentWebhookController self;
 
     @org.springframework.beans.factory.annotation.Value("${app.auth.assessmentTokenExpirationMsec:14400000}")
     private long assessmentTokenExpirationMsec;
@@ -182,21 +193,25 @@ public class PaymentWebhookController {
 
         PaymentTransaction txn = txnOpt.get();
 
-        // Reconcile against Razorpay if the caller asked and the DB still
-        // hasn't been flipped by the webhook. Cheap to skip when txn is
-        // already in a terminal state so we don't hammer Razorpay on every
-        // poll.
-        if ("1".equals(reconcile) && "created".equals(txn.getStatus())) {
+        // Reconcile against Razorpay if the caller asked and the txn hasn't
+        // reached a successful terminal state. We also re-drive
+        // "paid_provisioning_failed" so a payment whose provisioning crashed
+        // mid-way is retried (idempotently) instead of stranding the student.
+        // The Razorpay fetch (HTTP) happens here OUTSIDE any transaction; the
+        // actual mark-paid + provision runs through self.* so it engages
+        // @Transactional + the pessimistic row lock (fixes W3/W4).
+        if ("1".equals(reconcile)
+                && ("created".equals(txn.getStatus()) || "paid_provisioning_failed".equals(txn.getStatus()))) {
             try {
                 org.json.JSONObject link = razorpayService.fetchPaymentLink(razorpayLinkId);
                 String razorpayStatus = link.optString("status", null);
                 if ("paid".equals(razorpayStatus)) {
                     org.json.JSONObject paymentEntity = pickPaidPaymentFromLink(link);
-                    markPaidAndProvision(txn, paymentEntity, link.optJSONObject("notes"));
+                    self.reconcilePaidAndProvision(razorpayLinkId, paymentEntity, link.optJSONObject("notes"));
                     txn = paymentTransactionRepository.findById(txn.getTransactionId()).orElse(txn);
                 } else if ("expired".equals(razorpayStatus) || "cancelled".equals(razorpayStatus)) {
-                    txn.setStatus(razorpayStatus);
-                    paymentTransactionRepository.save(txn);
+                    self.reconcileTerminalStatus(razorpayLinkId, razorpayStatus);
+                    txn = paymentTransactionRepository.findById(txn.getTransactionId()).orElse(txn);
                 }
             } catch (Exception e) {
                 // Reconciliation is best-effort; on Razorpay errors we fall
@@ -357,6 +372,7 @@ public class PaymentWebhookController {
     private void handlePaymentLinkPaid(JSONObject payloadObj) {
         JSONObject paymentLink = payloadObj.getJSONObject("payment_link").getJSONObject("entity");
         String linkId = paymentLink.getString("id");
+        JSONObject notes = paymentLink.optJSONObject("notes");
 
         // Use the pessimistic-write finder so two concurrent webhook
         // deliveries for the same link serialise here. The status-based
@@ -364,13 +380,39 @@ public class PaymentWebhookController {
         // first delivery actually provisions the student.
         Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findByRazorpayLinkIdForUpdate(linkId);
         if (!txnOpt.isPresent()) {
+            // PAY1 fallback: the link id may never have been persisted (the
+            // controller commits a 'created' txn first, then the link, then the
+            // link-id update — if that last commit was lost we still have the row).
+            // Recover it via the transactionId stamped in the link notes and
+            // back-fill the link id so this and future deliveries match by id.
+            Long txnId = parseTransactionIdFromNotes(notes);
+            if (txnId != null) {
+                txnOpt = paymentTransactionRepository.findById(txnId);
+                txnOpt.ifPresent(t -> {
+                    if (t.getRazorpayLinkId() == null || t.getRazorpayLinkId().isEmpty()) {
+                        t.setRazorpayLinkId(linkId);
+                        paymentTransactionRepository.save(t);
+                    }
+                });
+            }
+        }
+        if (!txnOpt.isPresent()) {
             logger.warn("Payment link not found in DB: {}", linkId);
             return;
         }
 
         PaymentTransaction txn = txnOpt.get();
         JSONObject payment = payloadObj.getJSONObject("payment").getJSONObject("entity");
-        markPaidAndProvision(txn, payment, paymentLink.optJSONObject("notes"));
+        markPaidAndProvision(txn, payment, notes);
+    }
+
+    private Long parseTransactionIdFromNotes(JSONObject notes) {
+        if (notes == null || !notes.has("transactionId")) return null;
+        try {
+            return Long.parseLong(notes.get("transactionId").toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
@@ -431,11 +473,45 @@ public class PaymentWebhookController {
         txn.setStatus("paid");
         paymentTransactionRepository.save(txn);
 
-        // Branch: B2C (campaign-linked) vs legacy school payment.
+        // Phase 3b: a standalone PAID counselling session (booked against an existing
+        // entitlement that doesn't include counselling). This is NOT an assessment
+        // purchase — finalise the held slot only, and skip all student/entitlement
+        // provisioning + GA purchase tracking below.
+        if ("COUNSELLING_EXTRA".equals(txn.getPurpose())) {
+            finalizeExtraCounsellingSlot(txn);
+            return true;
+        }
+
+        // Branch: B2C (campaign-linked) vs B2B mapping / legacy school payment.
         if (txn.getCampaignId() != null && txn.getCampaignAssessmentTierId() != null) {
             provisionB2CStudentAndEntitlement(txn);
         } else {
             createStudentAndAllotAssessment(txn);
+            // B2B mapping payment → mint (first paid registration) or upgrade
+            // (free→paid) the service entitlement. No-op for legacy school txns
+            // (mappingId null) and for a failed provision (status flipped).
+            if (txn.getMappingId() != null && "paid".equals(txn.getStatus())) {
+                com.kccitm.api.model.career9.b2c.StudentEntitlement b2bEnt =
+                        entitlementService.activateB2BOnPayment(txn.getTransactionId());
+                // PAY_LATER counselling: a slot was held at selection time — now that
+                // payment is in and counselling is active, finalise the appointment.
+                finalizeHeldCounsellingSlot(txn, b2bEnt);
+            }
+            // Legacy-school payment → mint (or upgrade) the school service entitlement
+            // through the same shared seam, so school students get report/dashboard/
+            // counselling/LMS per the school tier's inclusions. createStudentAndAllotAssessment
+            // has already stamped user_student_id on the txn (new + existing + redrive paths).
+            if (txn.getSchoolConfigId() != null && "paid".equals(txn.getStatus())) {
+                entitlementService.activateSchoolOnPayment(txn.getTransactionId());
+            }
+        }
+        // Promo is consumed at realized redemption only (A1) — and only when
+        // provisioning fully succeeded (status still "paid"; a failed provision
+        // flips it to paid_provisioning_failed, so a later redrive consumes once
+        // on eventual success). The pessimistic row lock prevents concurrent
+        // double-consume; tryConsume is atomic + cap-guarded (A2).
+        if ("paid".equals(txn.getStatus())) {
+            consumePromoIfPresent(txn.getPromoCode());
         }
 
         // Fire the GA4 "purchase" conversion now that payment is confirmed.
@@ -456,6 +532,53 @@ public class PaymentWebhookController {
      * Best-effort only — {@link GoogleAnalyticsService} is async and swallows
      * its own errors, and this wrapper guards anyway.
      */
+    /**
+     * PAY_LATER counselling finaliser. When the txn carries a held counselling
+     * slot, confirm the appointment now that payment succeeded and the entitlement
+     * is active, then consume one counselling session. Best-effort: a failure here
+     * never rolls back the (already successful) payment + activation.
+     */
+    /**
+     * Phase 3b finaliser for a standalone PAID counselling session. The student already
+     * had an entitlement that does not include counselling, so this session was paid for
+     * separately — confirm the held slot, but pass entitlementId = null so no included
+     * session counter is consumed or credited back (it isn't drawn from one).
+     */
+    private void finalizeExtraCounsellingSlot(PaymentTransaction txn) {
+        if (txn.getCounsellingSlotId() == null || txn.getUserStudentId() == null) return;
+        try {
+            UserStudent us = userStudentRepository.findById(txn.getUserStudentId()).orElse(null);
+            if (us == null) return;
+            com.kccitm.api.service.counselling.BookingService.BookingContact contact =
+                    new com.kccitm.api.service.counselling.BookingService.BookingContact(
+                            txn.getCounsellingContactName(), txn.getCounsellingContactEmail(),
+                            txn.getCounsellingContactPhone(), txn.getCounsellingContactMethod());
+            bookingService.confirmHeldSlot(txn.getCounsellingSlotId(), us, "Counselling (paid)", contact, null);
+        } catch (Exception e) {
+            logger.error("Failed to finalise PAID counselling slot {} for txn {}: {}",
+                    txn.getCounsellingSlotId(), txn.getTransactionId(), e.getMessage(), e);
+        }
+    }
+
+    private void finalizeHeldCounsellingSlot(PaymentTransaction txn,
+            com.kccitm.api.model.career9.b2c.StudentEntitlement ent) {
+        if (txn.getCounsellingSlotId() == null || ent == null || txn.getUserStudentId() == null) return;
+        try {
+            UserStudent us = userStudentRepository.findById(txn.getUserStudentId()).orElse(null);
+            if (us == null) return;
+            com.kccitm.api.service.counselling.BookingService.BookingContact contact =
+                    new com.kccitm.api.service.counselling.BookingService.BookingContact(
+                            txn.getCounsellingContactName(), txn.getCounsellingContactEmail(),
+                            txn.getCounsellingContactPhone(), txn.getCounsellingContactMethod());
+            bookingService.confirmHeldSlot(txn.getCounsellingSlotId(), us, "Counselling (pay-later)", contact,
+                    ent.getEntitlementId());
+            entitlementService.consumeCounsellingSession(ent.getEntitlementId());
+        } catch (Exception e) {
+            logger.error("Failed to finalise pay-later counselling slot {} for txn {}: {}",
+                    txn.getCounsellingSlotId(), txn.getTransactionId(), e.getMessage(), e);
+        }
+    }
+
     private void sendPurchaseConversionToGa(PaymentTransaction txn) {
         try {
             // txn.amount is stored in paise (Razorpay's unit); GA wants rupees.
@@ -487,6 +610,53 @@ public class PaymentWebhookController {
         }
     }
 
+    /** Atomically consume one promo use for a realized redemption; no-op if absent/at-cap. */
+    private void consumePromoIfPresent(String promoCode) {
+        if (promoCode == null || promoCode.trim().isEmpty()) return;
+        promoCodeRepository.findByCodeIgnoreCase(promoCode.trim()).ifPresent(p -> {
+            int rows = promoCodeRepository.tryConsume(p.getId());
+            if (rows == 0) {
+                logger.warn("Promo {} already at maxUses at redemption time — not consumed", promoCode);
+            }
+        });
+    }
+
+    /**
+     * Transactional, pessimistically-locked reconcile entry point. Both the
+     * public status poll ({@code ?reconcile=1}) and the admin Tracker
+     * "check-status" action route through here (via the Spring proxy) so that
+     * mark-paid + provision runs under {@code @Transactional} AND the same
+     * {@code SELECT … FOR UPDATE} row lock the webhook uses — serialising every
+     * provisioning path on one payment so they can't double-provision (W3/W4).
+     * Idempotent: {@code markPaidAndProvision} early-returns when already paid.
+     */
+    @Transactional
+    public boolean reconcilePaidAndProvision(String razorpayLinkId,
+                                             JSONObject paymentEntity,
+                                             JSONObject notes) {
+        PaymentTransaction txn = paymentTransactionRepository
+                .findByRazorpayLinkIdForUpdate(razorpayLinkId).orElse(null);
+        if (txn == null) {
+            logger.warn("reconcilePaidAndProvision: no txn for link {}", razorpayLinkId);
+            return false;
+        }
+        return markPaidAndProvision(txn, paymentEntity, notes);
+    }
+
+    /**
+     * Locked status-only reconcile for expired/cancelled links. Never
+     * downgrades a txn that is already paid.
+     */
+    @Transactional
+    public void reconcileTerminalStatus(String razorpayLinkId, String status) {
+        PaymentTransaction txn = paymentTransactionRepository
+                .findByRazorpayLinkIdForUpdate(razorpayLinkId).orElse(null);
+        if (txn == null) return;
+        if ("paid".equals(txn.getStatus())) return;
+        txn.setStatus(status);
+        paymentTransactionRepository.save(txn);
+    }
+
     private void provisionB2CStudentAndEntitlement(PaymentTransaction txn) {
         try {
             Long assessmentId = txn.getAssessmentId();
@@ -500,14 +670,36 @@ public class PaymentWebhookController {
             Date dob = txn.getStudentDob() != null ? txn.getStudentDob() : new Date();
             String phone = txn.getStudentPhone();
 
-            // Look up an existing student globally (no instituteCode for B2C).
             UserStudent userStudent = null;
-            if (email != null) {
+            // Idempotent redrive: reuse the student a prior (partial or failed)
+            // provisioning run already created and stamped on the txn, instead of
+            // creating a duplicate User/StudentInfo on retry.
+            if (txn.getUserStudentId() != null) {
+                userStudent = userStudentRepository.findById(txn.getUserStudentId()).orElse(null);
+            }
+            // Look up an existing student globally (no instituteCode for B2C).
+            // Bind to an existing account ONLY when the DOB matches the paying
+            // student. The controller's impersonation guard only covers the free
+            // path; the paid path provisions here, so an unchecked email match
+            // would let a payer attach their assessment + entitlement to a
+            // victim's account (account takeover). Scan for the DOB-matching row
+            // rather than taking get(0) — email is non-unique globally.
+            if (userStudent == null && email != null) {
                 List<StudentInfo> existing = studentInfoRepository.findByEmail(email);
                 if (existing != null && !existing.isEmpty()) {
-                    StudentInfo info = existing.get(0);
-                    List<UserStudent> us = userStudentRepository.findByStudentInfoId(info.getId());
-                    if (!us.isEmpty()) userStudent = us.get(0);
+                    StudentInfo info = null;
+                    for (StudentInfo candidate : existing) {
+                        if (sameDay(candidate.getStudentDob(), txn.getStudentDob())) {
+                            info = candidate;
+                            break;
+                        }
+                    }
+                    if (info != null) {
+                        List<UserStudent> us = userStudentRepository.findByStudentInfoId(info.getId());
+                        if (!us.isEmpty()) userStudent = us.get(0);
+                    }
+                    // No DOB match → fall through to create a fresh student rather
+                    // than binding the payment to someone else's account.
                 }
             }
 
@@ -572,6 +764,12 @@ public class PaymentWebhookController {
         txn.setStatus(status);
         paymentTransactionRepository.save(txn);
         logger.info("Payment link {} status changed to: {}", linkId, status);
+
+        // PAY_LATER: payment didn't complete — release the slot we held so it
+        // returns to the available pool instead of being stranded as REQUESTED.
+        if (txn.getCounsellingSlotId() != null) {
+            try { bookingService.releaseHeldSlot(txn.getCounsellingSlotId()); } catch (Exception ignore) {}
+        }
 
         // Send automated notification for expired/cancelled
         if (txn.getStudentEmail() != null && !txn.getStudentEmail().isEmpty()) {
@@ -673,6 +871,14 @@ public class PaymentWebhookController {
             String name = txn.getStudentName() != null ? txn.getStudentName() : "Student";
             Date dob = txn.getStudentDob() != null ? txn.getStudentDob() : new Date();
             String phone = txn.getStudentPhone();
+
+            // Idempotent redrive: a prior run already created + stamped the student
+            // (and incremented the tier cap). Re-running would duplicate the account
+            // and double-count the cap, so just ensure the assessment mapping exists.
+            if (txn.getUserStudentId() != null) {
+                ensureAssessmentMapping(txn.getUserStudentId(), assessmentId);
+                return;
+            }
 
             if (email != null) {
                 List<StudentInfo> byEmail = studentInfoRepository.findByEmailAndInstituteId(email, instituteCode);
@@ -793,6 +999,16 @@ public class PaymentWebhookController {
         logger.info("Existing student assigned assessment via payment. UserStudentId: {}", userStudent.getUserStudentId());
     }
 
+    /** Idempotently ensures the student↔assessment mapping exists (used by redrive). */
+    private void ensureAssessmentMapping(Long userStudentId, Long assessmentId) {
+        if (userStudentId == null || assessmentId == null) return;
+        Optional<StudentAssessmentMapping> sam = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        if (!sam.isPresent()) {
+            studentAssessmentMappingRepository.save(new StudentAssessmentMapping(userStudentId, assessmentId));
+        }
+    }
+
     private void tryIncrementSchoolLink(PaymentTransaction txn) {
         if (txn == null || txn.getSchoolConfigId() == null) return;
         Optional<SchoolAssessmentConfig> configOpt = schoolAssessmentConfigRepository.findById(txn.getSchoolConfigId());
@@ -855,6 +1071,18 @@ public class PaymentWebhookController {
         }
         // Never fall back to classId (a DB primary key) — that would corrupt studentClass.
         return null;
+    }
+
+    /** Calendar-day equality (ignores time-of-day); false if either date is null. */
+    private static boolean sameDay(Date a, Date b) {
+        if (a == null || b == null) return false;
+        java.util.Calendar ca = java.util.Calendar.getInstance();
+        java.util.Calendar cb = java.util.Calendar.getInstance();
+        ca.setTime(a);
+        cb.setTime(b);
+        return ca.get(java.util.Calendar.YEAR) == cb.get(java.util.Calendar.YEAR)
+            && ca.get(java.util.Calendar.MONTH) == cb.get(java.util.Calendar.MONTH)
+            && ca.get(java.util.Calendar.DAY_OF_MONTH) == cb.get(java.util.Calendar.DAY_OF_MONTH);
     }
 
 }

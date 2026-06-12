@@ -1,21 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import PortalLayout, { MenuItem } from '../portal/PortalLayout'
+import PortalLayout from '../portal/PortalLayout'
 import { getCounsellorById, getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { useAuth } from '../../modules/auth'
+import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
 import './CounsellorPortal.css'
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
-
-const MENU_ITEMS: MenuItem[] = [
-  { label: 'Dashboard', path: '/counsellor/dashboard', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><rect x='3' y='3' width='7' height='7' rx='1'/><rect x='14' y='3' width='7' height='7' rx='1'/><rect x='3' y='14' width='7' height='7' rx='1'/><rect x='14' y='14' width='7' height='7' rx='1'/></svg> },
-  { label: 'Appointments', path: '/counsellor/appointments', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><rect x='3' y='4' width='18' height='18' rx='2' ry='2'/><line x1='16' y1='2' x2='16' y2='6'/><line x1='8' y1='2' x2='8' y2='6'/><line x1='3' y1='10' x2='21' y2='10'/></svg> },
-  { label: 'Session Notes', path: '/counsellor/notes', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7'/><path d='M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z'/></svg> },
-  { label: 'Availability', path: '/counsellor/availability', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/></svg> },
-  { label: 'Reports', path: '/counsellor/reports', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg> },
-  { label: 'My Profile', path: '/counsellor/profile', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/><circle cx='12' cy='7' r='4'/></svg> },
-]
 interface ProfileForm {
   name: string
   email: string
@@ -181,14 +173,14 @@ const CounsellorProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <PortalLayout title='Counsellor Dashboard' menuItems={MENU_ITEMS} storageKeys={[]} loginPath='/counsellor/login'>
+      <PortalLayout title='Counsellor Dashboard' menuItems={COUNSELLOR_MENU_ITEMS} storageKeys={[]} loginPath='/counsellor/login'>
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#5C7A72' }}>Loading profile...</div>
       </PortalLayout>
     )
   }
 
   return (
-    <PortalLayout title='Counsellor Dashboard' menuItems={MENU_ITEMS} storageKeys={[]} loginPath='/counsellor/login'>
+    <PortalLayout title='Counsellor Dashboard' menuItems={COUNSELLOR_MENU_ITEMS} storageKeys={[]} loginPath='/counsellor/login'>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
 
         {/* Header */}
@@ -221,7 +213,7 @@ const CounsellorProfilePage: React.FC = () => {
           </div>
         )}
 
-        {/* ── Profile Photo ── */}
+        {/* â”€â”€ Profile Photo â”€â”€ */}
         <div style={{ background: '#fff', border: '1px solid #D1E5DF', borderRadius: 12, padding: 24, marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#1A2B28', marginBottom: 16 }}>Profile Photo</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
@@ -249,7 +241,7 @@ const CounsellorProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Personal Details ── */}
+        {/* â”€â”€ Personal Details â”€â”€ */}
         <div style={{ background: '#fff', border: '1px solid #D1E5DF', borderRadius: 12, padding: 24, marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#1A2B28', marginBottom: 16 }}>Personal Details</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -273,7 +265,7 @@ const CounsellorProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Professional Details ── */}
+        {/* â”€â”€ Professional Details â”€â”€ */}
         <div style={{ background: '#fff', border: '1px solid #D1E5DF', borderRadius: 12, padding: 24, marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#1A2B28', marginBottom: 16 }}>Professional Details</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
@@ -334,7 +326,7 @@ const CounsellorProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Bank Details ── */}
+        {/* â”€â”€ Bank Details â”€â”€ */}
         <div style={{ background: '#fff', border: '1px solid #D1E5DF', borderRadius: 12, padding: 24, marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#1A2B28', marginBottom: 4 }}>Bank Details</div>
           <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 16 }}>For payout processing. Your details are stored securely.</div>

@@ -112,6 +112,11 @@ public class CounsellingAppointment implements Serializable {
     @Column(name = "attended")
     private Boolean attended;
 
+    // The entitlement this booking drew its counselling session from. Used by the
+    // lifecycle sweep to credit the session back on a no-show (always rebookable).
+    @Column(name = "entitlement_id")
+    private Long entitlementId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -314,6 +319,14 @@ public class CounsellingAppointment implements Serializable {
 
     public void setAttended(Boolean attended) {
         this.attended = attended;
+    }
+
+    public Long getEntitlementId() {
+        return entitlementId;
+    }
+
+    public void setEntitlementId(Long entitlementId) {
+        this.entitlementId = entitlementId;
     }
 
     public LocalDateTime getCreatedAt() {

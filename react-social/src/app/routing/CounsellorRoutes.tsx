@@ -67,11 +67,18 @@ const CounsellorAuthGuard: FC = () => {
   if (currentUser.superAdmin) {
     return <Outlet />
   }
+  // Role names reach the FE verbatim from role.name in the DB, which holds
+  // 'Counsellor' on staging/prod (the V20260610001 seed's WHERE name =
+  // 'COUNSELLOR' guard matched it case-insensitively and inserted nothing),
+  // so the comparison here must be case-insensitive too.
+  const matchesCounsellor = (r: unknown) =>
+    typeof r === 'string' &&
+    ['COUNSELLOR', 'ROLE_COUNSELLOR'].includes(r.toUpperCase())
   const roles = (currentUser as any).roles
   const role = (currentUser as any).role
   const isCounsellor =
-    role === 'COUNSELLOR' ||
-    (Array.isArray(roles) && roles.includes('COUNSELLOR'))
+    matchesCounsellor(role) ||
+    (Array.isArray(roles) && roles.some(matchesCounsellor))
   if (!isCounsellor) {
     return <Navigate to='/counsellor/login' replace />
   }

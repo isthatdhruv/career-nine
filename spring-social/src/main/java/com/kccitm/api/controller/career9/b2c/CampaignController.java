@@ -44,6 +44,8 @@ public class CampaignController {
     @Autowired private InstituteDetailRepository instituteDetailRepository;
     @Autowired private CampaignResolutionService campaignResolutionService;
 
+    @Autowired private com.kccitm.api.service.career9.InstituteAssessmentService instituteAssessmentService;
+
     @PreAuthorize("@auth.allows('campaign.read.all')")
     @GetMapping("/getAll")
     public ResponseEntity<List<Campaign>> getAll() {
@@ -87,6 +89,9 @@ public class CampaignController {
         }
         if (instituteDetailRepository.findById(body.getInstituteCode()) == null) {
             return ResponseEntity.badRequest().body("Selected institute does not exist");
+        }
+        if (invalidWindow(body.getValidFrom(), body.getValidTo())) {
+            return ResponseEntity.badRequest().body("validTo cannot be before validFrom");
         }
         String slug = body.getSlug().trim().toLowerCase().replaceAll("[^a-z0-9-]", "-");
         if (campaignRepository.findBySlugIgnoreCase(slug).isPresent()) {
@@ -135,12 +140,28 @@ public class CampaignController {
             }
             c.setInstituteCode(instituteCode);
         }
-        if (req.containsKey("isActive")) c.setIsActive((Boolean) req.get("isActive"));
+        if (req.containsKey("isActive")) c.setIsActive(toBool(req.get("isActive")));
+        if (invalidWindow(c.getValidFrom(), c.getValidTo())) {
+            return ResponseEntity.badRequest().body("validTo cannot be before validFrom");
+        }
         normalizeDefaults(c);
-        return ResponseEntity.ok(campaignRepository.save(c));
+        Campaign savedCampaign = campaignRepository.save(c);
+        // If this edit set/changed the institute, sync the catalog for every live
+        // assessment on the campaign — covers "attach assessments first, map the
+        // institute later". Idempotent.
+        if (req.containsKey("instituteCode") && savedCampaign.getInstituteCode() != null) {
+            for (CampaignAssessmentMapping m :
+                    mappingRepository.findByCampaignIdAndIsDeletedFalseOrderBySortOrderAscIdAsc(id)) {
+                if (Boolean.TRUE.equals(m.getIsActive())) {
+                    instituteAssessmentService.ensure(savedCampaign.getInstituteCode(), m.getAssessmentId());
+                }
+            }
+        }
+        return ResponseEntity.ok(savedCampaign);
     }
 
     @PreAuthorize("@auth.allows('campaign.delete')")
+    @org.springframework.transaction.annotation.Transactional
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> softDelete(@PathVariable Long id) {
         Optional<Campaign> opt = campaignRepository.findById(id);
@@ -149,6 +170,22 @@ public class CampaignController {
         c.setIsDeleted(true);
         c.setIsActive(false);
         campaignRepository.save(c);
+        // CRUD2: cascade-deactivate child mappings + their tiers so a deleted
+        // campaign's assessments are no longer registrable or price-resolvable.
+        // (Existing paid entitlements are intentionally left intact — they
+        // represent honoured purchases; only new registration paths are closed.)
+        for (CampaignAssessmentMapping m :
+                mappingRepository.findByCampaignIdAndIsDeletedFalseOrderBySortOrderAscIdAsc(id)) {
+            m.setIsActive(false);
+            mappingRepository.save(m);
+            for (CampaignAssessmentTier t :
+                    tierMappingRepository.findByCampaignAssessmentMappingIdOrderByIdAsc(m.getId())) {
+                if (Boolean.TRUE.equals(t.getIsActive())) {
+                    t.setIsActive(false);
+                    tierMappingRepository.save(t);
+                }
+            }
+        }
         return ResponseEntity.ok("Campaign deleted");
     }
 
@@ -164,25 +201,42 @@ public class CampaignController {
     @PostMapping("/{campaignId}/assessment")
     public ResponseEntity<?> attachAssessment(@PathVariable Long campaignId,
                                               @RequestBody Map<String, Object> req) {
-        if (!campaignRepository.findById(campaignId).isPresent()) {
+        Campaign campaign = campaignRepository.findById(campaignId).orElse(null);
+        if (campaign == null) {
             return ResponseEntity.notFound().build();
         }
         Long assessmentId = toLong(req.get("assessmentId"));
         if (assessmentId == null) return ResponseEntity.badRequest().body("assessmentId is required");
 
-        Optional<CampaignAssessmentMapping> existing = mappingRepository
-                .findByCampaignIdAndAssessmentIdAndIsDeletedFalse(campaignId, assessmentId);
-        if (existing.isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Assessment already attached");
+        // CRUD1: a prior detach soft-deletes the row but the UNIQUE(campaign_id,
+        // assessment_id) constraint still holds — inserting a fresh row would 500.
+        // Look up including soft-deleted and revive it; only conflict on a LIVE one.
+        Optional<CampaignAssessmentMapping> any = mappingRepository
+                .findByCampaignIdAndAssessmentId(campaignId, assessmentId);
+        CampaignAssessmentMapping m;
+        if (any.isPresent()) {
+            m = any.get();
+            if (!Boolean.TRUE.equals(m.getIsDeleted())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("Assessment already attached");
+            }
+            m.setIsDeleted(false);
+            m.setIsActive(true);
+        } else {
+            m = new CampaignAssessmentMapping();
+            m.setCampaignId(campaignId);
+            m.setAssessmentId(assessmentId);
         }
-
-        CampaignAssessmentMapping m = new CampaignAssessmentMapping();
-        m.setCampaignId(campaignId);
-        m.setAssessmentId(assessmentId);
         m.setPurchasePath(normalizePath((String) req.get("purchasePath")));
         m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
-        return ResponseEntity.ok(mappingRepository.save(m));
+        CampaignAssessmentMapping savedMapping = mappingRepository.save(m);
+        // Keep the institute<->assessment catalog in sync: an assessment attached to an
+        // institute-tied campaign is one that institute now has, so it shows in Reports
+        // Hub next to the B2B mappings. Idempotent; null-institute (legacy) campaigns skipped.
+        if (campaign.getInstituteCode() != null) {
+            instituteAssessmentService.ensure(campaign.getInstituteCode(), assessmentId);
+        }
+        return ResponseEntity.ok(savedMapping);
     }
 
     @PreAuthorize("@auth.allows('campaign.update')")
@@ -195,7 +249,7 @@ public class CampaignController {
         if (req.containsKey("purchasePath")) m.setPurchasePath(normalizePath((String) req.get("purchasePath")));
         if (req.containsKey("counsellingModel")) m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
-        if (req.containsKey("isActive")) m.setIsActive((Boolean) req.get("isActive"));
+        if (req.containsKey("isActive")) m.setIsActive(toBool(req.get("isActive")));
         return ResponseEntity.ok(mappingRepository.save(m));
     }
 
@@ -212,6 +266,7 @@ public class CampaignController {
     }
 
     @PreAuthorize("@auth.allows('campaign.update')")
+    @org.springframework.transaction.annotation.Transactional // CRUD4: single-default clear + save atomic
     @PostMapping("/assessment/{mappingId}/tier")
     public ResponseEntity<?> attachTier(@PathVariable Long mappingId,
                                         @RequestBody Map<String, Object> req) {
@@ -229,9 +284,17 @@ public class CampaignController {
         CampaignAssessmentTier tm = existing.orElseGet(CampaignAssessmentTier::new);
         tm.setCampaignAssessmentMappingId(mappingId);
         tm.setPricingTierId(pricingTierId);
-        if (req.containsKey("priceOverrideInr")) tm.setPriceOverrideInr(toLong(req.get("priceOverrideInr")));
-        if (req.containsKey("isDefault")) tm.setIsDefault((Boolean) req.get("isDefault"));
-        if (req.containsKey("isActive")) tm.setIsActive((Boolean) req.get("isActive"));
+        if (req.containsKey("priceOverrideInr")) {
+            Long override = toLong(req.get("priceOverrideInr"));
+            // PRICE-CRUD: a negative override would produce a negative/credit charge
+            // at checkout (base-price validation exists; the override had none).
+            if (override != null && override < 0) {
+                return ResponseEntity.badRequest().body("priceOverrideInr cannot be negative");
+            }
+            tm.setPriceOverrideInr(override);
+        }
+        if (req.containsKey("isDefault")) tm.setIsDefault(toBool(req.get("isDefault")));
+        if (req.containsKey("isActive")) tm.setIsActive(toBool(req.get("isActive")));
 
         // Enforce single default per mapping
         if (Boolean.TRUE.equals(tm.getIsDefault())) {
@@ -329,5 +392,17 @@ public class CampaignController {
         if (o == null) return null;
         if (o instanceof Number) return ((Number) o).intValue();
         return Integer.parseInt(o.toString());
+    }
+
+    /** CRUD5: tolerant boolean coercion so a string/number "isActive" no longer 500s. */
+    private static Boolean toBool(Object o) {
+        if (o == null) return null;
+        if (o instanceof Boolean) return (Boolean) o;
+        return Boolean.parseBoolean(o.toString().trim());
+    }
+
+    /** CRUD3: true when both dates are present and the window is inverted (validTo before validFrom). */
+    private static boolean invalidWindow(java.util.Date from, java.util.Date to) {
+        return from != null && to != null && to.before(from);
     }
 }

@@ -162,7 +162,19 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         contactEmail: contactEmail.trim() || undefined,
         preferredContactMethod: preferredMethod,
       })
-      onBooked(res.data as BookingResult)
+      const data: any = res.data
+      // Phase 3b: if the session isn't included in the plan, the backend holds the
+      // slot and returns a Razorpay payment link instead of a confirmed booking.
+      // Redirect to pay; on success the webhook finalises the booking.
+      if (data && data.requiresPayment) {
+        if (data.paymentUrl) {
+          window.location.href = data.paymentUrl
+          return
+        }
+        setBookError('Payment is required but no payment link was returned. Please try again.')
+        return
+      }
+      onBooked(data as BookingResult)
     } catch (err: any) {
       const body = err?.response?.data
       setBookError(typeof body === 'string' ? body : 'Could not confirm your booking. Please try again.')

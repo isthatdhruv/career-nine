@@ -1,83 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import PortalLayout, { MenuItem } from '../portal/PortalLayout'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
+import PortalLayout from '../portal/PortalLayout'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { getSlotsByCounsellor, createManualSlot, deleteSlot } from '../Counselling/API/SlotAPI'
 import { submitBlockDateRequest, getBlockRequestsByCounsellor, BlockDateRequest } from '../Counselling/API/BlockDateRequestAPI'
 import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
+import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
 import './CounsellorPortal.css'
 
 const API_URL = process.env.REACT_APP_API_URL
-
-const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
-  {
-    label: 'Dashboard',
-    path: '/counsellor/dashboard',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <rect x='3' y='3' width='7' height='7' rx='1' />
-        <rect x='14' y='3' width='7' height='7' rx='1' />
-        <rect x='3' y='14' width='7' height='7' rx='1' />
-        <rect x='14' y='14' width='7' height='7' rx='1' />
-      </svg>
-    ),
-  },
-  {
-    label: 'Appointments',
-    path: '/counsellor/appointments',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <rect x='3' y='4' width='18' height='18' rx='2' ry='2' />
-        <line x1='16' y1='2' x2='16' y2='6' />
-        <line x1='8' y1='2' x2='8' y2='6' />
-        <line x1='3' y1='10' x2='21' y2='10' />
-      </svg>
-    ),
-  },
-  {
-    label: 'Session Notes',
-    path: '/counsellor/notes',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <path d='M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' />
-        <path d='M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z' />
-      </svg>
-    ),
-  },
-  {
-    label: 'Availability',
-    path: '/counsellor/availability',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <circle cx='12' cy='12' r='10' />
-        <polyline points='12 6 12 12 16 14' />
-      </svg>
-    ),
-  },
-  {
-    label: 'Reports',
-    path: '/counsellor/reports',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <line x1='18' y1='20' x2='18' y2='10' />
-        <line x1='12' y1='20' x2='12' y2='4' />
-        <line x1='6' y1='20' x2='6' y2='14' />
-      </svg>
-    ),
-  },
-  {
-    label: 'My Profile',
-    path: '/counsellor/profile',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
-        <circle cx='12' cy='7' r='4' />
-      </svg>
-    ),
-  },
-]
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -109,6 +44,19 @@ function formatTime(timeStr: string): string {
   } catch {
     return timeStr
   }
+}
+
+// react-datepicker works with Date objects; form state keeps ISO yyyy-MM-dd
+// strings (what the backend's LocalDate expects), so convert at the boundary.
+function isoToDate(s: string): Date | null {
+  return s ? new Date(s + 'T00:00:00') : null
+}
+
+function dateToIso(d: Date | null): string {
+  if (!d) return ''
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
 }
 
 function formatDateShort(dateStr: string): string {
@@ -262,15 +210,21 @@ const CounsellorAvailabilityPage: React.FC = () => {
     setTemplateSaving(true)
     setError('')
     try {
+      // The endpoint binds the body straight onto the AvailabilityTemplate
+      // entity: counsellor must be the nested relation (counsellor_id is a
+      // non-null FK) and the duration field is defaultSlotDuration.
       await axios.post(`${API_URL}/api/availability-template/create`, {
-        counsellorId,
+        counsellor: { id: counsellorId },
         dayOfWeek: templateForm.dayOfWeek,
         startTime: templateForm.startTime,
         endTime: templateForm.endTime,
-        slotDurationMinutes: templateForm.slotDurationMinutes,
+        defaultSlotDuration: templateForm.slotDurationMinutes,
       })
-      setSuccess('Template saved successfully.')
+      setSuccess('Template saved — slots for the upcoming weeks were generated.')
       reloadTemplates()
+      // The backend materializes slots from the new template immediately,
+      // so the Upcoming Slots list must refresh too.
+      reloadSlots()
       setTemplateForm({ dayOfWeek: 'Monday', startTime: '09:00', endTime: '17:00', slotDurationMinutes: 30 })
     } catch {
       setError('Failed to save template.')
@@ -285,6 +239,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
       await axios.delete(`${API_URL}/api/availability-template/delete/${templateId}`)
       setSuccess('Template deleted.')
       reloadTemplates()
+      reloadSlots()
     } catch {
       setError('Failed to delete template.')
     } finally {
@@ -298,16 +253,25 @@ const CounsellorAvailabilityPage: React.FC = () => {
       setError('Please fill in date, start time, and end time.')
       return
     }
+    const [sh, sm] = manualSlotForm.startTime.split(':').map(Number)
+    const [eh, em] = manualSlotForm.endTime.split(':').map(Number)
+    const durationMinutes = eh * 60 + em - (sh * 60 + sm)
+    if (durationMinutes <= 0) {
+      setError('End time must be after start time.')
+      return
+    }
     setSlotSaving(true)
     setError('')
     try {
+      // The endpoint binds the body straight onto the CounsellingSlot entity:
+      // counsellor must be the nested relation (counsellor_id is a non-null
+      // FK) and startTime/endTime are LocalTime ("HH:mm:ss"), not datetimes.
       await createManualSlot({
-        counsellorId,
+        counsellor: { id: counsellorId },
         date: manualSlotForm.date,
-        startTime: `${manualSlotForm.date}T${manualSlotForm.startTime}:00`,
-        endTime: `${manualSlotForm.date}T${manualSlotForm.endTime}:00`,
-        durationMinutes: manualSlotForm.durationMinutes,
-        isManuallyCreated: true,
+        startTime: `${manualSlotForm.startTime}:00`,
+        endTime: `${manualSlotForm.endTime}:00`,
+        durationMinutes,
       })
       setSuccess('Extra slot added.')
       reloadSlots()
@@ -440,8 +404,106 @@ const CounsellorAvailabilityPage: React.FC = () => {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
-            {/* Left: Slots by Date */}
+            {/* Left: Weekly Schedule + Slots by Date */}
             <div>
+              {/* Weekly Schedule (recurring templates) */}
+              <div style={{
+                background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0',
+                padding: 20, marginBottom: 20,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B', marginBottom: 4 }}>
+                  Weekly Schedule
+                </div>
+                <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 14px' }}>
+                  Set your recurring weekly availability — bookable slots are generated automatically for the upcoming weeks.
+                </p>
+
+                {templates.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                    {templates.map((t: any) => (
+                      <div key={t.id} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', background: '#F8FAFC', borderRadius: 8,
+                        border: '1px solid #F1F5F9',
+                      }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>
+                          {t.dayOfWeek} &middot; {formatTime(t.startTime)} – {formatTime(t.endTime)}
+                          <span style={{ fontSize: 11, color: '#64748B', fontWeight: 500 }}>
+                            {' '}({t.defaultSlotDuration || 30}-min slots)
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteTemplate(t.id)}
+                          disabled={deletingTemplate === t.id}
+                          style={{
+                            background: 'none', border: '1px solid #FECACA', color: '#DC2626',
+                            borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                            cursor: deletingTemplate === t.id ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {deletingTemplate === t.id ? 'Removing…' : 'Remove'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
+                  <div>
+                    <label style={labelStyle}>Day</label>
+                    <select
+                      value={templateForm.dayOfWeek}
+                      onChange={(e) => setTemplateForm((f) => ({ ...f, dayOfWeek: e.target.value }))}
+                      style={inputStyle}
+                    >
+                      {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Start</label>
+                    <input
+                      type='time'
+                      value={templateForm.startTime}
+                      onChange={(e) => setTemplateForm((f) => ({ ...f, startTime: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>End</label>
+                    <input
+                      type='time'
+                      value={templateForm.endTime}
+                      onChange={(e) => setTemplateForm((f) => ({ ...f, endTime: e.target.value }))}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Slot Length</label>
+                    <select
+                      value={templateForm.slotDurationMinutes}
+                      onChange={(e) => setTemplateForm((f) => ({ ...f, slotDurationMinutes: Number(e.target.value) }))}
+                      style={inputStyle}
+                    >
+                      <option value={30}>30 min</option>
+                      <option value={45}>45 min</option>
+                      <option value={60}>60 min</option>
+                    </select>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSaveTemplate}
+                  disabled={templateSaving}
+                  style={{
+                    marginTop: 12, padding: '9px 18px', fontSize: 13, fontWeight: 600,
+                    border: 'none', borderRadius: 8, color: '#fff',
+                    cursor: templateSaving ? 'not-allowed' : 'pointer',
+                    background: templateSaving ? '#9CA3AF' : 'linear-gradient(135deg, #064E3B, #0C6B5A)',
+                  }}
+                >
+                  {templateSaving ? 'Saving…' : 'Add Weekly Schedule'}
+                </button>
+              </div>
+
               <div style={{
                 background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0',
                 overflow: 'hidden',
@@ -456,7 +518,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
 
                 {upcomingSlots.length === 0 ? (
                   <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94A3B8', fontSize: 14 }}>
-                    No upcoming slots. Contact admin to set up your schedule.
+                    No upcoming slots yet. Add a weekly schedule above or an extra slot on the right to get started.
                   </div>
                 ) : (
                   <div style={{ maxHeight: 480, overflowY: 'auto' }}>
@@ -475,6 +537,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
                             .sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''))
                             .map((s: any) => {
                             const sc = statusStyle(s.status)
+                            const isAvailable = (s.status || '').toUpperCase() === 'AVAILABLE'
                             return (
                               <div key={s.id} style={{
                                 display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -483,6 +546,21 @@ const CounsellorAvailabilityPage: React.FC = () => {
                               }}>
                                 <span>{formatTime(s.startTime)} – {formatTime(s.endTime)}</span>
                                 <span style={{ fontSize: 10, opacity: 0.7 }}>{(s.status || '').toUpperCase()}</span>
+                                {/* Backend only permits deleting AVAILABLE (or blocked) slots */}
+                                {isAvailable && (
+                                  <button
+                                    onClick={() => handleDeleteSlot(s.id)}
+                                    disabled={deletingSlot === s.id}
+                                    title='Remove this slot'
+                                    style={{
+                                      background: 'none', border: 'none', padding: 0, marginLeft: 2,
+                                      cursor: deletingSlot === s.id ? 'not-allowed' : 'pointer',
+                                      color: 'inherit', opacity: 0.6, fontSize: 14, lineHeight: 1,
+                                    }}
+                                  >
+                                    &times;
+                                  </button>
+                                )}
                               </div>
                             )
                           })}
@@ -494,8 +572,66 @@ const CounsellorAvailabilityPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Block Date + Blocked List */}
+            {/* Right: Extra Slot + Block Date + Blocked List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Add Extra Slot Form */}
+              <div style={{
+                background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', padding: 20,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B', marginBottom: 14 }}>
+                  Add Extra Slot
+                </div>
+                <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 14px' }}>
+                  Add a one-off slot outside your weekly schedule.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Date</label>
+                    <DatePicker
+                      selected={isoToDate(manualSlotForm.date)}
+                      onChange={(d: Date | null) => setManualSlotForm((f) => ({ ...f, date: dateToIso(d) }))}
+                      dateFormat='dd/MM/yyyy'
+                      placeholderText='dd/mm/yyyy'
+                      minDate={new Date()}
+                      wrapperClassName='cp-datepicker'
+                      customInput={<input style={inputStyle} />}
+                    />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={labelStyle}>Start</label>
+                      <input
+                        type='time'
+                        value={manualSlotForm.startTime}
+                        onChange={(e) => setManualSlotForm((f) => ({ ...f, startTime: e.target.value }))}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>End</label>
+                      <input
+                        type='time'
+                        value={manualSlotForm.endTime}
+                        onChange={(e) => setManualSlotForm((f) => ({ ...f, endTime: e.target.value }))}
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleSaveManualSlot}
+                    disabled={slotSaving}
+                    style={{
+                      width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
+                      border: 'none', borderRadius: 8, color: '#fff',
+                      cursor: slotSaving ? 'not-allowed' : 'pointer',
+                      background: slotSaving ? '#9CA3AF' : 'linear-gradient(135deg, #064E3B, #0C6B5A)',
+                    }}
+                  >
+                    {slotSaving ? 'Adding…' : 'Add Slot'}
+                  </button>
+                </div>
+              </div>
+
               {/* Block Date Form */}
               <div style={{
                 background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', padding: 20,
@@ -509,15 +645,19 @@ const CounsellorAvailabilityPage: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Date</label>
-                    <input
-                      type='date'
-                      value={blockDateForm.date}
-                      onChange={(e) => setBlockDateForm((f) => ({ ...f, date: e.target.value }))}
-                      min={new Date().toISOString().split('T')[0]}
-                      style={{
-                        width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
-                        borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box',
-                      }}
+                    <DatePicker
+                      selected={isoToDate(blockDateForm.date)}
+                      onChange={(d: Date | null) => setBlockDateForm((f) => ({ ...f, date: dateToIso(d) }))}
+                      dateFormat='dd/MM/yyyy'
+                      placeholderText='dd/mm/yyyy'
+                      minDate={new Date()}
+                      wrapperClassName='cp-datepicker'
+                      customInput={
+                        <input style={{
+                          width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
+                          borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                        }} />
+                      }
                     />
                   </div>
                   <div>

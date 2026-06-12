@@ -105,6 +105,31 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
+    // PAY_LATER counselling: the slot the student held before paying, plus the
+    // contact details captured at slot selection. The webhook finalises the
+    // appointment from these once payment succeeds. Null for all other payments.
+    @Column(name = "counselling_slot_id")
+    private Long counsellingSlotId;
+
+    @Column(name = "counselling_contact_name", length = 200)
+    private String counsellingContactName;
+
+    @Column(name = "counselling_contact_phone", length = 20)
+    private String counsellingContactPhone;
+
+    @Column(name = "counselling_contact_email", length = 200)
+    private String counsellingContactEmail;
+
+    @Column(name = "counselling_contact_method", length = 20)
+    private String counsellingContactMethod;
+
+    // Discriminator for non-assessment payments. Currently: "COUNSELLING_EXTRA" —
+    // a standalone paid counselling session booked against an existing entitlement
+    // that does not include (or has exhausted) counselling. NULL for normal
+    // assessment purchases (B2C/B2B/school), which the webhook routes by their ids.
+    @Column(name = "purpose", length = 30)
+    private String purpose;
+
     @Column(name = "welcome_email_sent", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean welcomeEmailSent = false;
 
@@ -211,6 +236,24 @@ public class PaymentTransaction implements Serializable {
 
     public String getFailureReason() { return failureReason; }
     public void setFailureReason(String failureReason) { this.failureReason = failureReason; }
+
+    public Long getCounsellingSlotId() { return counsellingSlotId; }
+    public void setCounsellingSlotId(Long counsellingSlotId) { this.counsellingSlotId = counsellingSlotId; }
+
+    public String getCounsellingContactName() { return counsellingContactName; }
+    public void setCounsellingContactName(String v) { this.counsellingContactName = v; }
+
+    public String getCounsellingContactPhone() { return counsellingContactPhone; }
+    public void setCounsellingContactPhone(String v) { this.counsellingContactPhone = v; }
+
+    public String getCounsellingContactEmail() { return counsellingContactEmail; }
+    public void setCounsellingContactEmail(String v) { this.counsellingContactEmail = v; }
+
+    public String getCounsellingContactMethod() { return counsellingContactMethod; }
+    public void setCounsellingContactMethod(String v) { this.counsellingContactMethod = v; }
+
+    public String getPurpose() { return purpose; }
+    public void setPurpose(String purpose) { this.purpose = purpose; }
 
     public Boolean getWelcomeEmailSent() { return welcomeEmailSent; }
     public void setWelcomeEmailSent(Boolean welcomeEmailSent) { this.welcomeEmailSent = welcomeEmailSent; }

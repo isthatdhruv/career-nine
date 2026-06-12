@@ -73,6 +73,12 @@ public class CounsellingSlot implements Serializable {
     @Version
     private Integer version;
 
+    // Soft-hold expiry (Counselling Phase 3): set when the slot is held during the
+    // pick-slot -> pay window. A sweep releases REQUESTED slots whose held_until has
+    // passed and that never became a confirmed appointment. NULL for instant bookings.
+    @Column(name = "held_until")
+    private LocalDateTime heldUntil;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -196,6 +202,14 @@ public class CounsellingSlot implements Serializable {
 
     public void setVersion(Integer version) {
         this.version = version;
+    }
+
+    public LocalDateTime getHeldUntil() {
+        return heldUntil;
+    }
+
+    public void setHeldUntil(LocalDateTime heldUntil) {
+        this.heldUntil = heldUntil;
     }
 
     public LocalDateTime getCreatedAt() {

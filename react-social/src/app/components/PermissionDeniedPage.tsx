@@ -40,8 +40,12 @@ function inferPersona(currentUser: unknown): Persona {
   const cu = currentUser as { role?: string; roles?: string[] }
   const role = cu.role
   const roles = cu.roles
+  // Role names come from role.name in the DB verbatim (e.g. 'Counsellor',
+  // not 'COUNSELLOR') — compare case-insensitively.
+  const eq = (x: unknown, r: string) =>
+    typeof x === 'string' && x.toUpperCase() === r
   const has = (r: string) =>
-    role === r || (Array.isArray(roles) && roles.includes(r))
+    eq(role, r) || (Array.isArray(roles) && roles.some((x) => eq(x, r)))
   if (has('B2C_STUDENT') || has('ROLE_B2C_STUDENT')) return 'b2c_student'
   if (has('STUDENT') || has('ROLE_STUDENT')) return 'student'
   if (has('COUNSELLOR') || has('ROLE_COUNSELLOR')) return 'counsellor'

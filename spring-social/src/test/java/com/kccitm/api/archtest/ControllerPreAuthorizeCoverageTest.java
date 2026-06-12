@@ -79,6 +79,10 @@ public class ControllerPreAuthorizeCoverageTest {
             // AuthController login/signup — these ESTABLISH the auth context, they don't consume it.
             "com.kccitm.api.controller.AuthController#authenticateUser",
             "com.kccitm.api.controller.AuthController#registerUser",
+            // UserController login endpoints — anonymous-by-design, mirror /auth/login (dashboard
+            // + student username/DOB sign-in establish the auth context, they don't consume it).
+            "com.kccitm.api.controller.UserController#checkUser",
+            "com.kccitm.api.controller.UserController#studentDashboardAuth",
             // Password reset funnel — anonymous-by-design; the reset-password endpoint is
             // gated by a single-use server-issued token in the request body, not by Spring auth.
             "com.kccitm.api.controller.AuthController#forgotPassword",
@@ -129,6 +133,10 @@ public class ControllerPreAuthorizeCoverageTest {
             "com.kccitm.api.controller.career9.b2c.CampaignPublicController#registerTrial",
             "com.kccitm.api.controller.career9.b2c.CampaignPublicController#upgradeInfo",
             "com.kccitm.api.controller.career9.b2c.CampaignPublicController#payForReport",
+            // Counselling slot list + booking — same anonymous funnel, gated by the
+            // entitlement accessToken (+ required entitlementId), not by Spring auth.
+            "com.kccitm.api.controller.career9.b2c.CampaignPublicController#listCounsellingSlots",
+            "com.kccitm.api.controller.career9.b2c.CampaignPublicController#bookCounsellingSlot",
 
             // --- Phase 2 (Task 2.1 / HIGH-B): genuinely anonymous funnel endpoints whose
             // @PreAuthorize was removed (they are permitAll + CSRF-exempt via PUBLIC_PATHS and
@@ -136,8 +144,15 @@ public class ControllerPreAuthorizeCoverageTest {
             "com.kccitm.api.controller.career9.PromoCodeController#validatePromoCode",
             "com.kccitm.api.controller.career9.b2c.ReportPreparationController#prepareReport",
             "com.kccitm.api.controller.career9.b2c.EntitlementController#redeemToken",
+            // Dashboard SSO bridge — trades the entitlement accessToken for cookies; gated by
+            // the token (+ dashboard-active + non-expired window, EXP2), not by Spring auth.
+            "com.kccitm.api.controller.career9.b2c.EntitlementController#redeemDashboardToken",
             "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getMappingInfoByToken",
             "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#registerStudentByToken",
+            // B2B free→paid upgrade — same anonymous funnel, gated by the entitlementId
+            // (+ the resolved B2B entitlement / active wave) in-controller, not Spring auth.
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getUpgradeInfo",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#payForUpgrade",
 
             // Operator-run 4-pager HTML template publish to DigitalOcean Spaces — runs from
             // an authenticated operator shell, not user JWT; gated by network reachability only.

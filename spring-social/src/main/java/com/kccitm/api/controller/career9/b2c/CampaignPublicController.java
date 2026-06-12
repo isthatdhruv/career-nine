@@ -68,6 +68,7 @@ public class CampaignPublicController {
     @Autowired private PromoCodeRepository promoCodeRepository;
     @Autowired private PromoCodeCampaignRepository promoCodeCampaignRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
+    @Autowired private com.kccitm.api.service.PaymentTransactionWriter paymentTransactionWriter;
     @Autowired private StudentInfoRepository studentInfoRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private com.kccitm.api.repository.InstituteDetailRepository instituteDetailRepository;
@@ -83,6 +84,16 @@ public class CampaignPublicController {
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
     @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
+
+    // Phase 3b — pay-before-book for EXTRA counselling sessions.
+    // Fallback per-session price (INR) when the entitlement has no snapshotted price.
+    @org.springframework.beans.factory.annotation.Value("${app.counselling.default-price:500}")
+    private long counsellingDefaultPrice;
+    // How long to hold the slot while the student completes payment (minutes).
+    @org.springframework.beans.factory.annotation.Value("${app.counselling.pay-window-minutes:30}")
+    private long counsellingPayWindowMinutes;
+    @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
+    private String razorpayCallbackBaseUrl;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
@@ -297,15 +308,20 @@ public class CampaignPublicController {
                 return ResponseEntity.badRequest().body("Promo code usage limit reached");
             }
             promoDiscountPercent = promo.getDiscountPercent();
+            // PROMO3: reject a discount outside [0,100] rather than letting it
+            // produce a negative/over-100% charge that clamps into the free path.
+            if (promoDiscountPercent == null || promoDiscountPercent < 0 || promoDiscountPercent > 100) {
+                return ResponseEntity.badRequest().body("Promo code is misconfigured");
+            }
             finalInr = originalInr * (100 - promoDiscountPercent) / 100;
-            promo.setCurrentUses(promo.getCurrentUses() + 1);
-            promoCodeRepository.save(promo);
+            // A1/A2: consumption is deferred to realized redemption (paid webhook
+            // success / free-commit) via atomic tryConsume — not burned here.
             promoCodeSaved = promo.getCode();
         }
 
-        // Defensive clamp — guards against >100% promo configs or negative
-        // priceOverrideInr. A 0-priced row routes to the free-path branch
-        // below; nothing in this flow should ever charge negative money.
+        // Defensive clamp — guards against a negative priceOverrideInr. A 0-priced
+        // row routes to the free-path branch below; nothing in this flow should
+        // ever charge negative money.
         if (finalInr < 0L) {
             logger.warn("Promo math produced negative finalInr={} — clamping to 0", finalInr);
             finalInr = 0L;
@@ -640,15 +656,20 @@ public class CampaignPublicController {
                 return ResponseEntity.badRequest().body("Promo code usage limit reached");
             }
             promoDiscountPercent = promo.getDiscountPercent();
+            // PROMO3: reject a discount outside [0,100] rather than letting it
+            // produce a negative/over-100% charge that clamps into the free path.
+            if (promoDiscountPercent == null || promoDiscountPercent < 0 || promoDiscountPercent > 100) {
+                return ResponseEntity.badRequest().body("Promo code is misconfigured");
+            }
             finalInr = originalInr * (100 - promoDiscountPercent) / 100;
-            promo.setCurrentUses(promo.getCurrentUses() + 1);
-            promoCodeRepository.save(promo);
+            // A1/A2: consumption is deferred to realized redemption (paid webhook
+            // success / free-commit) via atomic tryConsume — not burned here.
             promoCodeSaved = promo.getCode();
         }
 
-        // Defensive clamp — guards against >100% promo configs or negative
-        // priceOverrideInr. A 0-priced row routes to the free-path branch
-        // below; nothing in this flow should ever charge negative money.
+        // Defensive clamp — guards against a negative priceOverrideInr. A 0-priced
+        // row routes to the free-path branch below; nothing in this flow should
+        // ever charge negative money.
         if (finalInr < 0L) {
             logger.warn("Promo math produced negative finalInr={} — clamping to 0", finalInr);
             finalInr = 0L;
@@ -667,18 +688,9 @@ public class CampaignPublicController {
             String description = pricingTier.getName() + " — " + campaign.getName();
             String callbackUrl = (callbackBaseUrl == null ? "" : callbackBaseUrl)
                     + "/payment-status?upgrade=1&eid=" + entitlement.getEntitlementId();
-            String referenceId = "UPG-" + entitlement.getEntitlementId() + "-" + System.currentTimeMillis();
 
-            Map<String, String> notes = new HashMap<>();
-            notes.put("entitlementId", String.valueOf(entitlement.getEntitlementId()));
-            notes.put("campaignId", String.valueOf(entitlement.getCampaignId()));
-            notes.put("assessmentId", String.valueOf(entitlement.getAssessmentId()));
-            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
-            notes.put("studentEmail", studentInfo.getEmail());
-
-            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalInr, "INR", description, callbackUrl, referenceId, notes);
-
+            // PAY1: commit a 'created' txn BEFORE the irreversible Razorpay link
+            // call so a recoverable DB record always exists first.
             PaymentTransaction txn = new PaymentTransaction();
             txn.setAmount(finalInr);
             txn.setOriginalAmount(originalInr);
@@ -691,15 +703,30 @@ public class CampaignPublicController {
             txn.setStudentEmail(studentInfo.getEmail());
             txn.setStudentDob(studentInfo.getStudentDob());
             txn.setStudentPhone(studentInfo.getPhoneNumber());
-            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
-            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
-            txn.setShortUrl(rzpResponse.get("shortUrl"));
             txn.setStatus("created");
             if (promoCodeSaved != null) {
                 txn.setPromoCode(promoCodeSaved);
                 txn.setPromoDiscountPercent(promoDiscountPercent);
             }
-            txn = paymentTransactionRepository.save(txn);
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            String referenceId = "UPG-" + entitlement.getEntitlementId() + "-" + txn.getTransactionId();
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("entitlementId", String.valueOf(entitlement.getEntitlementId()));
+            notes.put("campaignId", String.valueOf(entitlement.getCampaignId()));
+            notes.put("assessmentId", String.valueOf(entitlement.getAssessmentId()));
+            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
+            notes.put("studentEmail", studentInfo.getEmail());
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalInr, "INR", description, callbackUrl, referenceId, notes);
+
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "payment_required");
@@ -864,6 +891,10 @@ public class CampaignPublicController {
                             + txn.getTransactionId());
         }
 
+        // A1: the free registration is now realized — consume the promo (atomic,
+        // cap-guarded). No-op when no promo was applied.
+        consumePromoIfPresent(promoCodeSaved);
+
         // Issue the cn_at_asmnt cookie so the student is genuinely
         // authenticated server-side when they land on /allotted-assessment.
         // Without this, the assessment SPA was running purely on
@@ -903,19 +934,9 @@ public class CampaignPublicController {
         try {
             String description = pricingTier.getName() + " — " + campaign.getName();
             String callbackUrl = (callbackBaseUrl == null ? "" : callbackBaseUrl) + "/payment-status";
-            String referenceId = "CAM-" + campaign.getCampaignId() + "-" + tierMapping.getId() + "-" + System.currentTimeMillis();
 
-            Map<String, String> notes = new HashMap<>();
-            notes.put("campaignId", String.valueOf(campaign.getCampaignId()));
-            notes.put("assessmentId", String.valueOf(mapping.getAssessmentId()));
-            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
-            notes.put("studentEmail", email);
-            notes.put("customerName", name);
-            notes.put("customerDob", dobStr);
-
-            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalInr, "INR", description, callbackUrl, referenceId, notes);
-
+            // PAY1: commit a 'created' txn BEFORE the irreversible Razorpay link
+            // call so a recoverable DB record always exists first.
             PaymentTransaction txn = new PaymentTransaction();
             txn.setAmount(finalInr);
             txn.setOriginalAmount(originalInr);
@@ -926,15 +947,32 @@ public class CampaignPublicController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
-            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
-            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
-            txn.setShortUrl(rzpResponse.get("shortUrl"));
             txn.setStatus("created");
             if (promoCodeSaved != null) {
                 txn.setPromoCode(promoCodeSaved);
                 txn.setPromoDiscountPercent(promoDiscountPercent);
             }
-            txn = paymentTransactionRepository.save(txn);
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            String referenceId = "CAM-" + campaign.getCampaignId() + "-" + tierMapping.getId()
+                    + "-" + txn.getTransactionId();
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("campaignId", String.valueOf(campaign.getCampaignId()));
+            notes.put("assessmentId", String.valueOf(mapping.getAssessmentId()));
+            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
+            notes.put("studentEmail", email);
+            notes.put("customerName", name);
+            notes.put("customerDob", dobStr);
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalInr, "INR", description, callbackUrl, referenceId, notes);
+
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "payment_required");
@@ -1010,22 +1048,23 @@ public class CampaignPublicController {
         Long entitlementId = longFromBody(body, "entitlementId");
         String fromStr = strFromBody(body, "from");
 
+        // entitlementId is required so redeemAccessToken's token↔entitlement match
+        // is actually enforced (it is a no-op when entitlementId is null).
+        if (entitlementId == null) {
+            return ResponseEntity.badRequest().body("entitlementId is required");
+        }
+
         StudentEntitlement e = entitlementService == null
                 ? null : entitlementService.redeemAccessToken(token, entitlementId);
         if (e == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
         }
-        if (!Boolean.TRUE.equals(e.getCounsellingActive())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("Counselling is not included in your plan");
-        }
+        // Phase 3b: do NOT reject when counselling isn't included or sessions are
+        // exhausted — those students can still browse slots and pay per session at
+        // booking time. `remaining` is returned so the UI can show free vs paid.
         int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
         int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
-        int remaining = total - used;
-        if (remaining <= 0) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("No counselling sessions remaining");
-        }
+        int remaining = Math.max(0, total - used);
 
         Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
         if (!usOpt.isPresent() || usOpt.get().getInstitute() == null) {
@@ -1045,8 +1084,10 @@ public class CampaignPublicController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body("Counselling booking is not configured on this instance");
         }
+        // Phase 4: restrict to counsellors the admin assigned to this assessment
+        // (falls back to institute-only when the assessment has no assignments).
         List<com.kccitm.api.model.career9.counselling.CounsellingSlot> slots =
-                bookingService.getAvailableSlotsForInstitute(from, instituteCode);
+                bookingService.getAvailableSlotsForInstitute(from, instituteCode, e.getAssessmentId());
 
         List<Map<String, Object>> slotDtos = new ArrayList<>();
         for (com.kccitm.api.model.career9.counselling.CounsellingSlot s : slots) {
@@ -1086,6 +1127,12 @@ public class CampaignPublicController {
         Long slotId = longFromBody(body, "slotId");
         String reason = strFromBody(body, "reason");
 
+        // entitlementId is required so redeemAccessToken's token↔entitlement match
+        // is actually enforced (it is a no-op when entitlementId is null).
+        if (entitlementId == null) {
+            return ResponseEntity.badRequest().body("entitlementId is required");
+        }
+
         // Basic contact details the student fills in when booking.
         String contactName = strFromBody(body, "contactName");
         String contactEmail = strFromBody(body, "contactEmail");
@@ -1105,17 +1152,6 @@ public class CampaignPublicController {
         if (e == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
         }
-        if (!Boolean.TRUE.equals(e.getCounsellingActive())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("Counselling is not included in your plan");
-        }
-        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
-        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
-        if (total - used <= 0) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("No counselling sessions remaining");
-        }
-
         Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
         if (!usOpt.isPresent()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Student not found");
@@ -1127,6 +1163,19 @@ public class CampaignPublicController {
                     .body("Counselling booking is not configured on this instance");
         }
 
+        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
+        boolean hasFreeSession = Boolean.TRUE.equals(e.getCounsellingActive()) && (total - used) > 0;
+
+        // Phase 3b: if the entitlement does not include a free session (counselling
+        // inactive, or all included sessions used), route to the pay-before-book flow
+        // instead of rejecting. Returns a Razorpay payment link; the webhook finalises
+        // the held slot on success (PaymentWebhookController.finalizeExtraCounsellingSlot).
+        if (!hasFreeSession) {
+            return initiateCounsellingPayment(e, student, slotId, reason,
+                    contactName, contactEmail, contactPhone, preferredContactMethod);
+        }
+
         try {
             com.kccitm.api.service.counselling.BookingService.BookingContact contact =
                     new com.kccitm.api.service.counselling.BookingService.BookingContact(
@@ -1135,7 +1184,7 @@ public class CampaignPublicController {
                             contactPhone != null ? contactPhone.trim() : null,
                             preferredContactMethod != null ? preferredContactMethod.trim() : null);
             com.kccitm.api.model.career9.counselling.CounsellingAppointment appt =
-                    bookingService.bookSlot(slotId, student, reason, contact);
+                    bookingService.bookSlot(slotId, student, reason, contact, entitlementId);
             // Decrement the seat counter on the entitlement. Runs in the same
             // transaction as the booking via Spring's default REQUIRED propagation
             // — if the post-booking save fails, the slot transition rolls back too.
@@ -1164,6 +1213,80 @@ public class CampaignPublicController {
         }
     }
 
+    /**
+     * Phase 3b pay-before-book: the student's entitlement does not include a free
+     * counselling session, so hold the slot and return a Razorpay payment link. On
+     * payment success the webhook ({@code finalizeExtraCounsellingSlot}) confirms the
+     * appointment from the held slot + contact details stored on the transaction.
+     */
+    private ResponseEntity<?> initiateCounsellingPayment(
+            com.kccitm.api.model.career9.b2c.StudentEntitlement e, UserStudent student, Long slotId,
+            String reason, String contactName, String contactEmail, String contactPhone,
+            String preferredContactMethod) {
+        long price = (e.getCounsellingPrice() != null && e.getCounsellingPrice() > 0)
+                ? e.getCounsellingPrice() : counsellingDefaultPrice;
+        if (price <= 0) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Counselling is not included in your plan and no price is configured.");
+        }
+
+        // Hold the slot for the payment window (fails with 409 if already taken).
+        try {
+            bookingService.holdSlot(slotId, counsellingPayWindowMinutes);
+        } catch (com.kccitm.api.exception.BadRequestException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        }
+
+        try {
+            String referenceId = "CNS-" + slotId + "-" + System.currentTimeMillis()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
+            String callbackUrl = (razorpayCallbackBaseUrl != null && !razorpayCallbackBaseUrl.isEmpty())
+                    ? razorpayCallbackBaseUrl + "/payment-status?ref=" + referenceId : null;
+            Map<String, String> notes = new HashMap<>();
+            notes.put("purpose", "COUNSELLING_EXTRA");
+            notes.put("slotId", slotId.toString());
+            notes.put("referenceId", referenceId);
+
+            Map<String, String> link = razorpayService.createPaymentLink(
+                    price, "INR", "Career-9: Counselling session", callbackUrl, referenceId, notes);
+
+            com.kccitm.api.model.career9.PaymentTransaction txn =
+                    new com.kccitm.api.model.career9.PaymentTransaction();
+            txn.setPurpose("COUNSELLING_EXTRA");
+            txn.setAmount(price);
+            txn.setUserStudentId(student.getUserStudentId());
+            txn.setCounsellingSlotId(slotId);
+            txn.setCounsellingContactName(contactName != null ? contactName.trim() : null);
+            txn.setCounsellingContactEmail(contactEmail != null ? contactEmail.trim() : null);
+            txn.setCounsellingContactPhone(contactPhone != null ? contactPhone.trim() : null);
+            txn.setCounsellingContactMethod(preferredContactMethod != null ? preferredContactMethod.trim() : null);
+            txn.setStudentName(contactName != null ? contactName.trim() : null);
+            txn.setStudentEmail(contactEmail != null ? contactEmail.trim() : null);
+            txn.setStudentPhone(contactPhone != null ? contactPhone.trim() : null);
+            txn.setRazorpayLinkId(link.get("linkId"));
+            txn.setPaymentLinkUrl(link.get("paymentLinkUrl"));
+            txn.setShortUrl(link.get("shortUrl"));
+            txn.setStatus("created");
+            txn = paymentTransactionRepository.save(txn);
+
+            Map<String, Object> out = new HashMap<>();
+            out.put("requiresPayment", true);
+            out.put("amount", price);
+            out.put("transactionId", txn.getTransactionId());
+            out.put("paymentUrl", txn.getShortUrl() != null ? txn.getShortUrl() : txn.getPaymentLinkUrl());
+            out.put("slotId", slotId);
+            return ResponseEntity.ok(out);
+        } catch (Exception ex) {
+            // Payment-link creation failed — release the hold so the slot reopens immediately.
+            try { bookingService.releaseHeldSlot(slotId); } catch (Exception ignore) { }
+            logger.error("Counselling payment initiation failed for slot {}: {}", slotId, ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Could not start payment. Please try again.");
+        }
+    }
+
     private static Long longFromBody(Map<String, Object> body, String key) {
         Object v = body.get(key);
         if (v == null) return null;
@@ -1179,6 +1302,17 @@ public class CampaignPublicController {
         if (v == null) return null;
         String s = v.toString().trim();
         return s.isEmpty() ? null : s;
+    }
+
+    /** Atomically consume one promo use for a realized redemption; no-op if absent/at-cap. */
+    private void consumePromoIfPresent(String promoCode) {
+        if (promoCode == null || promoCode.trim().isEmpty()) return;
+        promoCodeRepository.findByCodeIgnoreCase(promoCode.trim().toUpperCase()).ifPresent(p -> {
+            int rows = promoCodeRepository.tryConsume(p.getId());
+            if (rows == 0) {
+                logger.warn("Promo {} already at maxUses at redemption time — not consumed", promoCode);
+            }
+        });
     }
 
     private static boolean sameDay(Date a, Date b) {

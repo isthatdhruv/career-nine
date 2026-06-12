@@ -53,6 +53,14 @@ public class ReportPreparationController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("status", "failed", "message", "Invalid or expired token"));
         }
+        // REDEEM-PENDING: only an ACTIVE (paid) entitlement may generate the report.
+        // redeemAccessToken also accepts "pending"; without this guard a pending
+        // entitlement left with finalReportActive=true (e.g. after a payment reset)
+        // could trigger full report generation it hasn't paid to activate.
+        if (!"active".equals(entitlement.getStatus())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("status", "failed", "message", "Entitlement is not active"));
+        }
         if (!Boolean.TRUE.equals(entitlement.getFinalReportActive())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("status", "failed", "message",
