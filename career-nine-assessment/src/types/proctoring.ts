@@ -52,7 +52,11 @@ export interface PerQuestionData {
   questionRect: ElementRect | null;
   optionsRect: OptionRect[];
   gazePoints: GazePoint[];                // backward-compat gaze data with derived direction
-  eyeGazePoints: EyeGazeSnapshot[];      // raw screen coordinate gaze data
+  // Raw screen-coordinate gaze data. No longer emitted — it duplicated
+  // gazePoints (minus the derived gazeDirection) and doubled the payload.
+  // Optional so previously persisted localStorage entries still type-check;
+  // the backend column is nullable.
+  eyeGazePoints?: EyeGazeSnapshot[];
   timeSpentMs: number;
   questionStartTime: number;
   questionEndTime: number;

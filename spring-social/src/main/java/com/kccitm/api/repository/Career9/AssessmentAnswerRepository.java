@@ -34,6 +34,18 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
               @Param("userStudentId") Long userStudentId,
               @Param("assessmentId") Long assessmentId);
 
+       // Grouped variant for live tracking: ONE query for all students of an
+       // assessment instead of one COUNT query per student per poll (the
+       // per-student loop was O(N) queries every 8s per admin viewer).
+       // Rows: [userStudentId (Long), answeredCount (Long)].
+       @Query("SELECT aa.userStudent.userStudentId, " +
+              "COUNT(DISTINCT aa.questionnaireQuestion.questionnaireQuestionId) " +
+              "FROM AssessmentAnswer aa " +
+              "WHERE aa.assessment.id = :assessmentId " +
+              "GROUP BY aa.userStudent.userStudentId")
+       List<Object[]> countDistinctQuestionsAnsweredGroupedByStudent(
+              @Param("assessmentId") Long assessmentId);
+
        // Main query with JOIN FETCH to load related entities including measured
        // qualities
        @Query("SELECT DISTINCT aa FROM AssessmentAnswer aa " +

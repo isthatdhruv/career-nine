@@ -281,13 +281,19 @@ const DemographicDetailsPage: React.FC = () => {
         });
       }
 
-      await Promise.all([
+      const [, questionnaireLoaded] = await Promise.all([
         http.post('/assessments/startAssessment', {
           userStudentId: Number(userStudentId),
           assessmentId: Number(assessmentId),
         }),
         fetchAssessmentData(String(assessmentId)),
       ]);
+      if (!questionnaireLoaded) {
+        // Don't navigate forward without the questionnaire — the instructions
+        // page would dead-end with no content and no retry path.
+        alert('Failed to load the assessment. Please check your connection and try again.');
+        return;
+      }
 
       // Dev: Auto-fill bypasses instruction/section-select screens after
       // demographics so the test run lands on questions immediately. The

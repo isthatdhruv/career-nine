@@ -145,7 +145,7 @@ const SchoolAssessmentRegisterPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim() || !email.trim() || !dob.trim()) {
+    if (!name.trim() || !email.trim() || !phone.trim() || !dob.trim()) {
       showErrorToast("Please fill in all required fields.");
       return;
     }
@@ -415,8 +415,12 @@ const SchoolAssessmentRegisterPage = () => {
             {/* Phone + Gender */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div>
-                <label style={s.label}>Phone Number</label>
-                <input type="tel" placeholder="Enter phone number" value={phone} onChange={(e) => setPhone(e.target.value)} style={s.input}
+                {/* Phone is genuinely mandatory: the duplicate-check round-trip
+                    (which gates the submit button) only fires once email+phone+dob
+                    are all filled — rendering it as optional left students unable
+                    to submit with no explanation. */}
+                <label style={s.label}>Phone Number <span style={{ color: "#f43f5e" }}>*</span></label>
+                <input type="tel" placeholder="Enter phone number" value={phone} onChange={(e) => setPhone(e.target.value)} required style={s.input}
                   onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
               </div>
               <div>

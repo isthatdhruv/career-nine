@@ -21,6 +21,8 @@ import { submitProctoringData } from "../api/proctoringApi";
 import { savePartialAnswers, restorePartialAnswers } from "../api/assessmentApi";
 import type { ProctoringPayload } from "../types/proctoring";
 import { useHeartbeat } from "../hooks/useHeartbeat";
+import { timeoutSignal } from "../utils/timeoutSignal";
+import { PROCTORING_ENABLED } from "../utils/proctoringFlag";
 
 type GameTable = {
   gameId: number;
@@ -134,15 +136,8 @@ const SectionQuestionPage: React.FC = () => {
     Array<{ text: string; language: string }>
   >([]);
 
-  // Heartbeat: report current page position to backend for live tracking
-  useHeartbeat({
-    userStudentId: Number(localStorage.getItem("userStudentId")) || null,
-    assessmentId: Number(localStorage.getItem("assessmentId")) || null,
-    page: "question",
-    sectionName: currentSection?.section?.sectionName || "",
-    sectionId: sectionId,
-    questionIndex: String(currentIndex),
-  });
+  // Heartbeat moved below the answer-state refs (it reads them for the live
+  // answeredCount) — see the useHeartbeat call after the ref declarations.
 
   // Game-related state
   const [isGameActive, setIsGameActive] = useState<boolean>(false);
@@ -206,6 +201,44 @@ const SectionQuestionPage: React.FC = () => {
   textAnswersRef.current = textAnswers;
   const rankingAnswersRef = useRef(rankingAnswers);
   rankingAnswersRef.current = rankingAnswers;
+
+  // Heartbeat: report current page position + live answered count for the
+  // admin live-tracking view. The count comes from the in-memory answer state
+  // (via the refs above) — answers are never written to localStorage, so the
+  // old localStorage-based count permanently reported 0 to admins.
+  useHeartbeat({
+    userStudentId: Number(localStorage.getItem("userStudentId")) || null,
+    assessmentId: Number(localStorage.getItem("assessmentId")) || null,
+    page: "question",
+    sectionName: currentSection?.section?.sectionName || "",
+    sectionId: sectionId,
+    questionIndex: String(currentIndex),
+    answeredCount: () => {
+      const answered = new Set<string>();
+      const mc = answersRef.current;
+      for (const secId in mc) {
+        for (const qId in mc[secId]) {
+          if (Array.isArray(mc[secId][qId]) && mc[secId][qId].length > 0) answered.add(qId);
+        }
+      }
+      const rank = rankingAnswersRef.current;
+      for (const secId in rank) {
+        for (const qId in rank[secId]) {
+          if (Object.keys(rank[secId][qId] || {}).length > 0) answered.add(qId);
+        }
+      }
+      const text = textAnswersRef.current;
+      for (const secId in text) {
+        for (const qId in text[secId]) {
+          const inputs = text[secId][qId] || {};
+          if (Object.values(inputs).some((v) => typeof v === "string" && v.trim().length > 0)) {
+            answered.add(qId);
+          }
+        }
+      }
+      return answered.size;
+    },
+  });
 
   // Track which autocomplete dropdown is open: "questionId-inputIdx" or null
   const [activeAutocomplete, setActiveAutocomplete] = useState<string | null>(
@@ -310,6 +343,9 @@ const SectionQuestionPage: React.FC = () => {
 
   // Save answers to DB in background on section transitions (safety net)
   // Only sends if answers have actually changed since last save.
+  // The snapshot is marked "saved" ONLY after the server confirms — recording
+  // it before the request (the old behavior) meant a failed save was never
+  // retried and the section silently vanished from the recovery copy.
   const prevSectionIdRef = useRef<string | null>(null);
   const lastSavedAnswersRef = useRef<string>("");
   useEffect(() => {
@@ -318,13 +354,42 @@ const SectionQuestionPage: React.FC = () => {
       if (submission.answers.length > 0) {
         const snapshot = JSON.stringify(submission.answers);
         if (snapshot !== lastSavedAnswersRef.current) {
-          lastSavedAnswersRef.current = snapshot;
-          savePartialAnswers(submission);
+          savePartialAnswers(submission).then((ok) => {
+            if (ok) lastSavedAnswersRef.current = snapshot;
+          });
         }
       }
     }
     prevSectionIdRef.current = sectionId!;
   }, [sectionId]);
+
+  // Last-chance flush when the tab is being closed / navigated away / killed:
+  // answers live only in React state between section boundaries, so without
+  // this a mid-section crash or close loses everything since the last
+  // boundary. keepalive on the underlying fetch lets the browser finish the
+  // request after the page is gone. Reads through a ref to avoid a stale
+  // first-render closure; the ref is (re)assigned after generateSubmissionJSON
+  // is declared below (it sits past this component's loading early-returns).
+  const generateSubmissionJSONRef = useRef<() => any>(() => ({ answers: [] }));
+  useEffect(() => {
+    const flushOnPageHide = () => {
+      try {
+        const submission = generateSubmissionJSONRef.current();
+        if (submission.answers.length > 0) {
+          const snapshot = JSON.stringify(submission.answers);
+          if (snapshot !== lastSavedAnswersRef.current) {
+            // Fire-and-forget: deliberately do NOT mark the snapshot saved —
+            // if delivery fails, the next boundary save retries it.
+            savePartialAnswers(submission);
+          }
+        }
+      } catch {
+        // never block unload
+      }
+    };
+    window.addEventListener("pagehide", flushOnPageHide);
+    return () => window.removeEventListener("pagehide", flushOnPageHide);
+  }, []);
 
   // Debounced localStorage writes — batches all state into single write cycles.
   // NOTE: answer state (answers / rankingAnswers / textAnswers) intentionally
@@ -629,7 +694,28 @@ const SectionQuestionPage: React.FC = () => {
     return isLastSection() && currentIndex === questions.length - 1;
   };
 
-  // Check if all questions are answered
+  // Per-question minimum selections required to count as "answered" — the
+  // same derivation the Next-button gate uses (optionsRule/optionsCount with
+  // legacy min/maxOptionsAllowed fallback). Floored at 1: a question with no
+  // rule still needs at least one response.
+  const requiredMinFor = (q: Question): number => {
+    const rule = q.question.optionsRule ?? null;
+    const count =
+      typeof q.question.optionsCount === "number" ? q.question.optionsCount : null;
+    if (rule && count != null && count > 0) {
+      if (rule === "min" || rule === "equal") return count;
+      return 1; // "max" rule: any non-empty selection is valid
+    }
+    const maxAllowed = q.question.maxOptionsAllowed;
+    if (maxAllowed === 0) return 1; // unlimited — ≥1 counts as answered
+    return Math.max(1, q.question.minOptionsAllowed ?? maxAllowed ?? 1);
+  };
+
+  // Check if all questions are answered AND meet their selection rules.
+  // Previously "answered" meant ≥1 selection regardless of the question's
+  // min/exact rule — the Next button enforced the rule, but the sidebar grid
+  // navigates anywhere, so a student could leave a "select exactly 3"
+  // question with 1 pick and submit a rule-violating answer set unwarned.
   const areAllQuestionsAnswered = (): boolean => {
     if (!questionnaire) return false;
 
@@ -638,22 +724,23 @@ const SectionQuestionPage: React.FC = () => {
       for (const q of section.questions) {
         const qId = q.questionnaireQuestionId;
 
-        // Check if question is answered
+        // Count responses per question type
         const isRankingQuestion = q.question.questionType === "ranking";
         const isTextQuestion =
           q.question.questionType === "text" || q.question.isMQTtyped === true;
-        let isAnswered = false;
+        let responseCount = 0;
         if (isTextQuestion) {
           const texts = textAnswers[secId]?.[qId] || {};
-          isAnswered = Object.values(texts).some(
+          responseCount = Object.values(texts).filter(
             (t: string) => t.trim().length > 0,
-          );
+          ).length;
         } else if (isRankingQuestion) {
-          const rankings = rankingAnswers[secId]?.[qId] || {};
-          isAnswered = Object.keys(rankings).length > 0;
+          responseCount = Object.keys(rankingAnswers[secId]?.[qId] || {}).length;
         } else {
-          isAnswered = answers[secId]?.[qId]?.length > 0;
+          responseCount = answers[secId]?.[qId]?.length || 0;
         }
+
+        let isAnswered = responseCount >= requiredMinFor(q);
 
         // Fallback: treat completed game questions as answered even if
         // the answer wasn't stored in `answers` state
@@ -805,6 +892,11 @@ const SectionQuestionPage: React.FC = () => {
 
     return submissionData;
   };
+  // Keep the pagehide-flush handler pointed at the freshest closure. Assigned
+  // here (after the declaration, past the loading early-returns) rather than
+  // next to the ref, because the const above is TDZ-inaccessible earlier in
+  // the render.
+  generateSubmissionJSONRef.current = generateSubmissionJSON;
 
   const markSkipped = () => {
     setSkipped((prev) => {
@@ -1046,8 +1138,9 @@ const SectionQuestionPage: React.FC = () => {
     if (submission.answers.length > 0) {
       const snapshot = JSON.stringify(submission.answers);
       if (snapshot !== lastSavedAnswersRef.current) {
-        lastSavedAnswersRef.current = snapshot;
-        savePartialAnswers(submission);
+        savePartialAnswers(submission).then((ok) => {
+          if (ok) lastSavedAnswersRef.current = snapshot;
+        });
       }
     }
 
@@ -1060,7 +1153,14 @@ const SectionQuestionPage: React.FC = () => {
         `/studentAssessment/sections/${next.section.sectionId}/questions/0`,
       );
     } else {
-      navigate("/studentAssessment/completed");
+      // Last section: route into the REAL submit flow (confirm dialog →
+      // confirmAndSubmit → POST /assessment-answer/submit). Navigating
+      // straight to the thank-you page here — the old behavior — meant a
+      // student who finished via auto-advance saw "completed" while their
+      // assessment was never actually submitted: only a fire-and-forget
+      // partial save existed, live tracking showed them ongoing forever,
+      // and they appeared in no results.
+      handleSubmitAssessment();
     }
   };
 
@@ -1108,6 +1208,12 @@ const SectionQuestionPage: React.FC = () => {
         perQuestionData: Array.from(perQuestionData.current.values()),
       };
 
+      // Safety net: snapshot the final answer set to Redis before attempting
+      // the submit. Answers live only in React state (never localStorage), so
+      // without this a submit that genuinely never reaches the server loses
+      // the last section entirely on reload.
+      savePartialAnswers(submissionJSON);
+
       const maxRetries = 3;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -1126,26 +1232,39 @@ const SectionQuestionPage: React.FC = () => {
               credentials: "include",
               headers: submitHeaders,
               body: JSON.stringify(submissionJSON),
-              signal: AbortSignal.timeout(10000), // 10s timeout (async processing)
+              // 60s: under event load the server can legitimately take >10s;
+              // aborting early while it keeps processing caused retry → 409 →
+              // false "submission failed" loops at scale.
+              signal: timeoutSignal(60000),
             },
           );
 
-          if (!response.ok) {
+          if (response.status === 409) {
+            // {status:'duplicate'}: a previous attempt (e.g. one that timed out
+            // client-side) reached the server and holds the idempotency lock —
+            // the answers are safe and being processed. This is success, not
+            // failure; counting it as failure produced mass false alarms.
+            console.log("=== SUBMISSION ALREADY IN PROGRESS (409) — treating as accepted ===");
+          } else if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to submit assessment: ${errorText}`);
+          } else {
+            const result = await response.json();
+            console.log("=== SUBMISSION SUCCESSFUL ===");
+            console.log("Saved answers:", result);
           }
 
-          const result = await response.json();
-          console.log("=== SUBMISSION SUCCESSFUL ===");
-          console.log("Saved answers:", result);
-
-          // Submit proctoring data (fire-and-forget — don't block navigation)
-          submitProctoringData(proctoringPayload)
-            .then(() => {
-              console.log("=== PROCTORING DATA SUBMITTED ===");
-              localStorage.removeItem("proctoring_per_question");
-            })
-            .catch((err) => console.warn("Proctoring submit failed:", err));
+          // Submit proctoring data (fire-and-forget — don't block navigation).
+          // Skipped entirely when the proctoring kill-switch is off, and when
+          // there is nothing to send (empty map = nothing was ever collected).
+          if (PROCTORING_ENABLED && proctoringPayload.perQuestionData.length > 0) {
+            submitProctoringData(proctoringPayload)
+              .then(() => {
+                console.log("=== PROCTORING DATA SUBMITTED ===");
+                localStorage.removeItem("proctoring_per_question");
+              })
+              .catch((err) => console.warn("Proctoring submit failed:", err));
+          }
 
           // Clear all assessment-related storage to prevent stale data
           localStorage.removeItem("assessmentAnswers");
@@ -1170,8 +1289,12 @@ const SectionQuestionPage: React.FC = () => {
             );
             await new Promise((resolve) => setTimeout(resolve, delay));
           } else {
+            // Truthful message: answers are NOT in localStorage — the
+            // pre-submit savePartialAnswers() snapshot (server-side) is the
+            // recovery copy, so the student must NOT clear/close in panic;
+            // they should retry from this device once connectivity returns.
             alert(
-              "Failed to submit assessment after 3 attempts. Your answers are saved locally. Please check your connection and try again.",
+              "Could not submit after 3 attempts. Your answers have been backed up to the server — do NOT close this tab. Check your connection (or ask the invigilator) and press Submit again.",
             );
           }
         }

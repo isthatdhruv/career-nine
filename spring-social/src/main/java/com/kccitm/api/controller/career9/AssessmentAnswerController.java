@@ -326,6 +326,27 @@ public class AssessmentAnswerController {
             }
         }
 
+        // 3a. In-flight resubmission guard. The 90s lock below can expire while
+        // the processing job is still queued behind the async backlog; without
+        // this check, a client retry after lock expiry would acquire a FRESH
+        // lock and enqueue a SECOND processing job for the same submission.
+        // If the submitted payload is already in Redis awaiting/undergoing
+        // processing, the first submit owns it — acknowledge and do nothing.
+        // ("failed" payloads fall through so a genuine retry can re-enqueue.)
+        Map<String, Object> inflight = assessmentSessionService.getSubmittedAnswers(userStudentId, assessmentId);
+        if (inflight != null) {
+            Object inflightStatus = inflight.get("processingStatus");
+            if ("pending".equals(inflightStatus) || "processing".equals(inflightStatus)
+                    || "retrying".equals(inflightStatus)) {
+                logger.info("Resubmission while in flight (status={}) — acknowledging without re-enqueue. student={} assessment={}",
+                        inflightStatus, userStudentId, assessmentId);
+                return ResponseEntity.ok(Map.of(
+                        "status", "accepted",
+                        "message", "Submission already received and being processed"
+                ));
+            }
+        }
+
         // 3. Idempotency: short-lived in-flight lock (90s auto-expire).
         // If a previous submission just finished, return its cached result.
         if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {

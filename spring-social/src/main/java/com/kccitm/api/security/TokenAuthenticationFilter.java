@@ -90,28 +90,27 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
      */
     private static final String AUTH_SCOPE_HEADER = "X-Auth-Scope";
 
+    /**
+     * Short-TTL cache for the assessment-scope principal hydration
+     * (userStudentId → UserDetails). Without it, EVERY request carrying
+     * cn_at_asmnt — including each student's 30s heartbeat — paid 2-4 DB
+     * queries (findById + the role/permission walk in loadUserById) against
+     * the 50-connection Hikari pool: thousands of queries/sec of pure auth
+     * overhead at 4000 concurrent students. 120s staleness is acceptable —
+     * student role-group permissions effectively never change mid-assessment,
+     * and token revocation is enforced separately via the jti deny list above.
+     */
+    private final com.github.benmanes.caffeine.cache.Cache<Long, UserDetails> assessmentPrincipalCache =
+            com.github.benmanes.caffeine.cache.Caffeine.newBuilder()
+                    .expireAfterWrite(java.time.Duration.ofSeconds(120))
+                    .maximumSize(10_000)
+                    .build();
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         try {
             List<String> jwtCandidates = getJwtCandidatesFromRequest(request);
-
-            Cookie[] dbgCookies = request.getCookies();
-            StringBuilder dbgCookieNames = new StringBuilder();
-            if (dbgCookies != null) {
-                for (Cookie c : dbgCookies) {
-                    if (dbgCookieNames.length() > 0) dbgCookieNames.append(',');
-                    dbgCookieNames.append(c.getName()).append('=').append(c.getValue() == null || c.getValue().isEmpty() ? "<empty>" : "<set:" + c.getValue().length() + ">");
-                }
-            }
-            System.out.println("[SESSION-DEBUG] FILTER ENTRY uri=" + request.getRequestURI()
-                    + " method=" + request.getMethod()
-                    + " origin=" + request.getHeader("Origin")
-                    + " referer=" + request.getHeader("Referer")
-                    + " cookies=[" + dbgCookieNames + "]"
-                    + " bearer=" + (request.getHeader("Authorization") != null)
-                    + " authScopeHeader=" + request.getHeader(AUTH_SCOPE_HEADER)
-                    + " candidates=" + jwtCandidates.size());
 
             // Use the FIRST candidate that passes signature+expiry validation.
             // Candidate order encodes preference (assessment cookie first on
@@ -126,8 +125,10 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                     break;
                 }
             }
-            System.out.println("[SESSION-DEBUG] FILTER validToken=" + (jwt != null)
-                    + " of " + jwtCandidates.size() + " candidate(s) uri=" + request.getRequestURI());
+            if (logger.isDebugEnabled()) {
+                logger.debug("auth filter: validToken={} of {} candidate(s) uri={}",
+                        jwt != null, jwtCandidates.size(), request.getRequestURI());
+            }
 
             if (StringUtils.hasText(jwt)) {
                 // Phase 18: consult the jti deny list AFTER signature/expiry validation
@@ -138,10 +139,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 // Legacy v2.0 tokens (no `jti` claim) surface as null from getJtiFromToken
                 // and isRevoked(null) returns false, so they pass through to natural expiry.
                 String jti = tokenProvider.getJtiFromToken(jwt);
-                boolean dbgRevoked = jtiDenyListService.isRevoked(jti);
-                System.out.println("[SESSION-DEBUG] FILTER jti=" + jti + " revoked=" + dbgRevoked + " uri=" + request.getRequestURI());
-                if (dbgRevoked) {
-                    System.out.println("[SESSION-DEBUG] FILTER REJECTED-DENYLIST jti=" + jti + " uri=" + request.getRequestURI());
+                if (jtiDenyListService.isRevoked(jti)) {
                     logger.warn("Rejected request — jti is on deny list (jti={})", jti);
                     filterChain.doFilter(request, response);
                     return;
@@ -186,13 +184,19 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                     // the legacy service-layer (StudentAssessmentMapping) ABAC continues to apply.
                     UsernamePasswordAuthenticationToken assessmentAuth = null;
                     try {
-                        Long resolvedUserId = (userStudentRepository == null || aUserStudentId == null)
+                        // Cached: see assessmentPrincipalCache javadoc. Failures are
+                        // NOT cached — the next request retries the DB resolution.
+                        UserDetails studentDetails = (userStudentRepository == null || aUserStudentId == null)
                                 ? null
-                                : userStudentRepository.findById(aUserStudentId)
-                                        .map(com.kccitm.api.model.career9.UserStudent::getUserId)
-                                        .orElse(null);
-                        if (resolvedUserId != null) {
-                            UserDetails studentDetails = customUserDetailsService.loadUserById(resolvedUserId);
+                                : assessmentPrincipalCache.get(aUserStudentId, key -> {
+                                    Long resolvedUserId = userStudentRepository.findById(key)
+                                            .map(com.kccitm.api.model.career9.UserStudent::getUserId)
+                                            .orElse(null);
+                                    return resolvedUserId != null
+                                            ? customUserDetailsService.loadUserById(resolvedUserId)
+                                            : null;
+                                });
+                        if (studentDetails != null) {
                             assessmentAuth = new UsernamePasswordAuthenticationToken(
                                     studentDetails, null, studentDetails.getAuthorities());
                         }
@@ -262,14 +266,9 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception ex) {
-            System.out.println("[SESSION-DEBUG] FILTER EXCEPTION uri=" + request.getRequestURI() + " ex=" + ex.getClass().getSimpleName() + " msg=" + ex.getMessage());
-            ex.printStackTrace();
             logger.error("Could not set user authentication in security context", ex);
         }
 
-        System.out.println("[SESSION-DEBUG] FILTER EXIT uri=" + request.getRequestURI()
-                + " authenticated=" + (SecurityContextHolder.getContext().getAuthentication() != null
-                        && SecurityContextHolder.getContext().getAuthentication().isAuthenticated()));
         filterChain.doFilter(request, response);
     }
 
