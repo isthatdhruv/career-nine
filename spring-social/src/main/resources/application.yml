@@ -24,7 +24,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: production
+    active: dev
   servlet:
     multipart:
       max-file-size: 1GB
@@ -555,6 +555,12 @@ app:
   # incoming XFF from untrusted clients — safe to trust here.
   rate-limit:
     trust-xff: true   # behind DigitalOcean reverse proxy
+    # Event-scale override: PER_IP_PATHS share ONE bucket per client IP, and a
+    # whole school lab egresses through a single NAT IP — the default 10/min
+    # would cap venue-wide logins + assessment-session mints at 10 students
+    # per minute (429 for everyone else). 6000/min ≈ 100/s per venue IP still
+    # bounds scripted brute force while never throttling a legitimate cohort.
+    ip-per-minute: 6000
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # REQUIRES USER ACTION BEFORE PRODUCTION ENFORCE (Phase 17-04, 2026-05-12)

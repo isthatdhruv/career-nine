@@ -10,6 +10,7 @@ import javax.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +51,17 @@ public class PartialAnswerFlushService {
 
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+
+    /**
+     * Self-proxy: autoFlushPartials previously invoked flushOneStudent via a
+     * plain this-call, which bypasses the Spring AOP proxy — the delete and
+     * the re-insert ran in two SEPARATE transactions (a crash between them
+     * left the student with zero persisted answers). Calling through `self`
+     * makes @Transactional real (same pattern as AssessmentSubmissionProcessorService).
+     */
+    @Lazy
+    @Autowired
+    private PartialAnswerFlushService self;
 
     @SuppressWarnings("unchecked")
     @Transactional
@@ -119,11 +131,25 @@ public class PartialAnswerFlushService {
             }
         }
 
+        // Final guard INSIDE the transaction, immediately before the destructive
+        // delete: if a submission is (or was) in flight for this student, never
+        // touch their answer rows — the submission processor owns them now.
+        // The outer autoFlushPartials checks ran outside this transaction and can
+        // be minutes stale on a long sweep; this check closes that race window
+        // (a stale partial draft silently overwriting a persisted final submission).
+        if (assessmentSessionService.hasSubmittedAnswers(studentId, assessmentId)) {
+            logger.info("Skipping partial flush — submission in flight/persisted for student={} assessment={}",
+                    studentId, assessmentId);
+            return false;
+        }
+
         // Delete-and-replace in MySQL
         assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(studentId, assessmentId);
         assessmentAnswerRepository.saveAll(answersToSave);
 
-        // Do NOT delete from Redis — let 24h TTL handle cleanup
+        // Do NOT delete from Redis — let 24h TTL handle cleanup. Record what we
+        // flushed so the scheduler can skip unchanged buffers next sweep.
+        assessmentSessionService.setPartialFlushMarker(studentId, assessmentId, (String) partial.get("savedAt"));
         logger.info("Flushed {} answers for student={} assessment={}", answersToSave.size(), studentId, assessmentId);
         return true;
     }
@@ -133,13 +159,23 @@ public class PartialAnswerFlushService {
         List<Map<String, Object>> entries = assessmentSessionService.getAllPartialAnswerEntries(null);
         if (entries.isEmpty()) return;
 
-        int success = 0, failed = 0;
+        int success = 0, failed = 0, unchanged = 0;
         for (Map<String, Object> entry : entries) {
             try {
                 Long studentId = ((Number) entry.get("userStudentId")).longValue();
                 Long assessmentId = ((Number) entry.get("assessmentId")).longValue();
+                // Dirty check: skip buffers already flushed at this exact savedAt.
+                // Flushed keys are retained for 24h, so without this every sweep
+                // re-wrote every active student's full answer set even when idle.
+                String savedAt = (String) entry.get("savedAt");
+                if (savedAt != null
+                        && savedAt.equals(assessmentSessionService.getPartialFlushMarker(studentId, assessmentId))) {
+                    unchanged++;
+                    continue;
+                }
                 // Skip if student already submitted — async processor handles it
-                if (assessmentSessionService.hasSubmissionLock(studentId, assessmentId)) {
+                if (assessmentSessionService.hasSubmissionLock(studentId, assessmentId)
+                        || assessmentSessionService.hasSubmittedAnswers(studentId, assessmentId)) {
                     continue;
                 }
                 // Skip if assessment is completed — don't overwrite scored answers with raw partials.
@@ -154,14 +190,17 @@ public class PartialAnswerFlushService {
                     assessmentSessionService.deletePartialAnswers(studentId, assessmentId);
                     continue;
                 }
-                if (flushOneStudent(studentId, assessmentId)) success++;
+                // Through `self` so flushOneStudent's @Transactional applies
+                // (delete + re-insert must be one atomic transaction).
+                if (self.flushOneStudent(studentId, assessmentId)) success++;
             } catch (Exception e) {
                 failed++;
                 logger.warn("Scheduled flush failed for entry: {}", entry, e);
             }
         }
         if (success > 0 || failed > 0) {
-            logger.info("Scheduled partial flush: {} succeeded, {} failed", success, failed);
+            logger.info("Scheduled partial flush: {} succeeded, {} failed, {} unchanged (skipped)",
+                    success, failed, unchanged);
         }
     }
 }

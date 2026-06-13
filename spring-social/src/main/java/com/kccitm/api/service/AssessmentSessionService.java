@@ -46,13 +46,21 @@ public class AssessmentSessionService {
     private static final int DEMOGRAPHICS_TTL_HOURS = 24;
     private static final String PARTIAL_KEY_PREFIX = "career9:partial:";
     private static final int PARTIAL_TTL_HOURS = 24;
+    // Dirty-check marker for the 3-minute scheduled flush (savedAt of the last
+    // snapshot actually flushed to MySQL). Same TTL as the partial buffer.
+    private static final String PARTIAL_FLUSHED_KEY_PREFIX = "career9:partialFlushed:";
     // Submitted payload stays in Redis until the processor confirms persistence.
     // 7-day TTL is a safety ceiling; successful processing deletes the key explicitly.
     // Failed submissions stay recoverable for the full week.
     private static final String SUBMITTED_KEY_PREFIX = "career9:submitted:";
     private static final int SUBMITTED_TTL_HOURS = 168;
     private static final String PROCTORING_KEY_PREFIX = "career9:proctoring:";
-    private static final int PROCTORING_TTL_HOURS = 168;
+    // Proctoring payloads are multi-MB per student; successful processing now
+    // deletes the key (ProctoringProcessorService), so this TTL is only the
+    // ceiling for FAILED entries awaiting retry. 2h covers the 5-min retry
+    // scheduler's 3 attempts with huge margin while preventing 4000 students'
+    // blobs (8-16GB) from accumulating against Redis's 2GB maxmemory.
+    private static final int PROCTORING_TTL_HOURS = 2;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -186,6 +194,36 @@ public class AssessmentSessionService {
     }
 
     /**
+     * Batched heartbeat lookup for live tracking: ONE Redis MGET for all
+     * students of an assessment instead of N sequential GETs (the per-student
+     * loop was the dominant cost of every tracking poll at 4000 students).
+     * Returns only the students with a live (non-expired) heartbeat.
+     */
+    public Map<Long, Map<String, Object>> getHeartbeats(List<Long> studentIds, Long assessmentId) {
+        Map<Long, Map<String, Object>> result = new HashMap<>();
+        if (studentIds == null || studentIds.isEmpty()) {
+            return result;
+        }
+        List<String> keys = new ArrayList<>(studentIds.size());
+        for (Long studentId : studentIds) {
+            keys.add(HEARTBEAT_KEY_PREFIX + studentId + ":" + assessmentId);
+        }
+        List<Object> values = redisTemplate.opsForValue().multiGet(keys);
+        if (values == null) {
+            return result;
+        }
+        for (int i = 0; i < studentIds.size() && i < values.size(); i++) {
+            Object value = values.get(i);
+            if (value instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> heartbeat = (Map<String, Object>) value;
+                result.put(studentIds.get(i), heartbeat);
+            }
+        }
+        return result;
+    }
+
+    /**
      * Save demographic responses to Redis for deferred submission.
      * Called from the demographics page to avoid blocking navigation.
      */
@@ -248,7 +286,28 @@ public class AssessmentSessionService {
     public void deletePartialAnswers(Long studentId, Long assessmentId) {
         String key = PARTIAL_KEY_PREFIX + studentId + ":" + assessmentId;
         redisTemplate.delete(key);
+        redisTemplate.delete(PARTIAL_FLUSHED_KEY_PREFIX + studentId + ":" + assessmentId);
         logger.debug("Deleted partial answers for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
+     * Dirty-check marker for the scheduled partial flush: records the savedAt
+     * of the last snapshot flushed to MySQL. Flushed Redis keys are retained
+     * (24h TTL) for crash recovery, so without this marker every 3-minute
+     * sweep re-deleted and re-inserted EVERY active student's full answer set
+     * even when nothing changed — a ~400k-row write storm at 4000 students.
+     */
+    public String getPartialFlushMarker(Long studentId, Long assessmentId) {
+        Object value = redisTemplate.opsForValue()
+                .get(PARTIAL_FLUSHED_KEY_PREFIX + studentId + ":" + assessmentId);
+        return value != null ? value.toString() : null;
+    }
+
+    public void setPartialFlushMarker(Long studentId, Long assessmentId, String savedAt) {
+        if (savedAt == null) return;
+        redisTemplate.opsForValue().set(
+                PARTIAL_FLUSHED_KEY_PREFIX + studentId + ":" + assessmentId,
+                savedAt, PARTIAL_TTL_HOURS, TimeUnit.HOURS);
     }
 
     /**

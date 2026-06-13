@@ -76,33 +76,61 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             "/assessment-proctoring/",
             "/student-info/");
 
+    /**
+     * Clients that operate the ADMIN surface on assessment-scope paths (the
+     * dashboard's Live Tracking page hits /assessments/** and
+     * /assessment-answer/**) send {@code X-Auth-Scope: session} to opt out of
+     * the cn_at_asmnt cookie preference below. Without this, a domain-shared
+     * ({@code Domain=career-9.com}) assessment cookie minted in the same
+     * browser hijacks the admin's requests: expired → 401 (no fallback to the
+     * valid cn_at), valid → authenticated as the student and 403'd by
+     * {@link AssessmentScopeOwnershipInterceptor} on any other assessmentId.
+     * The header is a routing hint only — it never grants anything; the
+     * selected token still has to validate like any other.
+     */
+    private static final String AUTH_SCOPE_HEADER = "X-Auth-Scope";
+
+    /**
+     * Short-TTL cache for the assessment-scope principal hydration
+     * (userStudentId → UserDetails). Without it, EVERY request carrying
+     * cn_at_asmnt — including each student's 30s heartbeat — paid 2-4 DB
+     * queries (findById + the role/permission walk in loadUserById) against
+     * the 50-connection Hikari pool: thousands of queries/sec of pure auth
+     * overhead at 4000 concurrent students. 120s staleness is acceptable —
+     * student role-group permissions effectively never change mid-assessment,
+     * and token revocation is enforced separately via the jti deny list above.
+     */
+    private final com.github.benmanes.caffeine.cache.Cache<Long, UserDetails> assessmentPrincipalCache =
+            com.github.benmanes.caffeine.cache.Caffeine.newBuilder()
+                    .expireAfterWrite(java.time.Duration.ofSeconds(120))
+                    .maximumSize(10_000)
+                    .build();
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         try {
-            String jwt = getJwtFromRequest(request);
+            List<String> jwtCandidates = getJwtCandidatesFromRequest(request);
 
-            Cookie[] dbgCookies = request.getCookies();
-            StringBuilder dbgCookieNames = new StringBuilder();
-            if (dbgCookies != null) {
-                for (Cookie c : dbgCookies) {
-                    if (dbgCookieNames.length() > 0) dbgCookieNames.append(',');
-                    dbgCookieNames.append(c.getName()).append('=').append(c.getValue() == null || c.getValue().isEmpty() ? "<empty>" : "<set:" + c.getValue().length() + ">");
+            // Use the FIRST candidate that passes signature+expiry validation.
+            // Candidate order encodes preference (assessment cookie first on
+            // assessment paths, then cn_at, then Bearer); validating here means a
+            // stale/expired assessment cookie no longer shadows a perfectly valid
+            // admin session on /assessments/** — the filter falls through to the
+            // next carrier instead of leaving the request unauthenticated.
+            String jwt = null;
+            for (String candidate : jwtCandidates) {
+                if (tokenProvider.validateToken(candidate)) {
+                    jwt = candidate;
+                    break;
                 }
             }
-            System.out.println("[SESSION-DEBUG] FILTER ENTRY uri=" + request.getRequestURI()
-                    + " method=" + request.getMethod()
-                    + " origin=" + request.getHeader("Origin")
-                    + " referer=" + request.getHeader("Referer")
-                    + " cookies=[" + dbgCookieNames + "]"
-                    + " bearer=" + (request.getHeader("Authorization") != null)
-                    + " jwtExtracted=" + (jwt != null)
-                    + " jwtLen=" + (jwt == null ? 0 : jwt.length()));
+            if (logger.isDebugEnabled()) {
+                logger.debug("auth filter: validToken={} of {} candidate(s) uri={}",
+                        jwt != null, jwtCandidates.size(), request.getRequestURI());
+            }
 
-            boolean dbgValid = StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt);
-            System.out.println("[SESSION-DEBUG] FILTER validateToken=" + dbgValid + " uri=" + request.getRequestURI());
-
-            if (StringUtils.hasText(jwt) && dbgValid) {
+            if (StringUtils.hasText(jwt)) {
                 // Phase 18: consult the jti deny list AFTER signature/expiry validation
                 // and BEFORE populating the security context. A revoked jti causes us to
                 // skip setAuthentication entirely — the unauthenticated request falls
@@ -111,10 +139,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 // Legacy v2.0 tokens (no `jti` claim) surface as null from getJtiFromToken
                 // and isRevoked(null) returns false, so they pass through to natural expiry.
                 String jti = tokenProvider.getJtiFromToken(jwt);
-                boolean dbgRevoked = jtiDenyListService.isRevoked(jti);
-                System.out.println("[SESSION-DEBUG] FILTER jti=" + jti + " revoked=" + dbgRevoked + " uri=" + request.getRequestURI());
-                if (dbgRevoked) {
-                    System.out.println("[SESSION-DEBUG] FILTER REJECTED-DENYLIST jti=" + jti + " uri=" + request.getRequestURI());
+                if (jtiDenyListService.isRevoked(jti)) {
                     logger.warn("Rejected request — jti is on deny list (jti={})", jti);
                     filterChain.doFilter(request, response);
                     return;
@@ -159,13 +184,19 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                     // the legacy service-layer (StudentAssessmentMapping) ABAC continues to apply.
                     UsernamePasswordAuthenticationToken assessmentAuth = null;
                     try {
-                        Long resolvedUserId = (userStudentRepository == null || aUserStudentId == null)
+                        // Cached: see assessmentPrincipalCache javadoc. Failures are
+                        // NOT cached — the next request retries the DB resolution.
+                        UserDetails studentDetails = (userStudentRepository == null || aUserStudentId == null)
                                 ? null
-                                : userStudentRepository.findById(aUserStudentId)
-                                        .map(com.kccitm.api.model.career9.UserStudent::getUserId)
-                                        .orElse(null);
-                        if (resolvedUserId != null) {
-                            UserDetails studentDetails = customUserDetailsService.loadUserById(resolvedUserId);
+                                : assessmentPrincipalCache.get(aUserStudentId, key -> {
+                                    Long resolvedUserId = userStudentRepository.findById(key)
+                                            .map(com.kccitm.api.model.career9.UserStudent::getUserId)
+                                            .orElse(null);
+                                    return resolvedUserId != null
+                                            ? customUserDetailsService.loadUserById(resolvedUserId)
+                                            : null;
+                                });
+                        if (studentDetails != null) {
                             assessmentAuth = new UsernamePasswordAuthenticationToken(
                                     studentDetails, null, studentDetails.getAuthorities());
                         }
@@ -235,18 +266,13 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception ex) {
-            System.out.println("[SESSION-DEBUG] FILTER EXCEPTION uri=" + request.getRequestURI() + " ex=" + ex.getClass().getSimpleName() + " msg=" + ex.getMessage());
-            ex.printStackTrace();
             logger.error("Could not set user authentication in security context", ex);
         }
 
-        System.out.println("[SESSION-DEBUG] FILTER EXIT uri=" + request.getRequestURI()
-                + " authenticated=" + (SecurityContextHolder.getContext().getAuthentication() != null
-                        && SecurityContextHolder.getContext().getAuthentication().isAuthenticated()));
         filterChain.doFilter(request, response);
     }
 
-    private String getJwtFromRequest(HttpServletRequest request) {
+    private List<String> getJwtCandidatesFromRequest(HttpServletRequest request) {
         // Cookie-first: prefer the HttpOnly cn_at cookie (Phase 16). An HttpOnly
         // cookie cannot be set or read by JS, so it has a smaller attack surface
         // than an Authorization header that a phishing form or malicious script
@@ -259,42 +285,43 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         //     fall through to cn_at if the assessment cookie is absent / empty.
         //   - On every other request, ONLY cn_at is honoured — cn_at_asmnt is ignored
         //     (it would also be rejected later by the scope guard in doFilterInternal,
-        //     but reading it here lets us avoid the unnecessary parse/validate path).
+        //     but skipping it here avoids the unnecessary parse/validate path).
         // The Bearer header is the final fallback so external admin scripts keep working.
+        //
+        // Returns ALL carriers present on the request, in preference order;
+        // doFilterInternal picks the first one that actually validates, so an
+        // expired cn_at_asmnt cannot shadow a valid cn_at on assessment paths.
+        List<String> candidates = new java.util.ArrayList<>();
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             String uri = request.getRequestURI() == null ? "" : request.getRequestURI();
             boolean isAssessmentPath = isAssessmentScopePath(uri);
+            // Admin clients (dashboard Live Tracking etc.) declare X-Auth-Scope: session
+            // to skip the assessment-cookie preference entirely — see AUTH_SCOPE_HEADER.
+            boolean preferSession = "session".equalsIgnoreCase(request.getHeader(AUTH_SCOPE_HEADER));
 
-            // On assessment paths, prefer cn_at_asmnt first.
-            if (isAssessmentPath) {
-                for (Cookie c : cookies) {
-                    if (AuthCookieService.ASSESSMENT_SESSION_COOKIE.equals(c.getName())) {
-                        String value = c.getValue();
-                        if (StringUtils.hasText(value)) {
-                            return value;
-                        }
-                    }
-                }
+            if (isAssessmentPath && !preferSession) {
+                addCookieValue(candidates, cookies, AuthCookieService.ASSESSMENT_SESSION_COOKIE);
             }
-
             // Admin/staff/student/counsellor session cookie — accepted on every route.
-            for (Cookie c : cookies) {
-                if (AuthCookieService.ACCESS_COOKIE.equals(c.getName())) {
-                    String value = c.getValue();
-                    if (StringUtils.hasText(value)) {
-                        return value;
-                    }
-                }
-            }
+            addCookieValue(candidates, cookies, AuthCookieService.ACCESS_COOKIE);
         }
 
         // Fallback: Authorization: Bearer <jwt>
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
+            candidates.add(bearerToken.substring(7));
         }
-        return null;
+        return candidates;
+    }
+
+    private static void addCookieValue(List<String> candidates, Cookie[] cookies, String name) {
+        for (Cookie c : cookies) {
+            if (name.equals(c.getName()) && StringUtils.hasText(c.getValue())) {
+                candidates.add(c.getValue());
+                return;
+            }
+        }
     }
 
     /**

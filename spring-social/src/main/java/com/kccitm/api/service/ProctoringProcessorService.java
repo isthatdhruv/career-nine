@@ -53,14 +53,30 @@ public class ProctoringProcessorService {
     private ObjectMapper objectMapper;
 
     /**
-     * Async entry point — reads proctoring data from Redis and persists to MySQL.
+     * Self-proxy: retryFailedProctoring previously called processAsync on
+     * `this`, bypassing the @Async proxy — every retry ran synchronously and
+     * serially INSIDE the @Scheduled method, occupying the shared scheduler
+     * thread that also runs the partial-answer flush and submission retries.
      */
-    @Async
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private ProctoringProcessorService self;
+
+    /**
+     * Async entry point — reads proctoring data from Redis and persists to MySQL.
+     * Dedicated bounded pool: multi-MB proctoring persistence must never queue
+     * ahead of answer-submission persistence on a shared executor.
+     */
+    @Async(com.kccitm.api.config.AsyncExecutorsConfig.PROCTORING_EXECUTOR)
     public void processAsync(Long studentId, Long assessmentId) {
         try {
             logger.info("Processing proctoring data async for student={} assessment={}", studentId, assessmentId);
             persistToMySQL(studentId, assessmentId);
-            assessmentSessionService.updateProctoringStatus(studentId, assessmentId, "completed");
+            // MySQL is now the source of truth — free the multi-MB Redis payload
+            // immediately. Keeping it (old behavior: mark "completed", let the
+            // 7-day TTL reap it) let proctoring blobs fill Redis mid-event and,
+            // under allkeys-lru, evict live sessions and submitted answers.
+            assessmentSessionService.deleteProctoringData(studentId, assessmentId);
             logger.info("Proctoring data persisted for student={} assessment={}", studentId, assessmentId);
         } catch (Exception e) {
             logger.error("Failed to process proctoring data for student={} assessment={}: {}",
@@ -188,7 +204,9 @@ public class ProctoringProcessorService {
                     assessmentSessionService.updateProctoringStatus(studentId, assessmentId, "retrying");
                     logger.info("Retrying proctoring processing for student={} assessment={} (attempt {})",
                             studentId, assessmentId, retryCount + 1);
-                    processAsync(studentId, assessmentId);
+                    // Through `self` so @Async actually dispatches to the pool
+                    // instead of running synchronously on the scheduler thread.
+                    self.processAsync(studentId, assessmentId);
                     retried++;
                 } else if ("failed".equals(status) && retryCount >= 3) {
                     assessmentSessionService.updateProctoringStatus(studentId, assessmentId, "dead_letter");

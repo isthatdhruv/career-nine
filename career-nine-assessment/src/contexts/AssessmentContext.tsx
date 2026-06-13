@@ -7,7 +7,7 @@ type AssessmentContextType = {
   assessmentConfig: any;
   loading: boolean;
   error: string | null;
-  fetchAssessmentData: (assessmentId: string) => Promise<void>;
+  fetchAssessmentData: (assessmentId: string) => Promise<boolean>;
   prefetchAssessmentData: (userStudentId: string) => void;
   preloadAssessmentData: (assessmentId: string) => void;
   prefetchedAssessments: any[] | null;
@@ -331,7 +331,12 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCookieAuthActive(false);
   };
 
-  const fetchAssessmentData = async (assessmentId: string): Promise<void> => {
+  // Returns whether the questionnaire is actually available. Callers MUST
+  // block forward navigation on false — the old void signature swallowed
+  // every load failure (the context `error` string was read by nobody), so a
+  // failed fetch navigated the student onward with an empty config and
+  // dead-ended them on the instructions page with no message and no retry.
+  const fetchAssessmentData = async (assessmentId: string): Promise<boolean> => {
     // Wait for any in-flight prefetch or preload to complete first
     if (prefetchPromiseRef.current) {
       await prefetchPromiseRef.current;
@@ -341,7 +346,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     // Only use cached data if it matches the requested assessmentId
     if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) {
-      return;
+      return true;
     }
 
     setLoading(true);
@@ -350,9 +355,11 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const result = await loadAssessmentById(assessmentId);
       applyAssessmentResult(assessmentId, result.data, result.config);
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error fetching assessment data:', err);
+      return false;
     } finally {
       setLoading(false);
     }

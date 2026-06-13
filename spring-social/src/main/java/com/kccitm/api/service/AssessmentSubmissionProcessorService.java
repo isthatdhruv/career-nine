@@ -141,10 +141,54 @@ public class AssessmentSubmissionProcessorService {
     /**
      * Async entry point — called by /submit after the payload is in Redis.
      * Wraps the synchronous body with error classification + failure tracking.
+     *
+     * Runs on the dedicated bounded submission pool (NOT the shared default
+     * executor) so email/audit/proctoring work can never queue ahead of
+     * answer persistence during the end-of-assessment submit rush.
      */
-    @Async
+    @Async(com.kccitm.api.config.AsyncExecutorsConfig.SUBMISSION_EXECUTOR)
     public void processSubmissionAsync(Long studentId, Long assessmentId) {
         processSubmissionInternal(studentId, assessmentId);
+    }
+
+    /**
+     * Startup sweeper: the async queue is in-memory, so any submission that
+     * was accepted (persistenceState="pending", payload in Redis) but not yet
+     * persisted when the JVM died would previously be lost forever — the
+     * student saw "accepted", live tracking showed "ongoing", and nothing
+     * would ever process it. On boot, re-enqueue every such mapping whose
+     * Redis payload survived.
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void recoverPendingSubmissionsOnStartup() {
+        List<Object[]> pending;
+        try {
+            pending = studentAssessmentMappingRepository.findPendingPersistenceIds();
+        } catch (Exception e) {
+            logger.error("Startup submission sweep failed to query pending mappings", e);
+            return;
+        }
+        int recovered = 0, orphaned = 0;
+        for (Object[] row : pending) {
+            Long studentId = ((Number) row[0]).longValue();
+            Long assessmentId = ((Number) row[1]).longValue();
+            try {
+                if (assessmentSessionService.hasSubmittedAnswers(studentId, assessmentId)) {
+                    self.processSubmissionAsync(studentId, assessmentId);
+                    recovered++;
+                } else {
+                    // Payload gone (TTL/eviction/reset) — nothing to replay.
+                    // Leave state for the admin pending-persistence tools.
+                    orphaned++;
+                }
+            } catch (Exception e) {
+                logger.warn("Startup sweep failed for student={} assessment={}", studentId, assessmentId, e);
+            }
+        }
+        if (recovered > 0 || orphaned > 0) {
+            logger.warn("Startup submission sweep: re-enqueued {} pending submission(s), {} orphaned (no Redis payload)",
+                    recovered, orphaned);
+        }
     }
 
     /**
@@ -422,8 +466,16 @@ public class AssessmentSubmissionProcessorService {
         // status="ongoing" + persistence_state="pending" as before. No zombie
         // "pending" mappings with answers already in the DB.
         boolean hadWarnings = (duplicateCount > 0) || (skippedUnknownCount > 0);
-        self.persistToMySQL(studentId, assessmentId, mapping,
+        boolean persistedThisPass = self.persistToMySQL(studentId, assessmentId, mapping,
                 answersToSave, rawScoresToSave, hadWarnings);
+        if (!persistedThisPass) {
+            // A concurrent pass won the row lock and already persisted this
+            // submission. Its own success path fired the email/entitlement/
+            // report hooks — re-firing them here would double-notify the
+            // student. Redis cleanup below is idempotent, so just do that.
+            assessmentSessionService.deletePartialAnswers(studentId, assessmentId);
+            return;
+        }
 
         // 7. Clean up partial: key (no longer needed — student submitted).
         // CRITICAL: we do NOT delete the submitted: key on success. It stays as
@@ -527,11 +579,30 @@ public class AssessmentSubmissionProcessorService {
      * exist in the DB but the mapping reports otherwise.
      */
     @Transactional
-    public void persistToMySQL(Long studentId, Long assessmentId,
+    public boolean persistToMySQL(Long studentId, Long assessmentId,
                                StudentAssessmentMapping mapping,
                                List<AssessmentAnswer> answersToSave,
                                List<AssessmentRawScore> rawScoresToSave,
                                boolean hadWarnings) {
+
+        // Serialize concurrent passes at the DB. The 90s submit lock can expire
+        // while this job waits in the async backlog; a duplicate /submit then
+        // enqueues a SECOND job for the same submission, and both pass the
+        // entry idempotency guard (neither has persisted yet). Re-loading the
+        // row FOR UPDATE makes the second pass block until the first commits,
+        // then see persisted state and bail — instead of double-inserting
+        // answers and raw scores.
+        StudentAssessmentMapping locked = studentAssessmentMappingRepository
+                .findForUpdateByStudentAndAssessment(studentId, assessmentId)
+                .orElse(mapping);
+        if ("completed".equals(locked.getStatus())
+                && ("persisted".equals(locked.getPersistenceState())
+                    || "persisted_with_warnings".equals(locked.getPersistenceState()))) {
+            logger.info("Duplicate persistence pass blocked under row lock — already persisted. student={} assessment={}",
+                    studentId, assessmentId);
+            return false;
+        }
+        mapping = locked;
 
         // Delete existing answers for this (student, assessment)
         List<Long> existingAnswerIds = assessmentAnswerRepository
@@ -579,6 +650,7 @@ public class AssessmentSubmissionProcessorService {
 
         logger.info("Persisted to MySQL: {} answers, {} scores for student={} assessment={}",
                 answersToSave.size(), rawScoresToSave.size(), studentId, assessmentId);
+        return true;
     }
 
     // ── Error classification + failure tracking ──────────────────────────────

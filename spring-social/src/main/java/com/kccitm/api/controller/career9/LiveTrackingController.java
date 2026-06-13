@@ -126,6 +126,25 @@ public class LiveTrackingController {
         List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
                 .findAllByAssessmentId(assessmentId);
 
+        // 3a. Batch the two per-student lookups that made this endpoint O(N)
+        // round-trips per poll (one Redis GET + one COUNT query per student,
+        // re-run every few seconds per admin viewer):
+        //   - ONE Redis MGET for every student's heartbeat
+        //   - ONE grouped COUNT(DISTINCT) query for every student's answers
+        List<Long> studentIds = new ArrayList<>(mappings.size());
+        for (StudentAssessmentMapping mapping : mappings) {
+            if (mapping.getUserStudent() != null) {
+                studentIds.add(mapping.getUserStudent().getUserStudentId());
+            }
+        }
+        Map<Long, Map<String, Object>> heartbeats =
+                assessmentSessionService.getHeartbeats(studentIds, assessmentId);
+        Map<Long, Long> dbAnswerCounts = new HashMap<>();
+        for (Object[] row : assessmentAnswerRepository
+                .countDistinctQuestionsAnsweredGroupedByStudent(assessmentId)) {
+            dbAnswerCounts.put((Long) row[0], (Long) row[1]);
+        }
+
         // 4. Build student entries with answer counts
         int notStarted = 0, ongoing = 0, completed = 0;
         List<Map<String, Object>> students = new ArrayList<>();
@@ -164,8 +183,7 @@ public class LiveTrackingController {
                     us.getInstitute() != null ? us.getInstitute().getInstituteName() : "");
 
             // Hybrid progress: Redis heartbeat when active, DB when inactive
-            Map<String, Object> heartbeat = assessmentSessionService
-                    .getHeartbeat(us.getUserStudentId(), assessmentId);
+            Map<String, Object> heartbeat = heartbeats.get(us.getUserStudentId());
             if (heartbeat != null) {
                 // Student is actively giving assessment — use live Redis data
                 entry.put("currentPage", heartbeat.get("page"));
@@ -181,6 +199,14 @@ public class LiveTrackingController {
                 if (liveCountObj instanceof Number) {
                     liveCount = ((Number) liveCountObj).longValue();
                 }
+                // Floor at the DB count: heartbeats from non-question pages
+                // (instructions, section select) carry answeredCount=0 — without
+                // this, a student's progress visibly dropped to 0% every time
+                // they navigated between sections.
+                Long dbFloor = dbAnswerCounts.get(us.getUserStudentId());
+                if (dbFloor != null && dbFloor > liveCount) {
+                    liveCount = dbFloor;
+                }
                 if (totalQuestions > 0 && liveCount > totalQuestions) {
                     liveCount = totalQuestions;
                 }
@@ -190,9 +216,7 @@ public class LiveTrackingController {
                 // Student is NOT actively giving assessment — use DB count.
                 // Count DISTINCT questions, not answer rows (multi-select would over-count).
                 entry.put("currentPage", null);
-                Long dbCount = assessmentAnswerRepository
-                        .countDistinctQuestionsAnsweredByStudent(
-                                us.getUserStudentId(), assessmentId);
+                Long dbCount = dbAnswerCounts.get(us.getUserStudentId());
                 // Cap at totalQuestions as a safety net so the UI never shows >100%.
                 long safeCount = dbCount != null ? dbCount : 0L;
                 if (totalQuestions > 0 && safeCount > totalQuestions) {

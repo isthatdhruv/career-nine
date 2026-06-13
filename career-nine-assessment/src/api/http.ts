@@ -161,9 +161,15 @@ http.interceptors.response.use(
     }
 
     // 1) Retry on network / 5xx with exponential backoff.
+    // Per-request opt-out via config.__noRetry — used by the heartbeat, which
+    // is fire-and-forget by contract: retrying a missed beat only adds load
+    // exactly when the server is struggling, and the next 30s beat supersedes
+    // it anyway.
     if (config) {
       const retryCount = config.__retryCount || 0
-      const isRetryable = !error.response || error.response.status >= 500
+      const isRetryable =
+        !(config as AxiosRequestConfig & { __noRetry?: boolean }).__noRetry &&
+        (!error.response || error.response.status >= 500)
       if (isRetryable && retryCount < MAX_RETRIES) {
         config.__retryCount = retryCount + 1
         const delay = BASE_DELAY_MS * Math.pow(2, config.__retryCount - 1)

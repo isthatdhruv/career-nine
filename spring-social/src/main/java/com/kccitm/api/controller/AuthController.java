@@ -13,6 +13,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -76,6 +78,8 @@ import java.util.UUID;
 @RequestMapping("/auth")
 
 public class AuthController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     @Autowired
     private SmtpEmailService smtpEmailService;
 
@@ -366,7 +370,7 @@ public class AuthController {
                 dbgNames.append(c.getName());
             }
         }
-        System.out.println("[SESSION-DEBUG] REFRESH ENTRY ip=" + dbgIp
+        logger.debug("REFRESH ENTRY ip=" + dbgIp
                 + " ua=" + (dbgUa == null ? "null" : dbgUa.substring(0, Math.min(40, dbgUa.length())))
                 + " origin=" + request.getHeader("Origin")
                 + " referer=" + request.getHeader("Referer")
@@ -374,28 +378,28 @@ public class AuthController {
 
         Optional<String> rtOpt = authCookieService.readRefreshTokenCookie(request);
         if (!rtOpt.isPresent()) {
-            System.out.println("[SESSION-DEBUG] REFRESH FAIL no-cn_rt-cookie ip=" + dbgIp);
+            logger.debug("REFRESH FAIL no-cn_rt-cookie ip=" + dbgIp);
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         String oldJti = rtOpt.get();
-        System.out.println("[SESSION-DEBUG] REFRESH oldJti=" + oldJti);
+        logger.debug("REFRESH oldJti=" + oldJti);
         // Pre-rotation validation + user-id lookup. We need the userId BEFORE rotating
         // because the new access token must encode it.
         if (!refreshTokenService.validate(oldJti).isPresent()) {
-            System.out.println("[SESSION-DEBUG] REFRESH FAIL validate-failed oldJti=" + oldJti
+            logger.debug("REFRESH FAIL validate-failed oldJti=" + oldJti
                     + " — row missing / expired / revoked");
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         Long userId = refreshTokenService.getUserIdForJti(oldJti);
         if (userId == null) {
-            System.out.println("[SESSION-DEBUG] REFRESH FAIL no-userId oldJti=" + oldJti);
+            logger.debug("REFRESH FAIL no-userId oldJti=" + oldJti);
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        System.out.println("[SESSION-DEBUG] REFRESH validated userId=" + userId + " oldJti=" + oldJti);
+        logger.debug("REFRESH validated userId=" + userId + " oldJti=" + oldJti);
 
         String userAgent = request.getHeader("User-Agent");
         String ip = UserActivityLogService.getClientIp(request);
@@ -403,10 +407,10 @@ public class AuthController {
         String newJti;
         try {
             newJti = refreshTokenService.rotate(oldJti, userAgent, ip);
-            System.out.println("[SESSION-DEBUG] REFRESH rotated userId=" + userId + " oldJti=" + oldJti + " newJti=" + newJti);
+            logger.debug("REFRESH rotated userId=" + userId + " oldJti=" + oldJti + " newJti=" + newJti);
         } catch (RefreshTokenReuseException ex) {
             // Race lost OR replay attempt. Clear cookies; the client must re-login.
-            System.out.println("[SESSION-DEBUG] REFRESH FAIL race-lost-or-replay userId=" + userId
+            logger.debug("REFRESH FAIL race-lost-or-replay userId=" + userId
                     + " oldJti=" + oldJti + " msg=" + ex.getMessage());
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
@@ -417,7 +421,7 @@ public class AuthController {
         // on the next request — refresh path lacks an Authentication context).
         User refreshedUser = userRepository.findById(userId).orElse(null);
         if (refreshedUser == null) {
-            System.out.println("[SESSION-DEBUG] REFRESH FAIL user-not-found userId=" + userId);
+            logger.debug("REFRESH FAIL user-not-found userId=" + userId);
             authCookieService.clearAll(response);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -426,7 +430,7 @@ public class AuthController {
 
         authCookieService.setAccessToken(response, accessJwt);
         authCookieService.setRefreshToken(response, newJti);
-        System.out.println("[SESSION-DEBUG] REFRESH SUCCESS userId=" + userId + " newJti=" + newJti + " jwtLen=" + accessJwt.length());
+        logger.debug("REFRESH SUCCESS userId=" + userId + " newJti=" + newJti + " jwtLen=" + accessJwt.length());
         return ResponseEntity.noContent().build();
     }
 
@@ -444,9 +448,9 @@ public class AuthController {
      */
     @GetMapping("/me")
     public ResponseEntity<?> me(@AuthenticationPrincipal UserPrincipal principal) {
-        System.out.println("[SESSION-DEBUG] ME ENTRY principal=" + (principal == null ? "null" : ("id=" + principal.getId() + " email=" + principal.getEmail())));
+        logger.debug("ME ENTRY principal=" + (principal == null ? "null" : ("id=" + principal.getId() + " email=" + principal.getEmail())));
         if (principal == null) {
-            System.out.println("[SESSION-DEBUG] ME 401 — no principal in security context");
+            logger.debug("ME 401 — no principal in security context");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
