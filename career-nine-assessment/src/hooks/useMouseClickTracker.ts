@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { MouseClickRecord } from '../types/proctoring';
+import { PROCTORING_ENABLED } from '../utils/proctoringFlag';
 
 interface UseMouseClickTrackerReturn {
   clicks: React.MutableRefObject<MouseClickRecord[]>;
@@ -9,7 +10,7 @@ export function useMouseClickTracker(enabled: boolean = true): UseMouseClickTrac
   const clicksRef = useRef<MouseClickRecord[]>([]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !PROCTORING_ENABLED) return;
 
     const handler = (e: MouseEvent) => {
       clicksRef.current.push({

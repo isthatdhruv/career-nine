@@ -301,6 +301,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 "X-Assessment-Session",
                 "X-Assessment-Student-Id",
                 "X-Assessment-Id",
+                // Dashboard auth-routing header (AuthHelpers.setupAxios) telling
+                // TokenAuthenticationFilter to prefer the admin cn_at cookie over
+                // a co-resident cn_at_asmnt on /assessments/** — without this
+                // entry every cross-origin dashboard request fails preflight.
+                "X-Auth-Scope",
                 "X-Requested-With"));
         configuration.setAllowCredentials(true);
 

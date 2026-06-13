@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
+import { PROCTORING_ENABLED } from '../utils/proctoringFlag';
 
 const DETECTION_INTERVAL_MS = 1000; // count faces every 1 second
 
@@ -11,6 +12,7 @@ interface UseFaceCounterParams {
 export function useFaceCounter({ videoElement, faceCountRef }: UseFaceCounterParams): void {
 
   useEffect(() => {
+    if (!PROCTORING_ENABLED) return;
     let cancelled = false;
     let detector: FaceDetector | null = null;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;

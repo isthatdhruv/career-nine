@@ -1,9 +1,19 @@
 [mysqld]
-max_connections = 200
+# Sized for the production api container's Hikari pool (50) + report-worker
+# (50, when running) + admin/CLI headroom. The previous 200 allowed more
+# connections than the 2.5g container could actually serve (per-connection
+# buffers on top of the 1G buffer pool) — connections beyond the pools' needs
+# only add OOM risk, never throughput.
+max_connections = 120
 # Dashboard snapshot payloads (LONGTEXT) can run into hundreds of MB.
 # MySQL 8 defaults this to 64 MB, which force-closes the connection
 # mid-batch when a larger row is written. 512 MB gives headroom.
+# (This is a per-packet ceiling, not a reservation — large buffers are
+# allocated only when a packet actually needs them.)
 max_allowed_packet = 512M
 innodb_buffer_pool_size = 1G
 innodb_flush_log_at_trx_commit = 2
 innodb_flush_method = O_DIRECT
+# Skip reverse-DNS on every new connection — meaningless inside the docker
+# network and an avoidable stall when connection churn spikes at event load.
+skip-name-resolve

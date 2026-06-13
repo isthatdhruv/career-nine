@@ -7,8 +7,26 @@ import {
   ElementRect,
   OptionRect,
 } from '../types/proctoring';
+import { PROCTORING_ENABLED } from '../utils/proctoringFlag';
 
 const STORAGE_KEY = 'proctoring_per_question';
+
+// Cap on stored gaze points per question. At 4 samples/sec an unbounded
+// array reached thousands of points per slow question, and the whole map was
+// stringified to localStorage on EVERY navigation and POSTed as a multi-MB
+// payload at submit — per student. Stats (faces, head-away) are computed on
+// the FULL sample set before thinning, so only the stored trace is reduced.
+const MAX_GAZE_POINTS_PER_QUESTION = 300;
+
+function thinSamples<T>(samples: T[], max: number): T[] {
+  if (samples.length <= max) return samples;
+  const step = samples.length / max;
+  const out: T[] = [];
+  for (let i = 0; i < max; i++) {
+    out.push(samples[Math.floor(i * step)]);
+  }
+  return out;
+}
 
 interface UsePerQuestionProctoringParams {
   questionnaireQuestionId: number | null;
@@ -67,6 +85,7 @@ export function usePerQuestionProctoring({
 
   // Load persisted data on mount
   useEffect(() => {
+    if (!PROCTORING_ENABLED) return;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -120,6 +139,7 @@ export function usePerQuestionProctoring({
 
   // Finalize data for the current question
   const finalizeCurrentQuestion = useCallback(() => {
+    if (!PROCTORING_ENABLED) return;
     const qId = prevQuestionIdRef.current;
     if (qId === null) return;
 
@@ -136,8 +156,15 @@ export function usePerQuestionProctoring({
     const allClicks = proctoringClicks.current;
     const questionClicks = allClicks.slice(clickStartIndexRef.current);
 
-    // Convert to backward-compatible GazePoint format
-    const gazePoints: GazePoint[] = questionSnapshots.map((s) => ({
+    // Convert to backward-compatible GazePoint format, thinned to the cap.
+    // NOTE: the raw `eyeGazePoints` duplicate is deliberately NOT built any
+    // more — it carried strictly less information than gazePoints (which adds
+    // gazeDirection) while DOUBLING the payload; the backend stores it as a
+    // nullable column and nothing downstream requires it.
+    const gazePoints: GazePoint[] = thinSamples(
+      questionSnapshots,
+      MAX_GAZE_POINTS_PER_QUESTION,
+    ).map((s) => ({
       t: s.t,
       x: s.x,
       y: s.y,
@@ -148,9 +175,6 @@ export function usePerQuestionProctoring({
       headYaw: null,
       headPitch: null,
     }));
-
-    // Raw eye gaze points
-    const eyeGazePoints: EyeGazeSnapshot[] = [...questionSnapshots];
 
     // Face detection stats (from faceCount values)
     const faceCounts = questionSnapshots.map((s) => s.faceCount);
@@ -186,7 +210,6 @@ export function usePerQuestionProctoring({
       questionRect,
       optionsRect,
       gazePoints,
-      eyeGazePoints,
       timeSpentMs: now - startTime,
       questionStartTime: startTime,
       questionEndTime: now,
@@ -208,8 +231,11 @@ export function usePerQuestionProctoring({
       data.maxFacesDetected = Math.max(existing.maxFacesDetected, data.maxFacesDetected);
       data.headAwayCount = existing.headAwayCount + data.headAwayCount;
       data.tabSwitchCount = existing.tabSwitchCount + data.tabSwitchCount;
-      data.gazePoints = [...existing.gazePoints, ...data.gazePoints];
-      data.eyeGazePoints = [...existing.eyeGazePoints, ...data.eyeGazePoints];
+      // Revisits concatenate, so re-thin to keep the per-question cap
+      data.gazePoints = thinSamples(
+        [...existing.gazePoints, ...data.gazePoints],
+        MAX_GAZE_POINTS_PER_QUESTION,
+      );
       // Recompute avg faces from merged gazePoints
       const allFaces = data.gazePoints.map((g) => g.faceCount);
       data.avgFacesDetected = allFaces.length > 0
@@ -235,7 +261,7 @@ export function usePerQuestionProctoring({
 
   // When question changes, finalize previous and start new
   useEffect(() => {
-    if (questionnaireQuestionId === null) return;
+    if (!PROCTORING_ENABLED || questionnaireQuestionId === null) return;
 
     // Finalize the previous question if there was one
     if (prevQuestionIdRef.current !== null && prevQuestionIdRef.current !== questionnaireQuestionId) {

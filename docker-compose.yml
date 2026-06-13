@@ -29,10 +29,16 @@ services:
   redis_cache:
     image: redis:7.2-alpine
     restart: always
+    # noeviction (NOT allkeys-lru): this instance is a datastore, not a cache —
+    # it holds the ONLY pre-persistence copy of submitted answers
+    # (career9:submitted:*), partial drafts, sessions and submission locks.
+    # LRU eviction under memory pressure silently destroyed that data; with
+    # noeviction, writes fail loudly (OOM error) instead. Spring @Cacheable
+    # entries on this instance expire by TTL as before.
     command: >
       redis-server
       --maxmemory 2048mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
       --appendonly yes
       --appendfsync everysec
     ports:

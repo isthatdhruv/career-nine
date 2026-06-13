@@ -69,8 +69,14 @@ export default function AllottedAssessmentPage() {
         Number(assessment.assessmentId),
       );
 
-      // Load assessment config (uses static cache → API, same call that would happen anyway)
-      await fetchAssessmentData(String(assessment.assessmentId));
+      // Load assessment config (uses static cache → API, same call that would happen anyway).
+      // Block here on failure — proceeding without the questionnaire dead-ends
+      // the student on the instructions page with no message and no retry.
+      const loaded = await fetchAssessmentData(String(assessment.assessmentId));
+      if (!loaded) {
+        alert('Failed to load the assessment. Please check your connection and try again.');
+        return;
+      }
       const config = JSON.parse(sessionStorage.getItem('assessmentConfig') || '{}');
       const shouldCollectContact = config?.collectEmailAndPhone !== false;
 

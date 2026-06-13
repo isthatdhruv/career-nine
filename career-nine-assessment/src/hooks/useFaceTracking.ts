@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { EyeGazeSnapshot } from '../types/proctoring';
+import { PROCTORING_ENABLED } from '../utils/proctoringFlag';
 
 // Throttle: store one gaze point every 250ms to avoid flooding memory.
 // WebGazer calls the listener at ~60fps; we only need ~4 samples/sec.
@@ -23,6 +24,7 @@ export function useEyeGazeTracking({ faceCountRef }: UseEyeGazeTrackingParams): 
   // Create face-only snapshots while WebGazer is still initializing.
   // This ensures questions answered before WebGazer is ready still have face count data.
   useEffect(() => {
+    if (!PROCTORING_ENABLED) return;
     const intervalId = setInterval(() => {
       // Stop once WebGazer's gaze listener takes over
       if (webgazerReadyRef.current) {
@@ -45,6 +47,7 @@ export function useEyeGazeTracking({ faceCountRef }: UseEyeGazeTrackingParams): 
 
   // Initialize WebGazer for gaze tracking
   useEffect(() => {
+    if (!PROCTORING_ENABLED) return;
     let cancelled = false;
 
     const init = async () => {

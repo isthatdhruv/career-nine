@@ -1,4 +1,5 @@
 import { ProctoringPayload } from '../types/proctoring';
+import { timeoutSignal } from '../utils/timeoutSignal';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -16,6 +17,11 @@ export async function submitProctoringData(payload: ProctoringPayload): Promise<
     credentials: 'include',
     headers,
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(10000),
+    // 30s (was 10s): even with per-question sample capping this is the
+    // largest payload the student app sends, and it ships at event end over
+    // congested venue WiFi. timeoutSignal (not AbortSignal.timeout) so older
+    // school browsers don't throw a synchronous TypeError before the request
+    // even starts.
+    signal: timeoutSignal(30000),
   });
 }

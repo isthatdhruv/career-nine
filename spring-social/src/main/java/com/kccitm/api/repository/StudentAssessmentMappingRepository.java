@@ -17,6 +17,26 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
     Optional<StudentAssessmentMapping> findFirstByUserStudentUserStudentIdAndAssessmentId(Long userStudentId,
             Long assessmentId);
 
+    // Pessimistic row lock (SELECT ... FOR UPDATE) used by the submission
+    // processor to serialize concurrent persistence passes for the same
+    // (student, assessment): the 90s submit lock can expire while a job sits
+    // in the async backlog, letting a duplicate /submit enqueue a second job.
+    @org.springframework.data.jpa.repository.Lock(javax.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT m FROM StudentAssessmentMapping m " +
+        "WHERE m.userStudent.userStudentId = :userStudentId AND m.assessmentId = :assessmentId")
+    Optional<StudentAssessmentMapping> findForUpdateByStudentAndAssessment(
+        @org.springframework.data.repository.query.Param("userStudentId") Long userStudentId,
+        @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
+
+    // (userStudentId, assessmentId) pairs whose submission was accepted but not
+    // yet persisted — consumed by the startup sweeper that re-enqueues work
+    // lost from the in-memory async queue on a restart.
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT m.userStudent.userStudentId, m.assessmentId FROM StudentAssessmentMapping m " +
+        "WHERE m.persistenceState = 'pending'")
+    List<Object[]> findPendingPersistenceIds();
+
     Optional<StudentAssessmentMapping> findByAssessmentId(Long assessmentId);
 
     List<StudentAssessmentMapping> findAllByAssessmentId(Long assessmentId);
