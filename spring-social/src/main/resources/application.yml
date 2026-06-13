@@ -165,6 +165,15 @@ management:
       enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
 
 
+# Whitelabel report-on-completion pipeline (report.generate → report.email).
+report:
+  pipeline:
+    # Email transport for the report.email stage. "gmail" (default) sends via the
+    # Gmail API over HTTPS (synchronous; works where outbound SMTP ports are
+    # blocked); "odoo" routes through Odoo's JSON-RPC API instead. See
+    # GmailReportEmailSender / OdooEmailSender.
+    email-transport: ${REPORT_EMAIL_TRANSPORT:gmail}
+
 app:
   googleAPIJSON: classpath:google.json
   fileTempFolder: classpath:temp

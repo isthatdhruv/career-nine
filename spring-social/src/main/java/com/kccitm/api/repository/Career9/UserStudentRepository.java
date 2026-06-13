@@ -23,6 +23,18 @@ public interface UserStudentRepository extends JpaRepository<UserStudent, Long> 
     String getNameByUserID(@Param("userStudentId") Long userStudentId);
 
     /**
+     * Loads a UserStudent with its {@code studentInfo} eagerly JOIN-FETCHed so the
+     * association survives detachment. Post-completion hooks (completion email,
+     * B2C entitlement, whitelabel report pipeline) run on an @Async thread with no
+     * open Hibernate session, where a plain findById leaves studentInfo as an
+     * uninitialized lazy proxy that throws LazyInitializationException on access.
+     * {@code institute} is mapped EAGER, so it is fetched within the same session.
+     */
+    @Query("SELECT us FROM UserStudent us LEFT JOIN FETCH us.studentInfo " +
+           "WHERE us.userStudentId = :userStudentId")
+    Optional<UserStudent> findByIdWithStudentInfo(@Param("userStudentId") Long userStudentId);
+
+    /**
      * Students whose user holds no mapping to the given role group — i.e. not yet
      * provisioned. Used by the one-time backfill runner; self-limiting (returns
      * empty once every student has been provisioned).

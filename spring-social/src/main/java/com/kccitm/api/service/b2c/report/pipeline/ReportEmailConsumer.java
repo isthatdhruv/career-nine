@@ -10,6 +10,8 @@ import org.springframework.kafka.annotation.DltHandler;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.kafka.retrytopic.DltStrategy;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
 
@@ -72,13 +74,21 @@ public class ReportEmailConsumer {
             logger.info("Report email sent student={} assessment={} withPdf={}",
                     ev.userStudentId, ev.assessmentId, (pdf != null));
         } catch (Exception e) {
+            // @RetryableTopic republishes silently — log the cause so the reason a
+            // student wasn't emailed is visible without waiting for the DLT.
+            logger.warn("Report email attempt failed student={} assessment={}: {}",
+                    ev.userStudentId, ev.assessmentId, e.getMessage());
             idempotency.release(ev.userStudentId, ev.assessmentId); // let the retry re-claim
             throw e; // → @RetryableTopic retry → DLT
         }
     }
 
     @DltHandler
-    public void dlt(String json) {
-        logger.error("REPORT-EMAIL DLT (FOR-SURE ALERT — student NOT emailed, needs ops action): {}", json);
+    public void dlt(String json,
+                    @Header(name = KafkaHeaders.DLT_EXCEPTION_FQCN, required = false) String excClass,
+                    @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String excMessage,
+                    @Header(name = KafkaHeaders.DLT_EXCEPTION_STACKTRACE, required = false) String excStack) {
+        logger.error("REPORT-EMAIL DLT (FOR-SURE ALERT — student NOT emailed, needs ops action): "
+                + "payload={} cause={}: {}\n{}", json, excClass, excMessage, excStack);
     }
 }

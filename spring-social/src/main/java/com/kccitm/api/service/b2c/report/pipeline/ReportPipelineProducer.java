@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.school.InstituteDetail;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
 import org.slf4j.Logger;
@@ -30,6 +31,7 @@ public class ReportPipelineProducer {
     @Autowired private KafkaTemplate<String, String> kafkaTemplate;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private InstituteBrandingService brandingService;
+    @Autowired private UserStudentRepository userStudentRepository;
 
     @Value("${report.pipeline.enabled:true}")
     private boolean enabled;
@@ -41,10 +43,19 @@ public class ReportPipelineProducer {
      * @return true if a job was enqueued; false otherwise (caller may fall back
      *         to the legacy auto-gen).
      */
-    public boolean enqueueIfWhitelabel(UserStudent userStudent, Long assessmentId) {
-        if (!enabled || userStudent == null || assessmentId == null) {
+    public boolean enqueueIfWhitelabel(UserStudent userStudentArg, Long assessmentId) {
+        if (!enabled || userStudentArg == null || assessmentId == null) {
             return false;
         }
+        // Re-fetch with studentInfo JOIN-FETCHed. Callers reach this from @Async /
+        // background threads with no open Hibernate session, so the passed entity
+        // may be detached with a lazy studentInfo proxy — accessing it would throw
+        // LazyInitializationException and silently suppress the enqueue. Reading the
+        // @Id off a proxy is safe (no DB hit); the re-fetch fully initializes the
+        // graph (institute is EAGER). Fall back to the passed entity if not found.
+        Long userStudentId = userStudentArg.getUserStudentId();
+        UserStudent userStudent = userStudentId == null ? userStudentArg
+                : userStudentRepository.findByIdWithStudentInfo(userStudentId).orElse(userStudentArg);
         InstituteDetail institute = userStudent.getInstitute();
         BrandingDto brand = brandingService.forInstitute(institute);
         if (!brand.isWhitelabel()) {

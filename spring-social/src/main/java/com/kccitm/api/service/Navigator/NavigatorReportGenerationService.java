@@ -114,7 +114,11 @@ public class NavigatorReportGenerationService {
     }
 
     public NavigatorReportData generateForStudent(Long userStudentId, Long assessmentId, boolean skipAI) {
-        UserStudent us = userStudentRepository.findById(userStudentId)
+        // JOIN-FETCH studentInfo: reachable from the report-worker via the "legacy"
+        // engine (LegacyPlaceholderCalculator → here) with no open session, so the
+        // si.getName()/resolveClass(si) reads below would throw
+        // LazyInitializationException. institute is EAGER.
+        UserStudent us = userStudentRepository.findByIdWithStudentInfo(userStudentId)
                 .orElseThrow(() -> new RuntimeException("Student not found: " + userStudentId));
 
         Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
@@ -566,7 +570,12 @@ public class NavigatorReportGenerationService {
      * Returns null if student has no completed assessment.
      */
     public IntermediaryScores computeIntermediaryScores(Long userStudentId, Long assessmentId) {
-        UserStudent us = userStudentRepository.findById(userStudentId)
+        // JOIN-FETCH studentInfo: this runs on the report-worker's Kafka thread
+        // (no OSIV, no @Transactional), where a plain findById leaves studentInfo
+        // as a lazy proxy and the si.getName()/resolveClass(si) reads below throw
+        // LazyInitializationException. Eager-loading it here fixes report generation
+        // for students whose intermediary scores aren't already cached.
+        UserStudent us = userStudentRepository.findByIdWithStudentInfo(userStudentId)
                 .orElseThrow(() -> new RuntimeException("Student not found: " + userStudentId));
 
         Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository

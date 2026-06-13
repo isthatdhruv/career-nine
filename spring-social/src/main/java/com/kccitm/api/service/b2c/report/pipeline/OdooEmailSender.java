@@ -2,14 +2,21 @@ package com.kccitm.api.service.b2c.report.pipeline;
 
 import com.kccitm.api.service.OdooEmailService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Default {@link EmailSender} — sends the co-branded report email through Odoo
+ * Odoo {@link EmailSender} — sends the co-branded report email through Odoo
  * ({@link OdooEmailService#sendHtmlSync}, synchronous, throws on failure). The
  * actual outgoing SMTP server + daily cap are configured inside Odoo.
+ *
+ * <p>Opt-in: active only when {@code report.pipeline.email-transport=odoo}. The
+ * default transport is Gmail SMTP ({@link SmtpReportEmailSender}). Both impls
+ * implement {@link EmailSender}; the {@code @ConditionalOnProperty} gates ensure
+ * exactly one is registered so the email consumer's injection is unambiguous.
  */
 @Component
+@ConditionalOnProperty(name = "report.pipeline.email-transport", havingValue = "odoo")
 public class OdooEmailSender implements EmailSender {
 
     @Autowired private OdooEmailService odooEmailService;
