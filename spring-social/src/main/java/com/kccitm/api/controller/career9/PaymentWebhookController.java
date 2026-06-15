@@ -84,9 +84,12 @@ public class PaymentWebhookController {
     @Autowired private com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository schoolAssessmentTierRepository;
     @Autowired private StudentInstituteMembershipService membershipService;
     @Autowired private StudentProvisioningService studentProvisioningService;
+    @Autowired private com.kccitm.api.service.GoogleAnalyticsService googleAnalyticsService;
 
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+
+    @Autowired private com.kccitm.api.service.counselling.BookingService bookingService;
 
     @Autowired
     private com.kccitm.api.service.StudentSessionService studentSessionService;
@@ -470,6 +473,15 @@ public class PaymentWebhookController {
         txn.setStatus("paid");
         paymentTransactionRepository.save(txn);
 
+        // Phase 3b: a standalone PAID counselling session (booked against an existing
+        // entitlement that doesn't include counselling). This is NOT an assessment
+        // purchase — finalise the held slot only, and skip all student/entitlement
+        // provisioning + GA purchase tracking below.
+        if ("COUNSELLING_EXTRA".equals(txn.getPurpose())) {
+            finalizeExtraCounsellingSlot(txn);
+            return true;
+        }
+
         // Branch: B2C (campaign-linked) vs B2B mapping / legacy school payment.
         if (txn.getCampaignId() != null && txn.getCampaignAssessmentTierId() != null) {
             provisionB2CStudentAndEntitlement(txn);
@@ -479,7 +491,11 @@ public class PaymentWebhookController {
             // (free→paid) the service entitlement. No-op for legacy school txns
             // (mappingId null) and for a failed provision (status flipped).
             if (txn.getMappingId() != null && "paid".equals(txn.getStatus())) {
-                entitlementService.activateB2BOnPayment(txn.getTransactionId());
+                com.kccitm.api.model.career9.b2c.StudentEntitlement b2bEnt =
+                        entitlementService.activateB2BOnPayment(txn.getTransactionId());
+                // PAY_LATER counselling: a slot was held at selection time — now that
+                // payment is in and counselling is active, finalise the appointment.
+                finalizeHeldCounsellingSlot(txn, b2bEnt);
             }
             // Legacy-school payment → mint (or upgrade) the school service entitlement
             // through the same shared seam, so school students get report/dashboard/
@@ -497,7 +513,101 @@ public class PaymentWebhookController {
         if ("paid".equals(txn.getStatus())) {
             consumePromoIfPresent(txn.getPromoCode());
         }
+
+        // Fire the GA4 "purchase" conversion now that payment is confirmed.
+        // Done server-side (Measurement Protocol) because the buyer is on
+        // Razorpay at this point and may never return to the site, so a
+        // browser-only event would miss real paid sales. Async + best-effort:
+        // it never blocks or fails this transaction.
+        sendPurchaseConversionToGa(txn);
+
         return true;
+    }
+
+    /**
+     * Fire the GA4 "purchase" conversion for a confirmed-paid transaction.
+     * Tags the event so conversions can be split by funnel and source in GA:
+     *   - B2C (campaign-linked) → campaign ids
+     *   - B2B (institute/school) → institute code / school-config / mapping id
+     * Best-effort only — {@link GoogleAnalyticsService} is async and swallows
+     * its own errors, and this wrapper guards anyway.
+     */
+    /**
+     * PAY_LATER counselling finaliser. When the txn carries a held counselling
+     * slot, confirm the appointment now that payment succeeded and the entitlement
+     * is active, then consume one counselling session. Best-effort: a failure here
+     * never rolls back the (already successful) payment + activation.
+     */
+    /**
+     * Phase 3b finaliser for a standalone PAID counselling session. The student already
+     * had an entitlement that does not include counselling, so this session was paid for
+     * separately — confirm the held slot, but pass entitlementId = null so no included
+     * session counter is consumed or credited back (it isn't drawn from one).
+     */
+    private void finalizeExtraCounsellingSlot(PaymentTransaction txn) {
+        if (txn.getCounsellingSlotId() == null || txn.getUserStudentId() == null) return;
+        try {
+            UserStudent us = userStudentRepository.findById(txn.getUserStudentId()).orElse(null);
+            if (us == null) return;
+            com.kccitm.api.service.counselling.BookingService.BookingContact contact =
+                    new com.kccitm.api.service.counselling.BookingService.BookingContact(
+                            txn.getCounsellingContactName(), txn.getCounsellingContactEmail(),
+                            txn.getCounsellingContactPhone(), txn.getCounsellingContactMethod());
+            bookingService.confirmHeldSlot(txn.getCounsellingSlotId(), us, "Counselling (paid)", contact, null);
+        } catch (Exception e) {
+            logger.error("Failed to finalise PAID counselling slot {} for txn {}: {}",
+                    txn.getCounsellingSlotId(), txn.getTransactionId(), e.getMessage(), e);
+        }
+    }
+
+    private void finalizeHeldCounsellingSlot(PaymentTransaction txn,
+            com.kccitm.api.model.career9.b2c.StudentEntitlement ent) {
+        if (txn.getCounsellingSlotId() == null || ent == null || txn.getUserStudentId() == null) return;
+        try {
+            UserStudent us = userStudentRepository.findById(txn.getUserStudentId()).orElse(null);
+            if (us == null) return;
+            com.kccitm.api.service.counselling.BookingService.BookingContact contact =
+                    new com.kccitm.api.service.counselling.BookingService.BookingContact(
+                            txn.getCounsellingContactName(), txn.getCounsellingContactEmail(),
+                            txn.getCounsellingContactPhone(), txn.getCounsellingContactMethod());
+            bookingService.confirmHeldSlot(txn.getCounsellingSlotId(), us, "Counselling (pay-later)", contact,
+                    ent.getEntitlementId());
+            entitlementService.consumeCounsellingSession(ent.getEntitlementId());
+        } catch (Exception e) {
+            logger.error("Failed to finalise pay-later counselling slot {} for txn {}: {}",
+                    txn.getCounsellingSlotId(), txn.getTransactionId(), e.getMessage(), e);
+        }
+    }
+
+    private void sendPurchaseConversionToGa(PaymentTransaction txn) {
+        try {
+            // txn.amount is stored in paise (Razorpay's unit); GA wants rupees.
+            Double valueRupees = txn.getAmount() != null ? txn.getAmount() / 100.0 : null;
+
+            Map<String, Object> params = new HashMap<>();
+            if (txn.getAssessmentId() != null) params.put("assessment_id", txn.getAssessmentId());
+            if (txn.getPromoCode() != null && !txn.getPromoCode().isEmpty()) params.put("promo_code", txn.getPromoCode());
+
+            boolean isB2C = txn.getCampaignId() != null && txn.getCampaignAssessmentTierId() != null;
+            if (isB2C) {
+                params.put("funnel", "b2c");
+                params.put("campaign_id", txn.getCampaignId());
+                params.put("campaign_tier_id", txn.getCampaignAssessmentTierId());
+            } else {
+                params.put("funnel", "b2b");
+                if (txn.getInstituteCode() != null) params.put("institute_code", txn.getInstituteCode());
+                if (txn.getSchoolConfigId() != null) params.put("school_config_id", txn.getSchoolConfigId());
+                if (txn.getMappingId() != null) params.put("mapping_id", txn.getMappingId());
+            }
+
+            // Stable per-transaction client id. If we later capture the
+            // browser's GA client_id at registration and store it on the txn,
+            // pass that here instead for tighter session-level attribution.
+            String clientId = "txn." + txn.getTransactionId();
+            googleAnalyticsService.sendPurchase(clientId, String.valueOf(txn.getTransactionId()), valueRupees, params, isB2C);
+        } catch (Exception e) {
+            logger.warn("Failed to enqueue GA purchase conversion for txn {}: {}", txn.getTransactionId(), e.getMessage());
+        }
     }
 
     /** Atomically consume one promo use for a realized redemption; no-op if absent/at-cap. */
@@ -654,6 +764,12 @@ public class PaymentWebhookController {
         txn.setStatus(status);
         paymentTransactionRepository.save(txn);
         logger.info("Payment link {} status changed to: {}", linkId, status);
+
+        // PAY_LATER: payment didn't complete — release the slot we held so it
+        // returns to the available pool instead of being stranded as REQUESTED.
+        if (txn.getCounsellingSlotId() != null) {
+            try { bookingService.releaseHeldSlot(txn.getCounsellingSlotId()); } catch (Exception ignore) {}
+        }
 
         // Send automated notification for expired/cancelled
         if (txn.getStudentEmail() != null && !txn.getStudentEmail().isEmpty()) {

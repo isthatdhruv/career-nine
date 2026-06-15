@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
@@ -133,6 +134,9 @@ public class AssessmentInstituteMappingController {
     private AssessmentMappingTierService tierService;
 
     @Autowired
+    private com.kccitm.api.service.counselling.BookingService bookingService;
+
+    @Autowired
     private com.kccitm.api.service.career9.InstituteAssessmentService instituteAssessmentService;
 
     @Autowired
@@ -181,6 +185,14 @@ public class AssessmentInstituteMappingController {
         if (!levelCoordinatesPresent(mapping)) {
             return ResponseEntity.badRequest().body("Missing session/class/section for the selected level");
         }
+
+        // Normalize/validate the post-assessment payment timing (PAY_FIRST default).
+        String timing = mapping.getPaymentTiming() == null
+                ? "PAY_FIRST" : mapping.getPaymentTiming().trim().toUpperCase();
+        if (!"PAY_FIRST".equals(timing) && !"PAY_LATER".equals(timing)) {
+            return ResponseEntity.badRequest().body("paymentTiming must be PAY_FIRST or PAY_LATER");
+        }
+        mapping.setPaymentTiming(timing);
 
         // Reject an exact-duplicate mapping (the DB unique key is ineffective when any
         // coordinate is null, which is every level except SECTION — so guard in code).
@@ -438,11 +450,14 @@ public class AssessmentInstituteMappingController {
         // maxRegistrations is nullable-meaningful: always copy it through
         existing.setMaxRegistrations(updated.getMaxRegistrations());
         if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
-        // Service toggles (report / counselling / LMS) — booleans copied when sent;
-        // the count/validity sub-fields are nullable-meaningful so always copied.
+        // Service toggles (report / dashboard / counselling / LMS) — booleans copied
+        // when sent; the count/validity sub-fields are nullable-meaningful so always copied.
         if (updated.getIncludesFinalReport() != null) existing.setIncludesFinalReport(updated.getIncludesFinalReport());
+        if (updated.getIncludesDashboard() != null) existing.setIncludesDashboard(updated.getIncludesDashboard());
+        existing.setDashboardValidityDays(updated.getDashboardValidityDays());
         if (updated.getIncludesCounselling() != null) existing.setIncludesCounselling(updated.getIncludesCounselling());
         existing.setCounsellingSessionCount(updated.getCounsellingSessionCount());
+        existing.setCounsellingPrice(updated.getCounsellingPrice()); // Phase 3b: per-tier extra-session price
         if (updated.getIncludesLms() != null) existing.setIncludesLms(updated.getIncludesLms());
         existing.setLmsValidityDays(updated.getLmsValidityDays());
         return ResponseEntity.ok(tierRepository.save(existing));
@@ -545,6 +560,7 @@ public class AssessmentInstituteMappingController {
         inc.put("includesDashboard", Boolean.TRUE.equals(t.getIncludesDashboard()));
         inc.put("includesCounselling", Boolean.TRUE.equals(t.getIncludesCounselling()));
         inc.put("counsellingSessionCount", t.getCounsellingSessionCount());
+        inc.put("counsellingPrice", t.getCounsellingPrice());
         inc.put("includesLms", Boolean.TRUE.equals(t.getIncludesLms()));
         inc.put("lmsValidityDays", t.getLmsValidityDays());
         inc.put("dashboardValidityDays", t.getDashboardValidityDays());
@@ -947,6 +963,252 @@ public class AssessmentInstituteMappingController {
         return ResponseEntity.ok(resp);
     }
 
+    // ----- Post-assessment counselling tier selection (public) -----
+    // Drives the assessment-mapping thank-you page. Tells the SPA whether the
+    // student can book counselling already (paid tier included it) or must first
+    // pick a counselling-bearing tier — and, per the link's payment_timing,
+    // whether they pay before booking (PAY_FIRST) or at booking (PAY_LATER).
+    @GetMapping("/public/counselling-options/{entitlementId}")
+    public ResponseEntity<?> getCounsellingOptions(@PathVariable Long entitlementId) {
+        Optional<com.kccitm.api.model.career9.b2c.StudentEntitlement> entOpt =
+                studentEntitlementRepository.findById(entitlementId);
+        if (!entOpt.isPresent() || entOpt.get().getCampaignId() != null
+                || entOpt.get().getMappingId() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No mapping entitlement");
+        }
+        return ResponseEntity.ok(buildCounsellingOptions(entOpt.get()));
+    }
+
+    // Same payload resolved by (userStudentId, assessmentId) — used by the
+    // thank-you page, where a mapping student arrives via a fresh login and has
+    // no entitlementId in hand (mirrors the school-counselling resolution).
+    @GetMapping("/public/counselling-options-by-student")
+    public ResponseEntity<?> getCounsellingOptionsByStudent(
+            @RequestParam Long userStudentId, @RequestParam Long assessmentId) {
+        com.kccitm.api.model.career9.b2c.StudentEntitlement ent = null;
+        for (com.kccitm.api.model.career9.b2c.StudentEntitlement e : studentEntitlementRepository
+                .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
+            if (e.getCampaignId() == null && e.getMappingId() != null
+                    && !"revoked".equals(e.getStatus()) && !"refunded".equals(e.getStatus())) {
+                ent = e;
+                break;
+            }
+        }
+        if (ent == null) {
+            Map<String, Object> none = new HashMap<>();
+            none.put("needsTierSelection", false);
+            none.put("canBookNow", false);
+            none.put("tiers", new java.util.ArrayList<>());
+            return ResponseEntity.ok(none);
+        }
+        return ResponseEntity.ok(buildCounsellingOptions(ent));
+    }
+
+    /** Shared payload for the post-assessment counselling tier-selection screen. */
+    private Map<String, Object> buildCounsellingOptions(
+            com.kccitm.api.model.career9.b2c.StudentEntitlement ent) {
+        AssessmentInstituteMapping mapping = mappingRepository.findById(ent.getMappingId()).orElse(null);
+        String paymentTiming = mapping != null && mapping.getPaymentTiming() != null
+                ? mapping.getPaymentTiming() : "PAY_FIRST";
+
+        int total = ent.getCounsellingSessionsTotal() != null ? ent.getCounsellingSessionsTotal() : 0;
+        int used = ent.getCounsellingSessionsUsed() != null ? ent.getCounsellingSessionsUsed() : 0;
+        boolean canBookNow = Boolean.TRUE.equals(ent.getCounsellingActive()) && (total - used) > 0;
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("entitlementId", ent.getEntitlementId());
+        resp.put("paymentTiming", paymentTiming);
+        resp.put("counsellingActive", Boolean.TRUE.equals(ent.getCounsellingActive()));
+        resp.put("sessionsRemaining", Math.max(0, total - used));
+        resp.put("canBookNow", canBookNow);
+        // Token the SPA reuses to call the shared counselling slots/book endpoints
+        // (only meaningful once the entitlement is active with counselling).
+        resp.put("accessToken", canBookNow ? ent.getAccessToken() : null);
+        assessmentTableRepository.findById(ent.getAssessmentId())
+                .ifPresent(a -> resp.put("assessmentName", a.getAssessmentName()));
+
+        // Counselling-bearing paid tiers the student may pick to unlock a session.
+        List<Map<String, Object>> tiers = new java.util.ArrayList<>();
+        if (!canBookNow) {
+            for (AssessmentMappingTier t : tierRepository
+                    .findByMappingIdAndIsFreeAndIsActiveOrderBySortOrderAsc(ent.getMappingId(), false, true)) {
+                if (!Boolean.TRUE.equals(t.getIncludesCounselling())) continue;
+                if (t.getAmount() == null || t.getAmount() <= 0) continue;
+                Map<String, Object> tm = new HashMap<>();
+                tm.put("tierId", t.getTierId());
+                tm.put("name", t.getName());
+                tm.put("description", t.getDescription());
+                tm.put("amount", t.getAmount());
+                tm.put("inclusions", inclusionsOf(t));
+                tiers.add(tm);
+            }
+        }
+        resp.put("needsTierSelection", !canBookNow);
+        resp.put("tiers", tiers);
+        return resp;
+    }
+
+    // ----- PAY_LATER counselling: list slots before payment, then hold + pay -----
+
+    // Lists available counselling slots for the student's institute BEFORE payment
+    // (the shared campaign slots endpoint requires counselling already active, which
+    // it isn't yet under PAY_LATER). `from` is yyyy-MM-dd; defaults to today.
+    @GetMapping("/public/counselling-slots")
+    public ResponseEntity<?> getPayLaterSlots(@RequestParam Long entitlementId,
+            @RequestParam(required = false) String from) {
+        com.kccitm.api.model.career9.b2c.StudentEntitlement ent =
+                studentEntitlementRepository.findById(entitlementId).orElse(null);
+        if (ent == null || ent.getCampaignId() != null || ent.getMappingId() == null
+                || ent.getUserStudentId() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No mapping entitlement");
+        }
+        UserStudent us = userStudentRepository.findById(ent.getUserStudentId()).orElse(null);
+        Integer instituteCode = us != null && us.getStudentInfo() != null
+                ? us.getStudentInfo().getInstituteId() : null;
+        if (instituteCode == null) {
+            return ResponseEntity.ok(java.util.Collections.singletonMap("slots", new java.util.ArrayList<>()));
+        }
+        java.time.LocalDate weekStart;
+        try {
+            weekStart = from != null && !from.isEmpty() ? java.time.LocalDate.parse(from) : java.time.LocalDate.now();
+        } catch (Exception e) {
+            weekStart = java.time.LocalDate.now();
+        }
+        List<Map<String, Object>> slots = new java.util.ArrayList<>();
+        for (com.kccitm.api.model.career9.counselling.CounsellingSlot s :
+                bookingService.getAvailableSlotsForInstitute(weekStart, instituteCode)) {
+            Map<String, Object> sm = new HashMap<>();
+            sm.put("slotId", s.getId());
+            sm.put("date", s.getDate() != null ? s.getDate().toString() : null);
+            sm.put("startTime", s.getStartTime() != null ? s.getStartTime().toString() : null);
+            sm.put("endTime", s.getEndTime() != null ? s.getEndTime().toString() : null);
+            sm.put("durationMinutes", s.getDurationMinutes());
+            sm.put("counsellorName", s.getCounsellor() != null ? s.getCounsellor().getName() : null);
+            sm.put("mode", s.getMode());
+            slots.add(sm);
+        }
+        return ResponseEntity.ok(java.util.Collections.singletonMap("slots", slots));
+    }
+
+    // PAY_LATER booking: hold the chosen slot, create a Razorpay payment for the
+    // chosen counselling tier, and stash the held slot + contact on the txn. The
+    // webhook activates the entitlement AND finalises the appointment on success.
+    @PostMapping("/public/pay-later-book")
+    @Transactional
+    public ResponseEntity<?> payLaterBook(@RequestBody Map<String, Object> body) {
+        if (body.get("entitlementId") == null || body.get("tierId") == null || body.get("slotId") == null) {
+            return ResponseEntity.badRequest().body("entitlementId, tierId and slotId are required");
+        }
+        Long entitlementId = Long.valueOf(body.get("entitlementId").toString());
+        Long tierId = Long.valueOf(body.get("tierId").toString());
+        Long slotId = Long.valueOf(body.get("slotId").toString());
+
+        com.kccitm.api.model.career9.b2c.StudentEntitlement ent =
+                studentEntitlementRepository.findById(entitlementId).orElse(null);
+        if (ent == null || ent.getCampaignId() != null || ent.getMappingId() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No mapping entitlement");
+        }
+        AssessmentInstituteMapping mapping = mappingRepository.findById(ent.getMappingId()).orElse(null);
+        if (mapping == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Mapping not found");
+        }
+        AssessmentMappingTier tier = tierRepository.findById(tierId).orElse(null);
+        if (tier == null || !ent.getMappingId().equals(tier.getMappingId())
+                || Boolean.TRUE.equals(tier.getIsFree()) || !Boolean.TRUE.equals(tier.getIsActive())
+                || !Boolean.TRUE.equals(tier.getIncludesCounselling())
+                || tier.getAmount() == null || tier.getAmount() <= 0) {
+            return ResponseEntity.badRequest().body("Invalid counselling tier");
+        }
+
+        // Resolve student contact (prefer the posted contact, fall back to record).
+        String name = strOrNull(body.get("contactName"));
+        String phone = strOrNull(body.get("contactPhone"));
+        String email = strOrNull(body.get("contactEmail"));
+        String method = strOrNull(body.get("preferredContactMethod"));
+        Date dob = null;
+        if (ent.getUserStudentId() != null) {
+            UserStudent us = userStudentRepository.findById(ent.getUserStudentId()).orElse(null);
+            if (us != null && us.getStudentInfo() != null) {
+                StudentInfo si = us.getStudentInfo();
+                if (name == null) name = si.getName();
+                if (email == null) email = si.getEmail();
+                if (phone == null) phone = si.getPhoneNumber();
+                dob = si.getStudentDob();
+            }
+        }
+
+        // Hold the slot first so it can't be taken during the payment round-trip.
+        try {
+            bookingService.holdSlot(slotId);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Selected slot is no longer available. Please pick another.");
+        }
+
+        try {
+            String assessmentName = assessmentTableRepository.findById(ent.getAssessmentId())
+                    .map(a -> a.getAssessmentName()).orElse("Assessment");
+            String callbackUrl = callbackBaseUrl + "/payment-status";
+
+            PaymentTransaction txn = new PaymentTransaction();
+            txn.setMappingId(mapping.getMappingId());
+            txn.setMappingTierId(tier.getTierId());
+            txn.setAmount(tier.getAmount());
+            txn.setOriginalAmount(tier.getAmount());
+            txn.setAssessmentId(ent.getAssessmentId());
+            txn.setInstituteCode(mapping.getInstituteCode());
+            txn.setUserStudentId(ent.getUserStudentId());
+            txn.setPurchasePath("U");
+            txn.setStudentName(name);
+            txn.setStudentEmail(email);
+            txn.setStudentDob(dob);
+            txn.setStudentPhone(phone);
+            // Held slot + contact for the webhook to finalise on payment success.
+            txn.setCounsellingSlotId(slotId);
+            txn.setCounsellingContactName(name);
+            txn.setCounsellingContactPhone(phone);
+            txn.setCounsellingContactEmail(email);
+            txn.setCounsellingContactMethod(method);
+            txn.setStatus("created");
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            String referenceId = "PLB-" + entitlementId + "-" + txn.getTransactionId()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
+            Map<String, String> notes = new HashMap<>();
+            notes.put("mappingId", String.valueOf(mapping.getMappingId()));
+            notes.put("entitlementId", String.valueOf(entitlementId));
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+            notes.put("counsellingSlotId", String.valueOf(slotId));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    tier.getAmount(), "INR", assessmentName + " - Counselling",
+                    callbackUrl, referenceId, notes);
+
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "payment_required");
+            response.put("paymentUrl", rzpResponse.get("shortUrl"));
+            response.put("transactionId", txn.getTransactionId());
+            response.put("amount", tier.getAmount());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            // Roll the hold back so the slot isn't stuck if link creation failed.
+            try { bookingService.releaseHeldSlot(slotId); } catch (Exception ignore) {}
+            logger.error("Failed to create pay-later counselling payment link: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to start payment. Please try again.");
+        }
+    }
+
+    private static String strOrNull(Object o) {
+        if (o == null) return null;
+        String s = o.toString().trim();
+        return s.isEmpty() ? null : s;
+    }
+
     @PostMapping("/public/pay-for-upgrade")
     public ResponseEntity<?> payForUpgrade(@RequestBody Map<String, Object> body) {
         if (body.get("entitlementId") == null) {
@@ -967,8 +1229,23 @@ public class AssessmentInstituteMappingController {
         }
         AssessmentInstituteMapping mapping = mappingOpt.get();
 
-        AssessmentMappingTier wave = tierService.resolveActiveTier(
-                tierRepository.findByMappingIdAndIsFreeAndIsActiveOrderBySortOrderAsc(ent.getMappingId(), false, true));
+        // The student may pick a specific tier from the post-assessment dropdown.
+        // Validate it belongs to this mapping and is a paid, non-free tier; otherwise
+        // fall back to the auto-resolved active wave (legacy "Add feature" upsell).
+        AssessmentMappingTier wave;
+        if (body.get("tierId") != null) {
+            Long tierId = Long.valueOf(body.get("tierId").toString());
+            AssessmentMappingTier chosen = tierRepository.findById(tierId).orElse(null);
+            if (chosen == null || !ent.getMappingId().equals(chosen.getMappingId())
+                    || Boolean.TRUE.equals(chosen.getIsFree())
+                    || !Boolean.TRUE.equals(chosen.getIsActive())) {
+                return ResponseEntity.badRequest().body("Invalid tier for this assessment");
+            }
+            wave = chosen;
+        } else {
+            wave = tierService.resolveActiveTier(
+                    tierRepository.findByMappingIdAndIsFreeAndIsActiveOrderBySortOrderAsc(ent.getMappingId(), false, true));
+        }
         if (wave == null || wave.getAmount() == null || wave.getAmount() <= 0) {
             return ResponseEntity.badRequest().body("No upgrade is available for this assessment");
         }

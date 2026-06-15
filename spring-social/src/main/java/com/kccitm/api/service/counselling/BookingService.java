@@ -1,6 +1,7 @@
 package com.kccitm.api.service.counselling;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +29,9 @@ public class BookingService {
 
     private static final Logger logger = LoggerFactory.getLogger(BookingService.class);
 
+    /** Soft-hold TTL (minutes) for a slot reserved during the pick-slot -> pay window. */
+    private static final long SOFT_HOLD_MINUTES = 5;
+
     @Autowired
     private CounsellingSlotRepository slotRepository;
 
@@ -38,10 +42,16 @@ public class BookingService {
     private CounsellingNotificationService notificationService;
 
     @Autowired
+    private MeetingLinkService meetingLinkService;
+
+    @Autowired
     private AuditLogService auditLogService;
 
     @Autowired
     private CounsellorInstituteMappingService counsellorInstituteMappingService;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.counselling.CounsellorAssessmentAssignmentRepository assessmentAssignmentRepository;
 
     @Autowired
     private CounsellingActivityLogService activityLogService;
@@ -83,6 +93,41 @@ public class BookingService {
                 slotRepository.findAvailableSlotsForCounsellors(counsellorIds, effectiveStart, weekEnd));
     }
 
+    /**
+     * Counselling Phase 4: available slots for the institute, further restricted to the
+     * counsellor(s) the admin assigned to {@code assessmentId}. If the assessment has no
+     * active assignments, this is equivalent to {@link #getAvailableSlotsForInstitute}
+     * (institute filter only) so existing flows keep working. The two filters are
+     * intersected — a counsellor must serve the institute AND be assigned to the assessment.
+     */
+    public List<CounsellingSlot> getAvailableSlotsForInstitute(LocalDate weekStart, Integer instituteCode,
+                                                               Long assessmentId) {
+        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
+        if (effectiveStart.isAfter(weekEnd)) return List.of();
+
+        List<Long> counsellorIds = counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
+        if (counsellorIds.isEmpty()) {
+            logger.info("No counsellors allocated to institute {} — returning empty slots", instituteCode);
+            return List.of();
+        }
+
+        if (assessmentId != null) {
+            List<Long> assigned = assessmentAssignmentRepository.findActiveCounsellorIdsForAssessment(assessmentId);
+            if (!assigned.isEmpty()) {
+                counsellorIds = counsellorIds.stream().filter(assigned::contains).collect(Collectors.toList());
+                if (counsellorIds.isEmpty()) {
+                    logger.info("No counsellor both serves institute {} and is assigned to assessment {} — empty slots",
+                            instituteCode, assessmentId);
+                    return List.of();
+                }
+            }
+        }
+        return filterOutPastSlots(
+                slotRepository.findAvailableSlotsForCounsellors(counsellorIds, effectiveStart, weekEnd));
+    }
+
     private List<CounsellingSlot> filterOutPastSlots(List<CounsellingSlot> slots) {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
@@ -92,13 +137,51 @@ public class BookingService {
     }
 
     /**
+     * Basic contact details the student supplies when booking. All fields are
+     * optional at the service layer; the controller decides what is required.
+     */
+    public static class BookingContact {
+        public String name;
+        public String email;
+        public String phone;
+        public String preferredContactMethod; // EMAIL | PHONE | WHATSAPP
+
+        public BookingContact() {}
+
+        public BookingContact(String name, String email, String phone, String preferredContactMethod) {
+            this.name = name;
+            this.email = email;
+            this.phone = phone;
+            this.preferredContactMethod = preferredContactMethod;
+        }
+    }
+
+    /** Backwards-compatible overload — books with no extra contact details. */
+    @Transactional
+    public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason) {
+        return bookSlot(slotId, student, reason, null);
+    }
+
+    /**
      * Books a slot for the given student.
      * Verifies the slot is AVAILABLE, transitions it to REQUESTED,
      * creates an appointment with the counsellor auto-assigned from the slot,
-     * and fires notifications.
+     * snapshots the delivery mode (ONLINE/OFFLINE) and the corresponding
+     * meeting link or office address, stores the student's contact details,
+     * and fires a mode-aware confirmation notification.
      */
     @Transactional
-    public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason) {
+    public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason, BookingContact contact) {
+        return bookSlot(slotId, student, reason, contact, null);
+    }
+
+    /**
+     * As {@link #bookSlot(Long, UserStudent, String, BookingContact)} but records the
+     * entitlement the session is drawn from, so a later no-show can credit it back.
+     */
+    @Transactional
+    public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason,
+                                           BookingContact contact, Long entitlementId) {
         logger.info("Student {} attempting to book slot {}", student.getUserStudentId(), slotId);
 
         CounsellingSlot slot = slotRepository.findById(slotId)
@@ -119,6 +202,88 @@ public class BookingService {
         slot.setStatus("REQUESTED");
         slotRepository.save(slot);
 
+        return createAppointmentForSlot(slot, student, reason, contact, entitlementId);
+    }
+
+    /**
+     * Holds an AVAILABLE slot (AVAILABLE -> REQUESTED) WITHOUT creating an
+     * appointment. Used by the PAY_LATER flow to reserve the slot while the
+     * student completes payment; {@link #confirmHeldSlot} finalises it on the
+     * webhook, or it is released back to AVAILABLE if payment fails/expires.
+     */
+    @Transactional
+    public CounsellingSlot holdSlot(Long slotId) {
+        return holdSlot(slotId, SOFT_HOLD_MINUTES);
+    }
+
+    /**
+     * As {@link #holdSlot(Long)} but with an explicit hold TTL in minutes. Used by the
+     * pay-before-book flow, which needs a longer window than the default soft-hold so the
+     * student has time to complete the Razorpay payment before the slot is auto-released.
+     */
+    public CounsellingSlot holdSlot(Long slotId, long ttlMinutes) {
+        CounsellingSlot slot = slotRepository.findById(slotId)
+                .orElseThrow(() -> new ResourceNotFoundException("Slot", "id", slotId));
+        if (!"AVAILABLE".equals(slot.getStatus())) {
+            throw new BadRequestException(
+                    "Slot " + slotId + " is not available. Current status: " + slot.getStatus());
+        }
+        LocalDate today = LocalDate.now();
+        if (slot.getDate().isBefore(today)
+                || (slot.getDate().equals(today) && !slot.getStartTime().isAfter(LocalTime.now()))) {
+            throw new BadRequestException("Slot " + slotId + " is in the past and cannot be held.");
+        }
+        slot.setStatus("REQUESTED");
+        // Soft-hold TTL: the slot is reserved only for the payment window. A sweep
+        // (CounsellingLifecycleService.releaseExpiredHolds) frees it if the student
+        // abandons payment without it ever becoming a confirmed appointment.
+        slot.setHeldUntil(LocalDateTime.now().plusMinutes(ttlMinutes));
+        return slotRepository.save(slot);
+    }
+
+    /** Releases a held (REQUESTED) slot back to AVAILABLE — payment failed/expired. */
+    @Transactional
+    public void releaseHeldSlot(Long slotId) {
+        slotRepository.findById(slotId).ifPresent(slot -> {
+            if ("REQUESTED".equals(slot.getStatus())) {
+                slot.setStatus("AVAILABLE");
+                slotRepository.save(slot);
+            }
+        });
+    }
+
+    /**
+     * Finalises a previously {@link #holdSlot held} slot into a confirmed
+     * appointment (PAY_LATER, after payment succeeds). The slot is expected to be
+     * in REQUESTED state already.
+     */
+    @Transactional
+    public CounsellingAppointment confirmHeldSlot(Long slotId, UserStudent student, String reason,
+                                                  BookingContact contact) {
+        return confirmHeldSlot(slotId, student, reason, contact, null);
+    }
+
+    /**
+     * As {@link #confirmHeldSlot(Long, UserStudent, String, BookingContact)} but records
+     * the entitlement the session is drawn from (PAY flow, post-payment).
+     */
+    @Transactional
+    public CounsellingAppointment confirmHeldSlot(Long slotId, UserStudent student, String reason,
+                                                  BookingContact contact, Long entitlementId) {
+        CounsellingSlot slot = slotRepository.findById(slotId)
+                .orElseThrow(() -> new ResourceNotFoundException("Slot", "id", slotId));
+        if (!"REQUESTED".equals(slot.getStatus())) {
+            throw new BadRequestException(
+                    "Held slot " + slotId + " is not in REQUESTED state (was " + slot.getStatus() + ")");
+        }
+        return createAppointmentForSlot(slot, student, reason, contact, entitlementId);
+    }
+
+    /** Shared appointment creation for an already-reserved (REQUESTED) slot. */
+    private CounsellingAppointment createAppointmentForSlot(CounsellingSlot slot, UserStudent student,
+                                                            String reason, BookingContact contact,
+                                                            Long entitlementId) {
+        Long slotId = slot.getId();
         // Create appointment — auto-assign counsellor from the slot
         CounsellingAppointment appointment = new CounsellingAppointment();
         appointment.setSlot(slot);
@@ -126,13 +291,44 @@ public class BookingService {
         appointment.setCounsellor(slot.getCounsellor());
         appointment.setStudentReason(reason);
         appointment.setStatus("CONFIRMED");
+        appointment.setEntitlementId(entitlementId);
+
+        // The slot is now a confirmed booking, not an open hold — clear any soft-hold TTL
+        // so the release sweep never reclaims it.
+        slot.setHeldUntil(null);
+        slotRepository.save(slot);
+
+        // Snapshot the delivery mode from the slot, then attach the channel the
+        // student needs: an auto-generated meeting link for ONLINE, the
+        // counsellor's office address for OFFLINE.
+        String mode = slot.getMode() != null ? slot.getMode() : "ONLINE";
+        appointment.setMode(mode);
+        if ("OFFLINE".equals(mode)) {
+            String address = slot.getCounsellor() != null ? slot.getCounsellor().getOfficeAddress() : null;
+            appointment.setLocation(address);
+        } else {
+            String link = meetingLinkService.generateMeetLink(appointment);
+            appointment.setMeetingLink(link);
+            appointment.setMeetingLinkSource("AUTO");
+        }
+
+        // Store the contact details the student filled in at booking.
+        if (contact != null) {
+            appointment.setStudentContactName(contact.name);
+            appointment.setStudentContactEmail(contact.email);
+            appointment.setStudentContactPhone(contact.phone);
+            appointment.setPreferredContactMethod(contact.preferredContactMethod);
+        }
+
         appointment = appointmentRepository.save(appointment);
 
-        logger.info("Created appointment {} for student {} on slot {}",
-                appointment.getId(), student.getUserStudentId(), slotId);
+        logger.info("Created appointment {} for student {} on slot {} (mode={})",
+                appointment.getId(), student.getUserStudentId(), slotId, mode);
 
-        // Send booking received email
-        notificationService.sendBookingReceivedEmail(appointment);
+        // Auto-confirmed at booking — send the mode-aware confirmation
+        // (meeting link for ONLINE / office address for OFFLINE) plus a calendar
+        // (.ics) invite by email and a best-effort WhatsApp confirmation.
+        notificationService.sendConfirmationWithCalendar(appointment);
 
         // Send in-app notification to student — UserStudent stores userId (Long),
         // not a User entity. We build a lightweight User reference using the stored userId.
@@ -141,9 +337,10 @@ public class BookingService {
             studentUser.setId(student.getUserId());
             notificationService.createInAppNotification(
                     studentUser,
-                    "BOOKING_RECEIVED",
-                    "Counselling Request Received",
-                    "Your counselling request has been received and is under review.",
+                    "BOOKING_CONFIRMED",
+                    "Counselling Session Confirmed",
+                    "Your counselling session has been booked. Check your email for the "
+                            + ("OFFLINE".equals(mode) ? "venue address." : "meeting link."),
                     appointment.getId(),
                     "APPOINTMENT");
         } catch (Exception e) {

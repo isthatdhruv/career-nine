@@ -1,6 +1,7 @@
 package com.kccitm.api.repository.Career9.counselling;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,6 +33,9 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
 
     List<CounsellingSlot> findByCounsellorIdAndDateAndIsBlockedTrue(Long counsellorId, LocalDate date);
 
+    /** Soft-hold sweep: REQUESTED slots whose hold TTL has expired (Counselling Phase 3). */
+    List<CounsellingSlot> findByStatusAndHeldUntilBefore(String status, LocalDateTime cutoff);
+
     /** Find available slots for a specific set of counsellors (institute-filtered) */
     @Query("SELECT s FROM CounsellingSlot s WHERE s.status = 'AVAILABLE' AND s.isBlocked = false "
          + "AND s.counsellor.id IN :counsellorIds AND s.date BETWEEN :start AND :end "
@@ -40,6 +44,9 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
             @Param("counsellorIds") List<Long> counsellorIds,
             @Param("start") LocalDate start,
             @Param("end") LocalDate end);
+
+    /** Slots generated from one template — cleanup when that template is deleted. */
+    List<CounsellingSlot> findByTemplateId(Long templateId);
 
     /** Nullify template_id on every slot — needed before deleting templates */
     @Modifying

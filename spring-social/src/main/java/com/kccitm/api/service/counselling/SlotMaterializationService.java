@@ -101,6 +101,7 @@ public class SlotMaterializationService {
                 slot.setStartTime(slotStart);
                 slot.setEndTime(slotEnd);
                 slot.setDurationMinutes(template.getDefaultSlotDuration());
+                slot.setMode(template.getMode());
                 slot.setStatus("AVAILABLE");
                 slot.setIsManuallyCreated(false);
                 slot.setIsBlocked(false);

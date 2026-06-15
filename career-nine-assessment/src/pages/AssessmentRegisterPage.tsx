@@ -8,6 +8,7 @@ import {
   MappingInfo,
 } from "../api-clients/assessmentMappingAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
+import { TierCard, Tier } from "../components/TierCard"
 
 const AssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>()
@@ -244,6 +245,31 @@ const AssessmentRegisterPage = () => {
     return lines
   })()
 
+  // The single resolved tier for this link, rendered as a B2C-style "Your
+  // selection" card (one active tier — no picker on the B2B side).
+  const inc = mappingInfo?.inclusions
+  const selectionTier: Tier | null = mappingInfo
+    ? {
+        campaignAssessmentTierId: 0,
+        name: mappingInfo.activeTierName || mappingInfo.assessmentName || "Assessment",
+        basePriceInr: amountInr,
+        priceInr: discountedAmountInr,
+        isDefault: false,
+        includesFinalReport: !!inc?.includesFinalReport,
+        includesDashboard: !!inc?.includesDashboard,
+        includesCounselling: !!inc?.includesCounselling,
+        counsellingSessionCount: inc?.counsellingSessionCount ?? null,
+        includesLms: !!inc?.includesLms,
+        lmsValidityDays: inc?.lmsValidityDays ?? null,
+        dashboardValidityDays: inc?.dashboardValidityDays ?? null,
+      }
+    : null
+
+  // Show the selection card when there is anything meaningful to convey
+  // (a named tier, a price, or at least one included feature).
+  const showSelectionCard =
+    !!selectionTier && (!!mappingInfo?.activeTierName || isPaid || inclusionLines.length > 0)
+
   // SESSION level: class dropdown from availableClasses, sections nested as
   // schoolSections under the chosen class.
   const selectedClassSections: any[] = selectedClassId
@@ -461,30 +487,12 @@ const AssessmentRegisterPage = () => {
             {mappingInfo?.sessionYear && ` · ${mappingInfo.sessionYear}`}
           </p>
 
-          {isPaid && (
-            <div style={s.priceBadge}>
-              {promoApplied && discountedAmountInr !== amountInr ? (
-                <>
-                  <span style={{ textDecoration: "line-through", opacity: 0.5, marginRight: 8, fontWeight: 500 }}>
-                    INR {amountInr}
-                  </span>
-                  <span style={{ fontWeight: 800, fontSize: "1.15rem" }}>INR {discountedAmountInr}</span>
-                </>
-              ) : (
-                <span style={{ fontWeight: 800, fontSize: "1.15rem" }}>INR {amountInr}</span>
-              )}
-            </div>
-          )}
-
-          {/* What this link includes (nice-to-have) */}
-          {inclusionLines.length > 0 && (
-            <div style={s.inclusionsBox}>
-              <div style={s.inclusionsTitle}>What's included</div>
-              <ul style={s.inclusionsList}>
-                {inclusionLines.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
+          {/* Your selection — B2C-style tier card showing the resolved tier,
+              its price, and the included features as bullets. */}
+          {showSelectionCard && selectionTier && (
+            <div style={{ marginTop: 18 }}>
+              <div style={s.selectionLabel}>Your selection</div>
+              <TierCard tier={selectionTier} selected disabled onSelect={() => {}} />
             </div>
           )}
         </div>
@@ -973,6 +981,14 @@ const s: { [key: string]: React.CSSProperties } = {
     fontSize: "0.95rem",
     fontWeight: 700,
     border: "1px solid #6ee7b7",
+  },
+  selectionLabel: {
+    fontSize: "0.72rem",
+    fontWeight: 700,
+    color: "#10b981",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    marginBottom: 8,
   },
   inclusionsBox: {
     marginTop: 16,

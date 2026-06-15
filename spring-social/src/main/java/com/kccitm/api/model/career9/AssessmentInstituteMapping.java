@@ -81,6 +81,20 @@ public class AssessmentInstituteMapping implements Serializable {
     @Column(name = "amount")
     private Long amount;
 
+    // Post-assessment monetization timing (mirrors the campaign purchase path).
+    //   PAY_FIRST -> select tier, pay immediately, then book counselling.
+    //   PAY_LATER -> select tier, hold a counselling slot, pay before the
+    //                appointment is confirmed.
+    // Set by the admin at link generation; defaults to PAY_FIRST.
+   
+    // Post-assessment monetization timing (mirrors the campaign purchase path).
+    //   PAY_FIRST -> select tier, pay immediately, then book counselling.
+    //   PAY_LATER -> select tier, hold a counselling slot, pay before the
+    //                appointment is confirmed.
+    // Set by the admin at link generation; defaults to PAY_FIRST.
+    @Column(name = "payment_timing", nullable = false, length = 20)
+    private String paymentTiming = "PAY_FIRST";
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 
@@ -102,6 +116,9 @@ public class AssessmentInstituteMapping implements Serializable {
         }
         if (this.freeActive == null) {
             this.freeActive = true;
+        }
+        if (this.paymentTiming == null) {
+            this.paymentTiming = "PAY_FIRST";
         }
     }
 
@@ -170,6 +187,14 @@ public class AssessmentInstituteMapping implements Serializable {
 
     public void setAmount(Long amount) {
         this.amount = amount;
+    }
+
+    public String getPaymentTiming() {
+        return paymentTiming;
+    }
+
+    public void setPaymentTiming(String paymentTiming) {
+        this.paymentTiming = paymentTiming;
     }
 
     public String getToken() {

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,6 +84,16 @@ public class CampaignPublicController {
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
     @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
+
+    // Phase 3b — pay-before-book for EXTRA counselling sessions.
+    // Fallback per-session price (INR) when the entitlement has no snapshotted price.
+    @org.springframework.beans.factory.annotation.Value("${app.counselling.default-price:500}")
+    private long counsellingDefaultPrice;
+    // How long to hold the slot while the student completes payment (minutes).
+    @org.springframework.beans.factory.annotation.Value("${app.counselling.pay-window-minutes:30}")
+    private long counsellingPayWindowMinutes;
+    @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
+    private String razorpayCallbackBaseUrl;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
@@ -993,6 +1004,43 @@ public class CampaignPublicController {
      * Response: {@code { slots: [...], sessionsRemaining: int }}.
      */
     // @PreAuthorize-Exempt: public b2c funnel — anonymous, gated by entitlement accessToken.
+    /**
+     * Resolve a SCHOOL student's counselling for the assessment thank-you page.
+     * B2C students carry an entitlementId from registration; school students reach
+     * the thank-you page via a fresh login and have none — so the page resolves
+     * their counselling by (userStudentId, assessmentId) instead. Returns the
+     * entitlement's accessToken + session counts so the existing slot picker works
+     * unchanged. {@code counsellingActive:false} when there's nothing to offer.
+     */
+    // @PreAuthorize-Exempt: public funnel — mirrors the other /campaign/public endpoints.
+    @GetMapping("/student-counselling")
+    @Transactional(readOnly = true)
+    public ResponseEntity<?> studentCounselling(@RequestParam Long userStudentId,
+                                                @RequestParam Long assessmentId) {
+        Map<String, Object> out = new HashMap<>();
+        StudentEntitlement e = entitlementService == null ? null
+                : entitlementService.findActiveCounsellingForStudent(userStudentId, assessmentId);
+        if (e == null || e.getAccessToken() == null) {
+            out.put("counsellingActive", false);
+            return ResponseEntity.ok(out);
+        }
+        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
+        out.put("counsellingActive", true);
+        out.put("entitlementId", e.getEntitlementId());
+        out.put("accessToken", e.getAccessToken());
+        out.put("counsellingSessionsTotal", total);
+        out.put("counsellingSessionsUsed", used);
+        Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+        if (usOpt.isPresent() && usOpt.get().getStudentInfo() != null) {
+            StudentInfo si = usOpt.get().getStudentInfo();
+            out.put("studentName", si.getName());
+            out.put("studentEmail", si.getEmail());
+            out.put("studentPhone", si.getPhoneNumber());
+        }
+        return ResponseEntity.ok(out);
+    }
+
     @PostMapping("/counselling/slots")
     @Transactional(readOnly = true)
     public ResponseEntity<?> listCounsellingSlots(@RequestBody Map<String, Object> body) {
@@ -1011,17 +1059,12 @@ public class CampaignPublicController {
         if (e == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
         }
-        if (!Boolean.TRUE.equals(e.getCounsellingActive())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("Counselling is not included in your plan");
-        }
+        // Phase 3b: do NOT reject when counselling isn't included or sessions are
+        // exhausted — those students can still browse slots and pay per session at
+        // booking time. `remaining` is returned so the UI can show free vs paid.
         int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
         int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
-        int remaining = total - used;
-        if (remaining <= 0) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("No counselling sessions remaining");
-        }
+        int remaining = Math.max(0, total - used);
 
         Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
         if (!usOpt.isPresent() || usOpt.get().getInstitute() == null) {
@@ -1041,8 +1084,10 @@ public class CampaignPublicController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body("Counselling booking is not configured on this instance");
         }
+        // Phase 4: restrict to counsellors the admin assigned to this assessment
+        // (falls back to institute-only when the assessment has no assignments).
         List<com.kccitm.api.model.career9.counselling.CounsellingSlot> slots =
-                bookingService.getAvailableSlotsForInstitute(from, instituteCode);
+                bookingService.getAvailableSlotsForInstitute(from, instituteCode, e.getAssessmentId());
 
         List<Map<String, Object>> slotDtos = new ArrayList<>();
         for (com.kccitm.api.model.career9.counselling.CounsellingSlot s : slots) {
@@ -1052,6 +1097,7 @@ public class CampaignPublicController {
             dto.put("startTime", s.getStartTime().toString());
             dto.put("endTime", s.getEndTime().toString());
             dto.put("durationMinutes", s.getDurationMinutes());
+            dto.put("mode", s.getMode() != null ? s.getMode() : "ONLINE");
             if (s.getCounsellor() != null) {
                 dto.put("counsellorName", s.getCounsellor().getName());
             }
@@ -1086,8 +1132,19 @@ public class CampaignPublicController {
         if (entitlementId == null) {
             return ResponseEntity.badRequest().body("entitlementId is required");
         }
+
+        // Basic contact details the student fills in when booking.
+        String contactName = strFromBody(body, "contactName");
+        String contactEmail = strFromBody(body, "contactEmail");
+        String contactPhone = strFromBody(body, "contactPhone");
+        String preferredContactMethod = strFromBody(body, "preferredContactMethod");
+
         if (slotId == null) {
             return ResponseEntity.badRequest().body("slotId is required");
+        }
+        if (contactName == null || contactName.trim().isEmpty()
+                || contactPhone == null || contactPhone.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Contact name and phone are required");
         }
 
         StudentEntitlement e = entitlementService == null
@@ -1095,17 +1152,6 @@ public class CampaignPublicController {
         if (e == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
         }
-        if (!Boolean.TRUE.equals(e.getCounsellingActive())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("Counselling is not included in your plan");
-        }
-        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
-        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
-        if (total - used <= 0) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("No counselling sessions remaining");
-        }
-
         Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
         if (!usOpt.isPresent()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Student not found");
@@ -1117,9 +1163,28 @@ public class CampaignPublicController {
                     .body("Counselling booking is not configured on this instance");
         }
 
+        int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+        int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
+        boolean hasFreeSession = Boolean.TRUE.equals(e.getCounsellingActive()) && (total - used) > 0;
+
+        // Phase 3b: if the entitlement does not include a free session (counselling
+        // inactive, or all included sessions used), route to the pay-before-book flow
+        // instead of rejecting. Returns a Razorpay payment link; the webhook finalises
+        // the held slot on success (PaymentWebhookController.finalizeExtraCounsellingSlot).
+        if (!hasFreeSession) {
+            return initiateCounsellingPayment(e, student, slotId, reason,
+                    contactName, contactEmail, contactPhone, preferredContactMethod);
+        }
+
         try {
+            com.kccitm.api.service.counselling.BookingService.BookingContact contact =
+                    new com.kccitm.api.service.counselling.BookingService.BookingContact(
+                            contactName != null ? contactName.trim() : null,
+                            contactEmail != null ? contactEmail.trim() : null,
+                            contactPhone != null ? contactPhone.trim() : null,
+                            preferredContactMethod != null ? preferredContactMethod.trim() : null);
             com.kccitm.api.model.career9.counselling.CounsellingAppointment appt =
-                    bookingService.bookSlot(slotId, student, reason);
+                    bookingService.bookSlot(slotId, student, reason, contact, entitlementId);
             // Decrement the seat counter on the entitlement. Runs in the same
             // transaction as the booking via Spring's default REQUIRED propagation
             // — if the post-booking save fails, the slot transition rolls back too.
@@ -1128,6 +1193,9 @@ public class CampaignPublicController {
             Map<String, Object> out = new HashMap<>();
             out.put("appointmentId", appt.getId());
             out.put("status", appt.getStatus());
+            out.put("mode", appt.getMode());
+            if (appt.getMeetingLink() != null) out.put("meetingLink", appt.getMeetingLink());
+            if (appt.getLocation() != null) out.put("location", appt.getLocation());
             if (appt.getSlot() != null) {
                 out.put("slotDate", appt.getSlot().getDate().toString());
                 out.put("slotStartTime", appt.getSlot().getStartTime().toString());
@@ -1142,6 +1210,80 @@ public class CampaignPublicController {
         } catch (RuntimeException ex) {
             logger.warn("Counselling booking failed for entitlement {}: {}", entitlementId, ex.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        }
+    }
+
+    /**
+     * Phase 3b pay-before-book: the student's entitlement does not include a free
+     * counselling session, so hold the slot and return a Razorpay payment link. On
+     * payment success the webhook ({@code finalizeExtraCounsellingSlot}) confirms the
+     * appointment from the held slot + contact details stored on the transaction.
+     */
+    private ResponseEntity<?> initiateCounsellingPayment(
+            com.kccitm.api.model.career9.b2c.StudentEntitlement e, UserStudent student, Long slotId,
+            String reason, String contactName, String contactEmail, String contactPhone,
+            String preferredContactMethod) {
+        long price = (e.getCounsellingPrice() != null && e.getCounsellingPrice() > 0)
+                ? e.getCounsellingPrice() : counsellingDefaultPrice;
+        if (price <= 0) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Counselling is not included in your plan and no price is configured.");
+        }
+
+        // Hold the slot for the payment window (fails with 409 if already taken).
+        try {
+            bookingService.holdSlot(slotId, counsellingPayWindowMinutes);
+        } catch (com.kccitm.api.exception.BadRequestException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        }
+
+        try {
+            String referenceId = "CNS-" + slotId + "-" + System.currentTimeMillis()
+                    + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
+            String callbackUrl = (razorpayCallbackBaseUrl != null && !razorpayCallbackBaseUrl.isEmpty())
+                    ? razorpayCallbackBaseUrl + "/payment-status?ref=" + referenceId : null;
+            Map<String, String> notes = new HashMap<>();
+            notes.put("purpose", "COUNSELLING_EXTRA");
+            notes.put("slotId", slotId.toString());
+            notes.put("referenceId", referenceId);
+
+            Map<String, String> link = razorpayService.createPaymentLink(
+                    price, "INR", "Career-9: Counselling session", callbackUrl, referenceId, notes);
+
+            com.kccitm.api.model.career9.PaymentTransaction txn =
+                    new com.kccitm.api.model.career9.PaymentTransaction();
+            txn.setPurpose("COUNSELLING_EXTRA");
+            txn.setAmount(price);
+            txn.setUserStudentId(student.getUserStudentId());
+            txn.setCounsellingSlotId(slotId);
+            txn.setCounsellingContactName(contactName != null ? contactName.trim() : null);
+            txn.setCounsellingContactEmail(contactEmail != null ? contactEmail.trim() : null);
+            txn.setCounsellingContactPhone(contactPhone != null ? contactPhone.trim() : null);
+            txn.setCounsellingContactMethod(preferredContactMethod != null ? preferredContactMethod.trim() : null);
+            txn.setStudentName(contactName != null ? contactName.trim() : null);
+            txn.setStudentEmail(contactEmail != null ? contactEmail.trim() : null);
+            txn.setStudentPhone(contactPhone != null ? contactPhone.trim() : null);
+            txn.setRazorpayLinkId(link.get("linkId"));
+            txn.setPaymentLinkUrl(link.get("paymentLinkUrl"));
+            txn.setShortUrl(link.get("shortUrl"));
+            txn.setStatus("created");
+            txn = paymentTransactionRepository.save(txn);
+
+            Map<String, Object> out = new HashMap<>();
+            out.put("requiresPayment", true);
+            out.put("amount", price);
+            out.put("transactionId", txn.getTransactionId());
+            out.put("paymentUrl", txn.getShortUrl() != null ? txn.getShortUrl() : txn.getPaymentLinkUrl());
+            out.put("slotId", slotId);
+            return ResponseEntity.ok(out);
+        } catch (Exception ex) {
+            // Payment-link creation failed — release the hold so the slot reopens immediately.
+            try { bookingService.releaseHeldSlot(slotId); } catch (Exception ignore) { }
+            logger.error("Counselling payment initiation failed for slot {}: {}", slotId, ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Could not start payment. Please try again.");
         }
     }
 

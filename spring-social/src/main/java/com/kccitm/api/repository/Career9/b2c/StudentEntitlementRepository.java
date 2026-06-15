@@ -31,4 +31,14 @@ public interface StudentEntitlementRepository extends JpaRepository<StudentEntit
     @Query("SELECT e FROM StudentEntitlement e WHERE e.status = 'active' AND e.purchasePath = 'A' " +
            "AND e.grantedAt < :before AND e.userStudentId IS NOT NULL")
     List<StudentEntitlement> findActiveOlderThan(@Param("before") Date before);
+
+    // Active entitlements that include counselling, still have unused sessions,
+    // were granted before :before, and have not yet been nudged to book.
+    @Query("SELECT e FROM StudentEntitlement e WHERE e.status = 'active' " +
+           "AND e.counsellingActive = true " +
+           "AND e.counsellingSessionsTotal > e.counsellingSessionsUsed " +
+           "AND e.counsellingNudgeSentAt IS NULL " +
+           "AND e.userStudentId IS NOT NULL " +
+           "AND e.grantedAt IS NOT NULL AND e.grantedAt < :before")
+    List<StudentEntitlement> findCounsellingNudgeDue(@Param("before") Date before);
 }

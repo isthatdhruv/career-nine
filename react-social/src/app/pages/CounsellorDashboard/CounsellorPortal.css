@@ -304,3 +304,10 @@
   .cp-layout { grid-template-columns: 1fr; }
   .cp-grid-3 { grid-template-columns: 1fr; }
 }
+
+/* react-datepicker: make the wrapper fill its column like a native input */
+.cp-datepicker {
+  display: block;
+  width: 100%;
+}
+

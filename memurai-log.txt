@@ -1,0 +1,9 @@
+[2776] 10 Jun 03:55:33.631 # --- Memurai is starting ---
+[2776] 10 Jun 03:55:33.632 # Memurai Developer version=4.1.2, API=7.2.5, instance-name=, pid=2776, just started
+[2776] 10 Jun 03:55:33.634 # Usage of Memurai Developer Edition in a production environment is prohibited; it also automatically shuts down after 10 days. For more details see: https://www.memurai.com/faq
+[2776] 10 Jun 03:55:33.635 # Configuration loaded
+[2776] 10 Jun 03:55:33.637 * monotonic clock: Windows QueryPerformanceCounter
+[2776] 10 Jun 03:55:33.639 * Running mode=standalone, port=6379.
+[2776] 10 Jun 03:55:33.644 # Memurai QID = D0FB25BF59A218EF;17C2207700694885;821CAF7DB079C852;17C5B877006C80A4
+[2776] 10 Jun 03:55:33.646 * Server initialized
+[2776] 10 Jun 03:55:33.647 * Ready to accept connections tcp

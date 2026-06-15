@@ -54,6 +54,11 @@ public class CounsellingSlot implements Serializable {
     @Column(name = "status", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'AVAILABLE'")
     private String status = "AVAILABLE";
 
+    // Delivery mode for this slot: ONLINE | OFFLINE. Inherited from the
+    // availability template on materialization, or set directly for manual slots.
+    @Column(name = "mode", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'ONLINE'")
+    private String mode = "ONLINE";
+
     @JsonProperty("isManuallyCreated")
     @Column(name = "is_manually_created")
     private Boolean isManuallyCreated = false;
@@ -68,6 +73,12 @@ public class CounsellingSlot implements Serializable {
     @Version
     private Integer version;
 
+    // Soft-hold expiry (Counselling Phase 3): set when the slot is held during the
+    // pick-slot -> pay window. A sweep releases REQUESTED slots whose held_until has
+    // passed and that never became a confirmed appointment. NULL for instant bookings.
+    @Column(name = "held_until")
+    private LocalDateTime heldUntil;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -77,6 +88,7 @@ public class CounsellingSlot implements Serializable {
         if (this.status == null) this.status = "AVAILABLE";
         if (this.isManuallyCreated == null) this.isManuallyCreated = false;
         if (this.isBlocked == null) this.isBlocked = false;
+        if (this.mode == null) this.mode = "ONLINE";
     }
 
     public CounsellingSlot() {
@@ -148,6 +160,14 @@ public class CounsellingSlot implements Serializable {
         this.status = status;
     }
 
+    public String getMode() {
+        return mode;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode;
+    }
+
     @JsonProperty("isManuallyCreated")
     public Boolean getIsManuallyCreated() {
         return isManuallyCreated;
@@ -182,6 +202,14 @@ public class CounsellingSlot implements Serializable {
 
     public void setVersion(Integer version) {
         this.version = version;
+    }
+
+    public LocalDateTime getHeldUntil() {
+        return heldUntil;
+    }
+
+    public void setHeldUntil(LocalDateTime heldUntil) {
+        this.heldUntil = heldUntil;
     }
 
     public LocalDateTime getCreatedAt() {

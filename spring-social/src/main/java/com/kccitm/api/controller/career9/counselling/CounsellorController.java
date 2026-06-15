@@ -20,9 +20,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.model.AuthProvider;
+import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
+import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
+import com.kccitm.api.service.counselling.CounsellorProvisioningService;
 import com.kccitm.api.service.counselling.CounsellorService;
 
 @RestController
@@ -41,7 +45,19 @@ public class CounsellorController {
     private DigitalOceanSpacesService spacesService;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private CounsellorProvisioningService provisioningService;
+
+    @Autowired
     private com.kccitm.api.service.counselling.CounsellingActivityLogService activityLogService;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository appointmentRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository slotRepository;
 
     // Phase 2 (Task 2.2 / HIGH-A): shared BCrypt encoder (replaces inline unsalted SHA-256).
     @Autowired
@@ -73,6 +89,14 @@ public class CounsellorController {
                     .body(Map.of("error", "A counsellor with this email already exists"));
         }
 
+        // Counselling Phase 1: a counsellor authenticates via the unified /auth/login
+        // session, which resolves a local User by email. Reject if that email is already
+        // a local account so we never create an ambiguous duplicate identity.
+        if (userRepository.findByEmailAndProvider(email.trim(), AuthProvider.local) != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "An account with this email already exists"));
+        }
+
         Counsellor counsellor = new Counsellor();
         counsellor.setName(name.trim());
         counsellor.setEmail(email.trim());
@@ -89,6 +113,7 @@ public class CounsellorController {
         if (body.get("bio") != null) counsellor.setBio((String) body.get("bio"));
         if (body.get("languagesSpoken") != null) counsellor.setLanguagesSpoken((String) body.get("languagesSpoken"));
         if (body.get("modeCapability") != null) counsellor.setModeCapability((String) body.get("modeCapability"));
+        if (body.get("officeAddress") != null) counsellor.setOfficeAddress((String) body.get("officeAddress"));
         if (body.get("qualifications") != null) counsellor.setQualifications((String) body.get("qualifications"));
         if (body.get("yearsOfExperience") != null) counsellor.setYearsOfExperience(((Number) body.get("yearsOfExperience")).intValue());
         if (body.get("linkedinProfile") != null) counsellor.setLinkedinProfile((String) body.get("linkedinProfile"));
@@ -96,6 +121,21 @@ public class CounsellorController {
         if (body.get("workTime") != null) counsellor.setWorkTime((String) body.get("workTime"));
         if (body.get("counsellorType") != null) counsellor.setCounsellorType((String) body.get("counsellorType"));
         if (body.get("profileImageUrl") != null) counsellor.setProfileImageUrl((String) body.get("profileImageUrl"));
+
+        // Counselling Phase 1: create the linked local User now (inactive until admin
+        // approval) so the counsellor can sign in via /auth/login once activated. The
+        // counsellor.password_hash is retained for backwards compatibility, but the User
+        // password is the credential the unified login actually checks. Role-group/scope
+        // provisioning happens on approval (CounsellorService.toggleActive).
+        User user = new User();
+        user.setName(name.trim());
+        user.setEmail(email.trim());
+        user.setPhone(phone != null ? phone.trim() : null);
+        user.setProvider(AuthProvider.local);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setIsActive(false);
+        User savedUser = userRepository.save(user);
+        counsellor.setUser(savedUser);
 
         Counsellor saved = counsellorService.create(counsellor);
         logger.info("Counsellor self-registered: {} ({})", saved.getName(), saved.getEmail());
@@ -279,9 +319,74 @@ public class CounsellorController {
     @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/get/by-user/{userId}")
     public ResponseEntity<Counsellor> getByUserId(@PathVariable Long userId) {
-        return counsellorService.getByUserId(userId)
+        Optional<Counsellor> counsellorOpt = counsellorService.getByUserId(userId);
+        // Counselling Phase 1: lazy self-heal. Counsellors created/linked before
+        // V20260610001 (and back-filled by it) have no role-group/scope yet. The first
+        // portal load idempotently provisions an active counsellor's User so future
+        // enforce-mode requests resolve the counsellor permission bundle.
+        counsellorOpt.ifPresent(c -> {
+            if (Boolean.TRUE.equals(c.getIsActive()) && c.getUser() != null) {
+                try {
+                    provisioningService.provision(c.getUser().getId(), null);
+                } catch (Exception e) {
+                    logger.warn("Lazy counsellor provisioning failed for user {}: {}", userId, e.getMessage());
+                }
+            }
+        });
+        return counsellorOpt
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Dashboard summary for a counsellor: today's sessions plus headline counts
+     * (booked vs free slots this week, upcoming, completed, pending).
+     */
+    // no scope arg: identifies by counsellorId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('counsellor.read')")
+    @GetMapping("/{id}/dashboard-summary")
+    public ResponseEntity<?> dashboardSummary(@PathVariable Long id) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate weekEnd = today.plusDays(6);
+
+        // Today's confirmed/in-progress sessions.
+        java.util.List<com.kccitm.api.model.career9.counselling.CounsellingAppointment> todays =
+                appointmentRepository.findByCounsellorIdAndDate(id, today);
+        java.util.List<Map<String, Object>> todaysDtos = new java.util.ArrayList<>();
+        for (com.kccitm.api.model.career9.counselling.CounsellingAppointment a : todays) {
+            Map<String, Object> d = new java.util.HashMap<>();
+            d.put("appointmentId", a.getId());
+            d.put("startTime", a.getSlot() != null ? String.valueOf(a.getSlot().getStartTime()) : null);
+            d.put("status", a.getStatus());
+            d.put("mode", a.getMode());
+            d.put("attended", a.getAttended());
+            d.put("studentName", a.getStudentContactName());
+            d.put("studentPhone", a.getStudentContactPhone());
+            todaysDtos.add(d);
+        }
+
+        // Slot occupancy this week.
+        long freeSlots = 0, bookedSlots = 0;
+        for (com.kccitm.api.model.career9.counselling.CounsellingSlot s :
+                slotRepository.findByCounsellorIdAndDateBetween(id, today, weekEnd)) {
+            String st = s.getStatus();
+            if ("AVAILABLE".equals(st) && !Boolean.TRUE.equals(s.getIsBlocked())) freeSlots++;
+            else if ("REQUESTED".equals(st) || "BOOKED".equals(st)) bookedSlots++;
+        }
+
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("date", today.toString());
+        out.put("todayCount", todays.size());
+        out.put("todaysAppointments", todaysDtos);
+        out.put("freeSlotsThisWeek", freeSlots);
+        out.put("bookedSlotsThisWeek", bookedSlots);
+        out.put("upcomingCount",
+                appointmentRepository.countByCounsellorAndStatusInRange(id, "CONFIRMED", today, today.plusDays(30)));
+        out.put("completedCount",
+                appointmentRepository.countByCounsellorAndStatusInRange(id, "COMPLETED", today.minusDays(365), today.plusDays(1)));
+        out.put("pendingCount",
+                appointmentRepository.countByCounsellorAndStatusInRange(id, "REQUESTED", today, today.plusDays(30)));
+        return ResponseEntity.ok(out);
     }
 
     // no scope arg: update by id; admin-only

@@ -13,3 +13,10 @@ export function setMeetingLink(appointmentId: number, meetingLink: string) { ret
 export function getStudentAppointments(studentId: number) { return axios.get(`${BASE}/by-student/${studentId}`) }
 export function getCounsellorAppointments(counsellorId: number) { return axios.get(`${BASE}/by-counsellor/${counsellorId}`) }
 export function getAppointmentStats() { return axios.get(`${BASE}/stats`) }
+
+// Session check-in (counsellor enters the student's OTP at the start of the session).
+export function startSession(appointmentId: number) { return axios.post(`${BASE}/start/${appointmentId}`) }
+export function verifyCheckin(appointmentId: number, code: string) { return axios.post(`${BASE}/verify-checkin/${appointmentId}`, { code }) }
+
+// Counsellor dashboard headline summary (today's sessions + booked/free/upcoming counts).
+export function getDashboardSummary(counsellorId: number) { return axios.get(`${API_URL}/api/counsellor/${counsellorId}/dashboard-summary`) }

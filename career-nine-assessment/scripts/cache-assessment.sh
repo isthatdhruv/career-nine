@@ -36,6 +36,10 @@ sync_assessment() {
   fi
   echo "  ✓ Fetched assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
 
+  # Clean any mojibake out of the fetched JSON so the frozen static files are
+  # garbled-char free at rest, regardless of what the backend returned.
+  node scripts/sanitize-cache.cjs "$dir"
+
   # Extract base64 images from JSON into separate files (saves ~3.5MB per assessment with images)
   node scripts/extract-assessment-images.cjs "$dir"
 

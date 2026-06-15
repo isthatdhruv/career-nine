@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStudentBranding, brandLogoSrc } from '../hooks/useStudentBranding';
 import { useNavigate } from 'react-router-dom';
-import { getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
+import { getStudentCounselling, getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
 import { TierCard, Tier } from '../components/TierCard';
 import CounsellingSlotPicker from '../components/CounsellingSlotPicker';
+import MappingCounsellingSection from '../components/MappingCounsellingSection';
 import FeatureUpsellModal, { UpsellFeature } from '../components/FeatureUpsellModal';
 import { downloadHtmlAsPdf } from '../utils/htmlToPdf';
 
@@ -38,6 +39,20 @@ type BookedAppointment = {
     slotStartTime?: string;
     counsellorName?: string;
     sessionsRemaining?: number;
+};
+
+// Counselling resolved for a SCHOOL student (who has no entitlementId on this
+// page — they arrived via a fresh login). Resolved by userStudentId + assessmentId
+// via /campaign/public/student-counselling. Drives the same tile + slot picker as
+// the B2C path; the two are mutually exclusive (this is only fetched when there is
+// no B2C upgradeInfo).
+type SchoolCounselling = {
+    entitlementId: number;
+    accessToken: string;
+    sessionsRemaining: number;
+    studentName?: string;
+    studentEmail?: string;
+    studentPhone?: string;
 };
 
 // Compact "Add <feature>" pill rendered above the outcome-tiles row for students
@@ -108,6 +123,12 @@ const ThankYouPage: React.FC = () => {
     // remaining via /upgrade-info and re-renders the CTA correctly.
     const [isSlotPickerOpen, setIsSlotPickerOpen] = useState<boolean>(false);
     const [bookedAppointment, setBookedAppointment] = useState<BookedAppointment | null>(null);
+    // Counselling for a school student (resolved by userStudentId when there is no
+    // B2C entitlementId on this page). Null until resolved / when not applicable.
+    const [schoolCounselling, setSchoolCounselling] = useState<SchoolCounselling | null>(null);
+    // Ensures the slot picker auto-opens at most once per page mount (so the
+    // student isn't trapped re-opening it after they deliberately close it).
+    const autoOpenedPickerRef = useRef<boolean>(false);
     // Which per-feature upsell modal is open, if any. Set by the "Add <feature>"
     // cards; cleared on close / choose. Choosing a tier inside the modal reuses
     // the existing handleChoosePlan navigation — same /upgrade route, same
@@ -159,6 +180,58 @@ const ThankYouPage: React.FC = () => {
             .catch(() => setUpgradeInfo(null))
             .finally(() => setUpgradeInfoLoaded(true));
     }, []);
+
+    // School-student counselling: only when there's no B2C entitlement on this page.
+    // School students log in fresh (no entitlementId) but localStorage carries
+    // userStudentId + assessmentId, so we resolve their counselling by those.
+    useEffect(() => {
+        if (!upgradeInfoLoaded || upgradeInfo) return;
+        const userStudentId = localStorage.getItem('userStudentId');
+        const assessmentId = localStorage.getItem('assessmentId');
+        if (!userStudentId || !assessmentId) return;
+        getStudentCounselling(userStudentId, assessmentId)
+            .then((res) => {
+                const d: any = res?.data || {};
+                if (d.counsellingActive && d.accessToken) {
+                    const total = d.counsellingSessionsTotal ?? 0;
+                    const used = d.counsellingSessionsUsed ?? 0;
+                    setSchoolCounselling({
+                        entitlementId: d.entitlementId,
+                        accessToken: d.accessToken,
+                        sessionsRemaining: Math.max(0, total - used),
+                        studentName: d.studentName,
+                        studentEmail: d.studentEmail,
+                        studentPhone: d.studentPhone,
+                    });
+                }
+            })
+            .catch(() => {});
+    }, [upgradeInfoLoaded, upgradeInfo]);
+
+    // Best-flow: when the student has active counselling with sessions still to
+    // book (paid-first Path A, or returning from payment on Path B), open the
+    // session picker automatically so choosing a time is a guided step rather
+    // than a button they might miss. Fires once per mount and is fully skippable
+    // — closing it leaves them on the thank-you page to book later.
+    useEffect(() => {
+        if (!upgradeInfoLoaded || !upgradeInfo || autoOpenedPickerRef.current) return;
+        const remaining =
+            (upgradeInfo.counsellingSessionsTotal ?? 0) - (upgradeInfo.counsellingSessionsUsed ?? 0);
+        const canBook = !!upgradeInfo.counsellingActive && !!upgradeInfo.accessToken && remaining > 0;
+        if (canBook && !bookedAppointment) {
+            autoOpenedPickerRef.current = true;
+            setIsSlotPickerOpen(true);
+        }
+    }, [upgradeInfoLoaded, upgradeInfo, bookedAppointment]);
+
+    // Same auto-open behaviour for a school student's counselling.
+    useEffect(() => {
+        if (!schoolCounselling || autoOpenedPickerRef.current) return;
+        if (schoolCounselling.sessionsRemaining > 0 && !bookedAppointment) {
+            autoOpenedPickerRef.current = true;
+            setIsSlotPickerOpen(true);
+        }
+    }, [schoolCounselling, bookedAppointment]);
 
     // Once upgrade-info is loaded, if the entitlement is already active (the
     // student paid in advance, Path A — or upgraded from Path B), eagerly
@@ -551,6 +624,12 @@ const ThankYouPage: React.FC = () => {
                                     </div>
                                 )}
 
+                                {/* B2B assessment-mapping: post-assessment counselling tier
+                                    selection. Self-gating — renders only when the mapping
+                                    student must pick a counselling-bearing tier (otherwise
+                                    the existing counselling flow books directly). */}
+                                {!isLoadingContent && <MappingCounsellingSection />}
+
                                 {/* Try-First landing — students who haven't paid yet */}
                                 {!isLoadingContent && showUpgradeCta && upgradeInfo && (
                                     <TryFirstLanding
@@ -742,6 +821,19 @@ const ThankYouPage: React.FC = () => {
                                             }}
                                         >
                                             <div style={{
+                                                display: 'inline-block',
+                                                background: 'rgba(255,255,255,0.25)',
+                                                color: '#fff',
+                                                fontSize: '0.62rem',
+                                                fontWeight: 800,
+                                                letterSpacing: '0.08em',
+                                                padding: '2px 10px',
+                                                borderRadius: 999,
+                                                marginBottom: '0.6rem',
+                                            }}>
+                                                NEXT STEP
+                                            </div>
+                                            <div style={{
                                                 width: '42px',
                                                 height: '42px',
                                                 borderRadius: '10px',
@@ -759,10 +851,74 @@ const ThankYouPage: React.FC = () => {
                                                 </svg>
                                             </div>
                                             <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
-                                                Book Counselling
+                                                Choose your counselling time
                                             </h3>
                                             <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
                                                 {counsellingRemainingFromUpgradeInfo} session{counsellingRemainingFromUpgradeInfo === 1 ? '' : 's'} ready to book
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Book Counselling — school student (resolved by userStudentId,
+                                        no B2C entitlement on this page). Same tile/picker as B2C. */}
+                                    {!upgradeInfo && schoolCounselling && schoolCounselling.sessionsRemaining > 0 && !bookedAppointment && (
+                                        <div
+                                            onClick={handleOpenSlotPicker}
+                                            className="text-center"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #C4B5FD 0%, #8B5CF6 100%)',
+                                                borderRadius: '16px',
+                                                padding: '1.25rem 1.5rem',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.3s ease',
+                                                boxShadow: '0 10px 35px rgba(139, 92, 246, 0.4)',
+                                                width: '100%',
+                                                maxWidth: '280px',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+                                                e.currentTarget.style.boxShadow = '0 15px 45px rgba(139, 92, 246, 0.5)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                e.currentTarget.style.boxShadow = '0 10px 35px rgba(139, 92, 246, 0.4)';
+                                            }}
+                                        >
+                                            <div style={{
+                                                display: 'inline-block',
+                                                background: 'rgba(255,255,255,0.25)',
+                                                color: '#fff',
+                                                fontSize: '0.62rem',
+                                                fontWeight: 800,
+                                                letterSpacing: '0.08em',
+                                                padding: '2px 10px',
+                                                borderRadius: 999,
+                                                marginBottom: '0.6rem',
+                                            }}>
+                                                NEXT STEP
+                                            </div>
+                                            <div style={{
+                                                width: '42px',
+                                                height: '42px',
+                                                borderRadius: '10px',
+                                                background: 'rgba(255,255,255,0.22)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                margin: '0 auto 0.75rem auto',
+                                            }}>
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                                </svg>
+                                            </div>
+                                            <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                                                Choose your counselling time
+                                            </h3>
+                                            <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
+                                                {schoolCounselling.sessionsRemaining} session{schoolCounselling.sessionsRemaining === 1 ? '' : 's'} ready to book
                                             </p>
                                         </div>
                                     )}
@@ -885,13 +1041,16 @@ const ThankYouPage: React.FC = () => {
                 regardless of the layered backgrounds the page draws. Mounted
                 only while open so its initial slot-list fetch fires on each
                 open, not on every render. */}
-            {isSlotPickerOpen && upgradeInfo?.accessToken && (
+            {isSlotPickerOpen && (upgradeInfo?.accessToken || schoolCounselling?.accessToken) && (
                 <CounsellingSlotPicker
-                    accessToken={upgradeInfo.accessToken}
-                    entitlementId={upgradeInfo.entitlementId}
-                    sessionsRemaining={counsellingRemainingFromUpgradeInfo}
+                    accessToken={(upgradeInfo?.accessToken || schoolCounselling?.accessToken) as string}
+                    entitlementId={(upgradeInfo?.entitlementId ?? schoolCounselling?.entitlementId) as number}
+                    sessionsRemaining={upgradeInfo ? counsellingRemainingFromUpgradeInfo : (schoolCounselling?.sessionsRemaining ?? 0)}
                     onClose={handleSlotPickerClose}
                     onBooked={handleSlotBooked}
+                    defaultName={upgradeInfo?.student?.name ?? schoolCounselling?.studentName}
+                    defaultEmail={upgradeInfo?.student?.email ?? schoolCounselling?.studentEmail}
+                    defaultPhone={upgradeInfo?.student?.phone ?? schoolCounselling?.studentPhone}
                 />
             )}
 

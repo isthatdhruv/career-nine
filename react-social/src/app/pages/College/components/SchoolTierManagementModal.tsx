@@ -176,7 +176,7 @@ const SchoolTierManagementModal = ({
 
   return (
     <>
-      <Modal show={show} onHide={onHide} centered size="lg">
+      <Modal show={show} onHide={onHide} centered size="xl">
         <Modal.Header closeButton style={{ borderBottom: "1px solid #f1f5f9", padding: "20px 28px" }}>
           <Modal.Title style={{ fontSize: "1.05rem", fontWeight: 700, color: "#1e293b" }}>
             Pricing Tiers
@@ -328,6 +328,7 @@ const SchoolTierManagementModal = ({
               onChange={(e) => setForm({ ...form, maxRegistrations: e.target.value === "" ? null : Number(e.target.value) })}
             />
           </div>
+
           {/* Included services — what a student who registers under this tier is granted */}
           <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 14 }}>
             <Form.Label style={{ fontWeight: 700, fontSize: "0.8rem", color: "#1e293b" }}>

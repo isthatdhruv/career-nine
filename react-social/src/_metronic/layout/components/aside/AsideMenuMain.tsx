@@ -119,7 +119,11 @@ export function AsideMenuMain() {
 
   const showCounsellorPortal =
     isSuperAdmin ||
-    userRoles.some((r) => r === "COUNSELLOR" || r === "ROLE_COUNSELLOR");
+    // Case-insensitive: the DB role is named 'Counsellor', not 'COUNSELLOR'.
+    userRoles.some((r) => {
+      const u = typeof r === "string" ? r.toUpperCase() : "";
+      return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
+    });
 
   return (
     <>
@@ -679,6 +683,9 @@ export function AsideMenuMain() {
             )}
             {allowed("/admin/counselling-slots") && (
               <AsideMenuItem to="/admin/counselling-slots" title="Create Slots" hasBullet={true} />
+            )}
+            {allowed("/admin/counselling-assignments") && (
+              <AsideMenuItem to="/admin/counselling-assignments" title="Assessment Assignments" hasBullet={true} />
             )}
             {allowed("/admin/counselling-notifications") && (
               <AsideMenuItem to="/admin/counselling-notifications" title="Notifications" hasBullet={true} />

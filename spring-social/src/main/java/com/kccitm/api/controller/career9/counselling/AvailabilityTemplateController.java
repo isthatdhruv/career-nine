@@ -16,8 +16,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import com.kccitm.api.model.career9.counselling.AvailabilityTemplate;
+import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.AvailabilityTemplateRepository;
+import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.service.counselling.SlotMaterializationService;
 
 @RestController
@@ -31,6 +35,9 @@ public class AvailabilityTemplateController {
 
     @Autowired
     private SlotMaterializationService materializationService;
+
+    @Autowired
+    private CounsellingSlotRepository slotRepository;
 
     // no scope arg: body is AvailabilityTemplate; counsellor-scoped admin
     @PreAuthorize("@auth.allows('counselling.availability_template.create')")
@@ -70,6 +77,9 @@ public class AvailabilityTemplateController {
             if (updated.getDefaultSlotDuration() != null) {
                 existing.setDefaultSlotDuration(updated.getDefaultSlotDuration());
             }
+            if (updated.getMode() != null) {
+                existing.setMode(updated.getMode());
+            }
             logger.info("Updating availability template with id: {}", id);
             return ResponseEntity.ok(templateRepository.save(existing));
         }).orElse(ResponseEntity.notFound().build());
@@ -78,8 +88,27 @@ public class AvailabilityTemplateController {
     // no scope arg: delete by id; scope-filter narrows access
     @PreAuthorize("@auth.allows('counselling.availability_template.delete')")
     @DeleteMapping("/delete/{id}")
+    @Transactional
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        logger.info("Deleting availability template with id: {}", id);
+        // Materialized slots hold an FK to the template, so the template row
+        // cannot be deleted while they exist. Unbooked future inventory goes
+        // with the template; anything booked/held stays and is just detached.
+        List<CounsellingSlot> slots = slotRepository.findByTemplateId(id);
+        int deleted = 0, detached = 0;
+        for (CounsellingSlot slot : slots) {
+            boolean unbooked = "AVAILABLE".equals(slot.getStatus())
+                    && !Boolean.TRUE.equals(slot.getIsBlocked());
+            if (unbooked) {
+                slotRepository.delete(slot);
+                deleted++;
+            } else {
+                slot.setTemplate(null);
+                slotRepository.save(slot);
+                detached++;
+            }
+        }
+        logger.info("Deleting availability template {}: removed {} unbooked slots, detached {} booked/blocked slots",
+                id, deleted, detached);
         templateRepository.deleteById(id);
         return ResponseEntity.ok().build();
     }

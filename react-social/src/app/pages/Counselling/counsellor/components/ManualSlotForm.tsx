@@ -12,6 +12,7 @@ const ManualSlotForm: React.FC<ManualSlotFormProps> = ({ counsellorId, onSaved }
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('10:00')
   const [duration, setDuration] = useState(60)
+  const [mode, setMode] = useState<'ONLINE' | 'OFFLINE'>('ONLINE')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -39,11 +40,13 @@ const ManualSlotForm: React.FC<ManualSlotFormProps> = ({ counsellorId, onSaved }
         startTime,
         endTime,
         duration,
+        mode,
       })
       setDate('')
       setStartTime('09:00')
       setEndTime('10:00')
       setDuration(60)
+      setMode('ONLINE')
       setSuccess('Slot added successfully.')
       onSaved()
     } catch {
@@ -145,6 +148,35 @@ const ManualSlotForm: React.FC<ManualSlotFormProps> = ({ counsellorId, onSaved }
               color: 'var(--sp-text, #1A2B28)',
             }}
           />
+        </div>
+
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label
+            style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--sp-muted, #5C7A72)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.04em' }}
+          >
+            Session Mode
+          </label>
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as 'ONLINE' | 'OFFLINE')}
+            style={{
+              width: '100%',
+              padding: '8px 10px',
+              border: '1.5px solid var(--sp-border, #D1E5DF)',
+              borderRadius: 8,
+              fontSize: 14,
+              background: '#fff',
+              color: 'var(--sp-text, #1A2B28)',
+            }}
+          >
+            <option value='ONLINE'>Online (auto meeting link)</option>
+            <option value='OFFLINE'>In-person (office address)</option>
+          </select>
+          {mode === 'OFFLINE' && (
+            <p style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 6 }}>
+              The office address from your profile will be shared with the student.
+            </p>
+          )}
         </div>
       </div>
 
