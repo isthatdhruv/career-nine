@@ -1,6 +1,6 @@
 {
-  "version": "mqas3k83",
-  "generated": "2026-06-12T10:23:28.035Z",
+  "version": "mqeztm3w",
+  "generated": "2026-06-15T09:10:45.548Z",
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -118,32 +118,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-BfRcBdxD.js",
+      "url": "/assets/HydroTubeGame-B19Yiuty.js",
       "size": 23331,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-BTDNd9SO.js",
+      "url": "/assets/JungleSpotGame-CKZoExdB.js",
       "size": 23397,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-BdfrY1ru.js",
+      "url": "/assets/RabbitPathGame-iECA2tPY.js",
       "size": 26981,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-CwvqNAdP.js",
+      "url": "/assets/SectionInstructionPage-CR-Gu-11.js",
       "size": 4206,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-D-duB7Bd.js",
+      "url": "/assets/SectionQuestionPage-DkQ7osoU.js",
       "size": 175861,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-CXQRNUKn.js",
+      "url": "/assets/SelectSectionPage-HferHX6p.js",
       "size": 5255,
       "priority": "critical"
     },
@@ -173,12 +173,12 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-xHxGFC00.js",
-      "size": 1050161,
+      "url": "/assets/index-CwvbNMzx.js",
+      "size": 1072549,
       "priority": "critical"
     },
     {
-      "url": "/assets/index.es-DEdNZCoA.js",
+      "url": "/assets/index.es-Dz_Cgobp.js",
       "size": 158825,
       "priority": "critical"
     },
@@ -230,7 +230,7 @@
   ],
   "summary": {
     "total": 45,
-    "totalSize": 23755845,
+    "totalSize": 23778233,
     "byPriority": {
       "game": {
         "count": 11,
@@ -242,7 +242,7 @@
       },
       "critical": {
         "count": 18,
-        "size": 3325221
+        "size": 3347609
       },
       "other": {
         "count": 4,
