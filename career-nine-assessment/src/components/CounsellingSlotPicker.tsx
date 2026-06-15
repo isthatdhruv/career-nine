@@ -97,6 +97,13 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   const [reason, setReason] = useState<string>('')
   const [booking, setBooking] = useState<boolean>(false)
   const [bookError, setBookError] = useState<string>('')
+  // Confirm-before-leaving: only shown once the student has picked a slot (real
+  // intent), so an immediate open-and-close isn't interrupted.
+  const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false)
+  // Post-booking celebration: holds the confirmed booking so we can show an
+  // encouraging success screen before handing control back to the host page
+  // (which unmounts this picker and flips its tile to the confirmation state).
+  const [bookedResult, setBookedResult] = useState<BookingResult | null>(null)
 
   // Basic contact details — captured once a slot is selected.
   const [contactName, setContactName] = useState<string>(defaultName)
@@ -143,6 +150,17 @@ const CounsellingSlotPicker: React.FC<Props> = ({
     }
   }, [accessToken, entitlementId, from])
 
+  // All three dismiss paths (footer Cancel, header ×, backdrop) route through
+  // here so the leave-confirmation can't be bypassed by clicking outside.
+  const requestClose = () => {
+    if (booking) return
+    if (selectedSlotId != null) {
+      setShowCancelConfirm(true)
+      return
+    }
+    onClose()
+  }
+
   const handleConfirm = async () => {
     if (selectedSlotId == null || booking) return
     if (!contactName.trim() || !contactPhone.trim()) {
@@ -174,7 +192,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         setBookError('Payment is required but no payment link was returned. Please try again.')
         return
       }
-      onBooked(data as BookingResult)
+      // Show the encouraging success screen first; onBooked is called when the
+      // student taps "Got it!", which hands control back to the host page.
+      setBookedResult(data as BookingResult)
     } catch (err: any) {
       const body = err?.response?.data
       setBookError(typeof body === 'string' ? body : 'Could not confirm your booking. Please try again.')
@@ -185,7 +205,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
 
   return (
     <div
-      onClick={onClose}
+      onClick={requestClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -226,13 +246,10 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
               Book a Counselling Session
             </h2>
-            <div style={{ fontSize: '0.82rem', opacity: 0.9, marginTop: 2 }}>
-              {sessionsRemaining} session{sessionsRemaining === 1 ? '' : 's'} remaining
-            </div>
           </div>
           <button
             type='button'
-            onClick={onClose}
+            onClick={requestClose}
             style={{
               background: 'transparent',
               border: 'none',
@@ -310,11 +327,6 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                       <div style={{ fontWeight: 600 }}>
                         {formatTime(s.startTime)} – {formatTime(s.endTime)}
                       </div>
-                      {s.counsellorName && (
-                        <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: 2 }}>
-                          {s.counsellorName}
-                        </div>
-                      )}
                       <div style={modeBadgeStyle(s.mode === 'OFFLINE', isSelected)}>
                         {s.mode === 'OFFLINE' ? 'In-person' : 'Online'}
                       </div>
@@ -437,7 +449,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             gap: 10,
           }}
         >
-          <button type='button' onClick={onClose} style={btnSecondaryStyle}>
+          <button type='button' onClick={requestClose} style={btnSecondaryStyle}>
             Cancel
           </button>
           <button
@@ -450,6 +462,73 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      {/* Leave-confirmation — a deliberate interruption when a student tries to
+          walk away after picking a slot. Reframes leaving as a real loss. */}
+      {showCancelConfirm && !bookedResult && (
+        <div onClick={(e) => e.stopPropagation()} style={confirmOverlayStyle}>
+          <div style={confirmCardStyle}>
+            <div style={{ fontSize: '1.6rem', lineHeight: 1, marginBottom: 10 }}>⚠️</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 800, color: '#991B1B' }}>
+              Are you sure?
+            </h3>
+            <p style={{ margin: '0 0 18px', fontSize: '0.9rem', color: '#475569', lineHeight: 1.5 }}>
+              This is a life-changing opportunity. You just completed your assessment — your
+              counsellor is ready to turn those results into a real plan for your future.
+              <br />
+              <strong>Walk away now, and you leave that on the table.</strong>
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                type='button'
+                onClick={() => setShowCancelConfirm(false)}
+                style={btnPrimaryStyle(false)}
+              >
+                No, take me to my session
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  setShowCancelConfirm(false)
+                  onClose()
+                }}
+                style={btnGhostDangerStyle}
+              >
+                Yes, cancel anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post-booking celebration — affirms the choice before handing back to
+          the host page. "Got it!" calls onBooked, which unmounts this picker. */}
+      {bookedResult && (
+        <div onClick={(e) => e.stopPropagation()} style={confirmOverlayStyle}>
+          <div style={successCardStyle}>
+            <div style={{ fontSize: '1.8rem', lineHeight: 1, marginBottom: 10 }}>🎉</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.15rem', fontWeight: 800, color: '#065F46' }}>
+              You just made a great decision
+            </h3>
+            <p style={{ margin: '0 0 14px', fontSize: '0.9rem', color: '#047857', lineHeight: 1.5 }}>
+              Booking this session is one of the smartest moves you can make for your future.
+              This is where your assessment turns into a real plan.
+            </p>
+            {bookedResult.slotDate && bookedResult.slotStartTime && (
+              <div style={successWhenStyle}>
+                📅 {formatDateHeader(bookedResult.slotDate)} · {formatTime(bookedResult.slotStartTime)}
+              </div>
+            )}
+            <button
+              type='button'
+              onClick={() => onBooked(bookedResult)}
+              style={{ ...btnPrimaryStyle(false), width: '100%', marginTop: 16 }}
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -552,6 +631,66 @@ function slotChipStyle(selected: boolean): React.CSSProperties {
     textAlign: 'left',
     boxShadow: selected ? '0 6px 18px rgba(99, 102, 241, 0.35)' : 'none',
   }
+}
+
+// Overlay that sits on top of the picker for the leave-confirmation and the
+// post-booking celebration. Darkens the picker behind so the card is the focus.
+const confirmOverlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: 'rgba(15, 23, 42, 0.45)',
+  zIndex: 1100,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '1.25rem',
+}
+
+const confirmCardStyle: React.CSSProperties = {
+  background: '#fff',
+  borderRadius: 16,
+  padding: '1.5rem',
+  width: '100%',
+  maxWidth: 360,
+  textAlign: 'center',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+  borderTop: '4px solid #EF4444',
+}
+
+const successCardStyle: React.CSSProperties = {
+  background: 'linear-gradient(180deg, #F0FDF4 0%, #ffffff 60%)',
+  borderRadius: 16,
+  padding: '1.75rem 1.5rem',
+  width: '100%',
+  maxWidth: 360,
+  textAlign: 'center',
+  boxShadow: '0 20px 60px rgba(16, 185, 129, 0.35)',
+  border: '1.5px solid #6EE7B7',
+}
+
+const successWhenStyle: React.CSSProperties = {
+  display: 'inline-block',
+  background: '#ECFDF5',
+  border: '1px solid #A7F3D0',
+  color: '#065F46',
+  fontWeight: 700,
+  fontSize: '0.9rem',
+  padding: '0.5rem 0.9rem',
+  borderRadius: 10,
+}
+
+// Understated "leave anyway" action — deliberately lower-weight than the
+// gradient "stay" button so leaving feels like the harder choice.
+const btnGhostDangerStyle: React.CSSProperties = {
+  background: 'transparent',
+  color: '#94A3B8',
+  border: 'none',
+  padding: '0.5rem 1rem',
+  borderRadius: 10,
+  fontSize: '0.86rem',
+  fontWeight: 500,
+  cursor: 'pointer',
+  textDecoration: 'underline',
 }
 
 const btnSecondaryStyle: React.CSSProperties = {

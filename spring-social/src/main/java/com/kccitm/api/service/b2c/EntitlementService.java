@@ -467,7 +467,20 @@ public class EntitlementService {
         e.setCounsellingActive(Boolean.TRUE.equals(e.getCounsellingActive()) || inc.counselling);
         e.setLmsActive(Boolean.TRUE.equals(e.getLmsActive()) || inc.lms);
 
-        int newSessions = inc.counsellingSessionCount != null ? inc.counsellingSessionCount : 0;
+        // A tier with the counselling toggle ON must always grant at least one
+        // bookable session, even if the admin left the session-count field blank.
+        // Otherwise counsellingActive=true but counsellingSessionsTotal=0, and every
+        // "(total - used) > 0" gate (canBookNow, hasFreeSession, showCounsellingButton,
+        // the active-counselling query) hides the slot-booking option despite
+        // counselling being enabled. The toggle alone should unlock booking.
+        int newSessions;
+        if (inc.counselling) {
+            newSessions = (inc.counsellingSessionCount != null && inc.counsellingSessionCount > 0)
+                    ? inc.counsellingSessionCount
+                    : 1;
+        } else {
+            newSessions = inc.counsellingSessionCount != null ? inc.counsellingSessionCount : 0;
+        }
         int curSessions = e.getCounsellingSessionsTotal() != null ? e.getCounsellingSessionsTotal() : 0;
         e.setCounsellingSessionsTotal(Math.max(curSessions, newSessions));
 

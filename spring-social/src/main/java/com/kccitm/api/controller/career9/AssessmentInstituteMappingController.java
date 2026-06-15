@@ -1076,7 +1076,7 @@ public class AssessmentInstituteMappingController {
         }
         List<Map<String, Object>> slots = new java.util.ArrayList<>();
         for (com.kccitm.api.model.career9.counselling.CounsellingSlot s :
-                bookingService.getAvailableSlotsForInstitute(weekStart, instituteCode)) {
+                bookingService.getAvailableSlotsForInstitute(weekStart, instituteCode, ent.getAssessmentId())) {
             Map<String, Object> sm = new HashMap<>();
             sm.put("slotId", s.getId());
             sm.put("date", s.getDate() != null ? s.getDate().toString() : null);
