@@ -50,6 +50,9 @@ type SchoolCounselling = {
     entitlementId: number;
     accessToken: string;
     sessionsRemaining: number;
+    // True when a counsellor is assigned to the assessment — counselling is offered
+    // as an optional add-on regardless of the tier's counselling toggle / session count.
+    offered: boolean;
     studentName?: string;
     studentEmail?: string;
     studentPhone?: string;
@@ -123,6 +126,10 @@ const ThankYouPage: React.FC = () => {
     // remaining via /upgrade-info and re-renders the CTA correctly.
     const [isSlotPickerOpen, setIsSlotPickerOpen] = useState<boolean>(false);
     const [bookedAppointment, setBookedAppointment] = useState<BookedAppointment | null>(null);
+    // Loss-framed confirm when the student tries to abandon the slot picker, and the
+    // celebratory "you made a great decision" modal shown right after a booking.
+    const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false);
+    const [showBookedCelebration, setShowBookedCelebration] = useState<boolean>(false);
     // Counselling for a school student (resolved by userStudentId when there is no
     // B2C entitlementId on this page). Null until resolved / when not applicable.
     const [schoolCounselling, setSchoolCounselling] = useState<SchoolCounselling | null>(null);
@@ -192,13 +199,17 @@ const ThankYouPage: React.FC = () => {
         getStudentCounselling(userStudentId, assessmentId)
             .then((res) => {
                 const d: any = res?.data || {};
-                if (d.counsellingActive && d.accessToken) {
+                // Show the optional booking whenever counselling is OFFERED (a counsellor
+                // is assigned to the assessment) and we have a token to book with — not
+                // gated on the tier's counselling toggle or session count.
+                if (d.counsellingOffered && d.accessToken) {
                     const total = d.counsellingSessionsTotal ?? 0;
                     const used = d.counsellingSessionsUsed ?? 0;
                     setSchoolCounselling({
                         entitlementId: d.entitlementId,
                         accessToken: d.accessToken,
                         sessionsRemaining: Math.max(0, total - used),
+                        offered: true,
                         studentName: d.studentName,
                         studentEmail: d.studentEmail,
                         studentPhone: d.studentPhone,
@@ -224,10 +235,13 @@ const ThankYouPage: React.FC = () => {
         }
     }, [upgradeInfoLoaded, upgradeInfo, bookedAppointment]);
 
-    // Same auto-open behaviour for a school student's counselling.
+    // As soon as counselling is offered for the assessment (a counsellor is assigned),
+    // auto-open the slot picker so the student immediately sees the assigned counsellor's
+    // slots. It stays opt-in — picking a slot is their choice; closing it leaves them on
+    // the thank-you page with the "Want career counselling?" card to re-open later.
     useEffect(() => {
         if (!schoolCounselling || autoOpenedPickerRef.current) return;
-        if (schoolCounselling.sessionsRemaining > 0 && !bookedAppointment) {
+        if (schoolCounselling.offered && !bookedAppointment) {
             autoOpenedPickerRef.current = true;
             setIsSlotPickerOpen(true);
         }
@@ -377,7 +391,14 @@ const ThankYouPage: React.FC = () => {
     };
 
     const handleOpenSlotPicker = () => setIsSlotPickerOpen(true);
-    const handleSlotPickerClose = () => setIsSlotPickerOpen(false);
+    // Closing the picker is intercepted by a loss-framed "are you sure?" confirm —
+    // we don't let the student walk away from booking without one nudge.
+    const handleSlotPickerClose = () => setShowCancelConfirm(true);
+    const dismissCancelConfirm = () => setShowCancelConfirm(false);          // "No, take me to my session"
+    const confirmCancelBooking = () => {                                     // "Yes, cancel anyway"
+        setShowCancelConfirm(false);
+        setIsSlotPickerOpen(false);
+    };
     const handleSlotBooked = (result: BookedAppointment) => {
         // Snapshot the booking so the Counselling tile flips to its confirmation
         // state without an extra round-trip. counsellingRemaining decreases by one
@@ -386,6 +407,20 @@ const ThankYouPage: React.FC = () => {
         // download-ready state for paid students.
         setBookedAppointment(result);
         setIsSlotPickerOpen(false);
+        setShowBookedCelebration(true);   // celebratory "great decision" modal
+    };
+
+    // "Tue, 17 Jun · 3:00 PM" from slotDate (yyyy-MM-dd) + slotStartTime (HH:mm:ss).
+    const formatApptWhen = (date?: string, time?: string): string => {
+        if (!date || !time) return '';
+        try {
+            const d = new Date(`${date}T${time}`);
+            const day = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+            const t = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            return `${day} · ${t}`;
+        } catch {
+            return `${date} · ${time}`;
+        }
     };
 
     const submitRating = async (rating: number) => {
@@ -861,7 +896,7 @@ const ThankYouPage: React.FC = () => {
 
                                     {/* Book Counselling — school student (resolved by userStudentId,
                                         no B2C entitlement on this page). Same tile/picker as B2C. */}
-                                    {!upgradeInfo && schoolCounselling && schoolCounselling.sessionsRemaining > 0 && !bookedAppointment && (
+                                    {!upgradeInfo && schoolCounselling && schoolCounselling.offered && !bookedAppointment && (
                                         <div
                                             onClick={handleOpenSlotPicker}
                                             className="text-center"
@@ -915,10 +950,10 @@ const ThankYouPage: React.FC = () => {
                                                 </svg>
                                             </div>
                                             <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
-                                                Choose your counselling time
+                                                Book your career counselling
                                             </h3>
                                             <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
-                                                {schoolCounselling.sessionsRemaining} session{schoolCounselling.sessionsRemaining === 1 ? '' : 's'} ready to book
+                                                Pick a slot to talk to a counsellor
                                             </p>
                                         </div>
                                     )}
@@ -1054,6 +1089,62 @@ const ThankYouPage: React.FC = () => {
                 />
             )}
 
+            {/* Loss-framed "are you sure?" — shown OVER the open picker when the student
+                tries to close it without booking. One nudge before they walk away. */}
+            {showCancelConfirm && (
+                <div style={overlayStyle(1100)} onClick={dismissCancelConfirm}>
+                    <div onClick={(e) => e.stopPropagation()} style={dialogCardStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                            <span style={{ fontSize: '1.6rem' }}>⚠️</span>
+                            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0F172A' }}>
+                                Are you sure?
+                            </h3>
+                        </div>
+                        <p style={{ margin: '0 0 20px', fontSize: '0.95rem', lineHeight: 1.6, color: '#475569' }}>
+                            This is a <strong style={{ color: '#0F172A' }}>life-changing opportunity.</strong> You just
+                            completed your assessment — your counsellor is ready to turn those results into a real plan
+                            for your future. Walk away now, and you leave that on the table.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <button type="button" onClick={dismissCancelConfirm} style={primaryBtnStyle}>
+                                No, take me to my session
+                            </button>
+                            <button type="button" onClick={confirmCancelBooking} style={ghostBtnStyle}>
+                                Yes, cancel anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Celebratory affirmation right after a successful booking. */}
+            {showBookedCelebration && bookedAppointment && (
+                <div style={overlayStyle(1100)} onClick={() => setShowBookedCelebration(false)}>
+                    <div onClick={(e) => e.stopPropagation()} style={celebrationCardStyle}>
+                        <div style={{ fontSize: '2.6rem', marginBottom: 8 }}>🎉</div>
+                        <h3 style={{ margin: '0 0 10px', fontSize: '1.3rem', fontWeight: 800, color: '#065F46' }}>
+                            You just made a great decision
+                        </h3>
+                        <p style={{ margin: '0 0 16px', fontSize: '0.92rem', lineHeight: 1.6, color: '#047857' }}>
+                            Booking this session is one of the smartest moves you can make for your future. This is where
+                            your assessment turns into a real plan.
+                        </p>
+                        <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 8,
+                            background: '#fff', border: '1.5px solid #6EE7B7', borderRadius: 12,
+                            padding: '10px 18px', marginBottom: 20,
+                            fontWeight: 800, color: '#065F46', fontSize: '0.98rem',
+                        }}>
+                            <span>📅</span>
+                            <span>{formatApptWhen(bookedAppointment.slotDate, bookedAppointment.slotStartTime) || 'Your counsellor will reach out shortly'}</span>
+                        </div>
+                        <button type="button" onClick={() => setShowBookedCelebration(false)} style={{ ...primaryBtnStyle, width: '100%' }}>
+                            Got it!
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Per-feature tier-picker modal. Pre-filtered tier list comes from
                 upsellTiersFor[feature]; choosing one navigates to the same
                 /c/{slug}/{aid}/upgrade/{eid}?tier=… route the existing CTA uses,
@@ -1072,6 +1163,35 @@ const ThankYouPage: React.FC = () => {
             )}
         </>
     );
+};
+
+// ── Modal styles (cancel-confirm + booking celebration) ──
+const overlayStyle = (z: number): React.CSSProperties => ({
+    position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 16, zIndex: z, backdropFilter: 'blur(2px)',
+});
+const dialogCardStyle: React.CSSProperties = {
+    background: '#fff', borderRadius: 18, maxWidth: 420, width: '100%',
+    padding: '1.75rem', boxShadow: '0 24px 70px rgba(0,0,0,0.35)',
+    fontFamily: 'inherit', textAlign: 'left',
+};
+const celebrationCardStyle: React.CSSProperties = {
+    background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
+    border: '1.5px solid #6EE7B7', borderRadius: 18, maxWidth: 420, width: '100%',
+    padding: '2rem 1.75rem', boxShadow: '0 24px 70px rgba(16,185,129,0.3)',
+    fontFamily: 'inherit', textAlign: 'center',
+};
+const primaryBtnStyle: React.CSSProperties = {
+    padding: '13px 20px', border: 'none', borderRadius: 12,
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    color: '#fff', fontWeight: 700, fontSize: '0.98rem', cursor: 'pointer',
+    boxShadow: '0 4px 16px rgba(16,185,129,0.32)', width: '100%',
+};
+const ghostBtnStyle: React.CSSProperties = {
+    padding: '11px 20px', border: '1.5px solid #E2E8F0', borderRadius: 12,
+    background: 'transparent', color: '#64748B', fontWeight: 600,
+    fontSize: '0.9rem', cursor: 'pointer', width: '100%',
 };
 
 type TryFirstLandingProps = {

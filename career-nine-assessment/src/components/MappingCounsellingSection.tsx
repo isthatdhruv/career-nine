@@ -6,17 +6,19 @@ import {
   type CounsellingTierOption,
 } from '../api-clients/assessmentMappingAPI';
 import MappingPayLaterBooking from './MappingPayLaterBooking';
+import CounsellingSlotPicker from './CounsellingSlotPicker';
 import { TierCard, Tier } from './TierCard';
 
 /**
- * Post-assessment counselling tier selection for the B2B assessment-mapping
- * flow. Mounted on the thank-you page. Renders nothing unless the student needs
- * to pick a counselling-bearing tier (i.e. their current tier did not already
- * include counselling — in which case the existing thank-you flow books directly).
+ * Post-assessment counselling for the B2B assessment-mapping flow. Mounted on
+ * the thank-you page. Two cases:
  *
- *  PAY_FIRST -> pick a tier, pay (Razorpay), then book (after returning, the
- *               thank-you page's existing counselling flow opens the slot picker).
- *  PAY_LATER -> pick a tier, choose a slot, pay before the appointment confirms.
+ *  1. The student's tier already includes counselling (canBookNow) -> show the
+ *     slot-booking CTA directly, so the counselling toggle being on is enough
+ *     for booking to appear (no session-count threshold).
+ *  2. The student must first pick a counselling-bearing tier (needsTierSelection):
+ *       PAY_FIRST -> pick a tier, pay (Razorpay), then book.
+ *       PAY_LATER -> pick a tier, choose a slot, pay before the appointment confirms.
  */
 const MappingCounsellingSection: React.FC = () => {
   const [opts, setOpts] = useState<CounsellingOptions | null>(null);
@@ -25,6 +27,9 @@ const MappingCounsellingSection: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [payLaterOpen, setPayLaterOpen] = useState(false);
+  // Direct-booking case (tier already includes counselling).
+  const [slotPickerOpen, setSlotPickerOpen] = useState(false);
+  const [booked, setBooked] = useState<any | null>(null);
 
   const userStudentId = localStorage.getItem('userStudentId');
   const assessmentId = localStorage.getItem('assessmentId');
@@ -40,9 +45,98 @@ const MappingCounsellingSection: React.FC = () => {
       .finally(() => setLoaded(true));
   }, [userStudentId, assessmentId]);
 
-  // Only this component's concern: the tier-selection case. When the student can
-  // already book (tier included counselling), the thank-you page handles it.
-  if (!loaded || !opts || !opts.needsTierSelection || opts.tiers.length === 0) {
+  if (!loaded || !opts) {
+    return null;
+  }
+
+  // Case 1: the student already has counselling (toggle on + a bookable session).
+  // Show the slot-booking CTA directly — the counselling toggle alone is enough,
+  // regardless of how many sessions the tier grants.
+  if (opts.canBookNow && opts.accessToken) {
+    return (
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
+          border: '1.5px solid #6EE7B7',
+          borderRadius: 16,
+          padding: '1.5rem',
+          margin: '1.5rem auto',
+          maxWidth: 520,
+          textAlign: 'left',
+        }}
+      >
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+          Career counselling
+        </div>
+        <h3 style={{ margin: '0 0 6px', fontSize: '1.15rem', fontWeight: 800, color: '#065F46' }}>
+          Talk to a career counsellor
+        </h3>
+
+        {booked ? (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #A7F3D0 0%, #10B981 100%)',
+              borderRadius: 12,
+              padding: '1rem 1.25rem',
+              color: '#fff',
+              marginTop: 10,
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: 2 }}>
+              🎉 Your session is booked!
+            </div>
+            <div style={{ fontSize: '0.85rem', opacity: 0.95 }}>
+              {booked.slotDate && booked.slotStartTime
+                ? `${booked.slotDate} · ${booked.slotStartTime}`
+                : 'Your counsellor will reach out shortly.'}
+              <br />
+              We've sent the details to your email and WhatsApp.
+            </div>
+          </div>
+        ) : (
+          <>
+            <p style={{ margin: '0 0 16px', fontSize: '0.9rem', color: '#047857', lineHeight: 1.5 }}>
+              Your plan includes a one-on-one counselling session. Pick a time that works for you.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSlotPickerOpen(true)}
+              style={{
+                width: '100%',
+                padding: '13px 20px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 12,
+                fontWeight: 700,
+                fontSize: '0.98rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(16,185,129,0.32)',
+              }}
+            >
+              Book your counselling slot →
+            </button>
+          </>
+        )}
+
+        {slotPickerOpen && (
+          <CounsellingSlotPicker
+            accessToken={opts.accessToken}
+            entitlementId={opts.entitlementId}
+            sessionsRemaining={opts.sessionsRemaining}
+            onClose={() => setSlotPickerOpen(false)}
+            onBooked={(result) => {
+              setBooked(result);
+              setSlotPickerOpen(false);
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Case 2: the student must first pick a counselling-bearing tier.
+  if (!opts.needsTierSelection || opts.tiers.length === 0) {
     return null;
   }
 

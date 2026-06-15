@@ -94,11 +94,11 @@ public class BookingService {
     }
 
     /**
-     * Counselling Phase 4: available slots for the institute, further restricted to the
-     * counsellor(s) the admin assigned to {@code assessmentId}. If the assessment has no
-     * active assignments, this is equivalent to {@link #getAvailableSlotsForInstitute}
-     * (institute filter only) so existing flows keep working. The two filters are
-     * intersected — a counsellor must serve the institute AND be assigned to the assessment.
+     * Counselling Phase 4: available slots for the counsellor(s) the admin assigned to
+     * {@code assessmentId}. Counsellors are mapped to ASSESSMENTS, not institutes — so the
+     * assignment is the primary (and usually only) driver of which slots a student sees,
+     * regardless of their institute. The institute mapping is only a fallback for
+     * assessments that have no explicit counsellor assignment (keeps legacy flows working).
      */
     public List<CounsellingSlot> getAvailableSlotsForInstitute(LocalDate weekStart, Integer instituteCode,
                                                                Long assessmentId) {
@@ -107,25 +107,34 @@ public class BookingService {
         LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
         if (effectiveStart.isAfter(weekEnd)) return List.of();
 
-        List<Long> counsellorIds = counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
-        if (counsellorIds.isEmpty()) {
-            logger.info("No counsellors allocated to institute {} — returning empty slots", instituteCode);
-            return List.of();
-        }
+        // Primary: counsellors assigned to this assessment (institute-independent).
+        List<Long> counsellorIds = assessmentId != null
+                ? assessmentAssignmentRepository.findActiveCounsellorIdsForAssessment(assessmentId)
+                : List.of();
 
-        if (assessmentId != null) {
-            List<Long> assigned = assessmentAssignmentRepository.findActiveCounsellorIdsForAssessment(assessmentId);
-            if (!assigned.isEmpty()) {
-                counsellorIds = counsellorIds.stream().filter(assigned::contains).collect(Collectors.toList());
-                if (counsellorIds.isEmpty()) {
-                    logger.info("No counsellor both serves institute {} and is assigned to assessment {} — empty slots",
-                            instituteCode, assessmentId);
-                    return List.of();
-                }
+        // Fallback: only when no counsellor is assigned to the assessment, fall back to
+        // the institute's allocated counsellors so legacy (unassigned) flows still work.
+        if (counsellorIds.isEmpty()) {
+            counsellorIds = counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
+            if (counsellorIds.isEmpty()) {
+                logger.info("No counsellor assigned to assessment {} and none mapped to institute {} — empty slots",
+                        assessmentId, instituteCode);
+                return List.of();
             }
         }
         return filterOutPastSlots(
                 slotRepository.findAvailableSlotsForCounsellors(counsellorIds, effectiveStart, weekEnd));
+    }
+
+    /**
+     * Counselling is "offered" for an assessment when the admin has assigned at least one
+     * active counsellor to it. This is the single switch that decides whether a student is
+     * shown the optional slot-booking after finishing the assessment — independent of the
+     * tier's counselling toggle, session count, or the student's institute.
+     */
+    public boolean hasCounsellorForAssessment(Long assessmentId) {
+        if (assessmentId == null) return false;
+        return !assessmentAssignmentRepository.findActiveCounsellorIdsForAssessment(assessmentId).isEmpty();
     }
 
     private List<CounsellingSlot> filterOutPastSlots(List<CounsellingSlot> slots) {

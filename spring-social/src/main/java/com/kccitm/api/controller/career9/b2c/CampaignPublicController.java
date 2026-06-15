@@ -1018,9 +1018,26 @@ public class CampaignPublicController {
     public ResponseEntity<?> studentCounselling(@RequestParam Long userStudentId,
                                                 @RequestParam Long assessmentId) {
         Map<String, Object> out = new HashMap<>();
-        StudentEntitlement e = entitlementService == null ? null
-                : entitlementService.findActiveCounsellingForStudent(userStudentId, assessmentId);
-        if (e == null || e.getAccessToken() == null) {
+        // Counselling is OFFERED for an assessment whenever the admin has assigned a
+        // counsellor to it. It's an OPTIONAL add-on the student may book after finishing
+        // the assessment — NOT gated on the tier's counselling toggle or session count,
+        // and not auto-given. (Counsellors are mapped to assessments, not institutes.)
+        boolean offered = bookingService != null && bookingService.hasCounsellorForAssessment(assessmentId);
+        out.put("counsellingOffered", offered);
+        if (!offered) {
+            out.put("counsellingActive", false);
+            return ResponseEntity.ok(out);
+        }
+        // Resolve any active entitlement for this (student, assessment) to obtain a booking
+        // token — every provisioned student has one, regardless of counselling inclusion.
+        StudentEntitlement e = null;
+        if (studentEntitlementRepository != null) {
+            for (StudentEntitlement cand : studentEntitlementRepository
+                    .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
+                if ("active".equals(cand.getStatus()) && cand.getAccessToken() != null) { e = cand; break; }
+            }
+        }
+        if (e == null) {
             out.put("counsellingActive", false);
             return ResponseEntity.ok(out);
         }
@@ -1165,13 +1182,14 @@ public class CampaignPublicController {
 
         int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
         int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
-        boolean hasFreeSession = Boolean.TRUE.equals(e.getCounsellingActive()) && (total - used) > 0;
+        boolean tierGrantedSession = Boolean.TRUE.equals(e.getCounsellingActive()) && (total - used) > 0;
+        // Counselling is a free, optional add-on for any assessment that has an assigned
+        // counsellor — booking is allowed regardless of the tier's session count.
+        boolean offered = bookingService.hasCounsellorForAssessment(e.getAssessmentId());
 
-        // Phase 3b: if the entitlement does not include a free session (counselling
-        // inactive, or all included sessions used), route to the pay-before-book flow
-        // instead of rejecting. Returns a Razorpay payment link; the webhook finalises
-        // the held slot on success (PaymentWebhookController.finalizeExtraCounsellingSlot).
-        if (!hasFreeSession) {
+        // Only fall back to the pay-before-book flow when counselling is NOT offered for
+        // this assessment AND the tier didn't include a free session.
+        if (!offered && !tierGrantedSession) {
             return initiateCounsellingPayment(e, student, slotId, reason,
                     contactName, contactEmail, contactPhone, preferredContactMethod);
         }
@@ -1185,10 +1203,13 @@ public class CampaignPublicController {
                             preferredContactMethod != null ? preferredContactMethod.trim() : null);
             com.kccitm.api.model.career9.counselling.CounsellingAppointment appt =
                     bookingService.bookSlot(slotId, student, reason, contact, entitlementId);
-            // Decrement the seat counter on the entitlement. Runs in the same
-            // transaction as the booking via Spring's default REQUIRED propagation
-            // — if the post-booking save fails, the slot transition rolls back too.
-            entitlementService.consumeCounsellingSession(entitlementId);
+            // Decrement the seat counter only when the tier actually granted a session;
+            // free offered-counselling bookings (no tier session) don't consume a seat.
+            // Runs in the same transaction as the booking via Spring's default REQUIRED
+            // propagation — if the post-booking save fails, the slot transition rolls back too.
+            if (tierGrantedSession) {
+                entitlementService.consumeCounsellingSession(entitlementId);
+            }
 
             Map<String, Object> out = new HashMap<>();
             out.put("appointmentId", appt.getId());
@@ -1203,7 +1224,7 @@ public class CampaignPublicController {
                     out.put("counsellorName", appt.getSlot().getCounsellor().getName());
                 }
             }
-            out.put("sessionsRemaining", total - used - 1);
+            out.put("sessionsRemaining", Math.max(0, total - used - (tierGrantedSession ? 1 : 0)));
             return ResponseEntity.ok(out);
         } catch (com.kccitm.api.exception.BadRequestException ex) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
