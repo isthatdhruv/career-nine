@@ -1048,6 +1048,24 @@ public class CampaignPublicController {
         out.put("accessToken", e.getAccessToken());
         out.put("counsellingSessionsTotal", total);
         out.put("counsellingSessionsUsed", used);
+        // If the student has already booked a session for this entitlement, tell the
+        // frontend so it shows the "booked" state instead of offering booking again.
+        com.kccitm.api.model.career9.counselling.CounsellingAppointment booked =
+                bookingService == null ? null
+                        : bookingService.findActiveAppointment(userStudentId, e.getEntitlementId());
+        if (booked != null) {
+            out.put("alreadyBooked", true);
+            out.put("bookedAppointmentId", booked.getId());
+            out.put("bookedStatus", booked.getStatus());
+            if (booked.getSlot() != null) {
+                if (booked.getSlot().getDate() != null)
+                    out.put("bookedSlotDate", booked.getSlot().getDate().toString());
+                if (booked.getSlot().getStartTime() != null)
+                    out.put("bookedSlotStartTime", booked.getSlot().getStartTime().toString());
+            }
+            if (booked.getCounsellor() != null)
+                out.put("bookedCounsellorName", booked.getCounsellor().getName());
+        }
         Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
         if (usOpt.isPresent() && usOpt.get().getStudentInfo() != null) {
             StudentInfo si = usOpt.get().getStudentInfo();
@@ -1155,6 +1173,9 @@ public class CampaignPublicController {
         String contactEmail = strFromBody(body, "contactEmail");
         String contactPhone = strFromBody(body, "contactPhone");
         String preferredContactMethod = strFromBody(body, "preferredContactMethod");
+        // Optional parent/guardian contact — confirmation + reminders go here too.
+        String parentEmail = strFromBody(body, "parentEmail");
+        String parentPhone = strFromBody(body, "parentPhone");
 
         if (slotId == null) {
             return ResponseEntity.badRequest().body("slotId is required");
@@ -1201,6 +1222,8 @@ public class CampaignPublicController {
                             contactEmail != null ? contactEmail.trim() : null,
                             contactPhone != null ? contactPhone.trim() : null,
                             preferredContactMethod != null ? preferredContactMethod.trim() : null);
+            contact.parentEmail = parentEmail != null && !parentEmail.trim().isEmpty() ? parentEmail.trim() : null;
+            contact.parentPhone = parentPhone != null && !parentPhone.trim().isEmpty() ? parentPhone.trim() : null;
             com.kccitm.api.model.career9.counselling.CounsellingAppointment appt =
                     bookingService.bookSlot(slotId, student, reason, contact, entitlementId);
             // Decrement the seat counter only when the tier actually granted a session;

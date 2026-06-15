@@ -25,8 +25,6 @@ type BookingResult = {
   location?: string    // present for OFFLINE bookings
 }
 
-type ContactMethod = 'EMAIL' | 'PHONE' | 'WHATSAPP'
-
 type Props = {
   accessToken: string
   entitlementId: number | string
@@ -100,16 +98,14 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   // Confirm-before-leaving: only shown once the student has picked a slot (real
   // intent), so an immediate open-and-close isn't interrupted.
   const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false)
-  // Post-booking celebration: holds the confirmed booking so we can show an
-  // encouraging success screen before handing control back to the host page
-  // (which unmounts this picker and flips its tile to the confirmation state).
-  const [bookedResult, setBookedResult] = useState<BookingResult | null>(null)
 
-  // Basic contact details — captured once a slot is selected.
+  // Contact details — captured once a slot is selected. Parent email/phone are
+  // optional extra contacts who also receive the confirmation + reminders.
   const [contactName, setContactName] = useState<string>(defaultName)
   const [contactEmail, setContactEmail] = useState<string>(defaultEmail)
   const [contactPhone, setContactPhone] = useState<string>(defaultPhone)
-  const [preferredMethod, setPreferredMethod] = useState<ContactMethod>('PHONE')
+  const [parentEmail, setParentEmail] = useState<string>('')
+  const [parentPhone, setParentPhone] = useState<string>('')
 
   const selectedSlot = useMemo(
     () => slots.find((s) => s.slotId === selectedSlotId) || null,
@@ -178,7 +174,8 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         contactName: contactName.trim(),
         contactPhone: contactPhone.trim(),
         contactEmail: contactEmail.trim() || undefined,
-        preferredContactMethod: preferredMethod,
+        parentEmail: parentEmail.trim() || undefined,
+        parentPhone: parentPhone.trim() || undefined,
       })
       const data: any = res.data
       // Phase 3b: if the session isn't included in the plan, the backend holds the
@@ -192,9 +189,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         setBookError('Payment is required but no payment link was returned. Please try again.')
         return
       }
-      // Show the encouraging success screen first; onBooked is called when the
-      // student taps "Got it!", which hands control back to the host page.
-      setBookedResult(data as BookingResult)
+      // Hand the booking straight to the host page, which shows the single
+      // celebration screen — no in-picker celebration, so it only appears once.
+      onBooked(data as BookingResult)
     } catch (err: any) {
       const body = err?.response?.data
       setBookError(typeof body === 'string' ? body : 'Could not confirm your booking. Please try again.')
@@ -308,7 +305,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           )}
           {!loading && !loadError && grouped.length === 0 && (
             <div style={{ textAlign: 'center', color: '#64748B', padding: '2rem 0' }}>
-              No slots available in this week. Try a later date.
+              No upcoming counselling slots are available right now. Please check back later.
             </div>
           )}
           {!loading && grouped.map(([date, daySlots]) => (
@@ -389,20 +386,32 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                   />
                 </div>
                 <div>
-                  <label style={fieldLabelStyle}>Preferred contact method</label>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {(['PHONE', 'WHATSAPP', 'EMAIL'] as ContactMethod[]).map((m) => (
-                      <button
-                        key={m}
-                        type='button'
-                        onClick={() => setPreferredMethod(m)}
-                        style={methodChipStyle(preferredMethod === m)}
-                      >
-                        {m === 'PHONE' ? 'Phone call' : m === 'WHATSAPP' ? 'WhatsApp' : 'Email'}
-                      </button>
-                    ))}
-                  </div>
+                  <label style={fieldLabelStyle}>
+                    Parent's email <span style={{ color: '#94A3B8' }}>(optional)</span>
+                  </label>
+                  <input
+                    type='email'
+                    value={parentEmail}
+                    onChange={(e) => setParentEmail(e.target.value)}
+                    placeholder="parent@example.com"
+                    style={inputStyle}
+                  />
                 </div>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Parent's phone <span style={{ color: '#94A3B8' }}>(optional)</span>
+                  </label>
+                  <input
+                    type='tel'
+                    value={parentPhone}
+                    onChange={(e) => setParentPhone(e.target.value)}
+                    placeholder="Parent's mobile number"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: 8 }}>
+                We'll send the confirmation and reminders by email and WhatsApp to all the numbers/emails above.
               </div>
 
               <label
@@ -465,24 +474,24 @@ const CounsellingSlotPicker: React.FC<Props> = ({
 
       {/* Leave-confirmation — a deliberate interruption when a student tries to
           walk away after picking a slot. Reframes leaving as a real loss. */}
-      {showCancelConfirm && !bookedResult && (
+      {showCancelConfirm && (
         <div onClick={(e) => e.stopPropagation()} style={confirmOverlayStyle}>
           <div style={confirmCardStyle}>
-            <div style={{ fontSize: '1.6rem', lineHeight: 1, marginBottom: 10 }}>⚠️</div>
-            <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', fontWeight: 800, color: '#991B1B' }}>
+            <div style={{ fontSize: '2.4rem', lineHeight: 1, marginBottom: 14 }}>⚠️</div>
+            <h3 style={{ margin: '0 0 12px', fontSize: '1.5rem', fontWeight: 800, color: '#991B1B' }}>
               Are you sure?
             </h3>
-            <p style={{ margin: '0 0 18px', fontSize: '0.9rem', color: '#475569', lineHeight: 1.5 }}>
+            <p style={{ margin: '0 0 24px', fontSize: '1rem', color: '#475569', lineHeight: 1.6 }}>
               This is a life-changing opportunity. You just completed your assessment — your
               counsellor is ready to turn those results into a real plan for your future.
               <br />
-              <strong>Walk away now, and you leave that on the table.</strong>
+              <strong style={{ color: '#0F172A' }}>Walk away now, and you leave that on the table.</strong>
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <button
                 type='button'
                 onClick={() => setShowCancelConfirm(false)}
-                style={btnPrimaryStyle(false)}
+                style={{ ...btnPrimaryStyle(false), padding: '15px 20px', fontSize: '1.02rem' }}
               >
                 No, take me to my session
               </button>
@@ -497,35 +506,6 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                 Yes, cancel anyway
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Post-booking celebration — affirms the choice before handing back to
-          the host page. "Got it!" calls onBooked, which unmounts this picker. */}
-      {bookedResult && (
-        <div onClick={(e) => e.stopPropagation()} style={confirmOverlayStyle}>
-          <div style={successCardStyle}>
-            <div style={{ fontSize: '1.8rem', lineHeight: 1, marginBottom: 10 }}>🎉</div>
-            <h3 style={{ margin: '0 0 8px', fontSize: '1.15rem', fontWeight: 800, color: '#065F46' }}>
-              You just made a great decision
-            </h3>
-            <p style={{ margin: '0 0 14px', fontSize: '0.9rem', color: '#047857', lineHeight: 1.5 }}>
-              Booking this session is one of the smartest moves you can make for your future.
-              This is where your assessment turns into a real plan.
-            </p>
-            {bookedResult.slotDate && bookedResult.slotStartTime && (
-              <div style={successWhenStyle}>
-                📅 {formatDateHeader(bookedResult.slotDate)} · {formatTime(bookedResult.slotStartTime)}
-              </div>
-            )}
-            <button
-              type='button'
-              onClick={() => onBooked(bookedResult)}
-              style={{ ...btnPrimaryStyle(false), width: '100%', marginTop: 16 }}
-            >
-              Got it!
-            </button>
           </div>
         </div>
       )}
@@ -605,19 +585,6 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'inherit',
 }
 
-function methodChipStyle(selected: boolean): React.CSSProperties {
-  return {
-    background: selected ? 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' : '#fff',
-    color: selected ? '#fff' : '#334155',
-    border: selected ? '1px solid transparent' : '1px solid #CBD5E1',
-    padding: '0.4rem 0.8rem',
-    borderRadius: 8,
-    fontSize: '0.82rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-  }
-}
-
 function slotChipStyle(selected: boolean): React.CSSProperties {
   return {
     background: selected ? 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' : '#fff',
@@ -636,47 +603,27 @@ function slotChipStyle(selected: boolean): React.CSSProperties {
 // Overlay that sits on top of the picker for the leave-confirmation and the
 // post-booking celebration. Darkens the picker behind so the card is the focus.
 const confirmOverlayStyle: React.CSSProperties = {
-  position: 'absolute',
+  position: 'fixed',
   inset: 0,
-  background: 'rgba(15, 23, 42, 0.45)',
-  zIndex: 1100,
+  background: 'rgba(15, 23, 42, 0.6)',
+  backdropFilter: 'blur(3px)',
+  WebkitBackdropFilter: 'blur(3px)',
+  zIndex: 1200,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '1.25rem',
+  padding: '1.5rem',
 }
 
 const confirmCardStyle: React.CSSProperties = {
   background: '#fff',
-  borderRadius: 16,
-  padding: '1.5rem',
+  borderRadius: 20,
+  padding: '2.25rem 2rem',
   width: '100%',
-  maxWidth: 360,
+  maxWidth: 460,
   textAlign: 'center',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-  borderTop: '4px solid #EF4444',
-}
-
-const successCardStyle: React.CSSProperties = {
-  background: 'linear-gradient(180deg, #F0FDF4 0%, #ffffff 60%)',
-  borderRadius: 16,
-  padding: '1.75rem 1.5rem',
-  width: '100%',
-  maxWidth: 360,
-  textAlign: 'center',
-  boxShadow: '0 20px 60px rgba(16, 185, 129, 0.35)',
-  border: '1.5px solid #6EE7B7',
-}
-
-const successWhenStyle: React.CSSProperties = {
-  display: 'inline-block',
-  background: '#ECFDF5',
-  border: '1px solid #A7F3D0',
-  color: '#065F46',
-  fontWeight: 700,
-  fontSize: '0.9rem',
-  padding: '0.5rem 0.9rem',
-  borderRadius: 10,
+  boxShadow: '0 30px 80px rgba(0,0,0,0.4)',
+  borderTop: '5px solid #EF4444',
 }
 
 // Understated "leave anyway" action — deliberately lower-weight than the

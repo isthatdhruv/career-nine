@@ -1,7 +1,4 @@
-import React, { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { toAbsoluteUrl } from '../../../_metronic/helpers'
-import './PortalLayout.css'
+import React from 'react'
 
 export interface MenuItem {
   label: string
@@ -13,102 +10,29 @@ export interface MenuItem {
 }
 
 interface PortalLayoutProps {
-  /** Portal title shown in topbar */
-  title: string
-  /** Menu items for aside */
-  menuItems: MenuItem[]
-  /** localStorage keys to clear on logout */
-  storageKeys: string[]
-  /** Route to redirect after logout */
-  loginPath: string
+  /** Portal title (no longer rendered — kept for call-site compatibility). */
+  title?: string
+  /** Menu items (no longer rendered — the unified admin sidebar handles nav). */
+  menuItems?: MenuItem[]
+  /** localStorage keys to clear on logout (handled by the admin shell now). */
+  storageKeys?: string[]
+  /** Route to redirect after logout (handled by the admin shell now). */
+  loginPath?: string
   /** Child content */
   children: React.ReactNode
 }
 
-const PortalLayout: React.FC<PortalLayoutProps> = ({
-  title,
-  menuItems,
-  storageKeys,
-  loginPath,
-  children,
-}) => {
-  const navigate = useNavigate()
-  const [asideCollapsed, setAsideCollapsed] = useState(false)
-
-  const handleLogout = () => {
-    storageKeys.forEach((key) => localStorage.removeItem(key))
-    navigate(loginPath)
-  }
-
-  return (
-    <div className='portal-wrapper'>
-      {/* Top Bar */}
-      <div className='portal-topbar'>
-        <div className='portal-topbar-left'>
-          <button
-            className='portal-menu-toggle'
-            onClick={() => setAsideCollapsed(!asideCollapsed)}
-            title={asideCollapsed ? 'Expand menu' : 'Collapse menu'}
-          >
-            <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-              <line x1='3' y1='6' x2='21' y2='6' />
-              <line x1='3' y1='12' x2='21' y2='12' />
-              <line x1='3' y1='18' x2='21' y2='18' />
-            </svg>
-          </button>
-          <img
-            src={toAbsoluteUrl('/media/logos/kcc.webp')}
-            alt='Career-9'
-            className='portal-topbar-logo'
-          />
-          <span className='portal-topbar-title'>{title}</span>
-        </div>
-        <button className='portal-signout-btn' onClick={handleLogout}>
-          Sign Out
-        </button>
-      </div>
-
-      <div className='portal-body'>
-        {/* Aside Menu */}
-        <aside className={`portal-aside ${asideCollapsed ? 'collapsed' : ''}`}>
-          <nav className='portal-aside-nav'>
-            {menuItems.map((item) =>
-              item.externalHref ? (
-                <a
-                  key={item.path}
-                  href={item.externalHref}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='portal-aside-item'
-                  title={item.label}
-                >
-                  <span className='portal-aside-icon'>{item.icon}</span>
-                  <span className='portal-aside-label'>{item.label}</span>
-                </a>
-              ) : (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    `portal-aside-item ${isActive ? 'active' : ''}`
-                  }
-                  title={item.label}
-                >
-                  <span className='portal-aside-icon'>{item.icon}</span>
-                  <span className='portal-aside-label'>{item.label}</span>
-                </NavLink>
-              )
-            )}
-          </nav>
-        </aside>
-
-        {/* Content */}
-        <main className={`portal-content ${asideCollapsed ? 'expanded' : ''}`}>
-          {children}
-        </main>
-      </div>
-    </div>
-  )
+/**
+ * Phase: counsellor-portal unification. The counsellor pages now render INSIDE the
+ * main admin shell (MasterLayout) — its sidebar/header/sign-out replace the old
+ * standalone portal chrome. PortalLayout is therefore a thin pass-through that just
+ * renders its children; the topbar/aside it used to draw are gone so we don't get a
+ * second sidebar inside the admin layout. The `title`/`menuItems`/`storageKeys`/
+ * `loginPath` props are accepted but ignored, so the existing call sites compile
+ * unchanged. (The exported `MenuItem` type is still used by menu configs elsewhere.)
+ */
+const PortalLayout: React.FC<PortalLayoutProps> = ({ children }) => {
+  return <>{children}</>
 }
 
 export default PortalLayout

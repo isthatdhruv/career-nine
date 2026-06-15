@@ -102,7 +102,10 @@ public class BookingService {
      */
     public List<CounsellingSlot> getAvailableSlotsForInstitute(LocalDate weekStart, Integer instituteCode,
                                                                Long assessmentId) {
-        LocalDate weekEnd = weekStart.plusDays(6);
+        // Return a wide upcoming horizon (12 weeks) rather than a single week, so the
+        // student's picker shows slots starting from the FIRST available date instead of
+        // landing on an empty current week. The picker groups by date and omits empty days.
+        LocalDate weekEnd = weekStart.plusDays(83);
         LocalDate today = LocalDate.now();
         LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
         if (effectiveStart.isAfter(weekEnd)) return List.of();
@@ -137,6 +140,23 @@ public class BookingService {
         return !assessmentAssignmentRepository.findActiveCounsellorIdsForAssessment(assessmentId).isEmpty();
     }
 
+    /**
+     * The student's existing non-cancelled counselling appointment for this entitlement,
+     * if any — used to suppress the "book counselling" offer once they've already booked.
+     * Returns null when there is no active booking.
+     */
+    public CounsellingAppointment findActiveAppointment(Long userStudentId, Long entitlementId) {
+        if (userStudentId == null) return null;
+        java.util.Set<String> dead = java.util.Set.of("CANCELLED", "MISSED", "RESCHEDULED", "DECLINED");
+        for (CounsellingAppointment a : appointmentRepository.findByStudentUserStudentId(userStudentId)) {
+            String st = a.getStatus() == null ? "" : a.getStatus().toUpperCase();
+            boolean active = !dead.contains(st);
+            boolean sameEntitlement = entitlementId == null || entitlementId.equals(a.getEntitlementId());
+            if (active && sameEntitlement) return a;
+        }
+        return null;
+    }
+
     private List<CounsellingSlot> filterOutPastSlots(List<CounsellingSlot> slots) {
         LocalDate today = LocalDate.now();
         LocalTime now = LocalTime.now();
@@ -154,6 +174,9 @@ public class BookingService {
         public String email;
         public String phone;
         public String preferredContactMethod; // EMAIL | PHONE | WHATSAPP
+        // Optional parent/guardian contact — confirmation + reminders go here too.
+        public String parentEmail;
+        public String parentPhone;
 
         public BookingContact() {}
 
@@ -327,6 +350,8 @@ public class BookingService {
             appointment.setStudentContactEmail(contact.email);
             appointment.setStudentContactPhone(contact.phone);
             appointment.setPreferredContactMethod(contact.preferredContactMethod);
+            appointment.setParentEmail(contact.parentEmail);
+            appointment.setParentPhone(contact.parentPhone);
         }
 
         appointment = appointmentRepository.save(appointment);

@@ -136,9 +136,6 @@ const AppRoutes: FC = () => {
 
   return (
     <Routes>
-      {/* Role Portals — standalone layout, no Metronic MasterLayout */}
-      <Route path="/counsellor/*" element={<CounsellorRoutes />} />
-
       {/* Public, standalone School Dashboard — no auth, no Metronic layout, not in aside menu */}
       <Route
         path="/school/dashboard"
@@ -166,6 +163,10 @@ const AppRoutes: FC = () => {
       />
 
       <Route element={<App />}>
+        {/* Counsellor portal — unified into the main app. Login is standalone; the
+            protected pages render inside MasterLayout (see CounsellorRoutes). Mounted
+            inside <App> so MasterLayout has its LayoutProvider / i18n / auth context. */}
+        <Route path="/counsellor/*" element={<CounsellorRoutes />} />
         <Route path="/student-details" element={<StudentDetailPage />} />
         <Route path="/oauth2/redirect" element={<AuthRedirectPage />} />
         <Route path="error/*" element={<ErrorsPage />} />
