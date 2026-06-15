@@ -1,6 +1,7 @@
 import { FC, lazy, Suspense, useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { useAuth } from '../modules/auth/core/Auth'
+import { MasterLayout } from '../../_metronic/layout/MasterLayout'
 
 const CounsellorAuthPage = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorAuthPage')
@@ -124,13 +125,17 @@ const CounsellorRoutes: FC = () => {
         */}
         <Route path='permission-denied' element={<PermissionDeniedPage />} />
 
-        {/* Protected */}
+        {/* Protected — now rendered INSIDE the main admin shell (MasterLayout) so the
+            counsellor gets the same sidebar/header/UI as the rest of the project. The
+            sidebar (AsideMenuMain) shows the counsellor-only menu for COUNSELLOR users. */}
         <Route element={<CounsellorAuthGuard />}>
-          <Route path='dashboard' element={<CounsellorPortalDashboard />} />
-          <Route path='appointments' element={<CounsellorAppointmentsPage />} />
-          <Route path='notes' element={<CounsellorNotesPage />} />
-          <Route path='availability' element={<CounsellorAvailabilityPage />} />
-          <Route path='profile' element={<CounsellorProfilePage />} />
+          <Route element={<MasterLayout />}>
+            <Route path='dashboard' element={<CounsellorPortalDashboard />} />
+            <Route path='appointments' element={<CounsellorAppointmentsPage />} />
+            <Route path='notes' element={<CounsellorNotesPage />} />
+            <Route path='availability' element={<CounsellorAvailabilityPage />} />
+            <Route path='profile' element={<CounsellorProfilePage />} />
+          </Route>
         </Route>
 
         <Route path='*' element={<Navigate to='login' replace />} />

@@ -1,6 +1,7 @@
 package com.kccitm.api.model.career9.counselling;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
@@ -49,6 +50,11 @@ public class AvailabilityTemplate implements Serializable {
     // Delivery mode for slots generated from this template: ONLINE | OFFLINE.
     @Column(name = "mode", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'ONLINE'")
     private String mode = "ONLINE";
+
+    // The date from which this availability takes effect. Slots are materialized from
+    // max(startDate, tomorrow) onward; null means "start immediately".
+    @Column(name = "start_date")
+    private LocalDate startDate;
 
     @JsonProperty("isActive")
     @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
@@ -133,6 +139,14 @@ public class AvailabilityTemplate implements Serializable {
 
     public void setMode(String mode) {
         this.mode = mode;
+    }
+
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
     }
 
     @JsonProperty("isActive")

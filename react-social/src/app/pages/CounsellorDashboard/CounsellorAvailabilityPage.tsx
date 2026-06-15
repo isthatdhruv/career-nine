@@ -4,7 +4,7 @@ import axios from 'axios'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import PortalLayout from '../portal/PortalLayout'
-import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { getCounsellorByUserId, updateCounsellor } from '../Counselling/API/CounsellorAPI'
 import { getSlotsByCounsellor, createManualSlot, deleteSlot } from '../Counselling/API/SlotAPI'
 import { submitBlockDateRequest, getBlockRequestsByCounsellor, BlockDateRequest } from '../Counselling/API/BlockDateRequestAPI'
 import { useAuth } from '../../modules/auth'
@@ -17,10 +17,12 @@ const API_URL = process.env.REACT_APP_API_URL
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 interface TemplateForm {
-  dayOfWeek: string
+  days: string[]                 // one schedule can apply to multiple weekdays
   startTime: string
   endTime: string
   slotDurationMinutes: number
+  mode: 'ONLINE' | 'OFFLINE'
+  startDate: string              // yyyy-MM-dd; '' = start immediately
 }
 
 interface ManualSlotForm {
@@ -104,12 +106,16 @@ const CounsellorAvailabilityPage: React.FC = () => {
   // Templates
   const [templates, setTemplates] = useState<any[]>([])
   const [templateForm, setTemplateForm] = useState<TemplateForm>({
-    dayOfWeek: 'Monday',
+    days: ['Monday'],
     startTime: '09:00',
     endTime: '17:00',
     slotDurationMinutes: 30,
+    mode: 'ONLINE',
+    startDate: '',
   })
   const [templateSaving, setTemplateSaving] = useState(false)
+  // Counsellor's office address for OFFLINE sessions (Counsellor.officeAddress).
+  const [officeAddress, setOfficeAddress] = useState('')
   const [deletingTemplate, setDeletingTemplate] = useState<number | null>(null)
 
   // Manual slots & blocks
@@ -176,6 +182,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
           setLoading(false)
           return
         }
+        setOfficeAddress(res.data?.officeAddress || '')
         return loadData(resolvedId)
       })
       .catch(() => setError('Counsellor profile not found.'))
@@ -203,31 +210,53 @@ const CounsellorAvailabilityPage: React.FC = () => {
 
   const handleSaveTemplate = async () => {
     if (!counsellorId) return
+    if (!templateForm.days.length) {
+      setError('Please select at least one day.')
+      return
+    }
     if (!templateForm.startTime || !templateForm.endTime) {
       setError('Please fill in start time and end time.')
+      return
+    }
+    if (templateForm.mode === 'OFFLINE' && !officeAddress.trim()) {
+      setError('Please enter your office address for offline sessions.')
       return
     }
     setTemplateSaving(true)
     setError('')
     try {
-      // The endpoint binds the body straight onto the AvailabilityTemplate
-      // entity: counsellor must be the nested relation (counsellor_id is a
-      // non-null FK) and the duration field is defaultSlotDuration.
-      await axios.post(`${API_URL}/api/availability-template/create`, {
-        counsellor: { id: counsellorId },
-        dayOfWeek: templateForm.dayOfWeek,
-        startTime: templateForm.startTime,
-        endTime: templateForm.endTime,
-        defaultSlotDuration: templateForm.slotDurationMinutes,
-      })
-      setSuccess('Template saved — slots for the upcoming weeks were generated.')
+      // OFFLINE sessions are delivered at the counsellor's office address; persist it
+      // (booking copies it onto the appointment + confirmation email).
+      if (templateForm.mode === 'OFFLINE') {
+        await updateCounsellor(counsellorId, { officeAddress: officeAddress.trim() })
+      }
+      // One AvailabilityTemplate per selected day (the schema is one day per template),
+      // each carrying the chosen mode + effective start date. The endpoint binds the
+      // body straight onto the entity; counsellor must be the nested relation.
+      await Promise.all(
+        templateForm.days.map((day) =>
+          axios.post(`${API_URL}/api/availability-template/create`, {
+            counsellor: { id: counsellorId },
+            dayOfWeek: day,
+            startTime: templateForm.startTime,
+            endTime: templateForm.endTime,
+            defaultSlotDuration: templateForm.slotDurationMinutes,
+            mode: templateForm.mode,
+            startDate: templateForm.startDate || null,
+          }),
+        ),
+      )
+      setSuccess('Schedule saved — slots for the upcoming weeks were generated.')
       reloadTemplates()
       // The backend materializes slots from the new template immediately,
       // so the Upcoming Slots list must refresh too.
       reloadSlots()
-      setTemplateForm({ dayOfWeek: 'Monday', startTime: '09:00', endTime: '17:00', slotDurationMinutes: 30 })
+      setTemplateForm({
+        days: ['Monday'], startTime: '09:00', endTime: '17:00',
+        slotDurationMinutes: 30, mode: 'ONLINE', startDate: '',
+      })
     } catch {
-      setError('Failed to save template.')
+      setError('Failed to save schedule.')
     } finally {
       setTemplateSaving(false)
     }
@@ -448,16 +477,78 @@ const CounsellorAvailabilityPage: React.FC = () => {
                   </div>
                 )}
 
+                {/* Mode: Online / Offline */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={labelStyle}>Session mode</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {(['ONLINE', 'OFFLINE'] as const).map((m) => {
+                      const active = templateForm.mode === m
+                      return (
+                        <button
+                          key={m}
+                          type='button'
+                          onClick={() => setTemplateForm((f) => ({ ...f, mode: m }))}
+                          style={{
+                            flex: 1, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                            cursor: 'pointer',
+                            border: active ? '1.5px solid #0C6B5A' : '1.5px solid #DDE3EC',
+                            background: active ? 'rgba(12,107,90,0.08)' : '#fff',
+                            color: active ? '#0C6B5A' : '#475569',
+                          }}
+                        >
+                          {m === 'ONLINE' ? '💻 Online' : '📍 In-person'}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#6B7A8D', marginTop: 4 }}>
+                    {templateForm.mode === 'ONLINE'
+                      ? 'A meeting link is generated automatically and emailed to the student.'
+                      : 'The student is sent your office address (below).'}
+                  </div>
+                </div>
+
+                {/* Days of week (multi-select) */}
+                <div style={{ marginBottom: 12 }}>
+                  <label style={labelStyle}>Days</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {DAYS.map((d) => {
+                      const on = templateForm.days.includes(d)
+                      return (
+                        <button
+                          key={d}
+                          type='button'
+                          onClick={() =>
+                            setTemplateForm((f) => ({
+                              ...f,
+                              days: on ? f.days.filter((x) => x !== d) : [...f.days, d],
+                            }))
+                          }
+                          style={{
+                            padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                            cursor: 'pointer',
+                            border: on ? '1.5px solid #0C6B5A' : '1.5px solid #DDE3EC',
+                            background: on ? 'rgba(12,107,90,0.08)' : '#fff',
+                            color: on ? '#0C6B5A' : '#475569',
+                          }}
+                        >
+                          {d.slice(0, 3)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
                   <div>
-                    <label style={labelStyle}>Day</label>
-                    <select
-                      value={templateForm.dayOfWeek}
-                      onChange={(e) => setTemplateForm((f) => ({ ...f, dayOfWeek: e.target.value }))}
+                    <label style={labelStyle}>Start date</label>
+                    <input
+                      type='date'
+                      value={templateForm.startDate}
+                      min={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => setTemplateForm((f) => ({ ...f, startDate: e.target.value }))}
                       style={inputStyle}
-                    >
-                      {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-                    </select>
+                    />
                   </div>
                   <div>
                     <label style={labelStyle}>Start</label>
@@ -490,6 +581,20 @@ const CounsellorAvailabilityPage: React.FC = () => {
                     </select>
                   </div>
                 </div>
+
+                {/* Office address — only for in-person sessions */}
+                {templateForm.mode === 'OFFLINE' && (
+                  <div style={{ marginTop: 12 }}>
+                    <label style={labelStyle}>Office address (shared with students)</label>
+                    <textarea
+                      value={officeAddress}
+                      onChange={(e) => setOfficeAddress(e.target.value)}
+                      placeholder='Building, street, area, city — where the student should come'
+                      rows={2}
+                      style={{ ...inputStyle, resize: 'vertical' as const }}
+                    />
+                  </div>
+                )}
                 <button
                   onClick={handleSaveTemplate}
                   disabled={templateSaving}
