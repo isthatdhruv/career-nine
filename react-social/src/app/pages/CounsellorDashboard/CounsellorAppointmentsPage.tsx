@@ -8,6 +8,7 @@ import {
   cancelAppointment,
 } from '../Counselling/API/AppointmentAPI'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { getGeneratedReportsByStudent } from '../ReportGeneration/API/GeneratedReport_APIs'
 import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
@@ -110,8 +111,36 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
   const [actionLoading, setActionLoading] = useState<number | null>(null)
+  const [reportLoading, setReportLoading] = useState<number | null>(null)
   const [declineModal, setDeclineModal] = useState<{ appointmentId: number } | null>(null)
   const [declineReason, setDeclineReason] = useState('')
+
+  // Open the booked student's assessment report in a new tab. We look up the
+  // student's generated reports and open the first one that's ready (has a URL).
+  const handleViewReport = async (appt: any) => {
+    const usid = appt?.student?.userStudentId
+    if (!usid) {
+      setError('No student is linked to this appointment.')
+      return
+    }
+    setReportLoading(appt.id)
+    try {
+      const res = await getGeneratedReportsByStudent(usid)
+      const reports = (res.data || []) as any[]
+      const ready =
+        reports.find((r) => r.reportUrl && (r.reportStatus || '').toLowerCase() === 'generated') ||
+        reports.find((r) => r.reportUrl)
+      if (ready?.reportUrl) {
+        window.open(ready.reportUrl, '_blank', 'noopener,noreferrer')
+      } else {
+        setError("This student's report isn't ready yet.")
+      }
+    } catch {
+      setError("Could not load the student's report.")
+    } finally {
+      setReportLoading(null)
+    }
+  }
   const [cancelModal, setCancelModal] = useState<{ appointmentId: number } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
 
@@ -404,6 +433,16 @@ const CounsellorAppointmentsPage: React.FC = () => {
 
                   {/* Right: Actions */}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Student's assessment report — always available so the counsellor
+                        can prepare from the results that led to this booking. */}
+                    <button
+                      className='cp-action-btn'
+                      onClick={() => handleViewReport(appt)}
+                      disabled={reportLoading === appt.id}
+                      title="Open the student's assessment report"
+                    >
+                      {reportLoading === appt.id ? 'Opening…' : '📄 Report'}
+                    </button>
                     {status === 'ASSIGNED' && (
                       <>
                         <button

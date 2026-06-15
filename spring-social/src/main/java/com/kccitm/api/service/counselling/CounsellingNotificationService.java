@@ -298,6 +298,11 @@ public class CounsellingNotificationService {
                     + "\nPlease be prepared for your session.\n\n"
                     + "Regards,\nCareer-Nine Team";
             sendEmail(studentEmail, studentSubject, studentBody);
+            // Parent/guardian copy, if one was provided at booking.
+            String parentEmail = appointment.getParentEmail();
+            if (parentEmail != null && !parentEmail.isEmpty()) {
+                sendEmail(parentEmail, studentSubject, studentBody);
+            }
 
             // Send to counsellor
             if (appointment.getCounsellor() != null) {
@@ -403,14 +408,20 @@ public class CounsellingNotificationService {
                     + "A calendar invite is also attached so you can add this to any calendar.\n\n"
                     + "Regards,\nCareer-Nine Team";
 
+            // Recipients: the student, plus the parent/guardian email if one was given.
+            String parentEmail = appointment.getParentEmail();
+            java.util.List<String> emailTo = new java.util.ArrayList<>();
+            if (studentEmail != null && !studentEmail.isEmpty()) emailTo.add(studentEmail);
+            if (parentEmail != null && !parentEmail.isEmpty()) emailTo.add(parentEmail);
+
             // Email with .ics attachment (falls back to plain Mandrill text if
             // the SMTP/Odoo sender or the invite isn't available).
             byte[] ics = icsService.buildInvite(appointment);
             boolean emailed = false;
-            if (studentEmail != null && !studentEmail.isEmpty() && odooEmailService != null && ics != null) {
+            if (!emailTo.isEmpty() && odooEmailService != null && ics != null) {
                 try {
                     SmtpEmailRequest req = new SmtpEmailRequest();
-                    req.setTo(Arrays.asList(studentEmail));
+                    req.setTo(emailTo);
                     req.setSubject(subject);
                     req.setHtmlContent("<pre style=\"font-family:inherit\">" + body + "</pre>");
                     req.setFromName("Career-9");
@@ -424,13 +435,19 @@ public class CounsellingNotificationService {
                     logger.warn("ICS confirmation email failed for appointment {}: {}", appointment.getId(), e.getMessage());
                 }
             }
-            if (!emailed && studentEmail != null && !studentEmail.isEmpty()) {
-                sendEmail(studentEmail, subject, body); // plain fallback, no attachment
+            if (!emailed) {
+                for (String addr : emailTo) sendEmail(addr, subject, body); // plain fallback, no attachment
             }
 
-            // Best-effort WhatsApp confirmation in addition to the email.
-            whatsAppService.sendTemplate(studentPhone(appointment), whatsAppService.confirmationCampaign(),
-                    Arrays.asList(studentName, date + " " + time, offline ? "In-person" : "Online"));
+            // Best-effort WhatsApp confirmation in addition to the email — to the
+            // student and, if provided, the parent/guardian number.
+            java.util.List<String> waParams =
+                    Arrays.asList(studentName, date + " " + time, offline ? "In-person" : "Online");
+            whatsAppService.sendTemplate(studentPhone(appointment), whatsAppService.confirmationCampaign(), waParams);
+            String parentPhone = appointment.getParentPhone();
+            if (parentPhone != null && !parentPhone.isEmpty()) {
+                whatsAppService.sendTemplate(parentPhone, whatsAppService.confirmationCampaign(), waParams);
+            }
         } catch (Exception e) {
             logger.error("Failed to send confirmation for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -447,10 +464,15 @@ public class CounsellingNotificationService {
         String time = appointment.getSlot().getStartTime().format(TIME_FMT);
         // Phase 5: mode-aware — append the meeting link (online) or venue (offline)
         // to the date/time parameter so the reminder tells the student how to attend.
+        java.util.List<String> waParams = Arrays.asList(studentName(appointment), whenLabel,
+                date + " " + time + " — " + attendanceLine(appointment));
         boolean sent = whatsAppService.sendTemplate(
-                studentPhone(appointment), whatsAppService.reminderCampaign(),
-                Arrays.asList(studentName(appointment), whenLabel,
-                        date + " " + time + " — " + attendanceLine(appointment)));
+                studentPhone(appointment), whatsAppService.reminderCampaign(), waParams);
+        // Parent/guardian WhatsApp reminder, if a number was provided at booking.
+        String parentPhone = appointment.getParentPhone();
+        if (parentPhone != null && !parentPhone.isEmpty()) {
+            whatsAppService.sendTemplate(parentPhone, whatsAppService.reminderCampaign(), waParams);
+        }
         if (!sent) {
             sendReminderEmail(appointment, whenLabel);
         }

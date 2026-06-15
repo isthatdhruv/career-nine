@@ -128,7 +128,6 @@ const ThankYouPage: React.FC = () => {
     const [bookedAppointment, setBookedAppointment] = useState<BookedAppointment | null>(null);
     // Loss-framed confirm when the student tries to abandon the slot picker, and the
     // celebratory "you made a great decision" modal shown right after a booking.
-    const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false);
     const [showBookedCelebration, setShowBookedCelebration] = useState<boolean>(false);
     // Counselling for a school student (resolved by userStudentId when there is no
     // B2C entitlementId on this page). Null until resolved / when not applicable.
@@ -199,6 +198,18 @@ const ThankYouPage: React.FC = () => {
         getStudentCounselling(userStudentId, assessmentId)
             .then((res) => {
                 const d: any = res?.data || {};
+                // Already booked for this assessment? Show the "Counselling Booked"
+                // confirmation state and do NOT offer/auto-open booking again.
+                if (d.alreadyBooked) {
+                    setBookedAppointment({
+                        appointmentId: d.bookedAppointmentId ?? 0,
+                        status: d.bookedStatus ?? 'CONFIRMED',
+                        slotDate: d.bookedSlotDate,
+                        slotStartTime: d.bookedSlotStartTime,
+                        counsellorName: d.bookedCounsellorName,
+                    });
+                    return;
+                }
                 // Show the optional booking whenever counselling is OFFERED (a counsellor
                 // is assigned to the assessment) and we have a token to book with — not
                 // gated on the tier's counselling toggle or session count.
@@ -391,14 +402,9 @@ const ThankYouPage: React.FC = () => {
     };
 
     const handleOpenSlotPicker = () => setIsSlotPickerOpen(true);
-    // Closing the picker is intercepted by a loss-framed "are you sure?" confirm —
-    // we don't let the student walk away from booking without one nudge.
-    const handleSlotPickerClose = () => setShowCancelConfirm(true);
-    const dismissCancelConfirm = () => setShowCancelConfirm(false);          // "No, take me to my session"
-    const confirmCancelBooking = () => {                                     // "Yes, cancel anyway"
-        setShowCancelConfirm(false);
-        setIsSlotPickerOpen(false);
-    };
+    // The slot picker owns the loss-framed "are you sure?" confirm internally, so
+    // closing here just dismisses the picker (no second confirm on top).
+    const handleSlotPickerClose = () => setIsSlotPickerOpen(false);
     const handleSlotBooked = (result: BookedAppointment) => {
         // Snapshot the booking so the Counselling tile flips to its confirmation
         // state without an extra round-trip. counsellingRemaining decreases by one
@@ -1089,33 +1095,6 @@ const ThankYouPage: React.FC = () => {
                 />
             )}
 
-            {/* Loss-framed "are you sure?" — shown OVER the open picker when the student
-                tries to close it without booking. One nudge before they walk away. */}
-            {showCancelConfirm && (
-                <div style={overlayStyle(1100)} onClick={dismissCancelConfirm}>
-                    <div onClick={(e) => e.stopPropagation()} style={dialogCardStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                            <span style={{ fontSize: '1.6rem' }}>⚠️</span>
-                            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0F172A' }}>
-                                Are you sure?
-                            </h3>
-                        </div>
-                        <p style={{ margin: '0 0 20px', fontSize: '0.95rem', lineHeight: 1.6, color: '#475569' }}>
-                            This is a <strong style={{ color: '#0F172A' }}>life-changing opportunity.</strong> You just
-                            completed your assessment — your counsellor is ready to turn those results into a real plan
-                            for your future. Walk away now, and you leave that on the table.
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            <button type="button" onClick={dismissCancelConfirm} style={primaryBtnStyle}>
-                                No, take me to my session
-                            </button>
-                            <button type="button" onClick={confirmCancelBooking} style={ghostBtnStyle}>
-                                Yes, cancel anyway
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Celebratory affirmation right after a successful booking. */}
             {showBookedCelebration && bookedAppointment && (
@@ -1171,11 +1150,6 @@ const overlayStyle = (z: number): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: 16, zIndex: z, backdropFilter: 'blur(2px)',
 });
-const dialogCardStyle: React.CSSProperties = {
-    background: '#fff', borderRadius: 18, maxWidth: 420, width: '100%',
-    padding: '1.75rem', boxShadow: '0 24px 70px rgba(0,0,0,0.35)',
-    fontFamily: 'inherit', textAlign: 'left',
-};
 const celebrationCardStyle: React.CSSProperties = {
     background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
     border: '1.5px solid #6EE7B7', borderRadius: 18, maxWidth: 420, width: '100%',
@@ -1187,11 +1161,6 @@ const primaryBtnStyle: React.CSSProperties = {
     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     color: '#fff', fontWeight: 700, fontSize: '0.98rem', cursor: 'pointer',
     boxShadow: '0 4px 16px rgba(16,185,129,0.32)', width: '100%',
-};
-const ghostBtnStyle: React.CSSProperties = {
-    padding: '11px 20px', border: '1.5px solid #E2E8F0', borderRadius: 12,
-    background: 'transparent', color: '#64748B', fontWeight: 600,
-    fontSize: '0.9rem', cursor: 'pointer', width: '100%',
 };
 
 type TryFirstLandingProps = {

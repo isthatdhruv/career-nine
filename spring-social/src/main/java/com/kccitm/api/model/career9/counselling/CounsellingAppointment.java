@@ -81,6 +81,13 @@ public class CounsellingAppointment implements Serializable {
     @Column(name = "student_contact_phone", length = 30)
     private String studentContactPhone;
 
+    // Optional parent/guardian contact — confirmation + reminders go here too.
+    @Column(name = "parent_email", length = 255)
+    private String parentEmail;
+
+    @Column(name = "parent_phone", length = 30)
+    private String parentPhone;
+
     // EMAIL | PHONE | WHATSAPP
     @Column(name = "preferred_contact_method", length = 20)
     private String preferredContactMethod;
@@ -255,6 +262,22 @@ public class CounsellingAppointment implements Serializable {
 
     public void setStudentContactPhone(String studentContactPhone) {
         this.studentContactPhone = studentContactPhone;
+    }
+
+    public String getParentEmail() {
+        return parentEmail;
+    }
+
+    public void setParentEmail(String parentEmail) {
+        this.parentEmail = parentEmail;
+    }
+
+    public String getParentPhone() {
+        return parentPhone;
+    }
+
+    public void setParentPhone(String parentPhone) {
+        this.parentPhone = parentPhone;
     }
 
     public String getPreferredContactMethod() {
