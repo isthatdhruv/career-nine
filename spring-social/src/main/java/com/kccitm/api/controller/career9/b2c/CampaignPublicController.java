@@ -31,16 +31,20 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.b2c.Campaign;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
+import com.kccitm.api.model.career9.b2c.CampaignClassAssessment;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
 import com.kccitm.api.model.career9.counselling.CounsellingRequest;
+import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.PromoCodeRepository;
+import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentTierRepository;
+import com.kccitm.api.repository.Career9.b2c.CampaignClassAssessmentRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
 import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
 import com.kccitm.api.repository.Career9.b2c.PromoCodeCampaignRepository;
@@ -64,6 +68,8 @@ public class CampaignPublicController {
     @Autowired private CampaignRepository campaignRepository;
     @Autowired private CampaignAssessmentMappingRepository mappingRepository;
     @Autowired private CampaignAssessmentTierRepository tierMappingRepository;
+    @Autowired private CampaignClassAssessmentRepository classRouteRepository;
+    @Autowired private SchoolClassesRepository schoolClassesRepository;
     @Autowired private PricingTierRepository pricingTierRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private PromoCodeRepository promoCodeRepository;
@@ -232,6 +238,35 @@ public class CampaignPublicController {
         Map<String, Object> response = new HashMap<>();
         response.put("campaign", campaignDto);
         response.put("assessments", assessmentsOut);
+
+        // Class-based registration routes. When present (and this is not an
+        // assessment/tier deep-link), the student app shows a "Choose your class"
+        // picker; picking a class auto-selects its assessment (and default tier /
+        // price). Only routes whose assessment is actually reachable above are
+        // returned, so the picker can never resolve to a missing assessment.
+        if (filterAssessmentId == null) {
+            java.util.Set<Long> reachable = new java.util.HashSet<>();
+            for (Map<String, Object> aDto : assessmentsOut) {
+                Object aid = aDto.get("assessmentId");
+                if (aid instanceof Number) reachable.add(((Number) aid).longValue());
+            }
+            List<Map<String, Object>> classesOut = new ArrayList<>();
+            for (CampaignClassAssessment r : classRouteRepository
+                    .findByCampaignIdAndIsDeletedFalseOrderBySortOrderAscIdAsc(c.getCampaignId())) {
+                if (!Boolean.TRUE.equals(r.getIsActive())) continue;
+                if (r.getAssessmentId() == null || !reachable.contains(r.getAssessmentId())) continue;
+                SchoolClasses sc = r.getClassId() != null
+                        ? schoolClassesRepository.findById(r.getClassId()).orElse(null) : null;
+                if (sc == null) continue; // class deleted — skip rather than show a blank option
+                Map<String, Object> cDto = new HashMap<>();
+                cDto.put("classId", r.getClassId());
+                cDto.put("className", sc.getClassName());
+                cDto.put("assessmentId", r.getAssessmentId());
+                cDto.put("sortOrder", r.getSortOrder());
+                classesOut.add(cDto);
+            }
+            response.put("classes", classesOut);
+        }
         return ResponseEntity.ok(response);
     }
 
@@ -286,6 +321,9 @@ public class CampaignPublicController {
         String phone = strFromBody(body, "phone");
         String gender = strFromBody(body, "gender");
         String promoCodeStr = strFromBody(body, "promoCode");
+        // Optional: the class the student picked (class-based campaigns). Persisted
+        // as a grade number on StudentInfo so reports resolve the right template.
+        Integer classId = intFromBody(body, "classId");
 
         if (name == null || email == null || dobStr == null || phone == null) {
             return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
@@ -352,13 +390,13 @@ public class CampaignPublicController {
         // 6. Free path → inline-provision and return session
         if (finalInr == 0L) {
             return provisionFreeAndRespond(campaign, mapping, tierMapping, pricingTier,
-                    existing, name, email, dob, dobStr, phone, gender,
+                    existing, name, email, dob, dobStr, phone, gender, classId,
                     promoCodeSaved, promoDiscountPercent, originalInr, httpResponse);
         }
 
         // 7. Paid path → create Razorpay payment link + PaymentTransaction
         return createPaymentAndRedirect(campaign, mapping, tierMapping, pricingTier,
-                name, email, dob, dobStr, phone, gender,
+                name, email, dob, dobStr, phone, gender, classId,
                 finalInr, originalInr, promoCodeSaved, promoDiscountPercent);
     }
 
@@ -403,6 +441,8 @@ public class CampaignPublicController {
         String dobStr = strFromBody(body, "dob");
         String phone = strFromBody(body, "phone");
         String gender = strFromBody(body, "gender");
+        Integer classId = intFromBody(body, "classId");
+        Integer studentClass = parseClassNumber(classId);
 
         if (name == null || email == null || dobStr == null || phone == null) {
             return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
@@ -430,6 +470,10 @@ public class CampaignPublicController {
         UserStudent userStudent;
         User user;
         if (existing != null) {
+            if (studentClass != null && existing.getStudentClass() == null) {
+                existing.setStudentClass(studentClass);
+                studentInfoRepository.save(existing);
+            }
             user = existing.getUser();
             if (user == null) {
                 user = new User((int) (Math.random() * 100000), dob);
@@ -457,6 +501,7 @@ public class CampaignPublicController {
             info.setStudentDob(dob);
             info.setPhoneNumber(phone);
             info.setGender(gender);
+            info.setStudentClass(studentClass);
             info.setUser(user);
             info = studentInfoRepository.save(info);
 
@@ -793,8 +838,11 @@ public class CampaignPublicController {
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier, StudentInfo existing,
             String name, String email, Date dob, String dobStr, String phone, String gender,
+            Integer classId,
             String promoCodeSaved, Integer promoDiscountPercent, long originalInr,
             HttpServletResponse httpResponse) {
+
+        Integer studentClass = parseClassNumber(classId);
 
         // Re-check campaign expiry here. The /register entry already validated
         // it, but the form may have sat open for hours — we don't want to
@@ -807,6 +855,11 @@ public class CampaignPublicController {
         UserStudent userStudent;
         User user;
         if (existing != null) {
+            // Backfill the grade if we now know it and it wasn't recorded before.
+            if (studentClass != null && existing.getStudentClass() == null) {
+                existing.setStudentClass(studentClass);
+                studentInfoRepository.save(existing);
+            }
             user = existing.getUser();
             if (user == null) {
                 user = new User((int) (Math.random() * 100000), dob);
@@ -837,6 +890,7 @@ public class CampaignPublicController {
             studentInfo.setStudentDob(dob);
             studentInfo.setPhoneNumber(phone);
             studentInfo.setGender(gender);
+            studentInfo.setStudentClass(studentClass);
             studentInfo.setUser(user);
             studentInfo = studentInfoRepository.save(studentInfo);
 
@@ -868,6 +922,7 @@ public class CampaignPublicController {
         txn.setStudentEmail(email);
         txn.setStudentDob(dob);
         txn.setStudentPhone(phone);
+        txn.setStudentClass(studentClass);
         txn.setUserStudentId(userStudent.getUserStudentId());
         if (promoCodeSaved != null) {
             txn.setPromoCode(promoCodeSaved);
@@ -935,6 +990,7 @@ public class CampaignPublicController {
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier,
             String name, String email, Date dob, String dobStr, String phone, String gender,
+            Integer classId,
             long finalInr, long originalInr, String promoCodeSaved, Integer promoDiscountPercent) {
 
         // Re-check campaign expiry — see provisionFreeAndRespond comment.
@@ -958,6 +1014,9 @@ public class CampaignPublicController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
+            // Carry the grade to the webhook, which creates the StudentInfo for
+            // pay-first registrations (class context isn't available there).
+            txn.setStudentClass(parseClassNumber(classId));
             txn.setStatus("created");
             if (promoCodeSaved != null) {
                 txn.setPromoCode(promoCodeSaved);
@@ -1468,6 +1527,30 @@ public class CampaignPublicController {
         if (v == null) return null;
         String s = v.toString().trim();
         return s.isEmpty() ? null : s;
+    }
+
+    private static Integer intFromBody(Map<String, Object> body, String key) {
+        Object v = body.get(key);
+        if (v == null) return null;
+        if (v instanceof Number) return ((Number) v).intValue();
+        try { return Integer.parseInt(v.toString().trim()); }
+        catch (NumberFormatException e) { return null; }
+    }
+
+    /**
+     * Resolve a SchoolClasses id to its grade number (e.g. "Class 10" → 10) for
+     * StudentInfo.studentClass. Mirrors the B2B AssessmentInstituteMappingController
+     * logic: strip non-digits from the class name; return null for non-numeric
+     * names ("Nursery"/"LKG") rather than persisting the PK as a bogus grade.
+     */
+    private Integer parseClassNumber(Integer classId) {
+        if (classId == null) return null;
+        SchoolClasses sc = schoolClassesRepository.findById(classId).orElse(null);
+        if (sc == null || sc.getClassName() == null) return null;
+        String digits = sc.getClassName().replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) return null;
+        try { return Integer.parseInt(digits); }
+        catch (NumberFormatException e) { return null; }
     }
 
     /** Atomically consume one promo use for a realized redemption; no-op if absent/at-cap. */
