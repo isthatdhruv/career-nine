@@ -237,7 +237,14 @@ public class AssessmentSubmissionProcessorService {
             return;
         }
 
-        UserStudent userStudent = userStudentRepository.findById(studentId)
+        // JOIN-FETCH studentInfo: this runs on an @Async thread with no open
+        // Hibernate session, and the post-completion hooks below (completion email,
+        // B2C entitlement, whitelabel report pipeline) read userStudent.getStudentInfo().
+        // A plain findById leaves studentInfo as a lazy proxy that throws
+        // LazyInitializationException once the session closes — which silently
+        // suppressed the whole report pipeline (no report.generate events were ever
+        // produced). institute is EAGER, so it loads in the same session.
+        UserStudent userStudent = userStudentRepository.findByIdWithStudentInfo(studentId)
                 .orElseThrow(() -> new EntityNotFoundException("UserStudent " + studentId));
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                 .orElseThrow(() -> new EntityNotFoundException("Assessment " + assessmentId));

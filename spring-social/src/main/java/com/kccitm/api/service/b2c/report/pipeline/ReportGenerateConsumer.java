@@ -17,6 +17,8 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.annotation.RetryableTopic;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.retrytopic.DltStrategy;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
 
@@ -71,19 +73,32 @@ public class ReportGenerateConsumer {
             logger.info("Report generated student={} assessment={} pdf={}",
                     ev.userStudentId, ev.assessmentId, (pdfUrl != null));
         } catch (ScoresNotReadyException e) {
+            // Log the cause here: @RetryableTopic republishes silently, so without
+            // this the root reason never reaches the logs and the only artifact is
+            // an opaque DLT entry.
+            logger.warn("Report generate retrying (scores not ready) student={} assessment={}: {}",
+                    ev.userStudentId, ev.assessmentId, e.getMessage());
             throw new RetryablePipelineException("scores not ready student=" + ev.userStudentId
                     + " assessment=" + ev.assessmentId, e);
         } catch (SanityFailedException e) {
             if ("NOT_COMPLETED".equals(e.getCode())) {
+                logger.warn("Report generate retrying (mapping not completed) student={} assessment={}: {}",
+                        ev.userStudentId, ev.assessmentId, e.getMessage());
                 throw new RetryablePipelineException("mapping not yet visible as completed", e);
             }
             // Other sanity failures are terminal → not retried → DLT.
+            logger.error("Report generate TERMINAL (sanity {}) student={} assessment={}: {}",
+                    e.getCode(), ev.userStudentId, ev.assessmentId, e.getMessage());
             throw new IllegalStateException("sanity terminal " + e.getCode() + ": " + e.getMessage(), e);
         } catch (ReportRoutingException e) {
             // No template / no default → nothing to generate → terminal → DLT.
+            logger.error("Report generate TERMINAL (routing) student={} assessment={}: {}",
+                    ev.userStudentId, ev.assessmentId, e.getMessage());
             throw new IllegalStateException("routing terminal: " + e.getMessage(), e);
         } catch (Exception e) {
             // Unknown → treat as transient so flaky infra gets a chance to heal.
+            logger.error("Report generate retrying (unexpected error) student={} assessment={}",
+                    ev.userStudentId, ev.assessmentId, e);
             throw new RetryablePipelineException("generate failed student=" + ev.userStudentId, e);
         }
     }
@@ -101,7 +116,14 @@ public class ReportGenerateConsumer {
     }
 
     @DltHandler
-    public void dlt(String json) {
-        logger.error("REPORT-GENERATE DLT (needs ops attention — no report produced): {}", json);
+    public void dlt(String json,
+                    @Header(name = KafkaHeaders.DLT_EXCEPTION_FQCN, required = false) String excClass,
+                    @Header(name = KafkaHeaders.DLT_EXCEPTION_MESSAGE, required = false) String excMessage,
+                    @Header(name = KafkaHeaders.DLT_EXCEPTION_STACKTRACE, required = false) String excStack) {
+        // Surface the failure reason at the DLT. The exception that exhausted the
+        // retries is attached by the framework as DLT_* headers — without logging
+        // them here the DLT entry is just the payload with no cause.
+        logger.error("REPORT-GENERATE DLT (needs ops attention — no report produced): payload={} cause={}: {}\n{}",
+                json, excClass, excMessage, excStack);
     }
 }

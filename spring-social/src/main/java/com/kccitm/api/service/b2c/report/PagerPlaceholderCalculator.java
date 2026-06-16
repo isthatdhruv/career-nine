@@ -69,7 +69,10 @@ public class PagerPlaceholderCalculator implements PlaceholderCalculator {
         StudentMeta meta = new Navigator360Models.StudentMeta();
         meta.studentName  = result.studentName;
         meta.studentClass = result.studentClass;
-        userStudentRepository.findById(userStudentId).ifPresent(us -> {
+        // JOIN-FETCH studentInfo — runs on the report-worker thread (no session),
+        // so the si.getStudentClass()/getStudentDob() reads below would otherwise
+        // throw LazyInitializationException. institute is EAGER.
+        userStudentRepository.findByIdWithStudentInfo(userStudentId).ifPresent(us -> {
             StudentInfo si = us.getStudentInfo();
             if (si != null) {
                 if (si.getStudentClass() != null) meta.studentClass = String.valueOf(si.getStudentClass());
