@@ -33,6 +33,7 @@ import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
+import com.kccitm.api.model.career9.counselling.CounsellingRequest;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.PromoCodeRepository;
@@ -84,6 +85,15 @@ public class CampaignPublicController {
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
     @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
+    @Autowired(required = false) private com.kccitm.api.repository.Career9.counselling.CounsellingRequestRepository counsellingRequestRepository;
+    // Optional: only present when app.email.provider=smtp. Guard for null before sending.
+    @Autowired(required = false) private com.kccitm.api.service.SmtpEmailService smtpEmailService;
+
+    // Where "forward my counselling request" notices go, and the address shown to
+    // students on the thank-you page. Kept configurable; defaults to the canonical
+    // public support inbox used elsewhere in the app.
+    @org.springframework.beans.factory.annotation.Value("${app.support.email:support@career-9.net}")
+    private String supportEmail;
 
     // Phase 3b — pay-before-book for EXTRA counselling sessions.
     // Fallback per-session price (INR) when the entitlement has no snapshotted price.
@@ -175,6 +185,7 @@ public class CampaignPublicController {
             aDto.put("isActive", a.getIsActive());
             aDto.put("purchasePath", m.getPurchasePath() != null ? m.getPurchasePath() : defaultPurchasePath);
             aDto.put("counsellingModel", m.getCounsellingModel() != null ? m.getCounsellingModel() : defaultCounsellingModel);
+            aDto.put("description", m.getDescription());
 
             List<CampaignAssessmentTier> tiers = tierMappingRepository
                     .findByCampaignAssessmentMappingIdOrderByIdAsc(m.getId())
@@ -1026,6 +1037,21 @@ public class CampaignPublicController {
         out.put("counsellingOffered", offered);
         if (!offered) {
             out.put("counsellingActive", false);
+            // No counsellor mapped yet. If the student's package actually INCLUDED
+            // counselling (entitlement has sessions), surface a "pending assignment"
+            // flag so the thank-you page can forward the request to Career-9 instead
+            // of silently hiding counselling. Otherwise this assessment simply has no
+            // counselling and nothing extra is shown.
+            boolean includedCounselling = entitlementIncludesCounselling(userStudentId, assessmentId);
+            out.put("counsellingPendingAssignment", includedCounselling);
+            if (includedCounselling) {
+                out.put("supportEmail", supportEmail);
+                boolean alreadyForwarded = counsellingRequestRepository != null
+                        && counsellingRequestRepository
+                                .findFirstByUserStudentIdAndAssessmentIdAndStatus(userStudentId, assessmentId, "PENDING")
+                                .isPresent();
+                out.put("counsellingRequestForwarded", alreadyForwarded);
+            }
             return ResponseEntity.ok(out);
         }
         // Resolve any active entitlement for this (student, assessment) to obtain a booking
@@ -1074,6 +1100,102 @@ public class CampaignPublicController {
             out.put("studentPhone", si.getPhoneNumber());
         }
         return ResponseEntity.ok(out);
+    }
+
+    /** True when the student has an active entitlement for this assessment that included counselling. */
+    private boolean entitlementIncludesCounselling(Long userStudentId, Long assessmentId) {
+        if (studentEntitlementRepository == null) return false;
+        for (StudentEntitlement cand : studentEntitlementRepository
+                .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
+            if (!"active".equals(cand.getStatus())) continue;
+            Integer total = cand.getCounsellingSessionsTotal();
+            if (total != null && total > 0) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Forward a student's counselling interest when no counsellor is mapped to the
+     * assessment yet. Idempotent: at most one PENDING row per (student, assessment).
+     * Records the request (admins action it on the Counsellor ↔ Assessment page) and
+     * emails the Career-9 support inbox. Public funnel — anonymous, like the siblings.
+     */
+    // @PreAuthorize-Exempt: public b2c funnel (entire controller).
+    @PostMapping("/counselling-request")
+    @Transactional
+    public ResponseEntity<?> forwardCounsellingRequest(@RequestBody Map<String, Object> body) {
+        Long userStudentId = longFromBody(body, "userStudentId");
+        Long assessmentId = longFromBody(body, "assessmentId");
+        if (userStudentId == null || assessmentId == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Map<String, Object> out = new HashMap<>();
+        // A counsellor may have been assigned between page load and this call — nothing to forward.
+        if (bookingService != null && bookingService.hasCounsellorForAssessment(assessmentId)) {
+            out.put("status", "ASSIGNED");
+            return ResponseEntity.ok(out);
+        }
+        if (counsellingRequestRepository == null) {
+            // Persistence unavailable — acknowledge without throwing so the student still sees the notice.
+            out.put("status", "PENDING");
+            out.put("forwarded", false);
+            return ResponseEntity.ok(out);
+        }
+        Optional<CounsellingRequest> existing = counsellingRequestRepository
+                .findFirstByUserStudentIdAndAssessmentIdAndStatus(userStudentId, assessmentId, "PENDING");
+        if (existing.isPresent()) {
+            out.put("status", "PENDING");
+            out.put("alreadyForwarded", true);
+            return ResponseEntity.ok(out);
+        }
+        CounsellingRequest req = new CounsellingRequest();
+        req.setUserStudentId(userStudentId);
+        req.setAssessmentId(assessmentId);
+        String studentName = null, studentEmail = null, studentPhone = null, instituteName = null;
+        Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+        if (usOpt.isPresent()) {
+            UserStudent us = usOpt.get();
+            if (us.getInstitute() != null) {
+                req.setInstituteCode(us.getInstitute().getInstituteCode());
+                instituteName = us.getInstitute().getInstituteName();
+            }
+            if (us.getStudentInfo() != null) {
+                studentName = us.getStudentInfo().getName();
+                studentEmail = us.getStudentInfo().getEmail();
+                studentPhone = us.getStudentInfo().getPhoneNumber();
+            }
+        }
+        req.setStatus("PENDING");
+        counsellingRequestRepository.save(req);
+
+        String assessmentName = assessmentTableRepository.findById(assessmentId)
+                .map(AssessmentTable::getAssessmentName).orElse("assessment #" + assessmentId);
+        notifyCounsellingForwarded(assessmentName, studentName, studentEmail, studentPhone, instituteName);
+
+        out.put("status", "PENDING");
+        out.put("forwarded", true);
+        return ResponseEntity.ok(out);
+    }
+
+    /** Best-effort email to the Career-9 team; the DB row is the source of truth. */
+    private void notifyCounsellingForwarded(String assessmentName, String studentName,
+            String studentEmail, String studentPhone, String instituteName) {
+        if (smtpEmailService == null || supportEmail == null || supportEmail.isEmpty()) return;
+        try {
+            String subject = "Counselling request — " + assessmentName;
+            StringBuilder b = new StringBuilder();
+            b.append("A student has requested career counselling, but no counsellor is mapped to this assessment yet.\n\n");
+            b.append("Assessment: ").append(assessmentName).append('\n');
+            if (studentName != null)  b.append("Student: ").append(studentName).append('\n');
+            if (studentEmail != null) b.append("Email: ").append(studentEmail).append('\n');
+            if (studentPhone != null) b.append("Phone: ").append(studentPhone).append('\n');
+            if (instituteName != null) b.append("Institute: ").append(instituteName).append('\n');
+            b.append("\nAssign a counsellor on the Counsellor ↔ Assessment page to let the student book.");
+            smtpEmailService.sendSimpleEmail(supportEmail, subject, b.toString());
+        } catch (Exception ex) {
+            // Forwarding email is best-effort — never fail the request on a mail error.
+            logger.warn("Failed to email counselling request notice to {}: {}", supportEmail, ex.getMessage());
+        }
     }
 
     @PostMapping("/counselling/slots")

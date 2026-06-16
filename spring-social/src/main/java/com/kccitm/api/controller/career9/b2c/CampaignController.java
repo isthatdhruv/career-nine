@@ -228,6 +228,7 @@ public class CampaignController {
         }
         m.setPurchasePath(normalizePath((String) req.get("purchasePath")));
         m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
+        if (req.containsKey("description")) m.setDescription(normalizeDescription((String) req.get("description")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
         CampaignAssessmentMapping savedMapping = mappingRepository.save(m);
         // Keep the institute<->assessment catalog in sync: an assessment attached to an
@@ -248,6 +249,7 @@ public class CampaignController {
         CampaignAssessmentMapping m = opt.get();
         if (req.containsKey("purchasePath")) m.setPurchasePath(normalizePath((String) req.get("purchasePath")));
         if (req.containsKey("counsellingModel")) m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
+        if (req.containsKey("description")) m.setDescription(normalizeDescription((String) req.get("description")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
         if (req.containsKey("isActive")) m.setIsActive(toBool(req.get("isActive")));
         return ResponseEntity.ok(mappingRepository.save(m));
@@ -348,6 +350,7 @@ public class CampaignController {
             row.put("assessmentName", a != null ? a.getAssessmentName() : null);
             row.put("purchasePath", m.getPurchasePath());
             row.put("counsellingModel", m.getCounsellingModel());
+            row.put("description", m.getDescription());
             row.put("isActive", m.getIsActive());
             row.put("sortOrder", m.getSortOrder());
             List<CampaignAssessmentTier> tiers = tierMappingRepository
@@ -374,6 +377,13 @@ public class CampaignController {
         if (s == null) return null;
         s = s.trim();
         return ("1".equals(s) || "2".equals(s)) ? s : null;
+    }
+
+    /** Trim and collapse a blank description to NULL so the public card omits it cleanly. */
+    private static String normalizeDescription(String s) {
+        if (s == null) return null;
+        s = s.trim();
+        return s.isEmpty() ? null : s;
     }
 
     private static java.util.Date parseDate(String s) {

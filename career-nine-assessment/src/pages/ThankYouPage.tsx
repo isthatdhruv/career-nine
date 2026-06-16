@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStudentBranding, brandLogoSrc } from '../hooks/useStudentBranding';
 import { useNavigate } from 'react-router-dom';
-import { getStudentCounselling, getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
+import { forwardCounsellingRequest, getStudentCounselling, getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
 import { TierCard, Tier } from '../components/TierCard';
 import CounsellingSlotPicker from '../components/CounsellingSlotPicker';
 import MappingCounsellingSection from '../components/MappingCounsellingSection';
@@ -132,9 +132,16 @@ const ThankYouPage: React.FC = () => {
     // Counselling for a school student (resolved by userStudentId when there is no
     // B2C entitlementId on this page). Null until resolved / when not applicable.
     const [schoolCounselling, setSchoolCounselling] = useState<SchoolCounselling | null>(null);
+    // Set when the assessment includes counselling but NO counsellor is mapped yet:
+    // we forward the request to Career-9 and show a "request received" notice instead
+    // of a bookable slot picker. Null otherwise.
+    const [pendingCounselling, setPendingCounselling] = useState<{ supportEmail: string } | null>(null);
     // Ensures the slot picker auto-opens at most once per page mount (so the
     // student isn't trapped re-opening it after they deliberately close it).
     const autoOpenedPickerRef = useRef<boolean>(false);
+    // Forwards the counselling request at most once per mount (the POST is also
+    // idempotent server-side, so this just avoids a redundant call/email).
+    const counsellingForwardedRef = useRef<boolean>(false);
     // Which per-feature upsell modal is open, if any. Set by the "Add <feature>"
     // cards; cleared on close / choose. Choosing a tier inside the modal reuses
     // the existing handleChoosePlan navigation — same /upgrade route, same
@@ -225,6 +232,15 @@ const ThankYouPage: React.FC = () => {
                         studentEmail: d.studentEmail,
                         studentPhone: d.studentPhone,
                     });
+                } else if (d.counsellingPendingAssignment) {
+                    // Counselling is part of the package but no counsellor is mapped yet.
+                    // Forward the request to Career-9 (records it + emails the team) and
+                    // show a reassurance notice instead of a slot picker.
+                    setPendingCounselling({ supportEmail: d.supportEmail || 'support@career-9.net' });
+                    if (!d.counsellingRequestForwarded && !counsellingForwardedRef.current) {
+                        counsellingForwardedRef.current = true;
+                        forwardCounsellingRequest(userStudentId, assessmentId).catch(() => {});
+                    }
                 }
             })
             .catch(() => {});
@@ -1001,6 +1017,52 @@ const ThankYouPage: React.FC = () => {
                                                 {counsellingRemaining > 0 && (
                                                     <><br/><span style={{ fontSize: '0.72rem', opacity: 0.85 }}>{counsellingRemaining} more available</span></>
                                                 )}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Counselling request forwarded — no counsellor mapped yet.
+                                        Shown instead of a slot picker so the student knows their
+                                        request reached Career-9 and how to follow up. */}
+                                    {pendingCounselling && !schoolCounselling && !bookedAppointment && (
+                                        <div
+                                            className="text-center"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #BAE6FD 0%, #38BDF8 100%)',
+                                                borderRadius: '16px',
+                                                padding: '1.25rem 1.5rem',
+                                                boxShadow: '0 10px 35px rgba(56, 189, 248, 0.35)',
+                                                width: '100%',
+                                                maxWidth: '280px',
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '42px',
+                                                height: '42px',
+                                                borderRadius: '10px',
+                                                background: 'rgba(255,255,255,0.25)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                margin: '0 auto 0.75rem auto',
+                                            }}>
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                            </div>
+                                            <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                                                Counselling request received
+                                            </h3>
+                                            <p style={{ color: 'rgba(255,255,255,0.95)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
+                                                Your request for career counselling has been forwarded to the Career-9 team. We'll match you with a counsellor and reach out shortly.
+                                                <br />
+                                                <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>
+                                                    Need it sooner? Write to{' '}
+                                                    <a href={`mailto:${pendingCounselling.supportEmail}`} style={{ color: 'white', fontWeight: 700 }}>
+                                                        {pendingCounselling.supportEmail}
+                                                    </a>
+                                                </span>
                                             </p>
                                         </div>
                                     )}

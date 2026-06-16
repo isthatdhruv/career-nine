@@ -65,6 +65,19 @@ export function getStudentCounselling(
   })
 }
 
+// Forward a counselling request when the assessment includes counselling but no
+// counsellor is mapped yet. Idempotent server-side (one open request per
+// student+assessment); records the request and emails the Career-9 team.
+export function forwardCounsellingRequest(
+  userStudentId: number | string,
+  assessmentId: number | string,
+) {
+  return http.post('/campaign/public/counselling-request', {
+    userStudentId,
+    assessmentId,
+  })
+}
+
 /**
  * Magic-link redemption for the welcome-email flow. Validates the access
  * token, issues the cn_at_asmnt cookie via Set-Cookie, and returns the

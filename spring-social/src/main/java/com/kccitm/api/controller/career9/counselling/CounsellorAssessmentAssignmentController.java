@@ -1,5 +1,7 @@
 package com.kccitm.api.controller.career9.counselling;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,7 +22,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.counselling.Counsellor;
+import com.kccitm.api.model.career9.counselling.CounsellingRequest;
 import com.kccitm.api.model.career9.counselling.CounsellorAssessmentAssignment;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.Career9.counselling.CounsellingRequestRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorAssessmentAssignmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 
@@ -41,6 +47,15 @@ public class CounsellorAssessmentAssignmentController {
 
     @Autowired
     private CounsellorRepository counsellorRepository;
+
+    @Autowired(required = false)
+    private CounsellingRequestRepository counsellingRequestRepository;
+
+    @Autowired
+    private AssessmentTableRepository assessmentTableRepository;
+
+    @Autowired
+    private UserStudentRepository userStudentRepository;
 
     @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/by-assessment/{assessmentId}")
@@ -79,7 +94,9 @@ public class CounsellorAssessmentAssignmentController {
                 .findFirst().orElse(null);
         if (existing != null) {
             existing.setIsActive(true);
-            return ResponseEntity.ok(assignmentRepository.save(existing));
+            CounsellorAssessmentAssignment saved = assignmentRepository.save(existing);
+            closePendingRequests(assessmentId);
+            return ResponseEntity.ok(saved);
         }
 
         CounsellorAssessmentAssignment a = new CounsellorAssessmentAssignment();
@@ -89,7 +106,54 @@ public class CounsellorAssessmentAssignmentController {
         a.setAssignedBy(assignedBy);
         CounsellorAssessmentAssignment saved = assignmentRepository.save(a);
         logger.info("Assigned counsellor {} to assessment {}", counsellorId, assessmentId);
+        closePendingRequests(assessmentId);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    }
+
+    /**
+     * A counsellor is now mapped to this assessment, so any students who'd been
+     * "forwarded to Career-9" waiting on one can book. Flip their PENDING requests
+     * to ASSIGNED so they drop off the admin's pending list.
+     */
+    private void closePendingRequests(Long assessmentId) {
+        if (counsellingRequestRepository == null) return;
+        for (CounsellingRequest cr : counsellingRequestRepository.findByAssessmentIdAndStatus(assessmentId, "PENDING")) {
+            cr.setStatus("ASSIGNED");
+            counsellingRequestRepository.save(cr);
+        }
+    }
+
+    /**
+     * Students waiting on a counsellor — assessments that have counselling in the
+     * package but no counsellor mapped yet. Lets the admin see who to assign for.
+     */
+    @PreAuthorize("@auth.allows('counsellor.read')")
+    @GetMapping("/pending-requests")
+    public ResponseEntity<List<Map<String, Object>>> pendingRequests() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (counsellingRequestRepository == null) return ResponseEntity.ok(out);
+        for (CounsellingRequest r : counsellingRequestRepository.findByStatusOrderByCreatedAtDesc("PENDING")) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", r.getId());
+            row.put("userStudentId", r.getUserStudentId());
+            row.put("assessmentId", r.getAssessmentId());
+            row.put("instituteCode", r.getInstituteCode());
+            row.put("createdAt", r.getCreatedAt());
+            assessmentTableRepository.findById(r.getAssessmentId())
+                    .ifPresent(a -> row.put("assessmentName", a.getAssessmentName()));
+            userStudentRepository.findById(r.getUserStudentId()).ifPresent(us -> {
+                if (us.getStudentInfo() != null) {
+                    row.put("studentName", us.getStudentInfo().getName());
+                    row.put("studentEmail", us.getStudentInfo().getEmail());
+                    row.put("studentPhone", us.getStudentInfo().getPhoneNumber());
+                }
+                if (us.getInstitute() != null) {
+                    row.put("instituteName", us.getInstitute().getInstituteName());
+                }
+            });
+            out.add(row);
+        }
+        return ResponseEntity.ok(out);
     }
 
     @PreAuthorize("@auth.allows('counsellor.update')")

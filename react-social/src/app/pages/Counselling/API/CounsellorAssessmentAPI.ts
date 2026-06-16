@@ -19,3 +19,21 @@ export function toggleAssignment(id: number) {
 export function deleteAssignment(id: number) {
   return axios.delete(`${BASE}/${id}`)
 }
+
+// Students who requested counselling on the thank-you page for an assessment that
+// has no counsellor mapped yet. Assigning a counsellor auto-closes these.
+export interface PendingCounsellingRequest {
+  id: number
+  userStudentId: number
+  assessmentId: number
+  assessmentName?: string
+  studentName?: string
+  studentEmail?: string
+  studentPhone?: string
+  instituteCode?: number | null
+  instituteName?: string
+  createdAt?: string
+}
+export function getPendingCounsellingRequests() {
+  return axios.get<PendingCounsellingRequest[]>(`${BASE}/pending-requests`)
+}

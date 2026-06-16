@@ -35,6 +35,7 @@ type Assessment = {
   isActive: boolean
   purchasePath: string
   counsellingModel: string
+  description?: string | null
   tiers: Tier[]
 }
 
@@ -384,6 +385,9 @@ const CampaignRegisterPage = () => {
                       style={isSel ? { ...s.optionCard, ...s.optionCardSelected } : s.optionCard}
                     >
                       <div style={s.optionCardTitle}>{a.assessmentName}</div>
+                      {a.description && (
+                        <div style={s.optionCardDescription}>{a.description}</div>
+                      )}
                       <div style={s.optionCardMeta}>
                         {a.tiers.length} tier{a.tiers.length === 1 ? "" : "s"}
                       </div>
@@ -816,6 +820,9 @@ const s: { [key: string]: React.CSSProperties } = {
   },
   optionCardTitle: {
     fontSize: "0.95rem", fontWeight: 700, color: "#1e293b", marginBottom: 4,
+  },
+  optionCardDescription: {
+    color: "#475569", fontSize: "0.82rem", lineHeight: 1.4, marginBottom: 6, whiteSpace: "pre-wrap" as const,
   },
   optionCardMeta: {
     color: "#64748b", fontSize: "0.8rem",

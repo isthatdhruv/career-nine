@@ -6,6 +6,8 @@ import {
   getAssignmentsByAssessment,
   assignCounsellor,
   deleteAssignment,
+  getPendingCounsellingRequests,
+  PendingCounsellingRequest,
 } from '../API/CounsellorAssessmentAPI'
 import { getAssessmentSummaryList } from '../../AssessmentMapping/API/AssessmentMapping_APIs'
 import { useAuth } from '../../../modules/auth'
@@ -45,6 +47,13 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [pending, setPending] = useState<PendingCounsellingRequest[]>([])
+
+  const loadPending = () => {
+    getPendingCounsellingRequests()
+      .then((res) => setPending(res.data || []))
+      .catch(() => { /* non-fatal — the panel just stays empty */ })
+  }
 
   useEffect(() => {
     getAllCounsellors()
@@ -57,6 +66,7 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
         setAssessments(list)
       })
       .catch(() => setError('Failed to load assessments.'))
+    loadPending()
   }, [])
 
   const load = async (id: number) => {
@@ -94,6 +104,8 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
       }
       const res = await getAssignmentsByAssessment(loadedAssessmentId)
       setAssignments(res.data || [])
+      // Assigning a counsellor auto-closes any pending requests for the assessment.
+      loadPending()
     } catch {
       setError('Could not update the assignment. Please try again.')
     }
@@ -107,6 +119,49 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
         finish that assessment are only offered slots from the assigned counsellors. If an
         assessment has no assignments, all institute counsellors remain available.
       </p>
+
+      {pending.length > 0 && (
+        <div style={{ marginBottom: 20, border: '1px solid #FCD9A8', borderRadius: 12, background: '#FFF8EE', overflow: 'hidden' }}>
+          <div style={{ padding: '10px 14px', fontWeight: 700, fontSize: 14, color: '#92400E', background: '#FEF1DC' }}>
+            ⏳ Students waiting on a counsellor ({pending.length})
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ textAlign: 'left', color: '#92400E' }}>
+                <th style={{ padding: '8px 14px' }}>Assessment</th>
+                <th style={{ padding: '8px 14px' }}>Student</th>
+                <th style={{ padding: '8px 14px' }}>Institute</th>
+                <th style={{ padding: '8px 14px' }}>Requested</th>
+                <th style={{ padding: '8px 14px' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pending.map((r) => (
+                <tr key={r.id} style={{ borderTop: '1px solid #FCE7C4' }}>
+                  <td style={{ padding: '8px 14px', fontWeight: 600, color: '#1e293b' }}>{r.assessmentName || `#${r.assessmentId}`}</td>
+                  <td style={{ padding: '8px 14px', color: '#5C7A72' }}>
+                    {r.studentName || `Student #${r.userStudentId}`}
+                    {r.studentEmail && <span style={{ color: '#9CA3AF' }}> · {r.studentEmail}</span>}
+                  </td>
+                  <td style={{ padding: '8px 14px', color: '#5C7A72' }}>{r.instituteName || '—'}</td>
+                  <td style={{ padding: '8px 14px', color: '#9CA3AF' }}>{r.createdAt || '—'}</td>
+                  <td style={{ padding: '8px 14px' }}>
+                    <button
+                      onClick={() => load(r.assessmentId)}
+                      style={{
+                        padding: '5px 14px', borderRadius: 8, border: '1.5px solid #F59E0B', cursor: 'pointer',
+                        background: '#FEF3C7', color: '#92400E', fontWeight: 600,
+                      }}
+                    >
+                      Assign counsellor →
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
         <label style={{ fontWeight: 600, fontSize: 14, color: '#1e293b' }}>Assessment</label>
