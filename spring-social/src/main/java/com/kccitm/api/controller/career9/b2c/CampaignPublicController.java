@@ -242,19 +242,25 @@ public class CampaignPublicController {
         // Class-based registration routes. When present (and this is not an
         // assessment/tier deep-link), the student app shows a "Choose your class"
         // picker; picking a class auto-selects its assessment (and default tier /
-        // price). Only routes whose assessment is actually reachable above are
-        // returned, so the picker can never resolve to a missing assessment.
+        // price). Only routes whose assessment is COMPLETABLE are returned, so the
+        // picker can never resolve to a dead end: try-first needs no tier, but
+        // pay-first needs at least one active tier to charge against (e.g. an
+        // assessment freshly imported from school config before tiers are set).
         if (filterAssessmentId == null) {
-            java.util.Set<Long> reachable = new java.util.HashSet<>();
+            java.util.Set<Long> usable = new java.util.HashSet<>();
             for (Map<String, Object> aDto : assessmentsOut) {
                 Object aid = aDto.get("assessmentId");
-                if (aid instanceof Number) reachable.add(((Number) aid).longValue());
+                if (!(aid instanceof Number)) continue;
+                boolean tryFirst = "B".equals(aDto.get("purchasePath"));
+                Object tiersObj = aDto.get("tiers");
+                boolean hasTier = tiersObj instanceof List && !((List<?>) tiersObj).isEmpty();
+                if (tryFirst || hasTier) usable.add(((Number) aid).longValue());
             }
             List<Map<String, Object>> classesOut = new ArrayList<>();
             for (CampaignClassAssessment r : classRouteRepository
                     .findByCampaignIdAndIsDeletedFalseOrderBySortOrderAscIdAsc(c.getCampaignId())) {
                 if (!Boolean.TRUE.equals(r.getIsActive())) continue;
-                if (r.getAssessmentId() == null || !reachable.contains(r.getAssessmentId())) continue;
+                if (r.getAssessmentId() == null || !usable.contains(r.getAssessmentId())) continue;
                 SchoolClasses sc = r.getClassId() != null
                         ? schoolClassesRepository.findById(r.getClassId()).orElse(null) : null;
                 if (sc == null) continue; // class deleted — skip rather than show a blank option
@@ -265,6 +271,15 @@ public class CampaignPublicController {
                 cDto.put("sortOrder", r.getSortOrder());
                 classesOut.add(cDto);
             }
+            // Grade order ("Class 9" before "Class 10"); non-numeric names last, by name.
+            classesOut.sort((a, b) -> {
+                Integer ga = gradeOf((String) a.get("className"));
+                Integer gb = gradeOf((String) b.get("className"));
+                if (ga != null && gb != null) return ga.compareTo(gb);
+                if (ga != null) return -1;
+                if (gb != null) return 1;
+                return String.valueOf(a.get("className")).compareToIgnoreCase(String.valueOf(b.get("className")));
+            });
             response.put("classes", classesOut);
         }
         return ResponseEntity.ok(response);
@@ -1546,8 +1561,13 @@ public class CampaignPublicController {
     private Integer parseClassNumber(Integer classId) {
         if (classId == null) return null;
         SchoolClasses sc = schoolClassesRepository.findById(classId).orElse(null);
-        if (sc == null || sc.getClassName() == null) return null;
-        String digits = sc.getClassName().replaceAll("[^0-9]", "");
+        return sc == null ? null : gradeOf(sc.getClassName());
+    }
+
+    /** Grade number from a class name ("Class 10" → 10); null for non-numeric names. */
+    private static Integer gradeOf(String className) {
+        if (className == null) return null;
+        String digits = className.replaceAll("[^0-9]", "");
         if (digits.isEmpty()) return null;
         try { return Integer.parseInt(digits); }
         catch (NumberFormatException e) { return null; }
