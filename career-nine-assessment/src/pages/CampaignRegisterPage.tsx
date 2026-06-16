@@ -407,25 +407,33 @@ const CampaignRegisterPage = () => {
           {showClassPicker && (
             <section style={{ marginBottom: 24 }}>
               <h3 style={s.sectionTitle}>Choose your class</h3>
-              <div style={s.assessmentGrid}>
+              <select
+                value={selectedClassId ?? ""}
+                onChange={(e) => {
+                  const cid = e.target.value === "" ? null : Number(e.target.value)
+                  const cls = cid == null ? null : info.classes!.find((c) => c.classId === cid) ?? null
+                  if (cls) {
+                    selectClass(cls)
+                  } else {
+                    setSelectedClassId(null)
+                    setSelectedAssessmentId(null)
+                    setSelectedTierId(null)
+                  }
+                }}
+                style={{ ...s.input, color: selectedClassId ? "#1e293b" : "#94a3b8" }}
+                onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+              >
+                <option value="">Select your class</option>
                 {info.classes!.map((c) => {
-                  const isSel = selectedClassId === c.classId
                   const routed = info.assessments.find((a) => a.assessmentId === c.assessmentId)
                   return (
-                    <button
-                      key={c.classId}
-                      type="button"
-                      onClick={() => selectClass(c)}
-                      style={isSel ? { ...s.optionCard, ...s.optionCardSelected } : s.optionCard}
-                    >
-                      <div style={s.optionCardTitle}>{c.className}</div>
-                      {routed && (
-                        <div style={s.optionCardMeta}>{routed.assessmentName}</div>
-                      )}
-                    </button>
+                    <option key={c.classId} value={c.classId}>
+                      {c.className}{routed ? ` — ${routed.assessmentName}` : ""}
+                    </option>
                   )
                 })}
-              </div>
+              </select>
             </section>
           )}
 
