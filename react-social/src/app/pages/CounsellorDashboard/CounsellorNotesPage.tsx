@@ -7,6 +7,7 @@ import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
+import PageHeader from '../../components/PageHeader'
 import './CounsellorPortal.css'
 
 interface NotesFormState {
@@ -183,10 +184,12 @@ const CounsellorNotesPage: React.FC = () => {
       storageKeys={[]}
       loginPath='/counsellor/login'
     >
-      <div className='cp-welcome'>
-        <h2 className='cp-welcome-title'>Session Notes</h2>
-        <p className='cp-welcome-sub'>Review and add notes for completed counselling sessions</p>
-      </div>
+      <PageHeader
+        icon={<i className='bi bi-journal-text' />}
+        title='Session Notes'
+        subtitle='Review and add notes for completed counselling sessions'
+      />
+      <div style={{ height: 12 }} />
 
       {error && (
         <div
@@ -209,6 +212,7 @@ const CounsellorNotesPage: React.FC = () => {
         </div>
       )}
 
+      <div className='cp-page-card'>
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#6B7A8D', fontSize: 14 }}>
           Loading sessions...
@@ -445,6 +449,7 @@ const CounsellorNotesPage: React.FC = () => {
           })}
         </div>
       )}
+      </div>
     </PortalLayout>
   )
 }

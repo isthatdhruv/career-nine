@@ -5,6 +5,7 @@ import PortalLayout from '../portal/PortalLayout'
 import { getCounsellorById, getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { useAuth } from '../../modules/auth'
 import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
+import PageHeader from '../../components/PageHeader'
 import './CounsellorPortal.css'
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
@@ -163,42 +164,41 @@ const CounsellorProfilePage: React.FC = () => {
   }
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', border: '1.5px solid #D1E5DF',
+    width: '100%', padding: '10px 14px', border: '1.5px solid #DDE3EC',
     borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box',
-    background: '#FAFCFB', transition: 'border-color 0.2s',
+    background: '#F8F9FC', transition: 'border-color 0.2s',
   }
   const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: 12, fontWeight: 600, color: '#5C7A72', marginBottom: 5,
+    display: 'block', fontSize: 12, fontWeight: 600, color: '#6B7A8D', marginBottom: 5,
   }
 
   if (loading) {
     return (
       <PortalLayout title='Counsellor Dashboard' menuItems={COUNSELLOR_MENU_ITEMS} storageKeys={[]} loginPath='/counsellor/login'>
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#5C7A72' }}>Loading profile...</div>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#6B7A8D' }}>Loading profile...</div>
       </PortalLayout>
     )
   }
 
   return (
     <PortalLayout title='Counsellor Dashboard' menuItems={COUNSELLOR_MENU_ITEMS} storageKeys={[]} loginPath='/counsellor/login'>
-      <div style={{ maxWidth: 760, margin: '0 auto' }}>
+      <div style={{ width: '100%' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-          <button onClick={() => navigate('/counsellor/dashboard')} style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 36, height: 36, borderRadius: 8, border: '1.5px solid #D1E5DF',
-            background: '#fff', cursor: 'pointer', color: '#1A2B28', flexShrink: 0,
-          }} title='Back'>
-            <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-              <polyline points='15 18 9 12 15 6' />
-            </svg>
-          </button>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1A2B28', margin: 0 }}>My Profile</h1>
-            <p style={{ fontSize: 13, color: '#5C7A72', marginTop: 3, marginBottom: 0 }}>Update your personal and professional details</p>
-          </div>
-        </div>
+        <PageHeader
+          icon={<i className='bi bi-person-badge' />}
+          title='My Profile'
+          subtitle='Update your personal and professional details'
+          actions={[
+            {
+              label: 'Back',
+              iconClass: 'bi-arrow-left',
+              onClick: () => navigate('/counsellor/dashboard'),
+              variant: 'ghost',
+            },
+          ]}
+        />
+        <div style={{ height: 16 }} />
 
         {/* Alerts */}
         {success && (
@@ -214,24 +214,25 @@ const CounsellorProfilePage: React.FC = () => {
         )}
 
         {/* â”€â”€ Profile Photo â”€â”€ */}
-        <div style={{ background: '#fff', border: '1px solid #D1E5DF', borderRadius: 12, padding: 24, marginBottom: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#1A2B28', marginBottom: 16 }}>Profile Photo</div>
+        <div className='cp-page-card'>
+        <div style={{ paddingBottom: 24, marginBottom: 24, borderBottom: '1px solid #DDE3EC' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#263B6A', marginBottom: 16 }}>Profile Photo</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             <div style={{
               width: 88, height: 88, borderRadius: '50%', overflow: 'hidden',
-              background: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, border: '3px solid #D1E5DF',
+              background: 'rgba(105, 132, 169, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, border: '3px solid #DDE3EC',
             }}>
               {profileImageUrl ? (
                 <img src={profileImageUrl} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <span style={{ fontSize: 32, fontWeight: 700, color: '#0C6B5A' }}>{form.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                <span style={{ fontSize: 32, fontWeight: 700, color: '#263B6A' }}>{form.name?.charAt(0)?.toUpperCase() || '?'}</span>
               )}
             </div>
             <div>
               <button onClick={() => photoRef.current?.click()} style={{
-                padding: '8px 20px', fontSize: 13, fontWeight: 600, border: '1.5px solid #D1E5DF',
-                borderRadius: 8, background: '#fff', color: '#1A2B28', cursor: 'pointer',
+                padding: '8px 20px', fontSize: 13, fontWeight: 600, border: '1.5px solid #DDE3EC',
+                borderRadius: 8, background: '#fff', color: '#263B6A', cursor: 'pointer',
               }}>
                 {profileImageUrl ? 'Change Photo' : 'Upload Photo'}
               </button>
@@ -242,8 +243,8 @@ const CounsellorProfilePage: React.FC = () => {
         </div>
 
         {/* â”€â”€ Personal Details â”€â”€ */}
-        <div style={{ background: '#fff', border: '1px solid #D1E5DF', borderRadius: 12, padding: 24, marginBottom: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#1A2B28', marginBottom: 16 }}>Personal Details</div>
+        <div style={{ paddingBottom: 24, marginBottom: 24, borderBottom: '1px solid #DDE3EC' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#263B6A', marginBottom: 16 }}>Personal Details</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
               <label style={labelStyle}>Full Name *</label>
@@ -266,8 +267,8 @@ const CounsellorProfilePage: React.FC = () => {
         </div>
 
         {/* â”€â”€ Professional Details â”€â”€ */}
-        <div style={{ background: '#fff', border: '1px solid #D1E5DF', borderRadius: 12, padding: 24, marginBottom: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#1A2B28', marginBottom: 16 }}>Professional Details</div>
+        <div style={{ paddingBottom: 24, marginBottom: 24, borderBottom: '1px solid #DDE3EC' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#263B6A', marginBottom: 16 }}>Professional Details</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
             <div>
               <label style={labelStyle}>Specializations</label>
@@ -327,8 +328,8 @@ const CounsellorProfilePage: React.FC = () => {
         </div>
 
         {/* â”€â”€ Bank Details â”€â”€ */}
-        <div style={{ background: '#fff', border: '1px solid #D1E5DF', borderRadius: 12, padding: 24, marginBottom: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: '#1A2B28', marginBottom: 4 }}>Bank Details</div>
+        <div style={{ paddingBottom: 24, marginBottom: 24, borderBottom: '1px solid #DDE3EC' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#263B6A', marginBottom: 4 }}>Bank Details</div>
           <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 16 }}>For payout processing. Your details are stored securely.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
@@ -354,19 +355,21 @@ const CounsellorProfilePage: React.FC = () => {
           </div>
         </div>
 
+        </div>
+
         {/* Save Button */}
         <div style={{ display: 'flex', gap: 12, marginBottom: 40 }}>
           <button onClick={handleSave} disabled={saving} style={{
             padding: '12px 36px', fontSize: 15, fontWeight: 600, border: 'none', borderRadius: 10,
-            background: saving ? '#9CA3AF' : 'linear-gradient(135deg, #064E3B, #0C6B5A)',
+            background: saving ? '#9CA3AF' : 'linear-gradient(135deg, #1C2D52, #263B6A)',
             color: '#fff', cursor: saving ? 'not-allowed' : 'pointer',
-            boxShadow: '0 2px 8px rgba(12,107,90,0.3)',
+            boxShadow: '0 2px 8px rgba(38,59,106,0.3)',
           }}>
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
           <button onClick={() => navigate('/counsellor/dashboard')} style={{
-            padding: '12px 24px', fontSize: 15, fontWeight: 600, border: '1.5px solid #D1E5DF',
-            borderRadius: 10, background: '#fff', color: '#5C7A72', cursor: 'pointer',
+            padding: '12px 24px', fontSize: 15, fontWeight: 600, border: '1.5px solid #DDE3EC',
+            borderRadius: 10, background: '#fff', color: '#6B7A8D', cursor: 'pointer',
           }}>
             Cancel
           </button>
