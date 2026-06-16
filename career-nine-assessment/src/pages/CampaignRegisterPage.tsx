@@ -39,6 +39,13 @@ type Assessment = {
   tiers: Tier[]
 }
 
+type CampaignClass = {
+  classId: number
+  className: string
+  assessmentId: number
+  sortOrder?: number
+}
+
 type CampaignInfo = {
   campaign: {
     campaignId: number
@@ -51,6 +58,9 @@ type CampaignInfo = {
     validTo?: string
   }
   assessments: Assessment[]
+  // Present for class-based campaigns: the student picks a class and the routed
+  // assessment (+ its default tier) auto-selects. Omitted on assessment/tier deep-links.
+  classes?: CampaignClass[]
 }
 
 const CampaignRegisterPage = () => {
@@ -72,6 +82,7 @@ const CampaignRegisterPage = () => {
 
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(aidFromUrl)
   const [selectedTierId, setSelectedTierId] = useState<number | null>(tidFromUrl)
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null)
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -107,13 +118,33 @@ const CampaignRegisterPage = () => {
       })
   }, [slug, aidFromUrl, tidFromUrl])
 
+  // Class-based campaigns route a class → assessment. When present, the student
+  // picks a class (not an assessment) and the routed assessment auto-selects.
+  const classMode = !!info && Array.isArray(info.classes) && info.classes.length > 0
+
+  const selectClass = (cls: CampaignClass) => {
+    setSelectedClassId(cls.classId)
+    setSelectedAssessmentId(cls.assessmentId)
+    setSelectedTierId(null)
+  }
+
   // Auto-select if there's only one option at any layer.
   useEffect(() => {
-    if (!info) return
+    if (!info || classMode) return
     if (selectedAssessmentId == null && info.assessments.length === 1) {
       setSelectedAssessmentId(info.assessments[0].assessmentId)
     }
-  }, [info, selectedAssessmentId])
+  }, [info, selectedAssessmentId, classMode])
+
+  // Class mode: if there's only one class, select it (and its assessment) outright.
+  useEffect(() => {
+    if (!info || !classMode || selectedClassId != null) return
+    if (info.classes!.length === 1) {
+      const only = info.classes![0]
+      setSelectedClassId(only.classId)
+      setSelectedAssessmentId(only.assessmentId)
+    }
+  }, [info, classMode, selectedClassId])
 
   const selectedAssessment: Assessment | null =
     info && selectedAssessmentId != null
@@ -205,6 +236,7 @@ const CampaignRegisterPage = () => {
         gender,
       }
       if (!isTryFirst && promoApplied) data.promoCode = promoApplied.code
+      if (selectedClassId != null) data.classId = selectedClassId
 
       const res = isTryFirst
         ? await registerTrial(info.campaign.slug, selectedAssessment.assessmentId, data)
@@ -317,7 +349,10 @@ const CampaignRegisterPage = () => {
 
   const onlyOneAssessmentInUrl = aidFromUrl != null
   const onlyOneTierInUrl = tidFromUrl != null
-  const showAssessmentPicker = !onlyOneAssessmentInUrl && info.assessments.length > 1
+  // In class mode the class picker drives assessment selection, so the raw
+  // assessment picker is hidden.
+  const showClassPicker = classMode && info.classes!.length > 1
+  const showAssessmentPicker = !classMode && !onlyOneAssessmentInUrl && info.assessments.length > 1
   const showTierPicker =
     !isTryFirst && !onlyOneTierInUrl && selectedAssessment !== null && selectedAssessment.tiers.length > 1
   const showLockedTier = !isTryFirst && !showTierPicker && selectedTier !== null
@@ -367,6 +402,33 @@ const CampaignRegisterPage = () => {
         <div style={s.divider} />
 
         <div style={{ padding: "24px 32px 32px" }}>
+          {/* Class picker (class-based campaigns) — picking a class auto-selects
+              its assessment and default tier. */}
+          {showClassPicker && (
+            <section style={{ marginBottom: 24 }}>
+              <h3 style={s.sectionTitle}>Choose your class</h3>
+              <div style={s.assessmentGrid}>
+                {info.classes!.map((c) => {
+                  const isSel = selectedClassId === c.classId
+                  const routed = info.assessments.find((a) => a.assessmentId === c.assessmentId)
+                  return (
+                    <button
+                      key={c.classId}
+                      type="button"
+                      onClick={() => selectClass(c)}
+                      style={isSel ? { ...s.optionCard, ...s.optionCardSelected } : s.optionCard}
+                    >
+                      <div style={s.optionCardTitle}>{c.className}</div>
+                      {routed && (
+                        <div style={s.optionCardMeta}>{routed.assessmentName}</div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
           {/* Assessment picker */}
           {showAssessmentPicker && (
             <section style={{ marginBottom: 24 }}>

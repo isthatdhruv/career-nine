@@ -695,6 +695,12 @@ public class PaymentWebhookController {
                         }
                     }
                     if (info != null) {
+                        // Backfill the grade onto an existing student that has none, so
+                        // class-based pay-first registrations get the right report template.
+                        if (txn.getStudentClass() != null && info.getStudentClass() == null) {
+                            info.setStudentClass(txn.getStudentClass());
+                            studentInfoRepository.save(info);
+                        }
                         List<UserStudent> us = userStudentRepository.findByStudentInfoId(info.getId());
                         if (!us.isEmpty()) userStudent = us.get(0);
                     }
@@ -715,6 +721,8 @@ public class PaymentWebhookController {
                 studentInfo.setEmail(email);
                 studentInfo.setStudentDob(dob);
                 studentInfo.setPhoneNumber(phone);
+                // Grade resolved at registration from the picked class (class-based campaigns).
+                studentInfo.setStudentClass(txn.getStudentClass());
                 studentInfo.setUser(user);
                 studentInfo = studentInfoRepository.save(studentInfo);
 

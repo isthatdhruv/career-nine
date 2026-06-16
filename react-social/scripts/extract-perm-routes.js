@@ -18,6 +18,14 @@
  * inside a one-line element, so regex is enough. If/when that convention
  * breaks down, swap for `ts-morph` or `@typescript-eslint/parser` and update
  * this file — the consumers (manifest JSON) don't change.
+ *
+ * Comment stripping is string-AWARE (see stripComments): a naive block-comment
+ * regex sweep treats the slash-star inside a route path like the wildcard
+ * "auth/[star]" as a block-comment opener and silently eats every route up to
+ * the next comment-close. That bug dropped ~18 routes and emitted garbage
+ * paths (e.g. student_management.read got "auth}<newline><Route path="). The
+ * scanner below never starts a comment while inside a string literal, so
+ * wildcard paths survive intact.
  */
 
 const fs = require("fs");
@@ -27,6 +35,72 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const INPUT = path.join(REPO_ROOT, "src/app/routing/PrivateRoutes.tsx");
 const OUTPUT = path.join(REPO_ROOT, "src/app/permissions-manifest.json");
 
+/**
+ * Remove `//` line comments and `/* ... *​/` block comments, but ONLY when not
+ * inside a string literal (", ', or `). Newlines are preserved so byte offsets
+ * stay roughly line-aligned for debugging. Escapes inside strings are honoured.
+ */
+function stripComments(src) {
+  let out = "";
+  const n = src.length;
+  // code | line | block | dquote | squote | tquote
+  let state = "code";
+  for (let i = 0; i < n; i++) {
+    const c = src[i];
+    const c2 = i + 1 < n ? src[i + 1] : "";
+
+    if (state === "code") {
+      if (c === "/" && c2 === "/") { state = "line"; i++; continue; }
+      if (c === "/" && c2 === "*") { state = "block"; i++; continue; }
+      if (c === '"') { state = "dquote"; out += c; continue; }
+      if (c === "'") { state = "squote"; out += c; continue; }
+      if (c === "`") { state = "tquote"; out += c; continue; }
+      out += c;
+      continue;
+    }
+    if (state === "line") {
+      if (c === "\n") { state = "code"; out += c; }
+      continue;
+    }
+    if (state === "block") {
+      if (c === "*" && c2 === "/") { state = "code"; i++; continue; }
+      if (c === "\n") out += c; // keep line count stable
+      continue;
+    }
+    // ── inside a string literal: copy verbatim, respect escapes ──
+    out += c;
+    if (c === "\\") { // escape — copy the escaped char too
+      if (i + 1 < n) { out += src[i + 1]; i++; }
+      continue;
+    }
+    const q = state === "dquote" ? '"' : state === "squote" ? "'" : "`";
+    if (c === q) state = "code";
+  }
+  return out;
+}
+
+/**
+ * Normalize a captured route path to what React Router actually serves, so it
+ * matches `location.pathname` at runtime (the matcher in permissions.ts uses
+ * literal equality on the leading-slash form).
+ *
+ *  - Relative children of the path-less <AuthorizedLayout> parent (e.g.
+ *    `path="group"`) resolve to `/group`. Prepend the slash.
+ *  - Paths carrying a `${...}` template artifact (a bug where a template
+ *    literal was pasted into a plain "..." string) can never match a real URL —
+ *    skip them and warn rather than poison the manifest.
+ *
+ * Returns the normalized path, or null if the path should be skipped.
+ */
+function normalizeRoutePath(p) {
+  if (!p) return null;
+  if (p.includes("${")) {
+    console.warn(`[extract-perm-routes] skipping route with template artifact: ${JSON.stringify(p)}`);
+    return null;
+  }
+  return p.startsWith("/") ? p : "/" + p;
+}
+
 function extract() {
   if (!fs.existsSync(INPUT)) {
     console.warn(`[extract-perm-routes] ${INPUT} not found — writing empty manifest`);
@@ -35,12 +109,9 @@ function extract() {
 
   const src = fs.readFileSync(INPUT, "utf8");
 
-  // Strip /* ... */ block comments and // line comments so we don't pick up
-  // commented-out routes. Simple sweep — does not handle string-literal cases
-  // but those don't appear here.
-  const stripped = src
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "");
+  // String-aware comment removal so commented-out routes are ignored while
+  // wildcard paths like `path="auth/*"` survive intact.
+  const stripped = stripComments(src);
 
   // <Route path="X" ... element={<RequirePermission perm="Y" ...>...
   // The tempered `(?:(?!<Route\b)[\s\S])*?` segments handle attribute reordering
@@ -59,8 +130,8 @@ function extract() {
   const map = {};
   let m;
   while ((m = re.exec(stripped)) !== null) {
-    const routePath = m[2];
     const perm = m[4];
+    const routePath = normalizeRoutePath(m[2]);
     if (!perm || !routePath) continue;
     if (!map[perm]) map[perm] = [];
     if (!map[perm].includes(routePath)) map[perm].push(routePath);

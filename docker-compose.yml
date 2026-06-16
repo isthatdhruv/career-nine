@@ -1,69 +1,73 @@
 version: '3.3'
 services:
-  # mysql_db_api:
-  #   image: mysql:latest
-  #   restart: always
-  #   environment:
-  #     MYSQL_DATABASE: 'career-9-staging'
-  #     MYSQL_USER: 'user'
-  #     MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-  #     MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
-  #   # MySQL listens on 3306 inside the container; host 3307 must map to it.
-  #   ports:
-  #     - '3307:3306'
-  #   volumes:
-  #     - mysql_data:/var/lib/mysql
-  #   # Settings passed as flags instead of mounting mysql-custom.cnf: Windows
-  #   # bind mounts arrive world-writable inside the container and MySQL ignores
-  #   # world-writable config files, so the cnf was silently skipped.
-  #   command:
-  #     - --max-connections=200
-  #     - --max-allowed-packet=512M
-  #     - --innodb-buffer-pool-size=1G
-  #     - --innodb-flush-log-at-trx-commit=2
-  #     - --innodb-flush-method=O_DIRECT
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 2.5g
-  #   healthcheck:
-  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #     start_period: 30s
+  mysql_db_api:
+    image: mysql:latest
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'career-9'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
+      MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+    # MySQL listens on 3306 inside the container; host 3306 must map to it.
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # Settings passed as flags instead of mounting mysql-custom.cnf: Windows
+    # bind mounts arrive world-writable inside the container and MySQL ignores
+    # world-writable config files, so the cnf was silently skipped.
+    command:
+      - --max-connections=200
+      - --max-allowed-packet=512M
+      - --innodb-buffer-pool-size=1G
+      - --innodb-flush-log-at-trx-commit=2
+      - --innodb-flush-method=O_DIRECT
+    deploy:
+      resources:
+        limits:
+          memory: 2.5g
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - career_shared_net
    
 
-  # # redis_cache:
-  # #   image: redis:7.2-alpine
-  # #   restart: always
-  #   # noeviction (NOT allkeys-lru): this instance is a datastore, not a cache —
-  #   # it holds the ONLY pre-persistence copy of submitted answers
-  #   # (career9:submitted:*), partial drafts, sessions and submission locks.
-  #   # LRU eviction under memory pressure silently destroyed that data; with
-  #   # noeviction, writes fail loudly (OOM error) instead. Spring @Cacheable
-  #   # entries on this instance expire by TTL as before.
-  # #   command: >
-  # #     redis-server
-  # #     --maxmemory 2048mb
-  # #     --maxmemory-policy noeviction
-  # #     --appendonly yes
-  # #     --appendfsync everysec
-  # #   ports:
-  # #     - '6379:6379'
-  # #   deploy:
-  # #     resources:
-  # #       limits:
-  # #         memory: 2.5g
+  redis_cache:
+    image: redis:7.2-alpine
+    restart: always
+    # noeviction (NOT allkeys-lru): this instance is a datastore, not a cache —
+    # it holds the ONLY pre-persistence copy of submitted answers
+    # (career9:submitted:*), partial drafts, sessions and submission locks.
+    # LRU eviction under memory pressure silently destroyed that data; with
+    # noeviction, writes fail loudly (OOM error) instead. Spring @Cacheable
+    # entries on this instance expire by TTL as before.
+    command: >
+      redis-server
+      --maxmemory 2048mb
+      --maxmemory-policy noeviction
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - '6379:6379'
+    deploy:
+      resources:
+        limits:
+          memory: 2.5g
     
-  # #   volumes:
-  # #     - redis_data:/data
-  # #   healthcheck:
-  # #     test: ["CMD", "redis-cli", "ping"]
-  # #     interval: 10s
-  # #     timeout: 3s
-  # #     retries: 3
-  # #     start_period: 5s
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - career_shared_net
 
   # # # Shared headless-Chromium HTML→PDF service for server-rendered report PDFs.
   # # # Stateless, so ONE instance serves BOTH the production and staging backends over
@@ -78,222 +82,222 @@ services:
   # # # PDFs render synchronously during report generation; concurrent load on this
   # # # instance is just however many generate requests run at once across both
   # # # backends. Bump the memory limit if you generate very large cohorts in parallel.
-  # # gotenberg:
-  # #   image: gotenberg/gotenberg:8
-  # #   restart: unless-stopped
-  # #   command:
-  # #     - "gotenberg"
-  # #     - "--chromium-disable-javascript=false"   # reports draw charts client-side
-  # #     - "--api-timeout=120s"
-  # #   expose:
-  # #     - "3000"          # internal-only; reachable as http://gotenberg:3000 on the Docker network
-  # #   deploy:
-  # #     resources:
-  # #       limits:
-  # #         memory: 1.5g
-  #           # cpus: "3.0"          # cap Chromium renders so they can't starve the live API
-  # #   networks:
-  # #     - career_shared_net
-  # #     - career_staging_net   # uncomment/add if the staging backend is on a different network
-
-  # # api:
-  # #   container_name: api
-  # #   build:
-  # #     context: ./spring-social
-  # #     dockerfile: dockerfile
-  # #   ports:
-  # #     - 8080:8080
-  # #   command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production"]
-  # #   restart: always
-  # #   volumes:
-  # #     - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
-  # #   env_file:
-  # #     - .env.production
-  # #   environment:
-  # #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
-  # #     - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
-  # #     - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
-  # #     # HTML→PDF render service, reached by compose service name on the Docker network.
-  # #     # Without this the backend falls back to the application.yml default localhost:3000
-  # #     # (nothing listens there inside the container) and every PDF render fails.
-  # #     - GOTENBERG_URL=http://gotenberg:3000
-  #     # ── TEMPORARY (2026-06-09): skip Flyway validation of already-applied
-  #     #    migrations on startup. Prod has migrations applied DIRECTLY to the DB
-  #     #    that are not in git — e.g. version 20260601008 on prod is a
-  #     #    "fix assessment demographic mapping is mandatory type" migration that
-  #     #    exists on no branch, while in the repo that same version number is
-  #     #    drop_legacy_report_type_subtype. Flyway's validation aborts boot on
-  #     #    that version/description/checksum mismatch.
-  #     #    validate-on-migrate=false lets Flyway run any PENDING migrations
-  #     #    without re-validating applied ones, so the backend starts. It does
-  #     #    NOT re-run version 20260601008 (already in history → skipped).
-  #     #    REMOVE once the migration history is reconciled (see repair-prod-flyway.sh
-  #     #    and the /tmp backup of flyway_schema_history).
-  #     # - SPRING_FLYWAY_VALIDATE_ON_MIGRATE=false
-  #     # - KAFKA_BOOTSTRAP=kafka:9092
-  # #   deploy:
-  # #     resources:
-  # #       limits:
-  # #         memory: 3g
-  # #   depends_on:
-  # #     mysql_db_api:
-  # #       condition: service_started
-  # #     redis_cache:
-  # #       condition: service_healthy
-  #     kafka:
-  #       condition: service_started
-  #   networks:
-  #     - career_shared_net
-
-  # # ── Kafka (KRaft, single broker) — report-on-completion pipeline queue ──────
-  # kafka:
-  #   image: apache/kafka:latest
-  #   container_name: kafka
-  #   restart: unless-stopped
-  #   expose:
-  #     - "9092"
-  #   # apache/kafka official image → KAFKA_* env (NOT bitnami's KAFKA_CFG_*).
-  #   # Single-node KRaft (broker + controller in one process). CLUSTER_ID defaults
-  #   # deterministically in this image, so it's stable across restarts.
-  #   environment:
-  #     - KAFKA_NODE_ID=1
-  #     - KAFKA_PROCESS_ROLES=broker,controller
-  #     - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-  #     - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-  #     - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-  #     - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-  #     - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-  #     - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-  #     - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-  #     - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
-  #     - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
-  #     - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-  #     - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
-  #     - KAFKA_LOG_DIRS=/var/lib/kafka/data
-  #   volumes:
-  #     - kafka_data:/var/lib/kafka/data
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 1.5g
-  #         cpus: "1.0"
-  #   networks:
-  #     - career_shared_net
-
-  # # ── Report worker — runs the Kafka consumers (generate + email) in its own JVM,
-  # #    isolated from the live API. Same image, profile report-worker, no HTTP server. ──
-  # report-worker:
-  #   container_name: report-worker
-  #   build:
-  #     context: ./spring-social
-  #     dockerfile: dockerfile
-  #   command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production,report-worker"]
-  #   restart: always
-  #   env_file:
-  #     - .env.production
-  #   environment:
-  #     # Worker only consumes Kafka → generates reports → emails. It uses NO Firebase,
-  #     # so we don't mount the service-account secret and disable Firebase init outright.
-  #     - APP_FIREBASE_ENABLED=false
-  #     - GOTENBERG_URL=http://gotenberg:3000
-  #     - KAFKA_BOOTSTRAP=kafka:9092
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 1.5g
-  #         cpus: "3.0"          # the worker's render budget; live API keeps the rest
-  #   depends_on:
-  #     mysql_db_api:
-  #       condition: service_started
-  #     redis_cache:
-  #       condition: service_healthy
-  #     kafka:
-  #       condition: service_started
-  # #   networks:
-  # #     - career_shared_net
-      
-  redis_staging:
-    image: redis:7.2-alpine
-    restart: always
-    command: >
-      redis-server
-      --maxmemory 384mb
-      --maxmemory-policy allkeys-lru
-      --appendonly yes
-      --appendfsync everysec
-    ports:
-      - '6380:6379'
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=false"   # reports draw charts client-side
+      - "--api-timeout=120s"
+    expose:
+      - "3000"          # internal-only; reachable as http://gotenberg:3000 on the Docker network
     deploy:
       resources:
         limits:
-          memory: 768m
+          memory: 1.5g
+          cpus: "3.0"          # cap Chromium renders so they can't starve the live API
     networks:
-      - career_staging_net
-    volumes:
-      - redis_staging_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
+      - career_shared_net
+      - career_staging_net   # uncomment/add if the staging backend is on a different network
 
-  api-staging:
-    container_name: api-staging
+  api:
+    container_name: api
     build:
       context: ./spring-social
       dockerfile: dockerfile
     ports:
-      - 8081:8080
-    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
+      - 8080:8080
+    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production"]
     restart: always
     volumes:
       - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
     env_file:
-      - .env.staging
+      - .env.production
     environment:
       - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
       # HTML→PDF render service, reached by compose service name on the Docker network.
       # Without this the backend falls back to the application.yml default localhost:3000
       # (nothing listens there inside the container) and every PDF render fails.
       - GOTENBERG_URL=http://gotenberg:3000
+      # ── TEMPORARY (2026-06-09): skip Flyway validation of already-applied
+      #    migrations on startup. Prod has migrations applied DIRECTLY to the DB
+      #    that are not in git — e.g. version 20260601008 on prod is a
+      #    "fix assessment demographic mapping is mandatory type" migration that
+      #    exists on no branch, while in the repo that same version number is
+      #    drop_legacy_report_type_subtype. Flyway's validation aborts boot on
+      #    that version/description/checksum mismatch.
+      #    validate-on-migrate=false lets Flyway run any PENDING migrations
+      #    without re-validating applied ones, so the backend starts. It does
+      #    NOT re-run version 20260601008 (already in history → skipped).
+      #    REMOVE once the migration history is reconciled (see repair-prod-flyway.sh
+      #    and the /tmp backup of flyway_schema_history).
+      - SPRING_FLYWAY_VALIDATE_ON_MIGRATE=false
+      - KAFKA_BOOTSTRAP=kafka:9092
     deploy:
       resources:
         limits:
           memory: 3g
     depends_on:
-      mysql_db_staging:
+      mysql_db_api:
+        condition: service_started
+      redis_cache:
         condition: service_healthy
-      redis_staging:
-        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
-      - career_staging_net
+      - career_shared_net
 
-  mysql_db_staging:
-    image: mysql:latest
-    restart: always
+  # # ── Kafka (KRaft, single broker) — report-on-completion pipeline queue ──────
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    restart: unless-stopped
+    expose:
+      - "9092"
+    # apache/kafka official image → KAFKA_* env (NOT bitnami's KAFKA_CFG_*).
+    # Single-node KRaft (broker + controller in one process). CLUSTER_ID defaults
+    # deterministically in this image, so it's stable across restarts.
     environment:
-      MYSQL_DATABASE: 'career-9-staging'
-      MYSQL_USER: 'user'
-      MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-      MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
-    ports:
-      - '3307:3306'
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
     volumes:
-      - mysql_staging_data:/var/lib/mysql
-      - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
+      - kafka_data:/var/lib/kafka/data
     deploy:
       resources:
         limits:
           memory: 1.5g
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+          cpus: "1.0"
     networks:
-      - career_staging_net
+      - career_shared_net
+
+  # # ── Report worker — runs the Kafka consumers (generate + email) in its own JVM,
+  # #    isolated from the live API. Same image, profile report-worker, no HTTP server. ──
+  report-worker:
+    container_name: report-worker
+    build:
+      context: ./spring-social
+      dockerfile: dockerfile
+    command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production,report-worker"]
+    restart: always
+    env_file:
+      - .env.production
+    environment:
+      # Worker only consumes Kafka → generates reports → emails. It uses NO Firebase,
+      # so we don't mount the service-account secret and disable Firebase init outright.
+      - APP_FIREBASE_ENABLED=false
+      - GOTENBERG_URL=http://gotenberg:3000
+      - KAFKA_BOOTSTRAP=kafka:9092
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+          cpus: "3.0"          # the worker's render budget; live API keeps the rest
+    depends_on:
+      mysql_db_api:
+        condition: service_started
+      redis_cache:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - career_shared_net
+      
+  # redis_staging:
+  #   image: redis:7.2-alpine
+  #   restart: always
+  #   command: >
+  #     redis-server
+  #     --maxmemory 384mb
+  #     --maxmemory-policy allkeys-lru
+  #     --appendonly yes
+  #     --appendfsync everysec
+  #   ports:
+  #     - '6380:6379'
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 768m
+  #   networks:
+  #     - career_staging_net
+  #   volumes:
+  #     - redis_staging_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+  #     start_period: 5s
+
+  # api-staging:
+  #   container_name: api-staging
+  #   build:
+  #     context: ./spring-social
+  #     dockerfile: dockerfile
+  #   ports:
+  #     - 8081:8080
+  #   command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
+  #   restart: always
+  #   volumes:
+  #     - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
+  #   env_file:
+  #     - .env.staging
+  #   environment:
+  #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+  #     # HTML→PDF render service, reached by compose service name on the Docker network.
+  #     # Without this the backend falls back to the application.yml default localhost:3000
+  #     # (nothing listens there inside the container) and every PDF render fails.
+  #     - GOTENBERG_URL=http://gotenberg:3000
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 3g
+  #   depends_on:
+  #     mysql_db_staging:
+  #       condition: service_healthy
+  #     redis_staging:
+  #       condition: service_healthy
+  #   networks:
+  #     - career_staging_net
+
+  # mysql_db_staging:
+  #   image: mysql:latest
+  #   restart: always
+  #   environment:
+  #     MYSQL_DATABASE: 'career-9-staging'
+  #     MYSQL_USER: 'user'
+  #     MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
+  #     MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+  #   ports:
+  #     - '3307:3306'
+  #   volumes:
+  #     - mysql_staging_data:/var/lib/mysql
+  #     - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1.5g
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 30s
+  #   networks:
+  #     - career_staging_net
 
   # sync_cron:
   #   build:
@@ -341,9 +345,10 @@ volumes:
   redis_data:
   redis_staging_data:
   redisinsight_data:
+  kafka_data:
 
 networks:
-  # career_shared_net:
-  #   external: true
+  career_shared_net:
+    external: true
   career_staging_net:
     external: true

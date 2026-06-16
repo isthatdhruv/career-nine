@@ -39,6 +39,7 @@
     "/measured-qualities",
     "/measured-quality-types",
     "/question-sections",
+    "/questionaire/List",
     "/student/dashboard",
     "/student/dashboard/assessments",
     "/tools"
@@ -69,12 +70,14 @@
     "/student/insight-dashboard"
   ],
   "group.read": [
-    "google-groups",
-    "group",
-    "groups"
+    "/google-groups",
+    "/group",
+    "/groups",
+    "/school/groups"
   ],
   "group.write": [
-    "/batchgoogle"
+    "/batchgoogle",
+    "/school/group/create"
   ],
   "institute.read": [
     "/batch",
@@ -86,6 +89,7 @@
     "/dashboard/school-combined/:id",
     "/dashboard/school-navigator/:id",
     "/dashboard/school/:id",
+    "/school/principal/dashboard/:id",
     "/section",
     "/session"
   ],
@@ -100,6 +104,9 @@
   "permission.grant": [
     "/activity-log",
     "/communication-logs"
+  ],
+  "reminders.view": [
+    "/reminders"
   ],
   "report.export": [
     "/send-reports"
@@ -119,26 +126,30 @@
     "/user-management/roles/manage"
   ],
   "student.read": [
+    "/group-student",
     "/live-tracking",
     "/school/assigned-students",
     "/school/group-student",
+    "/school/principal/dashboard/studentList",
     "/student-list",
     "/student/dashboard-preview",
     "/student/dashboard/view/:studentId",
     "/student/registration-details",
     "/student/university/result",
     "/student/university/result-dashboard",
+    "/student/university/result-list",
     "/studentlist",
     "/studentprofile",
     "/teacher/class-dashboard"
   ],
   "student.write": [
     "/registrar/verification",
+    "/school/student/create",
     "/student/registrar/page",
     "/upload-excel"
   ],
   "student_management.read": [
-    "auth}\n        <Route path="
+    "/student-management"
   ],
   "user.read": [
     "/faculty/registration-details",
