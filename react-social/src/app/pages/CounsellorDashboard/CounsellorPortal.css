@@ -1,5 +1,42 @@
 /* ── Counsellor Portal ── */
 
+/* Counsellor pages render inside the admin shell, in the same centered content
+   container as the other admin pages — so they fill that container's width
+   (not edge-to-edge). Each page's data sits in ONE unified white card. */
+.cp-portal-page {
+  width: 100%;
+}
+
+/* The unified page card — one white card behind all the page's data, matching the
+   other admin list pages (white card on the light page background). */
+.cp-page-card {
+  background: #fff;
+  border: 1px solid #DDE3EC;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 24px;
+}
+
+/* Inside the unified page card, neutralize nested class-based cards so we don't
+   get a card-within-a-card — they read as plain sections of the one white card. */
+.cp-page-card .cp-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* Enclosing "background" card for pages that intentionally keep their own white
+   sub-cards (e.g. Availability's form + sidebar panels). A light well so the white
+   panels inside pop, with one border that visually groups them all together. */
+.cp-page-bg {
+  background: #F4F7FB;
+  border: 1px solid #DDE3EC;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+
 .cp-loading {
   position: fixed;
   inset: 0;
@@ -7,7 +44,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #F5F7FA;
+  background: #fff;
   z-index: 1000;
 }
 

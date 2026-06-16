@@ -7,6 +7,7 @@ import SessionNotes from './components/SessionNotes'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { useAuth } from '../../modules/auth'
 import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
+import PageHeader from '../../components/PageHeader'
 import './CounsellorPortal.css'
 
 const CounsellorPortalDashboard: React.FC = () => {
@@ -56,38 +57,25 @@ const CounsellorPortalDashboard: React.FC = () => {
       loginPath='/counsellor/login'
     >
       {/* Welcome Header */}
-      <div className='cp-welcome'>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: '50%', overflow: 'hidden',
-              background: '#E8F5E9', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', flexShrink: 0, border: '2px solid #D1E5DF',
-            }}>
-              {profileImageUrl ? (
-                <img src={profileImageUrl} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <span style={{ fontSize: 20, fontWeight: 700, color: '#0C6B5A' }}>
-                  {currentUser?.name?.charAt(0)?.toUpperCase() || '?'}
-                </span>
-              )}
-            </div>
-            <div>
-              <h2 className='cp-welcome-title'>
-                Welcome, {currentUser?.name || 'Counsellor'}
-              </h2>
-              <p className='cp-welcome-sub'>
-                Career-9 &middot; Counsellor Dashboard
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon={
+          profileImageUrl ? (
+            <img src={profileImageUrl} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} />
+          ) : (
+            <i className='bi bi-person-circle' />
+          )
+        }
+        title={`Welcome, ${currentUser?.name || 'Counsellor'}`}
+        subtitle='Career-9 · Counsellor Dashboard'
+      />
+      <div style={{ height: 16 }} />
 
       {/* Appointments + Session Notes */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <AppointmentCalendar counsellorId={counsellorId} />
-        <SessionNotes counsellorId={counsellorId} />
+      <div className='cp-page-card'>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <AppointmentCalendar counsellorId={counsellorId} />
+          <SessionNotes counsellorId={counsellorId} />
+        </div>
       </div>
     </PortalLayout>
   )

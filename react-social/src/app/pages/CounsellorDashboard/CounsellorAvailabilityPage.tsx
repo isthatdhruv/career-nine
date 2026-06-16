@@ -10,6 +10,7 @@ import { submitBlockDateRequest, getBlockRequestsByCounsellor, BlockDateRequest 
 import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
+import PageHeader from '../../components/PageHeader'
 import './CounsellorPortal.css'
 
 const API_URL = process.env.REACT_APP_API_URL
@@ -391,12 +392,12 @@ const CounsellorAvailabilityPage: React.FC = () => {
       loginPath='/counsellor/login'
     >
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1E293B' }}>My Availability</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748B' }}>View your assigned slots and block unavailable dates</p>
-        </div>
-      </div>
+      <PageHeader
+        icon={<i className='bi bi-calendar2-week' />}
+        title='My Availability'
+        subtitle='View your assigned slots and block unavailable dates'
+      />
+      <div style={{ height: 16 }} />
 
       {/* Alerts */}
       {error && (
@@ -415,6 +416,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
         <div style={{ textAlign: 'center', padding: 60, color: '#64748B', fontSize: 14 }}>Loading availability...</div>
       ) : (
         <>
+          <div className='cp-page-card'>
           {/* Stats Row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
             {[
@@ -437,7 +439,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
             <div>
               {/* Weekly Schedule (recurring templates) */}
               <div style={{
-                background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0',
+                background: '#F8F9FC', borderRadius: 12, border: '1px solid #DDE3EC',
                 padding: 20, marginBottom: 20,
               }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B', marginBottom: 4 }}>
@@ -491,9 +493,9 @@ const CounsellorAvailabilityPage: React.FC = () => {
                           style={{
                             flex: 1, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                             cursor: 'pointer',
-                            border: active ? '1.5px solid #0C6B5A' : '1.5px solid #DDE3EC',
-                            background: active ? 'rgba(12,107,90,0.08)' : '#fff',
-                            color: active ? '#0C6B5A' : '#475569',
+                            border: active ? '1.5px solid #263B6A' : '1.5px solid #DDE3EC',
+                            background: active ? 'rgba(38,59,106,0.08)' : '#fff',
+                            color: active ? '#263B6A' : '#475569',
                           }}
                         >
                           {m === 'ONLINE' ? '💻 Online' : '📍 In-person'}
@@ -527,9 +529,9 @@ const CounsellorAvailabilityPage: React.FC = () => {
                           style={{
                             padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600,
                             cursor: 'pointer',
-                            border: on ? '1.5px solid #0C6B5A' : '1.5px solid #DDE3EC',
-                            background: on ? 'rgba(12,107,90,0.08)' : '#fff',
-                            color: on ? '#0C6B5A' : '#475569',
+                            border: on ? '1.5px solid #263B6A' : '1.5px solid #DDE3EC',
+                            background: on ? 'rgba(38,59,106,0.08)' : '#fff',
+                            color: on ? '#263B6A' : '#475569',
                           }}
                         >
                           {d.slice(0, 3)}
@@ -602,7 +604,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
                     marginTop: 12, padding: '9px 18px', fontSize: 13, fontWeight: 600,
                     border: 'none', borderRadius: 8, color: '#fff',
                     cursor: templateSaving ? 'not-allowed' : 'pointer',
-                    background: templateSaving ? '#9CA3AF' : 'linear-gradient(135deg, #064E3B, #0C6B5A)',
+                    background: templateSaving ? '#9CA3AF' : 'linear-gradient(135deg, #1C2D52, #263B6A)',
                   }}
                 >
                   {templateSaving ? 'Saving…' : 'Add Weekly Schedule'}
@@ -610,11 +612,11 @@ const CounsellorAvailabilityPage: React.FC = () => {
               </div>
 
               <div style={{
-                background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0',
+                background: '#F8F9FC', borderRadius: 12, border: '1px solid #DDE3EC',
                 overflow: 'hidden',
               }}>
                 <div style={{
-                  padding: '14px 18px', borderBottom: '1px solid #E2E8F0',
+                  padding: '14px 18px', borderBottom: '1px solid #DDE3EC',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B' }}>Upcoming Slots</div>
@@ -681,7 +683,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* Add Extra Slot Form */}
               <div style={{
-                background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', padding: 20,
+                background: '#F8F9FC', borderRadius: 12, border: '1px solid #DDE3EC', padding: 20,
               }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B', marginBottom: 14 }}>
                   Add Extra Slot
@@ -729,7 +731,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
                       width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
                       border: 'none', borderRadius: 8, color: '#fff',
                       cursor: slotSaving ? 'not-allowed' : 'pointer',
-                      background: slotSaving ? '#9CA3AF' : 'linear-gradient(135deg, #064E3B, #0C6B5A)',
+                      background: slotSaving ? '#9CA3AF' : 'linear-gradient(135deg, #1C2D52, #263B6A)',
                     }}
                   >
                     {slotSaving ? 'Adding…' : 'Add Slot'}
@@ -739,7 +741,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
 
               {/* Block Date Form */}
               <div style={{
-                background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', padding: 20,
+                background: '#F8F9FC', borderRadius: 12, border: '1px solid #DDE3EC', padding: 20,
               }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B', marginBottom: 14 }}>
                   Block a Date
@@ -759,7 +761,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
                       wrapperClassName='cp-datepicker'
                       customInput={
                         <input style={{
-                          width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
+                          width: '100%', padding: '9px 12px', border: '1.5px solid #DDE3EC',
                           borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box',
                         }} />
                       }
@@ -773,7 +775,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
                       onChange={(e) => setBlockDateForm((f) => ({ ...f, reason: e.target.value }))}
                       placeholder='e.g. Personal leave, Holiday...'
                       style={{
-                        width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
+                        width: '100%', padding: '9px 12px', border: '1.5px solid #DDE3EC',
                         borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box',
                       }}
                     />
@@ -805,10 +807,10 @@ const CounsellorAvailabilityPage: React.FC = () => {
                 const groupedEntries = Array.from(blockedByDate.entries()).sort(([a], [b]) => a.localeCompare(b))
                 return (
                   <div style={{
-                    background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden',
+                    background: '#F8F9FC', borderRadius: 12, border: '1px solid #DDE3EC', overflow: 'hidden',
                   }}>
                     <div style={{
-                      padding: '14px 18px', borderBottom: '1px solid #E2E8F0',
+                      padding: '14px 18px', borderBottom: '1px solid #DDE3EC',
                       fontWeight: 700, fontSize: 15, color: '#1E293B',
                     }}>
                       Blocked Dates ({groupedEntries.length})
@@ -846,10 +848,10 @@ const CounsellorAvailabilityPage: React.FC = () => {
               {/* Block Requests */}
               {blockRequests.length > 0 && (
                 <div style={{
-                  background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden',
+                  background: '#F8F9FC', borderRadius: 12, border: '1px solid #DDE3EC', overflow: 'hidden',
                 }}>
                   <div style={{
-                    padding: '14px 18px', borderBottom: '1px solid #E2E8F0',
+                    padding: '14px 18px', borderBottom: '1px solid #DDE3EC',
                     fontWeight: 700, fontSize: 15, color: '#1E293B',
                   }}>
                     My Block Requests
@@ -895,6 +897,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
           </div>
         </>
       )}

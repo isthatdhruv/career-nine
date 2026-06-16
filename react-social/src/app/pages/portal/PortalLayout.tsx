@@ -32,7 +32,7 @@ interface PortalLayoutProps {
  * unchanged. (The exported `MenuItem` type is still used by menu configs elsewhere.)
  */
 const PortalLayout: React.FC<PortalLayoutProps> = ({ children }) => {
-  return <>{children}</>
+  return <div className='cp-portal-page'>{children}</div>
 }
 
 export default PortalLayout

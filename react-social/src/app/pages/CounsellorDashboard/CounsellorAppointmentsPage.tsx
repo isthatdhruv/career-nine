@@ -12,6 +12,7 @@ import { getGeneratedReportsByStudent } from '../ReportGeneration/API/GeneratedR
 import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
+import PageHeader from '../../components/PageHeader'
 import './CounsellorPortal.css'
 
 type FilterTab = 'all' | 'today' | 'upcoming' | 'completed' | 'pending' | 'cancelled'
@@ -308,10 +309,12 @@ const CounsellorAppointmentsPage: React.FC = () => {
       storageKeys={[]}
       loginPath='/counsellor/login'
     >
-      <div className='cp-welcome'>
-        <h2 className='cp-welcome-title'>Appointments</h2>
-        <p className='cp-welcome-sub'>Manage your counselling appointments</p>
-      </div>
+      <PageHeader
+        icon={<i className='bi bi-calendar-check' />}
+        title='Appointments'
+        subtitle='Manage your counselling appointments'
+      />
+      <div style={{ height: 12 }} />
 
       {error && (
         <div
@@ -375,6 +378,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
       </div>
 
       {/* Appointment List */}
+      <div className='cp-page-card'>
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#6B7A8D', fontSize: 14 }}>
           Loading appointments...
@@ -508,6 +512,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
           })}
         </div>
       )}
+      </div>
 
       {/* Decline Modal */}
       {declineModal && (
