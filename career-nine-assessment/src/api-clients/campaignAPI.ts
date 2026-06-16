@@ -23,6 +23,8 @@ export function registerForCampaignTier(
     phone?: string
     gender?: string
     promoCode?: string
+    // Set for class-based campaigns so the backend records the student's grade.
+    classId?: number
   }
 ) {
   return http.post(
@@ -40,6 +42,7 @@ export function registerTrial(
     dob: string
     phone: string
     gender?: string
+    classId?: number
   }
 ) {
   return http.post(
