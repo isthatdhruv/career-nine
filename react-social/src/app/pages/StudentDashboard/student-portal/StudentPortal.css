@@ -10,7 +10,7 @@
   --sp-accent: #6984A9;
   --sp-danger: #EF4444;
   --sp-info: #6984A9;
-  --sp-bg: #F5F7FA;
+  --sp-bg: #ffffff;
   --sp-card: #fff;
   --sp-text: #1A1F2E;
   --sp-muted: #6B7A8D;
@@ -48,10 +48,12 @@
 
 /* ── Profile Header ── */
 .sp-profile-header {
-  background: linear-gradient(135deg, #1C2D52, #263B6A, #354D7A);
+  background: var(--sp-card);
+  border: 1px solid var(--sp-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   border-radius: var(--sp-radius);
   padding: 20px 24px;
-  color: #fff;
+  color: var(--sp-text);
   display: flex;
   align-items: center;
   gap: 16px;
@@ -63,7 +65,8 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(105, 132, 169, 0.12);
+  color: var(--sp-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -84,7 +87,7 @@
 
 .sp-profile-meta {
   font-size: 12px;
-  opacity: 0.8;
+  color: var(--sp-muted);
 }
 
 .sp-trait-tags {
@@ -95,7 +98,8 @@
 }
 
 .sp-trait-tag {
-  background: rgba(255, 255, 255, 0.15);
+  background: #F1F5F9;
+  color: var(--sp-muted);
   padding: 3px 10px;
   border-radius: 12px;
   font-size: 11px;
@@ -124,9 +128,9 @@
   justify-content: flex-end;
 }
 
-.sp-cci-high { color: #A0D585; }
-.sp-cci-medium { color: #EEFABD; }
-.sp-cci-low { color: #FCA5A5; }
+.sp-cci-high { color: #059669; }
+.sp-cci-medium { color: #D97706; }
+.sp-cci-low { color: #DC2626; }
 
 /* ── Cards ── */
 .sp-card {

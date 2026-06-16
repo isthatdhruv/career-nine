@@ -138,7 +138,7 @@
     "/upload-excel"
   ],
   "student_management.read": [
-    "auth}\n        <Route path="
+    "auth}\r\n        <Route path="
   ],
   "user.read": [
     "/faculty/registration-details",
@@ -146,6 +146,7 @@
     "/old-student-email"
   ],
   "user.write": [
+    "/admin/counselling-assignments",
     "/admin/counselling-notifications",
     "/admin/counselling-slots",
     "/admin/counselling-students",

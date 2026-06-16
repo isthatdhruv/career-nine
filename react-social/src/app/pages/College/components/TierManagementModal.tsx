@@ -29,6 +29,7 @@ const emptyForm: AssessmentMappingTier = {
   dashboardValidityDays: null,
   includesCounselling: false,
   counsellingSessionCount: null,
+  counsellingPrice: null,
   includesLms: false,
   lmsValidityDays: null,
 };
@@ -120,6 +121,13 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
           && String(form.counsellingSessionCount) !== ""
             ? Math.round(Number(form.counsellingSessionCount))
             : null,
+        // Phase 3b: per-session price (INR) for booking EXTRA counselling sessions
+        // beyond what the tier includes. Applies regardless of includesCounselling.
+        counsellingPrice: form.counsellingPrice !== null
+          && form.counsellingPrice !== undefined
+          && String(form.counsellingPrice) !== ""
+            ? Math.round(Number(form.counsellingPrice))
+            : null,
         includesLms: !!form.includesLms,
         lmsValidityDays: form.includesLms
           && form.lmsValidityDays !== null
@@ -192,7 +200,7 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
 
   return (
     <>
-      <Modal show={show} onHide={onHide} centered size="lg">
+      <Modal show={show} onHide={onHide} centered size="xl">
         <Modal.Header closeButton style={{ borderBottom: "1px solid #f1f5f9", padding: "20px 28px" }}>
           <Modal.Title style={{ fontSize: "1.05rem", fontWeight: 700, color: "#1e293b" }}>
             Pricing Tiers
@@ -480,6 +488,23 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
                 />
               </div>
             )}
+
+            {/* Phase 3b: price for booking an EXTRA counselling session beyond the
+                tier's included count (or any session, if the tier includes none).
+                Shown always — it's what a student pays when no free session applies. */}
+            <div style={{ marginLeft: 36, marginTop: 8 }}>
+              <Form.Label style={{ fontWeight: 600, fontSize: "0.78rem" }}>
+                Extra counselling session price (₹) <span style={{ color: "#94a3b8", fontWeight: 400 }}>— blank = use default</span>
+              </Form.Label>
+              <Form.Control
+                type="number" min="0"
+                value={form.counsellingPrice ?? ""}
+                onChange={(e) => setForm({
+                  ...form,
+                  counsellingPrice: e.target.value === "" ? null : Number(e.target.value),
+                })}
+              />
+            </div>
 
             <Form.Check
               type="switch"

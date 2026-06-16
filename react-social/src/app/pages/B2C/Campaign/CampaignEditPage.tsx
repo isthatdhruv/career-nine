@@ -45,6 +45,10 @@ const CampaignEditPage = () => {
 
   const [campaign, setCampaign] = useState<Campaign>(emptyCampaign);
   const [assessmentRows, setAssessmentRows] = useState<CampaignAssessmentRow[]>([]);
+  // Per-row description drafts kept in state (keyed by mappingId) so typed text
+  // survives table re-renders/refreshes — an uncontrolled input would reset to
+  // its server value whenever the table remounts.
+  const [descDrafts, setDescDrafts] = useState<Record<number, string>>({});
   const [allAssessments, setAllAssessments] = useState<{ id: number; name: string }[]>([]);
   const [allTiers, setAllTiers] = useState<PricingTier[]>([]);
   const { data: allInstitutes = [] } = useInstitutes<InstituteOption>();
@@ -112,6 +116,20 @@ const CampaignEditPage = () => {
 
   useEffect(() => { loadTiers(); loadCampaign(); /* eslint-disable-next-line */ }, [id]);
 
+  // Seed description drafts for newly-loaded rows. Existing drafts are left
+  // untouched so an in-progress edit (or a value we just saved) is never
+  // clobbered by a background refresh.
+  useEffect(() => {
+    setDescDrafts(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const r of assessmentRows) {
+        if (!(r.mappingId in next)) { next[r.mappingId] = r.description ?? ""; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [assessmentRows]);
+
   useEffect(() => { loadAssessments(campaign.instituteCode); /* eslint-disable-next-line */ }, [campaign.instituteCode]);
 
   const handleSaveBasics = async () => {
@@ -165,6 +183,20 @@ const CampaignEditPage = () => {
     try {
       await updateAssessmentMapping(row.mappingId, body);
       await loadCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update");
+    }
+  };
+
+  // Description is a free-text box, so save on blur rather than every keystroke,
+  // and skip the round trip when nothing changed. Use the silent refresh so the
+  // table never unmounts mid-edit (which would drop focus / the next box's text).
+  const handleDescriptionSave = async (row: CampaignAssessmentRow) => {
+    const value = (descDrafts[row.mappingId] ?? "").trim();
+    if ((row.description ?? "") === value) return;
+    try {
+      await updateAssessmentMapping(row.mappingId, { description: value });
+      await refreshCampaign();
     } catch (e: any) {
       showErrorToast(e?.response?.data || "Failed to update");
     }
@@ -298,13 +330,14 @@ const CampaignEditPage = () => {
                       <th>Assessment</th>
                       <th>Path override</th>
                       <th>Counselling override</th>
+                      <th>Description</th>
                       <th>Tiers</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {assessmentRows.length === 0 && (
-                      <tr><td colSpan={5} className="text-center text-muted py-4">No assessments attached yet.</td></tr>
+                      <tr><td colSpan={6} className="text-center text-muted py-4">No assessments attached yet.</td></tr>
                     )}
                     {assessmentRows.map(r => (
                       <tr key={r.mappingId}>
@@ -324,6 +357,18 @@ const CampaignEditPage = () => {
                             <option value="1">Model 1 — Self-serve</option>
                             <option value="2">Model 2 — Admin-assigned</option>
                           </Form.Select>
+                        </td>
+                        <td>
+                          <Form.Control
+                            as="textarea"
+                            size="sm"
+                            rows={2}
+                            style={{ minWidth: 200 }}
+                            value={descDrafts[r.mappingId] ?? r.description ?? ""}
+                            placeholder="Shown on the registration card"
+                            onChange={e => setDescDrafts(prev => ({ ...prev, [r.mappingId]: e.target.value }))}
+                            onBlur={() => handleDescriptionSave(r)}
+                          />
                         </td>
                         <td>
                           {(r.tiers ?? []).filter(t => t.isActive).length} active tier(s)

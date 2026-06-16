@@ -57,16 +57,10 @@ public class SchoolAssessmentTier implements Serializable {
     @Column(name = "max_registrations")
     private Integer maxRegistrations;
 
-    @Column(name = "current_count", nullable = false, columnDefinition = "INT DEFAULT 0")
-    private Integer currentCount = 0;
-
-    @Column(name = "is_active")
-    private Boolean isActive = true;
-
-    // ── Service-inclusion toggles (mirrors AssessmentMappingTier) ──────────────
-    // What this school tier entitles the student to. Lets school registrations
-    // grant report/dashboard/counselling/LMS via the same StudentEntitlement
-    // contract as the per-level B2B flow.
+    // Feature inclusions — mirror the B2C PricingTier bundle so a school tier can
+    // grant the same services (final report / dashboard / counselling / lms).
+    // The columns were added by migration V20260606008; these fields map them so
+    // the tier CRUD endpoints and the registration grant can actually read them.
     @Column(name = "includes_final_report", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean includesFinalReport = false;
 
@@ -87,6 +81,12 @@ public class SchoolAssessmentTier implements Serializable {
 
     @Column(name = "lms_validity_days")
     private Integer lmsValidityDays;
+
+    @Column(name = "current_count", nullable = false, columnDefinition = "INT DEFAULT 0")
+    private Integer currentCount = 0;
+
+    @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean isActive = true;
 
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
@@ -144,32 +144,26 @@ public class SchoolAssessmentTier implements Serializable {
     public Integer getMaxRegistrations() { return maxRegistrations; }
     public void setMaxRegistrations(Integer maxRegistrations) { this.maxRegistrations = maxRegistrations; }
 
+    public Boolean getIncludesFinalReport() { return includesFinalReport; }
+    public void setIncludesFinalReport(Boolean v) { this.includesFinalReport = v; }
+    public Boolean getIncludesDashboard() { return includesDashboard; }
+    public void setIncludesDashboard(Boolean v) { this.includesDashboard = v; }
+    public Integer getDashboardValidityDays() { return dashboardValidityDays; }
+    public void setDashboardValidityDays(Integer v) { this.dashboardValidityDays = v; }
+    public Boolean getIncludesCounselling() { return includesCounselling; }
+    public void setIncludesCounselling(Boolean v) { this.includesCounselling = v; }
+    public Integer getCounsellingSessionCount() { return counsellingSessionCount; }
+    public void setCounsellingSessionCount(Integer v) { this.counsellingSessionCount = v; }
+    public Boolean getIncludesLms() { return includesLms; }
+    public void setIncludesLms(Boolean v) { this.includesLms = v; }
+    public Integer getLmsValidityDays() { return lmsValidityDays; }
+    public void setLmsValidityDays(Integer v) { this.lmsValidityDays = v; }
+
     public Integer getCurrentCount() { return currentCount; }
     public void setCurrentCount(Integer currentCount) { this.currentCount = currentCount; }
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-
-    public Boolean getIncludesFinalReport() { return includesFinalReport; }
-    public void setIncludesFinalReport(Boolean includesFinalReport) { this.includesFinalReport = includesFinalReport; }
-
-    public Boolean getIncludesDashboard() { return includesDashboard; }
-    public void setIncludesDashboard(Boolean includesDashboard) { this.includesDashboard = includesDashboard; }
-
-    public Integer getDashboardValidityDays() { return dashboardValidityDays; }
-    public void setDashboardValidityDays(Integer dashboardValidityDays) { this.dashboardValidityDays = dashboardValidityDays; }
-
-    public Boolean getIncludesCounselling() { return includesCounselling; }
-    public void setIncludesCounselling(Boolean includesCounselling) { this.includesCounselling = includesCounselling; }
-
-    public Integer getCounsellingSessionCount() { return counsellingSessionCount; }
-    public void setCounsellingSessionCount(Integer counsellingSessionCount) { this.counsellingSessionCount = counsellingSessionCount; }
-
-    public Boolean getIncludesLms() { return includesLms; }
-    public void setIncludesLms(Boolean includesLms) { this.includesLms = includesLms; }
-
-    public Integer getLmsValidityDays() { return lmsValidityDays; }
-    public void setLmsValidityDays(Integer lmsValidityDays) { this.lmsValidityDays = lmsValidityDays; }
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }

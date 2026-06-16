@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentMappingTier;
 import com.kccitm.api.model.career9.SchoolAssessmentTier;
 import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.SchoolAssessmentTier;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.b2c.Campaign;
@@ -135,6 +137,94 @@ public class EntitlementService {
             sendWelcomeAssessmentLink(entitlement, txn);
         }
         return entitlement;
+    }
+
+    /**
+     * School (B2B) entitlement grant. The school registration funnel has no campaign
+     * and no PaymentTransaction-driven activation path (activateOnPayment skips
+     * campaign-less txns), so this mints/updates a campaign-less entitlement directly
+     * from a {@link SchoolAssessmentTier}'s feature flags — the school equivalent of
+     * {@link #applyTierSnapshot}.
+     *
+     * Idempotent per (userStudentId, assessmentId): reuses the most recent existing
+     * entitlement for that pair so re-registration / re-runs never duplicate. Returns
+     * null (no-op) when the tier unlocks nothing beyond the base assessment, so plain
+     * school assessments are unaffected. Mints an access token so the assessment
+     * thank-you page can resolve counselling for this student.
+     */
+    @Transactional
+    public StudentEntitlement grantSchoolEntitlement(Long userStudentId, Long assessmentId,
+            SchoolAssessmentTier tier) {
+        if (userStudentId == null || assessmentId == null || tier == null) return null;
+
+        boolean grantsAnything = Boolean.TRUE.equals(tier.getIncludesFinalReport())
+                || Boolean.TRUE.equals(tier.getIncludesDashboard())
+                || Boolean.TRUE.equals(tier.getIncludesCounselling())
+                || Boolean.TRUE.equals(tier.getIncludesLms());
+        if (!grantsAnything) return null;
+
+        List<StudentEntitlement> existing = entitlementRepository
+                .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId);
+        StudentEntitlement e = existing.isEmpty() ? new StudentEntitlement() : existing.get(0);
+
+        e.setUserStudentId(userStudentId);
+        e.setAssessmentId(assessmentId);
+        e.setCampaignId(null); // school / B2B entitlement (no campaign)
+        e.setStatus("active");
+        e.setGrantedAt(new Date());
+        e.setFinalReportActive(Boolean.TRUE.equals(tier.getIncludesFinalReport()));
+        e.setDashboardActive(Boolean.TRUE.equals(tier.getIncludesDashboard()));
+        e.setCounsellingActive(Boolean.TRUE.equals(tier.getIncludesCounselling()));
+        e.setLmsActive(Boolean.TRUE.equals(tier.getIncludesLms()));
+        e.setCounsellingSessionsTotal(
+                tier.getCounsellingSessionCount() != null ? tier.getCounsellingSessionCount() : 0);
+        if (e.getCounsellingSessionsUsed() == null) e.setCounsellingSessionsUsed(0);
+
+        Date earliestExpiry = null;
+        if (Boolean.TRUE.equals(tier.getIncludesDashboard()) && tier.getDashboardValidityDays() != null
+                && tier.getDashboardValidityDays() > 0) {
+            Date d = daysFromNow(tier.getDashboardValidityDays());
+            e.setDashboardExpiresAt(d);
+            earliestExpiry = earlier(earliestExpiry, d);
+        }
+        if (Boolean.TRUE.equals(tier.getIncludesLms()) && tier.getLmsValidityDays() != null
+                && tier.getLmsValidityDays() > 0) {
+            Date d = daysFromNow(tier.getLmsValidityDays());
+            e.setLmsExpiresAt(d);
+            earliestExpiry = earlier(earliestExpiry, d);
+        }
+        e.setExpiresAt(earliestExpiry);
+
+        if (e.getAccessToken() == null) {
+            e.setAccessToken(generateToken());
+            e.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
+        }
+        // purchase_path column is length 1 — leave null for school. Self-serve booking.
+        if (e.getCounsellingModel() == null) e.setCounsellingModel("1");
+
+        StudentEntitlement saved = entitlementRepository.save(e);
+        logger.info("School entitlement granted/updated: id={} userStudent={} assessment={} counselling={} sessions={}",
+                saved.getEntitlementId(), userStudentId, assessmentId,
+                saved.getCounsellingActive(), saved.getCounsellingSessionsTotal());
+        return saved;
+    }
+
+    /**
+     * Resolve the active, counselling-bearing entitlement for a (student, assessment)
+     * pair — used by the assessment thank-you page for SCHOOL students, who reach it
+     * via a fresh login and therefore have no entitlementId in hand. Returns the most
+     * recent active entitlement that has counselling switched on, or null.
+     */
+    @Transactional(readOnly = true)
+    public StudentEntitlement findActiveCounsellingForStudent(Long userStudentId, Long assessmentId) {
+        if (userStudentId == null || assessmentId == null) return null;
+        for (StudentEntitlement e : entitlementRepository
+                .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
+            if ("active".equals(e.getStatus()) && Boolean.TRUE.equals(e.getCounsellingActive())) {
+                return e;
+            }
+        }
+        return null;
     }
 
     /**
@@ -324,6 +414,12 @@ public class EntitlementService {
     /** Union an AssessmentMappingTier's service flags onto the entitlement. */
     private void applyMappingTierSnapshot(StudentEntitlement e, AssessmentMappingTier tier) {
         applyInclusionSnapshot(e, ServiceInclusions.fromMappingTier(tier));
+        // Phase 3b: snapshot the per-session price for booking EXTRA counselling
+        // sessions (beyond what the tier includes). NULL leaves the booking flow
+        // to fall back to the configurable global default.
+        if (tier.getCounsellingPrice() != null) {
+            e.setCounsellingPrice(tier.getCounsellingPrice());
+        }
     }
 
     /**
@@ -371,7 +467,20 @@ public class EntitlementService {
         e.setCounsellingActive(Boolean.TRUE.equals(e.getCounsellingActive()) || inc.counselling);
         e.setLmsActive(Boolean.TRUE.equals(e.getLmsActive()) || inc.lms);
 
-        int newSessions = inc.counsellingSessionCount != null ? inc.counsellingSessionCount : 0;
+        // A tier with the counselling toggle ON must always grant at least one
+        // bookable session, even if the admin left the session-count field blank.
+        // Otherwise counsellingActive=true but counsellingSessionsTotal=0, and every
+        // "(total - used) > 0" gate (canBookNow, hasFreeSession, showCounsellingButton,
+        // the active-counselling query) hides the slot-booking option despite
+        // counselling being enabled. The toggle alone should unlock booking.
+        int newSessions;
+        if (inc.counselling) {
+            newSessions = (inc.counsellingSessionCount != null && inc.counsellingSessionCount > 0)
+                    ? inc.counsellingSessionCount
+                    : 1;
+        } else {
+            newSessions = inc.counsellingSessionCount != null ? inc.counsellingSessionCount : 0;
+        }
         int curSessions = e.getCounsellingSessionsTotal() != null ? e.getCounsellingSessionsTotal() : 0;
         e.setCounsellingSessionsTotal(Math.max(curSessions, newSessions));
 
@@ -450,6 +559,23 @@ public class EntitlementService {
         StudentEntitlement e = opt.get();
         int used = e.getCounsellingSessionsUsed() == null ? 0 : e.getCounsellingSessionsUsed();
         e.setCounsellingSessionsUsed(used + 1);
+        return entitlementRepository.save(e);
+    }
+
+    /**
+     * Credits a counselling session back to an entitlement (decrements used, floored
+     * at 0). Used when a booking is missed/cancelled: per the "always rebookable, no
+     * forfeit" rule a session is only truly consumed on COMPLETED, so a no-show returns
+     * the seat so the student can rebook.
+     */
+    @Transactional
+    public StudentEntitlement creditBackCounsellingSession(Long entitlementId) {
+        if (entitlementId == null) return null;
+        Optional<StudentEntitlement> opt = entitlementRepository.findById(entitlementId);
+        if (!opt.isPresent()) return null;
+        StudentEntitlement e = opt.get();
+        int used = e.getCounsellingSessionsUsed() == null ? 0 : e.getCounsellingSessionsUsed();
+        e.setCounsellingSessionsUsed(Math.max(0, used - 1));
         return entitlementRepository.save(e);
     }
 

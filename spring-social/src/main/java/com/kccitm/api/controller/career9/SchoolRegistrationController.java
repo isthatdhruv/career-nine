@@ -70,6 +70,7 @@ public class SchoolRegistrationController {
     @Autowired private SchoolAssessmentConfigRepository configRepository;
     @Autowired private SchoolAssessmentTierRepository schoolTierRepository;
     @Autowired private AssessmentMappingTierService tierService;
+    @Autowired private EntitlementService entitlementService;
     @Autowired private SchoolRegistrationLinkRepository linkRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
@@ -89,7 +90,6 @@ public class SchoolRegistrationController {
     @Autowired private StudentProvisioningService studentProvisioningService;
     @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
     @Autowired private InstituteAssessmentService instituteAssessmentService;
-    @Autowired private EntitlementService entitlementService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
     private String callbackBaseUrl;
@@ -1016,6 +1016,13 @@ public class SchoolRegistrationController {
                         user.getUsername(), dobFormatted, assessmentName);
             }
         }
+
+        // Grant the tier's services (counselling / report / dashboard) for the
+        // existing student too, so a returning student on a counselling link still
+        // gets the booking option. No-op for plain assessment tiers.
+        final UserStudent grantStudent = userStudent;
+        schoolTierRepository.findById(activeTierId).ifPresent(t ->
+                entitlementService.grantSchoolEntitlement(grantStudent.getUserStudentId(), assessmentId, t));
 
         return ResponseEntity.ok(response);
     }

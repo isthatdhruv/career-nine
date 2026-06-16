@@ -102,7 +102,13 @@ public class StudentEntitlement implements Serializable {
     @Column(name = "counselling_sessions_used", columnDefinition = "INT DEFAULT 0")
     private Integer counsellingSessionsUsed = 0;
 
-    @Column(name = "lms_active")
+    // Per-session price (INR, whole rupees) for booking an EXTRA counselling
+    // session that this entitlement does not include. Snapshotted from the tier
+    // at activation; NULL means use the configurable global default at booking time.
+    @Column(name = "counselling_price")
+    private Integer counsellingPrice;
+
+    @Column(name = "lms_active", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean lmsActive = false;
 
     @Column(name = "lms_expires_at")
@@ -135,6 +141,13 @@ public class StudentEntitlement implements Serializable {
     @Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     private Date reportPreparedAt;
+
+    // Set when the "you have counselling sessions left to book" nudge has been
+    // sent, so the scheduler sends it at most once per entitlement.
+    @Column(name = "counselling_nudge_sent_at")
+    @Temporal(TemporalType.TIMESTAMP)
+    @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
+    private Date counsellingNudgeSentAt;
 
     @PrePersist
     public void prePersist() {
@@ -193,6 +206,8 @@ public class StudentEntitlement implements Serializable {
     public void setCounsellingSessionsTotal(Integer v) { this.counsellingSessionsTotal = v; }
     public Integer getCounsellingSessionsUsed() { return counsellingSessionsUsed; }
     public void setCounsellingSessionsUsed(Integer v) { this.counsellingSessionsUsed = v; }
+    public Integer getCounsellingPrice() { return counsellingPrice; }
+    public void setCounsellingPrice(Integer v) { this.counsellingPrice = v; }
     public Boolean getLmsActive() { return lmsActive; }
     public void setLmsActive(Boolean v) { this.lmsActive = v; }
     public Date getLmsExpiresAt() { return lmsExpiresAt; }
@@ -209,4 +224,6 @@ public class StudentEntitlement implements Serializable {
     public void setUpdatedAt(Date v) { this.updatedAt = v; }
     public Date getReportPreparedAt() { return reportPreparedAt; }
     public void setReportPreparedAt(Date v) { this.reportPreparedAt = v; }
+    public Date getCounsellingNudgeSentAt() { return counsellingNudgeSentAt; }
+    public void setCounsellingNudgeSentAt(Date v) { this.counsellingNudgeSentAt = v; }
 }

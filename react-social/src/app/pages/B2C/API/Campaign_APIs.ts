@@ -30,6 +30,7 @@ export interface CampaignAssessmentRow {
   assessmentName?: string;
   purchasePath?: "A" | "B" | null;
   counsellingModel?: "1" | "2" | null;
+  description?: string | null;
   isActive?: boolean;
   sortOrder?: number;
   tiers?: CampaignAssessmentTier[];
@@ -74,6 +75,7 @@ export const attachAssessment = (campaignId: number, body: {
 export const updateAssessmentMapping = (mappingId: number, body: {
   purchasePath?: "A" | "B" | null;
   counsellingModel?: "1" | "2" | null;
+  description?: string | null;
   sortOrder?: number;
   isActive?: boolean;
 }) => axios.put(`${API_URL}/campaign/assessment/${mappingId}`, body);

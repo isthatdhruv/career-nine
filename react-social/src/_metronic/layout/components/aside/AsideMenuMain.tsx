@@ -119,7 +119,40 @@ export function AsideMenuMain() {
 
   const showCounsellorPortal =
     isSuperAdmin ||
-    userRoles.some((r) => r === "COUNSELLOR" || r === "ROLE_COUNSELLOR");
+    // Case-insensitive: the DB role is named 'Counsellor', not 'COUNSELLOR'.
+    userRoles.some((r) => {
+      const u = typeof r === "string" ? r.toUpperCase() : "";
+      return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
+    });
+
+  // A pure COUNSELLOR (not also a super-admin) sees ONLY the counsellor portal menu —
+  // none of the admin sections. The pages render inside this same admin shell, so the
+  // counsellor gets the unified UI but a focused, counsellor-only navigation.
+  const isCounsellorOnly =
+    !isSuperAdmin &&
+    userRoles.some((r) => {
+      const u = typeof r === "string" ? r.toUpperCase() : "";
+      return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
+    });
+
+  if (isCounsellorOnly) {
+    return (
+      <>
+        <div className="menu-item">
+          <div className="menu-content pt-8 pb-2">
+            <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+              Counsellor
+            </span>
+          </div>
+        </div>
+        <AsideMenuItem to="/counsellor/dashboard" title="Dashboard" icon="/media/icons/duotune/art/art002.svg" fontIcon="bi-grid" />
+        <AsideMenuItem to="/counsellor/appointments" title="Appointments" icon="/media/icons/duotune/general/gen019.svg" fontIcon="bi-calendar-check" />
+        <AsideMenuItem to="/counsellor/notes" title="Session Notes" icon="/media/icons/duotune/files/fil003.svg" fontIcon="bi-journal-text" />
+        <AsideMenuItem to="/counsellor/availability" title="Availability" icon="/media/icons/duotune/general/gen005.svg" fontIcon="bi-clock" />
+        <AsideMenuItem to="/counsellor/profile" title="My Profile" icon="/media/icons/duotune/communication/com006.svg" fontIcon="bi-person" />
+      </>
+    );
+  }
 
   return (
     <>
@@ -679,6 +712,9 @@ export function AsideMenuMain() {
             )}
             {allowed("/admin/counselling-slots") && (
               <AsideMenuItem to="/admin/counselling-slots" title="Create Slots" hasBullet={true} />
+            )}
+            {allowed("/admin/counselling-assignments") && (
+              <AsideMenuItem to="/admin/counselling-assignments" title="Assessment Assignments" hasBullet={true} />
             )}
             {allowed("/admin/counselling-notifications") && (
               <AsideMenuItem to="/admin/counselling-notifications" title="Notifications" hasBullet={true} />

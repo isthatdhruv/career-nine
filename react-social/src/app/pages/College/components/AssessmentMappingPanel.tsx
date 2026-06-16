@@ -38,6 +38,9 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
 
   const [selectedAssessment, setSelectedAssessment] = useState<string>("");
   const [mappingLevel, setMappingLevel] = useState<string>("INSTITUTE");
+  // Post-assessment payment timing for this link: PAY_FIRST (pay then book
+  // counselling) or PAY_LATER (hold a slot, pay before the appointment confirms).
+  const [paymentTiming, setPaymentTiming] = useState<string>("PAY_FIRST");
   const [selectedSession, setSelectedSession] = useState<string>("");
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [selectedSection, setSelectedSection] = useState<string>("");
@@ -128,6 +131,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
       assessmentId: Number(selectedAssessment),
       instituteCode: instituteCode,
       mappingLevel: mappingLevel,
+      paymentTiming: paymentTiming,
     };
 
     if (mappingLevel === "SESSION") {
@@ -339,6 +343,23 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                   <option value="CLASS">Class</option>
                   <option value="SECTION">Section</option>
                 </Form.Select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem", color: "#475569", marginBottom: 8 }}>
+                Counselling Payment Timing
+              </Form.Label>
+              <Form.Select
+                value={paymentTiming}
+                onChange={(e) => setPaymentTiming(e.target.value)}
+                style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: "0.9rem" }}
+              >
+                <option value="PAY_FIRST">Pay first — student pays for the tier, then books counselling</option>
+                <option value="PAY_LATER">Pay later — student picks a slot, pays before the session is confirmed</option>
+              </Form.Select>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: 6 }}>
+                Controls the post-assessment flow: when a student must pay to unlock a counselling session.
               </div>
             </div>
 

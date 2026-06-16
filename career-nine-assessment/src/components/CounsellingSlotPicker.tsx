@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { bookCounsellingSlot, listCounsellingSlots } from '../api-clients/campaignAPI'
 
+type SessionMode = 'ONLINE' | 'OFFLINE'
+
 type Slot = {
   slotId: number
   date: string         // yyyy-MM-dd
@@ -8,6 +10,7 @@ type Slot = {
   endTime: string      // HH:mm:ss
   durationMinutes: number
   counsellorName?: string
+  mode?: SessionMode   // delivery mode set by the counsellor on the slot
 }
 
 type BookingResult = {
@@ -17,6 +20,9 @@ type BookingResult = {
   slotStartTime?: string
   counsellorName?: string
   sessionsRemaining?: number
+  mode?: SessionMode
+  meetingLink?: string // present for ONLINE bookings
+  location?: string    // present for OFFLINE bookings
 }
 
 type Props = {
@@ -27,6 +33,11 @@ type Props = {
   /** Called with the server response after a successful booking. The host page
    *  uses this to refresh upgradeInfo and swap the CTA tile for a confirmation. */
   onBooked: (result: BookingResult) => void
+  /** Optional prefill for the contact form, if the host page already knows the
+   *  student's details from the entitlement/registration. */
+  defaultName?: string
+  defaultEmail?: string
+  defaultPhone?: string
 }
 
 // Format yyyy-MM-dd as e.g. "Tue, 17 Jun".
@@ -72,6 +83,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   sessionsRemaining,
   onClose,
   onBooked,
+  defaultName = '',
+  defaultEmail = '',
+  defaultPhone = '',
 }) => {
   const [from, setFrom] = useState<string>(todayIso())
   const [slots, setSlots] = useState<Slot[]>([])
@@ -81,6 +95,22 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   const [reason, setReason] = useState<string>('')
   const [booking, setBooking] = useState<boolean>(false)
   const [bookError, setBookError] = useState<string>('')
+  // Confirm-before-leaving: only shown once the student has picked a slot (real
+  // intent), so an immediate open-and-close isn't interrupted.
+  const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false)
+
+  // Contact details — captured once a slot is selected. Parent email/phone are
+  // optional extra contacts who also receive the confirmation + reminders.
+  const [contactName, setContactName] = useState<string>(defaultName)
+  const [contactEmail, setContactEmail] = useState<string>(defaultEmail)
+  const [contactPhone, setContactPhone] = useState<string>(defaultPhone)
+  const [parentEmail, setParentEmail] = useState<string>('')
+  const [parentPhone, setParentPhone] = useState<string>('')
+
+  const selectedSlot = useMemo(
+    () => slots.find((s) => s.slotId === selectedSlotId) || null,
+    [slots, selectedSlotId],
+  )
 
   // Group slots by date for rendering. Preserves the server's ordering within a date.
   const grouped = useMemo(() => {
@@ -116,8 +146,23 @@ const CounsellingSlotPicker: React.FC<Props> = ({
     }
   }, [accessToken, entitlementId, from])
 
+  // All three dismiss paths (footer Cancel, header ×, backdrop) route through
+  // here so the leave-confirmation can't be bypassed by clicking outside.
+  const requestClose = () => {
+    if (booking) return
+    if (selectedSlotId != null) {
+      setShowCancelConfirm(true)
+      return
+    }
+    onClose()
+  }
+
   const handleConfirm = async () => {
     if (selectedSlotId == null || booking) return
+    if (!contactName.trim() || !contactPhone.trim()) {
+      setBookError('Please enter your name and phone number.')
+      return
+    }
     setBooking(true)
     setBookError('')
     try {
@@ -126,8 +171,27 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         entitlementId,
         slotId: selectedSlotId,
         reason: reason.trim() || undefined,
+        contactName: contactName.trim(),
+        contactPhone: contactPhone.trim(),
+        contactEmail: contactEmail.trim() || undefined,
+        parentEmail: parentEmail.trim() || undefined,
+        parentPhone: parentPhone.trim() || undefined,
       })
-      onBooked(res.data as BookingResult)
+      const data: any = res.data
+      // Phase 3b: if the session isn't included in the plan, the backend holds the
+      // slot and returns a Razorpay payment link instead of a confirmed booking.
+      // Redirect to pay; on success the webhook finalises the booking.
+      if (data && data.requiresPayment) {
+        if (data.paymentUrl) {
+          window.location.href = data.paymentUrl
+          return
+        }
+        setBookError('Payment is required but no payment link was returned. Please try again.')
+        return
+      }
+      // Hand the booking straight to the host page, which shows the single
+      // celebration screen — no in-picker celebration, so it only appears once.
+      onBooked(data as BookingResult)
     } catch (err: any) {
       const body = err?.response?.data
       setBookError(typeof body === 'string' ? body : 'Could not confirm your booking. Please try again.')
@@ -138,7 +202,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
 
   return (
     <div
-      onClick={onClose}
+      onClick={requestClose}
       style={{
         position: 'fixed',
         inset: 0,
@@ -179,13 +243,10 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
               Book a Counselling Session
             </h2>
-            <div style={{ fontSize: '0.82rem', opacity: 0.9, marginTop: 2 }}>
-              {sessionsRemaining} session{sessionsRemaining === 1 ? '' : 's'} remaining
-            </div>
           </div>
           <button
             type='button'
-            onClick={onClose}
+            onClick={requestClose}
             style={{
               background: 'transparent',
               border: 'none',
@@ -244,7 +305,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           )}
           {!loading && !loadError && grouped.length === 0 && (
             <div style={{ textAlign: 'center', color: '#64748B', padding: '2rem 0' }}>
-              No slots available in this week. Try a later date.
+              No upcoming counselling slots are available right now. Please check back later.
             </div>
           )}
           {!loading && grouped.map(([date, daySlots]) => (
@@ -263,11 +324,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                       <div style={{ fontWeight: 600 }}>
                         {formatTime(s.startTime)} – {formatTime(s.endTime)}
                       </div>
-                      {s.counsellorName && (
-                        <div style={{ fontSize: '0.75rem', opacity: 0.85, marginTop: 2 }}>
-                          {s.counsellorName}
-                        </div>
-                      )}
+                      <div style={modeBadgeStyle(s.mode === 'OFFLINE', isSelected)}>
+                        {s.mode === 'OFFLINE' ? 'In-person' : 'Online'}
+                      </div>
                     </button>
                   )
                 })}
@@ -275,15 +334,92 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             </div>
           ))}
 
-          {/* Reason textarea — shown once a slot is picked */}
+          {/* Contact details + reason — shown once a slot is picked */}
           {selectedSlotId != null && (
             <div style={{ marginTop: 8 }}>
+              {/* Mode notice — tells the student how the session will be delivered */}
+              <div style={modeNoticeStyle(selectedSlot?.mode === 'OFFLINE')}>
+                {selectedSlot?.mode === 'OFFLINE'
+                  ? '📍 In-person session — the venue address will be sent to you by email.'
+                  : '💻 Online session — the meeting link will be sent to you by email.'}
+              </div>
+
+              <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600, margin: '12px 0 8px' }}>
+                Your contact details
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Full name <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type='text'
+                    value={contactName}
+                    onChange={(e) => setContactName(e.target.value)}
+                    placeholder='Your full name'
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Phone <span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type='tel'
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder='10-digit mobile number'
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Email <span style={{ color: '#94A3B8' }}>(optional)</span>
+                  </label>
+                  <input
+                    type='email'
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder='you@example.com'
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Parent's email <span style={{ color: '#94A3B8' }}>(optional)</span>
+                  </label>
+                  <input
+                    type='email'
+                    value={parentEmail}
+                    onChange={(e) => setParentEmail(e.target.value)}
+                    placeholder="parent@example.com"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={fieldLabelStyle}>
+                    Parent's phone <span style={{ color: '#94A3B8' }}>(optional)</span>
+                  </label>
+                  <input
+                    type='tel'
+                    value={parentPhone}
+                    onChange={(e) => setParentPhone(e.target.value)}
+                    placeholder="Parent's mobile number"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: 8 }}>
+                We'll send the confirmation and reminders by email and WhatsApp to all the numbers/emails above.
+              </div>
+
               <label
                 style={{
                   display: 'block',
                   fontSize: '0.85rem',
                   color: '#334155',
-                  marginBottom: 6,
+                  margin: '14px 0 6px',
                   fontWeight: 500,
                 }}
               >
@@ -322,19 +458,57 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             gap: 10,
           }}
         >
-          <button type='button' onClick={onClose} style={btnSecondaryStyle}>
+          <button type='button' onClick={requestClose} style={btnSecondaryStyle}>
             Cancel
           </button>
           <button
             type='button'
             onClick={handleConfirm}
-            disabled={selectedSlotId == null || booking}
-            style={btnPrimaryStyle(selectedSlotId == null || booking)}
+            disabled={selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim()}
+            style={btnPrimaryStyle(selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim())}
           >
             {booking ? 'Booking…' : 'Confirm booking'}
           </button>
         </div>
       </div>
+
+      {/* Leave-confirmation — a deliberate interruption when a student tries to
+          walk away after picking a slot. Reframes leaving as a real loss. */}
+      {showCancelConfirm && (
+        <div onClick={(e) => e.stopPropagation()} style={confirmOverlayStyle}>
+          <div style={confirmCardStyle}>
+            <div style={{ fontSize: '2.4rem', lineHeight: 1, marginBottom: 14 }}>⚠️</div>
+            <h3 style={{ margin: '0 0 12px', fontSize: '1.5rem', fontWeight: 800, color: '#991B1B' }}>
+              Are you sure?
+            </h3>
+            <p style={{ margin: '0 0 24px', fontSize: '1rem', color: '#475569', lineHeight: 1.6 }}>
+              This is a life-changing opportunity. You just completed your assessment — your
+              counsellor is ready to turn those results into a real plan for your future.
+              <br />
+              <strong style={{ color: '#0F172A' }}>Walk away now, and you leave that on the table.</strong>
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button
+                type='button'
+                onClick={() => setShowCancelConfirm(false)}
+                style={{ ...btnPrimaryStyle(false), padding: '15px 20px', fontSize: '1.02rem' }}
+              >
+                No, take me to my session
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  setShowCancelConfirm(false)
+                  onClose()
+                }}
+                style={btnGhostDangerStyle}
+              >
+                Yes, cancel anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -371,6 +545,46 @@ function navBtnStyle(disabled: boolean): React.CSSProperties {
   }
 }
 
+function modeBadgeStyle(offline: boolean, selected: boolean): React.CSSProperties {
+  return {
+    display: 'inline-block',
+    marginTop: 6,
+    padding: '1px 7px',
+    borderRadius: 999,
+    fontSize: '0.66rem',
+    fontWeight: 700,
+    letterSpacing: '0.02em',
+    background: selected ? 'rgba(255,255,255,0.22)' : offline ? '#FEF3C7' : '#E0E7FF',
+    color: selected ? '#fff' : offline ? '#92400E' : '#3730A3',
+  }
+}
+
+const modeNoticeStyle = (offline: boolean): React.CSSProperties => ({
+  background: offline ? '#FFFBEB' : '#EEF2FF',
+  border: `1px solid ${offline ? '#FDE68A' : '#C7D2FE'}`,
+  color: offline ? '#92400E' : '#3730A3',
+  padding: '0.55rem 0.7rem',
+  borderRadius: 8,
+  fontSize: '0.8rem',
+})
+
+const fieldLabelStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.8rem',
+  color: '#475569',
+  marginBottom: 4,
+  fontWeight: 500,
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '0.55rem 0.7rem',
+  borderRadius: 8,
+  border: '1px solid #CBD5E1',
+  fontSize: '0.9rem',
+  fontFamily: 'inherit',
+}
+
 function slotChipStyle(selected: boolean): React.CSSProperties {
   return {
     background: selected ? 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' : '#fff',
@@ -384,6 +598,46 @@ function slotChipStyle(selected: boolean): React.CSSProperties {
     textAlign: 'left',
     boxShadow: selected ? '0 6px 18px rgba(99, 102, 241, 0.35)' : 'none',
   }
+}
+
+// Overlay that sits on top of the picker for the leave-confirmation and the
+// post-booking celebration. Darkens the picker behind so the card is the focus.
+const confirmOverlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(15, 23, 42, 0.6)',
+  backdropFilter: 'blur(3px)',
+  WebkitBackdropFilter: 'blur(3px)',
+  zIndex: 1200,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '1.5rem',
+}
+
+const confirmCardStyle: React.CSSProperties = {
+  background: '#fff',
+  borderRadius: 20,
+  padding: '2.25rem 2rem',
+  width: '100%',
+  maxWidth: 460,
+  textAlign: 'center',
+  boxShadow: '0 30px 80px rgba(0,0,0,0.4)',
+  borderTop: '5px solid #EF4444',
+}
+
+// Understated "leave anyway" action — deliberately lower-weight than the
+// gradient "stay" button so leaving feels like the harder choice.
+const btnGhostDangerStyle: React.CSSProperties = {
+  background: 'transparent',
+  color: '#94A3B8',
+  border: 'none',
+  padding: '0.5rem 1rem',
+  borderRadius: 10,
+  fontSize: '0.86rem',
+  fontWeight: 500,
+  cursor: 'pointer',
+  textDecoration: 'underline',
 }
 
 const btnSecondaryStyle: React.CSSProperties = {

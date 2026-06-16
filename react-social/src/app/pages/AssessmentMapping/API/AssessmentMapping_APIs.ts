@@ -151,6 +151,8 @@ export interface AssessmentMappingTier {
   dashboardValidityDays?: number | null;
   includesCounselling?: boolean;
   counsellingSessionCount?: number | null;
+  // Price (in rupees) for counselling sessions beyond the included count.
+  counsellingPrice?: number | null;
   includesLms?: boolean;
   lmsValidityDays?: number | null;
 }

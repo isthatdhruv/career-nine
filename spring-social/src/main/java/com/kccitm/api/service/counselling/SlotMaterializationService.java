@@ -67,10 +67,14 @@ public class SlotMaterializationService {
     private int materializeSlotsForTemplate(AvailabilityTemplate template, int days) {
         DayOfWeek templateDayOfWeek = DayOfWeek.valueOf(template.getDayOfWeek().toUpperCase());
         LocalDate tomorrow = LocalDate.now().plusDays(1);
-        LocalDate endDate = LocalDate.now().plusDays(days);
+        // Honour the template's effective start date: materialize from max(startDate, tomorrow).
+        LocalDate start = (template.getStartDate() != null && template.getStartDate().isAfter(tomorrow))
+                ? template.getStartDate()
+                : tomorrow;
+        LocalDate endDate = start.plusDays(days);
         int created = 0;
 
-        for (LocalDate date = tomorrow; !date.isAfter(endDate); date = date.plusDays(1)) {
+        for (LocalDate date = start; !date.isAfter(endDate); date = date.plusDays(1)) {
             if (date.getDayOfWeek() != templateDayOfWeek) {
                 continue;
             }
@@ -101,6 +105,7 @@ public class SlotMaterializationService {
                 slot.setStartTime(slotStart);
                 slot.setEndTime(slotEnd);
                 slot.setDurationMinutes(template.getDefaultSlotDuration());
+                slot.setMode(template.getMode());
                 slot.setStatus("AVAILABLE");
                 slot.setIsManuallyCreated(false);
                 slot.setIsBlocked(false);

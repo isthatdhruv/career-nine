@@ -44,6 +44,10 @@ public class CampaignAssessmentMapping implements Serializable {
     @Column(name = "counselling_model", length = 1)
     private String counsellingModel;
 
+    /** Optional blurb shown under this assessment on the public registration card. */
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "sort_order", columnDefinition = "INT DEFAULT 0")
     private Integer sortOrder = 0;
 
@@ -88,6 +92,8 @@ public class CampaignAssessmentMapping implements Serializable {
     public void setPurchasePath(String v) { this.purchasePath = v; }
     public String getCounsellingModel() { return counsellingModel; }
     public void setCounsellingModel(String v) { this.counsellingModel = v; }
+    public String getDescription() { return description; }
+    public void setDescription(String v) { this.description = v; }
     public Integer getSortOrder() { return sortOrder; }
     public void setSortOrder(Integer v) { this.sortOrder = v; }
     public Boolean getIsActive() { return isActive; }

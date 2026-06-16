@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { useAuth } from '../../modules/auth/core/Auth'
+import { getCurrentUser } from '../../modules/auth/core/_requests'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
 
@@ -10,6 +12,7 @@ interface CounsellorLoginPanelProps {
 
 const CounsellorLoginPanel: React.FC<CounsellorLoginPanelProps> = ({ onSwitchToRegister }) => {
   const navigate = useNavigate()
+  const { setCurrentUser } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -39,6 +42,11 @@ const CounsellorLoginPanel: React.FC<CounsellorLoginPanelProps> = ({ onSwitchToR
           withCredentials: true,
         }
       )
+      // AuthInit only calls /auth/me once on app mount, and navigate() does
+      // not remount it — hydrate the auth context here or CounsellorAuthGuard
+      // sees currentUser=undefined and bounces straight back to this page.
+      const { data } = await getCurrentUser()
+      setCurrentUser(data)
       navigate('/counsellor/dashboard', { replace: true })
     } catch (err: any) {
       if (err.response?.status === 401) setError('Invalid email or password.')

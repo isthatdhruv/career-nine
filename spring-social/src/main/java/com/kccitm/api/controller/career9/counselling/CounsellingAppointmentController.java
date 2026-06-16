@@ -45,6 +45,9 @@ public class CounsellingAppointmentController {
     private MeetingLinkService meetingLinkService;
 
     @Autowired
+    private com.kccitm.api.service.counselling.CheckinOtpService checkinOtpService;
+
+    @Autowired
     private CounsellingAppointmentRepository appointmentRepository;
 
     @Autowired
@@ -190,6 +193,37 @@ public class CounsellingAppointmentController {
         CounsellingAppointment saved = appointmentRepository.save(appointment);
         logger.info("Set manual meeting link for appointment {}", id);
         return ResponseEntity.ok(saved);
+    }
+
+    // no scope arg: counsellor triggers check-in — generates + sends OTP to student
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/start/{id}")
+    public ResponseEntity<?> startSession(@PathVariable Long id) {
+        try {
+            CounsellingAppointment appointment = checkinOtpService.generateAndSend(id);
+            Map<String, Object> out = new java.util.HashMap<>();
+            out.put("appointmentId", appointment.getId());
+            out.put("status", appointment.getStatus());
+            out.put("message", "A check-in code has been sent to the student. Ask them for it to start the session.");
+            return ResponseEntity.ok(out);
+        } catch (RuntimeException e) {
+            logger.warn("Start session failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    // no scope arg: counsellor enters the student's OTP to verify check-in
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/verify-checkin/{id}")
+    public ResponseEntity<?> verifyCheckin(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        String code = request.get("code") != null ? request.get("code").toString() : null;
+        try {
+            CounsellingAppointment appointment = checkinOtpService.verify(id, code);
+            return ResponseEntity.ok(appointment);
+        } catch (RuntimeException e) {
+            logger.warn("Check-in verification failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
     }
 
     // no scope arg: identifies by studentId

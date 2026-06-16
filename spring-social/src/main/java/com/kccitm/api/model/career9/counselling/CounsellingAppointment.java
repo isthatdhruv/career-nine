@@ -59,6 +59,39 @@ public class CounsellingAppointment implements Serializable {
     @Column(name = "meeting_link_source", columnDefinition = "VARCHAR(10) DEFAULT 'AUTO'")
     private String meetingLinkSource = "AUTO";
 
+    // Delivery mode snapshot taken from the slot at booking time: ONLINE | OFFLINE.
+    @Column(name = "mode", length = 20)
+    private String mode;
+
+    // For OFFLINE sessions: the counsellor's office address copied at booking
+    // time, so the confirmation email and the student's record stay stable even
+    // if the counsellor later edits their profile.
+    @Column(name = "location", columnDefinition = "TEXT")
+    private String location;
+
+    // Contact details the student fills in when booking. Captured per booking
+    // (the student may want to be reached on a different number/email than the
+    // one on their assessment record).
+    @Column(name = "student_contact_name", length = 255)
+    private String studentContactName;
+
+    @Column(name = "student_contact_email", length = 255)
+    private String studentContactEmail;
+
+    @Column(name = "student_contact_phone", length = 30)
+    private String studentContactPhone;
+
+    // Optional parent/guardian contact — confirmation + reminders go here too.
+    @Column(name = "parent_email", length = 255)
+    private String parentEmail;
+
+    @Column(name = "parent_phone", length = 30)
+    private String parentPhone;
+
+    // EMAIL | PHONE | WHATSAPP
+    @Column(name = "preferred_contact_method", length = 20)
+    private String preferredContactMethod;
+
     @Column(name = "reminder_24h_sent")
     private Boolean reminder24hSent = false;
 
@@ -74,6 +107,22 @@ public class CounsellingAppointment implements Serializable {
     // when a new appointment is created via reschedule (chain it from the old).
     @Column(name = "student_reschedule_count", columnDefinition = "INT DEFAULT 0")
     private Integer studentRescheduleCount = 0;
+
+    // Session check-in / attendance — set when the counsellor verifies the
+    // student's OTP at the start of the session.
+    @Column(name = "session_started_at")
+    private LocalDateTime sessionStartedAt;
+
+    @Column(name = "checkin_verified_at")
+    private LocalDateTime checkinVerifiedAt;
+
+    @Column(name = "attended")
+    private Boolean attended;
+
+    // The entitlement this booking drew its counselling session from. Used by the
+    // lifecycle sweep to credit the session back on a no-show (always rebookable).
+    @Column(name = "entitlement_id")
+    private Long entitlementId;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -175,6 +224,70 @@ public class CounsellingAppointment implements Serializable {
         this.meetingLinkSource = meetingLinkSource;
     }
 
+    public String getMode() {
+        return mode;
+    }
+
+    public void setMode(String mode) {
+        this.mode = mode;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public String getStudentContactName() {
+        return studentContactName;
+    }
+
+    public void setStudentContactName(String studentContactName) {
+        this.studentContactName = studentContactName;
+    }
+
+    public String getStudentContactEmail() {
+        return studentContactEmail;
+    }
+
+    public void setStudentContactEmail(String studentContactEmail) {
+        this.studentContactEmail = studentContactEmail;
+    }
+
+    public String getStudentContactPhone() {
+        return studentContactPhone;
+    }
+
+    public void setStudentContactPhone(String studentContactPhone) {
+        this.studentContactPhone = studentContactPhone;
+    }
+
+    public String getParentEmail() {
+        return parentEmail;
+    }
+
+    public void setParentEmail(String parentEmail) {
+        this.parentEmail = parentEmail;
+    }
+
+    public String getParentPhone() {
+        return parentPhone;
+    }
+
+    public void setParentPhone(String parentPhone) {
+        this.parentPhone = parentPhone;
+    }
+
+    public String getPreferredContactMethod() {
+        return preferredContactMethod;
+    }
+
+    public void setPreferredContactMethod(String preferredContactMethod) {
+        this.preferredContactMethod = preferredContactMethod;
+    }
+
     public Boolean getReminder24hSent() {
         return reminder24hSent;
     }
@@ -205,6 +318,38 @@ public class CounsellingAppointment implements Serializable {
 
     public void setStudentRescheduleCount(Integer studentRescheduleCount) {
         this.studentRescheduleCount = studentRescheduleCount;
+    }
+
+    public LocalDateTime getSessionStartedAt() {
+        return sessionStartedAt;
+    }
+
+    public void setSessionStartedAt(LocalDateTime sessionStartedAt) {
+        this.sessionStartedAt = sessionStartedAt;
+    }
+
+    public LocalDateTime getCheckinVerifiedAt() {
+        return checkinVerifiedAt;
+    }
+
+    public void setCheckinVerifiedAt(LocalDateTime checkinVerifiedAt) {
+        this.checkinVerifiedAt = checkinVerifiedAt;
+    }
+
+    public Boolean getAttended() {
+        return attended;
+    }
+
+    public void setAttended(Boolean attended) {
+        this.attended = attended;
+    }
+
+    public Long getEntitlementId() {
+        return entitlementId;
+    }
+
+    public void setEntitlementId(Long entitlementId) {
+        this.entitlementId = entitlementId;
     }
 
     public LocalDateTime getCreatedAt() {

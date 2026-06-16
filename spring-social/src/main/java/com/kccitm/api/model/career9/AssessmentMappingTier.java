@@ -83,6 +83,12 @@ public class AssessmentMappingTier implements Serializable {
     @Column(name = "counselling_session_count")
     private Integer counsellingSessionCount;
 
+    // Per-session price (INR, whole rupees) charged when a student books an
+    // EXTRA counselling session beyond what this tier includes. NULL = use the
+    // configurable global default (app.counselling.default-price).
+    @Column(name = "counselling_price")
+    private Integer counsellingPrice;
+
     @Column(name = "includes_lms", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean includesLms = false;
 
@@ -163,6 +169,8 @@ public class AssessmentMappingTier implements Serializable {
 
     public Integer getCounsellingSessionCount() { return counsellingSessionCount; }
     public void setCounsellingSessionCount(Integer counsellingSessionCount) { this.counsellingSessionCount = counsellingSessionCount; }
+    public Integer getCounsellingPrice() { return counsellingPrice; }
+    public void setCounsellingPrice(Integer counsellingPrice) { this.counsellingPrice = counsellingPrice; }
 
     public Boolean getIncludesLms() { return includesLms; }
     public void setIncludesLms(Boolean includesLms) { this.includesLms = includesLms; }
