@@ -482,6 +482,14 @@ public class PaymentWebhookController {
             return true;
         }
 
+        // PAY_LATER mapping counselling: confirm the held slot and link it to the
+        // student's mapping entitlement (so "already booked" is detected), without
+        // consuming a pooled session — PAY_LATER grants none.
+        if ("COUNSELLING_PAYLATER".equals(txn.getPurpose())) {
+            finalizePayLaterCounsellingSlot(txn);
+            return true;
+        }
+
         // Branch: B2C (campaign-linked) vs B2B mapping / legacy school payment.
         if (txn.getCampaignId() != null && txn.getCampaignAssessmentTierId() != null) {
             provisionB2CStudentAndEntitlement(txn);
@@ -556,6 +564,31 @@ public class PaymentWebhookController {
             bookingService.confirmHeldSlot(txn.getCounsellingSlotId(), us, "Counselling (paid)", contact, null);
         } catch (Exception e) {
             logger.error("Failed to finalise PAID counselling slot {} for txn {}: {}",
+                    txn.getCounsellingSlotId(), txn.getTransactionId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * PAY_LATER mapping counselling finaliser. The student paid the per-slot fee, so
+     * confirm the held slot now. We LINK the appointment to the student's mapping
+     * entitlement (drives the thank-you page's "already booked" state) but do NOT
+     * consume a session — PAY_LATER never grants an included session pool.
+     */
+    private void finalizePayLaterCounsellingSlot(PaymentTransaction txn) {
+        if (txn.getCounsellingSlotId() == null || txn.getUserStudentId() == null) return;
+        try {
+            UserStudent us = userStudentRepository.findById(txn.getUserStudentId()).orElse(null);
+            if (us == null) return;
+            Long entitlementId = entitlementService.findActiveMappingEntitlementId(
+                    txn.getUserStudentId(), txn.getAssessmentId());
+            com.kccitm.api.service.counselling.BookingService.BookingContact contact =
+                    new com.kccitm.api.service.counselling.BookingService.BookingContact(
+                            txn.getCounsellingContactName(), txn.getCounsellingContactEmail(),
+                            txn.getCounsellingContactPhone(), txn.getCounsellingContactMethod());
+            bookingService.confirmHeldSlot(txn.getCounsellingSlotId(), us, "Counselling (pay-later)", contact,
+                    entitlementId);
+        } catch (Exception e) {
+            logger.error("Failed to finalise PAY_LATER counselling slot {} for txn {}: {}",
                     txn.getCounsellingSlotId(), txn.getTransactionId(), e.getMessage(), e);
         }
     }

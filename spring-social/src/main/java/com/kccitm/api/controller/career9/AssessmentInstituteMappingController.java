@@ -628,6 +628,30 @@ public class AssessmentInstituteMappingController {
         }
         info.put("inclusions", inclusionsOf(effective));
 
+        // Post-assessment counselling payment timing + fee breakdown. PAY_FIRST folds the
+        // counselling fee (counsellingPrice × included session count) into the registration
+        // total so the student pays it upfront; PAY_LATER charges it per slot after the
+        // assessment. The fee fields are surfaced so the registration page can itemise the
+        // PAY_FIRST total ("Assessment ₹X + Counselling ₹Y/session × N = ₹Z").
+        String timing = mapping.getPaymentTiming() != null ? mapping.getPaymentTiming() : "PAY_FIRST";
+        info.put("paymentTiming", timing);
+        long counsellingFeeTotal = 0L;
+        if (!link.freeLink && effective != null
+                && Boolean.TRUE.equals(effective.getIncludesCounselling())
+                && effective.getCounsellingPrice() != null && effective.getCounsellingPrice() > 0) {
+            int sessions = effective.getCounsellingSessionCount() != null && effective.getCounsellingSessionCount() > 0
+                    ? effective.getCounsellingSessionCount() : 1;
+            counsellingFeeTotal = (long) effective.getCounsellingPrice() * sessions;
+            info.put("counsellingFeePerSession", effective.getCounsellingPrice());
+            info.put("counsellingSessionCount", sessions);
+            info.put("counsellingFeeTotal", counsellingFeeTotal);
+        }
+        // The amount the student actually pays at registration. PAY_FIRST adds the
+        // counselling fee on top of the tier price; PAY_LATER pays only the tier price.
+        long baseAmt = link.freeLink ? 0L
+                : (effective != null && effective.getAmount() != null ? effective.getAmount() : 0L);
+        info.put("payableTotal", "PAY_FIRST".equals(timing) ? baseAmt + counsellingFeeTotal : baseAmt);
+
         assessmentTableRepository.findById(mapping.getAssessmentId())
                 .ifPresent(a -> info.put("assessmentName", a.getAssessmentName()));
 
@@ -745,6 +769,21 @@ public class AssessmentInstituteMappingController {
         }
         Long activeTierId = effectiveTier.getTierId();
         Long mappingAmount = link.freeLink ? 0L : effectiveTier.getAmount();
+        // PAY_FIRST: fold the counselling fee (counsellingPrice × included sessions) into the
+        // registration charge so it's paid upfront. The tier feature snapshot applied on
+        // payment success then activates counselling, so the student books for free after
+        // the assessment. PAY_LATER leaves the charge at the tier price and defers the
+        // counselling fee to per-slot booking (see payLaterBook + the snapshot guard).
+        String paymentTiming = mapping.getPaymentTiming() != null ? mapping.getPaymentTiming() : "PAY_FIRST";
+        if (!link.freeLink && "PAY_FIRST".equals(paymentTiming)
+                && Boolean.TRUE.equals(effectiveTier.getIncludesCounselling())
+                && effectiveTier.getCounsellingPrice() != null && effectiveTier.getCounsellingPrice() > 0) {
+            int feeSessions = effectiveTier.getCounsellingSessionCount() != null
+                    && effectiveTier.getCounsellingSessionCount() > 0
+                    ? effectiveTier.getCounsellingSessionCount() : 1;
+            long fee = (long) effectiveTier.getCounsellingPrice() * feeSessions;
+            mappingAmount = (mappingAmount != null ? mappingAmount : 0L) + fee;
+        }
         boolean paymentRequired = !link.freeLink && mappingAmount != null && mappingAmount > 0;
 
         // 5. Handle promo code if provided
@@ -1028,7 +1067,10 @@ public class AssessmentInstituteMappingController {
                 .ifPresent(a -> resp.put("assessmentName", a.getAssessmentName()));
 
         // Counselling-bearing paid tiers the student may pick to unlock a session.
+        // For PAY_LATER, this is also the tier the slot picker books against (it charges
+        // the per-slot counselling fee, not the tier price).
         List<Map<String, Object>> tiers = new java.util.ArrayList<>();
+        Integer counsellingFeePerSession = ent.getCounsellingPrice();
         if (!canBookNow) {
             for (AssessmentMappingTier t : tierRepository
                     .findByMappingIdAndIsFreeAndIsActiveOrderBySortOrderAsc(ent.getMappingId(), false, true)) {
@@ -1039,12 +1081,20 @@ public class AssessmentInstituteMappingController {
                 tm.put("name", t.getName());
                 tm.put("description", t.getDescription());
                 tm.put("amount", t.getAmount());
+                tm.put("counsellingPrice", t.getCounsellingPrice());
                 tm.put("inclusions", inclusionsOf(t));
                 tiers.add(tm);
+                // Fall back to the tier's configured per-session fee when the entitlement
+                // hasn't snapshotted one (e.g. free-link registration that later pays).
+                if (counsellingFeePerSession == null) counsellingFeePerSession = t.getCounsellingPrice();
             }
         }
         resp.put("needsTierSelection", !canBookNow);
         resp.put("tiers", tiers);
+        // PAY_LATER per-slot fee + flag: the SPA shows "₹X / session" and pays it at booking.
+        resp.put("counsellingFeePerSession", counsellingFeePerSession);
+        resp.put("payPerSlot", "PAY_LATER".equals(paymentTiming) && !canBookNow
+                && counsellingFeePerSession != null && counsellingFeePerSession > 0);
         return resp;
     }
 
@@ -1115,9 +1165,16 @@ public class AssessmentInstituteMappingController {
         AssessmentMappingTier tier = tierRepository.findById(tierId).orElse(null);
         if (tier == null || !ent.getMappingId().equals(tier.getMappingId())
                 || Boolean.TRUE.equals(tier.getIsFree()) || !Boolean.TRUE.equals(tier.getIsActive())
-                || !Boolean.TRUE.equals(tier.getIncludesCounselling())
-                || tier.getAmount() == null || tier.getAmount() <= 0) {
+                || !Boolean.TRUE.equals(tier.getIncludesCounselling())) {
             return ResponseEntity.badRequest().body("Invalid counselling tier");
+        }
+        // PAY_LATER charges the per-slot counselling fee, NOT the whole tier price.
+        // Prefer the fee snapshotted on the entitlement at registration; fall back to
+        // the tier's configured counselling price.
+        Long counsellingFee = ent.getCounsellingPrice() != null ? ent.getCounsellingPrice().longValue()
+                : (tier.getCounsellingPrice() != null ? tier.getCounsellingPrice().longValue() : null);
+        if (counsellingFee == null || counsellingFee <= 0) {
+            return ResponseEntity.badRequest().body("Counselling fee is not configured for this link");
         }
 
         // Resolve student contact (prefer the posted contact, fall back to record).
@@ -1152,12 +1209,17 @@ public class AssessmentInstituteMappingController {
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mapping.getMappingId());
             txn.setMappingTierId(tier.getTierId());
-            txn.setAmount(tier.getAmount());
-            txn.setOriginalAmount(tier.getAmount());
+            txn.setAmount(counsellingFee);
+            txn.setOriginalAmount(counsellingFee);
             txn.setAssessmentId(ent.getAssessmentId());
             txn.setInstituteCode(mapping.getInstituteCode());
             txn.setUserStudentId(ent.getUserStudentId());
             txn.setPurchasePath("U");
+            // Route the webhook through the PAY_LATER finaliser: confirm the held slot
+            // WITHOUT activating the tier's included counselling pool (each PAY_LATER slot
+            // is paid for individually), but LINK it to the mapping entitlement so the
+            // thank-you page can show the "already booked" state.
+            txn.setPurpose("COUNSELLING_PAYLATER");
             txn.setStudentName(name);
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
@@ -1180,7 +1242,7 @@ public class AssessmentInstituteMappingController {
             notes.put("counsellingSlotId", String.valueOf(slotId));
 
             Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    tier.getAmount(), "INR", assessmentName + " - Counselling",
+                    counsellingFee, "INR", assessmentName + " - Counselling",
                     callbackUrl, referenceId, notes);
 
             txn.setRazorpayLinkId(rzpResponse.get("linkId"));
@@ -1192,7 +1254,7 @@ public class AssessmentInstituteMappingController {
             response.put("status", "payment_required");
             response.put("paymentUrl", rzpResponse.get("shortUrl"));
             response.put("transactionId", txn.getTransactionId());
-            response.put("amount", tier.getAmount());
+            response.put("amount", counsellingFee);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             // Roll the hold back so the slot isn't stuck if link creation failed.

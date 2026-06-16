@@ -9,6 +9,8 @@ type Props = {
   entitlementId: number | string;
   tierId: number;
   onClose: () => void;
+  /** Per-slot counselling fee (₹) shown next to the pay button, charged at booking. */
+  feePerSession?: number | null;
 };
 
 function formatDateHeader(iso: string): string {
@@ -32,7 +34,7 @@ function formatTime(t: string): string {
  * contact details, then is sent to payment. The slot is held server-side and
  * the appointment is finalised by the payment webhook once payment succeeds.
  */
-const MappingPayLaterBooking: React.FC<Props> = ({ entitlementId, tierId, onClose }) => {
+const MappingPayLaterBooking: React.FC<Props> = ({ entitlementId, tierId, onClose, feePerSession }) => {
   const [slots, setSlots] = useState<CounsellingSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
@@ -109,6 +111,15 @@ const MappingPayLaterBooking: React.FC<Props> = ({ entitlementId, tierId, onClos
         </div>
         <p style={{ margin: '0 0 14px', fontSize: '0.85rem', color: '#64748b' }}>
           Choose a time, then complete payment to confirm your session.
+          {feePerSession != null && feePerSession > 0 && (
+            <>
+              {' '}
+              <strong style={{ color: '#065F46' }}>
+                ₹{Math.round(feePerSession).toLocaleString('en-IN')} per session
+              </strong>
+              .
+            </>
+          )}
         </p>
 
         {loading ? (

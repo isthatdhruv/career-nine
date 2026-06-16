@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.SimpleDateFormat;
 
 import com.kccitm.api.model.User;
+import com.kccitm.api.model.career9.AssessmentInstituteMapping;
 import com.kccitm.api.model.career9.AssessmentMappingTier;
 import com.kccitm.api.model.career9.SchoolAssessmentTier;
 import com.kccitm.api.model.career9.AssessmentTable;
@@ -28,6 +29,7 @@ import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
 import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
+import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
@@ -55,6 +57,7 @@ public class EntitlementService {
     @Autowired private CampaignAssessmentTierRepository tierMappingRepository;
     @Autowired private PricingTierRepository pricingTierRepository;
     @Autowired private AssessmentMappingTierRepository assessmentMappingTierRepository;
+    @Autowired private AssessmentInstituteMappingRepository instituteMappingRepository;
     @Autowired private SchoolAssessmentTierRepository schoolAssessmentTierRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
@@ -222,6 +225,25 @@ public class EntitlementService {
                 .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
             if ("active".equals(e.getStatus()) && Boolean.TRUE.equals(e.getCounsellingActive())) {
                 return e;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The student's current mapping entitlement id for an assessment (any non-terminal
+     * status), or null. Used to LINK a PAY_LATER counselling appointment to the
+     * entitlement so the thank-you page detects "already booked" — even though
+     * PAY_LATER grants no included session pool.
+     */
+    @Transactional(readOnly = true)
+    public Long findActiveMappingEntitlementId(Long userStudentId, Long assessmentId) {
+        if (userStudentId == null || assessmentId == null) return null;
+        for (StudentEntitlement e : entitlementRepository
+                .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
+            if (e.getCampaignId() == null && e.getMappingId() != null
+                    && !"revoked".equals(e.getStatus()) && !"refunded".equals(e.getStatus())) {
+                return e.getEntitlementId();
             }
         }
         return null;
@@ -413,10 +435,21 @@ public class EntitlementService {
 
     /** Union an AssessmentMappingTier's service flags onto the entitlement. */
     private void applyMappingTierSnapshot(StudentEntitlement e, AssessmentMappingTier tier) {
-        applyInclusionSnapshot(e, ServiceInclusions.fromMappingTier(tier));
-        // Phase 3b: snapshot the per-session price for booking EXTRA counselling
-        // sessions (beyond what the tier includes). NULL leaves the booking flow
-        // to fall back to the configurable global default.
+        ServiceInclusions inc = ServiceInclusions.fromMappingTier(tier);
+        // PAY_LATER: counselling is purchased per-slot AFTER the assessment, so a
+        // registration payment must NOT pre-activate the tier's included counselling
+        // (otherwise the student would book for free instead of paying the per-slot
+        // counselling fee). Every other service (report/dashboard/LMS) still activates.
+        if (tier.getMappingId() != null) {
+            AssessmentInstituteMapping m = instituteMappingRepository.findById(tier.getMappingId()).orElse(null);
+            if (m != null && "PAY_LATER".equals(m.getPaymentTiming())) {
+                inc = inc.withoutCounselling();
+            }
+        }
+        applyInclusionSnapshot(e, inc);
+        // Snapshot the per-session counselling fee so the post-assessment per-slot
+        // booking flow (PAY_LATER) and any EXTRA-session purchase know the price.
+        // NULL leaves the booking flow to fall back to the configurable global default.
         if (tier.getCounsellingPrice() != null) {
             e.setCounsellingPrice(tier.getCounsellingPrice());
         }
@@ -457,6 +490,12 @@ public class EntitlementService {
                     Boolean.TRUE.equals(t.getIncludesDashboard()), t.getDashboardValidityDays(),
                     Boolean.TRUE.equals(t.getIncludesCounselling()), t.getCounsellingSessionCount(),
                     Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays());
+        }
+
+        /** Copy with counselling stripped — used to defer counselling to PAY_LATER per-slot booking. */
+        ServiceInclusions withoutCounselling() {
+            return new ServiceInclusions(finalReport, dashboard, dashboardValidityDays,
+                    false, 0, lms, lmsValidityDays);
         }
     }
 

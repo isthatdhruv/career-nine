@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useStudentBranding, brandLogoSrc } from '../hooks/useStudentBranding';
 import { useNavigate } from 'react-router-dom';
 import { forwardCounsellingRequest, getStudentCounselling, getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
+import { getCounsellingOptionsByStudent } from '../api-clients/assessmentMappingAPI';
 import { TierCard, Tier } from '../components/TierCard';
 import CounsellingSlotPicker from '../components/CounsellingSlotPicker';
 import MappingCounsellingSection from '../components/MappingCounsellingSection';
@@ -132,6 +133,10 @@ const ThankYouPage: React.FC = () => {
     // Counselling for a school student (resolved by userStudentId when there is no
     // B2C entitlementId on this page). Null until resolved / when not applicable.
     const [schoolCounselling, setSchoolCounselling] = useState<SchoolCounselling | null>(null);
+    // True when the B2B mapping counselling component (MappingCounsellingSection)
+    // owns the booking UI for this student — in which case this page suppresses its
+    // OWN counselling CTAs/auto-open to avoid a duplicate booking card.
+    const [hasMappingCounselling, setHasMappingCounselling] = useState<boolean>(false);
     // Set when the assessment includes counselling but NO counsellor is mapped yet:
     // we forward the request to Career-9 and show a "request received" notice instead
     // of a bookable slot picker. Null otherwise.
@@ -202,9 +207,22 @@ const ThankYouPage: React.FC = () => {
         const userStudentId = localStorage.getItem('userStudentId');
         const assessmentId = localStorage.getItem('assessmentId');
         if (!userStudentId || !assessmentId) return;
-        getStudentCounselling(userStudentId, assessmentId)
-            .then((res) => {
-                const d: any = res?.data || {};
+        // First resolve whether the B2B mapping counselling component owns the booking
+        // UI for this student. If so, this page still shows the "booked" confirmation
+        // (single source of truth) but suppresses its OWN booking CTA/auto-open so the
+        // student doesn't see two booking cards.
+        getCounsellingOptionsByStudent(userStudentId, assessmentId)
+            .then((res) => res.data)
+            .catch(() => null)
+            .then((mo: any) => {
+                const mappingActionable = !!mo && !!mo.entitlementId &&
+                    (mo.canBookNow || mo.payPerSlot ||
+                        (mo.needsTierSelection && Array.isArray(mo.tiers) && mo.tiers.length > 0));
+                if (mappingActionable) setHasMappingCounselling(true);
+                return getStudentCounselling(userStudentId, assessmentId)
+                    .then((res) => ({ d: (res?.data as any) || {}, mappingActionable }));
+            })
+            .then(({ d, mappingActionable }) => {
                 // Already booked for this assessment? Show the "Counselling Booked"
                 // confirmation state and do NOT offer/auto-open booking again.
                 if (d.alreadyBooked) {
@@ -217,6 +235,8 @@ const ThankYouPage: React.FC = () => {
                     });
                     return;
                 }
+                // The mapping component owns booking — don't render this page's own CTA.
+                if (mappingActionable) return;
                 // Show the optional booking whenever counselling is OFFERED (a counsellor
                 // is assigned to the assessment) and we have a token to book with — not
                 // gated on the tier's counselling toggle or session count.
@@ -854,7 +874,7 @@ const ThankYouPage: React.FC = () => {
                                     )}
 
                                     {/* Book Counselling — only when active, counselling included, and seats remain */}
-                                    {showCounsellingButton && !bookedAppointment && (
+                                    {showCounsellingButton && !bookedAppointment && !hasMappingCounselling && (
                                         <div
                                             onClick={handleOpenSlotPicker}
                                             className="text-center"
@@ -918,7 +938,7 @@ const ThankYouPage: React.FC = () => {
 
                                     {/* Book Counselling — school student (resolved by userStudentId,
                                         no B2C entitlement on this page). Same tile/picker as B2C. */}
-                                    {!upgradeInfo && schoolCounselling && schoolCounselling.offered && !bookedAppointment && (
+                                    {!upgradeInfo && schoolCounselling && schoolCounselling.offered && !bookedAppointment && !hasMappingCounselling && (
                                         <div
                                             onClick={handleOpenSlotPicker}
                                             className="text-center"
