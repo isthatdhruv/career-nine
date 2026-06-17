@@ -22,6 +22,25 @@ import { TierCard, Tier } from './TierCard';
  *  3. The student must first pick a counselling-bearing tier (legacy free-link
  *     upsell, PAY_FIRST) -> pick a tier, pay (Razorpay), then book.
  */
+// "HH:mm:ss" -> "h:mm AM/PM"
+const fmtTime = (t?: string) => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return t;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = ((h + 11) % 12) + 1;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+};
+// "yyyy-MM-dd" -> "Tue, 17 Jun"
+const fmtDate = (iso?: string) => {
+  if (!iso) return '';
+  try {
+    return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+      weekday: 'short', day: 'numeric', month: 'short',
+    });
+  } catch { return iso; }
+};
+
 const MappingCounsellingSection: React.FC = () => {
   const [opts, setOpts] = useState<CounsellingOptions | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -34,6 +53,9 @@ const MappingCounsellingSection: React.FC = () => {
   const [booked, setBooked] = useState<any | null>(null);
   // Legacy free-link upsell on a PAY_LATER mapping: pick a tier, then pay per slot.
   const [payLaterOpen, setPayLaterOpen] = useState(false);
+  // Student contact, prefilled into the slot picker so "Confirm booking" is enabled
+  // immediately (name + phone are required) instead of starting disabled.
+  const [contact, setContact] = useState<{ name?: string; email?: string; phone?: string }>({});
 
   const userStudentId = localStorage.getItem('userStudentId');
   const assessmentId = localStorage.getItem('assessmentId');
@@ -53,6 +75,9 @@ const MappingCounsellingSection: React.FC = () => {
     ])
       .then(([o, sc]) => {
         if (o) setOpts(o);
+        if (sc) {
+          setContact({ name: sc.studentName, email: sc.studentEmail, phone: sc.studentPhone });
+        }
         if (sc?.alreadyBooked) {
           setBooked({
             slotDate: sc.bookedSlotDate,
@@ -103,46 +128,76 @@ const MappingCounsellingSection: React.FC = () => {
     </div>
   );
 
-  // Once a session is booked, the thank-you page itself renders the "Counselling
-  // Booked" confirmation (from the same already-booked signal). Render nothing here
-  // so the confirmation isn't shown twice.
+  // ── Booked: a celebratory confirmation — never a booking CTA. Covers both an
+  //    in-session PAY_FIRST booking and an already-booked PAY_LATER on reload. ──
   if (booked) {
-    return null;
+    const when = booked.slotDate && booked.slotStartTime
+      ? `${fmtDate(booked.slotDate)} · ${fmtTime(booked.slotStartTime)}`
+      : null;
+    return (
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+          border: '1.5px solid #6EE7B7',
+          borderRadius: 16,
+          padding: '1.5rem',
+          margin: '1.5rem auto',
+          maxWidth: 520,
+          textAlign: 'left',
+          boxShadow: '0 10px 30px rgba(16,185,129,0.15)',
+        }}
+      >
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
+          Career counselling
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ fontSize: '2rem', lineHeight: 1 }}>🎉</div>
+          <div>
+            <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', fontWeight: 800, color: '#065F46' }}>
+              You’re all set — your session is booked!
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.92rem', color: '#047857', lineHeight: 1.5 }}>
+              {when ? <strong>{when}</strong> : 'Your counsellor will reach out shortly.'}
+              {booked.counsellorName ? ` · with ${booked.counsellorName}` : ''}
+            </p>
+          </div>
+        </div>
+        <p style={{ margin: '14px 0 0', fontSize: '0.85rem', color: '#059669' }}>
+          We’ve sent the details to your email and WhatsApp. Great job taking this step! 🙌
+        </p>
+      </div>
+    );
   }
 
-  // Minimal "reopen" link shown after the student dismisses the picker without
-  // booking — deliberately a low-key link, NOT a prominent gradient card.
-  const reopenLink = (
-    <button
-      type="button"
-      onClick={() => { setUserClosed(false); setPickerOpen(true); }}
-      style={{
-        background: 'none',
-        border: 'none',
-        padding: 0,
-        marginTop: 6,
-        color: '#059669',
-        fontWeight: 700,
-        fontSize: '0.92rem',
-        cursor: 'pointer',
-        textDecoration: 'underline',
-      }}
-    >
-      Book your counselling session →
-    </button>
-  );
-
-  // ── Case 1/2: counselling is bookable now (auto-opening picker) ─────────────
+  // ── Bookable: a polished CTA card. The picker also auto-opens on first load;
+  //    if the student closes it, this card lets them reopen it. ──
   if (bookable) {
     const payLaterTierId = opts.tiers[0]?.tierId;
     return card(
       <>
-        <p style={{ margin: '0 0 12px', fontSize: '0.9rem', color: '#047857', lineHeight: 1.5 }}>
+        <p style={{ margin: '0 0 14px', fontSize: '0.9rem', color: '#047857', lineHeight: 1.5 }}>
           {opts.payPerSlot
-            ? `Pick a time to talk to a counsellor${opts.counsellingFeePerSession ? ` — ${rupees(opts.counsellingFeePerSession)} per session, paid when you book.` : '.'}`
+            ? `Turn your results into a real plan with a one-on-one session${opts.counsellingFeePerSession ? ` — ${rupees(opts.counsellingFeePerSession)} per session, paid when you book.` : '.'}`
             : 'Your plan includes a one-on-one counselling session. Pick a time that works for you.'}
         </p>
-        {!pickerOpen && reopenLink}
+        <button
+          type="button"
+          onClick={() => { setUserClosed(false); setPickerOpen(true); }}
+          style={{
+            width: '100%',
+            padding: '13px 20px',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 12,
+            fontWeight: 700,
+            fontSize: '0.98rem',
+            cursor: 'pointer',
+            boxShadow: '0 6px 18px rgba(16,185,129,0.32)',
+          }}
+        >
+          {opts.payPerSlot ? 'Book your counselling →' : 'Pick your counselling time →'}
+        </button>
 
         {/* PAY_LATER: pay the per-slot counselling fee at booking. */}
         {pickerOpen && opts.payPerSlot && payLaterTierId != null && (
@@ -150,6 +205,9 @@ const MappingCounsellingSection: React.FC = () => {
             entitlementId={opts.entitlementId}
             tierId={payLaterTierId}
             feePerSession={opts.counsellingFeePerSession}
+            defaultName={contact.name}
+            defaultPhone={contact.phone}
+            defaultEmail={contact.email}
             onClose={() => { setPickerOpen(false); setUserClosed(true); }}
           />
         )}
@@ -160,6 +218,9 @@ const MappingCounsellingSection: React.FC = () => {
             accessToken={opts.accessToken}
             entitlementId={opts.entitlementId}
             sessionsRemaining={opts.sessionsRemaining}
+            defaultName={contact.name}
+            defaultEmail={contact.email}
+            defaultPhone={contact.phone}
             onClose={() => { setPickerOpen(false); setUserClosed(true); }}
             onBooked={(result) => {
               setBooked(result);

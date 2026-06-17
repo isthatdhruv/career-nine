@@ -45,6 +45,19 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
             @Param("start") LocalDate start,
             @Param("end") LocalDate end);
 
+    /**
+     * All non-cancelled, non-blocked slots for a set of counsellors — both AVAILABLE and
+     * already-taken (REQUESTED/BOOKED/CONFIRMED). The student picker shows the taken ones
+     * greyed-out with a "Booked" badge so the day's real availability is visible.
+     */
+    @Query("SELECT s FROM CounsellingSlot s WHERE s.isBlocked = false AND s.status <> 'CANCELLED' "
+         + "AND s.counsellor.id IN :counsellorIds AND s.date BETWEEN :start AND :end "
+         + "ORDER BY s.date, s.startTime")
+    List<CounsellingSlot> findActiveSlotsForCounsellors(
+            @Param("counsellorIds") List<Long> counsellorIds,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
+
     /** Slots generated from one template — cleanup when that template is deleted. */
     List<CounsellingSlot> findByTemplateId(Long templateId);
 

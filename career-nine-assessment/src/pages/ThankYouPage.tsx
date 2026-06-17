@@ -1001,7 +1001,7 @@ const ThankYouPage: React.FC = () => {
                                     )}
 
                                     {/* Counselling booked confirmation */}
-                                    {bookedAppointment && (
+                                    {bookedAppointment && !hasMappingCounselling && (
                                         <div
                                             className="text-center"
                                             style={{
@@ -1044,7 +1044,7 @@ const ThankYouPage: React.FC = () => {
                                     {/* Counselling request forwarded — no counsellor mapped yet.
                                         Shown instead of a slot picker so the student knows their
                                         request reached Career-9 and how to follow up. */}
-                                    {pendingCounselling && !schoolCounselling && !bookedAppointment && (
+                                    {pendingCounselling && !schoolCounselling && !bookedAppointment && !hasMappingCounselling && (
                                         <div
                                             className="text-center"
                                             style={{
