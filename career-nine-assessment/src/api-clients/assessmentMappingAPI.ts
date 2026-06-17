@@ -157,6 +157,7 @@ export type CounsellingSlot = {
   durationMinutes: number;
   counsellorName?: string;
   mode?: 'ONLINE' | 'OFFLINE';
+  booked?: boolean;    // already taken by another student — shown greyed, not bookable
 };
 
 export function getPayLaterSlots(entitlementId: number | string, from?: string) {

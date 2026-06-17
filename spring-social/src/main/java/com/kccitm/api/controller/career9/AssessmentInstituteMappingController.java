@@ -1126,7 +1126,7 @@ public class AssessmentInstituteMappingController {
         }
         List<Map<String, Object>> slots = new java.util.ArrayList<>();
         for (com.kccitm.api.model.career9.counselling.CounsellingSlot s :
-                bookingService.getAvailableSlotsForInstitute(weekStart, instituteCode, ent.getAssessmentId())) {
+                bookingService.getBookableSlotsForInstitute(weekStart, instituteCode, ent.getAssessmentId())) {
             Map<String, Object> sm = new HashMap<>();
             sm.put("slotId", s.getId());
             sm.put("date", s.getDate() != null ? s.getDate().toString() : null);
@@ -1135,6 +1135,8 @@ public class AssessmentInstituteMappingController {
             sm.put("durationMinutes", s.getDurationMinutes());
             sm.put("counsellorName", s.getCounsellor() != null ? s.getCounsellor().getName() : null);
             sm.put("mode", s.getMode());
+            // Taken by another student — shown greyed/disabled in the picker, not bookable.
+            sm.put("booked", !"AVAILABLE".equals(s.getStatus()));
             slots.add(sm);
         }
         return ResponseEntity.ok(java.util.Collections.singletonMap("slots", slots));

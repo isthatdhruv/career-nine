@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { bookCounsellingSlot, listCounsellingSlots } from '../api-clients/campaignAPI'
 
 type SessionMode = 'ONLINE' | 'OFFLINE'
@@ -11,6 +11,7 @@ type Slot = {
   durationMinutes: number
   counsellorName?: string
   mode?: SessionMode   // delivery mode set by the counsellor on the slot
+  booked?: boolean     // already taken by another student — shown greyed, not bookable
 }
 
 type BookingResult = {
@@ -70,13 +71,6 @@ function todayIso(): string {
   return `${y}-${m}-${day}`
 }
 
-// Add `n` days to a yyyy-MM-dd string, return yyyy-MM-dd.
-function shiftIso(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00`)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
 const CounsellingSlotPicker: React.FC<Props> = ({
   accessToken,
   entitlementId,
@@ -87,7 +81,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   defaultEmail = '',
   defaultPhone = '',
 }) => {
-  const [from, setFrom] = useState<string>(todayIso())
+  const [from] = useState<string>(todayIso())
   const [slots, setSlots] = useState<Slot[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [loadError, setLoadError] = useState<string>('')
@@ -95,9 +89,11 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   const [reason, setReason] = useState<string>('')
   const [booking, setBooking] = useState<boolean>(false)
   const [bookError, setBookError] = useState<string>('')
-  // Confirm-before-leaving: only shown once the student has picked a slot (real
-  // intent), so an immediate open-and-close isn't interrupted.
+  // Confirm-before-leaving: shown on every dismiss so leaving is a deliberate choice.
   const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false)
+  // Which day is currently shown — the picker shows one day at a time and the
+  // Earlier/Later buttons step through the days that actually have slots.
+  const [dayIndex, setDayIndex] = useState<number>(0)
 
   // Contact details — captured once a slot is selected. Parent email/phone are
   // optional extra contacts who also receive the confirmation + reminders.
@@ -107,25 +103,41 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   const [parentEmail, setParentEmail] = useState<string>('')
   const [parentPhone, setParentPhone] = useState<string>('')
 
+  // Scroll target: the contact form auto-scrolls into view when a slot is picked,
+  // so the student doesn't have to scroll past the slot grid to fill it in.
+  const contactRef = useRef<HTMLDivElement>(null)
+
   const selectedSlot = useMemo(
     () => slots.find((s) => s.slotId === selectedSlotId) || null,
     [slots, selectedSlotId],
   )
 
-  // Group slots by date for rendering. Preserves the server's ordering within a date.
-  const grouped = useMemo(() => {
-    const map = new Map<string, Slot[]>()
-    for (const s of slots) {
-      if (!map.has(s.date)) map.set(s.date, [])
-      map.get(s.date)!.push(s)
-    }
-    return Array.from(map.entries())
+  // Distinct dates that have at least one slot (available or booked), sorted ascending.
+  const dates = useMemo(() => {
+    const set = new Set<string>()
+    for (const s of slots) set.add(s.date)
+    return Array.from(set).sort()
   }, [slots])
+
+  const safeIndex = dates.length ? Math.min(dayIndex, dates.length - 1) : 0
+  const currentDate = dates[safeIndex]
+  const daySlots = useMemo(
+    () => slots.filter((s) => s.date === currentDate),
+    [slots, currentDate],
+  )
+
+  // Smoothly bring the contact form into view as soon as a slot is selected.
+  useEffect(() => {
+    if (selectedSlotId != null && contactRef.current) {
+      contactRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [selectedSlotId])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setLoadError('')
+    // One fetch covers the whole upcoming horizon; day paging is done client-side.
     listCounsellingSlots({ token: accessToken, entitlementId, from })
       .then((res) => {
         if (cancelled) return
@@ -147,14 +159,12 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   }, [accessToken, entitlementId, from])
 
   // All three dismiss paths (footer Cancel, header ×, backdrop) route through
-  // here so the leave-confirmation can't be bypassed by clicking outside.
+  // here so the leave-confirmation can't be bypassed by clicking outside. The
+  // loss-framed "this is a great opportunity" prompt is shown on every dismiss —
+  // whether or not a slot was picked — so leaving is always a deliberate choice.
   const requestClose = () => {
     if (booking) return
-    if (selectedSlotId != null) {
-      setShowCancelConfirm(true)
-      return
-    }
-    onClose()
+    setShowCancelConfirm(true)
   }
 
   const handleConfirm = async () => {
@@ -275,19 +285,20 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         >
           <button
             type='button'
-            onClick={() => setFrom(shiftIso(from, -7))}
-            disabled={from <= todayIso()}
-            style={navBtnStyle(from <= todayIso())}
+            onClick={() => { setDayIndex((i) => Math.max(0, i - 1)); setSelectedSlotId(null) }}
+            disabled={safeIndex <= 0}
+            style={navBtnStyle(safeIndex <= 0)}
           >
             ← Earlier
           </button>
-          <div style={{ fontSize: '0.85rem', color: '#475569' }}>
-            From <strong>{formatDateHeader(from)}</strong>
+          <div style={{ fontSize: '0.9rem', color: '#1E293B', fontWeight: 700 }}>
+            {currentDate ? formatDateHeader(currentDate) : '—'}
           </div>
           <button
             type='button'
-            onClick={() => setFrom(shiftIso(from, 7))}
-            style={navBtnStyle(false)}
+            onClick={() => { setDayIndex((i) => Math.min(dates.length - 1, i + 1)); setSelectedSlotId(null) }}
+            disabled={safeIndex >= dates.length - 1}
+            style={navBtnStyle(safeIndex >= dates.length - 1)}
           >
             Later →
           </button>
@@ -303,40 +314,46 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           {!loading && loadError && (
             <div style={errorBoxStyle}>{loadError}</div>
           )}
-          {!loading && !loadError && grouped.length === 0 && (
+          {!loading && !loadError && dates.length === 0 && (
             <div style={{ textAlign: 'center', color: '#64748B', padding: '2rem 0' }}>
               No upcoming counselling slots are available right now. Please check back later.
             </div>
           )}
-          {!loading && grouped.map(([date, daySlots]) => (
-            <div key={date} style={{ marginBottom: 18 }}>
-              <div style={dayHeaderStyle}>{formatDateHeader(date)}</div>
+          {!loading && currentDate && (
+            <div style={{ marginBottom: 18 }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {daySlots.map((s) => {
                   const isSelected = selectedSlotId === s.slotId
+                  const isBooked = !!s.booked
                   return (
                     <button
                       key={s.slotId}
                       type='button'
-                      onClick={() => setSelectedSlotId(s.slotId)}
-                      style={slotChipStyle(isSelected)}
+                      disabled={isBooked}
+                      onClick={() => { if (!isBooked) setSelectedSlotId(s.slotId) }}
+                      style={isBooked ? slotChipBookedStyle() : slotChipStyle(isSelected)}
+                      title={isBooked ? 'This time is already booked' : undefined}
                     >
                       <div style={{ fontWeight: 600 }}>
                         {formatTime(s.startTime)} – {formatTime(s.endTime)}
                       </div>
-                      <div style={modeBadgeStyle(s.mode === 'OFFLINE', isSelected)}>
-                        {s.mode === 'OFFLINE' ? 'In-person' : 'Online'}
-                      </div>
+                      {isBooked ? (
+                        <div style={bookedBadgeStyle}>Booked</div>
+                      ) : (
+                        <div style={modeBadgeStyle(s.mode === 'OFFLINE', isSelected)}>
+                          {s.mode === 'OFFLINE' ? 'In-person' : 'Online'}
+                        </div>
+                      )}
                     </button>
                   )
                 })}
               </div>
             </div>
-          ))}
+          )}
 
           {/* Contact details + reason — shown once a slot is picked */}
           {selectedSlotId != null && (
-            <div style={{ marginTop: 8 }}>
+            <div ref={contactRef} style={{ marginTop: 8, scrollMarginTop: 8 }}>
               {/* Mode notice — tells the student how the session will be delivered */}
               <div style={modeNoticeStyle(selectedSlot?.mode === 'OFFLINE')}>
                 {selectedSlot?.mode === 'OFFLINE'
@@ -472,28 +489,27 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Leave-confirmation — a deliberate interruption when a student tries to
-          walk away after picking a slot. Reframes leaving as a real loss. */}
+      {/* Leave-confirmation — a deliberate, on-brand interruption when a student tries
+          to walk away. Reframes leaving as a real loss, in the picker's own palette. */}
       {showCancelConfirm && (
         <div onClick={(e) => e.stopPropagation()} style={confirmOverlayStyle}>
           <div style={confirmCardStyle}>
-            <div style={{ fontSize: '2.4rem', lineHeight: 1, marginBottom: 14 }}>⚠️</div>
-            <h3 style={{ margin: '0 0 12px', fontSize: '1.5rem', fontWeight: 800, color: '#991B1B' }}>
-              Are you sure?
+            {/* Gradient icon badge — matches the picker header */}
+            <div style={confirmBadgeStyle}>🎓</div>
+            <h3 style={{ margin: '0 0 10px', fontSize: '1.35rem', fontWeight: 800, color: '#1E293B' }}>
+              Don’t leave this on the table
             </h3>
-            <p style={{ margin: '0 0 24px', fontSize: '1rem', color: '#475569', lineHeight: 1.6 }}>
-              This is a life-changing opportunity. You just completed your assessment — your
-              counsellor is ready to turn those results into a real plan for your future.
-              <br />
-              <strong style={{ color: '#0F172A' }}>Walk away now, and you leave that on the table.</strong>
+            <p style={{ margin: '0 0 22px', fontSize: '0.96rem', color: '#475569', lineHeight: 1.6 }}>
+              You just finished your assessment. A one-on-one session turns those results into a
+              real plan for your future — and it only takes a moment to pick a time.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <button
                 type='button'
                 onClick={() => setShowCancelConfirm(false)}
-                style={{ ...btnPrimaryStyle(false), padding: '15px 20px', fontSize: '1.02rem' }}
+                style={{ ...btnPrimaryStyle(false), padding: '14px 20px', fontSize: '1rem' }}
               >
-                No, take me to my session
+                Pick my counselling time
               </button>
               <button
                 type='button'
@@ -503,7 +519,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                 }}
                 style={btnGhostDangerStyle}
               >
-                Yes, cancel anyway
+                No thanks, maybe later
               </button>
             </div>
           </div>
@@ -514,15 +530,6 @@ const CounsellingSlotPicker: React.FC<Props> = ({
 }
 
 // ── style helpers ──────────────────────────────────────────────────────────
-
-const dayHeaderStyle: React.CSSProperties = {
-  fontSize: '0.78rem',
-  fontWeight: 700,
-  color: '#475569',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
-  marginBottom: 8,
-}
 
 const errorBoxStyle: React.CSSProperties = {
   background: '#FEF2F2',
@@ -600,6 +607,47 @@ function slotChipStyle(selected: boolean): React.CSSProperties {
   }
 }
 
+// Already-taken slot: greyed, struck-through-feel, not clickable.
+function slotChipBookedStyle(): React.CSSProperties {
+  return {
+    background: '#F1F5F9',
+    color: '#94A3B8',
+    border: '1px dashed #CBD5E1',
+    padding: '0.55rem 0.85rem',
+    borderRadius: 10,
+    fontSize: '0.86rem',
+    cursor: 'not-allowed',
+    minWidth: 130,
+    textAlign: 'left',
+  }
+}
+
+const bookedBadgeStyle: React.CSSProperties = {
+  display: 'inline-block',
+  marginTop: 6,
+  padding: '1px 7px',
+  borderRadius: 999,
+  fontSize: '0.66rem',
+  fontWeight: 700,
+  letterSpacing: '0.02em',
+  background: '#E2E8F0',
+  color: '#64748B',
+}
+
+// Gradient circular icon badge atop the leave-confirmation card.
+const confirmBadgeStyle: React.CSSProperties = {
+  width: 60,
+  height: 60,
+  borderRadius: '50%',
+  margin: '0 auto 16px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '1.8rem',
+  background: 'linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%)',
+  border: '1px solid #C7D2FE',
+}
+
 // Overlay that sits on top of the picker for the leave-confirmation and the
 // post-booking celebration. Darkens the picker behind so the card is the focus.
 const confirmOverlayStyle: React.CSSProperties = {
@@ -618,12 +666,11 @@ const confirmOverlayStyle: React.CSSProperties = {
 const confirmCardStyle: React.CSSProperties = {
   background: '#fff',
   borderRadius: 20,
-  padding: '2.25rem 2rem',
+  padding: '2rem 1.75rem',
   width: '100%',
-  maxWidth: 460,
+  maxWidth: 440,
   textAlign: 'center',
-  boxShadow: '0 30px 80px rgba(0,0,0,0.4)',
-  borderTop: '5px solid #EF4444',
+  boxShadow: '0 24px 70px rgba(30, 41, 59, 0.35)',
 }
 
 // Understated "leave anyway" action — deliberately lower-weight than the

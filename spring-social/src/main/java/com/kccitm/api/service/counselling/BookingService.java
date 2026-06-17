@@ -130,6 +130,29 @@ public class BookingService {
     }
 
     /**
+     * Like {@link #getAvailableSlotsForInstitute(LocalDate, Integer, Long)} but ALSO returns
+     * already-taken slots (REQUESTED/BOOKED/CONFIRMED), so the student picker can show them
+     * greyed-out with a "Booked" badge. Booking still only succeeds on AVAILABLE slots.
+     */
+    public List<CounsellingSlot> getBookableSlotsForInstitute(LocalDate weekStart, Integer instituteCode,
+                                                              Long assessmentId) {
+        LocalDate weekEnd = weekStart.plusDays(83);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
+        if (effectiveStart.isAfter(weekEnd)) return List.of();
+
+        List<Long> counsellorIds = assessmentId != null
+                ? assessmentAssignmentRepository.findActiveCounsellorIdsForAssessment(assessmentId)
+                : List.of();
+        if (counsellorIds.isEmpty()) {
+            counsellorIds = counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
+            if (counsellorIds.isEmpty()) return List.of();
+        }
+        return filterOutPastSlots(
+                slotRepository.findActiveSlotsForCounsellors(counsellorIds, effectiveStart, weekEnd));
+    }
+
+    /**
      * Counselling is "offered" for an assessment when the admin has assigned at least one
      * active counsellor to it. This is the single switch that decides whether a student is
      * shown the optional slot-booking after finishing the assessment — independent of the

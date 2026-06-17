@@ -1317,8 +1317,9 @@ public class CampaignPublicController {
         }
         // Phase 4: restrict to counsellors the admin assigned to this assessment
         // (falls back to institute-only when the assessment has no assignments).
+        // Includes already-taken slots so the picker can grey them out as "Booked".
         List<com.kccitm.api.model.career9.counselling.CounsellingSlot> slots =
-                bookingService.getAvailableSlotsForInstitute(from, instituteCode, e.getAssessmentId());
+                bookingService.getBookableSlotsForInstitute(from, instituteCode, e.getAssessmentId());
 
         List<Map<String, Object>> slotDtos = new ArrayList<>();
         for (com.kccitm.api.model.career9.counselling.CounsellingSlot s : slots) {
@@ -1329,6 +1330,8 @@ public class CampaignPublicController {
             dto.put("endTime", s.getEndTime().toString());
             dto.put("durationMinutes", s.getDurationMinutes());
             dto.put("mode", s.getMode() != null ? s.getMode() : "ONLINE");
+            // Taken by another student — shown greyed/disabled, not bookable.
+            dto.put("booked", !"AVAILABLE".equals(s.getStatus()));
             if (s.getCounsellor() != null) {
                 dto.put("counsellorName", s.getCounsellor().getName());
             }
