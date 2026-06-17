@@ -71,6 +71,23 @@ function todayIso(): string {
   return `${y}-${m}-${day}`
 }
 
+// Inline SVG icons (no emojis anywhere in the flow).
+const IconMonitor: React.FC<{ color?: string }> = ({ color = '#065F46' }) => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+  </svg>
+)
+const IconMapPin: React.FC<{ color?: string }> = ({ color = '#92400E' }) => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+  </svg>
+)
+const IconCalendarCheck: React.FC<{ color?: string; size?: number }> = ({ color = '#059669', size = 26 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" />
+  </svg>
+)
+
 const CounsellingSlotPicker: React.FC<Props> = ({
   accessToken,
   entitlementId,
@@ -241,7 +258,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         {/* Header */}
         <div
           style={{
-            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             color: '#fff',
             padding: '1.25rem 1.5rem',
             display: 'flex',
@@ -356,9 +373,12 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             <div ref={contactRef} style={{ marginTop: 8, scrollMarginTop: 8 }}>
               {/* Mode notice — tells the student how the session will be delivered */}
               <div style={modeNoticeStyle(selectedSlot?.mode === 'OFFLINE')}>
-                {selectedSlot?.mode === 'OFFLINE'
-                  ? '📍 In-person session — the venue address will be sent to you by email.'
-                  : '💻 Online session — the meeting link will be sent to you by email.'}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {selectedSlot?.mode === 'OFFLINE' ? <IconMapPin /> : <IconMonitor />}
+                  {selectedSlot?.mode === 'OFFLINE'
+                    ? 'In-person session — the venue address will be sent to you by email.'
+                    : 'Online session — the meeting link will be sent to you by email.'}
+                </span>
               </div>
 
               <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600, margin: '12px 0 8px' }}>
@@ -495,7 +515,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         <div onClick={(e) => e.stopPropagation()} style={confirmOverlayStyle}>
           <div style={confirmCardStyle}>
             {/* Gradient icon badge — matches the picker header */}
-            <div style={confirmBadgeStyle}>🎓</div>
+            <div style={confirmBadgeStyle}><IconCalendarCheck color="#059669" size={28} /></div>
             <h3 style={{ margin: '0 0 10px', fontSize: '1.35rem', fontWeight: 800, color: '#1E293B' }}>
               Don’t leave this on the table
             </h3>
@@ -561,15 +581,15 @@ function modeBadgeStyle(offline: boolean, selected: boolean): React.CSSPropertie
     fontSize: '0.66rem',
     fontWeight: 700,
     letterSpacing: '0.02em',
-    background: selected ? 'rgba(255,255,255,0.22)' : offline ? '#FEF3C7' : '#E0E7FF',
-    color: selected ? '#fff' : offline ? '#92400E' : '#3730A3',
+    background: selected ? 'rgba(255,255,255,0.25)' : offline ? '#FEF3C7' : '#D1FAE5',
+    color: selected ? '#fff' : offline ? '#92400E' : '#065F46',
   }
 }
 
 const modeNoticeStyle = (offline: boolean): React.CSSProperties => ({
-  background: offline ? '#FFFBEB' : '#EEF2FF',
-  border: `1px solid ${offline ? '#FDE68A' : '#C7D2FE'}`,
-  color: offline ? '#92400E' : '#3730A3',
+  background: offline ? '#FFFBEB' : '#ECFDF5',
+  border: `1px solid ${offline ? '#FDE68A' : '#A7F3D0'}`,
+  color: offline ? '#92400E' : '#065F46',
   padding: '0.55rem 0.7rem',
   borderRadius: 8,
   fontSize: '0.8rem',
@@ -594,16 +614,16 @@ const inputStyle: React.CSSProperties = {
 
 function slotChipStyle(selected: boolean): React.CSSProperties {
   return {
-    background: selected ? 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' : '#fff',
+    background: selected ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '#fff',
     color: selected ? '#fff' : '#0F172A',
-    border: selected ? '1px solid transparent' : '1px solid #E2E8F0',
+    border: selected ? '1px solid transparent' : '1px solid #D1FAE5',
     padding: '0.55rem 0.85rem',
     borderRadius: 10,
     fontSize: '0.86rem',
     cursor: 'pointer',
     minWidth: 130,
     textAlign: 'left',
-    boxShadow: selected ? '0 6px 18px rgba(99, 102, 241, 0.35)' : 'none',
+    boxShadow: selected ? '0 6px 18px rgba(16, 185, 129, 0.35)' : 'none',
   }
 }
 
@@ -644,8 +664,8 @@ const confirmBadgeStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   fontSize: '1.8rem',
-  background: 'linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%)',
-  border: '1px solid #C7D2FE',
+  background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+  border: '1px solid #A7F3D0',
 }
 
 // Overlay that sits on top of the picker for the leave-confirmation and the
@@ -702,7 +722,7 @@ function btnPrimaryStyle(disabled: boolean): React.CSSProperties {
   return {
     background: disabled
       ? '#CBD5E1'
-      : 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+      : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
     color: '#fff',
     border: 'none',
     padding: '0.6rem 1.25rem',
@@ -710,7 +730,7 @@ function btnPrimaryStyle(disabled: boolean): React.CSSProperties {
     fontSize: '0.92rem',
     fontWeight: 600,
     cursor: disabled ? 'not-allowed' : 'pointer',
-    boxShadow: disabled ? 'none' : '0 8px 22px rgba(99, 102, 241, 0.4)',
+    boxShadow: disabled ? 'none' : '0 8px 22px rgba(16, 185, 129, 0.4)',
   }
 }
 

@@ -110,17 +110,20 @@ const StudentCounsellingPage: React.FC = () => {
 
   const today = getTodayISODate()
 
+  // A live session (IN_PROGRESS, after the counsellor verifies check-in) stays under
+  // "Upcoming" alongside CONFIRMED ones until its slot ends.
+  const isActiveStatus = (s: string) => s === 'CONFIRMED' || s === 'IN_PROGRESS'
   const upcomingAppointments = appointments.filter(
-    (a) => a.status === 'CONFIRMED' && a.slot?.date >= today && !hasSlotEnded(a.slot)
+    (a) => isActiveStatus(a.status) && a.slot?.date >= today && !hasSlotEnded(a.slot)
   )
   const pastAppointments = appointments
     .filter(
       (a) =>
         a.status === 'COMPLETED' ||
-        (a.status === 'CONFIRMED' && hasSlotEnded(a.slot))
+        (isActiveStatus(a.status) && hasSlotEnded(a.slot))
     )
     .map((a) =>
-      a.status === 'CONFIRMED' && hasSlotEnded(a.slot) ? { ...a, status: 'ENDED' } : a
+      isActiveStatus(a.status) && hasSlotEnded(a.slot) ? { ...a, status: 'ENDED' } : a
     )
 
   const handleReschedule = (appointmentId: number) => {

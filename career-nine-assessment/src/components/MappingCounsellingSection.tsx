@@ -41,6 +41,13 @@ const fmtDate = (iso?: string) => {
   } catch { return iso; }
 };
 
+// Inline SVG icon (no emojis anywhere in the flow).
+const IconCheckCircle: React.FC<{ size?: number; color?: string }> = ({ size = 44, color = '#059669' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" />
+  </svg>
+);
+
 const MappingCounsellingSection: React.FC = () => {
   const [opts, setOpts] = useState<CounsellingOptions | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -140,30 +147,32 @@ const MappingCounsellingSection: React.FC = () => {
           background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
           border: '1.5px solid #6EE7B7',
           borderRadius: 16,
-          padding: '1.5rem',
+          padding: '1.75rem 1.5rem',
           margin: '1.5rem auto',
           maxWidth: 520,
-          textAlign: 'left',
+          textAlign: 'center',
           boxShadow: '0 10px 30px rgba(16,185,129,0.15)',
         }}
       >
-        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
           Career counselling
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ fontSize: '2rem', lineHeight: 1 }}>🎉</div>
-          <div>
-            <h3 style={{ margin: '0 0 4px', fontSize: '1.2rem', fontWeight: 800, color: '#065F46' }}>
-              You’re all set — your session is booked!
-            </h3>
-            <p style={{ margin: 0, fontSize: '0.92rem', color: '#047857', lineHeight: 1.5 }}>
-              {when ? <strong>{when}</strong> : 'Your counsellor will reach out shortly.'}
-              {booked.counsellorName ? ` · with ${booked.counsellorName}` : ''}
-            </p>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+          <IconCheckCircle size={44} color="#059669" />
         </div>
-        <p style={{ margin: '14px 0 0', fontSize: '0.85rem', color: '#059669' }}>
-          We’ve sent the details to your email and WhatsApp. Great job taking this step! 🙌
+        <h3 style={{ margin: '0 0 6px', fontSize: '1.25rem', fontWeight: 800, color: '#065F46' }}>
+          You’re all set — your session is booked!
+        </h3>
+        {when && (
+          <p style={{ margin: '0 0 14px', fontSize: '0.95rem', color: '#047857', fontWeight: 700 }}>
+            {when}
+          </p>
+        )}
+        <p style={{ margin: '0 0 4px', fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
+          We’ve sent the details to your email and WhatsApp.
+        </p>
+        <p style={{ margin: 0, fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
+          Great job taking this step!
         </p>
       </div>
     );

@@ -1,5 +1,6 @@
 package com.kccitm.api.service.counselling;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -11,12 +12,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.kccitm.api.exception.BadRequestException;
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.model.career9.counselling.SessionNotes;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
-import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.repository.Career9.counselling.SessionNotesRepository;
 
 @Service
@@ -31,43 +33,66 @@ public class SessionNotesService {
     private CounsellingAppointmentRepository counsellingAppointmentRepository;
 
     @Autowired
-    private CounsellingSlotRepository counsellingSlotRepository;
-
-    @Autowired
     private CounsellingNotificationService notificationService;
 
     @Autowired
     private AuditLogService auditLogService;
 
     /**
-     * Creates session notes for a completed appointment.
-     * Marks both the appointment and its slot as COMPLETED,
-     * sends a session-complete email, an in-app notification to the student,
-     * and records an audit log entry.
+     * Creates session notes for a session that has genuinely taken place.
+     *
+     * <p>Saving notes does NOT complete the session — the lifecycle sweep owns the
+     * COMPLETED transition (slot end time + attendance). Notes are therefore gated on
+     * two conditions that together mean "the session actually happened":
+     * <ol>
+     *   <li>the student checked in via the OTP ({@code checkinVerifiedAt} is set), and</li>
+     *   <li>the scheduled slot time has ended.</li>
+     * </ol>
+     * The appointment is resolved by id (the request body carries an {@code appointmentId},
+     * not a nested appointment), then a session-notes-available notification is sent and an
+     * audit entry recorded.
      */
     @Transactional
-    public SessionNotes create(SessionNotes notes, User counsellorUser) {
-        CounsellingAppointment appointment = notes.getAppointment();
+    public SessionNotes create(Long appointmentId, SessionNotes notes, User counsellorUser) {
+        Long resolvedId = appointmentId;
+        if (resolvedId == null && notes.getAppointment() != null) {
+            resolvedId = notes.getAppointment().getId();
+        }
+        if (resolvedId == null) {
+            throw new BadRequestException("appointmentId is required to save session notes.");
+        }
+        final Long apptId = resolvedId;
 
-        // Mark slot as COMPLETED
+        CounsellingAppointment appointment = counsellingAppointmentRepository.findById(apptId)
+                .orElseThrow(() -> new ResourceNotFoundException("CounsellingAppointment", "id", apptId));
+
+        // Gate 1 — the session must have actually started, i.e. the student checked in
+        // with the OTP shared with the counsellor. No check-in => the session never began.
+        if (appointment.getCheckinVerifiedAt() == null) {
+            throw new BadRequestException(
+                    "Notes can be added only after the session has started via the student's check-in code (OTP).");
+        }
+
+        // Gate 2 — the scheduled session time must be over.
         CounsellingSlot slot = appointment.getSlot();
-        slot.setStatus("COMPLETED");
-        counsellingSlotRepository.save(slot);
+        if (slot == null || slot.getDate() == null || slot.getEndTime() == null) {
+            throw new BadRequestException("This appointment has no scheduled time, so notes cannot be added yet.");
+        }
+        LocalDateTime sessionEnd = LocalDateTime.of(slot.getDate(), slot.getEndTime());
+        if (LocalDateTime.now().isBefore(sessionEnd)) {
+            throw new BadRequestException("Notes can be added only after the session's scheduled time has ended.");
+        }
 
-        // Mark appointment as COMPLETED
-        appointment.setStatus("COMPLETED");
-        counsellingAppointmentRepository.save(appointment);
-
-        // Persist the session notes
+        // Persist the session notes. We deliberately do NOT change appointment/slot status
+        // here — completion is decided by CounsellingLifecycleService, not by note-saving.
+        notes.setAppointment(appointment);
         SessionNotes savedNotes = sessionNotesRepository.save(notes);
 
         logger.info("Session notes created for appointment ID {} by counsellor user ID {}",
                 appointment.getId(), counsellorUser != null ? counsellorUser.getId() : "unknown");
 
-        // Send session complete email to student (async)
+        // Tell the student their counsellor remarks are now available.
         notificationService.sendSessionCompleteEmail(appointment);
-
-        // Send in-app notification to student
         try {
             Long studentUserId = appointment.getStudent().getUserId();
             User studentUser = new User();
@@ -76,17 +101,16 @@ public class SessionNotesService {
                     studentUser,
                     "SESSION_COMPLETED",
                     "Session Complete - View Counsellor Remarks",
-                    "Your counselling session has been completed. Log in to view your session notes.",
+                    "Your counselling session notes are now available. Log in to view them.",
                     appointment.getId(),
                     "APPOINTMENT");
         } catch (Exception e) {
-            logger.warn("Failed to create in-app notification for student after session completion: {}",
+            logger.warn("Failed to create in-app notification for student after notes saved: {}",
                     e.getMessage());
         }
 
         // Audit log
         Map<String, Object> newValues = new HashMap<>();
-        newValues.put("status", "COMPLETED");
         newValues.put("sessionNotesId", savedNotes.getId());
         auditLogService.log(appointment, "SESSION_NOTES_CREATED", counsellorUser,
                 "Session notes saved", null, newValues);

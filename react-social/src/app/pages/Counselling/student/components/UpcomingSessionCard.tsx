@@ -3,7 +3,6 @@ import StatusBadge from '../../shared/StatusBadge'
 import CountdownTimer from '../../shared/CountdownTimer'
 import '../../Counselling.css'
 
-const JOIN_WINDOW_MS = 5 * 60 * 1000
 const RESCHEDULE_CUTOFF_MS = 4 * 60 * 60 * 1000
 
 function formatTimeRemaining(ms: number): string {
@@ -80,12 +79,11 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
 
   const startMs = buildSlotDateTime(slot.date, slot.startTime)
   const endMs = buildSlotDateTime(slot.date, slot.endTime)
-  const canJoin =
-    !!meetingLink &&
-    !isNaN(startMs) &&
-    !isNaN(endMs) &&
-    now >= startMs - JOIN_WINDOW_MS &&
-    now < endMs
+  // The meeting opens only after the counsellor verifies the check-in code (OTP)
+  // sent to you — i.e. the session is IN_PROGRESS. Time alone no longer unlocks Join,
+  // so the Jitsi link cannot be used to bypass check-in.
+  const sessionLive = (status || '').toUpperCase() === 'IN_PROGRESS'
+  const canJoin = !!meetingLink && sessionLive && !isNaN(endMs) && now < endMs
 
   const msUntilStart = isNaN(startMs) ? Infinity : startMs - now
   const rescheduleWithinCutoff = msUntilStart < RESCHEDULE_CUTOFF_MS
@@ -166,7 +164,8 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
         </div>
       ) : meetingLink ? (
         <div style={{ marginBottom: 14, fontSize: 12, color: 'var(--sp-muted, #5C7A72)' }}>
-          Join Meeting will be available 5 minutes before the session starts.
+          Your counsellor will start the session and verify the check-in code sent to you.
+          The Join button appears once check-in is done.
         </div>
       ) : null}
 
