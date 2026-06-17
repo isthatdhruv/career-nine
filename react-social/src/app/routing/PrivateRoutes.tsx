@@ -1,5 +1,5 @@
 import { FC, lazy, Suspense } from "react";
-import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
@@ -80,6 +80,7 @@ import AdminAssessmentEditPage from "../pages/ReportsHub/AdminAssessmentEdit/Adm
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
+import StudentPortalLayout from "../pages/StudentDashboard/student-portal/StudentPortalLayout";
 
 
 /** Backwards-compat: legacy /student-dashboard/:studentId -> /dashboard/student/view/:studentId */
@@ -122,6 +123,27 @@ const AuthorizedLayout = () => {
   return <MasterLayout />;
 };
 
+// Canonical student-role predicate. Tolerates ROLE_-prefixed Spring authorities.
+const STUDENT_ROLE_NAMES = ["STUDENT", "B2C_STUDENT", "ROLE_STUDENT", "ROLE_B2C_STUDENT"];
+const isStudentRoleName = (r: unknown): boolean =>
+  typeof r === "string" && STUDENT_ROLE_NAMES.includes(r);
+
+/**
+ * Role-based guard for the standalone student portal (decoupled from the admin
+ * permission/URL-whitelist system on purpose). A route is allowed iff the session
+ * user is a super-admin (full bypass, for inspection) OR carries a student role.
+ * Everyone else is bounced to the unified login. This replaces the per-page
+ * <RequirePermission> on the portal so a student never lands on the admin
+ * RequestAccessPage inside their own shell.
+ */
+const StudentAuthGuard: FC = () => {
+  const { currentUser } = useAuth();
+  if (!currentUser) return <Navigate to="/auth/login" replace />;
+  if (currentUser.superAdmin) return <Outlet />;
+  const roles = currentUser.roles || [];
+  return roles.some(isStudentRoleName) ? <Outlet /> : <Navigate to="/auth/login" replace />;
+};
+
 /**
  * Post-login gate: a student whose one-time profile step isn't done is routed to
  * /student/dashboard/student-info before any dashboard page. `infoCompleted` comes
@@ -148,6 +170,26 @@ const StudentInfoGate: FC<WithChildren> = ({ children }) => {
 };
 
 const PrivateRoutes = () => {
+  // ── Full seal for pure students ──────────────────────────────────────────────
+  // A "pure student" (carries a student role, no staff role, not super-admin) lives
+  // ONLY under /student/*. Any other path — /dashboard, the "/" → /dashboard index,
+  // or any admin route — bounces to their dashboard, so they can never reach the
+  // admin MasterLayout / aside. Super-admins and any staff/dual-role user are NOT
+  // sealed (they keep full admin access and can still inspect the student portal).
+  // /logout, /auth/* and /student/* are matched before this (logout in AppRoutes) or
+  // are inside the student space, so sign-out and the portal itself are unaffected.
+  const { currentUser } = useAuth();
+  const { pathname } = useLocation();
+  const roles = currentUser?.roles || [];
+  const isPureStudent =
+    !currentUser?.superAdmin &&
+    roles.length > 0 &&
+    roles.some(isStudentRoleName) &&
+    roles.every(isStudentRoleName);
+  if (isPureStudent && !pathname.startsWith("/student/")) {
+    return <Navigate to="/student/dashboard" replace />;
+  }
+
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
   );
@@ -211,6 +253,9 @@ const PrivateRoutes = () => {
   );
   const StudentPortalReports = lazy(
     () => import("../pages/StudentDashboard/student-portal/StudentReports")
+  );
+  const StudentPaymentReturn = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentPaymentReturn")
   );
   const StudentCounsellingPage = lazy(
     () => import("../pages/Counselling/student/StudentCounsellingPage")
@@ -366,6 +411,90 @@ const PrivateRoutes = () => {
           </SuspensedView>
         </RequirePermission>
       } />
+
+      {/* ─────────────────────────────────────────────────────────────────────
+          Student portal — dedicated lightweight shell (own aside menu), fully
+          decoupled from the admin MasterLayout. A student who signs in via the
+          unified /auth page (student mode) lands here and never loads admin chrome.
+          URLs stay at /student/dashboard/* (unchanged from before). The admin-only
+          "view a specific student" / insight-preview tools keep their own routes
+          (/student/dashboard/view/:studentId, /student/insight-dashboard,
+          /student/dashboard-preview) above, inside the admin shell.
+          ───────────────────────────────────────────────────────────────────── */}
+      {/* Role-based guard (StudentAuthGuard) → dedicated shell (StudentPortalLayout) →
+          pages. No <RequirePermission> here: the portal is decoupled from admin ABAC,
+          so a student is gated purely by their role + the one-time info-completion
+          gate, never by the admin URL whitelist / RequestAccessPage. */}
+      <Route element={<StudentAuthGuard />}>
+        <Route element={<StudentPortalLayout />}>
+          {/* Profile form — always reachable when logged in (it's the info-gate target,
+              so it must NOT be wrapped in StudentInfoGate or it would redirect-loop). */}
+          <Route path="/student/dashboard/student-info" element={
+            <SuspensedView>
+              <StudentInfoForm />
+            </SuspensedView>
+          } />
+          <Route path="/student/dashboard" element={
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalDashboard />
+              </SuspensedView>
+            </StudentInfoGate>
+          } />
+          <Route path="/student/dashboard/navigator-360" element={
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalNavigator360 />
+              </SuspensedView>
+            </StudentInfoGate>
+          } />
+          <Route path="/student/dashboard/assessments" element={
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalAssessments />
+              </SuspensedView>
+            </StudentInfoGate>
+          } />
+          <Route path="/student/dashboard/reports" element={
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentPortalReports />
+              </SuspensedView>
+            </StudentInfoGate>
+          } />
+          {/* The student's own data-driven Insight Dashboard (self mode). */}
+          <Route path="/student/dashboard/insight" element={
+            <StudentInfoGate>
+              <SuspensedView>
+                <InsightDashboard self />
+              </SuspensedView>
+            </StudentInfoGate>
+          } />
+          <Route path="/student/dashboard/counselling" element={
+            <StudentInfoGate>
+              <SuspensedView>
+                <StudentCounsellingPage />
+              </SuspensedView>
+            </StudentInfoGate>
+          } />
+          <Route path="/student/dashboard/counselling/book" element={
+            <StudentInfoGate>
+              <SuspensedView>
+                <SlotBookingPage />
+              </SuspensedView>
+            </StudentInfoGate>
+          } />
+          {/* Post-Razorpay return for a dashboard purchase. Outside StudentInfoGate so a
+              returning payer always reaches the confirmation (and onward into the unlocked
+              dashboard). Fixes a previously unmounted route — StudentPortalDashboard builds
+              this exact returnUrl for checkout. */}
+          <Route path="/student/payment-return" element={
+            <SuspensedView>
+              <StudentPaymentReturn />
+            </SuspensedView>
+          } />
+        </Route>
+      </Route>
 
       {/* payment-status and payment-register moved to public AppRoutes */}
       <Route element={<AuthorizedLayout />}>
@@ -538,64 +667,9 @@ const PrivateRoutes = () => {
           element={<RedirectStudentDashboard />}
         />
 
-        {/* Student portal — now inside MasterLayout (aside-menu shell), permission-gated.
-            All routes moved under /student/dashboard/* to match the new URL scheme.
-            Old /student/* paths redirect below for backwards compat. */}
-        <Route path="/student/dashboard/student-info" element={
-          <SuspensedView>
-            <StudentInfoForm />
-          </SuspensedView>
-        } />
-        <Route path="/student/dashboard" element={
-          <RequirePermission perm="assessment.read">
-            <StudentInfoGate>
-              <SuspensedView>
-                <StudentPortalDashboard />
-              </SuspensedView>
-            </StudentInfoGate>
-          </RequirePermission>
-        } />
-        <Route path="/student/dashboard/navigator-360" element={
-          <RequirePermission perm="generated_report.read">
-            <StudentInfoGate>
-              <SuspensedView>
-                <StudentPortalNavigator360 />
-              </SuspensedView>
-            </StudentInfoGate>
-          </RequirePermission>
-        } />
-        <Route path="/student/dashboard/assessments" element={
-          <RequirePermission perm="assessment.read">
-            <StudentInfoGate>
-              <SuspensedView>
-                <StudentPortalAssessments />
-              </SuspensedView>
-            </StudentInfoGate>
-          </RequirePermission>
-        } />
-        <Route path="/student/dashboard/reports" element={
-          <RequirePermission perm="generated_report.read">
-            <StudentInfoGate>
-              <SuspensedView>
-                <StudentPortalReports />
-              </SuspensedView>
-            </StudentInfoGate>
-          </RequirePermission>
-        } />
-        <Route path="/student/dashboard/counselling" element={
-          <StudentInfoGate>
-            <SuspensedView>
-              <StudentCounsellingPage />
-            </SuspensedView>
-          </StudentInfoGate>
-        } />
-        <Route path="/student/dashboard/counselling/book" element={
-          <StudentInfoGate>
-            <SuspensedView>
-              <SlotBookingPage />
-            </SuspensedView>
-          </StudentInfoGate>
-        } />
+        {/* Student portal pages moved OUT of the admin MasterLayout shell into the
+            dedicated, lightweight <StudentPortalLayout /> group below (its own aside
+            menu, no admin chrome). The /student/dashboard/* URLs are unchanged. */}
 
         {/* Backwards-compat redirects: legacy /student/* and /dashboard/student/* paths -> new /student/dashboard/* */}
         <Route path="/student/student-info"       element={<Navigate to="/student/dashboard/student-info" replace />} />

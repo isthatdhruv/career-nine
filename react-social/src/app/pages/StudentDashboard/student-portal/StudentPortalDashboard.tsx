@@ -413,55 +413,9 @@ const StudentPortalDashboard: React.FC = () => {
     <div className="spd-root">
       <canvas ref={confettiCanvasRef} className="spd-confetti-canvas" />
 
-      <nav className="spd-sidebar">
-        <div className="spd-sidebar-logo">C9</div>
-        <div className="spd-sidebar-nav">
-          {[
-            { id: "home", icon: "fas fa-home", tip: "Dashboard" },
-            { id: "class-select", icon: "fas fa-graduation-cap", tip: "Select Class" },
-            { id: "navigators", icon: "fas fa-compass", tip: "Navigators" },
-            { id: "how", icon: "fas fa-route", tip: "How It Works" },
-            { id: "report-preview", icon: "fas fa-file-alt", tip: "Sample Report" },
-            { id: "faq", icon: "fas fa-question-circle", tip: "FAQs" },
-            { id: "support", icon: "fas fa-headset", tip: "Support" },
-          ].map((item) => (
-            <div
-              key={item.id}
-              className={`spd-nav-item ${activeNav === item.id ? "active" : ""}`}
-              onClick={() => handleNavClick(item.id)}
-            >
-              <i className={item.icon} />
-              <span className="spd-tooltip">{item.tip}</span>
-            </div>
-          ))}
-        </div>
-        <div className="spd-sidebar-bottom">
-          <div className="spd-nav-item">
-            <i className="fas fa-cog" />
-            <span className="spd-tooltip">Settings</span>
-          </div>
-          <div className="spd-sidebar-avatar">{initials}</div>
-        </div>
-      </nav>
-
+      {/* Shell chrome (sidebar + top bar) now provided by StudentPortalLayout.
+          This page renders content only. */}
       <main className="spd-main">
-        <div className="spd-top-bar">
-          <div className="spd-breadcrumb">
-            <i className="fas fa-home" style={{ fontSize: 12 }} />
-            Dashboard <i className="fas fa-chevron-right" style={{ fontSize: 9 }} />{" "}
-            <span>Home</span>
-          </div>
-          <div className="spd-top-actions">
-            <div className="spd-search-box">
-              <i className="fas fa-search" />
-              <input type="text" placeholder="Search navigators, plans..." />
-            </div>
-            <div className="spd-notif-btn">
-              <i className="fas fa-bell" />
-              <div className="spd-notif-dot" />
-            </div>
-          </div>
-        </div>
 
         {/* Hero */}
         <section className="hero-welcome" id="home">

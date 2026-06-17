@@ -96,6 +96,14 @@ const PaymentRegisterPage = lazy(
   () => import("../pages/PaymentTracking/PaymentRegisterPage")
 );
 
+// Anonymous SSO landing for the assessment app's Thank-You "Go to Dashboard" CTA:
+// /student/sso?t=<accessToken>&e=<entitlementId>. It redeems the token (sets the
+// cn_at session) and forwards into /student/dashboard. Must be reachable while
+// logged-out, so it lives here in the public <App> tree, not behind PrivateRoutes.
+const StudentSsoLanding = lazy(
+  () => import("../pages/StudentDashboard/student-portal/StudentSsoLanding")
+);
+
 const StudentRegistrationForm = lazy(
   () => import("../pages/StudentRegistration/StudentRegistrationForm")
 );
@@ -167,6 +175,15 @@ const AppRoutes: FC = () => {
             protected pages render inside MasterLayout (see CounsellorRoutes). Mounted
             inside <App> so MasterLayout has its LayoutProvider / i18n / auth context. */}
         <Route path="/counsellor/*" element={<CounsellorRoutes />} />
+        {/* Anonymous student SSO landing (assessment Thank-You "Go to Dashboard"). */}
+        <Route
+          path="/student/sso"
+          element={
+            <SuspensedView>
+              <StudentSsoLanding />
+            </SuspensedView>
+          }
+        />
         <Route path="/student-details" element={<StudentDetailPage />} />
         <Route path="/oauth2/redirect" element={<AuthRedirectPage />} />
         <Route path="error/*" element={<ErrorsPage />} />

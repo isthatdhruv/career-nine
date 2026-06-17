@@ -15,8 +15,8 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
  * for the dashboard domain. We then hydrate currentUser via /auth/me and
  * navigate to /student/dashboard.
  *
- * Failure modes — all redirect to /student/login with a toast so a tampered link
- * cannot silently fail:
+ * Failure modes — all redirect to /auth/login (the unified login, student mode)
+ * with a toast so a tampered link cannot silently fail:
  *   - missing t/e in URL
  *   - 401 from redeem-dashboard-token (invalid/expired token)
  *   - 403 (dashboard access not included in this entitlement)
@@ -39,7 +39,7 @@ const StudentSsoLanding: React.FC = () => {
 
     if (!token || !entitlementId) {
       toast.error('Missing session link. Please log in.')
-      navigate('/student/login', { replace: true })
+      navigate('/auth/login', { replace: true })
       return
     }
 
@@ -71,7 +71,7 @@ const StudentSsoLanding: React.FC = () => {
         } else {
           setStatus('failed')
           toast.error('Session could not be established. Please log in.')
-          navigate('/student/login', { replace: true })
+          navigate('/auth/login', { replace: true })
         }
       } catch (err: any) {
         if (cancelled) return
@@ -84,7 +84,7 @@ const StudentSsoLanding: React.FC = () => {
           toast.error('We could not sign you in. Please log in manually.')
         }
         setStatus('failed')
-        navigate('/student/login', { replace: true })
+        navigate('/auth/login', { replace: true })
       }
     })()
 
