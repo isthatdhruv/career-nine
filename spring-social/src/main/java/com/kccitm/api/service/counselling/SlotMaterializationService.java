@@ -33,12 +33,22 @@ public class SlotMaterializationService {
      * Slots are now created via SlotConfigurationController.applyToCounsellors()
      * when admin picks a saved configuration from the Manage Counsellors page.
      */
+    /** Outcome of a materialization run: slots created vs slots skipped for overlapping an existing slot. */
+    public static class MaterializationResult {
+        public final int created;
+        public final int skipped;
+        public MaterializationResult(int created, int skipped) {
+            this.created = created;
+            this.skipped = skipped;
+        }
+    }
+
     public void materializeSlots() {
         List<AvailabilityTemplate> activeTemplates = templateRepository.findByIsActiveTrue();
         int totalCreated = 0;
 
         for (AvailabilityTemplate template : activeTemplates) {
-            totalCreated += materializeSlotsForTemplate(template);
+            totalCreated += materializeSlotsForTemplate(template).created;
         }
 
         logger.info("SlotMaterializationService: total slots created = {}", totalCreated);
@@ -53,18 +63,27 @@ public class SlotMaterializationService {
         int totalCreated = 0;
 
         for (AvailabilityTemplate template : templates) {
-            totalCreated += materializeSlotsForTemplate(template, days);
+            totalCreated += materializeSlotsForTemplate(template, days).created;
         }
 
         logger.info("SlotMaterializationService: slots created for counsellor {} = {} (days={})", counsellorId, totalCreated, days);
         return totalCreated;
     }
 
-    private int materializeSlotsForTemplate(AvailabilityTemplate template) {
+    /**
+     * Materialize a single template's slots (used right after a template is created) and
+     * report how many slots were skipped for overlapping an existing slot — so the UI can
+     * tell the counsellor "N slot(s) skipped because they conflicted with existing times".
+     */
+    public MaterializationResult materializeForTemplate(AvailabilityTemplate template, int days) {
+        return materializeSlotsForTemplate(template, days);
+    }
+
+    private MaterializationResult materializeSlotsForTemplate(AvailabilityTemplate template) {
         return materializeSlotsForTemplate(template, WEEKS_AHEAD);
     }
 
-    private int materializeSlotsForTemplate(AvailabilityTemplate template, int days) {
+    private MaterializationResult materializeSlotsForTemplate(AvailabilityTemplate template, int days) {
         DayOfWeek templateDayOfWeek = DayOfWeek.valueOf(template.getDayOfWeek().toUpperCase());
         LocalDate tomorrow = LocalDate.now().plusDays(1);
         // Honour the template's effective start date: materialize from max(startDate, tomorrow).
@@ -73,6 +92,7 @@ public class SlotMaterializationService {
                 : tomorrow;
         LocalDate endDate = start.plusDays(days);
         int created = 0;
+        int skipped = 0;
 
         for (LocalDate date = start; !date.isAfter(endDate); date = date.plusDays(1)) {
             if (date.getDayOfWeek() != templateDayOfWeek) {
@@ -93,31 +113,59 @@ public class SlotMaterializationService {
                 continue;
             }
 
+            // All other active slots on this date (any template / manual, any mode) — used
+            // to skip generating a slot that would overlap one the counsellor already has.
+            // A counsellor can't run two sessions at once, so an existing ONLINE slot also
+            // blocks an OFFLINE slot at the same time (and vice versa).
+            List<CounsellingSlot> sameDay = slotRepository
+                    .findByCounsellorIdAndDateBetween(template.getCounsellor().getId(), date, date);
+
             // Generate slots for this date
             LocalTime slotStart = template.getStartTime();
             LocalTime slotEnd = slotStart.plusMinutes(template.getDefaultSlotDuration());
 
             while (!slotEnd.isAfter(template.getEndTime())) {
-                CounsellingSlot slot = new CounsellingSlot();
-                slot.setCounsellor(template.getCounsellor());
-                slot.setTemplate(template);
-                slot.setDate(date);
-                slot.setStartTime(slotStart);
-                slot.setEndTime(slotEnd);
-                slot.setDurationMinutes(template.getDefaultSlotDuration());
-                slot.setMode(template.getMode());
-                slot.setStatus("AVAILABLE");
-                slot.setIsManuallyCreated(false);
-                slot.setIsBlocked(false);
+                if (overlapsExisting(sameDay, slotStart, slotEnd)) {
+                    // Conflicts with an existing slot — skip this one, keep generating the rest.
+                    skipped++;
+                } else {
+                    CounsellingSlot slot = new CounsellingSlot();
+                    slot.setCounsellor(template.getCounsellor());
+                    slot.setTemplate(template);
+                    slot.setDate(date);
+                    slot.setStartTime(slotStart);
+                    slot.setEndTime(slotEnd);
+                    slot.setDurationMinutes(template.getDefaultSlotDuration());
+                    slot.setMode(template.getMode());
+                    slot.setStatus("AVAILABLE");
+                    slot.setIsManuallyCreated(false);
+                    slot.setIsBlocked(false);
 
-                slotRepository.save(slot);
-                created++;
+                    slotRepository.save(slot);
+                    sameDay.add(slot); // so later slots in this run also see it
+                    created++;
+                }
 
                 slotStart = slotEnd;
                 slotEnd = slotStart.plusMinutes(template.getDefaultSlotDuration());
             }
         }
 
-        return created;
+        return new MaterializationResult(created, skipped);
+    }
+
+    /**
+     * True if [start, end) overlaps any active (non-cancelled, non-blocked) slot in the list.
+     * Two half-open intervals overlap iff each starts before the other ends.
+     */
+    public static boolean overlapsExisting(List<CounsellingSlot> sameDay, LocalTime start, LocalTime end) {
+        for (CounsellingSlot ex : sameDay) {
+            if (Boolean.TRUE.equals(ex.getIsBlocked()) || "CANCELLED".equals(ex.getStatus())) continue;
+            if (ex.getStartTime() == null || ex.getEndTime() == null) continue;
+            if (ex.getStartTime().isBefore(end) && start.isBefore(ex.getEndTime())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

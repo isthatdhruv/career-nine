@@ -489,12 +489,13 @@ const TierManagementModal = ({ mappingId, show, onHide }: Props) => {
               </div>
             )}
 
-            {/* Phase 3b: price for booking an EXTRA counselling session beyond the
-                tier's included count (or any session, if the tier includes none).
-                Shown always — it's what a student pays when no free session applies. */}
+            {/* Counselling fee charged per session. How it's collected depends on the
+                mapping's Counselling Payment Timing: PAY_FIRST adds it to the registration
+                total (fee × included sessions, paid upfront); PAY_LATER charges it per slot
+                when the student books after the assessment. */}
             <div style={{ marginLeft: 36, marginTop: 8 }}>
               <Form.Label style={{ fontWeight: 600, fontSize: "0.78rem" }}>
-                Extra counselling session price (₹) <span style={{ color: "#94a3b8", fontWeight: 400 }}>— blank = use default</span>
+                Counselling fee — per session (₹) <span style={{ color: "#94a3b8", fontWeight: 400 }}>— blank = use default</span>
               </Form.Label>
               <Form.Control
                 type="number" min="0"

@@ -57,13 +57,55 @@ public class CounsellingSlotController {
     // no scope arg: body is CounsellingSlot; admin manual slot creation
     @PreAuthorize("@auth.allows('counselling.slot.create')")
     @PostMapping("/create-manual")
-    public ResponseEntity<CounsellingSlot> createManual(@RequestBody CounsellingSlot slot) {
+    public ResponseEntity<?> createManual(@RequestBody CounsellingSlot slot) {
         logger.info("Creating manual counselling slot");
+
+        Long counsellorId = slot.getCounsellor() != null ? slot.getCounsellor().getId() : null;
+        if (counsellorId == null || slot.getDate() == null
+                || slot.getStartTime() == null || slot.getEndTime() == null) {
+            return ResponseEntity.badRequest()
+                    .body("Counsellor, date, start time and end time are required.");
+        }
+        if (!slot.getStartTime().isBefore(slot.getEndTime())) {
+            return ResponseEntity.badRequest().body("Start time must be before end time.");
+        }
+        // Default the delivery mode when the client didn't send one.
+        if (slot.getMode() == null || slot.getMode().isBlank()) {
+            slot.setMode("ONLINE");
+        }
+
+        // No double-booking: reject a slot that overlaps an existing active slot (any mode)
+        // on the same date. An existing ONLINE slot blocks an OFFLINE slot at the same time,
+        // and vice versa — the counsellor can't run two sessions at once.
+        List<CounsellingSlot> sameDay =
+                slotRepository.findByCounsellorIdAndDateBetween(counsellorId, slot.getDate(), slot.getDate());
+        CounsellingSlot conflict = firstOverlap(sameDay, slot.getStartTime(), slot.getEndTime());
+        if (conflict != null) {
+            String mode = "OFFLINE".equals(conflict.getMode()) ? "In-person" : "Online";
+            String msg = String.format(
+                    "You already have an %s slot at %s–%s on %s. Pick a different time.",
+                    mode, conflict.getStartTime(), conflict.getEndTime(), slot.getDate());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(msg);
+        }
+
         slot.setIsManuallyCreated(true);
         slot.setStatus("AVAILABLE");
         slot.setIsBlocked(false);
         CounsellingSlot saved = slotRepository.save(slot);
         return ResponseEntity.ok(saved);
+    }
+
+    /** First active (non-cancelled, non-blocked) slot in the list that overlaps [start, end), or null. */
+    private static CounsellingSlot firstOverlap(List<CounsellingSlot> sameDay,
+            java.time.LocalTime start, java.time.LocalTime end) {
+        for (CounsellingSlot ex : sameDay) {
+            if (Boolean.TRUE.equals(ex.getIsBlocked()) || "CANCELLED".equals(ex.getStatus())) continue;
+            if (ex.getStartTime() == null || ex.getEndTime() == null) continue;
+            if (ex.getStartTime().isBefore(end) && start.isBefore(ex.getEndTime())) {
+                return ex;
+            }
+        }
+        return null;
     }
 
     // no scope arg: body is CounsellingSlot; admin block-date action

@@ -149,7 +149,11 @@
     "/upload-excel"
   ],
   "student_management.read": [
+<<<<<<< HEAD
+    "auth}\r\n        <Route path="
+=======
     "/student-management"
+>>>>>>> 444d03eedf9fa2cf8b33e2dfd0b21c8ded5d2f92
   ],
   "user.read": [
     "/faculty/registration-details",

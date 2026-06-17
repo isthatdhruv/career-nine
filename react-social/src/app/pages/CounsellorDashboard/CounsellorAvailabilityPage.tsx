@@ -31,6 +31,7 @@ interface ManualSlotForm {
   startTime: string
   endTime: string
   durationMinutes: number
+  mode: 'ONLINE' | 'OFFLINE'
 }
 
 interface BlockDateForm {
@@ -128,6 +129,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
     startTime: '',
     endTime: '',
     durationMinutes: 30,
+    mode: 'ONLINE',
   })
   const [blockDateForm, setBlockDateForm] = useState<BlockDateForm>({ date: '', reason: '' })
   const [slotSaving, setSlotSaving] = useState(false)
@@ -234,7 +236,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
       // One AvailabilityTemplate per selected day (the schema is one day per template),
       // each carrying the chosen mode + effective start date. The endpoint binds the
       // body straight onto the entity; counsellor must be the nested relation.
-      await Promise.all(
+      const results = await Promise.all(
         templateForm.days.map((day) =>
           axios.post(`${API_URL}/api/availability-template/create`, {
             counsellor: { id: counsellorId },
@@ -247,7 +249,13 @@ const CounsellorAvailabilityPage: React.FC = () => {
           }),
         ),
       )
-      setSuccess('Schedule saved — slots for the upcoming weeks were generated.')
+      // Slots that overlapped an existing time (any mode) are skipped, not created.
+      const skipped = results.reduce((sum, r) => sum + (Number(r?.data?.slotsSkipped) || 0), 0)
+      setSuccess(
+        skipped > 0
+          ? `Schedule saved — slots generated. ${skipped} slot${skipped === 1 ? '' : 's'} skipped because they overlapped existing slots.`
+          : 'Schedule saved — slots for the upcoming weeks were generated.',
+      )
       reloadTemplates()
       // The backend materializes slots from the new template immediately,
       // so the Upcoming Slots list must refresh too.
@@ -290,24 +298,37 @@ const CounsellorAvailabilityPage: React.FC = () => {
       setError('End time must be after start time.')
       return
     }
+    if (manualSlotForm.mode === 'OFFLINE' && !officeAddress.trim()) {
+      setError('Please enter your office address for in-person sessions.')
+      return
+    }
     setSlotSaving(true)
     setError('')
     try {
+      // OFFLINE sessions are delivered at the counsellor's office address; persist it.
+      if (manualSlotForm.mode === 'OFFLINE') {
+        await updateCounsellor(counsellorId, { officeAddress: officeAddress.trim() })
+      }
       // The endpoint binds the body straight onto the CounsellingSlot entity:
       // counsellor must be the nested relation (counsellor_id is a non-null
       // FK) and startTime/endTime are LocalTime ("HH:mm:ss"), not datetimes.
+      // The backend rejects a slot that overlaps an existing one (any mode).
       await createManualSlot({
         counsellor: { id: counsellorId },
         date: manualSlotForm.date,
         startTime: `${manualSlotForm.startTime}:00`,
         endTime: `${manualSlotForm.endTime}:00`,
         durationMinutes,
+        mode: manualSlotForm.mode,
       })
       setSuccess('Extra slot added.')
       reloadSlots()
-      setManualSlotForm({ date: '', startTime: '', endTime: '', durationMinutes: 30 })
-    } catch {
-      setError('Failed to add slot.')
+      setManualSlotForm({ date: '', startTime: '', endTime: '', durationMinutes: 30, mode: 'ONLINE' })
+    } catch (e: any) {
+      // Surface the backend's conflict message (e.g. "You already have an Online
+      // slot at 15:00–16:00 …") so the counsellor knows to pick a different time.
+      const msg = e?.response?.data
+      setError(typeof msg === 'string' && msg ? msg : 'Failed to add slot.')
     } finally {
       setSlotSaving(false)
     }
@@ -724,6 +745,43 @@ const CounsellorAvailabilityPage: React.FC = () => {
                       />
                     </div>
                   </div>
+                  {/* Session mode — an existing slot at the same time (any mode) blocks creating another */}
+                  <div>
+                    <label style={labelStyle}>Session mode</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {(['ONLINE', 'OFFLINE'] as const).map((m) => {
+                        const active = manualSlotForm.mode === m
+                        return (
+                          <button
+                            key={m}
+                            type='button'
+                            onClick={() => setManualSlotForm((f) => ({ ...f, mode: m }))}
+                            style={{
+                              flex: 1, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                              cursor: 'pointer',
+                              border: active ? '1.5px solid #263B6A' : '1.5px solid #DDE3EC',
+                              background: active ? 'rgba(38,59,106,0.08)' : '#fff',
+                              color: active ? '#263B6A' : '#475569',
+                            }}
+                          >
+                            {m === 'ONLINE' ? '💻 Online' : '📍 In-person'}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  {manualSlotForm.mode === 'OFFLINE' && (
+                    <div>
+                      <label style={labelStyle}>Office address (shared with students)</label>
+                      <textarea
+                        value={officeAddress}
+                        onChange={(e) => setOfficeAddress(e.target.value)}
+                        placeholder='Building, street, area, city — where the student should come'
+                        rows={2}
+                        style={{ ...inputStyle, resize: 'vertical' as const }}
+                      />
+                    </div>
+                  )}
                   <button
                     onClick={handleSaveManualSlot}
                     disabled={slotSaving}

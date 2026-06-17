@@ -56,16 +56,27 @@ const AssessmentRegisterPage = () => {
   }, [token])
 
   const regBranding = mappingInfo?.branding
+  // Base assessment/report price (the tier amount) — the "Assessment" line item.
   const amountInr: number = mappingInfo?.amount || 0
+  // What the student actually pays at registration. PAY_FIRST folds the counselling
+  // fee into this total; PAY_LATER charges only the assessment price (counselling is
+  // paid per slot after the assessment). Falls back to the base amount.
+  const payableInr: number = mappingInfo?.payableTotal ?? amountInr
+  // Counselling fee breakdown (PAY_FIRST itemisation / PAY_LATER note).
+  const counsellingFeePerSession = mappingInfo?.counsellingFeePerSession || 0
+  const counsellingSessionCount = mappingInfo?.counsellingSessionCount || 0
+  const counsellingFeeTotal = mappingInfo?.counsellingFeeTotal || 0
+  const isPayFirst = (mappingInfo?.paymentTiming ?? "PAY_FIRST") === "PAY_FIRST"
   // Branch on the backend-resolved linkType, never on amount>0. A PAID link is
   // the single resolved wave price (one active tier — no picker).
   const isPaid = mappingInfo?.linkType === "PAID"
   const registrationClosed = mappingInfo?.registrationClosed === true
 
-  // Mirror the backend's integer (floor) division so the displayed price matches the charge.
+  // Mirror the backend's integer (floor) division so the displayed price matches the
+  // charge. Discount applies to the full payable total (incl. any PAY_FIRST counselling fee).
   const discountedAmountInr = promoApplied
-    ? Math.floor(amountInr * (100 - promoApplied.discountPercent) / 100)
-    : amountInr
+    ? Math.floor(payableInr * (100 - promoApplied.discountPercent) / 100)
+    : payableInr
 
   const handleDobChange = (value: string) => {
     let cleaned = value.replace(/[^0-9-]/g, "")
@@ -252,7 +263,7 @@ const AssessmentRegisterPage = () => {
     ? {
         campaignAssessmentTierId: 0,
         name: mappingInfo.activeTierName || mappingInfo.assessmentName || "Assessment",
-        basePriceInr: amountInr,
+        basePriceInr: payableInr,
         priceInr: discountedAmountInr,
         isDefault: false,
         includesFinalReport: !!inc?.includesFinalReport,
@@ -746,6 +757,37 @@ const AssessmentRegisterPage = () => {
                 padding: "14px 20px", fontSize: "0.88rem", color: "#065f46",
               }}>
                 Class: <strong>{mappingInfo.className}</strong> &middot; Section: <strong>{mappingInfo.sectionName}</strong>
+              </div>
+            )}
+
+            {/* Counselling fee itemisation. PAY_FIRST: the fee is added to the
+                registration total and paid upfront. PAY_LATER: only the assessment
+                price is paid now; counselling is paid per slot after the assessment. */}
+            {isPaid && counsellingFeePerSession > 0 && isPayFirst && counsellingFeeTotal > 0 && (
+              <div style={{
+                background: "linear-gradient(135deg, #eef2ff, #f5f3ff)",
+                border: "1.5px solid #c7d2fe", borderRadius: 12,
+                padding: "14px 18px", fontSize: "0.88rem", color: "#3730a3",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span>Assessment</span><strong>₹{amountInr.toLocaleString("en-IN")}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span>Counselling (₹{counsellingFeePerSession.toLocaleString("en-IN")} × {counsellingSessionCount})</span>
+                  <strong>₹{counsellingFeeTotal.toLocaleString("en-IN")}</strong>
+                </div>
+                <div style={{
+                  display: "flex", justifyContent: "space-between",
+                  borderTop: "1px solid #c7d2fe", paddingTop: 6, marginTop: 2, fontSize: "0.95rem",
+                }}>
+                  <span style={{ fontWeight: 700 }}>Total</span>
+                  <strong style={{ fontWeight: 800 }}>₹{payableInr.toLocaleString("en-IN")}</strong>
+                </div>
+              </div>
+            )}
+            {isPaid && counsellingFeePerSession > 0 && !isPayFirst && (
+              <div style={{ fontSize: "0.84rem", color: "#64748b", marginTop: -4 }}>
+                Counselling is ₹{counsellingFeePerSession.toLocaleString("en-IN")}/session — pay later when you book your slot after the assessment.
               </div>
             )}
 
