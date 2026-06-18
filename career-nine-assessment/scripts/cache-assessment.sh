@@ -21,6 +21,12 @@ else
   BASE_URL=${1:-"https://api.career-9.com"}
 fi
 
+# Strip any trailing slash: the URLs below concatenate "${BASE_URL}/path", so a
+# trailing slash would produce a "//" that Spring Security's StrictHttpFirewall
+# rejects (RequestRejectedException) — the same trigger that broke the runtime
+# fetch() write paths. Mirrors src/utils/apiUrl.ts on the build side.
+BASE_URL="${BASE_URL%/}"
+
 sync_assessment() {
   local id=$1
   local dir="${CACHE_DIR}/${id}"

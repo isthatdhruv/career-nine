@@ -22,6 +22,7 @@ import { savePartialAnswers, restorePartialAnswers } from "../api/assessmentApi"
 import type { ProctoringPayload } from "../types/proctoring";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { timeoutSignal } from "../utils/timeoutSignal";
+import { apiUrl } from "../utils/apiUrl";
 import { PROCTORING_ENABLED } from "../utils/proctoringFlag";
 
 type GameTable = {
@@ -1226,7 +1227,7 @@ const SectionQuestionPage: React.FC = () => {
           if (csrfToken) submitHeaders["X-CSRF-Token"] = csrfToken
 
           const response = await fetch(
-            `${import.meta.env.VITE_API_URL}/assessment-answer/submit`,
+            apiUrl("/assessment-answer/submit"),
             {
               method: "POST",
               credentials: "include",
