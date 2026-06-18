@@ -13,6 +13,10 @@ export function setMeetingLink(appointmentId: number, meetingLink: string) { ret
 export function getStudentAppointments(studentId: number) { return axios.get(`${BASE}/by-student/${studentId}`) }
 export function getCounsellorAppointments(counsellorId: number) { return axios.get(`${BASE}/by-counsellor/${counsellorId}`) }
 export function getAppointmentStats() { return axios.get(`${BASE}/stats`) }
+// Admin dashboard: every appointment (eager slot/counsellor/student) — the admin
+// Counselling Dashboard aggregates the funnel, live queue, per-counsellor and trend
+// metrics from this single list client-side.
+export function getAllAppointments() { return axios.get(`${BASE}/getAll`) }
 
 // Session check-in (counsellor enters the student's OTP at the start of the session).
 export function startSession(appointmentId: number) { return axios.post(`${BASE}/start/${appointmentId}`) }

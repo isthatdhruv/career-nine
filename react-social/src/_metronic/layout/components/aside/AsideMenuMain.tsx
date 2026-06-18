@@ -113,6 +113,7 @@ export function AsideMenuMain() {
     allowed("/teacher/class-dashboard") || allowed("/principal/dashboard");
 
   const showCounselling =
+    allowed("/admin/counselling-dashboard") ||
     allowed("/admin/counsellors") ||
     allowed("/admin/counselling-students") ||
     allowed("/admin/counselling-slots") ||
@@ -729,6 +730,9 @@ export function AsideMenuMain() {
             fontIcon="bi-app-indicator"
             icon="/media/icons/duotune/general/gen049.svg"
           >
+            {allowed("/admin/counselling-dashboard") && (
+              <AsideMenuItem to="/admin/counselling-dashboard" title="Dashboard" hasBullet={true} />
+            )}
             {allowed("/admin/counsellors") && (
               <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />
             )}
