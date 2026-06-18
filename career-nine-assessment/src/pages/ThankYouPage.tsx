@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStudentBranding, brandLogoSrc } from '../hooks/useStudentBranding';
 import { useNavigate } from 'react-router-dom';
-import { getStudentCounselling, getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
+import { forwardCounsellingRequest, getStudentCounselling, getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
+import { getCounsellingOptionsByStudent } from '../api-clients/assessmentMappingAPI';
 import { TierCard, Tier } from '../components/TierCard';
 import CounsellingSlotPicker from '../components/CounsellingSlotPicker';
 import MappingCounsellingSection from '../components/MappingCounsellingSection';
@@ -132,9 +133,20 @@ const ThankYouPage: React.FC = () => {
     // Counselling for a school student (resolved by userStudentId when there is no
     // B2C entitlementId on this page). Null until resolved / when not applicable.
     const [schoolCounselling, setSchoolCounselling] = useState<SchoolCounselling | null>(null);
+    // True when the B2B mapping counselling component (MappingCounsellingSection)
+    // owns the booking UI for this student — in which case this page suppresses its
+    // OWN counselling CTAs/auto-open to avoid a duplicate booking card.
+    const [hasMappingCounselling, setHasMappingCounselling] = useState<boolean>(false);
+    // Set when the assessment includes counselling but NO counsellor is mapped yet:
+    // we forward the request to Career-9 and show a "request received" notice instead
+    // of a bookable slot picker. Null otherwise.
+    const [pendingCounselling, setPendingCounselling] = useState<{ supportEmail: string } | null>(null);
     // Ensures the slot picker auto-opens at most once per page mount (so the
     // student isn't trapped re-opening it after they deliberately close it).
     const autoOpenedPickerRef = useRef<boolean>(false);
+    // Forwards the counselling request at most once per mount (the POST is also
+    // idempotent server-side, so this just avoids a redundant call/email).
+    const counsellingForwardedRef = useRef<boolean>(false);
     // Which per-feature upsell modal is open, if any. Set by the "Add <feature>"
     // cards; cleared on close / choose. Choosing a tier inside the modal reuses
     // the existing handleChoosePlan navigation — same /upgrade route, same
@@ -195,12 +207,34 @@ const ThankYouPage: React.FC = () => {
         const userStudentId = localStorage.getItem('userStudentId');
         const assessmentId = localStorage.getItem('assessmentId');
         if (!userStudentId || !assessmentId) return;
-        getStudentCounselling(userStudentId, assessmentId)
-            .then((res) => {
-                const d: any = res?.data || {};
-                // Already booked for this assessment? Show the "Counselling Booked"
-                // confirmation state and do NOT offer/auto-open booking again.
+        // First resolve whether the B2B mapping counselling component owns the booking
+        // UI for this student. If so, this page still shows the "booked" confirmation
+        // (single source of truth) but suppresses its OWN booking CTA/auto-open so the
+        // student doesn't see two booking cards.
+        getCounsellingOptionsByStudent(userStudentId, assessmentId)
+            .then((res) => res.data)
+            .catch(() => null)
+            .then((mo: any) => {
+                // mappingExists: the B2B mapping component (MappingCounsellingSection) is
+                // present for this student, so it owns the counselling display — including
+                // its own "your session is booked" confirmation. Mirrors its render gate
+                // (it renders whenever its options object is non-null).
+                const mappingExists = !!mo;
+                const mappingActionable = !!mo && !!mo.entitlementId &&
+                    (mo.canBookNow || mo.payPerSlot ||
+                        (mo.needsTierSelection && Array.isArray(mo.tiers) && mo.tiers.length > 0));
+                if (mappingActionable) setHasMappingCounselling(true);
+                return getStudentCounselling(userStudentId, assessmentId)
+                    .then((res) => ({ d: (res?.data as any) || {}, mappingActionable, mappingExists }));
+            })
+            .then(({ d, mappingActionable, mappingExists }) => {
+                // Already booked for this assessment? Record it and do NOT offer/auto-open
+                // booking again.
                 if (d.alreadyBooked) {
+                    // When the mapping component is present it shows its OWN "your session
+                    // is booked" confirmation, so suppress this page's duplicate
+                    // "Counselling Booked" tile — keep only the single booked card.
+                    if (mappingExists) setHasMappingCounselling(true);
                     setBookedAppointment({
                         appointmentId: d.bookedAppointmentId ?? 0,
                         status: d.bookedStatus ?? 'CONFIRMED',
@@ -210,6 +244,8 @@ const ThankYouPage: React.FC = () => {
                     });
                     return;
                 }
+                // The mapping component owns booking — don't render this page's own CTA.
+                if (mappingActionable) return;
                 // Show the optional booking whenever counselling is OFFERED (a counsellor
                 // is assigned to the assessment) and we have a token to book with — not
                 // gated on the tier's counselling toggle or session count.
@@ -225,6 +261,15 @@ const ThankYouPage: React.FC = () => {
                         studentEmail: d.studentEmail,
                         studentPhone: d.studentPhone,
                     });
+                } else if (d.counsellingPendingAssignment) {
+                    // Counselling is part of the package but no counsellor is mapped yet.
+                    // Forward the request to Career-9 (records it + emails the team) and
+                    // show a reassurance notice instead of a slot picker.
+                    setPendingCounselling({ supportEmail: d.supportEmail || 'support@career-9.net' });
+                    if (!d.counsellingRequestForwarded && !counsellingForwardedRef.current) {
+                        counsellingForwardedRef.current = true;
+                        forwardCounsellingRequest(userStudentId, assessmentId).catch(() => {});
+                    }
                 }
             })
             .catch(() => {});
@@ -682,14 +727,18 @@ const ThankYouPage: React.FC = () => {
                                 {/* Failure state — generation threw, error already recorded */}
                                 {!isLoadingContent && showFailedState && (
                                     <div style={ts.failedCard}>
-                                        <div style={ts.failedOrb}>!</div>
+                                        <div style={ts.failedOrb}>
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                                            </svg>
+                                        </div>
                                         <h3 style={ts.failedTitle}>
-                                            Your report will be generated and sent to you
+                                            Your personalised report is on its way
                                         </h3>
                                         <p style={ts.failedSub}>
-                                            We hit a hiccup preparing your report. It will be emailed to{' '}
-                                            <strong>{upgradeInfo?.student.email ?? 'you'}</strong> within 24 hours.
-                                            Our team has been notified — no action needed from your side.
+                                            We’re putting the finishing touches on your report. It will be emailed to{' '}
+                                            <strong>{upgradeInfo?.student.email ?? 'you'}</strong> within 24 hours —
+                                            there’s nothing you need to do.
                                         </p>
                                     </div>
                                 )}
@@ -838,7 +887,7 @@ const ThankYouPage: React.FC = () => {
                                     )}
 
                                     {/* Book Counselling — only when active, counselling included, and seats remain */}
-                                    {showCounsellingButton && !bookedAppointment && (
+                                    {showCounsellingButton && !bookedAppointment && !hasMappingCounselling && (
                                         <div
                                             onClick={handleOpenSlotPicker}
                                             className="text-center"
@@ -902,7 +951,7 @@ const ThankYouPage: React.FC = () => {
 
                                     {/* Book Counselling — school student (resolved by userStudentId,
                                         no B2C entitlement on this page). Same tile/picker as B2C. */}
-                                    {!upgradeInfo && schoolCounselling && schoolCounselling.offered && !bookedAppointment && (
+                                    {!upgradeInfo && schoolCounselling && schoolCounselling.offered && !bookedAppointment && !hasMappingCounselling && (
                                         <div
                                             onClick={handleOpenSlotPicker}
                                             className="text-center"
@@ -965,7 +1014,7 @@ const ThankYouPage: React.FC = () => {
                                     )}
 
                                     {/* Counselling booked confirmation */}
-                                    {bookedAppointment && (
+                                    {bookedAppointment && !hasMappingCounselling && (
                                         <div
                                             className="text-center"
                                             style={{
@@ -1005,6 +1054,52 @@ const ThankYouPage: React.FC = () => {
                                         </div>
                                     )}
 
+                                    {/* Counselling request forwarded — no counsellor mapped yet.
+                                        Shown instead of a slot picker so the student knows their
+                                        request reached Career-9 and how to follow up. */}
+                                    {pendingCounselling && !schoolCounselling && !bookedAppointment && !hasMappingCounselling && (
+                                        <div
+                                            className="text-center"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #BAE6FD 0%, #38BDF8 100%)',
+                                                borderRadius: '16px',
+                                                padding: '1.25rem 1.5rem',
+                                                boxShadow: '0 10px 35px rgba(56, 189, 248, 0.35)',
+                                                width: '100%',
+                                                maxWidth: '280px',
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '42px',
+                                                height: '42px',
+                                                borderRadius: '10px',
+                                                background: 'rgba(255,255,255,0.25)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                margin: '0 auto 0.75rem auto',
+                                            }}>
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                                </svg>
+                                            </div>
+                                            <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                                                Counselling request received
+                                            </h3>
+                                            <p style={{ color: 'rgba(255,255,255,0.95)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
+                                                Your request for career counselling has been forwarded to the Career-9 team. We'll match you with a counsellor and reach out shortly.
+                                                <br />
+                                                <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>
+                                                    Need it sooner? Write to{' '}
+                                                    <a href={`mailto:${pendingCounselling.supportEmail}`} style={{ color: 'white', fontWeight: 700 }}>
+                                                        {pendingCounselling.supportEmail}
+                                                    </a>
+                                                </span>
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* Career Library — always shown */}
                                     <div
                                         onClick={handleExploreCareerLibrary}
@@ -1017,7 +1112,8 @@ const ThankYouPage: React.FC = () => {
                                             transition: 'all 0.3s ease',
                                             boxShadow: '0 10px 35px rgba(52, 211, 153, 0.4)',
                                             width: '100%',
-                                            maxWidth: '280px',
+                                            maxWidth: '520px',
+                                            margin: '0 auto',
                                         }}
                                         onMouseEnter={(e) => {
                                             e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
@@ -1100,7 +1196,11 @@ const ThankYouPage: React.FC = () => {
             {showBookedCelebration && bookedAppointment && (
                 <div style={overlayStyle(1100)} onClick={() => setShowBookedCelebration(false)}>
                     <div onClick={(e) => e.stopPropagation()} style={celebrationCardStyle}>
-                        <div style={{ fontSize: '2.6rem', marginBottom: 8 }}>🎉</div>
+                        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" />
+                            </svg>
+                        </div>
                         <h3 style={{ margin: '0 0 10px', fontSize: '1.3rem', fontWeight: 800, color: '#065F46' }}>
                             You just made a great decision
                         </h3>
@@ -1114,7 +1214,9 @@ const ThankYouPage: React.FC = () => {
                             padding: '10px 18px', marginBottom: 20,
                             fontWeight: 800, color: '#065F46', fontSize: '0.98rem',
                         }}>
-                            <span>📅</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#065F46" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+                            </svg>
                             <span>{formatApptWhen(bookedAppointment.slotDate, bookedAppointment.slotStartTime) || 'Your counsellor will reach out shortly'}</span>
                         </div>
                         <button type="button" onClick={() => setShowBookedCelebration(false)} style={{ ...primaryBtnStyle, width: '100%' }}>
@@ -1236,11 +1338,26 @@ const TryFirstLanding: React.FC<TryFirstLandingProps> = ({ upgradeInfo, onChoose
             </div>
 
             <div style={ts.trustFooter}>
-                <span style={ts.trustItem}>🔒 Secure checkout</span>
+                <span style={{ ...ts.trustItem, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    Secure checkout
+                </span>
                 <span style={ts.trustDot} />
-                <span style={ts.trustItem}>📩 Report emailed within minutes</span>
+                <span style={{ ...ts.trustItem, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 5L2 7" />
+                    </svg>
+                    Report emailed within minutes
+                </span>
                 <span style={ts.trustDot} />
-                <span style={ts.trustItem}>🎓 Trusted by Career-9 students</span>
+                <span style={{ ...ts.trustItem, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 10 12 5 2 10l10 5 10-5z" /><path d="M6 12v5c0 1.5 2.5 3 6 3s6-1.5 6-3v-5" />
+                    </svg>
+                    Trusted by Career-9 students
+                </span>
             </div>
         </div>
     );
@@ -1271,11 +1388,13 @@ const ts: Record<string, React.CSSProperties> = {
         textAlign: 'center',
     },
     failedCard: {
-        background: 'linear-gradient(135deg, #FEF2F2 0%, #FFF7F7 100%)',
-        border: '1px solid #FECACA',
+        background: 'linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%)',
+        border: '1px solid #C7D2FE',
         borderRadius: 18,
         padding: '1.5rem 1.25rem',
-        marginBottom: '1.5rem',
+        margin: '0 auto 1.5rem',
+        width: '100%',
+        maxWidth: 520,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -1284,24 +1403,21 @@ const ts: Record<string, React.CSSProperties> = {
         width: 44,
         height: 44,
         borderRadius: '50%',
-        background: 'linear-gradient(135deg, #FEE2E2, #FECACA)',
-        color: '#dc2626',
-        fontWeight: 800,
-        fontSize: '1.25rem',
+        background: 'linear-gradient(135deg, #E0E7FF, #C7D2FE)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 10,
     },
     failedTitle: {
-        color: '#991B1B',
+        color: '#3730A3',
         fontWeight: 700,
         fontSize: '1.05rem',
         margin: '4px 0 6px',
         textAlign: 'center',
     },
     failedSub: {
-        color: '#7f1d1d',
+        color: '#4338CA',
         fontSize: '0.88rem',
         margin: 0,
         textAlign: 'center',

@@ -6,6 +6,8 @@ import {
   confirmAppointment,
   declineAppointment,
   cancelAppointment,
+  startSession,
+  verifyCheckin,
 } from '../Counselling/API/AppointmentAPI'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { getGeneratedReportsByStudent } from '../ReportGeneration/API/GeneratedReport_APIs'
@@ -21,6 +23,8 @@ function getStatusBadgeStyle(status: string): React.CSSProperties {
   switch ((status || '').toUpperCase()) {
     case 'CONFIRMED':
       return { background: '#D1FAE5', color: '#065F46', padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600 }
+    case 'IN_PROGRESS':
+      return { background: '#DCFCE7', color: '#166534', padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }
     case 'ASSIGNED':
       return { background: '#FEF3C7', color: '#92400E', padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600 }
     case 'PENDING':
@@ -144,6 +148,10 @@ const CounsellorAppointmentsPage: React.FC = () => {
   }
   const [cancelModal, setCancelModal] = useState<{ appointmentId: number } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  // Session check-in (OTP) state, keyed by appointment id.
+  const [otpSent, setOtpSent] = useState<Record<number, boolean>>({})
+  const [otpCode, setOtpCode] = useState<Record<number, string>>({})
+  const [checkinMsg, setCheckinMsg] = useState<Record<number, string>>({})
 
   const refreshAppointments = useCallback(() => {
     if (!counsellorId) return
@@ -226,6 +234,52 @@ const CounsellorAppointmentsPage: React.FC = () => {
       reload()
     } catch {
       setError('Failed to cancel appointment.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // Session check-in: counsellor sends the OTP to the student, then enters the code
+  // the student shares back. Verifying it is what actually starts the session
+  // (status -> IN_PROGRESS) and unlocks the meeting link — Jitsi included.
+  const handleStartSession = async (appointmentId: number) => {
+    setActionLoading(appointmentId)
+    setCheckinMsg((p) => ({ ...p, [appointmentId]: '' }))
+    try {
+      await startSession(appointmentId)
+      setOtpSent((p) => ({ ...p, [appointmentId]: true }))
+      setCheckinMsg((p) => ({
+        ...p,
+        [appointmentId]: 'A check-in code was sent to the student. Ask them for it to start the session.',
+      }))
+    } catch (e: any) {
+      setCheckinMsg((p) => ({
+        ...p,
+        [appointmentId]: typeof e?.response?.data === 'string' ? e.response.data : 'Could not start the session.',
+      }))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleVerifyCheckin = async (appointmentId: number) => {
+    const code = (otpCode[appointmentId] || '').trim()
+    if (code.length !== 6) {
+      setCheckinMsg((p) => ({ ...p, [appointmentId]: 'Enter the 6-digit code the student received.' }))
+      return
+    }
+    setActionLoading(appointmentId)
+    try {
+      await verifyCheckin(appointmentId, code)
+      setCheckinMsg((p) => ({ ...p, [appointmentId]: '✓ Checked in — session started.' }))
+      setOtpSent((p) => ({ ...p, [appointmentId]: false }))
+      setOtpCode((p) => ({ ...p, [appointmentId]: '' }))
+      reload()
+    } catch (e: any) {
+      setCheckinMsg((p) => ({
+        ...p,
+        [appointmentId]: typeof e?.response?.data === 'string' ? e.response.data : 'Incorrect or expired code.',
+      }))
     } finally {
       setActionLoading(null)
     }
@@ -472,16 +526,44 @@ const CounsellorAppointmentsPage: React.FC = () => {
 
                     {status === 'CONFIRMED' && (
                       <>
-                        {meetingLink && (
-                          <a
-                            href={meetingLink}
-                            target='_blank'
-                            rel='noopener noreferrer'
+                        {/* Check-in gate: the session (and its meeting link) only opens once
+                            the counsellor verifies the OTP sent to the student. */}
+                        {!otpSent[appt.id] ? (
+                          <button
                             className='cp-action-btn cp-action-btn-primary'
-                            style={{ textDecoration: 'none', display: 'inline-block' }}
+                            onClick={() => handleStartSession(appt.id)}
+                            disabled={actionLoading === appt.id}
                           >
-                            Join Meet
-                          </a>
+                            {actionLoading === appt.id ? 'Sending…' : 'Start session'}
+                          </button>
+                        ) : (
+                          <>
+                            <input
+                              type='text'
+                              inputMode='numeric'
+                              maxLength={6}
+                              placeholder='6-digit code'
+                              value={otpCode[appt.id] || ''}
+                              onChange={(e) =>
+                                setOtpCode((p) => ({ ...p, [appt.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))
+                              }
+                              style={{ padding: '6px 10px', border: '1px solid #DDE3EC', borderRadius: 8, fontSize: 13, width: 110 }}
+                            />
+                            <button
+                              className='cp-action-btn cp-action-btn-primary'
+                              onClick={() => handleVerifyCheckin(appt.id)}
+                              disabled={actionLoading === appt.id}
+                            >
+                              Verify &amp; start
+                            </button>
+                            <button
+                              className='cp-action-btn'
+                              onClick={() => handleStartSession(appt.id)}
+                              disabled={actionLoading === appt.id}
+                            >
+                              Resend
+                            </button>
+                          </>
                         )}
                         <button
                           className='cp-action-btn'
@@ -497,6 +579,23 @@ const CounsellorAppointmentsPage: React.FC = () => {
                       </>
                     )}
 
+                    {status === 'IN_PROGRESS' && (
+                      <>
+                        {meetingLink && (
+                          <a
+                            href={meetingLink}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='cp-action-btn cp-action-btn-primary'
+                            style={{ textDecoration: 'none', display: 'inline-block' }}
+                          >
+                            Join Meet
+                          </a>
+                        )}
+                        <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>● In progress</span>
+                      </>
+                    )}
+
                     {(status === 'COMPLETED' || status === 'ENDED') && (
                       <button
                         className='cp-action-btn'
@@ -507,6 +606,11 @@ const CounsellorAppointmentsPage: React.FC = () => {
                     )}
                   </div>
                 </div>
+                {checkinMsg[appt.id] && (
+                  <div style={{ fontSize: 12, color: '#6B7A8D', marginTop: 8 }}>
+                    {checkinMsg[appt.id]}
+                  </div>
+                )}
               </div>
             )
           })}

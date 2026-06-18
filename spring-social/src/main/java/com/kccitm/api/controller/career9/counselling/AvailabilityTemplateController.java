@@ -42,14 +42,21 @@ public class AvailabilityTemplateController {
     // no scope arg: body is AvailabilityTemplate; counsellor-scoped admin
     @PreAuthorize("@auth.allows('counselling.availability_template.create')")
     @PostMapping("/create")
-    public ResponseEntity<AvailabilityTemplate> create(
+    public ResponseEntity<?> create(
             @RequestBody AvailabilityTemplate template,
             @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "30") int days) {
         logger.info("Creating availability template for counsellor id: {}, days: {}",
                 template.getCounsellor() != null ? template.getCounsellor().getId() : null, days);
         AvailabilityTemplate saved = templateRepository.save(template);
-        materializationService.materializeSlotsForCounsellor(saved.getCounsellor().getId(), days);
-        return ResponseEntity.ok(saved);
+        // Materialize just this template's slots; overlapping slots (a time the counsellor
+        // already has a slot for, in any mode) are skipped — the rest are created.
+        SlotMaterializationService.MaterializationResult result =
+                materializationService.materializeForTemplate(saved, days);
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("template", saved);
+        body.put("slotsCreated", result.created);
+        body.put("slotsSkipped", result.skipped);
+        return ResponseEntity.ok(body);
     }
 
     // no scope arg: identifies by counsellorId; scope-filter narrows access

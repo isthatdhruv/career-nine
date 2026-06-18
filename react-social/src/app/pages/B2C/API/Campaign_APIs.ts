@@ -30,6 +30,7 @@ export interface CampaignAssessmentRow {
   assessmentName?: string;
   purchasePath?: "A" | "B" | null;
   counsellingModel?: "1" | "2" | null;
+  description?: string | null;
   isActive?: boolean;
   sortOrder?: number;
   tiers?: CampaignAssessmentTier[];
@@ -44,9 +45,35 @@ export interface CampaignAssessmentTier {
   isActive?: boolean;
 }
 
+// Class-based registration: a class routes to one of the campaign's attached
+// assessments. The student picks a class and that assessment (+ its default
+// tier/price) auto-selects — mirrors the B2B school flow.
+export interface CampaignClassRoute {
+  routeId: number;
+  classId: number;
+  sessionId?: number | null;
+  assessmentId: number;
+  assessmentName?: string | null;
+  className?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
+export interface CampaignClassOption {
+  classId: number;
+  className: string;
+}
+
+export interface CampaignSessionOption {
+  sessionId: number;
+  sessionYear?: string;
+  classes: CampaignClassOption[];
+}
+
 export interface CampaignFullDto {
   campaign: Campaign;
   assessments: CampaignAssessmentRow[];
+  classRoutes?: CampaignClassRoute[];
   institute?: InstituteOption | null;
 }
 
@@ -74,6 +101,7 @@ export const attachAssessment = (campaignId: number, body: {
 export const updateAssessmentMapping = (mappingId: number, body: {
   purchasePath?: "A" | "B" | null;
   counsellingModel?: "1" | "2" | null;
+  description?: string | null;
   sortOrder?: number;
   isActive?: boolean;
 }) => axios.put(`${API_URL}/campaign/assessment/${mappingId}`, body);
@@ -90,3 +118,22 @@ export const attachTierToMapping = (mappingId: number, body: {
 
 export const detachTierFromMapping = (tierMapId: number) =>
   axios.delete(`${API_URL}/campaign/assessment/tier/${tierMapId}`);
+
+// ── Class-based registration (class → assessment routing) ────────────────────
+export const getCampaignClassOptions = (campaignId: number) =>
+  axios.get<{ sessions: CampaignSessionOption[] }>(`${API_URL}/campaign/${campaignId}/class-options`);
+
+export const upsertClassRoute = (campaignId: number, body: {
+  classId: number;
+  sessionId?: number | null;
+  assessmentId: number;
+  sortOrder?: number;
+  isActive?: boolean;
+}) => axios.post(`${API_URL}/campaign/${campaignId}/class`, body);
+
+export const deleteClassRoute = (routeId: number) =>
+  axios.delete(`${API_URL}/campaign/class/${routeId}`);
+
+export const importSchoolConfig = (campaignId: number, sessionId: number) =>
+  axios.post<{ imported: number; assessmentsAttached: number; assessmentsTouched: number; message: string }>(
+    `${API_URL}/campaign/${campaignId}/import-school-config`, { sessionId });

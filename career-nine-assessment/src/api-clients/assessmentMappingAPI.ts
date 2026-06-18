@@ -39,6 +39,16 @@ export type MappingInfo = {
   instituteName: string;
   inclusions: MappingInclusions;
   activeTierName?: string;
+  // Post-assessment counselling payment timing + fee breakdown (PAID links only).
+  // PAY_FIRST folds the counselling fee into the registration total; PAY_LATER
+  // defers it to per-slot booking after the assessment.
+  paymentTiming?: 'PAY_FIRST' | 'PAY_LATER';
+  // The amount actually charged at registration: PAY_FIRST = amount + counsellingFeeTotal,
+  // PAY_LATER = amount. Use this as the headline price; `amount` is the assessment line item.
+  payableTotal?: number;
+  counsellingFeePerSession?: number;
+  counsellingSessionCount?: number;
+  counsellingFeeTotal?: number;
   sessionId?: number;
   sessionYear?: string;
   classId?: number;
@@ -103,6 +113,7 @@ export type CounsellingTierOption = {
   name: string;
   description?: string | null;
   amount: number;
+  counsellingPrice?: number | null;
   inclusions: MappingInclusions;
 };
 
@@ -116,6 +127,9 @@ export type CounsellingOptions = {
   assessmentName?: string;
   needsTierSelection: boolean;
   tiers: CounsellingTierOption[];
+  // PAY_LATER per-slot booking: pay the fee each time a slot is booked.
+  payPerSlot?: boolean;
+  counsellingFeePerSession?: number | null;
 };
 
 export function getCounsellingOptions(entitlementId: number | string) {
@@ -143,6 +157,7 @@ export type CounsellingSlot = {
   durationMinutes: number;
   counsellorName?: string;
   mode?: 'ONLINE' | 'OFFLINE';
+  booked?: boolean;    // already taken by another student — shown greyed, not bookable
 };
 
 export function getPayLaterSlots(entitlementId: number | string, from?: string) {

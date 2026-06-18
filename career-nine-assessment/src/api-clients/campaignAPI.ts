@@ -23,6 +23,8 @@ export function registerForCampaignTier(
     phone?: string
     gender?: string
     promoCode?: string
+    // Set for class-based campaigns so the backend records the student's grade.
+    classId?: number
   }
 ) {
   return http.post(
@@ -40,6 +42,7 @@ export function registerTrial(
     dob: string
     phone: string
     gender?: string
+    classId?: number
   }
 ) {
   return http.post(
@@ -62,6 +65,19 @@ export function getStudentCounselling(
 ) {
   return http.get('/campaign/public/student-counselling', {
     params: { userStudentId, assessmentId },
+  })
+}
+
+// Forward a counselling request when the assessment includes counselling but no
+// counsellor is mapped yet. Idempotent server-side (one open request per
+// student+assessment); records the request and emails the Career-9 team.
+export function forwardCounsellingRequest(
+  userStudentId: number | string,
+  assessmentId: number | string,
+) {
+  return http.post('/campaign/public/counselling-request', {
+    userStudentId,
+    assessmentId,
   })
 }
 

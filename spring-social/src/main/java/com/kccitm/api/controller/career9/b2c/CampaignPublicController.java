@@ -31,15 +31,20 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.b2c.Campaign;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
+import com.kccitm.api.model.career9.b2c.CampaignClassAssessment;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
+import com.kccitm.api.model.career9.counselling.CounsellingRequest;
+import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.PromoCodeRepository;
+import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentTierRepository;
+import com.kccitm.api.repository.Career9.b2c.CampaignClassAssessmentRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
 import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
 import com.kccitm.api.repository.Career9.b2c.PromoCodeCampaignRepository;
@@ -63,6 +68,8 @@ public class CampaignPublicController {
     @Autowired private CampaignRepository campaignRepository;
     @Autowired private CampaignAssessmentMappingRepository mappingRepository;
     @Autowired private CampaignAssessmentTierRepository tierMappingRepository;
+    @Autowired private CampaignClassAssessmentRepository classRouteRepository;
+    @Autowired private SchoolClassesRepository schoolClassesRepository;
     @Autowired private PricingTierRepository pricingTierRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private PromoCodeRepository promoCodeRepository;
@@ -84,6 +91,15 @@ public class CampaignPublicController {
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
     @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
+    @Autowired(required = false) private com.kccitm.api.repository.Career9.counselling.CounsellingRequestRepository counsellingRequestRepository;
+    // Optional: only present when app.email.provider=smtp. Guard for null before sending.
+    @Autowired(required = false) private com.kccitm.api.service.SmtpEmailService smtpEmailService;
+
+    // Where "forward my counselling request" notices go, and the address shown to
+    // students on the thank-you page. Kept configurable; defaults to the canonical
+    // public support inbox used elsewhere in the app.
+    @org.springframework.beans.factory.annotation.Value("${app.support.email:support@career-9.net}")
+    private String supportEmail;
 
     // Phase 3b — pay-before-book for EXTRA counselling sessions.
     // Fallback per-session price (INR) when the entitlement has no snapshotted price.
@@ -175,6 +191,7 @@ public class CampaignPublicController {
             aDto.put("isActive", a.getIsActive());
             aDto.put("purchasePath", m.getPurchasePath() != null ? m.getPurchasePath() : defaultPurchasePath);
             aDto.put("counsellingModel", m.getCounsellingModel() != null ? m.getCounsellingModel() : defaultCounsellingModel);
+            aDto.put("description", m.getDescription());
 
             List<CampaignAssessmentTier> tiers = tierMappingRepository
                     .findByCampaignAssessmentMappingIdOrderByIdAsc(m.getId())
@@ -221,6 +238,50 @@ public class CampaignPublicController {
         Map<String, Object> response = new HashMap<>();
         response.put("campaign", campaignDto);
         response.put("assessments", assessmentsOut);
+
+        // Class-based registration routes. When present (and this is not an
+        // assessment/tier deep-link), the student app shows a "Choose your class"
+        // picker; picking a class auto-selects its assessment (and default tier /
+        // price). Only routes whose assessment is COMPLETABLE are returned, so the
+        // picker can never resolve to a dead end: try-first needs no tier, but
+        // pay-first needs at least one active tier to charge against (e.g. an
+        // assessment freshly imported from school config before tiers are set).
+        if (filterAssessmentId == null) {
+            java.util.Set<Long> usable = new java.util.HashSet<>();
+            for (Map<String, Object> aDto : assessmentsOut) {
+                Object aid = aDto.get("assessmentId");
+                if (!(aid instanceof Number)) continue;
+                boolean tryFirst = "B".equals(aDto.get("purchasePath"));
+                Object tiersObj = aDto.get("tiers");
+                boolean hasTier = tiersObj instanceof List && !((List<?>) tiersObj).isEmpty();
+                if (tryFirst || hasTier) usable.add(((Number) aid).longValue());
+            }
+            List<Map<String, Object>> classesOut = new ArrayList<>();
+            for (CampaignClassAssessment r : classRouteRepository
+                    .findByCampaignIdAndIsDeletedFalseOrderBySortOrderAscIdAsc(c.getCampaignId())) {
+                if (!Boolean.TRUE.equals(r.getIsActive())) continue;
+                if (r.getAssessmentId() == null || !usable.contains(r.getAssessmentId())) continue;
+                SchoolClasses sc = r.getClassId() != null
+                        ? schoolClassesRepository.findById(r.getClassId()).orElse(null) : null;
+                if (sc == null) continue; // class deleted — skip rather than show a blank option
+                Map<String, Object> cDto = new HashMap<>();
+                cDto.put("classId", r.getClassId());
+                cDto.put("className", sc.getClassName());
+                cDto.put("assessmentId", r.getAssessmentId());
+                cDto.put("sortOrder", r.getSortOrder());
+                classesOut.add(cDto);
+            }
+            // Grade order ("Class 9" before "Class 10"); non-numeric names last, by name.
+            classesOut.sort((a, b) -> {
+                Integer ga = gradeOf((String) a.get("className"));
+                Integer gb = gradeOf((String) b.get("className"));
+                if (ga != null && gb != null) return ga.compareTo(gb);
+                if (ga != null) return -1;
+                if (gb != null) return 1;
+                return String.valueOf(a.get("className")).compareToIgnoreCase(String.valueOf(b.get("className")));
+            });
+            response.put("classes", classesOut);
+        }
         return ResponseEntity.ok(response);
     }
 
@@ -275,6 +336,9 @@ public class CampaignPublicController {
         String phone = strFromBody(body, "phone");
         String gender = strFromBody(body, "gender");
         String promoCodeStr = strFromBody(body, "promoCode");
+        // Optional: the class the student picked (class-based campaigns). Persisted
+        // as a grade number on StudentInfo so reports resolve the right template.
+        Integer classId = intFromBody(body, "classId");
 
         if (name == null || email == null || dobStr == null || phone == null) {
             return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
@@ -341,13 +405,13 @@ public class CampaignPublicController {
         // 6. Free path → inline-provision and return session
         if (finalInr == 0L) {
             return provisionFreeAndRespond(campaign, mapping, tierMapping, pricingTier,
-                    existing, name, email, dob, dobStr, phone, gender,
+                    existing, name, email, dob, dobStr, phone, gender, classId,
                     promoCodeSaved, promoDiscountPercent, originalInr, httpResponse);
         }
 
         // 7. Paid path → create Razorpay payment link + PaymentTransaction
         return createPaymentAndRedirect(campaign, mapping, tierMapping, pricingTier,
-                name, email, dob, dobStr, phone, gender,
+                name, email, dob, dobStr, phone, gender, classId,
                 finalInr, originalInr, promoCodeSaved, promoDiscountPercent);
     }
 
@@ -392,6 +456,8 @@ public class CampaignPublicController {
         String dobStr = strFromBody(body, "dob");
         String phone = strFromBody(body, "phone");
         String gender = strFromBody(body, "gender");
+        Integer classId = intFromBody(body, "classId");
+        Integer studentClass = parseClassNumber(classId);
 
         if (name == null || email == null || dobStr == null || phone == null) {
             return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
@@ -419,6 +485,10 @@ public class CampaignPublicController {
         UserStudent userStudent;
         User user;
         if (existing != null) {
+            if (studentClass != null && existing.getStudentClass() == null) {
+                existing.setStudentClass(studentClass);
+                studentInfoRepository.save(existing);
+            }
             user = existing.getUser();
             if (user == null) {
                 user = new User((int) (Math.random() * 100000), dob);
@@ -446,6 +516,7 @@ public class CampaignPublicController {
             info.setStudentDob(dob);
             info.setPhoneNumber(phone);
             info.setGender(gender);
+            info.setStudentClass(studentClass);
             info.setUser(user);
             info = studentInfoRepository.save(info);
 
@@ -782,8 +853,11 @@ public class CampaignPublicController {
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier, StudentInfo existing,
             String name, String email, Date dob, String dobStr, String phone, String gender,
+            Integer classId,
             String promoCodeSaved, Integer promoDiscountPercent, long originalInr,
             HttpServletResponse httpResponse) {
+
+        Integer studentClass = parseClassNumber(classId);
 
         // Re-check campaign expiry here. The /register entry already validated
         // it, but the form may have sat open for hours — we don't want to
@@ -796,6 +870,11 @@ public class CampaignPublicController {
         UserStudent userStudent;
         User user;
         if (existing != null) {
+            // Backfill the grade if we now know it and it wasn't recorded before.
+            if (studentClass != null && existing.getStudentClass() == null) {
+                existing.setStudentClass(studentClass);
+                studentInfoRepository.save(existing);
+            }
             user = existing.getUser();
             if (user == null) {
                 user = new User((int) (Math.random() * 100000), dob);
@@ -826,6 +905,7 @@ public class CampaignPublicController {
             studentInfo.setStudentDob(dob);
             studentInfo.setPhoneNumber(phone);
             studentInfo.setGender(gender);
+            studentInfo.setStudentClass(studentClass);
             studentInfo.setUser(user);
             studentInfo = studentInfoRepository.save(studentInfo);
 
@@ -857,6 +937,7 @@ public class CampaignPublicController {
         txn.setStudentEmail(email);
         txn.setStudentDob(dob);
         txn.setStudentPhone(phone);
+        txn.setStudentClass(studentClass);
         txn.setUserStudentId(userStudent.getUserStudentId());
         if (promoCodeSaved != null) {
             txn.setPromoCode(promoCodeSaved);
@@ -924,6 +1005,7 @@ public class CampaignPublicController {
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier,
             String name, String email, Date dob, String dobStr, String phone, String gender,
+            Integer classId,
             long finalInr, long originalInr, String promoCodeSaved, Integer promoDiscountPercent) {
 
         // Re-check campaign expiry — see provisionFreeAndRespond comment.
@@ -947,6 +1029,9 @@ public class CampaignPublicController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
+            // Carry the grade to the webhook, which creates the StudentInfo for
+            // pay-first registrations (class context isn't available there).
+            txn.setStudentClass(parseClassNumber(classId));
             txn.setStatus("created");
             if (promoCodeSaved != null) {
                 txn.setPromoCode(promoCodeSaved);
@@ -1026,6 +1111,21 @@ public class CampaignPublicController {
         out.put("counsellingOffered", offered);
         if (!offered) {
             out.put("counsellingActive", false);
+            // No counsellor mapped yet. If the student's package actually INCLUDED
+            // counselling (entitlement has sessions), surface a "pending assignment"
+            // flag so the thank-you page can forward the request to Career-9 instead
+            // of silently hiding counselling. Otherwise this assessment simply has no
+            // counselling and nothing extra is shown.
+            boolean includedCounselling = entitlementIncludesCounselling(userStudentId, assessmentId);
+            out.put("counsellingPendingAssignment", includedCounselling);
+            if (includedCounselling) {
+                out.put("supportEmail", supportEmail);
+                boolean alreadyForwarded = counsellingRequestRepository != null
+                        && counsellingRequestRepository
+                                .findFirstByUserStudentIdAndAssessmentIdAndStatus(userStudentId, assessmentId, "PENDING")
+                                .isPresent();
+                out.put("counsellingRequestForwarded", alreadyForwarded);
+            }
             return ResponseEntity.ok(out);
         }
         // Resolve any active entitlement for this (student, assessment) to obtain a booking
@@ -1076,6 +1176,102 @@ public class CampaignPublicController {
         return ResponseEntity.ok(out);
     }
 
+    /** True when the student has an active entitlement for this assessment that included counselling. */
+    private boolean entitlementIncludesCounselling(Long userStudentId, Long assessmentId) {
+        if (studentEntitlementRepository == null) return false;
+        for (StudentEntitlement cand : studentEntitlementRepository
+                .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
+            if (!"active".equals(cand.getStatus())) continue;
+            Integer total = cand.getCounsellingSessionsTotal();
+            if (total != null && total > 0) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Forward a student's counselling interest when no counsellor is mapped to the
+     * assessment yet. Idempotent: at most one PENDING row per (student, assessment).
+     * Records the request (admins action it on the Counsellor ↔ Assessment page) and
+     * emails the Career-9 support inbox. Public funnel — anonymous, like the siblings.
+     */
+    // @PreAuthorize-Exempt: public b2c funnel (entire controller).
+    @PostMapping("/counselling-request")
+    @Transactional
+    public ResponseEntity<?> forwardCounsellingRequest(@RequestBody Map<String, Object> body) {
+        Long userStudentId = longFromBody(body, "userStudentId");
+        Long assessmentId = longFromBody(body, "assessmentId");
+        if (userStudentId == null || assessmentId == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Map<String, Object> out = new HashMap<>();
+        // A counsellor may have been assigned between page load and this call — nothing to forward.
+        if (bookingService != null && bookingService.hasCounsellorForAssessment(assessmentId)) {
+            out.put("status", "ASSIGNED");
+            return ResponseEntity.ok(out);
+        }
+        if (counsellingRequestRepository == null) {
+            // Persistence unavailable — acknowledge without throwing so the student still sees the notice.
+            out.put("status", "PENDING");
+            out.put("forwarded", false);
+            return ResponseEntity.ok(out);
+        }
+        Optional<CounsellingRequest> existing = counsellingRequestRepository
+                .findFirstByUserStudentIdAndAssessmentIdAndStatus(userStudentId, assessmentId, "PENDING");
+        if (existing.isPresent()) {
+            out.put("status", "PENDING");
+            out.put("alreadyForwarded", true);
+            return ResponseEntity.ok(out);
+        }
+        CounsellingRequest req = new CounsellingRequest();
+        req.setUserStudentId(userStudentId);
+        req.setAssessmentId(assessmentId);
+        String studentName = null, studentEmail = null, studentPhone = null, instituteName = null;
+        Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+        if (usOpt.isPresent()) {
+            UserStudent us = usOpt.get();
+            if (us.getInstitute() != null) {
+                req.setInstituteCode(us.getInstitute().getInstituteCode());
+                instituteName = us.getInstitute().getInstituteName();
+            }
+            if (us.getStudentInfo() != null) {
+                studentName = us.getStudentInfo().getName();
+                studentEmail = us.getStudentInfo().getEmail();
+                studentPhone = us.getStudentInfo().getPhoneNumber();
+            }
+        }
+        req.setStatus("PENDING");
+        counsellingRequestRepository.save(req);
+
+        String assessmentName = assessmentTableRepository.findById(assessmentId)
+                .map(AssessmentTable::getAssessmentName).orElse("assessment #" + assessmentId);
+        notifyCounsellingForwarded(assessmentName, studentName, studentEmail, studentPhone, instituteName);
+
+        out.put("status", "PENDING");
+        out.put("forwarded", true);
+        return ResponseEntity.ok(out);
+    }
+
+    /** Best-effort email to the Career-9 team; the DB row is the source of truth. */
+    private void notifyCounsellingForwarded(String assessmentName, String studentName,
+            String studentEmail, String studentPhone, String instituteName) {
+        if (smtpEmailService == null || supportEmail == null || supportEmail.isEmpty()) return;
+        try {
+            String subject = "Counselling request — " + assessmentName;
+            StringBuilder b = new StringBuilder();
+            b.append("A student has requested career counselling, but no counsellor is mapped to this assessment yet.\n\n");
+            b.append("Assessment: ").append(assessmentName).append('\n');
+            if (studentName != null)  b.append("Student: ").append(studentName).append('\n');
+            if (studentEmail != null) b.append("Email: ").append(studentEmail).append('\n');
+            if (studentPhone != null) b.append("Phone: ").append(studentPhone).append('\n');
+            if (instituteName != null) b.append("Institute: ").append(instituteName).append('\n');
+            b.append("\nAssign a counsellor on the Counsellor ↔ Assessment page to let the student book.");
+            smtpEmailService.sendSimpleEmail(supportEmail, subject, b.toString());
+        } catch (Exception ex) {
+            // Forwarding email is best-effort — never fail the request on a mail error.
+            logger.warn("Failed to email counselling request notice to {}: {}", supportEmail, ex.getMessage());
+        }
+    }
+
     @PostMapping("/counselling/slots")
     @Transactional(readOnly = true)
     public ResponseEntity<?> listCounsellingSlots(@RequestBody Map<String, Object> body) {
@@ -1121,8 +1317,9 @@ public class CampaignPublicController {
         }
         // Phase 4: restrict to counsellors the admin assigned to this assessment
         // (falls back to institute-only when the assessment has no assignments).
+        // Includes already-taken slots so the picker can grey them out as "Booked".
         List<com.kccitm.api.model.career9.counselling.CounsellingSlot> slots =
-                bookingService.getAvailableSlotsForInstitute(from, instituteCode, e.getAssessmentId());
+                bookingService.getBookableSlotsForInstitute(from, instituteCode, e.getAssessmentId());
 
         List<Map<String, Object>> slotDtos = new ArrayList<>();
         for (com.kccitm.api.model.career9.counselling.CounsellingSlot s : slots) {
@@ -1133,6 +1330,8 @@ public class CampaignPublicController {
             dto.put("endTime", s.getEndTime().toString());
             dto.put("durationMinutes", s.getDurationMinutes());
             dto.put("mode", s.getMode() != null ? s.getMode() : "ONLINE");
+            // Taken by another student — shown greyed/disabled, not bookable.
+            dto.put("booked", !"AVAILABLE".equals(s.getStatus()));
             if (s.getCounsellor() != null) {
                 dto.put("counsellorName", s.getCounsellor().getName());
             }
@@ -1346,6 +1545,35 @@ public class CampaignPublicController {
         if (v == null) return null;
         String s = v.toString().trim();
         return s.isEmpty() ? null : s;
+    }
+
+    private static Integer intFromBody(Map<String, Object> body, String key) {
+        Object v = body.get(key);
+        if (v == null) return null;
+        if (v instanceof Number) return ((Number) v).intValue();
+        try { return Integer.parseInt(v.toString().trim()); }
+        catch (NumberFormatException e) { return null; }
+    }
+
+    /**
+     * Resolve a SchoolClasses id to its grade number (e.g. "Class 10" → 10) for
+     * StudentInfo.studentClass. Mirrors the B2B AssessmentInstituteMappingController
+     * logic: strip non-digits from the class name; return null for non-numeric
+     * names ("Nursery"/"LKG") rather than persisting the PK as a bogus grade.
+     */
+    private Integer parseClassNumber(Integer classId) {
+        if (classId == null) return null;
+        SchoolClasses sc = schoolClassesRepository.findById(classId).orElse(null);
+        return sc == null ? null : gradeOf(sc.getClassName());
+    }
+
+    /** Grade number from a class name ("Class 10" → 10); null for non-numeric names. */
+    private static Integer gradeOf(String className) {
+        if (className == null) return null;
+        String digits = className.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) return null;
+        try { return Integer.parseInt(digits); }
+        catch (NumberFormatException e) { return null; }
     }
 
     /** Atomically consume one promo use for a realized redemption; no-op if absent/at-cap. */

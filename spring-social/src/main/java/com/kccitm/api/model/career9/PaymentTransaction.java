@@ -72,6 +72,15 @@ public class PaymentTransaction implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy")
     private Date studentDob;
 
+    /**
+     * Student's grade number (e.g. 10), resolved from the class they picked on a
+     * class-based campaign. Snapshotted here so the pay-first webhook can stamp it
+     * onto StudentInfo.studentClass when it provisions the student. Null for
+     * non-class campaigns / non-numeric classes.
+     */
+    @Column(name = "student_class")
+    private Integer studentClass;
+
     @Column(name = "user_student_id")
     private Long userStudentId;
 
@@ -205,6 +214,9 @@ public class PaymentTransaction implements Serializable {
 
     public Date getStudentDob() { return studentDob; }
     public void setStudentDob(Date studentDob) { this.studentDob = studentDob; }
+
+    public Integer getStudentClass() { return studentClass; }
+    public void setStudentClass(Integer studentClass) { this.studentClass = studentClass; }
 
     public Long getUserStudentId() { return userStudentId; }
     public void setUserStudentId(Long userStudentId) { this.userStudentId = userStudentId; }

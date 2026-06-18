@@ -1,11 +1,6 @@
 {
-<<<<<<< HEAD
-  "version": "mqf5k24d",
-  "generated": "2026-06-15T11:51:17.437Z",
-=======
-  "version": "mqc00dt7",
-  "generated": "2026-06-13T06:52:42.859Z",
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+  "version": "mqghu21u",
+  "generated": "2026-06-16T10:22:45.474Z",
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -123,57 +118,32 @@
       "priority": "deferred"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/HydroTubeGame-ggfuYU2I.js",
-=======
-      "url": "/assets/HydroTubeGame-D-3LcFJn.js",
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+      "url": "/assets/HydroTubeGame-8gII6eQ7.js",
       "size": 23331,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/JungleSpotGame-D11PAR5C.js",
-=======
-      "url": "/assets/JungleSpotGame-h_wucsHZ.js",
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+      "url": "/assets/JungleSpotGame-BbAxMY4q.js",
       "size": 23397,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/RabbitPathGame-DE3nTkxi.js",
-=======
-      "url": "/assets/RabbitPathGame-CK55sFgv.js",
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+      "url": "/assets/RabbitPathGame-9dUpnIkk.js",
       "size": 26981,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/SectionInstructionPage-CVUvjxlw.js",
-=======
-      "url": "/assets/SectionInstructionPage-wgSMH2eY.js",
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+      "url": "/assets/SectionInstructionPage-DveDTE06.js",
       "size": 4206,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/SectionQuestionPage-D0qmRoRa.js",
-      "size": 175861,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/SelectSectionPage-DQszdLZM.js",
-=======
-      "url": "/assets/SectionQuestionPage-Ds0pcWqH.js",
+      "url": "/assets/SectionQuestionPage-cyMR2MZg.js",
       "size": 175845,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-NAMwBAt5.js",
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+      "url": "/assets/SelectSectionPage-DW0OnwRo.js",
       "size": 5255,
       "priority": "critical"
     },
@@ -193,18 +163,8 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-BCS5LYfk.js",
-      "size": 1070460,
-      "priority": "critical"
-    },
-    {
       "url": "/assets/index-BJK7OE60.js",
       "size": 1274010,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/index-CDM2LJwA.js",
-      "size": 1050145,
       "priority": "critical"
     },
     {
@@ -213,11 +173,12 @@
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/index.es-DiErvLDR.js",
-=======
-      "url": "/assets/index.es-H4OB9xdB.js",
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+      "url": "/assets/index-DZTXSx4P.js",
+      "size": 1073394,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index.es-f_knFt_q.js",
       "size": 158825,
       "priority": "critical"
     },
@@ -269,11 +230,7 @@
   ],
   "summary": {
     "total": 45,
-<<<<<<< HEAD
-    "totalSize": 23776144,
-=======
-    "totalSize": 23755797,
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+    "totalSize": 23779046,
     "byPriority": {
       "game": {
         "count": 11,
@@ -285,11 +242,7 @@
       },
       "critical": {
         "count": 18,
-<<<<<<< HEAD
-        "size": 3345520
-=======
-        "size": 3325173
->>>>>>> 6540efac657f19d886d4f473b78aa17f81a9b3d5
+        "size": 3348422
       },
       "other": {
         "count": 4,

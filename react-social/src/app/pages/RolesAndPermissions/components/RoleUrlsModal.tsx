@@ -117,6 +117,18 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
     setSelectedPaths(next);
   };
 
+  // Toggle every catalog route in a group on/off in one click. Custom paths are
+  // untouched — they live outside the catalog groups.
+  const handleSelectAllGroup = (groupOpts: RouteOption[]) => {
+    const allOn = groupOpts.every((o) => selectedPaths.has(o.value));
+    const next = new Set(selectedPaths);
+    for (const o of groupOpts) {
+      if (allOn) next.delete(o.value);
+      else next.add(o.value);
+    }
+    setSelectedPaths(next);
+  };
+
   const handleSave = async () => {
     if (!role) return;
     setSaving(true);
@@ -201,6 +213,14 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
                 }}
                 placeholder="Choose routes from the catalog..."
                 noOptionsMessage={() => "No routes available"}
+                formatGroupLabel={(g) => (
+                  <UrlGroupHeader
+                    label={g.label}
+                    onToggle={() => handleSelectAllGroup(g.options as RouteOption[])}
+                    selectedCount={(g.options as RouteOption[]).filter((o) => selectedPaths.has(o.value)).length}
+                    totalCount={g.options.length}
+                  />
+                )}
                 formatOptionLabel={(opt) => (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontFamily: "monospace", fontWeight: 600 }}>{opt.value}</span>
@@ -221,12 +241,8 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
                   valueContainer: (base) => ({ ...base, maxHeight: "200px", overflowY: "auto" }),
                   menuPortal: (base) => ({ ...base, zIndex: 10000 }),
                   menu: (base) => ({ ...base, zIndex: 10000 }),
-                  groupHeading: (base) => ({
-                    ...base,
-                    padding: "6px 12px", background: "#f3f4f6",
-                    fontSize: "0.78rem", fontWeight: 700, color: "#374151",
-                    textTransform: "uppercase", letterSpacing: "0.5px",
-                  }),
+                  // Custom header (formatGroupLabel) owns its own padding/bg.
+                  groupHeading: (base) => ({ ...base, padding: 0, marginBottom: 0 }),
                 }}
               />
 
@@ -339,6 +355,72 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
     </div>
   );
 };
+
+// ── Group header with click-to-toggle-all (mirrors RolePermissionsModal) ──────
+interface UrlGroupHeaderProps {
+  label: string;
+  onToggle: () => void;
+  selectedCount: number;
+  totalCount: number;
+}
+const UrlGroupHeader = ({ label, onToggle, selectedCount, totalCount }: UrlGroupHeaderProps) => {
+  const allOn = selectedCount === totalCount && totalCount > 0;
+  const someOn = selectedCount > 0 && !allOn;
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onToggle();
+      }}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "6px 12px",
+        background: "#f3f4f6",
+        cursor: "pointer",
+        fontSize: "0.78rem",
+        fontWeight: 700,
+        color: "#374151",
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+        userSelect: "none",
+      }}
+      title={allOn ? "Click to clear all in this group" : "Click to select all in this group"}
+    >
+      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <GroupCheckbox allOn={allOn} someOn={someOn} />
+        <span>{label}</span>
+      </span>
+      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: allOn ? "#059669" : someOn ? "#d97706" : "#9ca3af" }}>
+        {allOn ? "All selected" : someOn ? `${selectedCount} of ${totalCount} · select all` : "Select all"}
+      </span>
+    </div>
+  );
+};
+
+// Tri-state checkbox glyph: empty / dash (some) / check (all). Visual only.
+const GroupCheckbox = ({ allOn, someOn }: { allOn: boolean; someOn: boolean }) => (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: 16,
+      height: 16,
+      borderRadius: 4,
+      border: `1.5px solid ${allOn || someOn ? "#0891b2" : "#9ca3af"}`,
+      background: allOn || someOn ? "#0891b2" : "#fff",
+      color: "#fff",
+      fontSize: "0.7rem",
+      lineHeight: 1,
+      flexShrink: 0,
+    }}
+  >
+    {allOn ? "✓" : someOn ? "–" : ""}
+  </span>
+);
 
 function prettifyGroupName(g: string): string {
   if (g === "(other)") return "(other)";

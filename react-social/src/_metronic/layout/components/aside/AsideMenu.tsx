@@ -43,6 +43,11 @@ const AsideMenu: React.FC<Props> = ({ asideMenuCSSClasses }) => {
       <div
         id="#kt_aside_menu"
         data-kt-menu="true"
+        // minHeight:100% makes this flex column fill the menu area, so a menu item
+        // with marginTop:auto (e.g. the counsellor "Sign Out") is pushed to the very
+        // bottom. Harmless for menus whose items already overflow (admin) — there it
+        // simply stays content-height and scrolls as before.
+        style={{ minHeight: "100%" }}
         className={clsx(
           "menu menu-column menu-title-gray-800 menu-state-title-primary menu-state-icon-primary menu-state-bullet-primary menu-arrow-gray-500",
           asideMenuCSSClasses.join(" ")

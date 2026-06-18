@@ -21,12 +21,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.SchoolAssessmentConfig;
 import com.kccitm.api.model.career9.b2c.Campaign;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
+import com.kccitm.api.model.career9.b2c.CampaignClassAssessment;
+import com.kccitm.api.model.career9.school.SchoolClasses;
+import com.kccitm.api.model.career9.school.SchoolSession;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.SchoolAssessmentConfigRepository;
+import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
+import com.kccitm.api.repository.Career9.School.SchoolSessionRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentTierRepository;
+import com.kccitm.api.repository.Career9.b2c.CampaignClassAssessmentRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
 import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
@@ -39,9 +47,13 @@ public class CampaignController {
     @Autowired private CampaignRepository campaignRepository;
     @Autowired private CampaignAssessmentMappingRepository mappingRepository;
     @Autowired private CampaignAssessmentTierRepository tierMappingRepository;
+    @Autowired private CampaignClassAssessmentRepository classRouteRepository;
     @Autowired private PricingTierRepository pricingTierRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
+    @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
+    @Autowired private SchoolClassesRepository schoolClassesRepository;
+    @Autowired private SchoolSessionRepository schoolSessionRepository;
     @Autowired private CampaignResolutionService campaignResolutionService;
 
     @Autowired private com.kccitm.api.service.career9.InstituteAssessmentService instituteAssessmentService;
@@ -228,6 +240,7 @@ public class CampaignController {
         }
         m.setPurchasePath(normalizePath((String) req.get("purchasePath")));
         m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
+        if (req.containsKey("description")) m.setDescription(normalizeDescription((String) req.get("description")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
         CampaignAssessmentMapping savedMapping = mappingRepository.save(m);
         // Keep the institute<->assessment catalog in sync: an assessment attached to an
@@ -248,6 +261,7 @@ public class CampaignController {
         CampaignAssessmentMapping m = opt.get();
         if (req.containsKey("purchasePath")) m.setPurchasePath(normalizePath((String) req.get("purchasePath")));
         if (req.containsKey("counsellingModel")) m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
+        if (req.containsKey("description")) m.setDescription(normalizeDescription((String) req.get("description")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
         if (req.containsKey("isActive")) m.setIsActive(toBool(req.get("isActive")));
         return ResponseEntity.ok(mappingRepository.save(m));
@@ -320,6 +334,183 @@ public class CampaignController {
         return ResponseEntity.ok("Tier detached");
     }
 
+    // ── Class-based registration (class → assessment routing) ───────────────────
+    // A campaign-scoped mirror of the B2B "pick a class → assessment + price
+    // auto-selected" flow. Routes sit on top of the existing assessment mappings,
+    // so pricing/tier/payment logic is unchanged — a route just tells the public
+    // registration page which attached assessment a class resolves to.
+
+    /**
+     * Sessions + classes available for the campaign's institute, so the editor can
+     * offer a class picker. Campaign-scoped (guarded by campaign.read) to avoid
+     * coupling to the school_session.read permission.
+     */
+    @PreAuthorize("@auth.allows('campaign.read')")
+    @GetMapping("/{campaignId}/class-options")
+    public ResponseEntity<?> classOptions(@PathVariable Long campaignId) {
+        Campaign campaign = campaignRepository.findById(campaignId).orElse(null);
+        if (campaign == null) return ResponseEntity.notFound().build();
+        if (campaign.getInstituteCode() == null) {
+            return ResponseEntity.ok(java.util.Collections.singletonMap("sessions", new ArrayList<>()));
+        }
+        List<SchoolSession> sessions = schoolSessionRepository
+                .findByInstituteCodeWithClasses(campaign.getInstituteCode());
+        List<Map<String, Object>> sessionRows = new ArrayList<>();
+        for (SchoolSession s : sessions) {
+            Map<String, Object> sr = new HashMap<>();
+            sr.put("sessionId", s.getId());
+            sr.put("sessionYear", s.getSessionYear());
+            List<Map<String, Object>> classRows = new ArrayList<>();
+            if (s.getSchoolClasses() != null) {
+                for (SchoolClasses sc : s.getSchoolClasses()) {
+                    Map<String, Object> cr = new HashMap<>();
+                    cr.put("classId", sc.getId());
+                    cr.put("className", sc.getClassName());
+                    classRows.add(cr);
+                }
+            }
+            sr.put("classes", classRows);
+            sessionRows.add(sr);
+        }
+        return ResponseEntity.ok(java.util.Collections.singletonMap("sessions", sessionRows));
+    }
+
+    /**
+     * Create or update a class → assessment route. Reviving a soft-deleted route
+     * (same campaign+class) instead of inserting keeps UNIQUE(campaign_id,
+     * class_id) intact. The assessment must already be attached to the campaign.
+     */
+    @PreAuthorize("@auth.allows('campaign.update')")
+    @PostMapping("/{campaignId}/class")
+    public ResponseEntity<?> upsertClassRoute(@PathVariable Long campaignId,
+                                              @RequestBody Map<String, Object> req) {
+        Campaign campaign = campaignRepository.findById(campaignId).orElse(null);
+        if (campaign == null) return ResponseEntity.notFound().build();
+
+        Integer classId = toInt(req.get("classId"));
+        Long assessmentId = toLong(req.get("assessmentId"));
+        if (classId == null) return ResponseEntity.badRequest().body("classId is required");
+        if (assessmentId == null) return ResponseEntity.badRequest().body("assessmentId is required");
+
+        // The class must route to an assessment that is actually attached + live,
+        // otherwise the student would pick a class that resolves to nothing.
+        Optional<CampaignAssessmentMapping> mOpt = mappingRepository
+                .findByCampaignIdAndAssessmentIdAndIsDeletedFalse(campaignId, assessmentId);
+        if (!mOpt.isPresent() || !Boolean.TRUE.equals(mOpt.get().getIsActive())) {
+            return ResponseEntity.badRequest().body("Assessment is not attached to this campaign");
+        }
+
+        Optional<CampaignClassAssessment> any = classRouteRepository
+                .findByCampaignIdAndClassId(campaignId, classId);
+        CampaignClassAssessment route = any.orElseGet(CampaignClassAssessment::new);
+        route.setCampaignId(campaignId);
+        route.setClassId(classId);
+        route.setAssessmentId(assessmentId);
+        if (req.containsKey("sessionId")) route.setSessionId(toInt(req.get("sessionId")));
+        if (req.containsKey("sortOrder")) route.setSortOrder(toInt(req.get("sortOrder")));
+        if (req.containsKey("isActive")) route.setIsActive(toBool(req.get("isActive")));
+        route.setIsDeleted(false);
+        if (route.getIsActive() == null) route.setIsActive(true);
+        return ResponseEntity.ok(classRouteRepository.save(route));
+    }
+
+    @PreAuthorize("@auth.allows('campaign.update')")
+    @DeleteMapping("/class/{routeId}")
+    public ResponseEntity<?> deleteClassRoute(@PathVariable Long routeId) {
+        Optional<CampaignClassAssessment> opt = classRouteRepository.findById(routeId);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        CampaignClassAssessment route = opt.get();
+        route.setIsDeleted(true);
+        route.setIsActive(false);
+        classRouteRepository.save(route);
+        return ResponseEntity.ok("Class route removed");
+    }
+
+    /**
+     * Seed this campaign's class routes from the institute's existing B2B school
+     * config (SchoolAssessmentConfig) for a chosen session. For each
+     * class → assessment in that config we (a) ensure the assessment is attached
+     * to the campaign and (b) upsert a matching class route. Tiers/prices are NOT
+     * imported — the admin configures those via the existing tier drawer. Existing
+     * routes are overwritten so re-importing stays idempotent.
+     */
+    @PreAuthorize("@auth.allows('campaign.update')")
+    @org.springframework.transaction.annotation.Transactional
+    @PostMapping("/{campaignId}/import-school-config")
+    public ResponseEntity<?> importSchoolConfig(@PathVariable Long campaignId,
+                                                @RequestBody Map<String, Object> req) {
+        Campaign campaign = campaignRepository.findById(campaignId).orElse(null);
+        if (campaign == null) return ResponseEntity.notFound().build();
+        if (campaign.getInstituteCode() == null) {
+            return ResponseEntity.badRequest().body("Map an institute to this campaign first");
+        }
+        Integer sessionId = toInt(req.get("sessionId"));
+        if (sessionId == null) return ResponseEntity.badRequest().body("sessionId is required");
+
+        List<SchoolAssessmentConfig> configs = schoolAssessmentConfigRepository
+                .findByInstituteCodeAndSessionIdAndIsActiveTrue(campaign.getInstituteCode(), sessionId);
+
+        int imported = 0;
+        int attached = 0;
+        java.util.Set<Long> attachedAssessmentIds = new java.util.HashSet<>();
+        for (SchoolAssessmentConfig cfg : configs) {
+            if (cfg.getClassId() == null || cfg.getAssessmentId() == null) continue;
+            boolean created = ensureAssessmentAttached(campaign, cfg.getAssessmentId());
+            if (created) attached++;
+            attachedAssessmentIds.add(cfg.getAssessmentId());
+
+            Optional<CampaignClassAssessment> any = classRouteRepository
+                    .findByCampaignIdAndClassId(campaignId, cfg.getClassId());
+            CampaignClassAssessment route = any.orElseGet(CampaignClassAssessment::new);
+            route.setCampaignId(campaignId);
+            route.setClassId(cfg.getClassId());
+            route.setSessionId(sessionId);
+            route.setAssessmentId(cfg.getAssessmentId());
+            route.setIsDeleted(false);
+            route.setIsActive(true);
+            classRouteRepository.save(route);
+            imported++;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("imported", imported);
+        result.put("assessmentsAttached", attached);
+        result.put("assessmentsTouched", attachedAssessmentIds.size());
+        result.put("message", imported == 0
+                ? "No active school config found for the selected session"
+                : ("Imported " + imported + " class route(s). Configure pricing tiers for each assessment."));
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Ensure an assessment is attached (live) to the campaign, reviving a
+     * soft-deleted mapping or creating a fresh one. Mirrors attachAssessment's
+     * revive-or-create + institute-catalog sync. Returns true if a NEW mapping
+     * row was created (vs. an already-attached one).
+     */
+    private boolean ensureAssessmentAttached(Campaign campaign, Long assessmentId) {
+        Optional<CampaignAssessmentMapping> any = mappingRepository
+                .findByCampaignIdAndAssessmentId(campaign.getCampaignId(), assessmentId);
+        boolean created;
+        CampaignAssessmentMapping m;
+        if (any.isPresent()) {
+            m = any.get();
+            created = Boolean.TRUE.equals(m.getIsDeleted());
+            m.setIsDeleted(false);
+            m.setIsActive(true);
+        } else {
+            m = new CampaignAssessmentMapping();
+            m.setCampaignId(campaign.getCampaignId());
+            m.setAssessmentId(assessmentId);
+            created = true;
+        }
+        mappingRepository.save(m);
+        if (campaign.getInstituteCode() != null) {
+            instituteAssessmentService.ensure(campaign.getInstituteCode(), assessmentId);
+        }
+        return created;
+    }
+
     private Map<String, Object> toFullDto(Campaign c) {
         Map<String, Object> out = new HashMap<>();
         out.put("campaign", c);
@@ -348,6 +539,7 @@ public class CampaignController {
             row.put("assessmentName", a != null ? a.getAssessmentName() : null);
             row.put("purchasePath", m.getPurchasePath());
             row.put("counsellingModel", m.getCounsellingModel());
+            row.put("description", m.getDescription());
             row.put("isActive", m.getIsActive());
             row.put("sortOrder", m.getSortOrder());
             List<CampaignAssessmentTier> tiers = tierMappingRepository
@@ -356,6 +548,29 @@ public class CampaignController {
             rows.add(row);
         }
         out.put("assessments", rows);
+
+        // Class-based registration routes (class → assessment). Rendered in the
+        // "Class-based registration" section of the editor. className is resolved
+        // live from SchoolClasses; assessmentName from the assessment catalog.
+        List<CampaignClassAssessment> routes = classRouteRepository
+                .findByCampaignIdAndIsDeletedFalseOrderBySortOrderAscIdAsc(c.getCampaignId());
+        List<Map<String, Object>> routeRows = new ArrayList<>();
+        for (CampaignClassAssessment r : routes) {
+            Map<String, Object> rr = new HashMap<>();
+            rr.put("routeId", r.getId());
+            rr.put("classId", r.getClassId());
+            rr.put("sessionId", r.getSessionId());
+            rr.put("assessmentId", r.getAssessmentId());
+            rr.put("sortOrder", r.getSortOrder());
+            rr.put("isActive", r.getIsActive());
+            SchoolClasses sc = r.getClassId() != null
+                    ? schoolClassesRepository.findById(r.getClassId()).orElse(null) : null;
+            rr.put("className", sc != null ? sc.getClassName() : null);
+            AssessmentTable a = assessmentTableRepository.findById(r.getAssessmentId()).orElse(null);
+            rr.put("assessmentName", a != null ? a.getAssessmentName() : null);
+            routeRows.add(rr);
+        }
+        out.put("classRoutes", routeRows);
         return out;
     }
 
@@ -374,6 +589,13 @@ public class CampaignController {
         if (s == null) return null;
         s = s.trim();
         return ("1".equals(s) || "2".equals(s)) ? s : null;
+    }
+
+    /** Trim and collapse a blank description to NULL so the public card omits it cleanly. */
+    private static String normalizeDescription(String s) {
+        if (s == null) return null;
+        s = s.trim();
+        return s.isEmpty() ? null : s;
     }
 
     private static java.util.Date parseDate(String s) {

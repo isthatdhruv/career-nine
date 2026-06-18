@@ -329,7 +329,7 @@ interface GroupHeaderProps {
   totalCount: number;
 }
 const GroupHeader = ({ label, onToggle, selectedCount, totalCount }: GroupHeaderProps) => {
-  const allOn = selectedCount === totalCount;
+  const allOn = selectedCount === totalCount && totalCount > 0;
   const someOn = selectedCount > 0 && !allOn;
   return (
     <div
@@ -352,15 +352,41 @@ const GroupHeader = ({ label, onToggle, selectedCount, totalCount }: GroupHeader
         letterSpacing: "0.5px",
         userSelect: "none",
       }}
-      title="Click to toggle all permissions in this group"
+      title={allOn ? "Click to clear all in this group" : "Click to select all in this group"}
     >
-      <span>{label}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <GroupCheckbox allOn={allOn} someOn={someOn} />
+        <span>{label}</span>
+      </span>
       <span style={{ fontSize: "0.72rem", fontWeight: 600, color: allOn ? "#059669" : someOn ? "#d97706" : "#9ca3af" }}>
-        {allOn ? "All selected" : `${selectedCount} of ${totalCount}`}
+        {allOn ? "All selected" : someOn ? `${selectedCount} of ${totalCount} · select all` : "Select all"}
       </span>
     </div>
   );
 };
+
+// Tri-state checkbox glyph: empty / dash (some) / check (all). Visual only —
+// the click handler lives on the parent header row.
+const GroupCheckbox = ({ allOn, someOn }: { allOn: boolean; someOn: boolean }) => (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: 16,
+      height: 16,
+      borderRadius: 4,
+      border: `1.5px solid ${allOn || someOn ? "#2563eb" : "#9ca3af"}`,
+      background: allOn || someOn ? "#2563eb" : "#fff",
+      color: "#fff",
+      fontSize: "0.7rem",
+      lineHeight: 1,
+      flexShrink: 0,
+    }}
+  >
+    {allOn ? "✓" : someOn ? "–" : ""}
+  </span>
+);
 
 // ── Single option row: code · description · route/endpoint badges ────────────
 interface OptionLabelRowProps {

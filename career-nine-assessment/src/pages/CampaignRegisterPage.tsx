@@ -35,7 +35,15 @@ type Assessment = {
   isActive: boolean
   purchasePath: string
   counsellingModel: string
+  description?: string | null
   tiers: Tier[]
+}
+
+type CampaignClass = {
+  classId: number
+  className: string
+  assessmentId: number
+  sortOrder?: number
 }
 
 type CampaignInfo = {
@@ -50,6 +58,9 @@ type CampaignInfo = {
     validTo?: string
   }
   assessments: Assessment[]
+  // Present for class-based campaigns: the student picks a class and the routed
+  // assessment (+ its default tier) auto-selects. Omitted on assessment/tier deep-links.
+  classes?: CampaignClass[]
 }
 
 const CampaignRegisterPage = () => {
@@ -71,6 +82,7 @@ const CampaignRegisterPage = () => {
 
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(aidFromUrl)
   const [selectedTierId, setSelectedTierId] = useState<number | null>(tidFromUrl)
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null)
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -106,13 +118,33 @@ const CampaignRegisterPage = () => {
       })
   }, [slug, aidFromUrl, tidFromUrl])
 
+  // Class-based campaigns route a class → assessment. When present, the student
+  // picks a class (not an assessment) and the routed assessment auto-selects.
+  const classMode = !!info && Array.isArray(info.classes) && info.classes.length > 0
+
+  const selectClass = (cls: CampaignClass) => {
+    setSelectedClassId(cls.classId)
+    setSelectedAssessmentId(cls.assessmentId)
+    setSelectedTierId(null)
+  }
+
   // Auto-select if there's only one option at any layer.
   useEffect(() => {
-    if (!info) return
+    if (!info || classMode) return
     if (selectedAssessmentId == null && info.assessments.length === 1) {
       setSelectedAssessmentId(info.assessments[0].assessmentId)
     }
-  }, [info, selectedAssessmentId])
+  }, [info, selectedAssessmentId, classMode])
+
+  // Class mode: if there's only one class, select it (and its assessment) outright.
+  useEffect(() => {
+    if (!info || !classMode || selectedClassId != null) return
+    if (info.classes!.length === 1) {
+      const only = info.classes![0]
+      setSelectedClassId(only.classId)
+      setSelectedAssessmentId(only.assessmentId)
+    }
+  }, [info, classMode, selectedClassId])
 
   const selectedAssessment: Assessment | null =
     info && selectedAssessmentId != null
@@ -204,6 +236,7 @@ const CampaignRegisterPage = () => {
         gender,
       }
       if (!isTryFirst && promoApplied) data.promoCode = promoApplied.code
+      if (selectedClassId != null) data.classId = selectedClassId
 
       const res = isTryFirst
         ? await registerTrial(info.campaign.slug, selectedAssessment.assessmentId, data)
@@ -316,7 +349,10 @@ const CampaignRegisterPage = () => {
 
   const onlyOneAssessmentInUrl = aidFromUrl != null
   const onlyOneTierInUrl = tidFromUrl != null
-  const showAssessmentPicker = !onlyOneAssessmentInUrl && info.assessments.length > 1
+  // In class mode the class picker drives assessment selection, so the raw
+  // assessment picker is hidden.
+  const showClassPicker = classMode && info.classes!.length > 1
+  const showAssessmentPicker = !classMode && !onlyOneAssessmentInUrl && info.assessments.length > 1
   const showTierPicker =
     !isTryFirst && !onlyOneTierInUrl && selectedAssessment !== null && selectedAssessment.tiers.length > 1
   const showLockedTier = !isTryFirst && !showTierPicker && selectedTier !== null
@@ -366,6 +402,41 @@ const CampaignRegisterPage = () => {
         <div style={s.divider} />
 
         <div style={{ padding: "24px 32px 32px" }}>
+          {/* Class picker (class-based campaigns) — picking a class auto-selects
+              its assessment and default tier. */}
+          {showClassPicker && (
+            <section style={{ marginBottom: 24 }}>
+              <h3 style={s.sectionTitle}>Choose your class</h3>
+              <select
+                value={selectedClassId ?? ""}
+                onChange={(e) => {
+                  const cid = e.target.value === "" ? null : Number(e.target.value)
+                  const cls = cid == null ? null : info.classes!.find((c) => c.classId === cid) ?? null
+                  if (cls) {
+                    selectClass(cls)
+                  } else {
+                    setSelectedClassId(null)
+                    setSelectedAssessmentId(null)
+                    setSelectedTierId(null)
+                  }
+                }}
+                style={{ ...s.input, color: selectedClassId ? "#1e293b" : "#94a3b8" }}
+                onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+              >
+                <option value="">Select your class</option>
+                {info.classes!.map((c) => {
+                  const routed = info.assessments.find((a) => a.assessmentId === c.assessmentId)
+                  return (
+                    <option key={c.classId} value={c.classId}>
+                      {c.className}{routed ? ` — ${routed.assessmentName}` : ""}
+                    </option>
+                  )
+                })}
+              </select>
+            </section>
+          )}
+
           {/* Assessment picker */}
           {showAssessmentPicker && (
             <section style={{ marginBottom: 24 }}>
@@ -384,6 +455,9 @@ const CampaignRegisterPage = () => {
                       style={isSel ? { ...s.optionCard, ...s.optionCardSelected } : s.optionCard}
                     >
                       <div style={s.optionCardTitle}>{a.assessmentName}</div>
+                      {a.description && (
+                        <div style={s.optionCardDescription}>{a.description}</div>
+                      )}
                       <div style={s.optionCardMeta}>
                         {a.tiers.length} tier{a.tiers.length === 1 ? "" : "s"}
                       </div>
@@ -816,6 +890,9 @@ const s: { [key: string]: React.CSSProperties } = {
   },
   optionCardTitle: {
     fontSize: "0.95rem", fontWeight: 700, color: "#1e293b", marginBottom: 4,
+  },
+  optionCardDescription: {
+    color: "#475569", fontSize: "0.82rem", lineHeight: 1.4, marginBottom: 6, whiteSpace: "pre-wrap" as const,
   },
   optionCardMeta: {
     color: "#64748b", fontSize: "0.8rem",

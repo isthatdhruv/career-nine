@@ -7,13 +7,19 @@ import {
   attachTierToMapping,
   Campaign,
   CampaignAssessmentRow,
+  CampaignClassRoute,
+  CampaignSessionOption,
   createCampaign,
+  deleteClassRoute,
   detachAssessment,
   detachTierFromMapping,
   getCampaign,
+  getCampaignClassOptions,
+  importSchoolConfig,
   InstituteOption,
   updateAssessmentMapping,
   updateCampaign,
+  upsertClassRoute,
 } from "../API/Campaign_APIs";
 import { useInstitutes } from "../../../lib/queries/lookups";
 import { getActivePricingTiers, PricingTier } from "../API/PricingTier_APIs";
@@ -45,6 +51,18 @@ const CampaignEditPage = () => {
 
   const [campaign, setCampaign] = useState<Campaign>(emptyCampaign);
   const [assessmentRows, setAssessmentRows] = useState<CampaignAssessmentRow[]>([]);
+  const [classRoutes, setClassRoutes] = useState<CampaignClassRoute[]>([]);
+  // Class-based registration: sessions+classes of the campaign's institute, plus
+  // the picker working state for adding a new class → assessment route.
+  const [classSessions, setClassSessions] = useState<CampaignSessionOption[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | "">("");
+  const [newRouteClassId, setNewRouteClassId] = useState<number | "">("");
+  const [newRouteAssessmentId, setNewRouteAssessmentId] = useState<number | "">("");
+  const [importing, setImporting] = useState(false);
+  // Per-row description drafts kept in state (keyed by mappingId) so typed text
+  // survives table re-renders/refreshes — an uncontrolled input would reset to
+  // its server value whenever the table remounts.
+  const [descDrafts, setDescDrafts] = useState<Record<number, string>>({});
   const [allAssessments, setAllAssessments] = useState<{ id: number; name: string }[]>([]);
   const [allTiers, setAllTiers] = useState<PricingTier[]>([]);
   const { data: allInstitutes = [] } = useInstitutes<InstituteOption>();
@@ -90,10 +108,21 @@ const CampaignEditPage = () => {
       const res = await getCampaign(Number(id));
       setCampaign(res.data.campaign);
       setAssessmentRows(res.data.assessments || []);
+      setClassRoutes(res.data.classRoutes || []);
     } catch (e: any) {
       showErrorToast(e?.response?.data || "Failed to load campaign");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadClassOptions = async () => {
+    if (!isEdit) return;
+    try {
+      const res = await getCampaignClassOptions(Number(id));
+      setClassSessions(res.data.sessions || []);
+    } catch {
+      // non-fatal — section just won't offer classes to add
     }
   };
 
@@ -105,12 +134,27 @@ const CampaignEditPage = () => {
       const res = await getCampaign(Number(id));
       setCampaign(res.data.campaign);
       setAssessmentRows(res.data.assessments || []);
+      setClassRoutes(res.data.classRoutes || []);
     } catch (e: any) {
       showErrorToast(e?.response?.data || "Failed to refresh campaign");
     }
   };
 
-  useEffect(() => { loadTiers(); loadCampaign(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { loadTiers(); loadCampaign(); loadClassOptions(); /* eslint-disable-next-line */ }, [id]);
+
+  // Seed description drafts for newly-loaded rows. Existing drafts are left
+  // untouched so an in-progress edit (or a value we just saved) is never
+  // clobbered by a background refresh.
+  useEffect(() => {
+    setDescDrafts(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const r of assessmentRows) {
+        if (!(r.mappingId in next)) { next[r.mappingId] = r.description ?? ""; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [assessmentRows]);
 
   useEffect(() => { loadAssessments(campaign.instituteCode); /* eslint-disable-next-line */ }, [campaign.instituteCode]);
 
@@ -170,9 +214,90 @@ const CampaignEditPage = () => {
     }
   };
 
+  // Description is a free-text box, so save on blur rather than every keystroke,
+  // and skip the round trip when nothing changed. Use the silent refresh so the
+  // table never unmounts mid-edit (which would drop focus / the next box's text).
+  const handleDescriptionSave = async (row: CampaignAssessmentRow) => {
+    const value = (descDrafts[row.mappingId] ?? "").trim();
+    if ((row.description ?? "") === value) return;
+    try {
+      await updateAssessmentMapping(row.mappingId, { description: value });
+      await refreshCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update");
+    }
+  };
+
   const availableAssessmentsToAttach = allAssessments.filter(
     a => !assessmentRows.some(r => r.assessmentId === a.id)
   );
+
+  // ── Class-based registration handlers ──────────────────────────────────────
+  const selectedSession = classSessions.find(s => s.sessionId === selectedSessionId) || null;
+  // Classes in the chosen session that don't already have a route.
+  const routableClasses = (selectedSession?.classes ?? []).filter(
+    c => !classRoutes.some(r => r.classId === c.classId)
+  );
+
+  const handleAddClassRoute = async () => {
+    if (!campaign.campaignId) { showErrorToast("Save the campaign first"); return; }
+    if (newRouteClassId === "" || newRouteAssessmentId === "") {
+      showErrorToast("Pick a class and an assessment");
+      return;
+    }
+    try {
+      await upsertClassRoute(campaign.campaignId, {
+        classId: Number(newRouteClassId),
+        sessionId: selectedSessionId === "" ? null : Number(selectedSessionId),
+        assessmentId: Number(newRouteAssessmentId),
+      });
+      setNewRouteClassId("");
+      setNewRouteAssessmentId("");
+      await refreshCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to add class route");
+    }
+  };
+
+  const handleChangeRouteAssessment = async (route: CampaignClassRoute, assessmentId: number) => {
+    if (!campaign.campaignId) return;
+    try {
+      await upsertClassRoute(campaign.campaignId, {
+        classId: route.classId,
+        sessionId: route.sessionId ?? null,
+        assessmentId,
+      });
+      await refreshCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update class route");
+    }
+  };
+
+  const handleRemoveClassRoute = async (routeId: number) => {
+    if (!window.confirm("Remove this class mapping?")) return;
+    try {
+      await deleteClassRoute(routeId);
+      await refreshCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to remove class route");
+    }
+  };
+
+  const handleImportSchoolConfig = async () => {
+    if (!campaign.campaignId) { showErrorToast("Save the campaign first"); return; }
+    if (selectedSessionId === "") { showErrorToast("Pick a session to import from"); return; }
+    setImporting(true);
+    try {
+      const res = await importSchoolConfig(campaign.campaignId, Number(selectedSessionId));
+      showSuccessToast(res.data.message || "Imported");
+      await loadAssessments(campaign.instituteCode);
+      await refreshCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to import from school config");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   return (
     <div className="card">
@@ -298,13 +423,14 @@ const CampaignEditPage = () => {
                       <th>Assessment</th>
                       <th>Path override</th>
                       <th>Counselling override</th>
+                      <th>Description</th>
                       <th>Tiers</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {assessmentRows.length === 0 && (
-                      <tr><td colSpan={5} className="text-center text-muted py-4">No assessments attached yet.</td></tr>
+                      <tr><td colSpan={6} className="text-center text-muted py-4">No assessments attached yet.</td></tr>
                     )}
                     {assessmentRows.map(r => (
                       <tr key={r.mappingId}>
@@ -326,11 +452,153 @@ const CampaignEditPage = () => {
                           </Form.Select>
                         </td>
                         <td>
+                          <Form.Control
+                            as="textarea"
+                            size="sm"
+                            rows={2}
+                            style={{ minWidth: 200 }}
+                            value={descDrafts[r.mappingId] ?? r.description ?? ""}
+                            placeholder="Shown on the registration card"
+                            onChange={e => setDescDrafts(prev => ({ ...prev, [r.mappingId]: e.target.value }))}
+                            onBlur={() => handleDescriptionSave(r)}
+                          />
+                        </td>
+                        <td>
                           {(r.tiers ?? []).filter(t => t.isActive).length} active tier(s)
                         </td>
                         <td>
                           <Button size="sm" variant="outline-primary" className="me-1" onClick={() => setTierDrawerMappingId(r.mappingId)}>Configure tiers</Button>
                           <Button size="sm" variant="outline-danger" onClick={() => handleDetach(r.mappingId)}>Detach</Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+
+                <hr className="my-5" />
+                <h4 className="mb-1">Class-based registration <span className="text-muted fs-6">(optional)</span></h4>
+                <p className="text-muted">
+                  Map classes to assessments so a student just picks their class on the
+                  registration page and the right assessment (and its default tier price)
+                  is selected automatically — the same flow as the B2B school links. Leave
+                  this empty to keep the standard "pick an assessment" registration.
+                </p>
+
+                <div className="row align-items-end g-2 mb-3">
+                  <div className="col-md-4">
+                    <Form.Label>Session</Form.Label>
+                    <Form.Select
+                      value={selectedSessionId}
+                      onChange={e => {
+                        setSelectedSessionId(e.target.value === "" ? "" : Number(e.target.value));
+                        setNewRouteClassId("");
+                      }}
+                    >
+                      <option value="">
+                        {classSessions.length === 0 ? "— no sessions for this institute —" : "— select a session —"}
+                      </option>
+                      {classSessions.map(s => (
+                        <option key={s.sessionId} value={s.sessionId}>
+                          {s.sessionYear || `Session ${s.sessionId}`}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </div>
+                  <div className="col-md-4">
+                    <Button
+                      variant="outline-primary"
+                      disabled={selectedSessionId === "" || importing}
+                      onClick={handleImportSchoolConfig}
+                    >
+                      {importing ? <Spinner size="sm" animation="border" /> : "Import from school config"}
+                    </Button>
+                    <Form.Text className="d-block text-muted">
+                      Pulls this institute's class→assessment setup for the session.
+                    </Form.Text>
+                  </div>
+                </div>
+
+                {/* Add a single class → assessment route */}
+                <div className="row align-items-end g-2 mb-3">
+                  <div className="col-md-4">
+                    <Form.Label>Class</Form.Label>
+                    <Form.Select
+                      value={newRouteClassId}
+                      disabled={selectedSessionId === ""}
+                      onChange={e => setNewRouteClassId(e.target.value === "" ? "" : Number(e.target.value))}
+                    >
+                      <option value="">
+                        {selectedSessionId === ""
+                          ? "— select a session first —"
+                          : routableClasses.length === 0
+                            ? "— all classes mapped —"
+                            : "— pick a class —"}
+                      </option>
+                      {routableClasses.map(c => (
+                        <option key={c.classId} value={c.classId}>{c.className}</option>
+                      ))}
+                    </Form.Select>
+                  </div>
+                  <div className="col-md-4">
+                    <Form.Label>Assessment</Form.Label>
+                    <Form.Select
+                      value={newRouteAssessmentId}
+                      onChange={e => setNewRouteAssessmentId(e.target.value === "" ? "" : Number(e.target.value))}
+                    >
+                      <option value="">
+                        {assessmentRows.length === 0 ? "— attach assessments first —" : "— pick an assessment —"}
+                      </option>
+                      {assessmentRows.map(r => (
+                        <option key={r.assessmentId} value={r.assessmentId}>{r.assessmentName}</option>
+                      ))}
+                    </Form.Select>
+                  </div>
+                  <div className="col-md-2">
+                    <Button
+                      variant="primary"
+                      disabled={newRouteClassId === "" || newRouteAssessmentId === ""}
+                      onClick={handleAddClassRoute}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+
+                <Table responsive striped hover className="align-middle">
+                  <thead>
+                    <tr>
+                      <th>Class</th>
+                      <th>Mapped assessment</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {classRoutes.length === 0 && (
+                      <tr><td colSpan={3} className="text-center text-muted py-4">No class mappings yet.</td></tr>
+                    )}
+                    {classRoutes.map(route => (
+                      <tr key={route.routeId}>
+                        <td><strong>{route.className ?? `Class #${route.classId}`}</strong></td>
+                        <td>
+                          <Form.Select
+                            size="sm"
+                            style={{ minWidth: 220 }}
+                            value={route.assessmentId}
+                            onChange={e => handleChangeRouteAssessment(route, Number(e.target.value))}
+                          >
+                            {assessmentRows.map(r => (
+                              <option key={r.assessmentId} value={r.assessmentId}>{r.assessmentName}</option>
+                            ))}
+                            {/* If the routed assessment is no longer attached, still show it so the row isn't blank */}
+                            {!assessmentRows.some(r => r.assessmentId === route.assessmentId) && (
+                              <option value={route.assessmentId}>
+                                {route.assessmentName ?? `Assessment #${route.assessmentId}`} (detached)
+                              </option>
+                            )}
+                          </Form.Select>
+                        </td>
+                        <td>
+                          <Button size="sm" variant="outline-danger" onClick={() => handleRemoveClassRoute(route.routeId)}>Remove</Button>
                         </td>
                       </tr>
                     ))}
