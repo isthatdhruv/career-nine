@@ -39,12 +39,7 @@
     "/measured-qualities",
     "/measured-quality-types",
     "/question-sections",
-<<<<<<< HEAD
-=======
     "/questionaire/List",
-    "/student/dashboard",
-    "/student/dashboard/assessments",
->>>>>>> 7a213f9fa2ec9893836065db65f302948d5c12c9
     "/tools"
   ],
   "campaign.read": [

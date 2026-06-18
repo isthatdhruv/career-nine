@@ -1,6 +1,6 @@
 {
-  "version": "mqhm4mid",
-  "generated": "2026-06-17T05:10:43.189Z",
+  "version": "mqizhz2d",
+  "generated": "2026-06-18T04:12:47.173Z",
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -118,32 +118,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-DoHLMFjT.js",
+      "url": "/assets/HydroTubeGame-Bm_CNKMt.js",
       "size": 23331,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-Cg_Gv3cv.js",
+      "url": "/assets/JungleSpotGame-Cr0gq3p4.js",
       "size": 23397,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-DB6WktQ3.js",
+      "url": "/assets/RabbitPathGame-D6jEkq7O.js",
       "size": 26981,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-Cc-3VSwS.js",
+      "url": "/assets/SectionInstructionPage-BuN3ErWh.js",
       "size": 4206,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-D5vkXJ3Q.js",
+      "url": "/assets/SectionQuestionPage-B1kzrpxh.js",
       "size": 175845,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-BrWxMXJ5.js",
+      "url": "/assets/SelectSectionPage-CeF0KzTu.js",
       "size": 5255,
       "priority": "critical"
     },
@@ -168,17 +168,17 @@
       "priority": "critical"
     },
     {
+      "url": "/assets/index-BTBNM6T9.js",
+      "size": 1083079,
+      "priority": "critical"
+    },
+    {
       "url": "/assets/index-CLFiMXGO.css",
       "size": 260851,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-CgZ9Nr7U.js",
-      "size": 1080147,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/index.es-BF1A3JYz.js",
+      "url": "/assets/index.es-DWuTSM1I.js",
       "size": 158825,
       "priority": "critical"
     },
@@ -230,7 +230,7 @@
   ],
   "summary": {
     "total": 45,
-    "totalSize": 23785799,
+    "totalSize": 23788731,
     "byPriority": {
       "game": {
         "count": 11,
@@ -242,7 +242,7 @@
       },
       "critical": {
         "count": 18,
-        "size": 3355175
+        "size": 3358107
       },
       "other": {
         "count": 4,
