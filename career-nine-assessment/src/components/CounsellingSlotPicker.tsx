@@ -82,11 +82,6 @@ const IconMapPin: React.FC<{ color?: string }> = ({ color = '#92400E' }) => (
     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
   </svg>
 )
-const IconCalendarCheck: React.FC<{ color?: string; size?: number }> = ({ color = '#059669', size = 26 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" />
-  </svg>
-)
 
 const CounsellingSlotPicker: React.FC<Props> = ({
   accessToken,
@@ -106,8 +101,6 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   const [reason, setReason] = useState<string>('')
   const [booking, setBooking] = useState<boolean>(false)
   const [bookError, setBookError] = useState<string>('')
-  // Confirm-before-leaving: shown on every dismiss so leaving is a deliberate choice.
-  const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false)
   // Which day is currently shown — the picker shows one day at a time and the
   // Earlier/Later buttons step through the days that actually have slots.
   const [dayIndex, setDayIndex] = useState<number>(0)
@@ -175,13 +168,13 @@ const CounsellingSlotPicker: React.FC<Props> = ({
     }
   }, [accessToken, entitlementId, from])
 
-  // All three dismiss paths (footer Cancel, header ×, backdrop) route through
-  // here so the leave-confirmation can't be bypassed by clicking outside. The
-  // loss-framed "this is a great opportunity" prompt is shown on every dismiss —
-  // whether or not a slot was picked — so leaving is always a deliberate choice.
+  // All three dismiss paths (footer Cancel, header ×, backdrop) route through here.
+  // Closing simply dismisses the picker — the retention nudge now lives BEFORE the
+  // picker (host page's pre-picker reminder), so we don't stack a confirm on top.
+  // The host page reveals the Book-counselling card again after close.
   const requestClose = () => {
     if (booking) return
-    setShowCancelConfirm(true)
+    onClose()
   }
 
   const handleConfirm = async () => {
@@ -508,43 +501,6 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           </button>
         </div>
       </div>
-
-      {/* Leave-confirmation — a deliberate, on-brand interruption when a student tries
-          to walk away. Reframes leaving as a real loss, in the picker's own palette. */}
-      {showCancelConfirm && (
-        <div onClick={(e) => e.stopPropagation()} style={confirmOverlayStyle}>
-          <div style={confirmCardStyle}>
-            {/* Gradient icon badge — matches the picker header */}
-            <div style={confirmBadgeStyle}><IconCalendarCheck color="#059669" size={28} /></div>
-            <h3 style={{ margin: '0 0 10px', fontSize: '1.35rem', fontWeight: 800, color: '#1E293B' }}>
-              Don’t leave this on the table
-            </h3>
-            <p style={{ margin: '0 0 22px', fontSize: '0.96rem', color: '#475569', lineHeight: 1.6 }}>
-              You just finished your assessment. A one-on-one session turns those results into a
-              real plan for your future — and it only takes a moment to pick a time.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button
-                type='button'
-                onClick={() => setShowCancelConfirm(false)}
-                style={{ ...btnPrimaryStyle(false), padding: '14px 20px', fontSize: '1rem' }}
-              >
-                Pick my counselling time
-              </button>
-              <button
-                type='button'
-                onClick={() => {
-                  setShowCancelConfirm(false)
-                  onClose()
-                }}
-                style={btnGhostDangerStyle}
-              >
-                No thanks, maybe later
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -652,59 +608,6 @@ const bookedBadgeStyle: React.CSSProperties = {
   letterSpacing: '0.02em',
   background: '#E2E8F0',
   color: '#64748B',
-}
-
-// Gradient circular icon badge atop the leave-confirmation card.
-const confirmBadgeStyle: React.CSSProperties = {
-  width: 60,
-  height: 60,
-  borderRadius: '50%',
-  margin: '0 auto 16px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: '1.8rem',
-  background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
-  border: '1px solid #A7F3D0',
-}
-
-// Overlay that sits on top of the picker for the leave-confirmation and the
-// post-booking celebration. Darkens the picker behind so the card is the focus.
-const confirmOverlayStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(15, 23, 42, 0.6)',
-  backdropFilter: 'blur(3px)',
-  WebkitBackdropFilter: 'blur(3px)',
-  zIndex: 1200,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '1.5rem',
-}
-
-const confirmCardStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 20,
-  padding: '2rem 1.75rem',
-  width: '100%',
-  maxWidth: 440,
-  textAlign: 'center',
-  boxShadow: '0 24px 70px rgba(30, 41, 59, 0.35)',
-}
-
-// Understated "leave anyway" action — deliberately lower-weight than the
-// gradient "stay" button so leaving feels like the harder choice.
-const btnGhostDangerStyle: React.CSSProperties = {
-  background: 'transparent',
-  color: '#94A3B8',
-  border: 'none',
-  padding: '0.5rem 1rem',
-  borderRadius: 10,
-  fontSize: '0.86rem',
-  fontWeight: 500,
-  cursor: 'pointer',
-  textDecoration: 'underline',
 }
 
 const btnSecondaryStyle: React.CSSProperties = {
