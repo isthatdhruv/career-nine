@@ -29,6 +29,10 @@ export function CreateQuestionaire(questionaire: any) {
   return axios.post(createQuestionaire, questionaire);
 }
 
+export function DuplicateQuestionaire(id: string) {
+  return axios.post(`${API_URL}/api/questionnaire/duplicate/${id}`);
+}
+
 export function UpdateQuestionaire(id: string, questionaire: any) {
   return axios.put(`${updateQuestionaire}/${id}`, questionaire);
 }

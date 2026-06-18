@@ -9,6 +9,7 @@ import * as Yup from "yup";
 import { ReadAssessmentByIdData, UpdateAssessmentData, CreateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
 import AssessmentDemographicConfig from "./AssessmentDemographicConfig";
+import AssessmentReportTemplateConfig from "../../../ReportTemplates/components/AssessmentReportTemplateConfig";
 
 const validationSchema = Yup.object().shape({
   AssessmentName: Yup.string().required("Assessment name is required"),
@@ -354,6 +355,20 @@ const AssessmentEditPage = (props?: {
                         </label>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Report Templates (mapping needs a saved assessment id) */}
+            <div className="card mb-7">
+              <h3 className="card-title">Report Templates</h3>
+              <div className="card-body">
+                {isEditMode && id ? (
+                  <AssessmentReportTemplateConfig assessmentId={Number(id)} />
+                ) : (
+                  <div className="text-muted">
+                    Save the assessment first, then reopen it to map report templates and choose a default.
                   </div>
                 )}
               </div>

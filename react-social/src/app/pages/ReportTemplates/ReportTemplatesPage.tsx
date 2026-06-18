@@ -3,19 +3,19 @@ import {
   BootstrapClasspathTemplates,
   CreateReportTemplate,
   DeleteReportTemplate,
-  MapTemplateToQuestionnaire,
-  QuestionnaireOption,
-  QuestionnaireTemplateMappingDto,
-  ReadAllQuestionnaires,
-  ReadQuestionnaireTemplates,
   ReadReportTemplates,
   ReportTemplateDto,
-  SetDefaultTemplate,
-  UnmapTemplateFromQuestionnaire,
   UploadReportTemplateHtml,
 } from "./API/Report_Templates_APIs";
+import { getAllAssessments } from "../StudentInformation/StudentInfo_APIs";
+import AssessmentReportTemplateConfig from "./components/AssessmentReportTemplateConfig";
 
 const ENGINES = ["bet", "pager", "legacy"];
+
+interface AssessmentOption {
+  id: number;
+  assessmentName: string;
+}
 
 const ReportTemplatesPage = () => {
   const [templates, setTemplates] = useState<ReportTemplateDto[]>([]);
@@ -28,10 +28,8 @@ const ReportTemplatesPage = () => {
   const [form, setForm] = useState({ code: "", displayName: "", engineCode: "bet", spacesRenderFolder: "" });
 
   // mapping panel
-  const [qId, setQId] = useState<string>("");
-  const [questionnaires, setQuestionnaires] = useState<QuestionnaireOption[]>([]);
-  const [mappings, setMappings] = useState<QuestionnaireTemplateMappingDto[]>([]);
-  const [mapTemplateId, setMapTemplateId] = useState<string>("");
+  const [assessments, setAssessments] = useState<AssessmentOption[]>([]);
+  const [assessmentId, setAssessmentId] = useState<string>("");
 
   const fetchTemplates = async () => {
     setLoading(true);
@@ -45,18 +43,18 @@ const ReportTemplatesPage = () => {
     }
   };
 
-  const fetchQuestionnaires = async () => {
+  const fetchAssessments = async () => {
     try {
-      const res = await ReadAllQuestionnaires();
-      setQuestionnaires(res.data);
+      const res = await getAllAssessments();
+      setAssessments((res.data || []).map((a: any) => ({ id: a.id, assessmentName: a.assessmentName })));
     } catch (e) {
-      console.error("Failed to fetch questionnaires:", e);
+      console.error("Failed to fetch assessments:", e);
     }
   };
 
   useEffect(() => {
     fetchTemplates();
-    fetchQuestionnaires();
+    fetchAssessments();
   }, []);
 
   const onCreate = async () => {
@@ -103,56 +101,6 @@ const ReportTemplatesPage = () => {
       fetchTemplates();
     } catch (e: any) {
       setMsg("Bootstrap failed: " + (e?.response?.data ?? e?.message ?? "unknown"));
-    }
-  };
-
-  // ── mapping ──
-  const loadMappings = async (id?: string) => {
-    const target = id ?? qId;
-    if (!target) {
-      setMappings([]);
-      return;
-    }
-    try {
-      const res = await ReadQuestionnaireTemplates(Number(target));
-      setMappings(res.data);
-    } catch (e: any) {
-      setMsg("Failed to load mappings: " + (e?.response?.data ?? e?.message ?? "unknown"));
-    }
-  };
-
-  const onSelectQuestionnaire = (value: string) => {
-    setQId(value);
-    setMapTemplateId("");
-    loadMappings(value);
-  };
-
-  const onMap = async () => {
-    if (!qId || !mapTemplateId) return;
-    try {
-      await MapTemplateToQuestionnaire(Number(qId), Number(mapTemplateId));
-      setMapTemplateId("");
-      loadMappings();
-    } catch (e: any) {
-      setMsg("Map failed: " + (e?.response?.data ?? e?.message ?? "unknown"));
-    }
-  };
-
-  const onUnmap = async (templateId: number) => {
-    try {
-      await UnmapTemplateFromQuestionnaire(Number(qId), templateId);
-      loadMappings();
-    } catch (e: any) {
-      setMsg("Unmap failed: " + (e?.response?.data ?? e?.message ?? "unknown"));
-    }
-  };
-
-  const onSetDefault = async (templateId: number) => {
-    try {
-      await SetDefaultTemplate(Number(qId), templateId);
-      loadMappings();
-    } catch (e: any) {
-      setMsg("Set default failed: " + (e?.response?.data ?? e?.message ?? "unknown"));
     }
   };
 
@@ -283,96 +231,31 @@ const ReportTemplatesPage = () => {
         </div>
       </div>
 
-      {/* Questionnaire ↔ template mapping */}
+      {/* Assessment ↔ template mapping */}
       <div className="card shadow-sm">
         <div className="card-header">
-          <h2 className="mb-0">Questionnaire mapping</h2>
+          <h2 className="mb-0">Assessment mapping</h2>
         </div>
         <div className="card-body">
           <div className="d-flex align-items-end gap-3 mb-4">
             <div style={{ minWidth: 360 }}>
-              <label className="form-label">Questionnaire</label>
+              <label className="form-label">Assessment</label>
               <select
                 className="form-select"
-                value={qId}
-                onChange={(e) => onSelectQuestionnaire(e.target.value)}
+                value={assessmentId}
+                onChange={(e) => setAssessmentId(e.target.value)}
               >
-                <option value="">— select a questionnaire —</option>
-                {questionnaires.map((q) => (
-                  <option key={q.questionnaireId} value={q.questionnaireId}>
-                    {q.name ? `${q.name} (#${q.questionnaireId})` : `Questionnaire #${q.questionnaireId}`}
+                <option value="">— select an assessment —</option>
+                {assessments.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.assessmentName ? `${a.assessmentName} (#${a.id})` : `Assessment #${a.id}`}
                   </option>
                 ))}
               </select>
             </div>
-            <button className="btn btn-secondary" onClick={() => loadMappings()} disabled={!qId}>
-              Refresh
-            </button>
           </div>
 
-          {qId && (
-            <>
-              <div className="d-flex align-items-end gap-3 mb-4">
-                <div>
-                  <label className="form-label">Add template</label>
-                  <select
-                    className="form-select"
-                    style={{ maxWidth: 320 }}
-                    value={mapTemplateId}
-                    onChange={(e) => setMapTemplateId(e.target.value)}
-                  >
-                    <option value="">— select —</option>
-                    {templates.map((t) => (
-                      <option key={t.reportTemplateId} value={t.reportTemplateId}>
-                        {t.displayName} ({t.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button className="btn btn-primary" onClick={onMap} disabled={!mapTemplateId}>
-                  Map
-                </button>
-              </div>
-
-              <table className="table table-row-bordered align-middle">
-                <thead>
-                  <tr className="fw-bold text-muted">
-                    <th>Default</th>
-                    <th>Template</th>
-                    <th>Engine</th>
-                    <th className="text-end">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {mappings.map((m) => (
-                    <tr key={m.mappingId}>
-                      <td>
-                        <input
-                          type="radio"
-                          name="defaultTemplate"
-                          checked={m.isDefault}
-                          onChange={() => onSetDefault(m.template.reportTemplateId)}
-                        />
-                      </td>
-                      <td>{m.template.displayName} (<code>{m.template.code}</code>)</td>
-                      <td><span className="badge badge-light-primary">{m.template.engineCode}</span></td>
-                      <td className="text-end">
-                        <button
-                          className="btn btn-sm btn-light-danger"
-                          onClick={() => onUnmap(m.template.reportTemplateId)}
-                        >
-                          Unmap
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {mappings.length === 0 && (
-                    <tr><td colSpan={4} className="text-center text-muted">No templates mapped.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </>
-          )}
+          {assessmentId && <AssessmentReportTemplateConfig assessmentId={Number(assessmentId)} />}
         </div>
       </div>
     </div>

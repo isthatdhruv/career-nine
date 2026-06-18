@@ -1,10 +1,10 @@
 package com.kccitm.api.controller.career9.report;
 
-public class QuestionnaireTemplateMapRequest {
+public class TemplateMapRequest {
 
     private Long reportTemplateId;
 
-    public QuestionnaireTemplateMapRequest() {}
+    public TemplateMapRequest() {}
 
     public Long getReportTemplateId() { return reportTemplateId; }
     public void setReportTemplateId(Long reportTemplateId) { this.reportTemplateId = reportTemplateId; }

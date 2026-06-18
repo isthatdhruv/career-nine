@@ -17,34 +17,36 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.career9.ReportTemplate;
 
 /**
- * Join row mapping a questionnaire to a {@link ReportTemplate} (many-to-many).
- * One questionnaire offers several templates; exactly one may be flagged
+ * Join row mapping an assessment to a {@link ReportTemplate} (many-to-many).
+ * One assessment offers several templates; exactly one may be flagged
  * {@code isDefault} so report generation can run without an explicit template
- * id. The first template mapped to a questionnaire is auto-flagged default and
+ * id. The first template mapped to an assessment is auto-flagged default and
  * stays so until an admin changes it.
  *
- * <p>Standalone join entity (not cascade-managed from Questionnaire) so the
- * Questionnaire entity stays untouched and membership/default queries are
+ * <p>Supersedes the former questionnaire&rarr;template mapping: the template
+ * (and its default) is now chosen per assessment, so assessments that share a
+ * questionnaire can carry different report templates. Standalone join entity
+ * (not cascade-managed from AssessmentTable) so membership/default queries are
  * simple repository lookups.
  */
 @Entity
-@Table(name = "questionire_report_template",
+@Table(name = "assessment_report_template",
     uniqueConstraints = @UniqueConstraint(
-        name = "uk_qrt_questionnaire_template",
-        columnNames = {"questionnaire_id", "report_template_id"})
+        name = "uk_art_assessment_template",
+        columnNames = {"assessment_id", "report_template_id"})
 )
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-public class QuestionnaireReportTemplate implements Serializable {
+public class AssessmentReportTemplate implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "questionire_report_template_id")
+    @Column(name = "assessment_report_template_id")
     private Long id;
 
-    @Column(name = "questionnaire_id", nullable = false)
-    private Long questionnaireId;
+    @Column(name = "assessment_id", nullable = false)
+    private Long assessmentId;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "report_template_id", referencedColumnName = "report_template_id", nullable = false)
@@ -54,13 +56,13 @@ public class QuestionnaireReportTemplate implements Serializable {
     @Column(name = "is_default", nullable = false)
     private Boolean isDefault = false;
 
-    public QuestionnaireReportTemplate() {}
+    public AssessmentReportTemplate() {}
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public Long getQuestionnaireId() { return questionnaireId; }
-    public void setQuestionnaireId(Long questionnaireId) { this.questionnaireId = questionnaireId; }
+    public Long getAssessmentId() { return assessmentId; }
+    public void setAssessmentId(Long assessmentId) { this.assessmentId = assessmentId; }
 
     public ReportTemplate getReportTemplate() { return reportTemplate; }
     public void setReportTemplate(ReportTemplate reportTemplate) { this.reportTemplate = reportTemplate; }

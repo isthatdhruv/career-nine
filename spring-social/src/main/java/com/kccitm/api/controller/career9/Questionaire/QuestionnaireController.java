@@ -1,5 +1,7 @@
 package com.kccitm.api.controller.career9.Questionaire;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -107,6 +109,80 @@ public class QuestionnaireController {
 
         Questionnaire saved = questionnaireRepository.save(questionnaire);
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/duplicate/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.create')")
+    @Transactional
+    public ResponseEntity<Questionnaire> duplicate(@PathVariable Long id) {
+        return questionnaireRepository.findById(id)
+                .map(src -> {
+                    Questionnaire copy = new Questionnaire();
+                    copy.setName((src.getName() == null ? "Untitled" : src.getName()) + " (Copy)");
+                    copy.setModeId(src.getModeId());
+                    copy.setPrice(src.getPrice());
+                    copy.setIsFree(src.getIsFree());
+                    copy.setType(src.getType());
+                    copy.setReportCategory(src.getReportCategory());
+                    copy.setTool(src.getTool()); // shared catalog ref — not cloned
+                    copy.setDisplay(true);
+
+                    // Clone languages (new rows, shared LanguagesSupported refs)
+                    List<QuestionnaireLanguage> languages = new ArrayList<>();
+                    if (src.getLanguages() != null) {
+                        for (QuestionnaireLanguage l : src.getLanguages()) {
+                            QuestionnaireLanguage nl = new QuestionnaireLanguage();
+                            nl.setLanguage(l.getLanguage());
+                            nl.setInstructions(l.getInstructions());
+                            nl.setQuestionnaire(copy);
+                            languages.add(nl);
+                        }
+                    }
+                    copy.setLanguages(languages);
+
+                    // Clone sections -> questions + instructions
+                    List<QuestionnaireSection> sections = new ArrayList<>();
+                    if (src.getSections() != null) {
+                        for (QuestionnaireSection s : src.getSections()) {
+                            QuestionnaireSection ns = new QuestionnaireSection();
+                            ns.setSection(s.getSection()); // shared QuestionSection ref
+                            ns.setOrder(s.getOrder());
+                            ns.setQuestionnaire(copy);
+
+                            Set<QuestionnaireQuestion> questions = new HashSet<>();
+                            if (s.getQuestions() != null) {
+                                for (QuestionnaireQuestion q : s.getQuestions()) {
+                                    QuestionnaireQuestion nq = new QuestionnaireQuestion();
+                                    nq.setQuestion(q.getQuestion()); // shared AssessmentQuestions ref
+                                    nq.setOrder(q.getOrder());
+                                    nq.setExcelQuestionHeader(q.getExcelQuestionHeader());
+                                    nq.setSection(ns);
+                                    questions.add(nq);
+                                }
+                            }
+                            ns.setQuestions(questions);
+
+                            Set<QuestionnaireSectionInstruction> instructions = new HashSet<>();
+                            if (s.getInstruction() != null) {
+                                for (QuestionnaireSectionInstruction in : s.getInstruction()) {
+                                    QuestionnaireSectionInstruction ni = new QuestionnaireSectionInstruction();
+                                    ni.setLanguage(in.getLanguage()); // shared LanguagesSupported ref
+                                    ni.setInstructionText(in.getInstructionText());
+                                    ni.setSection(ns);
+                                    instructions.add(ni);
+                                }
+                            }
+                            ns.setInstruction(instructions);
+
+                            sections.add(ns);
+                        }
+                    }
+                    copy.setSections(sections);
+
+                    Questionnaire saved = questionnaireRepository.save(copy);
+                    return new ResponseEntity<>(saved, HttpStatus.CREATED);
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06) — non-super-admin callers see narrowed result set.

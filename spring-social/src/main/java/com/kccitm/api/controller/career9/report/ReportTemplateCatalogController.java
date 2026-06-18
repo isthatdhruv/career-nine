@@ -27,9 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.kccitm.api.model.career9.ReportTemplate;
-import com.kccitm.api.model.career9.report.QuestionnaireReportTemplate;
 import com.kccitm.api.repository.Career9.ReportTemplateRepository;
-import com.kccitm.api.repository.Career9.report.QuestionnaireReportTemplateRepository;
+import com.kccitm.api.repository.Career9.report.AssessmentReportTemplateRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.b2c.report.TemplateCache;
 
@@ -41,7 +40,7 @@ import com.kccitm.api.service.b2c.report.TemplateCache;
  *
  * <p>Coexists with the generic {@code /report-templates} controller (preview /
  * parse-placeholders / generate-pdf) on the same shared entity — this one adds
- * the scoring-engine + questionnaire-mapping side of the feature.
+ * the scoring-engine + assessment-mapping side of the feature.
  */
 @RestController
 public class ReportTemplateCatalogController {
@@ -50,7 +49,7 @@ public class ReportTemplateCatalogController {
     private static final String TEMPLATE_ROOT_FOLDER = "report-templates";
 
     @Autowired private ReportTemplateRepository reportTemplateRepository;
-    @Autowired private QuestionnaireReportTemplateRepository questionnaireReportTemplateRepository;
+    @Autowired private AssessmentReportTemplateRepository assessmentReportTemplateRepository;
     @Autowired private DigitalOceanSpacesService spacesService;
     @Autowired private TemplateCache templateCache;
 
@@ -113,14 +112,11 @@ public class ReportTemplateCatalogController {
     @PreAuthorize("@auth.allows('report_template.delete')")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         if (!reportTemplateRepository.existsById(id)) return ResponseEntity.notFound().build();
-        List<QuestionnaireReportTemplate> mappings = questionnaireReportTemplateRepository.findAll().stream()
-                .filter(m -> m.getReportTemplate() != null
-                        && id.equals(m.getReportTemplate().getReportTemplateId()))
-                .collect(Collectors.toList());
-        if (!mappings.isEmpty()) {
+        long mapped = assessmentReportTemplateRepository.countByReportTemplate_Id(id);
+        if (mapped > 0) {
             return ResponseEntity.status(409).body(
-                    "Cannot delete: template is mapped to " + mappings.size()
-                            + " questionnaire(s). Unmap it first.");
+                    "Cannot delete: template is mapped to " + mapped
+                            + " assessment(s). Unmap it first.");
         }
         reportTemplateRepository.deleteById(id);
         return ResponseEntity.noContent().build();
