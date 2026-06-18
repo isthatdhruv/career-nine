@@ -529,11 +529,12 @@ public class AssessmentSubmissionProcessorService {
                     studentId, assessmentId, entitlementErr);
         }
 
-        // 11. Whitelabel report pipeline (NEW) — enqueue generate+email job. Non-critical:
-        // a Kafka/producer hiccup must never fail completion.
+        // 11. Report pipeline — enqueue generation for EVERY student (the worker
+        // renders + stores the report; only whitelabel students are emailed).
+        // Non-critical: a Kafka/producer hiccup must never fail completion.
         try {
             if (reportPipelineProducer != null) {
-                reportPipelineProducer.enqueueIfWhitelabel(userStudent, assessmentId);
+                reportPipelineProducer.enqueue(userStudent, assessmentId);
             }
         } catch (Exception reportErr) {
             logger.warn("Report pipeline enqueue failed for student={} assessment={} (non-fatal)",

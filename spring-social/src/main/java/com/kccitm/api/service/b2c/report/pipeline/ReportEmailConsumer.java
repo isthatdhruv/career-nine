@@ -21,6 +21,9 @@ import org.springframework.stereotype.Component;
  * synchronously through {@link EmailSender}. Marks "sent" only on a real success
  * (then the offset commits); on failure releases the lock and rethrows so the
  * record retries → DLT. The DLT is the "for sure" alert (student NOT emailed).
+ *
+ * <p>Only whitelabel students reach this stage (the generate stage gates on it);
+ * a defensive whitelabel re-check guarantees the "mail whitelabel only" invariant.
  */
 @Profile("report-worker")
 @Component
@@ -47,6 +50,15 @@ public class ReportEmailConsumer {
         } catch (Exception e) {
             logger.error("Bad report.email payload (dropping): {}", json, e);
             return; // poison message
+        }
+
+        // Invariant: only whitelabel students are emailed. The generate stage already
+        // gates on this, but re-check defensively so a stray or replayed non-whitelabel
+        // event can never result in an email going out.
+        if (!ev.whitelabel) {
+            logger.warn("Report email skipped (non-whitelabel reached email stage) student={} assessment={}",
+                    ev.userStudentId, ev.assessmentId);
+            return;
         }
 
         ReportEmailIdempotency.Claim claim = idempotency.claim(ev.userStudentId, ev.assessmentId);

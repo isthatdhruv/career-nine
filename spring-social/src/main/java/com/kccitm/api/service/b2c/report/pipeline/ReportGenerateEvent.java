@@ -1,13 +1,15 @@
 package com.kccitm.api.service.b2c.report.pipeline;
 
 /**
- * Kafka payload for the <b>report.generate</b> topic. Emitted (whitelabel-gated)
- * the moment a student's assessment is marked completed; consumed by the report
- * worker which renders the default-template report and produces a
- * {@link ReportEmailEvent}.
+ * Kafka payload for the <b>report.generate</b> topic. Emitted for EVERY student
+ * the moment their assessment is marked completed; consumed by the report worker
+ * which renders the default-template report. For whitelabel students (with an
+ * address) it then produces a {@link ReportEmailEvent}; for everyone else the
+ * report is generated + stored and no email is queued.
  *
- * <p>Carries the recipient + branding resolved at completion time so the worker
- * needs no extra DB lookups. Plain public fields + no-arg ctor = Jackson-friendly.
+ * <p>{@code whitelabel} carries the email-gating decision; {@code recipientEmail}
+ * + branding are resolved at completion time so the worker needs no extra DB
+ * lookups. Plain public fields + no-arg ctor = Jackson-friendly.
  */
 public class ReportGenerateEvent {
 
