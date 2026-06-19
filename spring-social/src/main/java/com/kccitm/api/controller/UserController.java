@@ -231,8 +231,8 @@ public class UserController {
         if (email == null || !email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
             return ResponseEntity.badRequest().body(Map.of("error", "Valid email is required"));
         }
-        if (phone == null || !phone.matches("^[6-9]\\d{9}$")) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Valid 10-digit Indian phone number is required"));
+        if (phone == null || !phone.matches("^[0-9]{8,10}$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Valid phone number is required (8 to 10 digits)"));
         }
 
         // Update User entity
