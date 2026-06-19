@@ -835,7 +835,7 @@ public class NavigatorReportGenerationService {
         switch (label.toUpperCase()) {
             case "A": return 4;
             case "B": return 3;
-            case "C": return 3;
+            case "C": return 2; // Spec §2.1: Ability Likert A=4,B=3,C=2,D=1
             case "D": return 1;
             default: return 0;
         }

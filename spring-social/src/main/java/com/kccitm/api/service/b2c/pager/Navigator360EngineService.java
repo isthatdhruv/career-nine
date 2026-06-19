@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 import com.kccitm.api.service.Navigator.NavigatorReportGenerationService.IntermediaryScores;
 import com.kccitm.api.service.b2c.pager.Navigator360Models.CareerDefinition;
 import com.kccitm.api.service.b2c.pager.Navigator360Models.CareerMatch;
+import com.kccitm.api.service.b2c.pager.Navigator360Models.CciResult;
 import com.kccitm.api.service.b2c.pager.Navigator360Models.FlagInfo;
+import com.kccitm.api.service.b2c.pager.Navigator360Models.ValidityResult;
 import com.kccitm.api.service.b2c.pager.Navigator360Models.Navigator360Result;
 import com.kccitm.api.service.b2c.pager.Navigator360Models.PotentialScoreResult;
 import com.kccitm.api.service.b2c.pager.Navigator360Models.PreferenceScoreResult;
@@ -75,26 +77,29 @@ public class Navigator360EngineService {
 
     // ═══════════════════════ STANINE LOOKUP (Section 4.1) ═══════════════════════
 
+    // Spec §2.3 STANINE bands (Tech Spec v5 / EC-13): RIASEC 9–11 Low, 12–14 Moderate,
+    // 15–18 High. fromStanine() maps stanine ≥7→High, ≥3→Moderate, else Low, so these
+    // tables place raw 15 at stanine 7 (High) and raw 14 at stanine 6 (Moderate).
     private static int riasecStanine(int raw) {
         if (raw <= 10) return 1;
         if (raw == 11) return 2;
         if (raw == 12) return 3;
         if (raw == 13) return 4;
-        if (raw == 14) return 5;
-        if (raw == 15) return 6;
-        if (raw == 16) return 7;
-        if (raw == 17) return 8;
-        return 9; // 18
+        if (raw == 14) return 6;   // top of Moderate band (12–14)
+        if (raw == 15) return 7;   // bottom of High band (15–18)
+        if (raw == 16) return 8;
+        return 9; // 17–18
     }
 
+    // Spec §2.3 STANINE bands: Ability/MI 3–6 Low, 7–9 Moderate, 10–12 High.
     private static int abilityMIStanine(int raw) {
         if (raw <= 4) return 1;
-        if (raw == 5) return 2;
-        if (raw == 6) return 3;
-        if (raw == 7) return 4;
-        if (raw == 8) return 5;
-        if (raw == 9) return 6;
-        if (raw == 10) return 7;
+        if (raw == 5) return 1;
+        if (raw == 6) return 2;    // top of Low band (3–6)
+        if (raw == 7) return 3;    // bottom of Moderate band (7–9)
+        if (raw == 8) return 4;
+        if (raw == 9) return 6;    // top of Moderate band
+        if (raw == 10) return 7;   // bottom of High band (10–12)
         if (raw == 11) return 8;
         return 9; // 12
     }
@@ -135,53 +140,40 @@ public class Navigator360EngineService {
         return out;
     }
 
-    // ═══════════════════════ BIAS CHECKS (Section 2.5) ═══════════════════════
-
-    private List<FlagInfo> checkBiases(List<ScoredDimension> riasec,
-                                        List<ScoredDimension> abilities,
-                                        List<ScoredDimension> mi) {
-        List<FlagInfo> flags = new ArrayList<>();
-
-        // BIAS-01 / BIAS-02 — RIASEC acquiescence / disacquiescence
-        int riasecTotal = riasec.stream().mapToInt(d -> d.rawScore).sum();
-        int maxRiasec = riasec.size() * 18;
-        int minRiasec = riasec.size() * 9;
-        if (maxRiasec > 0 && (double) riasecTotal / maxRiasec >= 0.83) {
-            flags.add(new FlagInfo("BIAS-01", "Acquiescence",
-                "Personality answers followed an unusual positive pattern. Profile may be artificially high.",
-                "warning"));
-        }
-        if (maxRiasec - minRiasec > 0
-                && (double) (riasecTotal - minRiasec) / (maxRiasec - minRiasec) <= 0.17) {
-            flags.add(new FlagInfo("BIAS-02", "Disacquiescence",
-                "Personality answers followed an unusual negative pattern. All types may be suppressed.",
-                "warning"));
-        }
-
-        // BIAS-03 — abilities floor
-        if (!abilities.isEmpty()) {
-            long lowAb = abilities.stream().filter(a -> a.rawScore <= 4).count();
-            if ((double) lowAb / abilities.size() >= 0.83) {
-                flags.add(new FlagInfo("BIAS-03", "Ability Floor Bias",
-                    "Most ability scores at floor level. May indicate disengagement or reading difficulty.",
-                    "warning"));
-            }
-        }
-
-        // BIAS-04 — MI floor
-        if (!mi.isEmpty()) {
-            long lowMI = mi.stream().filter(m -> m.rawScore <= 4).count();
-            if ((double) lowMI / mi.size() >= 0.83) {
-                flags.add(new FlagInfo("BIAS-04", "MI Floor Bias",
-                    "Most intelligence scores at floor level. Discovery plan recommended.",
-                    "warning"));
-            }
-        }
-        return flags;
-    }
+    // Bias detection moved to computeValidity() with spec §2.2.4 item-count thresholds
+    // (BIAS-01/02 from RIASEC sums); the old raw-ratio ≥0.83 heuristic was removed.
 
     // ═══════════════════════ POTENTIAL SCORE (Section 5) ═══════════════════════
 
+    /**
+     * Rank-weighted average normPct over the top-N qualified (HIGH+MODERATE) dimensions.
+     * Moderate contributions ×0.75 (spec §2.3 step 6 / WT-2); rank weights renormalised
+     * to sum 1.0 when fewer than N traits qualify (WT-3). Returns 0–100.
+     */
+    private static double rankWeightedNorm(List<ScoredDimension> dims, double[] w) {
+        List<ScoredDimension> q = dims.stream()
+                .filter(d -> d.level != AbsoluteLevel.LOW)
+                .sorted(Comparator.comparingDouble((ScoredDimension d) -> d.normPct).reversed())
+                .limit(w.length)
+                .collect(Collectors.toList());
+        if (q.isEmpty()) return 0;
+        double wsum = 0;
+        for (int i = 0; i < q.size(); i++) wsum += w[i];
+        double weighted = 0;
+        for (int i = 0; i < q.size(); i++) {
+            double ww = w[i] / wsum; // WT-3 renormalise
+            double c = q.get(i).normPct * ww;
+            if (q.get(i).level == AbsoluteLevel.MODERATE) c *= 0.75;
+            weighted += c;
+        }
+        return weighted;
+    }
+
+    /**
+     * Non-spec "Potential score" construct retained for the report narrative. The spec
+     * weighting constants (WT-1/WT-2/WT-3) live here; the psychometric flags are emitted
+     * separately in {@link #collectFlags}.
+     */
     private PotentialScoreResult computePotentialScore(List<ScoredDimension> riasec,
                                                        List<ScoredDimension> mi,
                                                        List<ScoredDimension> abilities,
@@ -190,96 +182,43 @@ public class Navigator360EngineService {
         PotentialScoreResult result = new PotentialScoreResult();
 
         // ── Component 1: Personality (max 25) ──
-        List<ScoredDimension> hiR = riasec.stream().filter(d -> d.level == AbsoluteLevel.HIGH).collect(Collectors.toList());
-        List<ScoredDimension> mdR = riasec.stream().filter(d -> d.level == AbsoluteLevel.MODERATE).collect(Collectors.toList());
-        int personality;
-        if (hiR.isEmpty()) {
-            personality = 3;
-            result.flags.add("P-01");
+        long hiR = riasec.stream().filter(d -> d.level == AbsoluteLevel.HIGH).count();
+        if (riasec.stream().allMatch(d -> d.level == AbsoluteLevel.LOW)) {
+            result.personality = 3;
         } else {
-            double gateMul = hiR.size() == 1 ? 0.65 : 1.0;
-            List<ScoredDimension> qualified = new ArrayList<>();
-            qualified.addAll(hiR);
-            qualified.addAll(mdR);
-            qualified.sort(Comparator.comparingDouble((ScoredDimension d) -> d.normPct).reversed());
-            if (qualified.size() > 3) qualified = qualified.subList(0, 3);
-            double[] weights = {0.50, 0.30, 0.20};
-            double weighted = 0;
-            for (int i = 0; i < qualified.size() && i < 3; i++) {
-                double contribution = qualified.get(i).normPct * weights[i];
-                if (qualified.get(i).level == AbsoluteLevel.MODERATE) contribution *= 0.75;
-                weighted += contribution;
-            }
+            double gateMul = hiR >= 2 ? 1.0 : 0.65; // OPEN / HALF (spec §2.3 step 5)
+            double weighted = rankWeightedNorm(riasec, new double[]{0.50, 0.30, 0.20});
             double maxNorm = riasec.stream().mapToDouble(d -> d.normPct).max().orElse(0);
             double minNorm = riasec.stream().mapToDouble(d -> d.normPct).min().orElse(0);
-            double spread = maxNorm - minNorm;
-            int clarityBonus = spread >= 60 ? 3 : spread >= 40 ? 2 : 0;
+            int clarityBonus = (maxNorm - minNorm) >= 60 ? 3 : (maxNorm - minNorm) >= 40 ? 2 : 0;
             double basePts = (weighted / 100.0) * (25 - clarityBonus);
-            personality = Math.min(25, (int) Math.round((basePts + clarityBonus) * gateMul));
-
-            // P-03: flat moderate
-            if (hiR.isEmpty() && riasec.stream().allMatch(d -> d.stanine >= 3 && d.stanine <= 5)) {
-                result.flags.add("P-03");
-            }
+            result.personality = Math.min(25, (int) Math.round((basePts + clarityBonus) * gateMul));
         }
-        result.personality = personality;
 
         // ── Component 2: Intelligence (max 25) ──
-        List<ScoredDimension> hiMI = mi.stream().filter(d -> d.level == AbsoluteLevel.HIGH).collect(Collectors.toList());
-        List<ScoredDimension> mdMI = mi.stream().filter(d -> d.level == AbsoluteLevel.MODERATE).collect(Collectors.toList());
-        int intelligence;
-        if (hiMI.isEmpty()) {
-            intelligence = 2;
-            result.flags.add("P-05");
+        long hiMI = mi.stream().filter(d -> d.level == AbsoluteLevel.HIGH).count();
+        if (mi.stream().allMatch(d -> d.level == AbsoluteLevel.LOW)) {
+            result.intelligence = 2;
         } else {
-            double gateMul = hiMI.size() == 1 ? 0.65 : 1.0;
-            List<ScoredDimension> qualified = new ArrayList<>();
-            qualified.addAll(hiMI);
-            qualified.addAll(mdMI);
-            qualified.sort(Comparator.comparingDouble((ScoredDimension d) -> d.normPct).reversed());
-            if (qualified.size() > 3) qualified = qualified.subList(0, 3);
-            double[] weights = {0.50, 0.30, 0.20};
-            double weighted = 0;
-            for (int i = 0; i < qualified.size() && i < 3; i++) {
-                double contribution = qualified.get(i).normPct * weights[i];
-                if (qualified.get(i).level == AbsoluteLevel.MODERATE) contribution *= 0.75;
-                weighted += contribution;
-            }
-            intelligence = Math.min(25, (int) Math.round((weighted / 100.0) * 25.0 * gateMul));
+            double gateMul = hiMI >= 2 ? 1.0 : 0.65;
+            double weighted = rankWeightedNorm(mi, new double[]{0.50, 0.30, 0.20});
+            result.intelligence = Math.min(25, (int) Math.round((weighted / 100.0) * 25.0 * gateMul));
         }
-        result.intelligence = intelligence;
 
         // ── Component 3: Ability (max 30) ──
-        List<ScoredDimension> hiAb = abilities.stream().filter(d -> d.level == AbsoluteLevel.HIGH).collect(Collectors.toList());
-        List<ScoredDimension> mdAb = abilities.stream().filter(d -> d.level == AbsoluteLevel.MODERATE).collect(Collectors.toList());
-        int ability;
-        if (hiAb.isEmpty()) {
-            ability = 3;
-            result.flags.add("P-06");
+        long hiAb = abilities.stream().filter(d -> d.level == AbsoluteLevel.HIGH).count();
+        if (abilities.stream().allMatch(d -> d.level == AbsoluteLevel.LOW)) {
+            result.ability = 3;
         } else {
-            double gateMul = hiAb.size() < 3 ? 0.70 : 1.0;
-            List<ScoredDimension> qualified = new ArrayList<>();
-            qualified.addAll(hiAb);
-            qualified.addAll(mdAb);
-            qualified.sort(Comparator.comparingDouble((ScoredDimension d) -> d.normPct).reversed());
-            if (qualified.size() > 5) qualified = qualified.subList(0, 5);
-            double[] weights = {0.30, 0.25, 0.20, 0.15, 0.10};
-            double weighted = 0;
-            for (int i = 0; i < qualified.size() && i < 5; i++) {
-                double contribution = qualified.get(i).normPct * weights[i];
-                if (qualified.get(i).level == AbsoluteLevel.MODERATE) contribution *= 0.75;
-                weighted += contribution;
-            }
-            ability = Math.min(30, (int) Math.round((weighted / 100.0) * 30.0 * gateMul));
+            double gateMul = hiAb >= 3 ? 1.0 : 0.70;
+            double weighted = rankWeightedNorm(abilities, new double[]{0.30, 0.25, 0.20, 0.15, 0.10});
+            result.ability = Math.min(30, (int) Math.round((weighted / 100.0) * 30.0 * gateMul));
         }
-        result.ability = ability;
 
         // ── Component 4: Academic (max 20) ──
-        int academic = academicPct != null ? (int) Math.round((academicPct / 100.0) * 20.0) : 0;
-        result.academic = academic;
+        result.academic = academicPct != null ? (int) Math.round((academicPct / 100.0) * 20.0) : 0;
 
-        // ── Final ──
-        int potRaw = personality + intelligence + ability + academic;
+        int potRaw = result.personality + result.intelligence + result.ability + result.academic;
         double completionPct = Math.max(0, Math.min(1, completionPctOverride));
         result.total = Math.max(0, Math.min(100, (int) Math.round(potRaw * completionPct * 1.05)));
         result.completionPct = completionPct;
@@ -336,42 +275,23 @@ public class Navigator360EngineService {
         return result;
     }
 
-    // ═══════════════════════ CAREER MATCHING (Section 7) ═══════════════════════
+    // ═══════════════════════ CSI CAREER MATCHING (Spec §2.3 step 8–9) ═══════════════════════
 
-    private int computePotentialMatch(CareerDefinition career,
-                                       Map<String, AbsoluteLevel> riasecLevels,
-                                       Map<String, AbsoluteLevel> miLevels,
-                                       Map<String, AbsoluteLevel> abilityLevels) {
-        double[] weights = {1.0, 0.6, 0.3};
+    private static final double[] RIASEC_W  = {0.50, 0.30, 0.20};
+    private static final double[] ABILITY_W = {0.30, 0.25, 0.20, 0.15, 0.10};
+    // CURATED (flagged): the spec does not state MI rank-weights for I_score; we reuse the
+    // personality rank-weights over the cluster's (up to) 3 required MI domains.
+    private static final double[] MI_W      = {0.50, 0.30, 0.20};
 
-        double rPts = 0;
-        if (career.riasec != null) {
-            for (int i = 0; i < Math.min(career.riasec.size(), 3); i++) {
-                AbsoluteLevel lvl = riasecLevels.get(career.riasec.get(i).name());
-                if (lvl == AbsoluteLevel.HIGH) rPts += 13.3 * weights[i];
-                else if (lvl == AbsoluteLevel.MODERATE) rPts += 8.0 * weights[i];
-            }
+    /** P/A/I sub-score = Σ over the cluster's required traits of (norm × rank-weight). Spec §2.3 step 8. */
+    private static int clusterSubScore(List<String> requiredTraits, Map<String, Double> normByName, double[] w) {
+        if (requiredTraits == null) return 0;
+        double s = 0;
+        for (int i = 0; i < requiredTraits.size() && i < w.length; i++) {
+            Double n = normByName.get(requiredTraits.get(i));
+            if (n != null) s += n * w[i];
         }
-
-        double mPts = 0;
-        if (career.mi != null) {
-            for (int i = 0; i < Math.min(career.mi.size(), 3); i++) {
-                AbsoluteLevel lvl = miLevels.get(career.mi.get(i));
-                if (lvl == AbsoluteLevel.HIGH) mPts += 10.0 * weights[i];
-                else if (lvl == AbsoluteLevel.MODERATE) mPts += 6.0 * weights[i];
-            }
-        }
-
-        double aPts = 0;
-        if (career.abilities != null) {
-            for (int i = 0; i < Math.min(career.abilities.size(), 3); i++) {
-                AbsoluteLevel lvl = abilityLevels.get(career.abilities.get(i));
-                if (lvl == AbsoluteLevel.HIGH) aPts += 10.0 * weights[i];
-                else if (lvl == AbsoluteLevel.MODERATE) aPts += 6.0 * weights[i];
-            }
-        }
-
-        return Math.min(100, (int) Math.round(rPts + mPts + aPts));
+        return (int) Math.round(Math.max(0, Math.min(100, s)));
     }
 
     private static class ValuesMatchResult {
@@ -396,21 +316,23 @@ public class Navigator360EngineService {
                 if (career.values.contains(v)) matched.add(v);
             }
         }
-        double matchScore = spec.isEmpty() ? 0 : ((double) matched.size() / spec.size()) * 100.0;
+        // Spec §2.3 step 8 / §8.2: base = 100 × (matched / 5); penalty = 15 × conflict_count; clamp [0,100].
+        double base = (matched.size() / 5.0) * 100.0;
 
-        double conflictPenalty = 0;
+        int conflictCount = 0;
         for (String val : spec) {
             List<String> conflicts = Navigator360CareerData.VALUE_CONFLICTS.get(val);
             if (conflicts == null) continue;
             for (String c : conflicts) {
                 if (career.name != null && career.name.contains(c)) {
-                    conflictPenalty += 15;
+                    conflictCount++;
                     break;
                 }
             }
         }
+        double penalty = 15.0 * conflictCount;
 
-        int score = Math.max(0, (int) Math.round(matchScore - conflictPenalty));
+        int score = (int) Math.round(Math.max(0, Math.min(100, base - penalty)));
         return new ValuesMatchResult(score, matched);
     }
 
@@ -418,13 +340,15 @@ public class Navigator360EngineService {
                                             List<ScoredDimension> mi,
                                             List<ScoredDimension> abilities,
                                             List<String> studentValues,
-                                            List<String> aspirations) {
-        Map<String, AbsoluteLevel> riasecLevels = new HashMap<>();
-        for (ScoredDimension d : riasec) riasecLevels.put(d.name, d.level);
-        Map<String, AbsoluteLevel> miLevels = new HashMap<>();
-        for (ScoredDimension d : mi) miLevels.put(d.name, d.level);
-        Map<String, AbsoluteLevel> abilityLevels = new HashMap<>();
-        for (ScoredDimension d : abilities) abilityLevels.put(d.name, d.level);
+                                            List<String> aspirations,
+                                            double completionPct,
+                                            Set<String> suppressed) {
+        Map<String, Double> riasecNorm = new HashMap<>();
+        for (ScoredDimension d : riasec) riasecNorm.put(d.name, d.normPct);
+        Map<String, Double> miNorm = new HashMap<>();
+        for (ScoredDimension d : mi) miNorm.put(d.name, d.normPct);
+        Map<String, Double> abilNorm = new HashMap<>();
+        for (ScoredDimension d : abilities) abilNorm.put(d.name, d.normPct);
 
         Set<String> aspCareerIds = new HashSet<>();
         if (aspirations != null) {
@@ -434,47 +358,100 @@ public class Navigator360EngineService {
             }
         }
 
+        // CSI component weights (spec §2.3 step 8). A bias-suppressed component is dropped
+        // and the remaining weights renormalise to sum 1.0 (spec §2.2.4 reweighting).
+        Map<String, Double> w = new LinkedHashMap<>();
+        w.put("personality", 0.40);
+        w.put("ability", 0.30);
+        w.put("intelligence", 0.20);
+        w.put("values", 0.10);
+        if (suppressed != null) for (String s : suppressed) w.remove(s);
+        double wsum = w.values().stream().mapToDouble(Double::doubleValue).sum();
+        if (wsum <= 0) wsum = 1.0;
+
+        double clamped = Math.max(0, Math.min(1, completionPct));
+
         List<CareerMatch> matches = new ArrayList<>();
         for (CareerDefinition career : Navigator360CareerData.CAREER_DEFINITIONS) {
-            int potMatch = computePotentialMatch(career, riasecLevels, miLevels, abilityLevels);
+            List<String> reqRiasec = career.riasec == null ? null
+                    : career.riasec.stream().map(Enum::name).collect(Collectors.toList());
+            int p = clusterSubScore(reqRiasec, riasecNorm, RIASEC_W);
+            int a = clusterSubScore(career.abilities, abilNorm, ABILITY_W);
+            int iSc = clusterSubScore(career.mi, miNorm, MI_W);
             ValuesMatchResult valMatch = computeValuesMatch(career, studentValues);
-            boolean isAspiration = aspCareerIds.contains(career.id);
-            int aspBonus = isAspiration ? 10 : 0;
-            int suitability = Math.min(100, (int) Math.round(potMatch * 0.60 + valMatch.score * 0.40 + aspBonus));
-            int suit9 = (int) Math.round((suitability / 100.0) * 9.0);
+
+            double csi = 0;
+            if (w.containsKey("personality"))  csi += w.get("personality") * p;
+            if (w.containsKey("ability"))      csi += w.get("ability") * a;
+            if (w.containsKey("intelligence")) csi += w.get("intelligence") * iSc;
+            if (w.containsKey("values"))       csi += w.get("values") * valMatch.score;
+            csi = csi / wsum; // renormalise to 0–100
+
+            int csiRaw = (int) Math.round(Math.max(0, Math.min(100, csi)));
+            // Spec §2.3 step 11: csi_final = clamp(round(csi_raw × completion × 1.05), 0, 100)
+            int csiFinal = (int) Math.round(Math.max(0, Math.min(100, csiRaw * clamped * 1.05)));
 
             CareerMatch m = new CareerMatch();
             m.career = career;
-            m.potentialMatch = potMatch;
+            m.pScore = p;
+            m.aScore = a;
+            m.iScore = iSc;
             m.valuesMatch = valMatch.score;
-            m.suitability = suitability;
-            m.suitability9 = Math.max(1, suit9);
+            m.csiRaw = csiRaw;
+            m.suitability = csiFinal;
+            m.potentialMatch = (int) Math.round((p + a + iSc) / 3.0); // back-compat blend
+            m.suitability9 = Math.max(1, (int) Math.round((csiFinal / 100.0) * 9.0));
+            m.cell = barCell(csiFinal);
             m.matchedValues = valMatch.matched;
-            m.isAspiration = isAspiration;
+            m.isAspiration = aspCareerIds.contains(career.id);
             matches.add(m);
         }
-        matches.sort(Comparator.comparingInt((CareerMatch m) -> m.suitability).reversed());
+
+        // Rank desc by csi_final, then cluster cascade Tier A→F as a sort key (spec §9.3, EC-20):
+        // P → A → I → V → aspiration → canonical Sr-no (Tier F, deterministic terminator).
+        matches.sort(Comparator
+                .comparingInt((CareerMatch m) -> m.suitability).reversed()
+                .thenComparing(Comparator.comparingInt((CareerMatch m) -> m.pScore).reversed())
+                .thenComparing(Comparator.comparingInt((CareerMatch m) -> m.aScore).reversed())
+                .thenComparing(Comparator.comparingInt((CareerMatch m) -> m.iScore).reversed())
+                .thenComparing(Comparator.comparingInt((CareerMatch m) -> m.valuesMatch).reversed())
+                .thenComparing((CareerMatch m) -> m.isAspiration ? 0 : 1)
+                .thenComparing((CareerMatch m) -> m.career.srNo));
         return matches;
+    }
+
+    /** Spec §2.7.1 Page-4 bar cell = clamp(ceil(csi_pct / 11.11), 1, 9). */
+    static int barCell(int csiPct) {
+        int cell = (int) Math.ceil(csiPct / 11.11);
+        return Math.max(1, Math.min(9, cell));
     }
 
     // ═══════════════════════ CCI (Section 8) ═══════════════════════
 
-    private CciLevel computeCCI(List<String> aspirations, List<CareerMatch> ranked) {
-        List<String> top3 = ranked.stream().limit(3).map(m -> m.career.id).collect(Collectors.toList());
+    private CciResult computeCCI(List<String> aspirations, List<CareerMatch> ranked, String gradeGroup) {
+        // Spec §2.3 step 10 / §2.6: CCI is not computed for the Insight (6-8) stage.
+        if ("6-8".equals(gradeGroup)) {
+            return new CciResult(false, null, "N/A");
+        }
         List<String> top9 = ranked.stream().limit(9).map(m -> m.career.id).collect(Collectors.toList());
-
-        List<String> aspIds = new ArrayList<>();
+        int mapped = 0;
+        int matched = 0;
         if (aspirations != null) {
             for (String a : aspirations) {
                 String id = Navigator360CareerData.ASPIRATION_TO_CAREER.get(a);
-                if (id != null) aspIds.add(id);
+                if (id == null) continue;       // unmapped aspirations excluded from denominator (WCS-5)
+                mapped++;
+                if (top9.contains(id)) matched++;
             }
         }
-        long matchTop3 = aspIds.stream().filter(top3::contains).count();
-        long matchTop9 = aspIds.stream().filter(top9::contains).count();
-        if (matchTop3 >= 2) return CciLevel.High;
-        if (matchTop3 == 1 || matchTop9 >= 1) return CciLevel.Moderate;
-        return CciLevel.Low;
+        if (mapped == 0) {
+            return new CciResult(false, null, "N/A"); // EC-09: aspirations require counsellor mapping
+        }
+        int pct = (int) Math.round(((double) matched / mapped) * 100.0);
+        String band = pct >= 70 ? "Clear and Aligned"
+                : pct >= 40 ? "Partially Aligned"
+                : "Aspiration Mismatch";
+        return new CciResult(true, pct, band);
     }
 
     // ═══════════════════════ ALIGNMENT (Section 9) ═══════════════════════
@@ -562,33 +539,42 @@ public class Navigator360EngineService {
                                          List<ScoredDimension> abilities,
                                          List<String> aspirations,
                                          List<String> values,
-                                         CciLevel cci,
-                                         List<String> potFlags,
+                                         CciResult cci,
                                          String gradeGroup,
                                          Integer academicPct) {
         List<FlagInfo> flags = new ArrayList<>();
-        flags.addAll(checkBiases(riasec, abilities, mi));
+        // BIAS flags are emitted by the validity layer (spec §2.2.4) and merged in
+        // computeNavigator360 — they are not recomputed here.
 
-        if (potFlags.contains("P-01")) {
+        long hiR = riasec.stream().filter(d -> d.level == AbsoluteLevel.HIGH).count();
+        boolean allRiasecLow = !riasec.isEmpty() && riasec.stream().allMatch(d -> d.level == AbsoluteLevel.LOW);
+        boolean allRiasecMod  = !riasec.isEmpty() && hiR == 0 && riasec.stream().allMatch(d -> d.level == AbsoluteLevel.MODERATE);
+
+        if (allRiasecLow) {                                  // P-01: all 6 RIASEC Low
             flags.add(new FlagInfo("P-01", "Undifferentiated Personality",
                 "All RIASEC types are Low. Active exploration phase — counsellor will guide discovery.",
                 "11-12".equals(gradeGroup) ? "critical" : "info"));
         }
-        if (potFlags.contains("P-03")) {
+        if (hiR >= 3) {                                      // P-02: 3+ RIASEC High
+            flags.add(new FlagInfo("P-02", "Multi-Dominant Profile",
+                "Three or more personality types are equally strong — several pathways fit; counsellor will help focus.",
+                "11-12".equals(gradeGroup) ? "warning" : "info"));
+        }
+        if (allRiasecMod) {                                  // P-03: all RIASEC Moderate, no High
             flags.add(new FlagInfo("P-03", "Flat Moderate Profile",
                 "Broad range of interests with no strongly dominant personality type.", "info"));
         }
-        if (potFlags.contains("P-05")) {
+        if (!mi.isEmpty() && mi.stream().allMatch(d -> d.level == AbsoluteLevel.LOW)) { // P-05: all MI Low
             flags.add(new FlagInfo("P-05", "All MI Low",
                 "Learning strengths waiting to be discovered through experience.",
                 "11-12".equals(gradeGroup) ? "critical" : "warning"));
         }
-        if (potFlags.contains("P-06")) {
+        if (!abilities.isEmpty() && abilities.stream().allMatch(d -> d.level == AbsoluteLevel.LOW)) { // P-06: all Ability Low
             flags.add(new FlagInfo("P-06", "All Ability Low",
                 "Ability scores may not reflect true strengths. Counsellor will review.",
                 "11-12".equals(gradeGroup) ? "critical" : "warning"));
         }
-        if (cci == CciLevel.Low) {
+        if (cci != null && cci.applicable && cci.pct != null && cci.pct < 40) { // P-07: CCI < 40%
             flags.add(new FlagInfo("P-07", "Aspiration Mismatch",
                 "Career interests differ from top-strength careers — exciting conversation to have with counsellor.",
                 "11-12".equals(gradeGroup) ? "critical" : "info"));
@@ -653,10 +639,103 @@ public class Navigator360EngineService {
                                                    Integer academicPct,
                                                    Integer ccRaw,
                                                    double completionPct) {
+        return computeNavigator360(data, academicPct, ccRaw, completionPct,
+                computeValidity(data, completionPct));
+    }
+
+    // ═══════════════════════ VALIDITY / BIAS GATE (Spec §2.2) ═══════════════════════
+
+    /**
+     * Validity / bias outcome derivable from the cached intermediary scores: the Section
+     * A/B/C minimum gate (VG-2) and the RIASEC acquiescence/disacquiescence biases
+     * (VG-3 BIAS-01/02). A single bias suppresses the personality component (reweighted in
+     * the CSI); two biases hard-fail.
+     *
+     * <p><b>Flagged gap:</b> the item-level cleaning gate (VG-1 / ERR-01-02), the ability/MI
+     * floor biases (BIAS-03/04) and the real completion_pct denominator (WARN-01) require
+     * per-item answer data that is not carried in the cached intermediary payload; they are
+     * computed upstream in {@code NavigatorReportGenerationService} and should be threaded
+     * through the payload to complete the gate (and to make the EC-04 composite hard-fail
+     * reachable from ability/MI bias).
+     */
+    public ValidityResult computeValidity(IntermediaryScores data, double completionPctParam) {
+        ValidityResult v = new ValidityResult();
+        v.completionPct = Math.max(0, Math.min(1, completionPctParam));
+        String grade = resolveGradeGroup(data.studentClass);
+
+        // VG-2: Section A/B/C minimum (spec §2.2.3). 0 selections is treated as "not collected
+        // for this stage" and skipped to avoid mass-blocking on unpopulated fields (flagged).
+        sectionMinimum(v, "Core Values (B)", size(data.selectedValues));
+        sectionMinimum(v, "Subjects of Interest (C)", size(data.selectedSOIs));
+        if (!"6-8".equals(grade)) {
+            sectionMinimum(v, "Career Aspirations (A)", size(data.selectedCareerAsps));
+        }
+
+        // VG-3: BIAS-01/02 from RIASEC sums (54 items, Yes=2/No=1 ⇒ #Yes = total − 54).
+        int biasCount = 0;
+        if (data.riasecScores != null && !data.riasecScores.isEmpty()) {
+            int total = data.riasecScores.values().stream().mapToInt(Integer::intValue).sum();
+            int yes = total - 54;
+            int no = 54 - yes;
+            if (yes >= 46) {           // ≥85% Yes
+                biasCount++;
+                v.suppressed.add("personality");
+                v.flags.add(new FlagInfo("BIAS-01", "Acquiescence",
+                    "Personality answers were almost all 'Yes' — the personality module is set aside for a counsellor conversation.",
+                    "warning"));
+            } else if (no >= 46) {     // ≥85% No
+                biasCount++;
+                v.suppressed.add("personality");
+                v.flags.add(new FlagInfo("BIAS-02", "Disacquiescence",
+                    "Personality answers were almost all 'No' — the personality module is set aside for a counsellor conversation.",
+                    "warning"));
+            }
+        }
+        // Composite hard-fail (spec §2.2.4): 2+ bias flags → cover-message only, no Top 9.
+        if (biasCount >= 2) {
+            v.hardFail = true;
+            v.suppressed.clear();
+        }
+        return v;
+    }
+
+    private static void sectionMinimum(ValidityResult v, String section, int n) {
+        if (n <= 0) return; // not collected for this stage — skip (flagged conservative choice)
+        if (n < 3) {        // 1–2 selections → ERR-04 invalid (spec §2.2.3 / EC-29)
+            v.valid = false;
+            v.flags.add(new FlagInfo("ERR-04", "Section below minimum",
+                section + " has fewer than 3 selections — re-administer this section.", "critical"));
+        } else if (n < 5) { // 3–4 selections → WARN-02 (panel blank, record valid) / EC-17,31,32
+            v.flags.add(new FlagInfo("WARN-02", "Under-selection",
+                section + " has " + n + " selections — panel rendered blank; counsellor to note.", "info"));
+        }
+    }
+
+    private static int size(List<String> l) { return l == null ? 0 : l.size(); }
+
+    /**
+     * @param validity item-level validity / bias outcome (spec §2.2). When non-null its
+     *                 completionPct overrides the parameter, its suppressed components are
+     *                 dropped from the CSI weighting (reweighted to 100), its flags are
+     *                 merged, and a composite bias hard-fail suppresses the Top-9.
+     */
+    public Navigator360Result computeNavigator360(IntermediaryScores data,
+                                                   Integer academicPct,
+                                                   Integer ccRaw,
+                                                   double completionPct,
+                                                   ValidityResult validity) {
         Navigator360Result result = new Navigator360Result();
         result.studentName = data.studentName;
         result.studentClass = data.studentClass;
         result.gradeGroup = resolveGradeGroup(data.studentClass);
+
+        java.util.Set<String> suppressed = validity != null ? validity.suppressed : new HashSet<>();
+        boolean invalid = false;
+        if (validity != null) {
+            completionPct = validity.completionPct;
+            result.hardFail = validity.hardFail;
+            invalid = !validity.valid; // ERR-* → no report-worthy Top 9
+        }
 
         // 1. Score dimensions
         result.riasec = scoreRIASEC(data.riasecScores);
@@ -683,14 +762,22 @@ public class Navigator360EngineService {
         result.preferenceScore = computePreferenceScore(
                 result.values, data.selectedCareerAsps, data.selectedSOIs, topRiasec, ccNorm);
 
-        // 7. Career matching
+        // 7. Career matching — CSI over all 24 clusters, ranked, Top 9 (spec §2.3 step 8–9)
         result.careerMatches = matchCareers(
-                result.riasec, result.mi, result.abilities, result.values, data.selectedCareerAsps);
+                result.riasec, result.mi, result.abilities, result.values,
+                data.selectedCareerAsps, completionPct, suppressed);
+        // Composite bias hard-fail (spec §2.2.4 / EC-04) or ERR-* invalid (spec §2.2): no Top 9.
+        List<CareerMatch> top9 = (result.hardFail || invalid)
+                ? new ArrayList<>()
+                : result.careerMatches.stream().limit(9).collect(Collectors.toList());
         int topCount = "11-12".equals(result.gradeGroup) ? 5 : 3;
-        result.topCareers = result.careerMatches.stream().limit(topCount).collect(Collectors.toList());
+        result.topCareers = top9.stream().limit(topCount).collect(Collectors.toList());
 
-        // 8. CCI
-        result.cci = computeCCI(data.selectedCareerAsps, result.careerMatches);
+        // TOP9-3: suppress bottom tier when ≥4 of the Top 9 fall below csi 50 (spec §9.4)
+        result.suppressBottomTier = top9.stream().filter(m -> m.suitability < 50).count() >= 4;
+
+        // 8. CCI (spec §2.3 step 10; skipped for Insight)
+        result.cci = computeCCI(data.selectedCareerAsps, result.careerMatches, result.gradeGroup);
 
         // 9. Alignment
         result.alignmentScore = computeAlignment(result.riasec, result.mi, result.abilities, result.topCareers);
@@ -698,11 +785,13 @@ public class Navigator360EngineService {
         // 10. Holland code (top 3 RIASEC)
         result.hollandCode = topRiasec.stream().limit(3).map(Enum::name).collect(Collectors.joining());
 
-        // 11. Flags
-        result.flags = collectFlags(
+        // 11. Flags (validity/bias flags first, then psychometric P-flags)
+        result.flags = new ArrayList<>();
+        if (validity != null) result.flags.addAll(validity.flags);
+        result.flags.addAll(collectFlags(
                 result.riasec, result.mi, result.abilities,
                 data.selectedCareerAsps != null ? data.selectedCareerAsps : new ArrayList<>(),
-                result.values, result.cci, result.potentialScore.flags, result.gradeGroup, academicPct);
+                result.values, result.cci, result.gradeGroup, academicPct));
 
         // 12. Pass-through Section A/B/C selections
         result.careerAspirations = data.selectedCareerAsps != null ? new ArrayList<>(data.selectedCareerAsps) : new ArrayList<>();

@@ -5,29 +5,17 @@ import {
 } from '../../ReportGeneration/API/GeneratedReport_APIs'
 import { useAutoRefresh } from '../../../utils/useAutoRefresh'
 import { useAuth } from '../../../modules/auth/core/Auth'
+import { useStudentData } from './StudentDataContext'
+import { showErrorToast } from '../../../utils/toast'
 import './StudentPortal.css'
 
 function getReportLabel(type: string): string {
   switch (type) {
-    case 'navigator': return 'Navigator 360 Report'
+    case 'navigator':
+    case 'pager': return 'Navigator 360 Report'
     case 'bet': return 'BET Report'
+    case 'legacy': return 'Assessment Report'
     default: return type.charAt(0).toUpperCase() + type.slice(1) + ' Report'
-  }
-}
-
-function getReportDescription(type: string): string {
-  switch (type) {
-    case 'navigator': return 'Complete 6-pillar career profile with career matches & action plan'
-    case 'bet': return 'Behavioral, Emotional & Thinking assessment insights'
-    default: return 'Assessment report'
-  }
-}
-
-function getReportIcon(type: string): { bg: string; color: string } {
-  switch (type) {
-    case 'navigator': return { bg: '#E8F5E9', color: '#2E7D32' }
-    case 'bet': return { bg: '#E3F2FD', color: '#1565C0' }
-    default: return { bg: '#FFF3E0', color: '#E65100' }
   }
 }
 
@@ -41,18 +29,31 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+const safeName = (s: string) =>
+  (s || 'report').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_')
+
 const StudentReports: React.FC = () => {
   const { currentUser } = useAuth()
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  // Assessment names come from the once-at-login bootstrap, so we can label each
+  // report with the assessment it belongs to (no extra request).
+  const { data: studentData } = useStudentData()
+  const [downloadingId, setDownloadingId] = useState<number | null>(null)
 
-  // Phase 19 (19-02): userStudentId now sourced from useAuth().currentUser instead
-  // of localStorage.studentPortalProfile. The field is not yet declared on the
-  // canonical User type (Phase 16 surface gap); cast to any to peek at it.
   const userStudentId = useMemo<number | null>(() => {
     const u = currentUser as any
     return (u?.userStudentId as number | undefined) ?? null
   }, [currentUser])
 
+  const assessmentName = useMemo<Map<number, string>>(() => {
+    const m = new Map<number, string>()
+    ;(studentData.assessments || []).forEach((a: any) => {
+      if (a?.assessmentId != null && a?.assessmentName) m.set(a.assessmentId, a.assessmentName)
+    })
+    return m
+  }, [studentData])
+
+  // Visibility gate is preserved: only reports an admin has released to the
+  // student (visibleToStudent=true) are returned by this endpoint.
   const { data, loading } = useAutoRefresh<GeneratedReport[]>(
     async () => {
       if (!userStudentId) return []
@@ -63,8 +64,36 @@ const StudentReports: React.FC = () => {
   )
   const reports = data ?? []
 
-  const handleDownload = (url: string) => {
-    window.open(url, '_blank')
+  // Preview = open the HTML report (DigitalOcean Spaces) in a new tab.
+  const handlePreview = (url: string | null) => {
+    if (!url) return
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  // Download = fetch the stored PDF straight from Spaces and save it — exactly like
+  // the Reports Hub Generate modal (downloadUrlAsFile). No client-side rendering: the
+  // server-rendered pdf_url is the canonical file. A cross-origin <a download> is
+  // ignored by browsers, so we go through a blob (bucket CORS allows GET).
+  const handleDownload = async (r: GeneratedReport, label: string) => {
+    if (!r.pdfUrl) { showErrorToast('PDF is not available for this report'); return }
+    setDownloadingId(r.generatedReportId)
+    try {
+      const res = await fetch(r.pdfUrl)
+      if (!res.ok) throw new Error('fetch failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeName(label)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      showErrorToast('Download failed — try Preview to open the report directly')
+    } finally {
+      setDownloadingId(null)
+    }
   }
 
   return (
@@ -96,7 +125,12 @@ const StudentReports: React.FC = () => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {reports.map((r) => {
-            const icon = getReportIcon(r.typeOfReport)
+            const title = assessmentName.get(r.assessmentId) || `Assessment ${r.assessmentId}`
+            const isDownloading = downloadingId === r.generatedReportId
+            // Downloadable only when the server-rendered PDF exists in Spaces. If
+            // pdf_url is missing the PDF render failed/hasn't run — Preview (HTML)
+            // still works. Same gate as the Reports Hub Generate modal.
+            const canDownload = !!r.pdfUrl
             return (
               <div
                 key={r.generatedReportId}
@@ -109,26 +143,26 @@ const StudentReports: React.FC = () => {
                     width: 42,
                     height: 42,
                     borderRadius: 10,
-                    background: icon.bg,
+                    background: '#e8f5ee',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
                   }}
                 >
-                  <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke={icon.color} strokeWidth='2'>
+                  <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='#1a6b3c' strokeWidth='2'>
                     <path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/>
                     <polyline points='14 2 14 8 20 8'/>
                   </svg>
                 </div>
 
-                {/* Report info */}
+                {/* Report info — which assessment this report is for */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: '#1A1A1A' }}>
-                    {getReportLabel(r.typeOfReport)}
+                    {title}
                   </div>
                   <div style={{ fontSize: 12, color: '#78909C', marginTop: 3 }}>
-                    {getReportDescription(r.typeOfReport)}
+                    {getReportLabel(r.typeOfReport)}
                     {r.updatedAt && (
                       <span style={{ marginLeft: 8, color: '#B0BEC5' }}>
                         &middot; {formatDate(r.updatedAt)}
@@ -140,36 +174,54 @@ const StudentReports: React.FC = () => {
                 {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                   <button
-                    onClick={() => setPreviewUrl(r.reportUrl)}
+                    onClick={() => handlePreview(r.reportUrl)}
                     style={{
                       padding: '8px 16px',
                       fontSize: 13,
                       fontWeight: 600,
                       borderRadius: 8,
-                      border: '1px solid #DDE3EC',
+                      border: '1px solid rgba(40,160,90,0.35)',
                       cursor: 'pointer',
                       background: '#fff',
-                      color: '#455A64',
+                      color: '#1a6b3c',
                       whiteSpace: 'nowrap',
                     }}
                   >
                     Preview
                   </button>
                   <button
-                    onClick={() => handleDownload(r.reportUrl!)}
+                    onClick={() => handleDownload(r, title)}
+                    disabled={!canDownload || isDownloading}
+                    title={!canDownload ? 'PDF not available for this report' : 'Download PDF'}
                     style={{
                       padding: '8px 16px',
                       fontSize: 13,
                       fontWeight: 600,
                       borderRadius: 8,
                       border: 'none',
-                      cursor: 'pointer',
-                      background: '#263B6A',
+                      cursor: !canDownload || isDownloading ? 'not-allowed' : 'pointer',
+                      background: !canDownload || isDownloading ? '#c2cdd6' : '#1a6b3c',
                       color: '#fff',
                       whiteSpace: 'nowrap',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
                     }}
                   >
-                    Download
+                    {isDownloading && (
+                      <span
+                        style={{
+                          width: 13,
+                          height: 13,
+                          border: '2px solid rgba(255,255,255,0.45)',
+                          borderTopColor: '#fff',
+                          borderRadius: '50%',
+                          display: 'inline-block',
+                          animation: 'sp-spin 0.6s linear infinite',
+                        }}
+                      />
+                    )}
+                    {isDownloading ? 'Downloading…' : 'Download'}
                   </button>
                 </div>
               </div>
@@ -178,97 +230,7 @@ const StudentReports: React.FC = () => {
         </div>
       )}
 
-      {/* Preview modal */}
-      {previewUrl && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 24,
-          }}
-          onClick={() => setPreviewUrl(null)}
-        >
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 16,
-              width: '100%',
-              maxWidth: 900,
-              height: '85vh',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-              boxShadow: '0 24px 48px rgba(0,0,0,0.15)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px 24px',
-                borderBottom: '1px solid #E5E7EB',
-              }}
-            >
-              <span style={{ fontSize: 16, fontWeight: 600, color: '#1A1A1A' }}>Report Preview</span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => handleDownload(previewUrl)}
-                  style={{
-                    padding: '6px 16px',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    borderRadius: 8,
-                    border: 'none',
-                    cursor: 'pointer',
-                    background: '#263B6A',
-                    color: '#fff',
-                  }}
-                >
-                  Download
-                </button>
-                <button
-                  onClick={() => setPreviewUrl(null)}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: 18,
-                    fontWeight: 400,
-                    borderRadius: 8,
-                    border: '1px solid #DDE3EC',
-                    cursor: 'pointer',
-                    background: '#fff',
-                    color: '#6B7280',
-                    lineHeight: 1,
-                  }}
-                >
-                  &times;
-                </button>
-              </div>
-            </div>
-
-            {/* iframe preview */}
-            <iframe
-              src={previewUrl}
-              title='Report Preview'
-              style={{
-                flex: 1,
-                border: 'none',
-                width: '100%',
-              }}
-            />
-          </div>
-        </div>
-      )}
+      <style>{`@keyframes sp-spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }

@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +31,8 @@ import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.security.AuthorizationService;
+import com.kccitm.api.security.UserPrincipal;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping("/generated-reports")
@@ -41,6 +44,7 @@ public class GeneratedReportController {
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     // Phase 2 (Task 2.4 / HIGH-F): used to scope-bind the report delete + visibility mutations.
     @Autowired private AuthorizationService authorizationService;
+    @Autowired private ObjectMapper objectMapper;
 
     @Autowired private BetReportDataController betReportDataController;
     @Autowired private NavigatorReportDataController navigatorReportDataController;
@@ -59,6 +63,80 @@ public class GeneratedReportController {
         return generatedReportRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    // ═══════════════════════ STUDENT SELF-SERVICE (own data only) ═══════════════════════
+    // Resolves the student from the SESSION (never a path param), gated by plain
+    // authentication — mirrors InsightDashboardController#getMyInsight. The Navigator 360
+    // dashboard is precomputed at report-generation time (ReportService) and stored on
+    // generated_report.navigator_dashboard_json, so these read directly with no recompute.
+
+    /** GET /generated-reports/me/navigator — lean card list for the signed-in student. */
+    @GetMapping("/me/navigator")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getMyNavigatorCards(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null || principal.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No authenticated user."));
+        }
+        UserStudent self = userStudentRepository.getByUserId(principal.getId()).orElse(null);
+        if (self == null || self.getUserStudentId() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "This account is not a student."));
+        }
+        List<GeneratedReport> rows = generatedReportRepository.findByUserStudentUserStudentId(self.getUserStudentId());
+        List<Map<String, Object>> cards = new ArrayList<>();
+        for (GeneratedReport r : rows) {
+            Map<String, Object> card = new HashMap<>();
+            card.put("assessmentId", r.getAssessmentId());
+            card.put("reportStatus", r.getReportStatus());
+            card.put("hasDashboard", r.getNavigatorDashboardJson() != null && !r.getNavigatorDashboardJson().isEmpty());
+            card.put("pdfUrl", r.getPdfUrl());
+            card.put("reportUrl", r.getReportUrl());
+            card.put("updatedAt", r.getUpdatedAt());
+            cards.add(card);
+        }
+        return ResponseEntity.ok(cards);
+    }
+
+    /** GET /generated-reports/me/navigator/{assessmentId} — the precomputed Navigator 360 dashboard. */
+    @GetMapping("/me/navigator/{assessmentId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getMyNavigatorDashboard(@AuthenticationPrincipal UserPrincipal principal,
+                                                     @PathVariable Long assessmentId) {
+        if (principal == null || principal.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No authenticated user."));
+        }
+        UserStudent self = userStudentRepository.getByUserId(principal.getId()).orElse(null);
+        if (self == null || self.getUserStudentId() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "This account is not a student."));
+        }
+        // Pick this student's generated report for the assessment that carries a navigator
+        // payload (most recently updated wins if more than one template was generated).
+        GeneratedReport row = generatedReportRepository
+                .findByUserStudentUserStudentId(self.getUserStudentId()).stream()
+                .filter(r -> assessmentId.equals(r.getAssessmentId()))
+                .filter(r -> r.getNavigatorDashboardJson() != null && !r.getNavigatorDashboardJson().isEmpty())
+                .max((a, b) -> {
+                    java.util.Date da = a.getUpdatedAt() != null ? a.getUpdatedAt() : new java.util.Date(0);
+                    java.util.Date db = b.getUpdatedAt() != null ? b.getUpdatedAt() : new java.util.Date(0);
+                    return da.compareTo(db);
+                })
+                .orElse(null);
+        if (row == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Navigator dashboard not ready for this assessment."));
+        }
+        try {
+            Object dashboard = objectMapper.readValue(row.getNavigatorDashboardJson(), Object.class);
+            Map<String, Object> body = new HashMap<>();
+            body.put("assessmentId", assessmentId);
+            body.put("pdfUrl", row.getPdfUrl());
+            body.put("reportUrl", row.getReportUrl());
+            body.put("dashboard", dashboard);
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to parse navigator dashboard."));
+        }
     }
 
     // Phase 2 (Task 2.4 / HIGH-F): was a flat permission with no scope binding — any

@@ -29,6 +29,9 @@ import com.kccitm.api.repository.Career9.report.CalculatedReportDataRepository;
 import com.kccitm.api.repository.Career9.report.IntermediaryScoresRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
+import com.kccitm.api.service.Navigator.NavigatorReportGenerationService.IntermediaryScores;
+import com.kccitm.api.service.b2c.pager.Navigator360EngineService;
+import com.kccitm.api.service.b2c.pager.Navigator360Models.Navigator360Result;
 import com.kccitm.api.service.b2c.pager.PagerScoreSource;
 import com.kccitm.api.service.b2c.report.SanityCheckService.SanityResult;
 
@@ -60,6 +63,7 @@ public class ReportService {
 
     @Autowired private SanityCheckService sanityCheckService;
     @Autowired private PagerScoreSource pagerScoreSource;
+    @Autowired private Navigator360EngineService navigator360EngineService;
 
     @Autowired private ReportTemplateRepository reportTemplateRepository;
     @Autowired private AssessmentReportTemplateRepository assessmentReportTemplateRepository;
@@ -184,6 +188,24 @@ public class ReportService {
         // 7. Upsert generated_report with the rendered PDF state.
         GeneratedReport gr = upsertGeneratedReport(userStudentId, assessmentId, template,
                 reportUrl, pdfUrl, pdfStatus);
+
+        // 7b. Precompute + persist the Navigator 360 dashboard payload (pager engine only)
+        // so the student portal renders it directly — ready the moment the report is
+        // generated, no recompute on read. Fails soft: the report is already saved.
+        if ("pager".equalsIgnoreCase(template.getEngineCode())) {
+            try {
+                IntermediaryScores navScores = pagerScoreSource.getIntermediaryScores(userStudentId, assessmentId);
+                if (navScores != null) {
+                    Navigator360Result navResult =
+                            navigator360EngineService.computeNavigator360(navScores, null, null, 1.0);
+                    gr.setNavigatorDashboardJson(objectMapper.writeValueAsString(navResult));
+                    generatedReportRepository.save(gr);
+                }
+            } catch (Exception e) {
+                logger.warn("Navigator dashboard JSON persist failed (report still generated) "
+                        + "student={} assessment={}: {}", userStudentId, assessmentId, e.getMessage());
+            }
+        }
 
         return new ReportResult(reportUrl, template.getEngineCode(), templateLabel(template),
                 calcRow.getCalculatedAt(), gr.getUpdatedAt(), reusedCalc,

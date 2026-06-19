@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { toAbsoluteUrl } from '../../../../_metronic/helpers'
 import { useAuth } from '../../../modules/auth/core/Auth'
 import './StudentPortal.css'
 
@@ -160,38 +159,16 @@ const StudentInfoForm: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F7FA' }}>
+      <div style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}>
         <div style={{ color: '#6B7280', fontSize: 14 }}>Loading ...</div>
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F5F7FA' }}>
-      {/* Top bar */}
-      <div
-        style={{
-          background: '#263B6A',
-          color: '#fff',
-          padding: '0 20px',
-          height: 56,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <img
-          src={toAbsoluteUrl('/media/logos/kcc.webp')}
-          alt='Career-9'
-          style={{ height: 28, borderRadius: 4, background: '#fff', padding: 2 }}
-        />
-        <span style={{ fontSize: 14, fontWeight: 600 }}>Career Navigator 360</span>
-      </div>
-
-      <div style={{ maxWidth: 520, margin: '0 auto', padding: '40px 20px' }}>
+    <div>
+      {/* Chrome (logo bar) is provided by StudentPortalLayout — content only here. */}
+      <div style={{ maxWidth: 520, margin: '0 auto', padding: '4px 0 20px' }}>
         <div className='sp-card' style={{ padding: '32px 28px' }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1A1A1A', margin: '0 0 4px' }}>
             {isEditMode ? 'Edit Profile' : 'Complete Your Profile'}
@@ -379,7 +356,7 @@ const StudentInfoForm: React.FC = () => {
                   fontWeight: 600,
                   borderRadius: 8,
                   border: 'none',
-                  background: submitting ? '#6984A9' : '#263B6A',
+                  background: submitting ? '#7bb394' : '#1a6b3c',
                   color: '#fff',
                   cursor: submitting ? 'not-allowed' : 'pointer',
                 }}

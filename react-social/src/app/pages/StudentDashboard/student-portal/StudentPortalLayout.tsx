@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { toAbsoluteUrl } from '../../../../_metronic/helpers'
 import { useAuth } from '../../../modules/auth/core/Auth'
 import { STUDENT_MENU_ITEMS } from './studentMenuConfig'
+import { StudentDataProvider, useStudentData } from './StudentDataContext'
 import './StudentPortalLayout.css'
 
 /**
@@ -13,8 +15,9 @@ import './StudentPortalLayout.css'
  * (studentMenuConfig.tsx) — content unchanged; only the look is the new green/glass
  * theme (palette borrowed from StudentPortalDashboard's spd-* design).
  *
- * No data is fetched here — the user comes from the already-hydrated auth context
- * (useAuth, sourced from /auth/me at app boot), so the shell adds zero network load.
+ * Dashboard data is fetched ONCE by the StudentDataProvider that wraps this shell
+ * (so it persists across in-portal navigation), and pages read it via useStudentData().
+ * The top-bar Refresh button re-runs that bootstrap on demand.
  */
 
 const HamburgerIcon = () => (
@@ -39,11 +42,18 @@ const SignOutIcon = () => (
     <path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4' /><polyline points='16 17 21 12 16 7' /><line x1='21' y1='12' x2='9' y2='12' />
   </svg>
 )
+const RefreshIcon = () => (
+  <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+    <polyline points='23 4 23 10 17 10' /><polyline points='1 20 1 14 7 14' />
+    <path d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15' />
+  </svg>
+)
 
-const StudentPortalLayout: React.FC = () => {
+const StudentPortalShell: React.FC = () => {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { currentUser } = useAuth()
+  const { refresh, loading: dataLoading } = useStudentData()
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
@@ -91,9 +101,8 @@ const StudentPortalLayout: React.FC = () => {
       {/* Aside */}
       <aside className={`sp-aside ${collapsed ? 'collapsed' : ''}`}>
         <div className='sp-brand'>
-          <div className='sp-brand-logo'>C9</div>
+          <img className='sp-brand-logo' src={toAbsoluteUrl('/media/logos/kcc.webp')} alt='Career-9' />
           <div className='sp-brand-text'>
-            <strong>Career-9</strong>
             <span>Student Portal</span>
           </div>
         </div>
@@ -165,6 +174,17 @@ const StudentPortalLayout: React.FC = () => {
               <BellIcon />
               <span className='sp-notif-dot' />
             </button>
+            <button
+              className='sp-icon-btn'
+              onClick={() => refresh()}
+              disabled={dataLoading}
+              title='Refresh dashboard data'
+              aria-label='Refresh dashboard data'
+            >
+              <span className={dataLoading ? 'sp-spin' : ''} style={{ display: 'inline-flex' }}>
+                <RefreshIcon />
+              </span>
+            </button>
             <button className='sp-icon-btn' onClick={handleLogout} title='Sign out' aria-label='Sign out'>
               <SignOutIcon />
             </button>
@@ -178,5 +198,15 @@ const StudentPortalLayout: React.FC = () => {
     </div>
   )
 }
+
+/**
+ * Wraps the shell in the StudentDataProvider so the dashboard data is bootstrapped
+ * once and shared with every page (and the Refresh button) for the whole session.
+ */
+const StudentPortalLayout: React.FC = () => (
+  <StudentDataProvider>
+    <StudentPortalShell />
+  </StudentDataProvider>
+)
 
 export default StudentPortalLayout

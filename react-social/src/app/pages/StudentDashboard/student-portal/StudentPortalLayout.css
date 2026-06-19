@@ -69,19 +69,19 @@
   min-height: 44px;
 }
 .sp-brand-logo {
-  width: 44px;
-  height: 44px;
+  height: 40px;
+  width: auto;
+  max-width: 150px;
   flex-shrink: 0;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--sp-primary), var(--sp-primary-light));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 15px;
-  letter-spacing: -0.5px;
-  box-shadow: 0 6px 16px rgba(26, 107, 60, 0.28);
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+  padding: 4px 7px;
+  box-shadow: 0 2px 10px rgba(26, 107, 60, 0.12);
+}
+.sp-aside.collapsed .sp-brand-logo {
+  max-width: 50px;
+  padding: 4px;
 }
 .sp-brand-text {
   display: flex;
@@ -310,6 +310,9 @@
 .sp-search input::placeholder {
   color: #aab4bf;
 }
+.sp-spin { animation: sp-spin 0.8s linear infinite; }
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+
 .sp-notif-dot {
   position: absolute;
   top: 9px;
