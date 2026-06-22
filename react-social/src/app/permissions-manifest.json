@@ -95,7 +95,8 @@
   ],
   "payment.refund": [
     "/payment-tracking",
-    "/promo-codes"
+    "/promo-codes",
+    "/referral-codes"
   ],
   "permission.grant": [
     "/activity-log",
