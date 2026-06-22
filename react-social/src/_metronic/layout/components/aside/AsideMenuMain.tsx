@@ -94,7 +94,8 @@ export function AsideMenuMain() {
     allowed("/b2c/pricing-tiers") ||
     allowed("/b2c/tracker") ||
     allowed("/payment-tracking") ||
-    allowed("/promo-codes");
+    allowed("/promo-codes") ||
+    allowed("/referral-codes");
 
   const showReports = allowed("/reports") || allowed("/reports-hub") || allowed("/admin/report-templates");
 

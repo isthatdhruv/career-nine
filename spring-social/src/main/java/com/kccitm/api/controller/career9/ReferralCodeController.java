@@ -1,6 +1,7 @@
 package com.kccitm.api.controller.career9;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -15,6 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,6 +40,8 @@ import com.kccitm.api.repository.Career9.ReferralCodeRepository;
 import com.kccitm.api.repository.Career9.StudentReferralRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
+import com.kccitm.api.security.CurrentScopes;
+import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.career9.ReferralService;
 
 @RestController
@@ -65,6 +70,9 @@ public class ReferralCodeController {
         if (instituteCode == null) {
             return ResponseEntity.badRequest().body("Institute is required");
         }
+        if (!canAccessInstitute(instituteCode)) {
+            return forbidden();
+        }
         if (referralCodeRepository.findByCodeIgnoreCase(code.trim().toUpperCase()).isPresent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Referral code already exists");
         }
@@ -89,14 +97,28 @@ public class ReferralCodeController {
     @PreAuthorize("@auth.allows('referral_code.read.all')")
     @GetMapping("/getAll")
     public ResponseEntity<List<ReferralCode>> getAll() {
-        return ResponseEntity.ok(referralCodeRepository.findAllByOrderByCreatedAtDesc());
+        List<ReferralCode> all = referralCodeRepository.findAllByOrderByCreatedAtDesc();
+        List<Integer> allowed = allowedInstituteCodes();
+        if (allowed == null) {
+            return ResponseEntity.ok(all); // unrestricted (super-admin / wildcard)
+        }
+        List<ReferralCode> scoped = all.stream()
+                .filter(rc -> rc.getInstituteCode() != null && allowed.contains(rc.getInstituteCode()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(scoped);
     }
 
     @PreAuthorize("@auth.allows('referral_code.read')")
     @GetMapping("/get/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         Optional<ReferralCode> rc = referralCodeRepository.findById(id);
-        return rc.isPresent() ? ResponseEntity.ok(rc.get()) : ResponseEntity.notFound().build();
+        if (!rc.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!canAccessInstitute(rc.get().getInstituteCode())) {
+            return forbidden();
+        }
+        return ResponseEntity.ok(rc.get());
     }
 
     @PreAuthorize("@auth.allows('referral_code.update')")
@@ -107,6 +129,9 @@ public class ReferralCodeController {
             return ResponseEntity.notFound().build();
         }
         ReferralCode rc = opt.get();
+        if (!canAccessInstitute(rc.getInstituteCode())) {
+            return forbidden();
+        }
 
         if (request.containsKey("code")) {
             String newCode = ((String) request.get("code")).trim().toUpperCase();
@@ -122,7 +147,12 @@ public class ReferralCodeController {
         if (request.containsKey("description")) rc.setDescription((String) request.get("description"));
         if (request.containsKey("instituteCode")) {
             Integer ic = toInt(request.get("instituteCode"));
-            if (ic != null) rc.setInstituteCode(ic);
+            if (ic != null) {
+                if (!canAccessInstitute(ic)) {
+                    return forbidden(); // cannot reassign a code to an institute you aren't mapped to
+                }
+                rc.setInstituteCode(ic);
+            }
         }
         if (request.containsKey("isActive")) rc.setIsActive((Boolean) request.get("isActive"));
         if (request.containsKey("maxUses")) {
@@ -143,8 +173,12 @@ public class ReferralCodeController {
     @PreAuthorize("@auth.allows('referral_code.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        if (!referralCodeRepository.existsById(id)) {
+        Optional<ReferralCode> opt = referralCodeRepository.findById(id);
+        if (!opt.isPresent()) {
             return ResponseEntity.notFound().build();
+        }
+        if (!canAccessInstitute(opt.get().getInstituteCode())) {
+            return forbidden();
         }
         referralCodeAssessmentRepository.deleteByReferralCodeId(id);
         referralCodeRepository.deleteById(id);
@@ -156,6 +190,13 @@ public class ReferralCodeController {
     @PreAuthorize("@auth.allows('referral_code.read')")
     @GetMapping("/{id}/assessments")
     public ResponseEntity<?> getAssessments(@PathVariable Long id) {
+        Optional<ReferralCode> opt = referralCodeRepository.findById(id);
+        if (!opt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!canAccessInstitute(opt.get().getInstituteCode())) {
+            return forbidden();
+        }
         List<Long> ids = referralCodeAssessmentRepository.findByReferralCodeId(id).stream()
                 .map(ReferralCodeAssessment::getAssessmentId)
                 .collect(Collectors.toList());
@@ -167,8 +208,12 @@ public class ReferralCodeController {
     @PreAuthorize("@auth.allows('referral_code.read')")
     @GetMapping("/institutes")
     public ResponseEntity<?> listInstitutes() {
+        List<Integer> allowed = allowedInstituteCodes(); // null = unrestricted
         List<Map<String, Object>> out = new ArrayList<>();
         for (InstituteDetail inst : instituteDetailRepository.findAll()) {
+            if (allowed != null && !allowed.contains(inst.getInstituteCode())) {
+                continue; // only institutes the caller is mapped to
+            }
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("instituteCode", inst.getInstituteCode());
             m.put("instituteName", inst.getInstituteName());
@@ -180,6 +225,9 @@ public class ReferralCodeController {
     @PreAuthorize("@auth.allows('referral_code.read')")
     @GetMapping("/institutes/{instituteCode}/assessments")
     public ResponseEntity<?> listInstituteAssessments(@PathVariable Integer instituteCode) {
+        if (!canAccessInstitute(instituteCode)) {
+            return forbidden();
+        }
         // Distinct assessments this institute offers (via its active mappings).
         Set<Long> assessmentIds = assessmentInstituteMappingRepository
                 .findByInstituteCode(instituteCode).stream()
@@ -204,8 +252,12 @@ public class ReferralCodeController {
     @PreAuthorize("@auth.allows('referral_code.read')")
     @GetMapping("/{id}/students")
     public ResponseEntity<?> getReferredStudents(@PathVariable Long id) {
-        if (!referralCodeRepository.existsById(id)) {
+        Optional<ReferralCode> rcOpt = referralCodeRepository.findById(id);
+        if (!rcOpt.isPresent()) {
             return ResponseEntity.notFound().build();
+        }
+        if (!canAccessInstitute(rcOpt.get().getInstituteCode())) {
+            return forbidden();
         }
         List<Map<String, Object>> out = new ArrayList<>();
         for (StudentReferral link : studentReferralRepository.findByReferralCodeId(id)) {
@@ -302,5 +354,49 @@ public class ReferralCodeController {
 
     private static String nullSafe(String s) {
         return s == null ? "" : s;
+    }
+
+    // ── ABAC institute scoping ────────────────────────────────────────────────
+    // A referral code belongs to one institute. A non-super-admin may only see /
+    // manage codes for the institutes their role-assignment scopes cover. This
+    // reuses the same CurrentScopes source that @auth.allows('perm', instituteId)
+    // consults, so referral scoping stays consistent with the permission system.
+
+    private UserPrincipal currentPrincipal() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        if (a == null || !(a.getPrincipal() instanceof UserPrincipal)) {
+            return null;
+        }
+        return (UserPrincipal) a.getPrincipal();
+    }
+
+    /**
+     * Institute codes the caller is scoped to, or {@code null} when unrestricted
+     * (super-admin, or a wildcard scope row with {@code i == null}). An empty list
+     * means "scoped to nothing" → sees nothing.
+     */
+    private List<Integer> allowedInstituteCodes() {
+        UserPrincipal p = currentPrincipal();
+        if (p == null) return Collections.emptyList();
+        if (p.isSuperAdmin()) return null;
+        List<CurrentScopes.ScopeRow> rows = p.getScopes();
+        if (rows == null || rows.isEmpty()) return Collections.emptyList();
+        List<Integer> codes = new ArrayList<>();
+        for (CurrentScopes.ScopeRow row : rows) {
+            if (row.i == null) return null; // wildcard at institute dim = unrestricted
+            if (!codes.contains(row.i)) codes.add(row.i);
+        }
+        return codes;
+    }
+
+    private boolean canAccessInstitute(Integer instituteCode) {
+        if (instituteCode == null) return true;
+        List<Integer> allowed = allowedInstituteCodes();
+        return allowed == null || allowed.contains(instituteCode);
+    }
+
+    private ResponseEntity<?> forbidden() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body("You are not mapped to this institute");
     }
 }

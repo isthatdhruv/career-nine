@@ -1664,7 +1664,7 @@ const PrivateRoutes = () => {
         <Route
           path="/referral-codes"
           element={
-            <RequirePermission perm="payment.refund">
+            <RequirePermission perm="referral_code.read.all">
               <SuspensedView>
                 <ReferralCodePage />
               </SuspensedView>
