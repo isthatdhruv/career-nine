@@ -1,6 +1,6 @@
 /* eslint-disable react/jsx-no-target-blank */
 import { useIntl } from "react-intl";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../app/modules/auth";
 import { urlAllowed } from "../../../../app/modules/auth/core/permissions";
 import { AsideMenuItem } from "./AsideMenuItem";
@@ -18,9 +18,19 @@ import { AsideMenuItemWithSub } from "./AsideMenuItemWithSub";
 export function AsideMenuMain() {
   const intl = useIntl();
   const { pathname, search } = useLocation();
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
+  const navigate = useNavigate();
 
   const isSuperAdmin = currentUser?.superAdmin === true;
+
+  // Counsellor sign-out (the counsellor shell has no top header/avatar menu, so
+  // logout lives at the bottom of the sidebar instead). Await logout so the session
+  // (currentUser) is cleared BEFORE navigating — otherwise "/auth" would bounce to
+  // "/dashboard" while still authenticated. Lands on the main Staff/Student sign-in.
+  const handleCounsellorLogout = async () => {
+    await logout();
+    navigate("/auth", { replace: true });
+  };
 
   // An item/section is visible iff its path is in the role group's allowed-URL list
   // (super-admins see everything). Query strings are stripped — the whitelist is path-based.
@@ -150,6 +160,21 @@ export function AsideMenuMain() {
         <AsideMenuItem to="/counsellor/notes" title="Session Notes" icon="/media/icons/duotune/files/fil003.svg" fontIcon="bi-journal-text" />
         <AsideMenuItem to="/counsellor/availability" title="Availability" icon="/media/icons/duotune/general/gen005.svg" fontIcon="bi-clock" />
         <AsideMenuItem to="/counsellor/profile" title="My Profile" icon="/media/icons/duotune/communication/com006.svg" fontIcon="bi-person" />
+
+        {/* Sign out — pinned to the bottom of the counsellor sidebar */}
+        <div className="menu-item" style={{ marginTop: "auto" }}>
+          <div className="menu-content">
+            <div className="separator separator-dashed my-2" />
+          </div>
+        </div>
+        <div className="menu-item">
+          <a className="menu-link" style={{ cursor: "pointer" }} onClick={handleCounsellorLogout}>
+            <span className="menu-icon">
+              <i className="bi bi-box-arrow-right fs-3" />
+            </span>
+            <span className="menu-title">Sign Out</span>
+          </a>
+        </div>
       </>
     );
   }
@@ -507,6 +532,14 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/ecommerce/ecm001.svg"
                 title="Promo Codes"
                 fontIcon="bi-tag"
+              />
+            )}
+            {allowed("/referral-codes") && (
+              <AsideMenuItem
+                to="/referral-codes"
+                icon="/media/icons/duotune/communication/com014.svg"
+                title="Referral Codes"
+                fontIcon="bi-people"
               />
             )}
           </AsideMenuItemWithSub>

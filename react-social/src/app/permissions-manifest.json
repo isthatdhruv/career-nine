@@ -40,8 +40,6 @@
     "/measured-quality-types",
     "/question-sections",
     "/questionaire/List",
-    "/student/dashboard",
-    "/student/dashboard/assessments",
     "/tools"
   ],
   "campaign.read": [
@@ -65,8 +63,6 @@
     "/counsellor/dashboard"
   ],
   "generated_report.read": [
-    "/student/dashboard/navigator-360",
-    "/student/dashboard/reports",
     "/student/insight-dashboard"
   ],
   "group.read": [

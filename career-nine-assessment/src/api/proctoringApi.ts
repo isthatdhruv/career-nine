@@ -1,7 +1,6 @@
 import { ProctoringPayload } from '../types/proctoring';
 import { timeoutSignal } from '../utils/timeoutSignal';
-
-const BASE_URL = import.meta.env.VITE_API_URL;
+import { apiUrl } from '../utils/apiUrl';
 
 export async function submitProctoringData(payload: ProctoringPayload): Promise<Response> {
   const csrfMatch = document.cookie.match(/(?:^|;\s*)cn_csrf=([^;]*)/)
@@ -12,7 +11,7 @@ export async function submitProctoringData(payload: ProctoringPayload): Promise<
   }
   if (csrfToken) headers['X-CSRF-Token'] = csrfToken
 
-  return fetch(`${BASE_URL}/assessment-proctoring/save`, {
+  return fetch(apiUrl('/assessment-proctoring/save'), {
     method: 'POST',
     credentials: 'include',
     headers,

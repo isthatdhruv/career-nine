@@ -24,10 +24,12 @@ import org.springframework.stereotype.Component;
 
 /**
  * Generate stage (report-worker only). Consumes {@code report.generate}, renders
- * the default-template (pager) report via {@link ReportService#generate}, and
- * produces a {@link ReportEmailEvent}. Concurrency is bounded (Gotenberg is the
- * CPU bottleneck). Retries ONLY transient {@link RetryablePipelineException};
- * terminal errors (no template) go straight to the DLT.
+ * the default-template (pager) report via {@link ReportService#generate} for
+ * EVERY student, and — only for whitelabel students with a recipient address —
+ * produces a {@link ReportEmailEvent} for the mail stage. Non-whitelabel reports
+ * are generated + stored, then the record is acked with no email. Concurrency is
+ * bounded (Gotenberg is the CPU bottleneck). Retries ONLY transient
+ * {@link RetryablePipelineException}; "no template mapped" is a benign skip.
  */
 @Profile("report-worker")
 @Component
@@ -61,6 +63,18 @@ public class ReportGenerateConsumer {
 
         try {
             ReportResult r = reportService.generate(ev.userStudentId, ev.assessmentId, null, false);
+
+            // Reports are generated for everyone, but only whitelabel students with a
+            // recipient address are emailed. For non-whitelabel (or address-less)
+            // students the report is now rendered + stored — ack here without queuing
+            // the mail stage, and skip the email-only PDF re-render to spare Gotenberg.
+            boolean hasEmail = ev.recipientEmail != null && !ev.recipientEmail.isBlank();
+            if (!ev.whitelabel || !hasEmail) {
+                logger.info("Report generated (not mailed — whitelabel={} hasEmail={}) student={} assessment={}",
+                        ev.whitelabel, hasEmail, ev.userStudentId, ev.assessmentId);
+                return;
+            }
+
             String pdfUrl = "ready".equals(r.pdfStatus) ? r.pdfUrl : retryPdf(r.reportUrl);
             boolean linkOnly = (pdfUrl == null);
             if (linkOnly) {
@@ -70,7 +84,7 @@ public class ReportGenerateConsumer {
             ReportEmailEvent out = new ReportEmailEvent(ev, r.reportUrl, pdfUrl, linkOnly);
             kafkaTemplate.send(ReportPipelineConfig.TOPIC_EMAIL, out.key(),
                     objectMapper.writeValueAsString(out));
-            logger.info("Report generated student={} assessment={} pdf={}",
+            logger.info("Report generated + queued for email student={} assessment={} pdf={}",
                     ev.userStudentId, ev.assessmentId, (pdfUrl != null));
         } catch (ScoresNotReadyException e) {
             // Log the cause here: @RetryableTopic republishes silently, so without
@@ -91,10 +105,13 @@ public class ReportGenerateConsumer {
                     e.getCode(), ev.userStudentId, ev.assessmentId, e.getMessage());
             throw new IllegalStateException("sanity terminal " + e.getCode() + ": " + e.getMessage(), e);
         } catch (ReportRoutingException e) {
-            // No template / no default → nothing to generate → terminal → DLT.
-            logger.error("Report generate TERMINAL (routing) student={} assessment={}: {}",
+            // No template / no default mapped → nothing to generate. Now that ALL
+            // students flow through this stage, treat it as a benign skip (ack, no
+            // DLT) — matching the legacy auto-gen, which just logged and moved on.
+            // Otherwise every template-less assessment would flood the DLT.
+            logger.warn("Report generate skipped (no template) student={} assessment={}: {}",
                     ev.userStudentId, ev.assessmentId, e.getMessage());
-            throw new IllegalStateException("routing terminal: " + e.getMessage(), e);
+            return;
         } catch (Exception e) {
             // Unknown → treat as transient so flaky infra gets a chance to heal.
             logger.error("Report generate retrying (unexpected error) student={} assessment={}",

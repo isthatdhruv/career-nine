@@ -1,0 +1,360 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Student Portal shell — green glassmorphism theme.
+
+   Theme reference: the existing StudentPortalDashboard (spd-*) green palette.
+   The aside CONTENT is unchanged (the 7 route items from STUDENT_MENU_ITEMS);
+   only the look is updated — translucent, blurred "glass" panels floating over
+   a soft green gradient. Scoped under `.sp-shell` so it can't leak into the
+   admin Metronic styles.
+   ────────────────────────────────────────────────────────────────────────── */
+.sp-shell {
+  /* Palette (mirrors StudentPortalDashboard --primary family) */
+  --sp-primary: #1a6b3c;
+  --sp-primary-light: #28a05a;
+  --sp-primary-lighter: #e8f5ee;
+  --sp-accent: #f5a623;
+  --sp-text-dark: #1a1a2e;
+  --sp-text: #3b4754;
+  --sp-text-muted: #6b7a8d;
+  --sp-radius: 16px;
+
+  /* Glass surfaces */
+  --sp-glass: rgba(255, 255, 255, 0.62);
+  --sp-glass-strong: rgba(255, 255, 255, 0.78);
+  --sp-glass-border: rgba(255, 255, 255, 0.6);
+  --sp-blur: blur(18px) saturate(140%);
+
+  min-height: 100vh;
+  display: flex;
+  color: var(--sp-text);
+  font-family: "Inter", "Segoe UI", sans-serif;
+  /* Soft green gradient + tinted blobs so the glass has something to refract. */
+  background:
+    radial-gradient(1100px 560px at 0% -5%, rgba(40, 160, 90, 0.12), transparent 60%),
+    radial-gradient(900px 520px at 105% 110%, rgba(245, 166, 35, 0.10), transparent 55%),
+    linear-gradient(135deg, #eef9f1 0%, #ecf5ef 45%, #fdf8ee 100%);
+  background-attachment: fixed;
+}
+
+/* ── Aside ─────────────────────────────────────────────────────────────────── */
+.sp-aside {
+  width: 252px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
+  background: linear-gradient(180deg, var(--sp-glass-strong), var(--sp-glass));
+  -webkit-backdrop-filter: var(--sp-blur);
+  backdrop-filter: var(--sp-blur);
+  border-right: 1px solid var(--sp-glass-border);
+  box-shadow: 0 8px 40px rgba(26, 107, 60, 0.07);
+  transition: width 0.22s ease, padding 0.22s ease;
+  z-index: 20;
+}
+.sp-aside.collapsed {
+  width: 80px;
+  padding: 18px 12px;
+}
+
+/* Brand */
+.sp-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 4px;
+  margin-bottom: 22px;
+  min-height: 44px;
+}
+.sp-brand-logo {
+  height: 40px;
+  width: auto;
+  max-width: 150px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
+  padding: 4px 7px;
+  box-shadow: 0 2px 10px rgba(26, 107, 60, 0.12);
+}
+.sp-aside.collapsed .sp-brand-logo {
+  max-width: 50px;
+  padding: 4px;
+}
+.sp-brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sp-brand-text strong {
+  font-size: 15px;
+  color: var(--sp-text-dark);
+  font-weight: 700;
+}
+.sp-brand-text span {
+  font-size: 11px;
+  color: var(--sp-text-muted);
+  font-weight: 500;
+}
+
+/* Nav */
+.sp-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.sp-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  color: var(--sp-text-muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  position: relative;
+  transition: background 0.16s, color 0.16s;
+}
+.sp-nav-item:hover {
+  background: rgba(40, 160, 90, 0.10);
+  color: var(--sp-primary);
+}
+.sp-nav-item.active {
+  background: rgba(40, 160, 90, 0.15);
+  color: var(--sp-primary);
+  font-weight: 650;
+}
+.sp-nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 22px;
+  border-radius: 0 4px 4px 0;
+  background: var(--sp-primary);
+}
+.sp-nav-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sp-nav-label {
+  transition: opacity 0.18s;
+}
+.sp-aside.collapsed .sp-brand-text,
+.sp-aside.collapsed .sp-nav-label,
+.sp-aside.collapsed .sp-user-meta {
+  opacity: 0;
+  width: 0;
+}
+.sp-aside.collapsed .sp-nav-item,
+.sp-aside.collapsed .sp-brand {
+  justify-content: center;
+  gap: 0;
+}
+
+/* Aside footer: settings + user */
+.sp-aside-bottom {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(26, 107, 60, 0.10);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sp-user {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px;
+  border-radius: 12px;
+}
+.sp-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--sp-primary), var(--sp-primary-light));
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sp-user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.sp-user-meta strong {
+  font-size: 13px;
+  color: var(--sp-text-dark);
+  font-weight: 600;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sp-user-meta span {
+  font-size: 11px;
+  color: var(--sp-text-muted);
+}
+
+/* ── Body ──────────────────────────────────────────────────────────────────── */
+.sp-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar (glass) */
+.sp-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 28px;
+  background: var(--sp-glass);
+  -webkit-backdrop-filter: var(--sp-blur);
+  backdrop-filter: var(--sp-blur);
+  border-bottom: 1px solid var(--sp-glass-border);
+}
+.sp-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.sp-icon-btn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  border: 1px solid var(--sp-glass-border);
+  background: var(--sp-glass-strong);
+  color: var(--sp-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.16s, border-color 0.16s, background 0.16s;
+}
+.sp-icon-btn:hover {
+  color: var(--sp-primary);
+  border-color: rgba(40, 160, 90, 0.5);
+}
+.sp-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--sp-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sp-breadcrumb b {
+  color: var(--sp-primary);
+  font-weight: 600;
+}
+.sp-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sp-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border-radius: 11px;
+  background: var(--sp-glass-strong);
+  border: 1px solid var(--sp-glass-border);
+  color: var(--sp-text-muted);
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+.sp-search:focus-within {
+  border-color: var(--sp-primary);
+  box-shadow: 0 0 0 3px var(--sp-primary-lighter);
+}
+.sp-search input {
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 13.5px;
+  color: var(--sp-text-dark);
+  width: 190px;
+  font-family: inherit;
+}
+.sp-search input::placeholder {
+  color: #aab4bf;
+}
+.sp-spin { animation: sp-spin 0.8s linear infinite; }
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+
+.sp-notif-dot {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #fff;
+}
+
+/* Content */
+.sp-content {
+  flex: 1;
+  padding: 26px 32px 48px;
+  min-width: 0;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 992px) {
+  .sp-search input {
+    width: 120px;
+  }
+}
+@media (max-width: 768px) {
+  .sp-aside {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 60;
+    box-shadow: 8px 0 40px rgba(0, 0, 0, 0.18);
+  }
+  .sp-aside.collapsed {
+    width: 0;
+    padding: 0;
+    border: none;
+  }
+  .sp-search {
+    display: none;
+  }
+  .sp-content {
+    padding: 18px 16px 40px;
+  }
+}

@@ -15,13 +15,17 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Produces {@code report.generate} events when a WHITELABEL student completes an
- * assessment. Called (non-fatally) from both completion paths — the live async
- * processor and the bulk/admin {@code markCompletedIfFullyAnswered}.
+ * Produces {@code report.generate} events when a student completes an assessment.
+ * Called (non-fatally) from both completion paths — the live async processor and
+ * the bulk/admin {@code markCompletedIfFullyAnswered}.
  *
- * <p>Returns {@code true} only when it actually enqueued (student is whitelabel
- * AND has an email), so the bulk path can fall back to the legacy unbounded
- * auto-gen for everyone else.
+ * <p>Reports are generated for ALL students (the worker renders + stores every
+ * report); the {@code whitelabel} flag carried on the event decides whether the
+ * email stage actually mails it — only whitelabel students are emailed.
+ *
+ * <p>Returns {@code true} when it enqueued (so the caller does NOT also run the
+ * legacy auto-gen), and {@code false} only when the pipeline is disabled or the
+ * arguments are unusable, letting the caller fall back to the legacy auto-gen.
  */
 @Component
 public class ReportPipelineProducer {
@@ -37,13 +41,16 @@ public class ReportPipelineProducer {
     private boolean enabled;
 
     /**
-     * Enqueue a report-generation job iff the student's institute is whitelabel
-     * and the student has an email address.
+     * Enqueue a report-generation job for this student. Generation runs for ALL
+     * students; the {@code whitelabel} flag on the event gates only the email
+     * stage. A whitelabel student with no email address still has their report
+     * generated — the worker simply skips the mail.
      *
-     * @return true if a job was enqueued; false otherwise (caller may fall back
-     *         to the legacy auto-gen).
+     * @return true if a job was enqueued (caller must NOT run the legacy auto-gen);
+     *         false only when the pipeline is disabled or the args are unusable
+     *         (caller may fall back to the legacy auto-gen).
      */
-    public boolean enqueueIfWhitelabel(UserStudent userStudentArg, Long assessmentId) {
+    public boolean enqueue(UserStudent userStudentArg, Long assessmentId) {
         if (!enabled || userStudentArg == null || assessmentId == null) {
             return false;
         }
@@ -58,24 +65,22 @@ public class ReportPipelineProducer {
                 : userStudentRepository.findByIdWithStudentInfo(userStudentId).orElse(userStudentArg);
         InstituteDetail institute = userStudent.getInstitute();
         BrandingDto brand = brandingService.forInstitute(institute);
-        if (!brand.isWhitelabel()) {
-            return false;
-        }
+        boolean whitelabel = brand.isWhitelabel();
         StudentInfo info = userStudent.getStudentInfo();
         String email = info != null ? info.getEmail() : null;
-        if (email == null || email.trim().isEmpty()) {
-            logger.warn("Report pipeline: whitelabel student {} has no email; falling back to legacy gen (assessment {})",
+        String recipient = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
+        if (whitelabel && recipient == null) {
+            logger.warn("Report pipeline: whitelabel student {} has no email; report will be generated but not mailed (assessment {})",
                     userStudent.getUserStudentId(), assessmentId);
-            return false;
         }
         ReportGenerateEvent ev = new ReportGenerateEvent(
-                userStudent.getUserStudentId(), assessmentId, email.trim(),
-                true, brand.getSchoolName(), brand.getLogoUrl());
+                userStudent.getUserStudentId(), assessmentId, recipient,
+                whitelabel, brand.getSchoolName(), brand.getLogoUrl());
         try {
             kafkaTemplate.send(ReportPipelineConfig.TOPIC_GENERATE, ev.key(),
                     objectMapper.writeValueAsString(ev));
-            logger.info("Report pipeline: enqueued report.generate student={} assessment={} school={}",
-                    ev.userStudentId, ev.assessmentId, ev.schoolName);
+            logger.info("Report pipeline: enqueued report.generate student={} assessment={} whitelabel={} school={}",
+                    ev.userStudentId, ev.assessmentId, ev.whitelabel, ev.schoolName);
         } catch (Exception e) {
             // Non-fatal: completion must never fail because of the pipeline.
             logger.error("Report pipeline: failed to enqueue report.generate student={} assessment={}: {}",

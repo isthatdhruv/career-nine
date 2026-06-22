@@ -30,8 +30,8 @@ public class ReportTemplate implements Serializable {
     private String templateName;
 
     // Legacy direct mapping for the generic preview/PDF feature. Nullable now —
-    // engine-backed templates are mapped to questionnaires via
-    // questionire_report_template instead.
+    // engine-backed templates are mapped to assessments via
+    // assessment_report_template instead.
     @Column(name = "assessment_id")
     private Long assessmentId;
 

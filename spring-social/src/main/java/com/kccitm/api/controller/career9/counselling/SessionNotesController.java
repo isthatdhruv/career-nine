@@ -1,5 +1,6 @@
 package com.kccitm.api.controller.career9.counselling;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -37,12 +38,31 @@ public class SessionNotesController {
     // no scope arg: counsellor writes notes; scope-filter narrows access
     @PreAuthorize("@auth.allows('counselling.session_notes.create')")
     @PostMapping("/create")
-    public ResponseEntity<?> create(@RequestBody SessionNotes notes, @RequestParam Long userId) {
+    public ResponseEntity<?> create(@RequestBody Map<String, Object> body, @RequestParam Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-        SessionNotes created = sessionNotesService.create(notes, user);
-        logger.info("Session notes created for userId: {}", userId);
+
+        Long appointmentId = body.get("appointmentId") != null
+                ? Long.valueOf(body.get("appointmentId").toString())
+                : null;
+
+        SessionNotes notes = new SessionNotes();
+        notes.setKeyDiscussionPoints(asString(body.get("keyDiscussionPoints")));
+        notes.setActionItems(asString(body.get("actionItems")));
+        notes.setRecommendedNextSession(asString(body.get("recommendedNextSession")));
+        // FE sends "followUpRequired"; the entity field is "followupRequired" — accept either.
+        Object followUp = body.containsKey("followUpRequired") ? body.get("followUpRequired") : body.get("followupRequired");
+        notes.setFollowupRequired(followUp != null && Boolean.parseBoolean(followUp.toString()));
+        notes.setPublicRemarks(asString(body.get("publicRemarks")));
+        notes.setPrivateNotes(asString(body.get("privateNotes")));
+
+        SessionNotes created = sessionNotesService.create(appointmentId, notes, user);
+        logger.info("Session notes created for userId: {} appointment: {}", userId, appointmentId);
         return ResponseEntity.ok(created);
+    }
+
+    private static String asString(Object o) {
+        return o == null ? null : o.toString();
     }
 
     // no scope arg: fetch by appointmentId
