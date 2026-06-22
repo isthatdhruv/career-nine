@@ -95,12 +95,14 @@
   ],
   "payment.refund": [
     "/payment-tracking",
-    "/promo-codes",
-    "/referral-codes"
+    "/promo-codes"
   ],
   "permission.grant": [
     "/activity-log",
     "/communication-logs"
+  ],
+  "referral_code.read.all": [
+    "/referral-codes"
   ],
   "reminders.view": [
     "/reminders"
