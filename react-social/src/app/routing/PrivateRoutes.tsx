@@ -332,6 +332,7 @@ const PrivateRoutes = () => {
   const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
+  const ReferralCodePage = lazy(() => import("../pages/ReferralCode/ReferralCodePage"));
   const PaymentRegisterPage = lazy(() => import("../pages/PaymentTracking/PaymentRegisterPage"));
   const B2CPricingTierPage = lazy(() => import("../pages/B2C/PricingTier/PricingTierPage"));
   const B2CCampaignPage = lazy(() => import("../pages/B2C/Campaign/CampaignPage"));
@@ -1656,6 +1657,16 @@ const PrivateRoutes = () => {
             <RequirePermission perm="payment.refund">
               <SuspensedView>
                 <PromoCodePage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/referral-codes"
+          element={
+            <RequirePermission perm="payment.refund">
+              <SuspensedView>
+                <ReferralCodePage />
               </SuspensedView>
             </RequirePermission>
           }

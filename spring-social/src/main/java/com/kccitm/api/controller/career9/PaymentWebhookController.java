@@ -71,6 +71,7 @@ public class PaymentWebhookController {
     @Autowired private UserRepository userRepository;
     @Autowired private StudentInfoRepository studentInfoRepository;
     @Autowired private UserStudentRepository userStudentRepository;
+    @Autowired private com.kccitm.api.service.career9.ReferralService referralService;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
     @Autowired private CareerNineRollNumberService rollNumberService;
@@ -775,6 +776,10 @@ public class PaymentWebhookController {
             txn.setUserStudentId(userStudent.getUserStudentId());
             paymentTransactionRepository.save(txn);
 
+            // Realized redemption: link the referral carried on the txn (no-op if none).
+            referralService.linkStudent(userStudent.getUserStudentId(), txn.getReferralCode(),
+                    txn.getAssessmentId(), txn.getInstituteCode());
+
             // Now activate the entitlement — sends welcome + assessment link with token.
             if (entitlementService != null) {
                 entitlementService.activateOnPayment(txn.getTransactionId());
@@ -969,6 +974,10 @@ public class PaymentWebhookController {
             txn.setUserStudentId(userStudent.getUserStudentId());
             paymentTransactionRepository.save(txn);
 
+            // Realized redemption: link the referral carried on the txn (no-op if none).
+            referralService.linkStudent(userStudent.getUserStudentId(), txn.getReferralCode(),
+                    txn.getAssessmentId(), txn.getInstituteCode());
+
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
@@ -1026,6 +1035,10 @@ public class PaymentWebhookController {
 
         txn.setUserStudentId(userStudent.getUserStudentId());
         paymentTransactionRepository.save(txn);
+
+        // Realized redemption: link the referral carried on the txn (no-op if none).
+        referralService.linkStudent(userStudent.getUserStudentId(), txn.getReferralCode(),
+                txn.getAssessmentId(), txn.getInstituteCode());
 
         User user = existingStudent.getUser();
         if (user != null && existingStudent.getEmail() != null) {

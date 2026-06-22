@@ -534,6 +534,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-tag"
               />
             )}
+            {allowed("/referral-codes") && (
+              <AsideMenuItem
+                to="/referral-codes"
+                icon="/media/icons/duotune/communication/com014.svg"
+                title="Referral Codes"
+                fontIcon="bi-people"
+              />
+            )}
           </AsideMenuItemWithSub>
         </>
       )}

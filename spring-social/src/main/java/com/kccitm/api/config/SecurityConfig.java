@@ -139,6 +139,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             // Phase 2 (Task 2.1 / HIGH-B): corrected from the dead "/promo-code/validate" typo to
             // the real endpoint path; was CSRF-exempt-but-not-permitAll, so anonymous validation 401'd.
             "/promo-codes/public/validate",
+            "/referral-codes/public/validate",
             "/bet-report-data/public/**",
             "/navigator-report-data/public/**",
             "/assessment-mapping/public/**",

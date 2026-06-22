@@ -93,6 +93,9 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "promo_code", length = 50)
     private String promoCode;
 
+    @Column(name = "referral_code", length = 50)
+    private String referralCode;
+
     @Column(name = "campaign_id")
     private Long campaignId;
 
@@ -229,6 +232,9 @@ public class PaymentTransaction implements Serializable {
 
     public String getPromoCode() { return promoCode; }
     public void setPromoCode(String promoCode) { this.promoCode = promoCode; }
+
+    public String getReferralCode() { return referralCode; }
+    public void setReferralCode(String referralCode) { this.referralCode = referralCode; }
 
     public Long getCampaignId() { return campaignId; }
     public void setCampaignId(Long campaignId) { this.campaignId = campaignId; }

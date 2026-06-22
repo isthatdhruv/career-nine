@@ -33,6 +33,7 @@ export function registerSchoolStudent(
     classId: number
     schoolSectionId?: number
     promoCode?: string
+    referralCode?: string
   }
 ) {
   return http.post(`/school-registration/public/register/${token}`, studentData)

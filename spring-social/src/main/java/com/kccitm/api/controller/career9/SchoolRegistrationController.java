@@ -59,6 +59,7 @@ import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
 import com.kccitm.api.service.career9.InstituteAssessmentService;
+import com.kccitm.api.service.career9.ReferralService;
 import com.kccitm.api.service.b2c.EntitlementService;
 
 @RestController
@@ -84,6 +85,7 @@ public class SchoolRegistrationController {
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private com.kccitm.api.service.PaymentTransactionWriter paymentTransactionWriter;
     @Autowired private PromoCodeRepository promoCodeRepository;
+    @Autowired private com.kccitm.api.service.career9.ReferralService referralService;
     @Autowired private RazorpayService razorpayService;
     @Autowired private SmtpEmailService emailService;
     @Autowired private CareerNineRollNumberService rollNumberService;
@@ -677,6 +679,15 @@ public class SchoolRegistrationController {
         // 5. Parse student class number (BUG FIX: always set studentClass)
         Integer studentClass = parseClassNumber(classId);
 
+        // 5c. Referral code (applies to free AND paid; records who referred the student)
+        String referralCodeStr = (String) studentData.get("referralCode");
+        if (referralCodeStr != null && !referralCodeStr.trim().isEmpty()) {
+            ReferralService.Result refResult = referralService.validate(referralCodeStr, assessmentId);
+            if (!refResult.valid) {
+                return ResponseEntity.badRequest().body(refResult.message);
+            }
+        }
+
         // 6. Promo code handling
         String promoCodeStr = (String) studentData.get("promoCode");
         Integer promoDiscountPercent = null;
@@ -718,11 +729,11 @@ public class SchoolRegistrationController {
             if (paymentRequired && finalAmount > 0) {
                 return handleExistingStudentWithPayment(byEmail.get(0), assessmentId, instituteCode,
                         config.getConfigId(), activeTierId, finalAmount, originalAmount,
-                        promoCodeStr, promoDiscountPercent,
+                        promoCodeStr, promoDiscountPercent, referralCodeStr,
                         name, email, dob, phone);
             }
             return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, activeTierId,
-                    config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent);
+                    config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr);
         }
 
         // 8. Duplicate check by DOB + institute + class + name
@@ -733,18 +744,18 @@ public class SchoolRegistrationController {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
                             config.getConfigId(), activeTierId, finalAmount, originalAmount,
-                            promoCodeStr, promoDiscountPercent,
+                            promoCodeStr, promoDiscountPercent, referralCodeStr,
                             name, email, dob, phone);
                 }
                 return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId,
-                        config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent);
+                        config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr);
             }
         }
 
         // 9. Payment required → create payment and redirect
         if (paymentRequired && finalAmount > 0) {
             return createPaymentAndRedirect(config.getConfigId(), activeTierId, assessmentId, instituteCode,
-                    finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
+                    finalAmount, originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr,
                     name, email, dob, dobStr, phone, gender, classId, schoolSectionId, studentClass);
         }
 
@@ -797,6 +808,9 @@ public class SchoolRegistrationController {
         // A1: the free registration is now realized — consume the promo (atomic,
         // cap-guarded). No-op when no promo was applied.
         consumePromoIfPresent(promoCodeStr);
+
+        // Realized redemption: link this student as the referral of the code (no-op if none).
+        referralService.linkStudent(userStudent.getUserStudentId(), referralCodeStr, assessmentId, instituteCode);
 
         // 12. Build response + send email
         Map<String, Object> response = new HashMap<>();
@@ -854,7 +868,7 @@ public class SchoolRegistrationController {
     private ResponseEntity<?> createPaymentAndRedirect(Long schoolConfigId, Long mappingTierId,
             Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
-            String name, String email, Date dob, String dobStr, String phone, String gender,
+            String referralCodeStr, String name, String email, Date dob, String dobStr, String phone, String gender,
             Integer classId, Integer schoolSectionId, Integer studentClass) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
@@ -879,6 +893,9 @@ public class SchoolRegistrationController {
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
                 txn.setPromoCode(promoCodeStr.trim().toUpperCase());
                 txn.setPromoDiscountPercent(promoDiscountPercent);
+            }
+            if (referralCodeStr != null && !referralCodeStr.trim().isEmpty()) {
+                txn.setReferralCode(referralCodeStr.trim().toUpperCase());
             }
             txn = paymentTransactionWriter.saveInNewTransaction(txn);
 
@@ -933,7 +950,7 @@ public class SchoolRegistrationController {
     private ResponseEntity<?> handleExistingStudentWithPayment(StudentInfo existingStudentInfo, Long assessmentId,
             Integer instituteCode, Long schoolConfigId, Long mappingTierId,
             Long finalAmountInr, Long originalAmountInr,
-            String promoCodeStr, Integer promoDiscountPercent,
+            String promoCodeStr, Integer promoDiscountPercent, String referralCodeStr,
             String name, String email, Date dob, String phone) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (!userStudents.isEmpty()) {
@@ -952,13 +969,13 @@ public class SchoolRegistrationController {
         SimpleDateFormat sdfFmt = new SimpleDateFormat("dd-MM-yyyy");
         String dobStr = sdfFmt.format(dob);
         return createPaymentAndRedirect(schoolConfigId, mappingTierId, assessmentId, instituteCode,
-                finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent,
+                finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent, referralCodeStr,
                 name, email, dob, dobStr, phone, null, null, null, null);
     }
 
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
             Integer instituteCode, Long activeTierId, Long schoolConfigId,
-            Long originalAmount, String promoCodeStr, Integer promoDiscountPercent) {
+            Long originalAmount, String promoCodeStr, Integer promoDiscountPercent, String referralCodeStr) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (userStudents.isEmpty()) {
             InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
@@ -980,6 +997,10 @@ public class SchoolRegistrationController {
         }
 
         UserStudent userStudent = userStudents.get(0);
+
+        // Link the referral for this existing student (idempotent; one per student).
+        referralService.linkStudent(userStudent.getUserStudentId(), referralCodeStr, assessmentId, instituteCode);
+
         Optional<StudentAssessmentMapping> existingMapping = studentAssessmentMappingRepository
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(
                         userStudent.getUserStudentId(), assessmentId);
