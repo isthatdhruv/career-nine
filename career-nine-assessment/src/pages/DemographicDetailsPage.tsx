@@ -95,7 +95,7 @@ const DemographicDetailsPage: React.FC = () => {
 
   const validateContactPhone = (value: string): string => {
     if (!value.trim()) return '';
-    if (!/^[0-9]{10}$/.test(value)) return 'Phone number must be 10 digits';
+    if (!/^[0-9]{8,10}$/.test(value)) return 'Phone number must be 8 to 10 digits';
     return '';
   };
 
@@ -664,7 +664,7 @@ const DemographicDetailsPage: React.FC = () => {
                           <input
                             type="tel"
                             className={`form-control ${contactErrors.phone && contactTouched.phone ? 'is-invalid' : ''}`}
-                            placeholder="10-digit phone number"
+                            placeholder="8 to 10 digit phone number"
                             value={contactPhone}
                             onChange={(e) => {
                               const val = e.target.value.replace(/\D/g, '').slice(0, 10);

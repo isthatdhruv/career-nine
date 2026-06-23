@@ -7,7 +7,7 @@ import './StudentPortal.css'
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080'
 
 const EMAIL_REGEX = /^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
-const PHONE_REGEX = /^[6-9]\d{9}$/
+const PHONE_REGEX = /^[0-9]{8,10}$/
 const NAME_REGEX = /^[A-Za-z\s.'-]{2,60}$/
 
 const GRADES = ['6', '7', '8', '9', '10', '11', '12']
@@ -106,7 +106,7 @@ const StudentInfoForm: React.FC = () => {
     if (!phone.trim()) {
       e.phone = 'Phone number is required'
     } else if (!PHONE_REGEX.test(phone.trim())) {
-      e.phone = 'Enter a valid 10-digit Indian mobile number'
+      e.phone = 'Enter a valid phone number (8 to 10 digits)'
     }
 
     if (!grade) e.grade = 'Please select your class'

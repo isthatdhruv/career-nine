@@ -101,6 +101,9 @@
     "/activity-log",
     "/communication-logs"
   ],
+  "referral_code.read.all": [
+    "/referral-codes"
+  ],
   "reminders.view": [
     "/reminders"
   ],
