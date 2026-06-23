@@ -17,6 +17,8 @@ interface Slot {
   endTime: string
   durationMinutes: number
   counsellorName?: string
+  /** All slotIds that share this exact timing — one per counsellor free then. */
+  candidateSlotIds?: number[]
 }
 
 /** True if a slot's start time has already passed. */
@@ -24,6 +26,60 @@ function isSlotInPast(slot: { date: string; startTime: string }): boolean {
   if (!slot?.date || !slot?.startTime) return false
   const start = new Date(`${slot.date}T${slot.startTime}`)
   return !isNaN(start.getTime()) && start.getTime() <= Date.now()
+}
+
+/**
+ * Collapse slots that share the same timing (same date AND start AND end) into a
+ * single bookable tile. Slots at a DIFFERENT start time stay as separate tiles —
+ * only exact same-timing duplicates are merged. Every slotId sharing that timing
+ * is kept on `candidateSlotIds`, so booking can pick one counsellor at random.
+ * The student picks a time, never a counsellor (and never sees a name). Only
+ * AVAILABLE slots reach here, so as counsellors fill up, the still-free peers at
+ * that time remain as candidates.
+ */
+function dedupeByTiming(slots: Slot[]): Slot[] {
+  const groups = new Map<string, Slot[]>()
+  for (const s of slots) {
+    const key = `${s.date}|${s.startTime}|${s.endTime}`
+    const group = groups.get(key)
+    if (group) group.push(s)
+    else groups.set(key, [s])
+  }
+  return Array.from(groups.values()).map((group) => ({
+    ...group[0],
+    candidateSlotIds: group.map((s) => s.slotId),
+  }))
+}
+
+/** Fisher–Yates shuffle — returns a new array, does not mutate the input. */
+function shuffle<T>(items: T[]): T[] {
+  const a = [...items]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/**
+ * Books the given slotIds in order, returning the first that succeeds. The
+ * same-timing slots act as fallbacks for one another: if the randomly-chosen
+ * counsellor's slot was taken meanwhile, the next candidate (another counsellor
+ * at the same time) is tried before giving up.
+ */
+async function tryBookCandidates(
+  slotIds: number[],
+  book: (slotId: number) => Promise<unknown>,
+): Promise<unknown> {
+  let lastError: unknown
+  for (const slotId of slotIds) {
+    try {
+      return await book(slotId)
+    } catch (err) {
+      lastError = err
+    }
+  }
+  throw lastError
 }
 
 /** Returns ISO date string for the Monday of the current week */
@@ -131,10 +187,11 @@ const SlotBookingPage: React.FC = () => {
             startTime: s.startTime,
             endTime: s.endTime,
             durationMinutes: s.durationMinutes,
-            counsellorName: s.counsellor?.name,
+            // counsellor identity is intentionally not surfaced — the system
+            // auto-assigns a counsellor when the slot is booked.
           }))
           .filter((s: Slot) => !isSlotInPast(s))
-        setSlots(data)
+        setSlots(dedupeByTiming(data))
       })
       .catch(() => {
         if (!opts?.silent) {
@@ -167,13 +224,20 @@ const SlotBookingPage: React.FC = () => {
 
   const handleSubmit = () => {
     if (!selectedSlot) return
+    // When several counsellors are free at the selected time, pick one at RANDOM
+    // (shuffle the same-timing candidates) so bookings spread across counsellors
+    // rather than always hitting the same one. tryBookCandidates lets the other
+    // counsellors at that time stand in if the chosen slot was just taken.
+    const candidates = shuffle(
+      selectedSlot.candidateSlotIds?.length ? selectedSlot.candidateSlotIds : [selectedSlot.slotId],
+    )
     if (isReschedule) {
       if (!userId) {
         showErrorToast('Your session has expired. Please log in again to reschedule.')
         return
       }
       setLoading(true)
-      rescheduleAppointment(rescheduleAppointmentId!, selectedSlot.slotId, userId)
+      tryBookCandidates(candidates, (slotId) => rescheduleAppointment(rescheduleAppointmentId!, slotId, userId))
         .then(() => setBooked(true))
         .catch((err) => {
           const serverMsg = typeof err?.response?.data === 'string' ? err.response.data : err?.response?.data?.message
@@ -184,7 +248,7 @@ const SlotBookingPage: React.FC = () => {
     }
     if (!reason.trim() || !studentId) return
     setLoading(true)
-    bookSlot(selectedSlot.slotId, studentId, reason.trim())
+    tryBookCandidates(candidates, (slotId) => bookSlot(slotId, studentId, reason.trim()))
       .then(() => setBooked(true))
       .catch(() => showErrorToast('Could not complete the booking. Please try again.'))
       .finally(() => setLoading(false))

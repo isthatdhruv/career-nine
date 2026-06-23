@@ -1196,12 +1196,11 @@ const ThankYouPage: React.FC = () => {
                             </svg>
                         </div>
                         <h3 style={{ margin: '0 0 10px', fontSize: '1.3rem', fontWeight: 800, color: '#065F46' }}>
-                            You're one step away
+                            Don't leave this on the table
                         </h3>
                         <p style={{ margin: '0 0 20px', fontSize: '0.95rem', lineHeight: 1.6, color: '#047857' }}>
-                            Great work finishing your assessment! Book a one-on-one session with a counsellor
-                            to turn your results into a clear, personalised plan — it only takes a moment to
-                            pick a time.
+                            You just finished your assessment. A one-on-one session turns those results into a
+                            real plan for your future — and it only takes a moment to pick a time.
                         </p>
                         <button
                             type="button"
