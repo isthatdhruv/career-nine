@@ -20,7 +20,7 @@ import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.model.career9.counselling.Notification;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.Career9.counselling.NotificationRepository;
-import com.kccitm.api.service.OdooEmailService;
+import com.kccitm.api.service.SmtpEmailService;
 import com.microtripit.mandrillapp.lutung.MandrillApi;
 import com.microtripit.mandrillapp.lutung.view.MandrillMessage;
 import com.microtripit.mandrillapp.lutung.view.MandrillMessage.Recipient;
@@ -47,7 +47,7 @@ public class CounsellingNotificationService {
     private IcsService icsService;
 
     @Autowired(required = false)
-    private OdooEmailService odooEmailService;
+    private SmtpEmailService smtpEmailService;
 
     // ─── In-app Notifications ────────────────────────────────────────────────────
 
@@ -415,10 +415,10 @@ public class CounsellingNotificationService {
             if (parentEmail != null && !parentEmail.isEmpty()) emailTo.add(parentEmail);
 
             // Email with .ics attachment (falls back to plain Mandrill text if
-            // the SMTP/Odoo sender or the invite isn't available).
+            // the Gmail sender or the invite isn't available).
             byte[] ics = icsService.buildInvite(appointment);
             boolean emailed = false;
-            if (!emailTo.isEmpty() && odooEmailService != null && ics != null) {
+            if (!emailTo.isEmpty() && smtpEmailService != null && ics != null) {
                 try {
                     SmtpEmailRequest req = new SmtpEmailRequest();
                     req.setTo(emailTo);
@@ -429,7 +429,7 @@ public class CounsellingNotificationService {
                     req.setAttachments(Arrays.asList(
                             new SmtpEmailRequest.EmailAttachment(
                                     icsService.fileName(appointment), ics, "text/calendar")));
-                    odooEmailService.sendEmail(req);
+                    smtpEmailService.sendEmail(req);
                     emailed = true;
                 } catch (Exception e) {
                     logger.warn("ICS confirmation email failed for appointment {}: {}", appointment.getId(), e.getMessage());

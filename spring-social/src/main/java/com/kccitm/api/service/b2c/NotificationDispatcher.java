@@ -10,10 +10,10 @@ import org.springframework.stereotype.Service;
 import com.kccitm.api.model.career9.b2c.ServiceDeliveryLog;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
 import com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository;
-import com.kccitm.api.service.OdooEmailService;
+import com.kccitm.api.service.SmtpEmailService;
 
 /**
- * Wraps the existing Odoo email service and writes a ServiceDeliveryLog row
+ * Wraps the Gmail email service and writes a ServiceDeliveryLog row
  * for every send. All B2C transactional emails route through here.
  */
 @Service
@@ -21,7 +21,7 @@ public class NotificationDispatcher {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationDispatcher.class);
 
-    @Autowired private OdooEmailService odooEmailService;
+    @Autowired private SmtpEmailService smtpEmailService;
     @Autowired private ServiceDeliveryLogRepository serviceDeliveryLogRepository;
 
     public ServiceDeliveryLog sendEmail(StudentEntitlement entitlement,
@@ -53,7 +53,7 @@ public class NotificationDispatcher {
         }
 
         try {
-            odooEmailService.sendHtmlEmail(recipient, subject, htmlBody);
+            smtpEmailService.sendHtmlEmail(recipient, subject, htmlBody);
             log.setDeliveryStatus("sent");
             log.setSentAt(new Date());
         } catch (Exception e) {
