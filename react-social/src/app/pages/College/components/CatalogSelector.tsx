@@ -39,7 +39,13 @@ const CatalogSelector = ({ assessments, catalog, onAdd, onRemove, busy }: Props)
               ? `${catalog.length} assessment${catalog.length === 1 ? "" : "s"} enabled`
               : "Select assessments"}
           </Dropdown.Toggle>
-          <Dropdown.Menu style={{ maxHeight: 300, overflowY: "auto", minWidth: 300 }}>
+          {/* strategy:"fixed" lets the menu float above any overflow-clipping ancestor
+              and flip when near the viewport bottom, so the last option is always
+              reachable. paddingBottom adds a gap so the last row isn't flush/clipped. */}
+          <Dropdown.Menu
+            popperConfig={{ strategy: "fixed" }}
+            style={{ maxHeight: 380, overflowY: "auto", minWidth: 320, paddingTop: 6, paddingBottom: 10 }}
+          >
             {assessments.length === 0 ? (
               <Dropdown.ItemText className="text-muted small">No assessments available</Dropdown.ItemText>
             ) : (
@@ -47,7 +53,7 @@ const CatalogSelector = ({ assessments, catalog, onAdd, onRemove, busy }: Props)
                 const item = byAssessment.get(Number(a.id));
                 const enabled = !!item;
                 return (
-                  <div key={a.id} className="px-3 py-1">
+                  <div key={a.id} className="px-3 py-2">
                     <Form.Check
                       type="checkbox"
                       id={`catalog-opt-${a.id}`}

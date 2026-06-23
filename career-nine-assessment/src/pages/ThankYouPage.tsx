@@ -128,6 +128,11 @@ const ThankYouPage: React.FC = () => {
     // remaining via /upgrade-info and re-renders the CTA correctly.
     const [isSlotPickerOpen, setIsSlotPickerOpen] = useState<boolean>(false);
     const [bookedAppointment, setBookedAppointment] = useState<BookedAppointment | null>(null);
+    // Retention nudge shown when the student CANCELS the slot picker (standalone — the
+    // picker is closed first, so it's never stacked on top of it). "Pick my counselling
+    // time" reopens the picker; "No thanks" dismisses it and leaves the Book-counselling
+    // card on the page to open whenever they're ready.
+    const [showCounsellingReminder, setShowCounsellingReminder] = useState<boolean>(false);
     // Loss-framed confirm when the student tries to abandon the slot picker, and the
     // celebratory "you made a great decision" modal shown right after a booking.
     const [showBookedCelebration, setShowBookedCelebration] = useState<boolean>(false);
@@ -391,11 +396,6 @@ const ThankYouPage: React.FC = () => {
         0,
         (upgradeInfo?.counsellingSessionsTotal ?? 0) - (upgradeInfo?.counsellingSessionsUsed ?? 0),
     );
-    // After a fresh booking, the upgrade-info on this page hasn't been re-fetched,
-    // so subtract the just-booked session locally for the remaining count.
-    const counsellingRemaining = bookedAppointment
-        ? Math.max(0, counsellingRemainingFromUpgradeInfo - 1)
-        : counsellingRemainingFromUpgradeInfo;
     const showCounsellingButton =
         showActiveButtons &&
         !!upgradeInfo?.counsellingActive &&
@@ -448,9 +448,14 @@ const ThankYouPage: React.FC = () => {
     };
 
     const handleOpenSlotPicker = () => setIsSlotPickerOpen(true);
-    // The slot picker owns the loss-framed "are you sure?" confirm internally, so
-    // closing here just dismisses the picker (no second confirm on top).
-    const handleSlotPickerClose = () => setIsSlotPickerOpen(false);
+    // Cancelling the picker surfaces the retention reminder as a STANDALONE modal —
+    // the picker is closed first, so nothing is stacked. From the reminder, "Pick my
+    // counselling time" reopens the picker; "No thanks" leaves the Book-counselling
+    // card on the page. Skipped once a booking exists.
+    const handleSlotPickerClose = () => {
+        setIsSlotPickerOpen(false);
+        if (!bookedAppointment) setShowCounsellingReminder(true);
+    };
     const handleSlotBooked = (result: BookedAppointment) => {
         // Snapshot the booking so the Counselling tile flips to its confirmation
         // state without an extra round-trip. counsellingRemaining decreases by one
@@ -893,22 +898,23 @@ const ThankYouPage: React.FC = () => {
                                             onClick={handleOpenSlotPicker}
                                             className="text-center"
                                             style={{
-                                                background: 'linear-gradient(135deg, #C4B5FD 0%, #8B5CF6 100%)',
+                                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                                 borderRadius: '16px',
                                                 padding: '1.25rem 1.5rem',
                                                 cursor: 'pointer',
                                                 transition: 'all 0.3s ease',
-                                                boxShadow: '0 10px 35px rgba(139, 92, 246, 0.4)',
+                                                boxShadow: '0 10px 35px rgba(16, 185, 129, 0.4)',
                                                 width: '100%',
-                                                maxWidth: '280px',
+                                                maxWidth: '520px',
+                                                margin: '0 auto',
                                             }}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-                                                e.currentTarget.style.boxShadow = '0 15px 45px rgba(139, 92, 246, 0.5)';
+                                                e.currentTarget.style.boxShadow = '0 15px 45px rgba(16, 185, 129, 0.5)';
                                             }}
                                             onMouseLeave={(e) => {
                                                 e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                                                e.currentTarget.style.boxShadow = '0 10px 35px rgba(139, 92, 246, 0.4)';
+                                                e.currentTarget.style.boxShadow = '0 10px 35px rgba(16, 185, 129, 0.4)';
                                             }}
                                         >
                                             <div style={{
@@ -957,22 +963,23 @@ const ThankYouPage: React.FC = () => {
                                             onClick={handleOpenSlotPicker}
                                             className="text-center"
                                             style={{
-                                                background: 'linear-gradient(135deg, #C4B5FD 0%, #8B5CF6 100%)',
+                                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                                 borderRadius: '16px',
                                                 padding: '1.25rem 1.5rem',
                                                 cursor: 'pointer',
                                                 transition: 'all 0.3s ease',
-                                                boxShadow: '0 10px 35px rgba(139, 92, 246, 0.4)',
+                                                boxShadow: '0 10px 35px rgba(16, 185, 129, 0.4)',
                                                 width: '100%',
-                                                maxWidth: '280px',
+                                                maxWidth: '520px',
+                                                margin: '0 auto',
                                             }}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-                                                e.currentTarget.style.boxShadow = '0 15px 45px rgba(139, 92, 246, 0.5)';
+                                                e.currentTarget.style.boxShadow = '0 15px 45px rgba(16, 185, 129, 0.5)';
                                             }}
                                             onMouseLeave={(e) => {
                                                 e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                                                e.currentTarget.style.boxShadow = '0 10px 35px rgba(139, 92, 246, 0.4)';
+                                                e.currentTarget.style.boxShadow = '0 10px 35px rgba(16, 185, 129, 0.4)';
                                             }}
                                         >
                                             <div style={{
@@ -1014,43 +1021,45 @@ const ThankYouPage: React.FC = () => {
                                         </div>
                                     )}
 
-                                    {/* Counselling booked confirmation */}
+                                    {/* Counselling booked confirmation — full-width, matches the B2B
+                                        mapping "You're all set" card: light-mint card, eyebrow label,
+                                        outline check icon, dark-green text. No counsellor name, no emoji. */}
                                     {bookedAppointment && !hasMappingCounselling && (
                                         <div
                                             className="text-center"
                                             style={{
-                                                background: 'linear-gradient(135deg, #A7F3D0 0%, #10B981 100%)',
+                                                background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                                                border: '1.5px solid #6EE7B7',
                                                 borderRadius: '16px',
-                                                padding: '1.25rem 1.5rem',
-                                                boxShadow: '0 10px 35px rgba(16, 185, 129, 0.4)',
+                                                padding: '1.75rem 1.5rem',
+                                                boxShadow: '0 10px 30px rgba(16,185,129,0.15)',
                                                 width: '100%',
-                                                maxWidth: '280px',
+                                                maxWidth: '520px',
+                                                margin: '0 auto',
                                             }}
                                         >
-                                            <div style={{
-                                                width: '42px',
-                                                height: '42px',
-                                                borderRadius: '10px',
-                                                background: 'rgba(255,255,255,0.22)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                margin: '0 auto 0.75rem auto',
-                                            }}>
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
+                                                Career counselling
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                                                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <circle cx="12" cy="12" r="10"></circle>
+                                                    <path d="M8 12l3 3 5-6"></path>
                                                 </svg>
                                             </div>
-                                            <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
-                                                Counselling Booked
+                                            <h3 style={{ margin: '0 0 6px', fontSize: '1.25rem', fontWeight: 800, color: '#065F46' }}>
+                                                You're all set — your session is booked!
                                             </h3>
-                                            <p style={{ color: 'rgba(255,255,255,0.95)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
-                                                {bookedAppointment.slotDate && bookedAppointment.slotStartTime
-                                                    ? `${bookedAppointment.slotDate} · ${bookedAppointment.slotStartTime}`
-                                                    : 'Your counsellor will reach out shortly'}
-                                                {counsellingRemaining > 0 && (
-                                                    <><br/><span style={{ fontSize: '0.72rem', opacity: 0.85 }}>{counsellingRemaining} more available</span></>
-                                                )}
+                                            {(bookedAppointment.slotDate && bookedAppointment.slotStartTime) && (
+                                                <p style={{ margin: '0 0 14px', fontSize: '0.95rem', color: '#047857', fontWeight: 700 }}>
+                                                    {formatApptWhen(bookedAppointment.slotDate, bookedAppointment.slotStartTime)}
+                                                </p>
+                                            )}
+                                            <p style={{ margin: '0 0 4px', fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
+                                                We've sent the details to your email and WhatsApp.
+                                            </p>
+                                            <p style={{ margin: 0, fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
+                                                Great job taking this step!
                                             </p>
                                         </div>
                                     )}
@@ -1067,7 +1076,8 @@ const ThankYouPage: React.FC = () => {
                                                 padding: '1.25rem 1.5rem',
                                                 boxShadow: '0 10px 35px rgba(56, 189, 248, 0.35)',
                                                 width: '100%',
-                                                maxWidth: '280px',
+                                                maxWidth: '520px',
+                                                margin: '0 auto',
                                             }}
                                         >
                                             <div style={{
@@ -1173,6 +1183,47 @@ const ThankYouPage: React.FC = () => {
                     `}
                 </style>
             </div>
+
+            {/* Pre-picker reminder — a single, focused nudge shown BEFORE the slot
+                picker (never stacked on top of it). "Pick my counselling time" opens
+                the picker; "Maybe later" dismisses it, leaving the Book-counselling
+                card on the page to open whenever the student is ready. */}
+            {showCounsellingReminder && !isSlotPickerOpen && !bookedAppointment && (
+                <div style={overlayStyle(1100)} onClick={() => setShowCounsellingReminder(false)}>
+                    <div onClick={(e) => e.stopPropagation()} style={celebrationCardStyle}>
+                        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" />
+                            </svg>
+                        </div>
+                        <h3 style={{ margin: '0 0 10px', fontSize: '1.3rem', fontWeight: 800, color: '#065F46' }}>
+                            Don't leave this on the table
+                        </h3>
+                        <p style={{ margin: '0 0 20px', fontSize: '0.95rem', lineHeight: 1.6, color: '#047857' }}>
+                            You just finished your assessment. A one-on-one session turns those results into a
+                            real plan for your future — and it only takes a moment to pick a time.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => { setShowCounsellingReminder(false); setIsSlotPickerOpen(true); }}
+                            style={{ ...primaryBtnStyle, marginBottom: 10 }}
+                        >
+                            Pick my counselling time
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowCounsellingReminder(false)}
+                            style={{
+                                background: 'transparent', border: 'none', color: '#94A3B8',
+                                fontSize: '0.86rem', fontWeight: 500, cursor: 'pointer',
+                                textDecoration: 'underline', width: '100%', padding: '0.4rem',
+                            }}
+                        >
+                            No thanks, maybe later
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Counselling slot picker — modal overlay. Rendered at the fragment
                 level so its fixed-position backdrop covers the full viewport
