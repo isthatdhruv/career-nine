@@ -11,7 +11,7 @@ import com.kccitm.api.model.reminder.ReminderDeliveryLog;
 import com.kccitm.api.model.reminder.ReminderDeliveryStatus;
 import com.kccitm.api.model.reminder.ReminderServiceType;
 import com.kccitm.api.model.reminder.ReminderTriggerSource;
-import com.kccitm.api.service.OdooEmailService;
+import com.kccitm.api.service.SmtpEmailService;
 
 /**
  * Single entry point for actually delivering a reminder email. Centralises:
@@ -26,7 +26,7 @@ public class ReminderSender {
     @Autowired private ReminderTemplateRenderer renderer;
     @Autowired private ReminderSuppressionService suppressionService;
     @Autowired private ReminderDeliveryLogService logService;
-    @Autowired private OdooEmailService emailService;
+    @Autowired private SmtpEmailService emailService;
 
     public static class Context {
         public ReminderServiceType serviceType;

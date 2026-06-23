@@ -10,11 +10,12 @@ import java.text.SimpleDateFormat;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
 
 /**
- * Sends a styled assessment-completion email to the student via Odoo.
+ * Sends a styled assessment-completion email to the student via Gmail.
  */
 @Service
 public class AssessmentCompletionEmailService {
@@ -22,7 +23,7 @@ public class AssessmentCompletionEmailService {
     private static final Logger logger = LoggerFactory.getLogger(AssessmentCompletionEmailService.class);
 
     @Autowired
-    private OdooEmailService odooEmailService;
+    private SmtpEmailService smtpEmailService;
 
     @Autowired
     private InstituteBrandingService brandingService;
@@ -73,10 +74,16 @@ public class AssessmentCompletionEmailService {
             String html = buildEmailHtml(studentName, assessmentName, username, dob, brand);
 
             if (brand.isWhitelabel()) {
-                odooEmailService.sendHtmlEmail(studentEmail, subject, html,
-                        brand.getSchoolName() + " (via Career-9)");
+                // Preserve the whitelabel "From" display name via a full request,
+                // since the simple sendHtmlEmail overload has no display-name arg.
+                SmtpEmailRequest req = new SmtpEmailRequest();
+                req.setTo(java.util.Collections.singletonList(studentEmail));
+                req.setSubject(subject);
+                req.setHtmlContent(html);
+                req.setFromName(brand.getSchoolName() + " (via Career-9)");
+                smtpEmailService.sendEmail(req);
             } else {
-                odooEmailService.sendHtmlEmail(studentEmail, subject, html);
+                smtpEmailService.sendHtmlEmail(studentEmail, subject, html);
             }
             logger.info("Assessment completion email sent to {} for assessment '{}' (whitelabel={})",
                     studentEmail, assessmentName, brand.isWhitelabel());

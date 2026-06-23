@@ -6,24 +6,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.career9.school.InstituteDetail;
+import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.service.b2c.LinkBuilder;
 import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
 
 /**
  * Sends a styled "here are your login credentials" email to a student via
- * {@link OdooEmailService}.
+ * {@link SmtpEmailService} (Gmail transport).
  *
  * <p>Template mirrors {@link AssessmentCompletionEmailService} (Career-9 brand
  * glassmorphism card, gradient top/bottom bars, logo block, login-details card,
  * 3-step "What's Next" section, CTA) so the credentials email visually fits in
  * with the rest of the transactional emails the platform sends.
  *
- * <p>Like every other Odoo dispatch path, this is fire-and-forget: the actual
- * mail.mail create + send happens asynchronously on the WebClient. Callers see
- * "queued OK" (no exception) or "queued failed" (validation error before the
- * send call). Eventual send success/failure shows up only in OdooEmailService
- * logs.
+ * <p>Like every other Gmail dispatch path, this is fire-and-forget: the send
+ * happens asynchronously (@Async). Callers see "queued OK" (no exception) or
+ * "queued failed" (validation error before the send call). Eventual send
+ * success/failure shows up only in SmtpEmailService logs.
  */
 @Service
 public class LoginCredentialsEmailService {
@@ -31,7 +31,7 @@ public class LoginCredentialsEmailService {
     private static final Logger logger = LoggerFactory.getLogger(LoginCredentialsEmailService.class);
 
     @Autowired
-    private OdooEmailService odooEmailService;
+    private SmtpEmailService smtpEmailService;
 
     @Autowired
     private LinkBuilder linkBuilder;
@@ -77,12 +77,18 @@ public class LoginCredentialsEmailService {
         String dashboardLink = linkBuilder.studentLogin();
         String html = buildEmailHtml(studentName, username, dob, dashboardLink, brand);
         if (brand.isWhitelabel()) {
-            odooEmailService.sendHtmlEmail(recipientEmail, subject, html,
-                    brand.getSchoolName() + " (via Career-9)");
+            // Preserve the whitelabel "From" display name via a full request,
+            // since the simple sendHtmlEmail overload has no display-name arg.
+            SmtpEmailRequest req = new SmtpEmailRequest();
+            req.setTo(java.util.Collections.singletonList(recipientEmail));
+            req.setSubject(subject);
+            req.setHtmlContent(html);
+            req.setFromName(brand.getSchoolName() + " (via Career-9)");
+            smtpEmailService.sendEmail(req);
         } else {
-            odooEmailService.sendHtmlEmail(recipientEmail, subject, html);
+            smtpEmailService.sendHtmlEmail(recipientEmail, subject, html);
         }
-        logger.info("Login-credentials email queued via Odoo for {} (whitelabel={})",
+        logger.info("Login-credentials email queued via Gmail for {} (whitelabel={})",
                 recipientEmail, brand.isWhitelabel());
     }
 

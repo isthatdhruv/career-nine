@@ -58,7 +58,6 @@ import com.kccitm.api.security.RefreshTokenService.RefreshTokenReuseException;
 import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.security.UserPrincipal;
-import com.kccitm.api.service.OdooEmailService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.UserActivityLogService;
@@ -144,9 +143,6 @@ public class AuthController {
 
     @Autowired
     private PasswordResetTokenRepository passwordResetTokenRepository;
-
-    @Autowired
-    private OdooEmailService odooEmailService;
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
@@ -655,7 +651,7 @@ public class AuthController {
 
     /**
      * POST /auth/forgot-password — issues a single-use reset link and emails it
-     * via Odoo. Per the product spec the endpoint REVEALS whether an email is
+     * via Gmail. Per the product spec the endpoint REVEALS whether an email is
      * registered (matches user request despite the enumeration trade-off).
      */
     // @PreAuthorize-Exempt: anonymous-by-design entrypoint; token-gated reset on /auth/reset-password.
@@ -683,7 +679,7 @@ public class AuthController {
 
         String resetLink = buildResetLink(token);
         try {
-            odooEmailService.sendHtmlEmail(
+            smtpEmailService.sendHtmlEmail(
                     user.getEmail(),
                     "Reset your Career-9 password",
                     buildResetEmailHtml(user.getName(), resetLink));
@@ -697,7 +693,7 @@ public class AuthController {
 
     /**
      * POST /auth/reset-password — consumes a single-use token, rewrites the
-     * user's BCrypt password hash, and sends an Odoo confirmation email.
+     * user's BCrypt password hash, and sends a Gmail confirmation email.
      */
     // @PreAuthorize-Exempt: anonymous-by-design — auth context derives from the token in the body.
     @PostMapping("/reset-password")
@@ -730,7 +726,7 @@ public class AuthController {
         passwordResetTokenRepository.save(token);
 
         try {
-            odooEmailService.sendHtmlEmail(
+            smtpEmailService.sendHtmlEmail(
                     user.getEmail(),
                     "Your Career-9 password was reset",
                     buildResetConfirmationHtml(user.getName()));

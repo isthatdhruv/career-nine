@@ -46,7 +46,7 @@ import com.kccitm.api.repository.Career9.NavigatorReportDataRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.service.CommunicationLogService;
-import com.kccitm.api.service.OdooEmailService;
+import com.kccitm.api.service.SmtpEmailService;
 
 @RestController
 @RequestMapping("/contact-person")
@@ -74,7 +74,7 @@ public class ContactPersonController {
     private SchoolSectionsRepository schoolSectionsRepository;
 
     @Autowired
-    private OdooEmailService odooEmailService;
+    private SmtpEmailService smtpEmailService;
 
     @Autowired
     private CommunicationLogService communicationLogService;
@@ -376,7 +376,7 @@ public class ContactPersonController {
             boolean ok = true;
             String err = null;
             try {
-                odooEmailService.sendHtmlEmail(cp.getEmail(), subject, htmlBody);
+                smtpEmailService.sendHtmlEmail(cp.getEmail(), subject, htmlBody);
             } catch (Exception e) {
                 ok = false;
                 err = e.getMessage();
@@ -572,7 +572,7 @@ public class ContactPersonController {
         boolean sendSuccess = true;
         String sendError = null;
         try {
-            odooEmailService.sendEmail(request);
+            smtpEmailService.sendEmail(request);
         } catch (Exception e) {
             sendSuccess = false;
             sendError = e.getMessage();
@@ -749,7 +749,7 @@ public class ContactPersonController {
         boolean sendSuccess = true;
         String sendError = null;
         try {
-            odooEmailService.sendEmail(emailRequest);
+            smtpEmailService.sendEmail(emailRequest);
         } catch (Exception e) {
             sendSuccess = false;
             sendError = e.getMessage();
@@ -1065,7 +1065,7 @@ public class ContactPersonController {
         boolean sendSuccess = true;
         String sendError = null;
         try {
-            odooEmailService.sendEmail(emailRequest);
+            smtpEmailService.sendEmail(emailRequest);
         } catch (Exception e) {
             sendSuccess = false;
             sendError = e.getMessage();
