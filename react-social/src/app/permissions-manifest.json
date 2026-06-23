@@ -157,6 +157,7 @@
   ],
   "user.write": [
     "/admin/counselling-assignments",
+    "/admin/counselling-dashboard",
     "/admin/counselling-notifications",
     "/admin/counselling-slots",
     "/admin/counselling-students",

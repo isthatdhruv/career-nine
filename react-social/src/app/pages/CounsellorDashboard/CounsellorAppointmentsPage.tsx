@@ -242,15 +242,23 @@ const CounsellorAppointmentsPage: React.FC = () => {
   // Session check-in: counsellor sends the OTP to the student, then enters the code
   // the student shares back. Verifying it is what actually starts the session
   // (status -> IN_PROGRESS) and unlocks the meeting link — Jitsi included.
-  const handleStartSession = async (appointmentId: number) => {
+  const handleStartSession = async (appointmentId: number, meetingLink?: string) => {
     setActionLoading(appointmentId)
     setCheckinMsg((p) => ({ ...p, [appointmentId]: '' }))
+    // Online session: open the meeting room straight away (synchronously, within the
+    // click gesture so it isn't popup-blocked) so the counsellor joins the call and
+    // can collect the check-in code from the student on the call.
+    if (meetingLink) {
+      window.open(meetingLink, '_blank', 'noopener,noreferrer')
+    }
     try {
       await startSession(appointmentId)
       setOtpSent((p) => ({ ...p, [appointmentId]: true }))
       setCheckinMsg((p) => ({
         ...p,
-        [appointmentId]: 'A check-in code was sent to the student. Ask them for it to start the session.',
+        [appointmentId]: meetingLink
+          ? 'The meeting has opened in a new tab. A check-in code was sent to the student — ask them for it on the call, then enter it to start the session.'
+          : 'A check-in code was sent to the student. Ask them for it to start the session.',
       }))
     } catch (e: any) {
       setCheckinMsg((p) => ({
@@ -531,13 +539,26 @@ const CounsellorAppointmentsPage: React.FC = () => {
                         {!otpSent[appt.id] ? (
                           <button
                             className='cp-action-btn cp-action-btn-primary'
-                            onClick={() => handleStartSession(appt.id)}
+                            onClick={() => handleStartSession(appt.id, meetingLink || undefined)}
                             disabled={actionLoading === appt.id}
                           >
-                            {actionLoading === appt.id ? 'Sending…' : 'Start session'}
+                            {actionLoading === appt.id ? 'Sending…' : meetingLink ? 'Start session & join' : 'Start session'}
                           </button>
                         ) : (
                           <>
+                            {/* Online: a reliable in-app way to (re)join the call if the
+                                auto-opened tab was blocked or closed. */}
+                            {meetingLink && (
+                              <a
+                                href={meetingLink}
+                                target='_blank'
+                                rel='noopener noreferrer'
+                                className='cp-action-btn cp-action-btn-primary'
+                                style={{ textDecoration: 'none', display: 'inline-block' }}
+                              >
+                                Join Meet
+                              </a>
+                            )}
                             <input
                               type='text'
                               inputMode='numeric'

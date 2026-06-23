@@ -92,12 +92,8 @@ const BookingForm: React.FC<BookingFormProps> = ({
             )}
           </span>
         </div>
-        {selectedSlot.counsellorName && (
-          <div style={{ fontSize: 13, color: 'var(--sp-muted, #5C7A72)' }}>
-            <span style={{ fontWeight: 500 }}>Counsellor: </span>
-            {selectedSlot.counsellorName}
-          </div>
-        )}
+        {/* Counsellor name is intentionally omitted — the system auto-assigns a
+            counsellor at booking, so the student picks a time, not a person. */}
       </div>
 
       {/* Reason textarea */}

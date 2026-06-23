@@ -57,6 +57,9 @@ const MappingCounsellingSection: React.FC = () => {
   // Auto-open picker state (the canBookNow + payPerSlot flows).
   const [pickerOpen, setPickerOpen] = useState(false);
   const [userClosed, setUserClosed] = useState(false);
+  // Retention nudge shown when the student dismisses the picker without booking —
+  // the same "Don't leave this on the table" card the school/B2C flow shows.
+  const [showReminder, setShowReminder] = useState(false);
   const [booked, setBooked] = useState<any | null>(null);
   // Legacy free-link upsell on a PAY_LATER mapping: pick a tier, then pay per slot.
   const [payLaterOpen, setPayLaterOpen] = useState(false);
@@ -110,6 +113,15 @@ const MappingCounsellingSection: React.FC = () => {
     return null;
   }
 
+  // Closing the slot picker WITHOUT booking surfaces the same retention nudge the
+  // school/B2C flow shows on ThankYouPage — so a mapping student who dismisses the
+  // picker still gets one focused "pick a time" reminder instead of nothing.
+  const handlePickerDismiss = () => {
+    setPickerOpen(false);
+    setUserClosed(true);
+    setShowReminder(true);
+  };
+
   const rupees = (v: number) => `₹${Math.round(v).toLocaleString('en-IN')}`;
 
   // Shared green container for all counselling states.
@@ -122,7 +134,7 @@ const MappingCounsellingSection: React.FC = () => {
         padding: '1.5rem',
         margin: '1.5rem auto',
         maxWidth: 520,
-        textAlign: 'left',
+        textAlign: 'center',
       }}
     >
       <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
@@ -182,62 +194,126 @@ const MappingCounsellingSection: React.FC = () => {
   //    if the student closes it, this card lets them reopen it. ──
   if (bookable) {
     const payLaterTierId = opts.tiers[0]?.tierId;
-    return card(
+    return (
       <>
-        <p style={{ margin: '0 0 14px', fontSize: '0.9rem', color: '#047857', lineHeight: 1.5 }}>
-          {opts.payPerSlot
-            ? `Turn your results into a real plan with a one-on-one session${opts.counsellingFeePerSession ? ` — ${rupees(opts.counsellingFeePerSession)} per session, paid when you book.` : '.'}`
-            : 'Your plan includes a one-on-one counselling session. Pick a time that works for you.'}
-        </p>
-        <button
-          type="button"
-          onClick={() => { setUserClosed(false); setPickerOpen(true); }}
-          style={{
-            width: '100%',
-            padding: '13px 20px',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 12,
-            fontWeight: 700,
-            fontSize: '0.98rem',
-            cursor: 'pointer',
-            boxShadow: '0 6px 18px rgba(16,185,129,0.32)',
-          }}
-        >
-          {opts.payPerSlot ? 'Book your counselling →' : 'Pick your counselling time →'}
-        </button>
+        {card(
+          <>
+            <p style={{ margin: '0 0 14px', fontSize: '0.9rem', color: '#047857', lineHeight: 1.5 }}>
+              {opts.payPerSlot
+                ? `Turn your results into a real plan with a one-on-one session${opts.counsellingFeePerSession ? ` — ${rupees(opts.counsellingFeePerSession)} per session, paid when you book.` : '.'}`
+                : 'Your plan includes a one-on-one counselling session. Pick a time that works for you.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => { setUserClosed(false); setPickerOpen(true); }}
+              style={{
+                width: '100%',
+                padding: '13px 20px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 12,
+                fontWeight: 700,
+                fontSize: '0.98rem',
+                cursor: 'pointer',
+                boxShadow: '0 6px 18px rgba(16,185,129,0.32)',
+              }}
+            >
+              {opts.payPerSlot ? 'Book your counselling →' : 'Pick your counselling time →'}
+            </button>
 
-        {/* PAY_LATER: pay the per-slot counselling fee at booking. */}
-        {pickerOpen && opts.payPerSlot && payLaterTierId != null && (
-          <MappingPayLaterBooking
-            entitlementId={opts.entitlementId}
-            tierId={payLaterTierId}
-            feePerSession={opts.counsellingFeePerSession}
-            defaultName={contact.name}
-            defaultPhone={contact.phone}
-            defaultEmail={contact.email}
-            onClose={() => { setPickerOpen(false); setUserClosed(true); }}
-          />
+            {/* PAY_LATER: pay the per-slot counselling fee at booking. */}
+            {pickerOpen && opts.payPerSlot && payLaterTierId != null && (
+              <MappingPayLaterBooking
+                entitlementId={opts.entitlementId}
+                tierId={payLaterTierId}
+                feePerSession={opts.counsellingFeePerSession}
+                defaultName={contact.name}
+                defaultPhone={contact.phone}
+                defaultEmail={contact.email}
+                onClose={handlePickerDismiss}
+              />
+            )}
+
+            {/* PAY_FIRST / included: free booking against the active entitlement. */}
+            {pickerOpen && !opts.payPerSlot && opts.canBookNow && opts.accessToken && (
+              <CounsellingSlotPicker
+                accessToken={opts.accessToken}
+                entitlementId={opts.entitlementId}
+                sessionsRemaining={opts.sessionsRemaining}
+                defaultName={contact.name}
+                defaultEmail={contact.email}
+                defaultPhone={contact.phone}
+                onClose={handlePickerDismiss}
+                onBooked={(result) => {
+                  setBooked(result);
+                  setPickerOpen(false);
+                }}
+              />
+            )}
+          </>,
         )}
 
-        {/* PAY_FIRST / included: free booking against the active entitlement. */}
-        {pickerOpen && !opts.payPerSlot && opts.canBookNow && opts.accessToken && (
-          <CounsellingSlotPicker
-            accessToken={opts.accessToken}
-            entitlementId={opts.entitlementId}
-            sessionsRemaining={opts.sessionsRemaining}
-            defaultName={contact.name}
-            defaultEmail={contact.email}
-            defaultPhone={contact.phone}
-            onClose={() => { setPickerOpen(false); setUserClosed(true); }}
-            onBooked={(result) => {
-              setBooked(result);
-              setPickerOpen(false);
+        {/* Retention nudge — shown after the student dismisses the picker WITHOUT
+            booking. Same card as the school/B2C flow on ThankYouPage. "Pick my
+            counselling time" reopens the picker; "No thanks" leaves the card on the
+            page so they can reopen it whenever they're ready. */}
+        {showReminder && !pickerOpen && !booked && (
+          <div
+            onClick={() => setShowReminder(false)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 16, zIndex: 1100, backdropFilter: 'blur(2px)',
             }}
-          />
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
+                border: '1.5px solid #6EE7B7', borderRadius: 18, maxWidth: 420, width: '100%',
+                padding: '2rem 1.75rem', boxShadow: '0 24px 70px rgba(16,185,129,0.3)', textAlign: 'center',
+              }}
+            >
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" />
+                </svg>
+              </div>
+              <h3 style={{ margin: '0 0 10px', fontSize: '1.3rem', fontWeight: 800, color: '#065F46' }}>
+                Don't leave this on the table
+              </h3>
+              <p style={{ margin: '0 0 20px', fontSize: '0.95rem', lineHeight: 1.6, color: '#047857' }}>
+                You just finished your assessment. A one-on-one session turns those results into a
+                real plan for your future — and it only takes a moment to pick a time.
+              </p>
+              <button
+                type="button"
+                onClick={() => { setShowReminder(false); setUserClosed(false); setPickerOpen(true); }}
+                style={{
+                  padding: '13px 20px', border: 'none', borderRadius: 12,
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#fff', fontWeight: 700, fontSize: '0.98rem', cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(16,185,129,0.32)', width: '100%', marginBottom: 10,
+                }}
+              >
+                Pick my counselling time
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowReminder(false)}
+                style={{
+                  background: 'transparent', border: 'none', color: '#94A3B8',
+                  fontSize: '0.86rem', fontWeight: 500, cursor: 'pointer',
+                  textDecoration: 'underline', width: '100%', padding: '0.4rem',
+                }}
+              >
+                No thanks, maybe later
+              </button>
+            </div>
+          </div>
         )}
-      </>,
+      </>
     );
   }
 
