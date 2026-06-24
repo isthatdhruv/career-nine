@@ -62,6 +62,9 @@
   "counselling.read": [
     "/counsellor/dashboard"
   ],
+  "dashboard.school.insights.read": [
+    "/school-admin/cohort-insights"
+  ],
   "generated_report.read": [
     "/student/insight-dashboard"
   ],

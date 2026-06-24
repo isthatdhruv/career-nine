@@ -32,6 +32,10 @@ public enum PermissionCode {
     INSTITUTE_WRITE  ("institute.write",  "Create or update institutes"),
     INSTITUTE_DELETE ("institute.delete", "Delete institutes"),
 
+    // ── School cohort insights dashboard (Dashboard 2) ──────────────────
+    DASHBOARD_SCHOOL_INSIGHTS_GENERATE("dashboard.school.insights.generate", "Generate/refresh school cohort insight payloads (superadmin)"),
+    DASHBOARD_SCHOOL_INSIGHTS_READ("dashboard.school.insights.read", "View the school cohort insights dashboard"),
+
     // ── Session (Phase 14 foundation) ───────────────────────────────────
     SESSION_READ  ("session.read",  "View academic sessions"),
     SESSION_WRITE ("session.write", "Create or update sessions"),

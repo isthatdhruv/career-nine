@@ -274,6 +274,7 @@ const PrivateRoutes = () => {
   );
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
   const College = lazy(() => import("../pages/College/CollegePage"));
+  const CohortInsightsPage = lazy(() => import("../pages/SchoolAdmin/CohortInsightsPage"));
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
   const AssessmentMappingPage = lazy(() => import("../pages/AssessmentMapping/AssessmentMappingPage"));
@@ -1462,6 +1463,16 @@ const PrivateRoutes = () => {
             <RequirePermission perm="report.read">
               <SuspensedView>
                 <ReportsHubPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/school-admin/cohort-insights"
+          element={
+            <RequirePermission perm="dashboard.school.insights.read">
+              <SuspensedView>
+                <CohortInsightsPage />
               </SuspensedView>
             </RequirePermission>
           }

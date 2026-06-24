@@ -582,6 +582,14 @@ export function AsideMenuMain() {
               fontIcon="bi-mortarboard"
             />
           )}
+          {allowed("/school-admin/cohort-insights") && (
+            <AsideMenuItem
+              to="/school-admin/cohort-insights"
+              icon="/media/icons/duotune/graphs/gra007.svg"
+              title="Cohort Insights"
+              fontIcon="bi-bar-chart"
+            />
+          )}
         </>
       )}
 
