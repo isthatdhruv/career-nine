@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentInstituteMapping;
 import com.kccitm.api.model.career9.AssessmentMappingTier;
+import com.kccitm.api.model.career9.AssessmentStudentInvite;
 import com.kccitm.api.model.career9.InstituteAssessment;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.PromoCode;
@@ -144,6 +145,15 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.AssessmentStudentInviteRepository inviteRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.UserStudentInstituteHistoryRepository inviteHistoryRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.b2c.PricingTierRepository pricingTierRepository;
 
     @Autowired
     private AuthCookieService authCookieService;
@@ -1733,5 +1743,478 @@ public class AssessmentInstituteMappingController {
         return ca.get(java.util.Calendar.YEAR) == cb.get(java.util.Calendar.YEAR)
             && ca.get(java.util.Calendar.MONTH) == cb.get(java.util.Calendar.MONTH)
             && ca.get(java.util.Calendar.DAY_OF_MONTH) == cb.get(java.util.Calendar.DAY_OF_MONTH);
+    }
+
+    // ============ PER-STUDENT INVITE ENDPOINTS ============
+    // An admin pre-selects a specific, already-existing student of an institute and
+    // binds them (mapping + custom-priced tier) into a one-student token. The student
+    // opens the token's link, sees a pre-filled registration page, pays the tier price
+    // and takes the assessment — reusing the existing B2B payment + entitlement +
+    // provisioning pipeline (the PaymentTransaction carries the existing userStudentId,
+    // so the webhook never creates a new account).
+
+    /**
+     * Find-or-create the INSTITUTE-level mapping that per-student invites for this
+     * (institute, assessment) hang their custom-priced tiers off of. Reuses the same
+     * dual-token + free-tier + catalog bootstrap as createMapping so the row is a
+     * first-class mapping (its tiers show in the normal tier modal).
+     */
+    private AssessmentInstituteMapping findOrCreateInstituteMapping(Integer instituteCode, Long assessmentId) {
+        AssessmentInstituteMapping existing = mappingRepository.findByInstituteCode(instituteCode).stream()
+                .filter(m -> assessmentId.equals(m.getAssessmentId()) && "INSTITUTE".equals(m.getMappingLevel()))
+                .findFirst().orElse(null);
+        if (existing != null) return existing;
+
+        AssessmentInstituteMapping mapping = new AssessmentInstituteMapping();
+        mapping.setInstituteCode(instituteCode);
+        mapping.setAssessmentId(assessmentId);
+        mapping.setMappingLevel("INSTITUTE");
+        String paidToken = UUID.randomUUID().toString();
+        mapping.setToken(paidToken);
+        mapping.setPaidToken(paidToken);
+        mapping.setFreeToken(UUID.randomUUID().toString());
+        mapping.setPaidActive(true);
+        mapping.setFreeActive(true);
+        mapping.setPaymentTiming("PAY_FIRST");
+        AssessmentInstituteMapping saved = mappingRepository.save(mapping);
+
+        if (!tierRepository.findFirstByMappingIdAndIsFreeTrue(saved.getMappingId()).isPresent()) {
+            AssessmentMappingTier freeTier = new AssessmentMappingTier();
+            freeTier.setMappingId(saved.getMappingId());
+            freeTier.setName("Free");
+            freeTier.setDescription("Free registration");
+            freeTier.setAmount(0L);
+            freeTier.setSortOrder(-1);
+            freeTier.setCurrentCount(0);
+            freeTier.setIsActive(true);
+            freeTier.setIsFree(true);
+            tierRepository.save(freeTier);
+        }
+        instituteAssessmentService.ensure(saved.getInstituteCode(), saved.getAssessmentId());
+        return saved;
+    }
+
+    /**
+     * Step 3 of the invite wizard: ensure the INSTITUTE-level mapping exists so the
+     * admin can attach custom-priced tiers to it (via the normal tier endpoints) and
+     * then generate per-student invites against those tiers.
+     */
+    @PostMapping("/student-invite/ensure-mapping")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.create')")
+    @Transactional
+    public ResponseEntity<?> ensureInviteMapping(@RequestBody Map<String, Object> body) {
+        if (body.get("instituteCode") == null || body.get("assessmentId") == null) {
+            return ResponseEntity.badRequest().body("instituteCode and assessmentId are required");
+        }
+        Integer instituteCode = Integer.valueOf(body.get("instituteCode").toString());
+        Long assessmentId = Long.valueOf(body.get("assessmentId").toString());
+        if (!assessmentTableRepository.existsById(assessmentId)) {
+            return ResponseEntity.badRequest().body("Assessment not found");
+        }
+        return ResponseEntity.ok(findOrCreateInstituteMapping(instituteCode, assessmentId));
+    }
+
+    /**
+     * Generate a per-student invite link. The admin selects a reusable B2C pricing
+     * tier (pricing_tiers); it is materialised onto this mapping as an
+     * assessment_mapping_tier (so the existing payment + entitlement pipeline works
+     * unchanged), and the invite points at that materialised tier.
+     */
+    @PostMapping("/student-invite")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.create')")
+    @Transactional
+    public ResponseEntity<?> createStudentInvite(@RequestBody Map<String, Object> body) {
+        if (body.get("mappingId") == null || body.get("pricingTierId") == null
+                || body.get("userStudentId") == null) {
+            return ResponseEntity.badRequest().body("mappingId, pricingTierId and userStudentId are required");
+        }
+        Long mappingId = Long.valueOf(body.get("mappingId").toString());
+        Long pricingTierId = Long.valueOf(body.get("pricingTierId").toString());
+        Long userStudentId = Long.valueOf(body.get("userStudentId").toString());
+
+        AssessmentInstituteMapping mapping = mappingRepository.findById(mappingId).orElse(null);
+        if (mapping == null) {
+            return ResponseEntity.badRequest().body("Mapping not found");
+        }
+        com.kccitm.api.model.career9.b2c.PricingTier pricingTier =
+                pricingTierRepository.findById(pricingTierId).orElse(null);
+        if (pricingTier == null || Boolean.TRUE.equals(pricingTier.getIsDeleted())) {
+            return ResponseEntity.badRequest().body("Pricing tier not found");
+        }
+        UserStudent us = userStudentRepository.findById(userStudentId).orElse(null);
+        if (us == null || us.getStudentInfo() == null) {
+            return ResponseEntity.badRequest().body("Student not found");
+        }
+        // NB: the admin picks from this institute's membership-based roster, so the
+        // student's StudentInfo.instituteId (their PRIMARY institute) may legitimately
+        // differ from this institute. Don't hard-reject on it — this is an
+        // admin-permissioned tool and the invite stores the mapping's institute code.
+
+        AssessmentMappingTier tier = materializeTierFromPricing(mapping, pricingTier);
+
+        // Optional per-invite custom price (INR) — overrides the tier's base price for
+        // THIS student. Absent/blank → charge the tier's own price.
+        Long customAmount = null;
+        if (body.get("customPrice") != null && !body.get("customPrice").toString().trim().isEmpty()) {
+            try {
+                customAmount = Long.valueOf(body.get("customPrice").toString().trim());
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().body("customPrice must be a whole number");
+            }
+            if (customAmount < 0) {
+                return ResponseEntity.badRequest().body("customPrice cannot be negative");
+            }
+        }
+
+        AssessmentStudentInvite invite = new AssessmentStudentInvite();
+        invite.setMappingId(mapping.getMappingId());
+        invite.setTierId(tier.getTierId());
+        invite.setUserStudentId(userStudentId);
+        invite.setAssessmentId(mapping.getAssessmentId());
+        invite.setInstituteCode(mapping.getInstituteCode());
+        invite.setCustomAmount(customAmount);
+        invite.setToken(UUID.randomUUID().toString());
+        invite.setStatus("PENDING");
+        if (body.get("expiresAt") != null) {
+            try {
+                invite.setExpiresAt(new SimpleDateFormat("dd-MM-yyyy").parse(body.get("expiresAt").toString()));
+            } catch (Exception ignore) { /* optional */ }
+        }
+        AssessmentStudentInvite saved = inviteRepository.save(invite);
+        return ResponseEntity.ok(saved);
+    }
+
+    /**
+     * Find-or-create the assessment_mapping_tier row mirroring a B2C pricing tier on
+     * this mapping, syncing price + inclusions so the charge always matches the
+     * current pricing tier. A fresh row gets the next free sort_order (the
+     * (mapping_id, sort_order) unique key rules out reusing one).
+     */
+    private AssessmentMappingTier materializeTierFromPricing(AssessmentInstituteMapping mapping,
+            com.kccitm.api.model.career9.b2c.PricingTier pt) {
+        AssessmentMappingTier tier = tierRepository
+                .findFirstByMappingIdAndPricingTierId(mapping.getMappingId(), pt.getTierId())
+                .orElseGet(() -> {
+                    AssessmentMappingTier t = new AssessmentMappingTier();
+                    t.setMappingId(mapping.getMappingId());
+                    t.setPricingTierId(pt.getTierId());
+                    t.setIsFree(false);
+                    t.setCurrentCount(0);
+                    int nextSort = 0;
+                    for (AssessmentMappingTier ex : tierRepository.findByMappingIdOrderBySortOrderAsc(mapping.getMappingId())) {
+                        if (ex.getSortOrder() != null && ex.getSortOrder() >= nextSort) nextSort = ex.getSortOrder() + 1;
+                    }
+                    t.setSortOrder(nextSort);
+                    return t;
+                });
+        // Sync mutable fields to the current pricing tier (latest price/inclusions).
+        tier.setName(pt.getName());
+        String desc = pt.getDescription() != null && !pt.getDescription().trim().isEmpty()
+                ? pt.getDescription().trim() : pt.getName();
+        if (desc.length() > 200) desc = desc.substring(0, 200);
+        tier.setDescription(desc);
+        tier.setAmount(pt.getBasePriceInr() != null ? pt.getBasePriceInr() : 0L);
+        tier.setIsActive(true);
+        tier.setIncludesFinalReport(Boolean.TRUE.equals(pt.getIncludesFinalReport()));
+        tier.setIncludesDashboard(Boolean.TRUE.equals(pt.getIncludesDashboard()));
+        tier.setDashboardValidityDays(pt.getDashboardValidityDays());
+        tier.setIncludesCounselling(Boolean.TRUE.equals(pt.getIncludesCounselling()));
+        tier.setCounsellingSessionCount(pt.getCounsellingSessionCount());
+        tier.setIncludesLms(Boolean.TRUE.equals(pt.getIncludesLms()));
+        tier.setLmsValidityDays(pt.getLmsValidityDays());
+        return tierRepository.save(tier);
+    }
+
+    /**
+     * Reusable B2C pricing tiers for the invite picker — gated by the SAME permission
+     * as the invite feature, so the tool doesn't require the separate pricing_tier.read
+     * permission. Active, non-deleted tiers only.
+     */
+    @GetMapping("/student-invite/pricing-tiers")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
+    public ResponseEntity<?> listPricingTiersForInvite() {
+        return ResponseEntity.ok(
+                pricingTierRepository.findByIsDeletedFalseAndIsActiveTrueOrderBySortOrderAscTierIdAsc());
+    }
+
+    /**
+     * Institute student roster for the invite picker — gated by the SAME permission as
+     * the rest of the invite/mapping feature, so the admin tool is self-contained and
+     * doesn't require the separate student_institute_membership.read permission.
+     */
+    @GetMapping("/student-invite/students/{instituteCode}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
+    public ResponseEntity<?> listInstituteStudentsForInvite(@PathVariable Integer instituteCode) {
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (com.kccitm.api.model.career9.UserStudentInstituteHistory r :
+                inviteHistoryRepository.findByInstituteCodeAndIsDroppedFalse(instituteCode)) {
+            Map<String, Object> dto = new HashMap<>();
+            dto.put("userStudentId", r.getUserStudentId());
+            userStudentRepository.findById(r.getUserStudentId()).ifPresent(us -> {
+                if (us.getStudentInfo() != null) {
+                    dto.put("name", us.getStudentInfo().getName());
+                    dto.put("email", us.getStudentInfo().getEmail());
+                    dto.put("phone", us.getStudentInfo().getPhoneNumber());
+                }
+            });
+            dto.put("source", r.getSource());
+            dto.put("isDropped", r.getIsDropped());
+            out.add(dto);
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /** Admin listing of generated invites for an institute (status dashboard). */
+    @GetMapping("/student-invite/by-institute/{instituteCode}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
+    public ResponseEntity<?> listInvitesByInstitute(@PathVariable Integer instituteCode) {
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        for (AssessmentStudentInvite inv : inviteRepository.findByInstituteCodeOrderByCreatedAtDesc(instituteCode)) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("inviteId", inv.getInviteId());
+            m.put("token", inv.getToken());
+            m.put("status", inv.getStatus());
+            m.put("createdAt", inv.getCreatedAt() != null ? sdf.format(inv.getCreatedAt()) : null);
+            m.put("assessmentId", inv.getAssessmentId());
+            assessmentTableRepository.findById(inv.getAssessmentId())
+                    .ifPresent(a -> m.put("assessmentName", a.getAssessmentName()));
+            tierRepository.findById(inv.getTierId()).ifPresent(t -> {
+                m.put("tierId", t.getTierId());
+                m.put("tierName", t.getName());
+                // Show what the student actually pays: custom price if set, else tier price.
+                m.put("amount", inv.getCustomAmount() != null ? inv.getCustomAmount() : t.getAmount());
+            });
+            userStudentRepository.findById(inv.getUserStudentId()).ifPresent(us -> {
+                if (us.getStudentInfo() != null) {
+                    m.put("studentName", us.getStudentInfo().getName());
+                    m.put("studentEmail", us.getStudentInfo().getEmail());
+                }
+            });
+            out.add(m);
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /** Revoke an invite link so it can no longer be opened/paid. */
+    @PatchMapping("/student-invite/{inviteId}/revoke")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.update')")
+    public ResponseEntity<?> revokeInvite(@PathVariable Long inviteId) {
+        Optional<AssessmentStudentInvite> opt = inviteRepository.findById(inviteId);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        AssessmentStudentInvite inv = opt.get();
+        inv.setStatus("REVOKED");
+        return ResponseEntity.ok(inviteRepository.save(inv));
+    }
+
+    // ----- Public per-student invite (token-gated; CSRF-exempt via /public/**) -----
+
+    /** Pre-fill payload for the student-locked registration page. */
+    @GetMapping("/public/student-invite/info/{token}")
+    public ResponseEntity<?> getInviteInfo(@PathVariable String token) {
+        AssessmentStudentInvite inv = inviteRepository.findByToken(token).orElse(null);
+        if (inv == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid or expired invite link");
+        }
+        AssessmentInstituteMapping mapping = mappingRepository.findById(inv.getMappingId()).orElse(null);
+        AssessmentMappingTier tier = tierRepository.findById(inv.getTierId()).orElse(null);
+        UserStudent us = userStudentRepository.findById(inv.getUserStudentId()).orElse(null);
+        if (mapping == null || tier == null || us == null || us.getStudentInfo() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid or expired invite link");
+        }
+        StudentInfo si = us.getStudentInfo();
+
+        boolean closed = "REVOKED".equals(inv.getStatus())
+                || (inv.getExpiresAt() != null && inv.getExpiresAt().before(new Date()))
+                || !Boolean.TRUE.equals(mapping.getIsActive());
+
+        boolean alreadyRegistered = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(
+                        us.getUserStudentId(), inv.getAssessmentId()).isPresent();
+
+        Map<String, Object> info = new HashMap<>();
+        info.put("status", inv.getStatus());
+        info.put("registrationClosed", closed);
+        info.put("alreadyRegistered", alreadyRegistered);
+        info.put("assessmentId", inv.getAssessmentId());
+        assessmentTableRepository.findById(inv.getAssessmentId())
+                .ifPresent(a -> info.put("assessmentName", a.getAssessmentName()));
+        InstituteDetail institute = instituteDetailRepository.findById(mapping.getInstituteCode().intValue());
+        if (institute != null) info.put("instituteName", institute.getInstituteName());
+        info.put("branding", brandingService.forInstitute(institute));
+
+        info.put("tierName", tier.getName());
+        // Effective price = invite's custom amount if set, else the tier's base price.
+        long effectiveAmount = inv.getCustomAmount() != null ? inv.getCustomAmount()
+                : (tier.getAmount() != null ? tier.getAmount() : 0L);
+        info.put("amount", effectiveAmount);
+        info.put("inclusions", inclusionsOf(tier));
+
+        String timing = mapping.getPaymentTiming() != null ? mapping.getPaymentTiming() : "PAY_FIRST";
+        info.put("paymentTiming", timing);
+        long counsellingFeeTotal = 0L;
+        if (Boolean.TRUE.equals(tier.getIncludesCounselling())
+                && tier.getCounsellingPrice() != null && tier.getCounsellingPrice() > 0) {
+            int sessions = tier.getCounsellingSessionCount() != null && tier.getCounsellingSessionCount() > 0
+                    ? tier.getCounsellingSessionCount() : 1;
+            counsellingFeeTotal = (long) tier.getCounsellingPrice() * sessions;
+            info.put("counsellingFeePerSession", tier.getCounsellingPrice());
+            info.put("counsellingSessionCount", sessions);
+            info.put("counsellingFeeTotal", counsellingFeeTotal);
+        }
+        info.put("payableTotal", computeInvitePayable(inv, tier, mapping));
+
+        // Pre-fill (identity fields the page locks). DOB returned in dd-MM-yyyy so the
+        // page can mint the assessment-session cookie after payment, like normal reg.
+        Map<String, Object> student = new HashMap<>();
+        student.put("name", si.getName());
+        student.put("email", si.getEmail());
+        student.put("phone", si.getPhoneNumber());
+        student.put("dob", si.getStudentDob() != null
+                ? new SimpleDateFormat("dd-MM-yyyy").format(si.getStudentDob()) : null);
+        info.put("student", student);
+
+        return ResponseEntity.ok(info);
+    }
+
+    /** The student confirms the pre-filled page → pay (price > 0) or straight in (free). */
+    @PostMapping("/public/student-invite/register/{token}")
+    @Transactional
+    public ResponseEntity<?> registerInvite(@PathVariable String token,
+            @RequestBody(required = false) Map<String, Object> body,
+            HttpServletResponse httpResponse) {
+        AssessmentStudentInvite inv = inviteRepository.findByToken(token).orElse(null);
+        if (inv == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid or expired invite link");
+        }
+        if ("REVOKED".equals(inv.getStatus())
+                || (inv.getExpiresAt() != null && inv.getExpiresAt().before(new Date()))) {
+            return ResponseEntity.badRequest().body("This invite link is no longer active");
+        }
+        AssessmentInstituteMapping mapping = mappingRepository.findById(inv.getMappingId()).orElse(null);
+        AssessmentMappingTier tier = tierRepository.findById(inv.getTierId()).orElse(null);
+        UserStudent us = userStudentRepository.findById(inv.getUserStudentId()).orElse(null);
+        if (mapping == null || tier == null || us == null || us.getStudentInfo() == null
+                || !Boolean.TRUE.equals(mapping.getIsActive())) {
+            return ResponseEntity.badRequest().body("This invite link is no longer active");
+        }
+        // Fully initialise StudentInfo (and its User) before handleExistingStudent calls
+        // tierRepository.tryIncrementCount(...), which is @Modifying(clearAutomatically=true)
+        // and clears the persistence context mid-transaction — a lazy us.getStudentInfo()
+        // proxy would otherwise be detached and throw LazyInitializationException on
+        // getName()/getEmail()/getUser()/etc. (the normal registration flow is immune
+        // because it passes a repository-loaded StudentInfo).
+        StudentInfo si = us.getStudentInfo();
+        org.hibernate.Hibernate.initialize(si);
+        if (si.getUser() != null) org.hibernate.Hibernate.initialize(si.getUser());
+        Long assessmentId = inv.getAssessmentId();
+        Integer instituteCode = mapping.getInstituteCode();
+
+        // Already enrolled → just log them in (no double charge).
+        if (studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(us.getUserStudentId(), assessmentId)
+                .isPresent()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "already_registered");
+            response.put("message", "You are already registered for this assessment.");
+            response.putAll(studentSessionService.buildSessionPayload(us.getUserStudentId()));
+            issueAssessmentSessionCookie(httpResponse, us, assessmentId);
+            return ResponseEntity.ok(response);
+        }
+
+        long payable = computeInvitePayable(inv, tier, mapping);
+
+        // Paid invite → create a PaymentTransaction stamped with the EXISTING student
+        // and redirect to Razorpay. The webhook (userStudentId set) skips account
+        // creation, ensures the assessment mapping, and mints the entitlement.
+        if (payable > 0) {
+            return createInvitePaymentAndRedirect(mapping, tier, us, si, payable);
+        }
+
+        // Free invite (tier amount 0) → assign + entitlement immediately, reusing the
+        // existing-student free path (zero-amount ledger txn + activateB2BOnPayment).
+        inv.setStatus("PAID");
+        inviteRepository.save(inv);
+        return handleExistingStudent(si, assessmentId, instituteCode,
+                mapping.getMappingId(), tier.getTierId(), httpResponse);
+    }
+
+    /**
+     * What the student pays now: the invite's custom price if set (else the tier's
+     * base price), plus the PAY_FIRST folded-in counselling fee.
+     */
+    private long computeInvitePayable(AssessmentStudentInvite inv, AssessmentMappingTier tier,
+            AssessmentInstituteMapping mapping) {
+        long base = inv.getCustomAmount() != null ? inv.getCustomAmount()
+                : (tier.getAmount() != null ? tier.getAmount() : 0L);
+        String timing = mapping.getPaymentTiming() != null ? mapping.getPaymentTiming() : "PAY_FIRST";
+        if ("PAY_FIRST".equals(timing) && Boolean.TRUE.equals(tier.getIncludesCounselling())
+                && tier.getCounsellingPrice() != null && tier.getCounsellingPrice() > 0) {
+            int sessions = tier.getCounsellingSessionCount() != null && tier.getCounsellingSessionCount() > 0
+                    ? tier.getCounsellingSessionCount() : 1;
+            base += (long) tier.getCounsellingPrice() * sessions;
+        }
+        return base;
+    }
+
+    /**
+     * Paid-invite payment: mirrors createPaymentAndRedirect but pre-stamps the
+     * existing userStudentId on the txn so the webhook provisions the known student
+     * (no new account) and activateB2BOnPayment grants the tier's entitlement.
+     */
+    private ResponseEntity<?> createInvitePaymentAndRedirect(AssessmentInstituteMapping mapping,
+            AssessmentMappingTier tier, UserStudent us, StudentInfo si, long amountInr) {
+        try {
+            Long assessmentId = mapping.getAssessmentId();
+            String assessmentName = assessmentTableRepository.findById(assessmentId)
+                    .map(a -> a.getAssessmentName()).orElse("Assessment");
+            String callbackUrl = callbackBaseUrl + "/payment-status";
+
+            PaymentTransaction txn = new PaymentTransaction();
+            txn.setMappingId(mapping.getMappingId());
+            txn.setMappingTierId(tier.getTierId());
+            txn.setAmount(amountInr);
+            txn.setOriginalAmount(amountInr);
+            txn.setAssessmentId(assessmentId);
+            txn.setInstituteCode(mapping.getInstituteCode());
+            txn.setUserStudentId(us.getUserStudentId());
+            txn.setStudentName(si.getName());
+            txn.setStudentEmail(si.getEmail());
+            txn.setStudentDob(si.getStudentDob());
+            txn.setStudentPhone(si.getPhoneNumber());
+            txn.setStatus("created");
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            String referenceId = "INV-" + mapping.getMappingId() + "-" + txn.getTransactionId()
+                    + "-" + UUID.randomUUID().toString().substring(0, 6);
+            Map<String, String> notes = new HashMap<>();
+            notes.put("mappingId", String.valueOf(mapping.getMappingId()));
+            notes.put("assessmentId", String.valueOf(assessmentId));
+            notes.put("instituteCode", String.valueOf(mapping.getInstituteCode()));
+            notes.put("userStudentId", String.valueOf(us.getUserStudentId()));
+            notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    amountInr, "INR", assessmentName + " - Payment",
+                    callbackUrl, referenceId, notes);
+
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            cancelPriorOutstandingLinks(si.getEmail(), assessmentId, txn.getTransactionId());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "payment_required");
+            response.put("paymentUrl", rzpResponse.get("shortUrl"));
+            response.put("transactionId", txn.getTransactionId());
+            response.put("amount", amountInr);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Failed to create invite payment link: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to create payment link. Please try again.");
+        }
     }
 }

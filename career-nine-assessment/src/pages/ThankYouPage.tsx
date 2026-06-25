@@ -805,7 +805,8 @@ const ThankYouPage: React.FC = () => {
                                                 transition: 'all 0.3s ease',
                                                 boxShadow: '0 10px 35px rgba(245, 158, 11, 0.4)',
                                                 width: '100%',
-                                                maxWidth: '280px',
+                                                maxWidth: '520px',
+                                                margin: '0 auto',
                                             }}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
@@ -854,7 +855,8 @@ const ThankYouPage: React.FC = () => {
                                                 transition: 'all 0.3s ease',
                                                 boxShadow: '0 10px 35px rgba(59, 130, 246, 0.4)',
                                                 width: '100%',
-                                                maxWidth: '280px',
+                                                maxWidth: '520px',
+                                                margin: '0 auto',
                                             }}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { PricingTier } from "../../B2C/API/PricingTier_APIs";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -189,4 +190,90 @@ export function deleteTier(tierId: number) {
 
 export function recountTier(tierId: number) {
   return axios.post(`${API_URL}/assessment-mapping/tiers/${tierId}/recount`);
+}
+
+// ============ PER-STUDENT INVITES (admin) ============
+// Bind a specific, already-existing student to a mapping + custom-priced tier and
+// mint a one-student link. The student opens it, sees a pre-filled registration
+// page, pays the tier price, and takes the assessment.
+
+export interface AssessmentStudentInvite {
+  inviteId: number;
+  mappingId: number;
+  tierId: number;
+  userStudentId: number;
+  assessmentId: number;
+  instituteCode: number;
+  token: string;
+  status: string;
+}
+
+// Find-or-create the INSTITUTE-level mapping invites hang their tiers off of.
+export function ensureInviteMapping(instituteCode: number, assessmentId: number) {
+  return axios.post<AssessmentInstituteMapping>(
+    `${API_URL}/assessment-mapping/student-invite/ensure-mapping`,
+    { instituteCode, assessmentId }
+  );
+}
+
+// Reusable B2C pricing tiers for the invite picker — served under the mapping
+// permission so the tool is self-contained.
+export function getInvitePricingTiers() {
+  return axios.get<PricingTier[]>(`${API_URL}/assessment-mapping/student-invite/pricing-tiers`);
+}
+
+// Selects a reusable B2C pricing tier (pricingTierId); the backend materialises it
+// onto the mapping and binds the invite to it. customPrice (optional) overrides the
+// tier's base price for this student.
+export function createStudentInvite(
+  mappingId: number,
+  pricingTierId: number,
+  userStudentId: number,
+  customPrice?: number
+) {
+  return axios.post<AssessmentStudentInvite>(
+    `${API_URL}/assessment-mapping/student-invite`,
+    { mappingId, pricingTierId, userStudentId, customPrice }
+  );
+}
+
+export interface StudentInviteRow {
+  inviteId: number;
+  token: string;
+  status: string;
+  createdAt?: string;
+  assessmentId: number;
+  assessmentName?: string;
+  tierId?: number;
+  tierName?: string;
+  amount?: number | null;
+  studentName?: string;
+  studentEmail?: string;
+}
+
+export interface InviteStudentRow {
+  userStudentId: number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  source?: string;
+  isDropped?: boolean;
+}
+
+// Institute student roster for the invite picker — gated by the SAME permission
+// as the rest of the mapping feature (so the tool is self-contained).
+export function getInviteStudents(instituteCode: number) {
+  return axios.get<InviteStudentRow[]>(
+    `${API_URL}/assessment-mapping/student-invite/students/${instituteCode}`
+  );
+}
+
+export function getInvitesByInstitute(instituteCode: number) {
+  return axios.get<StudentInviteRow[]>(
+    `${API_URL}/assessment-mapping/student-invite/by-institute/${instituteCode}`
+  );
+}
+
+export function revokeInvite(inviteId: number) {
+  return axios.patch(`${API_URL}/assessment-mapping/student-invite/${inviteId}/revoke`);
 }
