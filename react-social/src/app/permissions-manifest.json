@@ -65,6 +65,12 @@
   "dashboard.school.insights.read": [
     "/school-admin/cohort-insights"
   ],
+  "email_account.read": [
+    "/admin/email-accounts"
+  ],
+  "email_log.read": [
+    "/admin/email-log"
+  ],
   "generated_report.read": [
     "/student/insight-dashboard"
   ],

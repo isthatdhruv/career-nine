@@ -106,6 +106,9 @@ export function AsideMenuMain() {
   const showActivityLog = allowed("/activity-log");
   // JWT Token console is super-admin-only — backend enforces via @PreAuthorize("principal.superAdmin")
   const showJwtTokens = isSuperAdmin;
+  const showEmailAccounts = allowed("/admin/email-accounts");
+  const showEmailLog = allowed("/admin/email-log");
+  const showEmail = showEmailAccounts || showEmailLog;
   const showLeads = allowed("/leads");
   const showOldDataMapping = allowed("/old-data-mapping");
   const showScoreDebug = allowed("/score-debug");
@@ -627,7 +630,7 @@ export function AsideMenuMain() {
       )}
 
 
-      {(showActivityLog || showJwtTokens) && (
+      {(showActivityLog || showJwtTokens || showEmail) && (
         <>
           <div className="menu-item">
             <div className="menu-content pt-8 pb-2">
@@ -651,6 +654,31 @@ export function AsideMenuMain() {
               title="JWT Tokens"
               fontIcon="bi-shield-lock"
             />
+          )}
+          {showEmail && (
+            <AsideMenuItemWithSub
+              to=""
+              title="Email"
+              fontIcon="bi-envelope"
+              icon="/media/icons/duotune/communication/com010.svg"
+            >
+              {showEmailAccounts && (
+                <AsideMenuItem
+                  to="/admin/email-accounts"
+                  icon="/media/icons/duotune/communication/com011.svg"
+                  title="Email Accounts"
+                  fontIcon="bi-envelope-at"
+                />
+              )}
+              {showEmailLog && (
+                <AsideMenuItem
+                  to="/admin/email-log"
+                  icon="/media/icons/duotune/communication/com007.svg"
+                  title="Email Log"
+                  fontIcon="bi-envelope-paper"
+                />
+              )}
+            </AsideMenuItemWithSub>
           )}
         </>
       )}

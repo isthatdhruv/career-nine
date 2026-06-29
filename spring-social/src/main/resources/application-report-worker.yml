@@ -1,5 +1,10 @@
 # Profile: report-worker
-# Activated on the dedicated worker container (SPRING_PROFILES_ACTIVE=production,report-worker).
+# Layered on top of the environment profile on the dedicated worker containers:
+#   - production: SPRING_PROFILES_ACTIVE=production,report-worker  → report-worker service
+#   - staging:    SPRING_PROFILES_ACTIVE=sandbox,report-worker     → report-worker-staging service
+# The environment profile supplies the DB / Redis / Kafka / Gotenberg targets (e.g. the
+# sandbox profile points at mysql_db_staging / redis_staging / kafka-staging / common gotenberg);
+# this profile only adds the worker-specific bits below.
 # Runs the report.generate / report.email Kafka consumers (gated by @Profile("report-worker"))
 # in their own JVM so report rendering never steals threads/heap from the live API.
 # NOTE: the worker runs as a normal servlet web app (Tomcat binds 8080 INTERNALLY —

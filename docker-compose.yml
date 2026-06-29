@@ -242,6 +242,42 @@ services:
       retries: 3
       start_period: 5s
 
+  # # # ── Kafka (KRaft, single broker) — staging report-on-completion pipeline queue.
+  # # #    Dedicated to staging (the staging stack is isolated on career_staging_net);
+  # # #    api-staging produces here and report-worker-staging consumes. ──
+  kafka-staging:
+    image: apache/kafka:latest
+    container_name: kafka-staging
+    restart: unless-stopped
+    expose:
+      - "9092"
+    # apache/kafka official image → KAFKA_* env (NOT bitnami's KAFKA_CFG_*).
+    # Single-node KRaft (broker + controller in one process), advertised by service name.
+    environment:
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka-staging:9093
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-staging:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
+    volumes:
+      - kafka_staging_data:/var/lib/kafka/data
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+    networks:
+      - career_staging_net
+
   api-staging:
     container_name: api-staging
     build:
@@ -261,6 +297,9 @@ services:
       # Without this the backend falls back to the application.yml default localhost:3000
       # (nothing listens there inside the container) and every PDF render fails.
       - GOTENBERG_URL=http://gotenberg:3000
+      # Staging Kafka broker (KRaft) — the report-on-completion pipeline queue that
+      # report-worker-staging consumes from. Without it the report pipeline can't enqueue.
+      - KAFKA_BOOTSTRAP=kafka-staging:9092
     deploy:
       resources:
         limits:
@@ -270,6 +309,47 @@ services:
         condition: service_healthy
       redis_staging:
         condition: service_healthy
+      kafka-staging:
+        condition: service_started
+    networks:
+      - career_staging_net
+
+  # # # ── Report worker (staging) — runs the Kafka consumers (report generate + email)
+  # # #    in their own JVM on the sandbox profile, isolated from the staging API.
+  # # #    Same image, profile sandbox,report-worker, no HTTP server. Shares the staging
+  # # #    DB + Redis (via .env.staging), the common Kafka, and the COMMON gotenberg. ──
+  report-worker-staging:
+    container_name: report-worker-staging
+    build:
+      context: ./spring-social
+      dockerfile: dockerfile
+    command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox,report-worker"]
+    restart: always
+    env_file:
+      - .env.staging
+    environment:
+      # Worker only consumes Kafka → generates reports → emails. Firebase Admin SDK
+      # (FCM/push) is unused here, so disable it and skip mounting the secret; report
+      # emails still send via the classpath Gmail service account baked into the jar.
+      - APP_FIREBASE_ENABLED=false
+      # The SAME common headless-Chromium PDF renderer the staging/live APIs use,
+      # reached by service name on the Docker network (one shared instance on :3000).
+      - GOTENBERG_URL=http://gotenberg:3000
+      # Same Kafka the staging API (api-staging) produces to, so the worker consumes
+      # the report.generate / report.email events it emits.
+      - KAFKA_BOOTSTRAP=kafka-staging:9092
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+          cpus: "3.0"          # the worker's render budget
+    depends_on:
+      mysql_db_staging:
+        condition: service_healthy
+      redis_staging:
+        condition: service_healthy
+      kafka-staging:
+        condition: service_started
     networks:
       - career_staging_net
 
@@ -346,6 +426,7 @@ volumes:
   redis_staging_data:
   redisinsight_data:
   kafka_data:
+  kafka_staging_data:
 
 networks:
   career_shared_net:

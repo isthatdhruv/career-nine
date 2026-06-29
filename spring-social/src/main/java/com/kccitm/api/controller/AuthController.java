@@ -59,6 +59,8 @@ import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.UserActivityLogService;
 import com.kccitm.api.model.career9.UserStudent;
@@ -81,6 +83,9 @@ public class AuthController {
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
     @Autowired
     private SmtpEmailService smtpEmailService;
+
+    @Autowired
+    private EmailDispatchService emailDispatchService;
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -679,7 +684,7 @@ public class AuthController {
 
         String resetLink = buildResetLink(token);
         try {
-            smtpEmailService.sendHtmlEmail(
+            emailDispatchService.sendHtml(EmailType.PASSWORD_RESET,
                     user.getEmail(),
                     "Reset your Career-9 password",
                     buildResetEmailHtml(user.getName(), resetLink));
@@ -726,7 +731,7 @@ public class AuthController {
         passwordResetTokenRepository.save(token);
 
         try {
-            smtpEmailService.sendHtmlEmail(
+            emailDispatchService.sendHtml(EmailType.PASSWORD_RESET_CONFIRM,
                     user.getEmail(),
                     "Your Career-9 password was reset",
                     buildResetConfirmationHtml(user.getName()));
