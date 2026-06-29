@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.email.EmailAccountForm;
@@ -94,6 +95,24 @@ public class EmailAccountController {
         out.put("error", result.getError());
         out.put("logId", result.getLogId());
         return ResponseEntity.ok(out);
+    }
+
+    /** Test credentials BEFORE saving — builds a transient account from the form and sends a test. */
+    @PreAuthorize("@auth.allows('email_account.test')")
+    @PostMapping("/test-connection")
+    public ResponseEntity<?> testConnection(@RequestBody EmailAccountForm form,
+                                            @RequestParam(required = false) String to) {
+        try {
+            EmailSendResult result = accountService.sendTestDraft(form, to);
+            Map<String, Object> out = new HashMap<>();
+            out.put("success", result.isSuccess());
+            out.put("status", result.getStatus() != null ? result.getStatus().name() : null);
+            out.put("error", result.getError());
+            out.put("logId", result.getLogId());
+            return ResponseEntity.ok(out);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(error(e.getMessage()));
+        }
     }
 
     private Long currentUserId() {

@@ -84,3 +84,11 @@ export function deleteEmailAccount(id: number) {
 export function testEmailAccount(id: number, to: string) {
   return axios.post<EmailAccountTestResult>(`${API_URL}/email-accounts/${id}/test`, { to });
 }
+
+// Test credentials BEFORE saving — sends a real test through a transient (unsaved) account.
+export function testEmailAccountConnection(payload: EmailAccountPayload, to: string) {
+  return axios.post<EmailAccountTestResult>(
+    `${API_URL}/email-accounts/test-connection?to=${encodeURIComponent(to)}`,
+    payload
+  );
+}

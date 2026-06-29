@@ -8,6 +8,7 @@ import {
   EmailMode,
   EmailProvider,
   createEmailAccount,
+  testEmailAccountConnection,
   updateEmailAccount,
 } from "../API/EmailAccount_APIs";
 
@@ -64,6 +65,9 @@ const EmailAccountModal = ({ show, onHide, account, onSaved }: Props) => {
   const [active, setActive] = useState(true);
   const [creds, setCreds] = useState<CredentialForm>(EMPTY_CREDS);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testTo, setTestTo] = useState("");
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     if (!show) return;
@@ -88,6 +92,8 @@ const EmailAccountModal = ({ show, onHide, account, onSaved }: Props) => {
       setActive(true);
       setCreds(EMPTY_CREDS);
     }
+    setTestTo("");
+    setTestResult(null);
   }, [show, account]);
 
   // Provider drives mode: ODOO has no mode; GMAIL defaults to API.
@@ -171,6 +177,57 @@ const EmailAccountModal = ({ show, onHide, account, onSaved }: Props) => {
       showErrorToast(msg);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Pre-save credential check: build a transient account from the form and send a real
+  // test through it. Saved secrets are write-only (never returned), so this tests only
+  // what's currently entered in the form.
+  const handleTest = async () => {
+    if (!fromEmail.trim()) {
+      showErrorToast("From email is required to test");
+      return;
+    }
+    if (!testTo.trim()) {
+      showErrorToast("Enter a recipient email to send the test to");
+      return;
+    }
+    const credentials = buildCredentials();
+    if (!credentials) {
+      showErrorToast("Enter the credentials you want to test");
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const payload: EmailAccountPayload = {
+        name: name.trim() || "Connection test",
+        provider,
+        mode: provider === "GMAIL" ? mode : null,
+        fromEmail: fromEmail.trim(),
+        fromName: fromName.trim(),
+        isGlobalDefault: false,
+        active: true,
+        credentials,
+      };
+      const { data } = await testEmailAccountConnection(payload, testTo.trim());
+      if (data.success) {
+        setTestResult({
+          success: true,
+          message: `Test email sent to ${testTo.trim()} via ${provider}${mode ? "/" + mode : ""}.`,
+        });
+        showSuccessToast("Test email sent");
+      } else {
+        setTestResult({ success: false, message: data.error || "The provider rejected the send." });
+        showErrorToast(data.error || "Test failed");
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error || err?.response?.data?.message || err?.message || "Test failed";
+      setTestResult({ success: false, message: msg });
+      showErrorToast(msg);
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -463,22 +520,52 @@ const EmailAccountModal = ({ show, onHide, account, onSaved }: Props) => {
               </div>
             )}
           </div>
+
+          {testResult && (
+            <div
+              className={`mt-3 alert ${testResult.success ? "alert-success" : "alert-danger"} py-2 mb-0`}
+              style={{ fontSize: "0.82rem", borderRadius: "8px" }}
+            >
+              <i className={`bi ${testResult.success ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-2`}></i>
+              {testResult.message}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "0.75rem 1.5rem", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-          <button className="btn btn-sm btn-light" onClick={onHide} style={{ borderRadius: "6px" }}>Cancel</button>
-          <button
-            className="btn btn-sm"
-            onClick={handleSave}
-            disabled={saving}
-            style={{
-              background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-              color: "#fff", border: "none", borderRadius: "6px", fontWeight: 600, padding: "6px 16px",
-            }}
-          >
-            {saving ? <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</> : <><ActionIcon type="approve" size="sm" className="me-1" />Save</>}
-          </button>
+        <div style={{ padding: "0.75rem 1.5rem", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <div className="d-flex align-items-center gap-2">
+            <input
+              className="form-control form-control-sm"
+              style={{ ...inputStyle, width: "200px" }}
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder="recipient to test-send to"
+            />
+            <button
+              className="btn btn-sm btn-outline-primary"
+              onClick={handleTest}
+              disabled={testing}
+              style={{ borderRadius: "6px", whiteSpace: "nowrap" }}
+              title="Send a test email through the entered credentials without saving"
+            >
+              {testing ? <><span className="spinner-border spinner-border-sm me-1"></span>Testing...</> : <><i className="bi bi-plug-fill me-1"></i>Test connection</>}
+            </button>
+          </div>
+          <div className="d-flex align-items-center gap-2">
+            <button className="btn btn-sm btn-light" onClick={onHide} style={{ borderRadius: "6px" }}>Cancel</button>
+            <button
+              className="btn btn-sm"
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                color: "#fff", border: "none", borderRadius: "6px", fontWeight: 600, padding: "6px 16px",
+              }}
+            >
+              {saving ? <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</> : <><ActionIcon type="approve" size="sm" className="me-1" />Save</>}
+            </button>
+          </div>
         </div>
       </div>
     </div>

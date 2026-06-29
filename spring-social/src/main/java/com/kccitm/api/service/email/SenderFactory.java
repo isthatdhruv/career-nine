@@ -26,6 +26,10 @@ public class SenderFactory {
     private final ConcurrentHashMap<String, ConfiguredEmailSender> cache = new ConcurrentHashMap<>();
 
     public ConfiguredEmailSender forAccount(EmailAccount account) {
+        if (account.getId() == null) {
+            // Transient draft (pre-save "test connection") — build fresh, never cache.
+            return build(account);
+        }
         long version = account.getUpdatedAt() != null ? account.getUpdatedAt().getTime() : 0L;
         String key = account.getId() + ":" + version;
         return cache.computeIfAbsent(key, k -> build(account));

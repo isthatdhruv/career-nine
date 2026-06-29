@@ -78,6 +78,17 @@ public class EmailAccountService {
         return dispatchService.sendTestThroughAccount(a, to);
     }
 
+    /**
+     * Test a NOT-yet-saved account (pre-save credential check) by sending a real test
+     * email through the draft's credentials. Persists nothing.
+     */
+    public EmailSendResult sendTestDraft(EmailAccountForm form, String to) {
+        validate(form, true);
+        EmailAccount draft = new EmailAccount();
+        apply(draft, form, null, true);
+        return dispatchService.sendTestThroughAccount(draft, to);
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────────
 
     private void validate(EmailAccountForm form, boolean isCreate) {
