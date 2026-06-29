@@ -29,18 +29,35 @@ public class GmailSmtpSender implements ConfiguredEmailSender {
         this.fromEmail = account.getFromEmail();
         this.fromName = account.getFromName();
 
+        // Blank (not just null) host/port/username fall back to sane Gmail defaults —
+        // otherwise an empty host makes JavaMail dial localhost:0.
+        String host = notBlank(creds.getSmtpHost()) ? creds.getSmtpHost().trim() : "smtp.gmail.com";
+        int port = (creds.getSmtpPort() != null && creds.getSmtpPort() > 0) ? creds.getSmtpPort() : 587;
+        String username = notBlank(creds.getSmtpUsername()) ? creds.getSmtpUsername().trim() : account.getFromEmail();
+
         JavaMailSenderImpl sender = new JavaMailSenderImpl();
-        sender.setHost(creds.getSmtpHost() != null ? creds.getSmtpHost() : "smtp.gmail.com");
-        sender.setPort(creds.getSmtpPort() != null ? creds.getSmtpPort() : 587);
-        sender.setUsername(creds.getSmtpUsername() != null ? creds.getSmtpUsername() : account.getFromEmail());
+        sender.setHost(host);
+        sender.setPort(port);
+        sender.setUsername(username);
         sender.setPassword(creds.getSmtpPassword());
         sender.setDefaultEncoding("UTF-8");
 
         Properties props = sender.getJavaMailProperties();
         props.put("mail.transport.protocol", "smtp");
         props.put("mail.smtp.auth", "true");
-        boolean starttls = creds.getSmtpStarttls() == null || creds.getSmtpStarttls();
-        props.put("mail.smtp.starttls.enable", String.valueOf(starttls));
+        // Fail fast (~10s) instead of hanging when the port is unreachable — e.g.
+        // DigitalOcean blocks outbound SMTP 25/465/587, so use Gmail API mode there.
+        props.put("mail.smtp.connectiontimeout", "10000");
+        props.put("mail.smtp.timeout", "10000");
+        props.put("mail.smtp.writetimeout", "10000");
+        if (port == 465) {
+            // Port 465 = implicit TLS (SMTPS): TLS on connect, NOT STARTTLS.
+            props.put("mail.smtp.ssl.enable", "true");
+        } else {
+            // Port 587 (and others) = STARTTLS upgrade.
+            boolean starttls = creds.getSmtpStarttls() == null || creds.getSmtpStarttls();
+            props.put("mail.smtp.starttls.enable", String.valueOf(starttls));
+        }
         this.mailSender = sender;
     }
 
@@ -80,5 +97,9 @@ public class GmailSmtpSender implements ConfiguredEmailSender {
             }
         }
         mailSender.send(message);
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.trim().isEmpty();
     }
 }
