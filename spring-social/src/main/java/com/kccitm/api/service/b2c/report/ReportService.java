@@ -15,22 +15,23 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.GeneratedReport;
-import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.model.career9.ReportTemplate;
+import com.kccitm.api.model.career9.report.AssessmentReportTemplate;
 import com.kccitm.api.model.career9.report.CalculatedReportData;
 import com.kccitm.api.model.career9.report.IntermediaryScoresRow;
-import com.kccitm.api.model.career9.report.QuestionnaireReportTemplate;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.repository.Career9.ReportTemplateRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.Career9.report.AssessmentReportTemplateRepository;
 import com.kccitm.api.repository.Career9.report.CalculatedReportDataRepository;
 import com.kccitm.api.repository.Career9.report.IntermediaryScoresRepository;
-import com.kccitm.api.repository.Career9.report.QuestionnaireReportTemplateRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
+import com.kccitm.api.service.Navigator.NavigatorReportGenerationService.IntermediaryScores;
+import com.kccitm.api.service.b2c.pager.Navigator360EngineService;
+import com.kccitm.api.service.b2c.pager.Navigator360Models.Navigator360Result;
 import com.kccitm.api.service.b2c.pager.PagerScoreSource;
 import com.kccitm.api.service.b2c.report.SanityCheckService.SanityResult;
 
@@ -43,8 +44,8 @@ import com.kccitm.api.service.b2c.report.SanityCheckService.SanityResult;
  * <ol>
  *   <li>Sanity pre-flight (mapping completed).</li>
  *   <li>Resolve the {@link ReportTemplate}: an explicit {@code reportTemplateId}
- *       (validated to belong to the assessment's questionnaire), else the
- *       questionnaire's default template.</li>
+ *       (validated to belong to the assessment), else the assessment's default
+ *       template.</li>
  *   <li>If the strategy uses intermediary scores: load the cached
  *       {@code intermediary_scores} row OR compute via {@link PagerScoreSource}.</li>
  *   <li>Load the cached {@code calculated_report_data} row (keyed by template)
@@ -62,9 +63,10 @@ public class ReportService {
 
     @Autowired private SanityCheckService sanityCheckService;
     @Autowired private PagerScoreSource pagerScoreSource;
+    @Autowired private Navigator360EngineService navigator360EngineService;
 
     @Autowired private ReportTemplateRepository reportTemplateRepository;
-    @Autowired private QuestionnaireReportTemplateRepository questionnaireReportTemplateRepository;
+    @Autowired private AssessmentReportTemplateRepository assessmentReportTemplateRepository;
     @Autowired private IntermediaryScoresRepository intermediaryScoresRepository;
     @Autowired private CalculatedReportDataRepository calculatedReportDataRepository;
     @Autowired private GeneratedReportRepository generatedReportRepository;
@@ -92,7 +94,7 @@ public class ReportService {
 
     /**
      * @param reportTemplateId explicit template id, or {@code null} to use the
-     *                         questionnaire's default template.
+     *                         assessment's default template.
      */
     public ReportResult generate(Long userStudentId, Long assessmentId,
                                  Long reportTemplateId, boolean force) {
@@ -102,14 +104,11 @@ public class ReportService {
             throw new SanityFailedException(sanity.code, sanity.reason);
         }
 
-        // 2. Resolve the template (explicit id or questionnaire default)
-        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                .orElseThrow(() -> new ReportRoutingException("Assessment not found: " + assessmentId));
-        Questionnaire q = assessment.getQuestionnaire();
-        if (q == null) {
-            throw new ReportRoutingException("Assessment " + assessmentId + " has no questionnaire");
+        // 2. Resolve the template (explicit id or the assessment's default)
+        if (!assessmentTableRepository.existsById(assessmentId)) {
+            throw new ReportRoutingException("Assessment not found: " + assessmentId);
         }
-        ReportTemplate template = resolveTemplate(q.getQuestionnaireId(), reportTemplateId);
+        ReportTemplate template = resolveTemplate(assessmentId, reportTemplateId);
 
         if (template.getEngineCode() == null || template.getEngineCode().trim().isEmpty()) {
             throw new ReportRoutingException("Template " + template.getReportTemplateId()
@@ -190,6 +189,24 @@ public class ReportService {
         GeneratedReport gr = upsertGeneratedReport(userStudentId, assessmentId, template,
                 reportUrl, pdfUrl, pdfStatus);
 
+        // 7b. Precompute + persist the Navigator 360 dashboard payload (pager engine only)
+        // so the student portal renders it directly — ready the moment the report is
+        // generated, no recompute on read. Fails soft: the report is already saved.
+        if ("pager".equalsIgnoreCase(template.getEngineCode())) {
+            try {
+                IntermediaryScores navScores = pagerScoreSource.getIntermediaryScores(userStudentId, assessmentId);
+                if (navScores != null) {
+                    Navigator360Result navResult =
+                            navigator360EngineService.computeNavigator360(navScores, null, null, 1.0);
+                    gr.setNavigatorDashboardJson(objectMapper.writeValueAsString(navResult));
+                    generatedReportRepository.save(gr);
+                }
+            } catch (Exception e) {
+                logger.warn("Navigator dashboard JSON persist failed (report still generated) "
+                        + "student={} assessment={}: {}", userStudentId, assessmentId, e.getMessage());
+            }
+        }
+
         return new ReportResult(reportUrl, template.getEngineCode(), templateLabel(template),
                 calcRow.getCalculatedAt(), gr.getUpdatedAt(), reusedCalc,
                 gr.getPdfUrl(), gr.getPdfStatus());
@@ -199,37 +216,37 @@ public class ReportService {
 
     /**
      * Resolves the template to render. Explicit id wins (validated to belong to
-     * the questionnaire). Otherwise the questionnaire's default; if no default
-     * flag is set but exactly one template is mapped, it is adopted and flagged
-     * default. Empty mapping → routing error.
+     * the assessment). Otherwise the assessment's default; if no default flag is
+     * set but exactly one template is mapped, it is adopted and flagged default.
+     * Empty mapping → routing error.
      */
-    private ReportTemplate resolveTemplate(Long questionnaireId, Long reportTemplateId) {
+    private ReportTemplate resolveTemplate(Long assessmentId, Long reportTemplateId) {
         if (reportTemplateId != null) {
-            QuestionnaireReportTemplate link = questionnaireReportTemplateRepository
-                    .findByQuestionnaireIdAndReportTemplate_Id(questionnaireId, reportTemplateId)
+            AssessmentReportTemplate link = assessmentReportTemplateRepository
+                    .findByAssessmentIdAndReportTemplate_Id(assessmentId, reportTemplateId)
                     .orElseThrow(() -> new ReportRoutingException(
-                            "Template " + reportTemplateId + " is not mapped to questionnaire " + questionnaireId));
+                            "Template " + reportTemplateId + " is not mapped to assessment " + assessmentId));
             return link.getReportTemplate();
         }
 
-        Optional<QuestionnaireReportTemplate> def = questionnaireReportTemplateRepository
-                .findByQuestionnaireIdAndIsDefaultTrue(questionnaireId);
+        Optional<AssessmentReportTemplate> def = assessmentReportTemplateRepository
+                .findByAssessmentIdAndIsDefaultTrue(assessmentId);
         if (def.isPresent()) {
             return def.get().getReportTemplate();
         }
 
-        List<QuestionnaireReportTemplate> all = questionnaireReportTemplateRepository
-                .findByQuestionnaireId(questionnaireId);
+        List<AssessmentReportTemplate> all = assessmentReportTemplateRepository
+                .findByAssessmentId(assessmentId);
         if (all.isEmpty()) {
-            throw new ReportRoutingException("No template mapped to questionnaire " + questionnaireId);
+            throw new ReportRoutingException("No template mapped to assessment " + assessmentId);
         }
         if (all.size() == 1) {
-            QuestionnaireReportTemplate only = all.get(0);
+            AssessmentReportTemplate only = all.get(0);
             only.setIsDefault(true);
-            questionnaireReportTemplateRepository.save(only);
+            assessmentReportTemplateRepository.save(only);
             return only.getReportTemplate();
         }
-        throw new ReportRoutingException("Questionnaire " + questionnaireId
+        throw new ReportRoutingException("Assessment " + assessmentId
                 + " has multiple templates but no default — pass a reportTemplateId or set a default");
     }
 

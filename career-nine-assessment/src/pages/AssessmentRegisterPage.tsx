@@ -8,6 +8,7 @@ import {
   MappingInfo,
 } from "../api-clients/assessmentMappingAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
+import { validateReferralCode } from "../api-clients/referralCodeAPI"
 import { TierCard, Tier } from "../components/TierCard"
 
 const AssessmentRegisterPage = () => {
@@ -40,6 +41,13 @@ const AssessmentRegisterPage = () => {
   const [promoApplied, setPromoApplied] = useState<{ code: string; discountPercent: number } | null>(null)
   const [promoError, setPromoError] = useState("")
   const [promoValidating, setPromoValidating] = useState(false)
+
+  // Referral code
+  const [hasReferral, setHasReferral] = useState(false)
+  const [referralCode, setReferralCode] = useState("")
+  const [referralApplied, setReferralApplied] = useState<{ code: string; name?: string } | null>(null)
+  const [referralError, setReferralError] = useState("")
+  const [referralValidating, setReferralValidating] = useState(false)
 
   useEffect(() => {
     if (token) {
@@ -118,6 +126,33 @@ const AssessmentRegisterPage = () => {
     setPromoError("")
   }
 
+  const handleApplyReferral = async () => {
+    if (!referralCode.trim()) return
+    const assessmentId = mappingInfo?.assessmentId
+    if (!assessmentId) {
+      setReferralError("Could not determine the assessment. Please reload.")
+      return
+    }
+    setReferralValidating(true)
+    setReferralError("")
+    setReferralApplied(null)
+    try {
+      const res = await validateReferralCode(referralCode.trim(), assessmentId)
+      setReferralApplied({ code: res.data.code, name: res.data.name })
+    } catch (err: any) {
+      const msg = err.response?.data || "Invalid referral code"
+      setReferralError(typeof msg === "string" ? msg : "Invalid referral code")
+    } finally {
+      setReferralValidating(false)
+    }
+  }
+
+  const handleRemoveReferral = () => {
+    setReferralApplied(null)
+    setReferralCode("")
+    setReferralError("")
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -158,6 +193,10 @@ const AssessmentRegisterPage = () => {
 
       if (promoApplied) {
         data.promoCode = promoApplied.code
+      }
+
+      if (referralApplied) {
+        data.referralCode = referralApplied.code
       }
 
       const res = await registerStudentByToken(token!, data)
@@ -861,6 +900,89 @@ const AssessmentRegisterPage = () => {
                 )}
               </div>
             )}
+
+            {/* Referral Code — available for free and paid links */}
+            <div>
+              {!hasReferral && !referralApplied ? (
+                <button
+                  type="button"
+                  onClick={() => setHasReferral(true)}
+                  style={{
+                    background: "none", border: "none", padding: 0,
+                    color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+                  }}
+                >
+                  + Have a referral code?
+                </button>
+              ) : (
+                <>
+                  <label style={s.label}>Referral Code</label>
+                  {referralApplied ? (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
+                      border: "1.5px solid #6ee7b7",
+                      borderRadius: 12, padding: "12px 18px",
+                    }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: "50%",
+                        background: "#d1fae5", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.85rem", color: "#059669",
+                      }}>
+                        &#10003;
+                      </div>
+                      <span style={{ color: "#065f46", fontWeight: 700, flex: 1, fontSize: "0.92rem" }}>
+                        {referralApplied.code}{referralApplied.name ? ` — ${referralApplied.name}` : ""}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRemoveReferral}
+                        style={{
+                          background: "none", border: "1.5px solid #fca5a5",
+                          borderRadius: 8, padding: "4px 12px", color: "#ef4444",
+                          fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <input
+                        type="text"
+                        placeholder="Enter referral code"
+                        value={referralCode}
+                        onChange={(e) => {
+                          setReferralCode(e.target.value.toUpperCase())
+                          setReferralError("")
+                        }}
+                        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyReferral())}
+                        style={{ ...s.input, flex: 1, marginBottom: 0 }}
+                        onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                        onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplyReferral}
+                        disabled={referralValidating || !referralCode.trim()}
+                        style={{
+                          ...s.btnOutline,
+                          opacity: referralValidating || !referralCode.trim() ? 0.5 : 1,
+                          cursor: referralValidating || !referralCode.trim() ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        {referralValidating ? "..." : "Verify"}
+                      </button>
+                    </div>
+                  )}
+                  {referralError && (
+                    <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: 6 }}>
+                      {referralError}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Submit Button */}

@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
-import { Link } from "react-router-dom";
-import { ReadQuestionaireDataList, DeleteQuestionaire } from "../../API/Create_Questionaire_APIs";
-import { MdDelete } from "react-icons/md";
+import { Link, useNavigate } from "react-router-dom";
+import { ReadQuestionaireDataList, DeleteQuestionaire, DuplicateQuestionaire } from "../../API/Create_Questionaire_APIs";
+import { MdDelete, MdContentCopy } from "react-icons/md";
 import QuestionnaireRecycleBinModal from "./QuestionnaireRecycleBinModal";
 import PageHeader from "../../../../components/PageHeader";
 
 const QuestionaireListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
-  
+  const navigate = useNavigate();
+
   const [datatable, setDatatable] = useState({
     columns: [
       {
@@ -65,6 +66,20 @@ const QuestionaireListPage: React.FC = () => {
     }
   };
 
+  const handleDuplicate = async (id: number) => {
+    try {
+      const response = await DuplicateQuestionaire(String(id));
+      const newId = response.data?.questionnaireId;
+      if (newId) {
+        navigate(`/questionare/edit/${newId}`);
+      } else {
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Error duplicating questionnaire:", error);
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -85,6 +100,13 @@ const QuestionaireListPage: React.FC = () => {
             >
               Edit
             </Link>
+            <button
+              className="btn btn-sm btn-light-info"
+              title="Duplicate"
+              onClick={() => handleDuplicate(item.questionnaireId)}
+            >
+              <MdContentCopy size={14} />
+            </button>
             <button
               className="btn btn-sm btn-light-danger"
               onClick={() => handleSoftDelete(item.questionnaireId, item.name || `ID: ${item.questionnaireId}`)}

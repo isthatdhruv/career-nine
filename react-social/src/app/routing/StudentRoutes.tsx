@@ -65,7 +65,7 @@ const StudentFallback: FC = () => (
 const StudentAuthGuard: FC = () => {
   const { currentUser } = useAuth()
   if (!currentUser) {
-    return <Navigate to='/student/login' replace />
+    return <Navigate to='/auth/login' replace />
   }
   // Super-admin is a full bypass — matches the predicate in
   // modules/auth/core/permissions.ts and the backend AuthorizationService.
@@ -82,7 +82,7 @@ const StudentAuthGuard: FC = () => {
     (r) => r === 'STUDENT' || r === 'B2C_STUDENT' || r === 'ROLE_STUDENT' || r === 'ROLE_B2C_STUDENT'
   )
   if (!isStudent) {
-    return <Navigate to='/student/login' replace />
+    return <Navigate to='/auth/login' replace />
   }
   return <Outlet />
 }

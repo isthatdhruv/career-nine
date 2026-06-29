@@ -21,7 +21,7 @@ import {
 import {
   ReadAssessmentTemplates,
   GenerateUnifiedReport,
-  QuestionnaireTemplateMappingDto,
+  TemplateMappingDto,
 } from "../ReportTemplates/API/Report_Templates_APIs";
 import { generateAndExportNavigatorExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
 import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
@@ -130,8 +130,8 @@ const ReportsHubPage: React.FC = () => {
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
   const [mappedAssessmentIds, setMappedAssessmentIds] = useState<Set<number> | null>(null);
 
-  // Report templates mapped to the selected assessment's questionnaire.
-  const [templates, setTemplates] = useState<QuestionnaireTemplateMappingDto[]>([]);
+  // Report templates mapped to the selected assessment.
+  const [templates, setTemplates] = useState<TemplateMappingDto[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | "">("");
 
   // ── Students ──
@@ -359,7 +359,7 @@ const ReportsHubPage: React.FC = () => {
     }
   }, [selectedAssessmentObj, matchesTemplate]);
 
-  // Load the templates mapped to this assessment's questionnaire; preselect the
+  // Load the templates mapped to this assessment; preselect the
   // default (else the first) so generation has a target.
   useEffect(() => {
     if (!selectedAssessmentObj) { setTemplates([]); setSelectedTemplateId(""); return; }
@@ -531,7 +531,7 @@ const ReportsHubPage: React.FC = () => {
     const ids = getSelectedOrAllIds();
     if (ids.length === 0) { showErrorToast("Select at least one student."); return; }
     if (templates.length === 0) {
-      showErrorToast("No report template is mapped to this assessment's questionnaire. Map one in Report Templates first.");
+      showErrorToast("No report template is mapped to this assessment. Map one in Report Templates or the assessment editor first.");
       return;
     }
     const list: ModalStudent[] = ids.map((id) => {
@@ -1067,7 +1067,7 @@ const ReportsHubPage: React.FC = () => {
                     value={selectedTemplateId}
                     onChange={(e) => setSelectedTemplateId(e.target.value === "" ? "" : Number(e.target.value))}
                     disabled={templates.length === 0}
-                    title={templates.length === 0 ? "No template mapped to this assessment's questionnaire" : "Template to generate"}
+                    title={templates.length === 0 ? "No template mapped to this assessment" : "Template to generate"}
                   >
                     {templates.length === 0 ? (
                       <option value="">No template mapped</option>

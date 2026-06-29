@@ -1866,10 +1866,10 @@ public class StudentInfoController {
             }
             String dob = new SimpleDateFormat("dd-MM-yyyy").format(info.getStudentDob());
 
-            // Hand off to the Odoo-backed templated email service. Note that
-            // OdooEmailService is @Async fire-and-forget — the actual SMTP
-            // dispatch happens later; eventual send success/failure shows up
-            // only in OdooEmailService logs. So per-row status here is
+            // Hand off to the Gmail-backed templated email service. Note that
+            // the Gmail send is @Async fire-and-forget — the actual dispatch
+            // happens later; eventual send success/failure shows up
+            // only in SmtpEmailService logs. So per-row status here is
             // "queued" once validation passes, not "sent". Anything thrown
             // synchronously (validation guard or pre-queue error) is reported
             // as "failed" with the reason.
@@ -1888,9 +1888,9 @@ public class StudentInfoController {
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("requested", userStudentIds.size());
-        // `sent` here means "queued for Odoo dispatch" — the FE label reads
+        // `sent` here means "queued for Gmail dispatch" — the FE label reads
         // "Sent to N students" which matches user expectation even though the
-        // actual SMTP handshake happens asynchronously.
+        // actual send happens asynchronously.
         resp.put("sent", sent);
         resp.put("failed", failed);
         resp.put("results", results);

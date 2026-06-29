@@ -8,6 +8,7 @@ import CounsellingSlotPicker from '../components/CounsellingSlotPicker';
 import MappingCounsellingSection from '../components/MappingCounsellingSection';
 import FeatureUpsellModal, { UpsellFeature } from '../components/FeatureUpsellModal';
 import { downloadHtmlAsPdf } from '../utils/htmlToPdf';
+import { apiUrl } from '../utils/apiUrl';
 
 type UpgradeInfo = {
     entitlementId: number;
@@ -503,7 +504,7 @@ const ThankYouPage: React.FC = () => {
             if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
 
             const res = await fetch(
-                `${import.meta.env.VITE_API_URL}/assessment-answer/feedback-rating`,
+                apiUrl('/assessment-answer/feedback-rating'),
                 {
                     method: 'PUT',
                     credentials: 'include', // Phase 19: send cn_at_asmnt cookie on rating submit

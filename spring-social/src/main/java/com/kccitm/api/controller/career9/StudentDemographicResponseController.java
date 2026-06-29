@@ -104,8 +104,8 @@ public class StudentDemographicResponseController {
             errors.add("Invalid email format");
         }
         if (phoneNumber != null && !phoneNumber.trim().isEmpty()
-                && !Pattern.matches("^[0-9]{10}$", phoneNumber.trim())) {
-            errors.add("Phone number must be 10 digits");
+                && !Pattern.matches("^[0-9]{8,10}$", phoneNumber.trim())) {
+            errors.add("Phone number must be 8 to 10 digits");
         }
         if (!errors.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("validationErrors", errors));

@@ -1,3 +1,5 @@
+import { apiUrl } from "../utils/apiUrl"
+
 /**
  * Background partial save of student answers to Redis (crash-recovery copy).
  * Called on section transitions and pagehide.
@@ -31,7 +33,7 @@ export async function savePartialAnswers(payload: Record<string, any>): Promise<
   const body = JSON.stringify(payload)
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/assessment-answer/save-partial`, {
+      const res = await fetch(apiUrl("/assessment-answer/save-partial"), {
         method: "POST",
         credentials: "include", // Phase 19: send cn_at_asmnt cookie on the partial-save call
         headers,
@@ -66,7 +68,7 @@ export async function restorePartialAnswers(
 ): Promise<{ answers: any[]; savedAt?: string } | null> {
   try {
     const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/assessment-answer/partial-restore/${studentId}/${assessmentId}`,
+      apiUrl(`/assessment-answer/partial-restore/${studentId}/${assessmentId}`),
       {
         method: "GET",
         credentials: "include",

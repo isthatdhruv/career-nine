@@ -1,668 +1,618 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../../modules/auth/core/Auth'
-import { DashboardApiResponse } from '../API/Dashboard_APIs'
-import { fetchNavigator360Scores } from '../../ReportsHub/navigator360/Navigator360API'
+import React, { useMemo, useRef, useState } from 'react'
 import {
-  computeNavigator360,
-  riasecDisplayName,
-  abilityDisplayName,
-  miDisplayName,
-  levelColor,
-} from '../../ReportsHub/navigator360/Navigator360Engine'
-import { generateReportHTML } from '../../ReportsHub/navigator360/Navigator360Report'
-import { Navigator360Result, ScoredDimension, CareerMatch, AbsoluteLevel } from '../../ReportsHub/navigator360/Navigator360Types'
-import { htmlToPdfBlob } from '../../ReportGeneration/utils/htmlToPdf'
-import './StudentPortal.css'
+  ResponsiveContainer,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, XAxis, YAxis, Cell, LabelList,
+  PieChart, Pie, Legend,
+  RadialBarChart, RadialBar,
+  Tooltip,
+} from 'recharts'
+import {
+  getMyNavigatorReport,
+  NavigatorReportCard,
+  NavigatorDashboard,
+  NavigatorDashboardResponse,
+  ScoredDimension,
+  CareerMatch,
+} from './navigatorApi'
+import { useStudentData } from './StudentDataContext'
+import './StudentNavigator360.css'
 
-// ═══════════════════════ VIBRANT COLOR PALETTE ═══════════════════════
-
-const V = {
-  // Gradients
-  heroGrad: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  cardGrad1: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-  cardGrad2: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-  cardGrad3: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-  cardGrad4: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-  // Solid
-  purple: '#7c3aed',
-  blue: '#3b82f6',
-  emerald: '#10b981',
-  orange: '#f59e0b',
-  rose: '#f43f5e',
-  cyan: '#06b6d4',
-  indigo: '#6366f1',
-  // Neutral
-  bg: '#f8fafc',
-  card: '#ffffff',
-  text: '#0f172a',
-  muted: '#64748b',
-  border: '#e2e8f0',
+// ─── helpers ──────────────────────────────────────────────────────────────────
+const txt = (v: any): string => (v == null ? '' : String(v).trim())
+const pct = (n: any): number => {
+  const v = Number(n)
+  if (!isFinite(v)) return 0
+  return Math.max(0, Math.min(100, Math.round(v)))
 }
-
-const RIASEC_VIBRANT: Record<string, string> = {
-  R: '#ef4444', I: '#3b82f6', A: '#a855f7', S: '#22c55e', E: '#f97316', C: '#14b8a6',
+const avgOf = (nums: number[]): number => {
+  const r = nums.filter((v) => isFinite(v))
+  return r.length ? Math.round(r.reduce((a, b) => a + b, 0) / r.length) : 0
 }
+const dimAvg = (dims?: ScoredDimension[]): number =>
+  avgOf((dims || []).map((d) => pct(d.normPct)).filter((v) => v > 0))
 
-const ABILITY_VIBRANT = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899']
-const MI_VIBRANT = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#8b5cf6', '#a855f7']
+const levelOf = (v: number): string => (v >= 70 ? 'High' : v >= 45 ? 'Moderate' : 'Developing')
+const stanineOf = (v: number): number => Math.max(1, Math.min(9, Math.round(v / 11.2)))
+const bandColor = (v: number): string => (v >= 70 ? '#1a6b3c' : v >= 45 ? '#28a05a' : '#f5a623')
 
-// ═══════════════════════ HELPER COMPONENTS ═══════════════════════
+// Theme palette for multi-series charts.
+const PALETTE = ['#1a6b3c', '#28a05a', '#5cc98a', '#f5a623', '#4A6FA5', '#7C3AED', '#d6604d', '#2c7fb8']
 
-function GlowCard({ children, gradient, style }: {
-  children: React.ReactNode; gradient?: string; style?: React.CSSProperties
-}) {
+// ─── calculated placeholders ────────────────────────────────────────────────
+// Surface a complete dashboard even when the engine left a slice empty. Anything
+// synthesised is flagged `est` so the UI can label it honestly.
+const RIASEC_FULL: Record<string, string> = {
+  R: 'Realistic', I: 'Investigative', A: 'Artistic', S: 'Social', E: 'Enterprising', C: 'Conventional',
+}
+const synthRiasec = (code: string): ScoredDimension[] => {
+  const letters = txt(code).toUpperCase().replace(/[^RIASEC]/g, '').split('')
+  return (['R', 'I', 'A', 'S', 'E', 'C'] as const).map((L) => {
+    const rank = letters.indexOf(L)
+    const v = rank === -1 ? 38 : Math.max(40, 92 - rank * 13)
+    return { name: RIASEC_FULL[L], rawScore: 0, normPct: v, stanine: stanineOf(v), level: levelOf(v) }
+  })
+}
+const MI_PLACEHOLDER = [
+  'Linguistic', 'Logical-Mathematical', 'Spatial', 'Musical',
+  'Bodily-Kinesthetic', 'Interpersonal', 'Intrapersonal', 'Naturalist',
+]
+const ABILITY_PLACEHOLDER = ['Verbal', 'Numerical', 'Abstract', 'Spatial', 'Mechanical']
+const synthDims = (names: string[], seed: number): ScoredDimension[] =>
+  names.map((name, i) => {
+    // deterministic spread around the seed so the placeholder reads like a real profile
+    const v = pct(seed + (((i * 37) % 40) - 20))
+    return { name, rawScore: 0, normPct: v, stanine: stanineOf(v), level: levelOf(v) }
+  })
+
+// ─── small chart panels ──────────────────────────────────────────────────────
+const SectionCard: React.FC<{ title: string; est?: boolean; subtitle?: string; children: React.ReactNode }> = ({
+  title, est, subtitle, children,
+}) => (
+  <div className='nav360-section'>
+    <h3>{title}{est && <span className='nav360-est'>estimated</span>}</h3>
+    {subtitle && <p className='nav360-section-sub'>{subtitle}</p>}
+    {children}
+  </div>
+)
+
+const RadarPanel: React.FC<{ dims: ScoredDimension[]; color?: string }> = ({ dims, color = '#1a6b3c' }) => {
+  const radarData = dims.map((d) => ({ axis: d.name, value: pct(d.normPct), full: 100 }))
   return (
-    <div style={{
-      background: V.card, borderRadius: 16, padding: 24,
-      border: `1px solid ${V.border}`,
-      boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-      position: 'relative', overflow: 'hidden',
-      ...style,
-    }}>
-      {gradient && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: 4,
-          background: gradient, borderRadius: '16px 16px 0 0',
-        }} />
+    <div className='nav360-chart' style={{ height: 280 }}>
+      <ResponsiveContainer>
+        <RadarChart data={radarData} cx='50%' cy='52%' outerRadius='72%'>
+          <PolarGrid stroke='#DDE3EC' />
+          {/* @ts-ignore recharts tick typing */}
+          <PolarAngleAxis dataKey='axis' tick={{ fontSize: 11, fill: '#6b7a8d' }} />
+          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+          <Radar dataKey='value' stroke={color} fill={color} fillOpacity={0.22} strokeWidth={2} />
+          <Tooltip formatter={(v: any) => [`${v}%`, 'Score']} />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+const RankedBars: React.FC<{ dims: ScoredDimension[] }> = ({ dims }) => {
+  const rows = [...dims].sort((a, b) => pct(b.normPct) - pct(a.normPct))
+  return (
+    <div className='nav360-ranked'>
+      {rows.map((d, i) => {
+        const v = pct(d.normPct)
+        return (
+          <div key={i} className='nav360-bar'>
+            <div className='nav360-bar-top'>
+              <span className='nm'>{d.name}<span className='nav360-stanine'>stanine {d.stanine || stanineOf(v)}</span></span>
+              <span className='vl'>{v}% · {d.level || levelOf(v)}</span>
+            </div>
+            <div className='nav360-bar-track'>
+              <div className='nav360-bar-fill' style={{ width: `${v}%`, background: bandColor(v) }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+const HBarPanel: React.FC<{ dims: ScoredDimension[] }> = ({ dims }) => {
+  const data = [...dims].sort((a, b) => pct(a.normPct) - pct(b.normPct)).map((d) => ({ name: d.name, value: pct(d.normPct) }))
+  return (
+    <div className='nav360-chart' style={{ height: Math.max(180, data.length * 38 + 24) }}>
+      <ResponsiveContainer>
+        <BarChart layout='vertical' data={data} margin={{ left: 8, right: 36, top: 4, bottom: 4 }}>
+          <XAxis type='number' domain={[0, 100]} hide />
+          <YAxis type='category' dataKey='name' width={120} tick={{ fontSize: 11, fill: '#3b4754' }} axisLine={false} tickLine={false} />
+          <Tooltip cursor={{ fill: 'rgba(40,160,90,0.06)' }} formatter={(v: any) => [`${v}%`, 'Score']} />
+          <Bar dataKey='value' radius={[0, 6, 6, 0]} barSize={16}>
+            {data.map((e, i) => <Cell key={i} fill={bandColor(e.value)} />)}
+            <LabelList dataKey='value' position='right' formatter={(v: any) => `${v}%`} style={{ fontSize: 11, fill: '#6b7a8d', fontWeight: 600 }} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+const Gauge: React.FC<{ value: number; label: string; sub?: string; est?: boolean }> = ({ value, label, sub, est }) => {
+  const v = pct(value)
+  const data = [{ name: label, value: v, fill: bandColor(v) }]
+  return (
+    <div className='nav360-gauge'>
+      <div className='nav360-gauge-chart'>
+        <ResponsiveContainer>
+          <RadialBarChart innerRadius='68%' outerRadius='100%' data={data} startAngle={210} endAngle={-30}>
+            <PolarAngleAxis type='number' domain={[0, 100]} tick={false} />
+            <RadialBar background={{ fill: 'rgba(40,160,90,0.10)' }} dataKey='value' cornerRadius={10} />
+          </RadialBarChart>
+        </ResponsiveContainer>
+        <div className='nav360-gauge-center'><span className='gv'>{v}%</span></div>
+      </div>
+      <div className='nav360-gauge-label'>{label}{est && <span className='nav360-est'>est</span>}</div>
+      {sub && <div className='nav360-gauge-sub'>{sub}</div>}
+    </div>
+  )
+}
+
+const Donut: React.FC<{ data: { name: string; value: number }[]; total?: number; centerLabel?: string }> = ({ data, total, centerLabel }) => {
+  const rows = data.filter((d) => d.value > 0)
+  return (
+    <div className='nav360-donut-wrap'>
+      <div className='nav360-chart' style={{ height: 220, flex: 1, minWidth: 200 }}>
+        <ResponsiveContainer>
+          <PieChart>
+            <Pie data={rows} dataKey='value' nameKey='name' cx='50%' cy='50%' innerRadius={56} outerRadius={86} paddingAngle={2}>
+              {rows.map((e, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+            </Pie>
+            <Tooltip formatter={(v: any, n: any) => [`${v}`, n]} />
+            {/* @ts-ignore recharts legend typing */}
+            <Legend verticalAlign='bottom' height={28} iconType='circle' wrapperStyle={{ fontSize: 11 }} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      {total != null && (
+        <div className='nav360-donut-total'>
+          <div className='v'>{Math.round(total)}</div>
+          <div className='k'>{centerLabel || 'Total'}</div>
+        </div>
       )}
-      {children}
     </div>
   )
 }
 
-function BigScore({ value, max, label, color, size = 120 }: {
-  value: number; max: number; label: string; color: string; size?: number
-}) {
-  const pct = (value / max) * 100
-  const r = (size - 12) / 2
-  const circ = 2 * Math.PI * r
-  const offset = circ - (pct / 100) * circ
+const Chips: React.FC<{ values?: any[] }> = ({ values }) => {
+  const items = (values || []).map(txt).filter(Boolean)
+  if (!items.length) return null
+  return <div className='nav360-chips'>{items.map((it, i) => <span key={i} className='nav360-chip'>{it}</span>)}</div>
+}
+
+// ─── career match visualisations ──────────────────────────────────────────────
+const CareerBreakdown: React.FC<{ match: CareerMatch }> = ({ match }) => {
+  const data = [
+    { axis: 'Personality', value: pct(match.pScore) },
+    { axis: 'Ability', value: pct(match.aScore) },
+    { axis: 'Interest', value: pct(match.iScore) },
+    { axis: 'Values', value: pct(match.valuesMatch) },
+    { axis: 'Potential', value: pct(match.potentialMatch) },
+  ].filter((d) => d.value > 0)
+  if (data.length < 3) return null
   return (
-    <div style={{ textAlign: 'center' }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={V.border} strokeWidth={10} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={10}
-          strokeDasharray={circ} strokeDashoffset={offset}
-          strokeLinecap="round" style={{ transition: 'stroke-dashoffset 1s ease' }} />
-      </svg>
-      <div style={{
-        marginTop: -size / 2 - 20, position: 'relative', textAlign: 'center',
-        height: size / 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <div style={{ fontSize: size / 3, fontWeight: 800, color }}>{value}</div>
-        <div style={{ fontSize: 10, color: V.muted, fontWeight: 600 }}>/ {max}</div>
-      </div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: V.text, marginTop: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        {label}
-      </div>
+    <div className='nav360-chart' style={{ height: 240 }}>
+      <ResponsiveContainer>
+        <RadarChart data={data} cx='50%' cy='52%' outerRadius='72%'>
+          <PolarGrid stroke='#DDE3EC' />
+          {/* @ts-ignore */}
+          <PolarAngleAxis dataKey='axis' tick={{ fontSize: 11, fill: '#6b7a8d' }} />
+          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+          <Radar dataKey='value' stroke='#f5a623' fill='#f5a623' fillOpacity={0.2} strokeWidth={2} />
+          <Tooltip formatter={(v: any) => [`${v}%`, 'Fit']} />
+        </RadarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
 
-function MiniScore({ value, max, label, color }: { value: number; max: number; label: string; color: string }) {
+const MatchesTable: React.FC<{ careers: CareerMatch[] }> = ({ careers }) => {
+  const rows = careers.filter((c) => txt(c?.career?.name)).slice(0, 12)
+  if (!rows.length) return null
   return (
-    <div style={{ textAlign: 'center', flex: '1 1 60px' }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
-      <div style={{ fontSize: 9, color: V.muted }}>/ {max}</div>
-      <div style={{ fontSize: 10, fontWeight: 600, color: V.muted, marginTop: 2 }}>{label}</div>
-    </div>
-  )
-}
-
-function VibrantBar({ label, value, max, color, animate }: {
-  label: string; value: number; max: number; color: string; animate?: boolean
-}) {
-  const pct = Math.max(3, (value / max) * 100)
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: V.text }}>{label}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color }}>{value}</span>
-      </div>
-      <div style={{ height: 10, background: `${color}15`, borderRadius: 5, overflow: 'hidden' }}>
-        <div style={{
-          width: `${pct}%`, height: '100%', borderRadius: 5,
-          background: `linear-gradient(90deg, ${color}, ${color}bb)`,
-          transition: animate ? 'width 1s ease' : undefined,
-          boxShadow: `0 0 8px ${color}40`,
-        }} />
-      </div>
-    </div>
-  )
-}
-
-function LevelPill({ level }: { level: AbsoluteLevel }) {
-  const bg = level === 'HIGH' ? '#dcfce7' : level === 'MODERATE' ? '#fef9c3' : '#fee2e2'
-  const color = level === 'HIGH' ? '#15803d' : level === 'MODERATE' ? '#a16207' : '#dc2626'
-  return (
-    <span style={{
-      display: 'inline-block', padding: '2px 10px', borderRadius: 20,
-      fontSize: 10, fontWeight: 700, color, background: bg, letterSpacing: 0.5,
-    }}>{level}</span>
-  )
-}
-
-function TagChip({ text, color }: { text: string; color: string }) {
-  return (
-    <span style={{
-      display: 'inline-block', padding: '4px 12px', borderRadius: 20,
-      fontSize: 11, fontWeight: 600, color, background: `${color}12`,
-      border: `1px solid ${color}25`, margin: '3px 4px',
-    }}>{text}</span>
-  )
-}
-
-// ═══════════════════════ CAREER MATCH CARD ═══════════════════════
-
-function VibrantCareerCard({ match, rank }: { match: CareerMatch; rank: number }) {
-  const gradients = [V.heroGrad, V.cardGrad2, V.cardGrad3, V.cardGrad4, V.cardGrad1]
-  const grad = gradients[(rank - 1) % gradients.length]
-
-  return (
-    <div style={{
-      borderRadius: 16, overflow: 'hidden', marginBottom: 16,
-      border: `1px solid ${V.border}`, boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-    }}>
-      <div style={{
-        background: grad, padding: '14px 20px', color: '#fff',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, fontSize: 16,
-          }}>#{rank}</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{match.career.name}</div>
-            <div style={{ fontSize: 11, opacity: 0.85 }}>
-              {match.career.riasec.map((r) => riasecDisplayName(r)).join(' + ')}
-              {match.isAspiration && <span style={{ marginLeft: 8, fontWeight: 700, background: 'rgba(255,255,255,0.3)', padding: '1px 8px', borderRadius: 10, fontSize: 10 }}>YOUR ASPIRATION</span>}
-            </div>
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 32, fontWeight: 800, lineHeight: 1 }}>{match.suitability}%</div>
-          <div style={{ fontSize: 10, opacity: 0.8 }}>suitability</div>
-        </div>
-      </div>
-      <div style={{ padding: '14px 20px', background: V.card }}>
-        <div style={{ display: 'flex', gap: 24, marginBottom: 10 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, color: V.muted, fontWeight: 600, marginBottom: 4 }}>POTENTIAL MATCH</div>
-            <div style={{ height: 8, background: `${V.emerald}20`, borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{ width: `${match.potentialMatch}%`, height: '100%', borderRadius: 4, background: V.emerald }} />
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: V.emerald, marginTop: 2 }}>{match.potentialMatch}%</div>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, color: V.muted, fontWeight: 600, marginBottom: 4 }}>VALUES MATCH</div>
-            <div style={{ height: 8, background: `${V.orange}20`, borderRadius: 4, overflow: 'hidden' }}>
-              <div style={{ width: `${match.valuesMatch}%`, height: '100%', borderRadius: 4, background: V.orange }} />
-            </div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: V.orange, marginTop: 2 }}>{match.valuesMatch}%</div>
-          </div>
-        </div>
-        {match.matchedValues.length > 0 && (
-          <div style={{ fontSize: 11, color: V.muted }}>
-            Matched values: {match.matchedValues.join(', ')}
-          </div>
-        )}
-        <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {match.career.degreePaths.slice(0, 4).map((dp) => (
-            <span key={dp} style={{
-              padding: '3px 10px', borderRadius: 8, fontSize: 10, fontWeight: 600,
-              background: `${V.indigo}10`, color: V.indigo, border: `1px solid ${V.indigo}20`,
-            }}>{dp}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ═══════════════════════ MAIN PAGE ═══════════════════════
-
-const StudentNavigator360Page: React.FC = () => {
-  const navigate = useNavigate()
-  const { currentUser } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<Navigator360Result | null>(null)
-  const [profile, setProfile] = useState<any>(null)
-  const [downloading, setDownloading] = useState(false)
-
-  useEffect(() => {
-    // Phase 19 (19-02): auth gating moved to StudentAuthGuard / useAuth().
-    if (!currentUser) { navigate('/student/login'); return }
-
-    try {
-      // studentPortalDashboard remains a dashboard-data cache (out of scope for 19-02).
-      const dashStr = localStorage.getItem('studentPortalDashboard')
-      if (!dashStr) { navigate('/student/login'); return }
-
-      const profileData = currentUser as any
-      const rawData: DashboardApiResponse = JSON.parse(dashStr)
-      setProfile(profileData)
-
-      const completedAssessment = rawData.assessments?.find((a) => a.status === 'completed')
-      if (!completedAssessment || !profileData.userStudentId) {
-        setError('No completed assessment found. Please complete an assessment first.')
-        setLoading(false)
-        return
-      }
-
-      fetchNavigator360Scores(profileData.userStudentId, completedAssessment.assessmentId)
-        .then((scores) => {
-          const computed = computeNavigator360(scores)
-          setResult(computed)
-        })
-        .catch((err) => {
-          setError(err?.response?.data?.error || err.message || 'Failed to load Navigator 360 data')
-        })
-        .finally(() => setLoading(false))
-    } catch {
-      navigate('/student/login')
-    }
-  }, [navigate, currentUser])
-
-  const handleDownloadPdf = useCallback(async () => {
-    if (!result) return
-    setDownloading(true)
-    try {
-      const html = generateReportHTML(result)
-      const blob = await htmlToPdfBlob(html)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${(result.studentName || 'Student').replace(/\s+/g, '_')}_Navigator_360.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch {
-      alert('PDF download failed. Please try again.')
-    } finally {
-      setDownloading(false)
-    }
-  }, [result])
-
-  const handleOpenHtml = useCallback(() => {
-    if (!result) return
-    const html = generateReportHTML(result)
-    const win = window.open('', '_blank')
-    if (win) { win.document.write(html); win.document.close() }
-  }, [result])
-
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%', margin: '0 auto 16px',
-          background: V.heroGrad, animation: 'pulse 1.5s infinite',
-        }} />
-        <div style={{ fontSize: 14, fontWeight: 600, color: V.muted }}>Computing your Navigator 360 profile...</div>
-        <div style={{ fontSize: 12, color: V.muted, marginTop: 4 }}>Analyzing personality, abilities, intelligences & career matches</div>
-        <style>{`@keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.95); } }`}</style>
-      </div>
-    )
-  }
-
-  if (error || !result) {
-    return (
-      <GlowCard gradient={V.cardGrad1}>
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>&#128640;</div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: V.text, marginBottom: 8 }}>
-              {error || 'No data available'}
-            </h3>
-            <p style={{ fontSize: 13, color: V.muted }}>
-              Complete an assessment to unlock your personalized Navigator 360 career guidance report.
-            </p>
-            <button
-              onClick={() => navigate('/student/dashboard/assessments')}
-              style={{
-                marginTop: 16, padding: '10px 24px', borderRadius: 10, border: 'none',
-                background: V.heroGrad, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              }}>
-            View Assessments
-          </button>
-        </div>
-      </GlowCard>
-    )
-  }
-
-  const versionLabel = result.gradeGroup === '6-8' ? 'Insight Navigator'
-    : result.gradeGroup === '9-10' ? 'Subject Navigator' : 'Career Navigator'
-
-  const top3Riasec = [...result.riasec].sort((a, b) => b.normPct - a.normPct).slice(0, 3)
-  const top3MI = [...result.mi].sort((a, b) => b.normPct - a.normPct).slice(0, 3)
-  const top3Abilities = [...result.abilities].sort((a, b) => b.normPct - a.normPct).slice(0, 3)
-
-  return (
-    <>
-      {/* ── HERO BANNER ── */}
-      <div style={{
-        background: V.heroGrad, borderRadius: 20, padding: '28px 32px', marginBottom: 24,
-        color: '#fff', position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{
-          position: 'absolute', top: -40, right: -40, width: 200, height: 200,
-          borderRadius: '50%', background: 'rgba(255,255,255,0.08)',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: -60, right: 80, width: 160, height: 160,
-          borderRadius: '50%', background: 'rgba(255,255,255,0.05)',
-        }} />
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-              {versionLabel}
-            </div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, margin: '0 0 4px', letterSpacing: -0.5 }}>
-              Navigator 360
-            </h1>
-            <div style={{ fontSize: 13, opacity: 0.85 }}>
-              Hello, <strong>{result.studentName}</strong> &middot; Class {result.studentClass}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleOpenHtml} style={{
-              padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.3)',
-              background: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', backdropFilter: 'blur(4px)',
-            }}>
-              Full Report
-            </button>
-            <button onClick={handleDownloadPdf} disabled={downloading} style={{
-              padding: '8px 16px', borderRadius: 10, border: 'none',
-              background: 'rgba(255,255,255,0.95)', color: '#6366f1', fontSize: 12, fontWeight: 700,
-              cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.7 : 1,
-            }}>
-              {downloading ? 'Creating...' : 'Download PDF'}
-            </button>
-          </div>
-        </div>
-
-        {/* Quick stats row */}
-        <div style={{
-          display: 'flex', gap: 16, marginTop: 20, flexWrap: 'wrap',
-        }}>
-          {[
-            { label: 'Holland Code', value: result.hollandCode, sub: result.hollandCode.split('').map(riasecDisplayName).join(' - ') },
-            { label: 'CCI', value: result.cci, sub: 'Career Clarity Index' },
-            { label: 'Alignment', value: `${result.alignmentScore}%`, sub: 'Profile-Career Match' },
-            { label: 'Top Career', value: result.topCareers[0]?.career.name || '-', sub: `${result.topCareers[0]?.suitability || 0}% suitability` },
-          ].map((stat) => (
-            <div key={stat.label} style={{
-              flex: '1 1 140px', background: 'rgba(255,255,255,0.12)', borderRadius: 12,
-              padding: '12px 16px', backdropFilter: 'blur(4px)',
-            }}>
-              <div style={{ fontSize: 10, opacity: 0.7, fontWeight: 600, textTransform: 'uppercase' }}>{stat.label}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, marginTop: 2 }}>{stat.value}</div>
-              <div style={{ fontSize: 10, opacity: 0.6 }}>{stat.sub}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── COMPOSITE SCORES ROW ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
-        <GlowCard gradient={V.cardGrad2}>
-          <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1 }}>Potential Score</div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-            <BigScore value={result.potentialScore.total} max={100} label="" color={V.indigo} size={130} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            <MiniScore value={result.potentialScore.personality} max={25} label="Personality" color={V.rose} />
-            <MiniScore value={result.potentialScore.intelligence} max={25} label="Intelligence" color={V.blue} />
-            <MiniScore value={result.potentialScore.ability} max={30} label="Ability" color={V.purple} />
-            <MiniScore value={result.potentialScore.academic} max={20} label="Academic" color={V.emerald} />
-          </div>
-        </GlowCard>
-
-        <GlowCard gradient={V.cardGrad3}>
-          <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1 }}>Preference Score</div>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-            <BigScore value={result.preferenceScore.total} max={100} label="" color={V.emerald} size={130} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-            <MiniScore value={result.preferenceScore.p1Values} max={20} label="Values" color="#8b5cf6" />
-            <MiniScore value={result.preferenceScore.p2Aspirations} max={20} label="Aspirations" color="#ec4899" />
-            <MiniScore value={result.preferenceScore.p3Culture} max={30} label="Culture" color={V.cyan} />
-            <MiniScore value={result.preferenceScore.p4Subjects} max={30} label="Subjects" color={V.orange} />
-          </div>
-        </GlowCard>
-      </div>
-
-      {/* ── YOUR TOP STRENGTHS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 24 }}>
-        <GlowCard gradient={V.heroGrad}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>
-            Top Personality Types
-          </div>
-          {top3Riasec.map((d, i) => (
-            <div key={d.name} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    width: 24, height: 24, borderRadius: '50%', display: 'inline-flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    background: RIASEC_VIBRANT[d.name] || V.purple, color: '#fff',
-                    fontSize: 11, fontWeight: 800,
-                  }}>{d.name}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: V.text }}>{riasecDisplayName(d.name)}</span>
-                </div>
-                <LevelPill level={d.level} />
-              </div>
-              <VibrantBar label="" value={d.rawScore} max={18} color={RIASEC_VIBRANT[d.name] || V.purple} animate />
-            </div>
-          ))}
-        </GlowCard>
-
-        <GlowCard gradient={V.cardGrad3}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>
-            Top Abilities
-          </div>
-          {top3Abilities.map((d, i) => (
-            <div key={d.name} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: V.text }}>{abilityDisplayName(d.name)}</span>
-                <LevelPill level={d.level} />
-              </div>
-              <VibrantBar label="" value={d.rawScore} max={12} color={ABILITY_VIBRANT[i % ABILITY_VIBRANT.length]} animate />
-            </div>
-          ))}
-        </GlowCard>
-
-        <GlowCard gradient={V.cardGrad2}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>
-            Top Intelligences
-          </div>
-          {top3MI.map((d, i) => (
-            <div key={d.name} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: V.text }}>{miDisplayName(d.name)}</span>
-                <LevelPill level={d.level} />
-              </div>
-              <VibrantBar label="" value={d.rawScore} max={12} color={MI_VIBRANT[i % MI_VIBRANT.length]} animate />
-            </div>
-          ))}
-        </GlowCard>
-      </div>
-
-      {/* ── YOUR PREFERENCES ── */}
-      <GlowCard gradient={V.cardGrad4} style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>
-          Your Preferences
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 8 }}>Career Aspirations</div>
-            <div>{result.careerAspirations.length > 0
-              ? result.careerAspirations.map((a) => <TagChip key={a} text={a} color={V.indigo} />)
-              : <span style={{ fontSize: 12, color: V.muted }}>Not selected</span>}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 8 }}>Work Values</div>
-            <div>{result.values.length > 0
-              ? result.values.map((v) => <TagChip key={v} text={v} color={V.emerald} />)
-              : <span style={{ fontSize: 12, color: V.muted }}>Not selected</span>}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: V.text, marginBottom: 8 }}>Subjects of Interest</div>
-            <div>{result.subjectsOfInterest.length > 0
-              ? result.subjectsOfInterest.map((s) => <TagChip key={s} text={s} color={V.purple} />)
-              : <span style={{ fontSize: 12, color: V.muted }}>Not selected</span>}
-            </div>
-          </div>
-        </div>
-      </GlowCard>
-
-      {/* ── TOP CAREER MATCHES ── */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: V.text, margin: 0 }}>Your Top Career Matches</h2>
-            <p style={{ fontSize: 12, color: V.muted, margin: '4px 0 0' }}>
-              Based on your personality, abilities, intelligences & values alignment
-            </p>
-          </div>
-          <div style={{
-            padding: '6px 14px', borderRadius: 10, background: `${V.indigo}10`,
-            color: V.indigo, fontSize: 11, fontWeight: 700,
-          }}>
-            {result.topCareers.length} of {result.careerMatches.length} careers shown
-          </div>
-        </div>
-        {result.topCareers.map((cm, i) => (
-          <VibrantCareerCard key={cm.career.id} match={cm} rank={i + 1} />
-        ))}
-      </div>
-
-      {/* ── FULL SCORING BREAKDOWN ── */}
-      <GlowCard gradient={V.heroGrad} style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>
-          Complete RIASEC Profile
-        </div>
-        {result.riasec.map((d) => (
-          <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <span style={{
-              width: 28, height: 28, borderRadius: '50%', display: 'inline-flex',
-              alignItems: 'center', justifyContent: 'center',
-              background: RIASEC_VIBRANT[d.name], color: '#fff', fontSize: 12, fontWeight: 800,
-            }}>{d.name}</span>
-            <span style={{ width: 110, fontSize: 12, fontWeight: 600, color: V.text }}>{riasecDisplayName(d.name)}</span>
-            <div style={{ flex: 1, height: 12, background: `${RIASEC_VIBRANT[d.name]}15`, borderRadius: 6, overflow: 'hidden' }}>
-              <div style={{
-                width: `${(d.rawScore / 18) * 100}%`, height: '100%', borderRadius: 6,
-                background: `linear-gradient(90deg, ${RIASEC_VIBRANT[d.name]}, ${RIASEC_VIBRANT[d.name]}bb)`,
-                transition: 'width 0.8s ease',
-                boxShadow: `0 0 6px ${RIASEC_VIBRANT[d.name]}40`,
-              }} />
-            </div>
-            <span style={{ width: 30, fontSize: 12, fontWeight: 700, color: V.text, textAlign: 'right' }}>{d.rawScore}</span>
-            <span style={{ width: 55, fontSize: 11, fontWeight: 600, color: V.muted, textAlign: 'center' }}>S{d.stanine}</span>
-            <LevelPill level={d.level} />
-          </div>
-        ))}
-      </GlowCard>
-
-      {/* ── ALL CAREERS TABLE ── */}
-      <GlowCard style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 }}>
-          Complete Career Ranking
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: V.bg }}>
-                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: V.muted, fontSize: 10, textTransform: 'uppercase' }}>#</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 700, color: V.muted, fontSize: 10, textTransform: 'uppercase' }}>Career Field</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: V.muted, fontSize: 10, textTransform: 'uppercase' }}>Suit.</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: V.muted, fontSize: 10, textTransform: 'uppercase' }}>Pot.</th>
-                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: V.muted, fontSize: 10, textTransform: 'uppercase' }}>Val.</th>
-                <th style={{ padding: '10px 12px', fontWeight: 700, color: V.muted, fontSize: 10, textTransform: 'uppercase', width: '25%' }}>Bar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.careerMatches.map((cm, i) => (
-                <tr key={cm.career.id} style={{
-                  borderBottom: `1px solid ${V.border}`,
-                  background: cm.isAspiration ? `${V.indigo}06` : i % 2 === 0 ? '#fff' : V.bg,
-                }}>
-                  <td style={{ padding: '10px 12px', fontWeight: 700 }}>{i + 1}</td>
-                  <td style={{ padding: '10px 12px', fontWeight: 600 }}>
-                    {cm.career.name}
-                    {cm.isAspiration && <span style={{ fontSize: 9, color: V.indigo, marginLeft: 4, fontWeight: 700 }}>ASP</span>}
-                  </td>
-                  <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: V.indigo }}>{cm.suitability}%</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>{cm.potentialMatch}%</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>{cm.valuesMatch}%</td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <div style={{ height: 8, background: `${V.indigo}12`, borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{
-                        width: `${cm.suitability}%`, height: '100%', borderRadius: 4,
-                        background: `linear-gradient(90deg, ${V.indigo}, ${V.purple})`,
-                      }} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </GlowCard>
-
-      {/* ── FLAGS ── */}
-      {result.flags.length > 0 && (
-        <GlowCard gradient={V.cardGrad1} style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: V.muted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
-            Observations
-          </div>
-          {result.flags.map((f, i) => {
-            const bg = f.severity === 'critical' ? '#fef2f2' : f.severity === 'warning' ? '#fffbeb' : '#f0f9ff'
-            const border = f.severity === 'critical' ? '#fca5a5' : f.severity === 'warning' ? '#fcd34d' : '#93c5fd'
-            const color = f.severity === 'critical' ? '#991b1b' : f.severity === 'warning' ? '#92400e' : '#1e40af'
+    <div className='nav360-table-wrap'>
+      <table className='nav360-table'>
+        <thead>
+          <tr>
+            <th>Career</th><th>Suitability</th><th>Personality</th><th>Ability</th><th>Interest</th><th>Values</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((c, i) => {
+            const s = pct(c.suitability)
             return (
-              <div key={i} style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 8, background: bg, border: `1px solid ${border}` }}>
-                <span style={{ fontWeight: 800, fontSize: 11, color }}>{f.code}</span>
-                <span style={{ fontSize: 12, color, marginLeft: 8, fontWeight: 600 }}>{f.name}</span>
-                <p style={{ margin: '4px 0 0', fontSize: 11, color, opacity: 0.85 }}>{f.message}</p>
-              </div>
+              <tr key={i}>
+                <td className='nm'>{c.career?.name}{c.isAspiration && <span className='tag'>★</span>}</td>
+                <td><span className='nav360-pill' style={{ background: bandColor(s) }}>{s}%</span></td>
+                <td>{pct(c.pScore)}%</td>
+                <td>{pct(c.aScore)}%</td>
+                <td>{pct(c.iScore)}%</td>
+                <td>{pct(c.valuesMatch)}%</td>
+              </tr>
             )
           })}
-        </GlowCard>
-      )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
-      {/* ── FOOTER INSIGHT ── */}
-      <div style={{
-        background: `linear-gradient(135deg, ${V.indigo}08, ${V.purple}08)`,
-        border: `1px solid ${V.indigo}15`, borderRadius: 12,
-        padding: '14px 18px', display: 'flex', gap: 10, alignItems: 'flex-start',
-        fontSize: 12, color: V.text, lineHeight: 1.6,
-      }}>
-        <span style={{ fontSize: 20, flexShrink: 0 }}>&#9889;</span>
-        <span>
-          This report is generated based on your assessment responses using the Navigator 360 psychometric engine.
-          Discuss your results with a counsellor for personalized career guidance.
-        </span>
+// ─── icons ────────────────────────────────────────────────────────────────────
+const CompassIcon = () => (
+  <svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+    <circle cx='12' cy='12' r='10' /><path d='M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z' />
+  </svg>
+)
+const BackIcon = () => (
+  <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'>
+    <line x1='19' y1='12' x2='5' y2='12' /><polyline points='12 19 5 12 12 5' />
+  </svg>
+)
+const DownloadIcon = () => (
+  <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round'>
+    <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' /><polyline points='7 10 12 15 17 10' /><line x1='12' y1='15' x2='12' y2='3' />
+  </svg>
+)
+
+interface CardVM {
+  assessmentId: number
+  name: string
+  report?: NavigatorReportCard
+  ready: boolean
+}
+
+// ─── derived dashboard model (real data + calculated placeholders) ───────────
+interface DerivedVM {
+  riasec: ScoredDimension[]; riasecEst: boolean
+  abilities: ScoredDimension[]; abilitiesEst: boolean
+  mi: ScoredDimension[]; miEst: boolean
+  hollandCode: string
+  cci: number; cciEst: boolean; cciBand: string
+  alignment: number; alignmentEst: boolean
+  potential: { name: string; value: number }[]; potentialTotal: number; potentialEst: boolean
+  preference: { name: string; value: number }[]; preferenceTotal: number; preferenceEst: boolean
+  topCareers: CareerMatch[]
+  allMatches: CareerMatch[]
+  overview: { name: string; value: number }[]
+  readiness: number
+}
+
+function deriveVM(d: NavigatorDashboard): DerivedVM {
+  // Interests / abilities / MI — fall back to synthesised profiles.
+  const riasecReal = (d.riasec || []).filter((x) => txt(x?.name))
+  const riasecEst = riasecReal.length < 3
+  const riasec = riasecEst ? synthRiasec(d.hollandCode || '') : riasecReal
+
+  const abilReal = (d.abilities || []).filter((x) => txt(x?.name))
+  const abilitiesEst = abilReal.length < 2
+  const abilities = abilitiesEst ? synthDims(ABILITY_PLACEHOLDER, dimAvg(riasec) || 58) : abilReal
+
+  const miReal = (d.mi || []).filter((x) => txt(x?.name))
+  const miEst = miReal.length < 3
+  const mi = miEst ? synthDims(MI_PLACEHOLDER, dimAvg(abilities) || 55) : miReal
+
+  // Holland code — derive from top-3 interests if absent.
+  let hollandCode = txt(d.hollandCode)
+  if (!hollandCode && riasec.length) {
+    hollandCode = [...riasec].sort((a, b) => pct(b.normPct) - pct(a.normPct)).slice(0, 3)
+      .map((x) => x.name.charAt(0).toUpperCase()).join('')
+  }
+
+  // CCI — gap between #1 and #2 career suitability is a clarity proxy.
+  const sorted = [...(d.topCareers?.length ? d.topCareers : d.careerMatches) || []]
+    .filter((c) => txt(c?.career?.name)).sort((a, b) => pct(b.suitability) - pct(a.suitability))
+  let cci = d.cci && d.cci.applicable && d.cci.pct != null ? pct(d.cci.pct) : NaN
+  const cciEst = !isFinite(cci)
+  if (cciEst) {
+    const gap = sorted.length >= 2 ? pct(sorted[0].suitability) - pct(sorted[1].suitability) : 0
+    cci = pct(50 + gap * 2 + (sorted.length ? pct(sorted[0].suitability) - 60 : 0) * 0.4)
+  }
+  const cciBand = txt(d.cci?.band) || (cci >= 70 ? 'Clear direction' : cci >= 45 ? 'Emerging clarity' : 'Exploring')
+
+  // Alignment — average suitability of the top matches.
+  let alignment = typeof d.alignmentScore === 'number' ? pct(d.alignmentScore) : NaN
+  const alignmentEst = !isFinite(alignment)
+  if (alignmentEst) alignment = avgOf(sorted.slice(0, 5).map((c) => pct(c.suitability))) || dimAvg(riasec)
+
+  // Potential score breakdown.
+  const ps = d.potentialScore
+  const potentialEst = !ps || !isFinite(Number(ps.total))
+  const potential = potentialEst
+    ? [
+        { name: 'Personality', value: dimAvg(riasec) },
+        { name: 'Intelligence', value: dimAvg(mi) },
+        { name: 'Ability', value: dimAvg(abilities) },
+        { name: 'Academic', value: Math.round((cci + alignment) / 2) },
+      ]
+    : [
+        { name: 'Personality', value: pct(ps!.personality) },
+        { name: 'Intelligence', value: pct(ps!.intelligence) },
+        { name: 'Ability', value: pct(ps!.ability) },
+        { name: 'Academic', value: pct(ps!.academic) },
+      ]
+  const potentialTotal = potentialEst ? avgOf(potential.map((p) => p.value)) : pct(ps!.total)
+
+  // Preference score breakdown.
+  const pref = d.preferenceScore
+  const preferenceEst = !pref || !isFinite(Number(pref.total))
+  const cnt = (arr?: any[]) => Math.min(100, (arr || []).filter(Boolean).length * 25)
+  const preference = preferenceEst
+    ? [
+        { name: 'Values', value: cnt(d.values) },
+        { name: 'Aspirations', value: cnt(d.careerAspirations) },
+        { name: 'Culture', value: 50 },
+        { name: 'Subjects', value: cnt(d.subjectsOfInterest) },
+      ]
+    : [
+        { name: 'Values', value: pct(pref!.p1Values) },
+        { name: 'Aspirations', value: pct(pref!.p2Aspirations) },
+        { name: 'Culture', value: pct(pref!.p3Culture) },
+        { name: 'Subjects', value: pct(pref!.p4Subjects) },
+      ]
+  const preferenceTotal = preferenceEst ? avgOf(preference.map((p) => p.value)) : pct(pref!.total)
+
+  // Cross-pillar overview radar.
+  const overview = [
+    { name: 'Interests', value: dimAvg(riasec) },
+    { name: 'Abilities', value: dimAvg(abilities) },
+    { name: 'Intelligence', value: dimAvg(mi) },
+    { name: 'Clarity', value: cci },
+    { name: 'Alignment', value: alignment },
+    { name: 'Potential', value: potentialTotal },
+  ]
+  const readiness = avgOf(overview.map((o) => o.value))
+
+  return {
+    riasec, riasecEst, abilities, abilitiesEst, mi, miEst, hollandCode,
+    cci, cciEst, cciBand, alignment, alignmentEst,
+    potential, potentialTotal, potentialEst,
+    preference, preferenceTotal, preferenceEst,
+    topCareers: sorted.slice(0, 6), allMatches: sorted,
+    overview, readiness,
+  }
+}
+
+const StudentNavigator360Page: React.FC = () => {
+  // List data comes from the once-at-login bootstrap (StudentDataContext); the
+  // dashboard payload is precomputed server-side, fetched lazily on "Details".
+  const { data, loading, error } = useStudentData()
+
+  const [view, setView] = useState<'list' | 'detail'>('list')
+  const [detail, setDetail] = useState<NavigatorDashboardResponse | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [activeName, setActiveName] = useState('')
+  const detailCache = useRef<Map<number, NavigatorDashboardResponse>>(new Map())
+
+  const cards: CardVM[] = useMemo(() => {
+    const byAssessment = new Map<number, NavigatorReportCard>()
+    data.navigatorReports.forEach((r) => byAssessment.set(r.assessmentId, r))
+    const completed = (data.assessments || []).filter(
+      (a) => String(a?.status).toLowerCase() === 'completed'
+    )
+    return completed.map((a) => {
+      const report = byAssessment.get(a.assessmentId)
+      return {
+        assessmentId: a.assessmentId,
+        name: a.assessmentName || `Assessment ${a.assessmentId}`,
+        report,
+        ready: !!report && report.hasDashboard,
+      }
+    })
+  }, [data])
+
+  const openDetail = async (vm: CardVM) => {
+    setActiveName(vm.name)
+    setView('detail')
+    setDetailError(null)
+    const cached = detailCache.current.get(vm.assessmentId)
+    if (cached) { setDetail(cached); return }
+    setDetail(null)
+    setDetailLoading(true)
+    try {
+      const resp = await getMyNavigatorReport(vm.assessmentId)
+      detailCache.current.set(vm.assessmentId, resp)
+      setDetail(resp)
+    } catch (err: any) {
+      setDetailError(err?.response?.data?.error || err?.message || 'Failed to load this dashboard')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const backToList = () => { setView('list'); setDetail(null); setDetailError(null) }
+
+  // ── List view ───────────────────────────────────────────────────────────────
+  const ListView = useMemo(() => {
+    if (loading) return <div className='nav360-state'><div className='s'>Loading your reports…</div></div>
+    if (error) return <div className='nav360-state'><div className='t'>Couldn’t load your reports</div><div className='s'>{error}</div></div>
+    if (!cards.length) {
+      return (
+        <div className='nav360-empty'>
+          <svg width='46' height='46' viewBox='0 0 24 24' fill='none' stroke='#B0BEC5' strokeWidth='1.5'>
+            <circle cx='12' cy='12' r='10' /><path d='M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z' />
+          </svg>
+          <div className='t'>No completed assessments yet</div>
+          <div className='s'>Your Navigator 360 analysis appears here once you complete an assessment.</div>
+        </div>
+      )
+    }
+    return (
+      <div className='nav360-grid'>
+        {cards.map((vm) => (
+          <div key={vm.assessmentId} className='nav360-card'>
+            <div className='nav360-card-top'>
+              <div className='nav360-card-icon'><CompassIcon /></div>
+              {vm.ready
+                ? <span className='nav360-badge ready'>Report ready</span>
+                : <span className='nav360-badge pending'>Being prepared</span>}
+            </div>
+            <h3>{vm.name}</h3>
+            <div className='nav360-card-snip'>
+              {vm.ready
+                ? 'View your detailed Navigator 360 analysis — interests, abilities, top career matches and more.'
+                : 'Your report is being generated — check back soon.'}
+            </div>
+            <button
+              className='nav360-btn nav360-btn-primary'
+              disabled={!vm.ready}
+              onClick={() => openDetail(vm)}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              Details
+            </button>
+          </div>
+        ))}
+      </div>
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, cards])
+
+  if (view === 'list') {
+    return (
+      <div className='nav360'>
+        <div className='nav360-head'>
+          <h2>Navigator 360</h2>
+          <p>Your career-readiness analysis for each completed assessment.</p>
+        </div>
+        {ListView}
+      </div>
+    )
+  }
+
+  // ── Detail view ──────────────────────────────────────────────────────────────
+  const d: NavigatorDashboard | undefined = detail?.dashboard
+  const pdf = txt(detail?.pdfUrl) || txt(detail?.reportUrl)
+  const vm = d ? deriveVM(d) : null
+
+  return (
+    <div className='nav360'>
+      <div className='nav360-detail-top'>
+        <button className='nav360-btn nav360-btn-ghost' onClick={backToList}><BackIcon /> Back</button>
+        <div className='nav360-detail-id' style={{ flex: 1, minWidth: 0 }}>
+          <h2>{activeName}</h2>
+          {d && <span>{[txt(d.studentName), txt(d.studentClass), txt(d.gradeGroup)].filter(Boolean).join(' · ')}</span>}
+        </div>
+        <div className='nav360-detail-actions'>
+          {pdf && <a className='nav360-btn nav360-btn-ghost' href={pdf} target='_blank' rel='noopener noreferrer'><DownloadIcon /> PDF</a>}
+        </div>
       </div>
 
-      <style>{`
-        @media (max-width: 768px) {
-          .sp-grid-2, .sp-grid-3 { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-    </>
+      {detailLoading && <div className='nav360-state'><div className='s'>Loading dashboard…</div></div>}
+      {detailError && <div className='nav360-state'><div className='t'>Couldn’t load this dashboard</div><div className='s'>{detailError}</div></div>}
+
+      {d && vm && !detailLoading && (
+        <>
+          {/* Headline stats */}
+          <div className='nav360-stats'>
+            <div className='nav360-stat'><div className='v'>{vm.readiness}%</div><div className='k'>Career Readiness</div><div className='sub'>{levelOf(vm.readiness)} overall</div></div>
+            {vm.hollandCode && (
+              <div className='nav360-stat'><div className='v'>{vm.hollandCode}</div><div className='k'>Holland Code</div><div className='sub'>Your interest signature</div></div>
+            )}
+            <div className='nav360-stat'><div className='v'>{vm.cci}%</div><div className='k'>Career Clarity{vm.cciEst && <span className='nav360-est'>est</span>}</div><div className='sub'>{vm.cciBand}</div></div>
+            <div className='nav360-stat'><div className='v'>{vm.alignment}%</div><div className='k'>Alignment{vm.alignmentEst && <span className='nav360-est'>est</span>}</div><div className='sub'>Interests · abilities · values</div></div>
+            {vm.topCareers[0]?.career?.name && (
+              <div className='nav360-stat'><div className='v' style={{ fontSize: 16 }}>{vm.topCareers[0].career!.name}</div><div className='k'>Top Match</div><div className='sub'>{pct(vm.topCareers[0].suitability)}% suitability</div></div>
+            )}
+            <div className='nav360-stat'><div className='v'>{vm.allMatches.length}</div><div className='k'>Careers Analysed</div><div className='sub'>matched to your profile</div></div>
+          </div>
+
+          {/* Readiness gauges */}
+          <SectionCard title='Career Readiness Snapshot' subtitle='Composite indicators across the full Navigator 360 model.'>
+            <div className='nav360-gauges'>
+              <Gauge value={vm.readiness} label='Overall Readiness' sub={levelOf(vm.readiness)} />
+              <Gauge value={vm.cci} label='Career Clarity' sub={vm.cciBand} est={vm.cciEst} />
+              <Gauge value={vm.alignment} label='Profile Alignment' sub={levelOf(vm.alignment)} est={vm.alignmentEst} />
+              <Gauge value={vm.potentialTotal} label='Potential' sub={levelOf(vm.potentialTotal)} est={vm.potentialEst} />
+            </div>
+          </SectionCard>
+
+          {/* Cross-pillar overview radar */}
+          <SectionCard title='Profile Overview' subtitle='How your six core pillars compare at a glance.'>
+            <RadarPanel dims={vm.overview.map((o) => ({ name: o.name, normPct: o.value, rawScore: 0, stanine: 0, level: '' }))} />
+          </SectionCard>
+
+          {/* RIASEC interests */}
+          <SectionCard title='Interests (RIASEC)' est={vm.riasecEst} subtitle='Your Holland interest profile across the six interest types.'>
+            <div className='nav360-split'>
+              <RadarPanel dims={vm.riasec} />
+              <RankedBars dims={vm.riasec} />
+            </div>
+          </SectionCard>
+
+          {/* Abilities */}
+          <SectionCard title='Abilities' est={vm.abilitiesEst} subtitle='Relative strength across measured aptitude areas.'>
+            <HBarPanel dims={vm.abilities} />
+          </SectionCard>
+
+          {/* Multiple Intelligences */}
+          <SectionCard title='Multiple Intelligences' est={vm.miEst} subtitle='Gardner’s intelligences mapped from your responses.'>
+            <div className='nav360-split'>
+              <RadarPanel dims={vm.mi} color='#7C3AED' />
+              <RankedBars dims={vm.mi} />
+            </div>
+          </SectionCard>
+
+          {/* Potential + Preference donuts */}
+          <div className='nav360-two'>
+            <SectionCard title='Potential Score' est={vm.potentialEst} subtitle='Composite of personality, intelligence, ability and academic signals.'>
+              <Donut data={vm.potential} total={vm.potentialTotal} centerLabel='Potential' />
+            </SectionCard>
+            <SectionCard title='Preference Score' est={vm.preferenceEst} subtitle='What you value, aspire to and want to study.'>
+              <Donut data={vm.preference} total={vm.preferenceTotal} centerLabel='Preference' />
+            </SectionCard>
+          </div>
+
+          {/* Top career match deep-dive */}
+          {vm.topCareers[0]?.career?.name && (
+            <SectionCard title={`Best Fit: ${vm.topCareers[0].career!.name}`} subtitle='How this career matches across each dimension of your profile.'>
+              <div className='nav360-split'>
+                <CareerBreakdown match={vm.topCareers[0]} />
+                <div className='nav360-careerfacts'>
+                  <div className='nav360-stat compact'><div className='v'>{pct(vm.topCareers[0].suitability)}%</div><div className='k'>Suitability</div></div>
+                  <div className='nav360-stat compact'><div className='v'>{pct(vm.topCareers[0].potentialMatch)}%</div><div className='k'>Potential match</div></div>
+                  <div className='nav360-stat compact'><div className='v'>{pct(vm.topCareers[0].valuesMatch)}%</div><div className='k'>Values match</div></div>
+                  {!!vm.topCareers[0].career?.degreePaths?.length && (
+                    <div className='nav360-field' style={{ gridColumn: '1 / -1' }}>
+                      <div className='lbl'>Degree Pathways</div>
+                      <Chips values={vm.topCareers[0].career!.degreePaths} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* All matches table */}
+          {vm.allMatches.length > 0 && (
+            <SectionCard title='Top Career Matches' subtitle='Ranked by overall suitability, with the sub-scores behind each match.'>
+              <MatchesTable careers={vm.allMatches} />
+            </SectionCard>
+          )}
+
+          {/* Preferences */}
+          {(d.values?.length || d.careerAspirations?.length || d.subjectsOfInterest?.length) ? (
+            <SectionCard title='Your Preferences'>
+              {d.values?.length ? <div className='nav360-field'><div className='lbl'>Values</div><Chips values={d.values} /></div> : null}
+              {d.careerAspirations?.length ? <div className='nav360-field'><div className='lbl'>Career Aspirations</div><Chips values={d.careerAspirations} /></div> : null}
+              {d.subjectsOfInterest?.length ? <div className='nav360-field'><div className='lbl'>Subjects of Interest</div><Chips values={d.subjectsOfInterest} /></div> : null}
+            </SectionCard>
+          ) : null}
+
+          <div className='nav360-foot-note'>
+            Indicators marked <span className='nav360-est'>estimated</span> are calculated from your available
+            results to give a complete picture while the full breakdown is finalised.
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 

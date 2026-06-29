@@ -115,12 +115,14 @@ public class AssessmentCompletionService {
         // On a fresh transition to completed, kick off default-template report
         // generation in the background (no-op if no template is mapped).
         if ("completed".equals(resolved) && !"completed".equals(previousStatus)) {
-            // Whitelabel students go through the new report pipeline (generate + email);
-            // everyone else keeps the legacy unbounded auto-gen (generate only).
+            // All students go through the report pipeline (the worker generates +
+            // stores every report; only whitelabel students are emailed). The legacy
+            // in-JVM auto-gen remains only as a fallback for when the pipeline is
+            // disabled (enqueue() returns false).
             boolean enqueued = false;
             try {
                 if (reportPipelineProducer != null) {
-                    enqueued = reportPipelineProducer.enqueueIfWhitelabel(mapping.getUserStudent(), assessmentId);
+                    enqueued = reportPipelineProducer.enqueue(mapping.getUserStudent(), assessmentId);
                 }
             } catch (Exception ex) {
                 logger.warn("Report pipeline enqueue failed student={} assessment={}", studentId, assessmentId, ex);

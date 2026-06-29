@@ -94,7 +94,8 @@ export function AsideMenuMain() {
     allowed("/b2c/pricing-tiers") ||
     allowed("/b2c/tracker") ||
     allowed("/payment-tracking") ||
-    allowed("/promo-codes");
+    allowed("/promo-codes") ||
+    allowed("/referral-codes");
 
   const showReports = allowed("/reports") || allowed("/reports-hub") || allowed("/admin/report-templates");
 
@@ -535,6 +536,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-tag"
               />
             )}
+            {allowed("/referral-codes") && (
+              <AsideMenuItem
+                to="/referral-codes"
+                icon="/media/icons/duotune/communication/com014.svg"
+                title="Referral Codes"
+                fontIcon="bi-people"
+              />
+            )}
           </AsideMenuItemWithSub>
         </>
       )}
@@ -571,6 +580,14 @@ export function AsideMenuMain() {
               icon="/media/icons/duotune/graphs/gra010.svg"
               title="School Reports"
               fontIcon="bi-mortarboard"
+            />
+          )}
+          {allowed("/school-admin/cohort-insights") && (
+            <AsideMenuItem
+              to="/school-admin/cohort-insights"
+              icon="/media/icons/duotune/graphs/gra007.svg"
+              title="Cohort Insights"
+              fontIcon="bi-bar-chart"
             />
           )}
         </>

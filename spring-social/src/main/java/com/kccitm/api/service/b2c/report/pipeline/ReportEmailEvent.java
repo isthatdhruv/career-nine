@@ -2,8 +2,9 @@ package com.kccitm.api.service.b2c.report.pipeline;
 
 /**
  * Kafka payload for the <b>report.email</b> topic. Produced by the generate
- * consumer after the report (HTML + PDF) is rendered and stored in Spaces;
- * consumed by the email consumer which sends the co-branded email via Odoo.
+ * consumer for whitelabel students only (with a recipient address), after the
+ * report (HTML + PDF) is rendered and stored in Spaces; consumed by the email
+ * consumer which sends the co-branded email.
  *
  * <p>{@code linkOnly=true} means the PDF render failed after retries — send the
  * HTML report link without the attachment (degraded, but the student still gets

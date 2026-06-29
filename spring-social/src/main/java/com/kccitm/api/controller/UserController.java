@@ -36,7 +36,6 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
-import com.kccitm.api.service.OdooEmailService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.dashboard.StudentDashboardDataService;
@@ -48,9 +47,6 @@ public class UserController {
 
     @Autowired
     private SmtpEmailService smtpEmailService;
-
-    @Autowired
-    private OdooEmailService odooEmailService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -231,8 +227,8 @@ public class UserController {
         if (email == null || !email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
             return ResponseEntity.badRequest().body(Map.of("error", "Valid email is required"));
         }
-        if (phone == null || !phone.matches("^[6-9]\\d{9}$")) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Valid 10-digit Indian phone number is required"));
+        if (phone == null || !phone.matches("^[0-9]{8,10}$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Valid phone number is required (8 to 10 digits)"));
         }
 
         // Update User entity
@@ -510,10 +506,10 @@ public class UserController {
                             "and the password above, and change it immediately from your profile.\n\n" +
                             "If you did not request this change, contact your administrator.\n\n" +
                             "— Career-9 Team";
-                    // Odoo path is @Async fire-and-forget — returns immediately and the
+                    // Gmail path is @Async fire-and-forget — returns immediately and the
                     // actual send happens on a worker thread. We only know the request
-                    // was queued; OdooEmailService logs the eventual success/failure.
-                    odooEmailService.sendSimpleEmail(user.getEmail(), subject, text);
+                    // was queued; SmtpEmailService logs the eventual success/failure.
+                    smtpEmailService.sendSimpleEmail(user.getEmail(), subject, text);
                     emailQueued = true;
                 } catch (Exception e) {
                     emailError = e.getMessage();

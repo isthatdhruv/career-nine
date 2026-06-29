@@ -179,9 +179,9 @@ public class InsightDashboardService {
         if (r.hollandCode != null && !r.hollandCode.isEmpty()) {
             stats.add(new InsightDashboard.Stat("Holland Code", r.hollandCode, "Your interest signature", "primary"));
         }
-        if (r.cci != null) {
-            stats.add(new InsightDashboard.Stat("Career Choice Index", r.cci.name(),
-                    "Readiness to commit to a career direction", accentForLevel(r.cci.name())));
+        if (r.cci != null && r.cci.applicable && r.cci.pct != null) {
+            stats.add(new InsightDashboard.Stat("Career Clarity Index", r.cci.pct + "%",
+                    "Readiness to commit to a career direction", accentForPct(r.cci.pct)));
         }
         stats.add(new InsightDashboard.Stat("Alignment", r.alignmentScore + "%",
                 "How well your interests, abilities & values line up", accentForPct(r.alignmentScore)));

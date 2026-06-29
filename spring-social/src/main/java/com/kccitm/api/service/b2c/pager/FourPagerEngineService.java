@@ -327,12 +327,21 @@ public class FourPagerEngineService {
         return new SimpleDateFormat("d MMMM yyyy", Locale.forLanguageTag("en-IN")).format(new Date());
     }
 
-    private static String cciDescription(CciLevel cci) {
-        if (cci == CciLevel.High)
-            return "2 or more of your career choices match your top suitability careers.";
-        if (cci == CciLevel.Moderate)
+    private static String cciDescription(Navigator360Models.CciResult cci) {
+        if (cci == null || !cci.applicable)
+            return "Career-clarity is measured from Grade 9 onward, once career aspirations are explored.";
+        if ("Clear and Aligned".equals(cci.band))
+            return "Your career choices strongly match your top suitability careers.";
+        if ("Partially Aligned".equals(cci.band))
             return "Some of your career choices align with your top suitability range.";
         return "Your career choices differ from your strength-based suggestions — a great discussion for your counsellor.";
+    }
+
+    /** Spec §2.7.1 / Master "8. Page 4 Bar Mapping" — Excel labels win (source-of-truth hierarchy). */
+    private static String cellBandLabel(int cell) {
+        if (cell >= 7) return "Best Fit";        // cells 7–9 (green)
+        if (cell >= 4) return "Strong Fit";       // cells 4–6 (amber)
+        return "Worth Exploring";                 // cells 1–3 (red)
     }
 
     private static String coherenceLabel(int p2Aspirations) {
@@ -538,14 +547,21 @@ public class FourPagerEngineService {
                 .collect(Collectors.toList());
         out.put("subject_alignment", subjectAlignment(subjects, top3Riasec));
 
-        // Aspirations (up to 4)
-        if (r.careerAspirations != null) {
+        // Aspirations (up to 4). Spec §2.6: the Insight (6-8) stage does not ask Section A —
+        // the aspiration panel is replaced by motivation copy and CCI is omitted.
+        boolean insightStage = "6-8".equals(r.gradeGroup);
+        if (!insightStage && r.careerAspirations != null) {
             int max = Math.min(r.careerAspirations.size(), 4);
             for (int i = 0; i < max; i++) {
                 out.put("aspiration_" + (i + 1), r.careerAspirations.get(i));
             }
+            out.put("aspiration_coherence", coherenceLabel(r.preferenceScore.p2Aspirations));
+        } else if (insightStage) {
+            out.put("aspiration_coherence", "");
+            out.put("motivation_copy",
+                "At this stage it's about discovering what you enjoy — your career direction will sharpen "
+                + "as you explore more subjects and activities.");
         }
-        out.put("aspiration_coherence", coherenceLabel(r.preferenceScore.p2Aspirations));
 
         // Demographic free-text profile fields (fallback strings already applied upstream).
         out.put("achievements", nz(s.achievements, ""));
@@ -582,8 +598,10 @@ public class FourPagerEngineService {
             out.put("strength_profile_4", creative != null ? creative : v);
         }
 
-        // Clarity + alignment
-        out.put("clarity_index", r.cci != null ? r.cci.name() : "");
+        // Clarity + alignment (CCI now a %/band; N/A for the Insight stage)
+        boolean cciOn = r.cci != null && r.cci.applicable && r.cci.pct != null;
+        out.put("clarity_index", cciOn ? r.cci.pct + "%" : "N/A");
+        out.put("clarity_band", r.cci != null && r.cci.band != null ? r.cci.band : "N/A");
         out.put("clarity_description", cciDescription(r.cci));
         out.put("alignment_score", String.valueOf(r.alignmentScore));
 
@@ -606,6 +624,10 @@ public class FourPagerEngineService {
             // Redesigned template renders the per-career percentage via {{p1%}}..{{p9%}}.
             // The % is inside the braces (consumed by substitution), so the value carries it.
             out.put("p" + n + "%", m.suitability + "%");
+            // Spec §2.7.1 / PH-1: Page-4 bar cell (1–9) and its fit label.
+            out.put("p" + n + "_cell", String.valueOf(m.cell));
+            out.put("career_" + n + "_cell", String.valueOf(m.cell));
+            out.put("career_" + n + "_band", cellBandLabel(m.cell));
             out.put("career_" + n + "_desc", careerShortDesc(m));
             out.put("career_" + n + "_tags", careerTags(m));
         }
@@ -615,18 +637,8 @@ public class FourPagerEngineService {
         out.put("most_suited_1", out.get("career_1_name"));
         out.put("most_suited_2", out.get("career_2_name"));
 
-        // CCI% = (aspirations whose career is among the top-9 shown) / (aspirations selected) × 100.
-        Set<String> top9Ids = topCareers.stream()
-                .map(m -> m.career.id)
-                .filter(id -> id != null)
-                .collect(Collectors.toSet());
-        List<String> asps = r.careerAspirations != null ? r.careerAspirations : new ArrayList<>();
-        long matched = asps.stream()
-                .map(Navigator360CareerData.ASPIRATION_TO_CAREER::get)
-                .filter(id -> id != null && top9Ids.contains(id))
-                .count();
-        int cciPct = asps.isEmpty() ? 0 : (int) Math.round((double) matched / asps.size() * 100.0);
-        out.put("cci", String.valueOf(cciPct));
+        // CCI% comes from the engine (spec §2.3 step 10); N/A for Insight or unmapped aspirations.
+        out.put("cci", cciOn ? String.valueOf(r.cci.pct) : "N/A");
 
         // Growth areas (5 lowest)
         List<String[]> growth = pickGrowthAreas(r.riasec, r.mi, r.abilities);

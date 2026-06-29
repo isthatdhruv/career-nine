@@ -88,6 +88,11 @@ public class GeneratedReport implements Serializable {
     @Column(name = "visible_to_student", nullable = false)
     private Boolean visibleToStudent = false;
 
+    // Precomputed Navigator 360 dashboard (serialised Navigator360Result), filled by
+    // ReportService.generate for the pager engine so the student portal renders directly.
+    @Column(name = "navigator_dashboard_json", columnDefinition = "LONGTEXT")
+    private String navigatorDashboardJson;
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", updatable = false)
     private Date createdAt;
@@ -108,6 +113,14 @@ public class GeneratedReport implements Serializable {
     }
 
     public GeneratedReport() {
+    }
+
+    public String getNavigatorDashboardJson() {
+        return navigatorDashboardJson;
+    }
+
+    public void setNavigatorDashboardJson(String navigatorDashboardJson) {
+        this.navigatorDashboardJson = navigatorDashboardJson;
     }
 
     public Long getGeneratedReportId() {

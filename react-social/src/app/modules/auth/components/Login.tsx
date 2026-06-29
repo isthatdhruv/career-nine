@@ -16,18 +16,18 @@ const Redirect_URL =
   URL +
   "/oauth2/redirect";
 
-// Convert an <input type="date"> value (yyyy-MM-dd) to the dd-MM-yyyy the API expects.
-const toDdMmYyyy = (iso: string): string => {
-  if (!iso) return "";
-  const parts = iso.split("-");
-  if (parts.length !== 3) return iso;
-  const [y, m, d] = parts;
-  return `${d}-${m}-${y}`;
-};
+// Date-of-birth dropdown options. The student API expects dd-MM-yyyy, so the
+// values are zero-padded and combined in that order.
+const DOB_DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
+const DOB_MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
+const DOB_YEARS = Array.from({ length: 40 }, (_, i) => String(2024 - i));
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<"staff" | "student">("staff");
+  const [dobDay, setDobDay] = useState("");
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobYear, setDobYear] = useState("");
   const { setCurrentUser } = useAuth();
   const navigate = useNavigate();
 
@@ -62,7 +62,8 @@ const Login = () => {
       setStatus(undefined);
       try {
         if (values.mode === "student") {
-          await studentLogin(values.email, toDdMmYyyy(values.dob));
+          // values.dob is already dd-MM-yyyy, assembled from the dropdowns.
+          await studentLogin(values.email, values.dob);
         } else {
           // Phase 16: cookies are set by the server on /auth/login.
           await login(values.email, values.password);
@@ -96,6 +97,14 @@ const Login = () => {
     formik.setStatus(undefined);
   };
 
+  // Keep the dd-MM-yyyy `dob` formik field in sync with the three dropdowns.
+  const updateDob = (day: string, month: string, year: string) => {
+    setDobDay(day);
+    setDobMonth(month);
+    setDobYear(year);
+    formik.setFieldValue("dob", day && month && year ? `${day}-${month}-${year}` : "");
+  };
+
   const isStudent = mode === "student";
 
   return (
@@ -103,12 +112,14 @@ const Login = () => {
       {/* begin::Heading */}
       <div className="text-center mb-10">
         <h1 className="text-dark mb-3">Sign In to Career-9</h1>
-        <div className="text-gray-400 fw-bold fs-4">
-          New Here?{' '}
-          <Link to='/auth/registration' className='link-primary fw-bolder'>
-            Create an Account
-          </Link>
-        </div>
+        {!isStudent && (
+          <div className="text-gray-400 fw-bold fs-4">
+            New Here?{' '}
+            <Link to='/auth/registration' className='link-primary fw-bolder'>
+              Create an Account
+            </Link>
+          </div>
+        )}
       </div>
       {/* end::Heading */}
 
@@ -166,19 +177,54 @@ const Login = () => {
       {isStudent ? (
         <div className='fv-row mb-10'>
           <label className='form-label fw-bolder text-dark fs-6'>Date of Birth</label>
-          <input
-            type='date'
-            autoComplete='off'
-            {...formik.getFieldProps('dob')}
-            className={clsx(
-              'form-control form-control-lg form-control-solid',
-              {'is-invalid': formik.touched.dob && formik.errors.dob},
-              {'is-valid': formik.touched.dob && !formik.errors.dob}
-            )}
-            name='dob'
-          />
+          <div className='d-flex gap-3'>
+            <select
+              className={clsx(
+                'form-select form-select-lg form-select-solid',
+                {'is-invalid': formik.touched.dob && formik.errors.dob}
+              )}
+              value={dobDay}
+              onChange={(e) => updateDob(e.target.value, dobMonth, dobYear)}
+              onBlur={() => formik.setFieldTouched('dob', true)}
+            >
+              <option value=''>DD</option>
+              {DOB_DAYS.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+
+            <select
+              className={clsx(
+                'form-select form-select-lg form-select-solid',
+                {'is-invalid': formik.touched.dob && formik.errors.dob}
+              )}
+              value={dobMonth}
+              onChange={(e) => updateDob(dobDay, e.target.value, dobYear)}
+              onBlur={() => formik.setFieldTouched('dob', true)}
+            >
+              <option value=''>MM</option>
+              {DOB_MONTHS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+
+            <select
+              className={clsx(
+                'form-select form-select-lg form-select-solid',
+                {'is-invalid': formik.touched.dob && formik.errors.dob}
+              )}
+              value={dobYear}
+              onChange={(e) => updateDob(dobDay, dobMonth, e.target.value)}
+              onBlur={() => formik.setFieldTouched('dob', true)}
+            >
+              <option value=''>YYYY</option>
+              {DOB_YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
           {formik.touched.dob && formik.errors.dob && (
-            <div className='fv-plugins-message-container'>
+            <div className='fv-plugins-message-container mt-2'>
               <div className='fv-help-block'>
                 <span role='alert'>{formik.errors.dob}</span>
               </div>

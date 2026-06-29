@@ -283,7 +283,7 @@ spring:
       - optional:file:../.env.staging[.properties]
   datasource:
     url: jdbc:mysql://localhost:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
-    username: user
+    username: root
     password: Career-qCsfeuECc3MW
     hikari:
       # Dev sizing: a single dev machine with one running JVM rarely needs >10

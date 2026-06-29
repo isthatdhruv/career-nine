@@ -4,7 +4,7 @@ import { zipStoredPdfs } from "../../ReportGeneration/utils/pdfZip";
 import {
   GenerateUnifiedReport,
   GenerateUnifiedReportsBulk,
-  QuestionnaireTemplateMappingDto,
+  TemplateMappingDto,
 } from "../../ReportTemplates/API/Report_Templates_APIs";
 import {
   getGeneratedReportsByAssessment,
@@ -21,7 +21,7 @@ interface Props {
   onClose: () => void;
   assessmentId: number;
   assessmentName: string;
-  templates: QuestionnaireTemplateMappingDto[];
+  templates: TemplateMappingDto[];
   initialTemplateId: number | "";
   students: ModalStudent[];
   /** Called after any generation so the parent page can refresh its own maps. */
@@ -218,7 +218,7 @@ const GenerateReportsModal: React.FC<Props> = ({
             onChange={(e) => setTemplateId(e.target.value === "" ? "" : Number(e.target.value))}
           >
             {templates.length === 0 ? (
-              <option value="">No template mapped to this questionnaire</option>
+              <option value="">No template mapped to this assessment</option>
             ) : (
               templates.map((m) => (
                 <option key={m.template.reportTemplateId} value={m.template.reportTemplateId}>

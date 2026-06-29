@@ -26,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +37,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.NavigatorReportData;
+import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.NavigatorReportDataRepository;
+import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.Navigator.CoreTechnicalNavigatorDataService;
 import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
@@ -287,6 +290,61 @@ public class NavigatorReportDataController {
     @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> getByStudent(@PathVariable Long userStudentId) {
         return ResponseEntity.ok(navigatorReportDataRepository.findByUserStudentUserStudentId(userStudentId));
+    }
+
+    // ═══════════════════════ STUDENT SELF-SERVICE (own data only) ═══════════════════════
+    // Mirrors the Insight dashboard's /me contract (InsightDashboardController#getMyInsight):
+    // the student id is resolved from the SESSION (never a path param) and gated by plain
+    // authentication, so a student can only ever read their own navigator data — no
+    // navigator_report_data.read grant is needed and there is no cross-student exposure.
+
+    /** GET /navigator-report-data/me — lean card list (one summary per generated report). */
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getMyNavigatorReports(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null || principal.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No authenticated user."));
+        }
+        UserStudent self = userStudentRepository.getByUserId(principal.getId()).orElse(null);
+        if (self == null || self.getUserStudentId() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "This account is not a student."));
+        }
+        List<NavigatorReportData> rows =
+                navigatorReportDataRepository.findByUserStudentUserStudentId(self.getUserStudentId());
+        List<Map<String, Object>> cards = new ArrayList<>();
+        for (NavigatorReportData r : rows) {
+            Map<String, Object> card = new LinkedHashMap<>();
+            card.put("navigatorReportDataId", r.getNavigatorReportDataId());
+            card.put("assessmentId", r.getAssessmentId());
+            card.put("eligible", r.isEligible());
+            card.put("reportStatus", r.getReportStatus());
+            card.put("reportUrl", r.getReportUrl());
+            card.put("careerMatchResult", r.getCareerMatchResult());
+            card.put("summary", r.getSummary());
+            card.put("createdAt", r.getCreatedAt());
+            cards.add(card);
+        }
+        return ResponseEntity.ok(cards);
+    }
+
+    /** GET /navigator-report-data/me/{assessmentId} — full persisted report for one own assessment. */
+    @GetMapping("/me/{assessmentId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getMyNavigatorReport(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long assessmentId) {
+        if (principal == null || principal.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No authenticated user."));
+        }
+        UserStudent self = userStudentRepository.getByUserId(principal.getId()).orElse(null);
+        if (self == null || self.getUserStudentId() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "This account is not a student."));
+        }
+        return navigatorReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(self.getUserStudentId(), assessmentId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No navigator report for this assessment.")));
     }
 
     @DeleteMapping("/delete/{id}")

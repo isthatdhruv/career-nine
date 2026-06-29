@@ -54,26 +54,60 @@ public final class Navigator360Models {
         public int total;           // max 100
     }
 
-    /** Spec §7.5. */
+    /** Spec §2.3 step 9 — one of the 24 canonical career clusters. */
     public static class CareerDefinition {
+        public int srNo;                        // canonical Sr-no (cluster cascade Tier F)
         public String id;
         public String name;
-        public List<RiasecType> riasec;        // [Primary, Secondary, Tertiary]
-        public List<String> mi;                 // 3 supporting MI
-        public List<String> abilities;          // 3 supporting abilities
-        public List<String> values;             // aligned values
+        public List<RiasecType> riasec;        // [Primary, Secondary, Tertiary] (P_score)
+        public List<String> mi;                 // required MI domains (I_score)
+        public List<String> abilities;          // required abilities, ranked (A_score)
+        public List<String> values;             // aligned values (V_score)
         public List<String> degreePaths;
     }
 
-    /** One row of the ranked career-match list. */
+    /** One ranked cluster, scored by the spec §2.3 step 8 CSI. */
     public static class CareerMatch {
         public CareerDefinition career;
-        public int potentialMatch;          // 0–100
-        public int valuesMatch;             // 0–100
-        public int suitability;             // 0–100
+        public int pScore;                  // 0–100 personality sub-score
+        public int aScore;                  // 0–100 ability sub-score
+        public int iScore;                  // 0–100 intelligence sub-score
+        public int valuesMatch;             // 0–100 V_score
+        public int csiRaw;                  // 0–100 csi before reliability
+        public int suitability;             // 0–100 csi_final (csi_raw × completion × 1.05, clamped)
         public int suitability9;            // 1–9
+        public int cell;                    // 1–9 Page-4 bar cell = clamp(ceil(pct/11.11),1,9)
+        // Back-compat alias: callers that read potentialMatch get the personality+ability+intelligence blend.
+        public int potentialMatch;          // 0–100
         public List<String> matchedValues = new ArrayList<>();
         public boolean isAspiration;
+    }
+
+    /** Career Clarity Index (spec §2.3 step 10). */
+    public static class CciResult {
+        public boolean applicable;          // false → N/A (Insight stage, or no aspiration maps)
+        public Integer pct;                 // 0–100, null when not applicable
+        public String band;                 // "Clear and Aligned" | "Partially Aligned" | "Aspiration Mismatch" | "N/A"
+
+        public CciResult() {}
+        public CciResult(boolean applicable, Integer pct, String band) {
+            this.applicable = applicable;
+            this.pct = pct;
+            this.band = band;
+        }
+    }
+
+    /**
+     * Validity / bias outcome computed at the item level by
+     * {@code NavigatorReportGenerationService} (spec §2.2) and consumed by the
+     * engine for component suppression / reweighting / hard-fail.
+     */
+    public static class ValidityResult {
+        public boolean valid = true;        // false → ERR-*, no report
+        public boolean hardFail = false;    // 2+ bias → cover-message-only
+        public double completionPct = 1.0;  // (108 − total_issues) / 108
+        public java.util.Set<String> suppressed = new java.util.HashSet<>(); // "personality"|"ability"|"intelligence"
+        public List<FlagInfo> flags = new ArrayList<>(); // ERR/WARN/BIAS emitted at validity stage
     }
 
     /** Psychometric flag (spec §10–12). */
@@ -112,8 +146,11 @@ public final class Navigator360Models {
 
         public List<CareerMatch> careerMatches = new ArrayList<>();
         public List<CareerMatch> topCareers = new ArrayList<>();
-        public CciLevel cci;
+        public CciResult cci;
         public int alignmentScore;
+
+        public boolean suppressBottomTier;   // TOP9-3: ≥4 of Top-9 below csi 50
+        public boolean hardFail;             // composite bias → cover-message-only
 
         public List<FlagInfo> flags = new ArrayList<>();
         public String hollandCode;

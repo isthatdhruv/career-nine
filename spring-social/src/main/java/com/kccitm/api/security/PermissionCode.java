@@ -32,6 +32,10 @@ public enum PermissionCode {
     INSTITUTE_WRITE  ("institute.write",  "Create or update institutes"),
     INSTITUTE_DELETE ("institute.delete", "Delete institutes"),
 
+    // ── School cohort insights dashboard (Dashboard 2) ──────────────────
+    DASHBOARD_SCHOOL_INSIGHTS_GENERATE("dashboard.school.insights.generate", "Generate/refresh school cohort insight payloads (superadmin)"),
+    DASHBOARD_SCHOOL_INSIGHTS_READ("dashboard.school.insights.read", "View the school cohort insights dashboard"),
+
     // ── Session (Phase 14 foundation) ───────────────────────────────────
     SESSION_READ  ("session.read",  "View academic sessions"),
     SESSION_WRITE ("session.write", "Create or update sessions"),
@@ -220,6 +224,11 @@ public enum PermissionCode {
     PROMO_CODE_CREATE      ("promo_code.create",      "Create promo codes"),
     PROMO_CODE_UPDATE      ("promo_code.update",      "Update promo codes"),
     PROMO_CODE_DELETE      ("promo_code.delete",      "Delete promo codes"),
+    REFERRAL_CODE_READ     ("referral_code.read",     "View referral codes"),
+    REFERRAL_CODE_READ_ALL ("referral_code.read.all", "View all referral codes across scopes"),
+    REFERRAL_CODE_CREATE   ("referral_code.create",   "Create referral codes"),
+    REFERRAL_CODE_UPDATE   ("referral_code.update",   "Update referral codes"),
+    REFERRAL_CODE_DELETE   ("referral_code.delete",   "Delete referral codes"),
     CAMPAIGN_PUBLIC        ("campaign.public",        "Access public-facing campaign endpoints"),
     CAMPAIGN_CREATE        ("campaign.create",        "Create campaigns"),
     CAMPAIGN_UPDATE        ("campaign.update",        "Update campaigns"),

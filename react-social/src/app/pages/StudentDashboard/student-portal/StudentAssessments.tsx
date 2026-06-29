@@ -1,6 +1,5 @@
 import React from 'react'
-import { useNavigate } from 'react-router-dom'
-import { DashboardApiResponse, DashboardApiAssessmentData } from '../API/Dashboard_APIs'
+import { useStudentData } from './StudentDataContext'
 import './StudentPortal.css'
 
 const ASSESSMENT_URL = 'https://assessment.career-9.com'
@@ -27,11 +26,10 @@ function formatDate(dateStr: string | null | undefined): string {
 }
 
 const StudentAssessments: React.FC = () => {
-  const navigate = useNavigate()
-
-  const dashStr = localStorage.getItem('studentPortalDashboard')
-  const rawData: DashboardApiResponse | null = dashStr ? JSON.parse(dashStr) : null
-  const assessments: DashboardApiAssessmentData[] = rawData?.assessments || []
+  // Assessments come from the once-at-login bootstrap (StudentDataContext), not the
+  // retired studentPortalDashboard localStorage cache.
+  const { data } = useStudentData()
+  const assessments = data.assessments || []
 
   const handleAssessmentClick = () => {
     window.open(ASSESSMENT_URL, '_blank')

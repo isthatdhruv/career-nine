@@ -28,9 +28,10 @@
   --radius-xs: 8px;
 
   font-family: "Inter", sans-serif;
-  background: var(--bg-page);
+  /* Transparent so the StudentPortalLayout green-glass gradient shows through —
+     the page no longer owns the full-viewport background (the shell does). */
+  background: transparent;
   color: var(--text-body);
-  min-height: 100vh;
   position: relative;
 }
 
@@ -158,9 +159,11 @@
 }
 
 /* ========== MAIN ========== */
+/* Chrome moved to StudentPortalLayout: no sidebar offset, no own padding (the
+   shell's .sp-content owns outer spacing); just cap content width and center. */
 .spd-root .spd-main {
-  margin-left: 72px;
-  padding: 24px 40px 60px;
+  margin: 0 auto;
+  padding: 0;
   max-width: 1340px;
 }
 

@@ -22,21 +22,10 @@ export interface ReportTemplateCreate {
   spacesRenderFolder: string;
 }
 
-export interface QuestionnaireTemplateMappingDto {
+export interface TemplateMappingDto {
   mappingId: number;
   isDefault: boolean;
   template: ReportTemplateDto;
-}
-
-export interface QuestionnaireOption {
-  questionnaireId: number;
-  name: string | null;
-}
-
-export function ReadAllQuestionnaires() {
-  return axios.get<QuestionnaireOption[]>(`${API_URL}/api/questionnaire/get/list`, {
-    headers: { Accept: "application/json" },
-  });
 }
 
 // ── Template catalog CRUD ──────────────────────────────────────────────
@@ -80,35 +69,29 @@ export function BootstrapClasspathTemplates() {
   }>(`${API_URL}/report-template/bootstrap-classpath`, {});
 }
 
-// ── Questionnaire ↔ template mapping ───────────────────────────────────
+// ── Assessment ↔ template mapping ──────────────────────────────────────
 
-export function ReadQuestionnaireTemplates(questionnaireId: number) {
-  return axios.get<QuestionnaireTemplateMappingDto[]>(
-    `${API_URL}/questionnaire/${questionnaireId}/templates`
-  );
-}
-
-/** Templates available for an assessment (mapped to its questionnaire). */
+/** Templates mapped to an assessment, with the default flagged. */
 export function ReadAssessmentTemplates(assessmentId: number) {
-  return axios.get<QuestionnaireTemplateMappingDto[]>(
+  return axios.get<TemplateMappingDto[]>(
     `${API_URL}/assessment/${assessmentId}/report-templates`
   );
 }
 
-export function MapTemplateToQuestionnaire(questionnaireId: number, reportTemplateId: number) {
-  return axios.post<QuestionnaireTemplateMappingDto>(
-    `${API_URL}/questionnaire/${questionnaireId}/templates`,
+export function MapTemplateToAssessment(assessmentId: number, reportTemplateId: number) {
+  return axios.post<TemplateMappingDto>(
+    `${API_URL}/assessment/${assessmentId}/templates`,
     { reportTemplateId }
   );
 }
 
-export function UnmapTemplateFromQuestionnaire(questionnaireId: number, reportTemplateId: number) {
-  return axios.delete(`${API_URL}/questionnaire/${questionnaireId}/templates/${reportTemplateId}`);
+export function UnmapTemplateFromAssessment(assessmentId: number, reportTemplateId: number) {
+  return axios.delete(`${API_URL}/assessment/${assessmentId}/templates/${reportTemplateId}`);
 }
 
-export function SetDefaultTemplate(questionnaireId: number, reportTemplateId: number) {
-  return axios.put<QuestionnaireTemplateMappingDto>(
-    `${API_URL}/questionnaire/${questionnaireId}/default-template`,
+export function SetDefaultAssessmentTemplate(assessmentId: number, reportTemplateId: number) {
+  return axios.put<TemplateMappingDto>(
+    `${API_URL}/assessment/${assessmentId}/default-template`,
     { reportTemplateId }
   );
 }
