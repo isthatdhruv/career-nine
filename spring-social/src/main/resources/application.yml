@@ -391,7 +391,7 @@ spring:
       - optional:file:./.env.staging[.properties]
       - optional:file:../.env.staging[.properties]
   datasource:
-    url: jdbc:mysql://mysql_db_staging:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&maxAllowedPacket=536870912&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+    url: jdbc:mysql://mysql_db_staging:3306/career-9-staging-v2?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&maxAllowedPacket=536870912&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
     username: root
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
