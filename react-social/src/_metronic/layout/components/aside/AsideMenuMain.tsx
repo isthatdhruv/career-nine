@@ -108,7 +108,8 @@ export function AsideMenuMain() {
   const showJwtTokens = isSuperAdmin;
   const showEmailAccounts = allowed("/admin/email-accounts");
   const showEmailLog = allowed("/admin/email-log");
-  const showEmail = showEmailAccounts || showEmailLog;
+  const showEmailTemplates = allowed("/admin/email-templates");
+  const showEmail = showEmailAccounts || showEmailLog || showEmailTemplates;
   const showLeads = allowed("/leads");
   const showOldDataMapping = allowed("/old-data-mapping");
   const showScoreDebug = allowed("/score-debug");
@@ -668,6 +669,14 @@ export function AsideMenuMain() {
                   icon="/media/icons/duotune/communication/com011.svg"
                   title="Email Accounts"
                   fontIcon="bi-envelope-at"
+                />
+              )}
+              {showEmailTemplates && (
+                <AsideMenuItem
+                  to="/admin/email-templates"
+                  icon="/media/icons/duotune/communication/com009.svg"
+                  title="Email Templates"
+                  fontIcon="bi-envelope-paper-heart"
                 />
               )}
               {showEmailLog && (

@@ -197,7 +197,6 @@ app:
     access-max-age-seconds: 864000
   openai:
     api-key: ${OPENAI_API_KEY:}
-  mandrill: ${APP_MANDRILL:}
   # Google Analytics (GA4) server-side conversion tracking via the Measurement
   # Protocol. The measurement-id is public (it also ships in the frontend
   # index.html). The api-secret IS sensitive — supply it per-profile via the

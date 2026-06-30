@@ -55,7 +55,8 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.RazorpayService;
-import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
 import com.kccitm.api.service.career9.InstituteAssessmentService;
@@ -87,7 +88,7 @@ public class SchoolRegistrationController {
     @Autowired private PromoCodeRepository promoCodeRepository;
     @Autowired private com.kccitm.api.service.career9.ReferralService referralService;
     @Autowired private RazorpayService razorpayService;
-    @Autowired private SmtpEmailService emailService;
+    @Autowired private EmailDispatchService emailDispatchService;
     @Autowired private CareerNineRollNumberService rollNumberService;
     @Autowired private StudentProvisioningService studentProvisioningService;
     @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
@@ -1134,7 +1135,7 @@ public class SchoolRegistrationController {
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                     + "</div></div>";
 
-            emailService.sendHtmlEmail(toEmail, subject, htmlContent);
+            emailDispatchService.sendHtml(EmailType.SCHOOL_REGISTRATION, toEmail, subject, htmlContent);
             logger.info("Registration email sent to: {}", toEmail);
         } catch (Exception e) {
             logger.error("Failed to send registration email to: {}. Error: {}", toEmail, e.getMessage(), e);

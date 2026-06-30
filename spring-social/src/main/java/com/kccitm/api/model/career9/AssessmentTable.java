@@ -73,6 +73,10 @@ public class AssessmentTable implements java.io.Serializable {
     @Column(name = "collect_email_and_phone")
     private Boolean collectEmailAndPhone = true;
 
+    /** When true, students of this assessment get their report emailed even if not whitelabel (Phase 4). */
+    @Column(name = "email_report_enabled")
+    private Boolean emailReportEnabled = false;
+
     @Column(name = "default_purchase_path", length = 1, columnDefinition = "char(1) default 'B'")
     private String defaultPurchasePath = "B";
 
@@ -234,6 +238,14 @@ public class AssessmentTable implements java.io.Serializable {
 
     public void setReportType(String reportType) {
         this.reportType = reportType;
+    }
+
+    public Boolean getEmailReportEnabled() {
+        return emailReportEnabled;
+    }
+
+    public void setEmailReportEnabled(Boolean emailReportEnabled) {
+        this.emailReportEnabled = emailReportEnabled;
     }
 
 }

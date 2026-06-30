@@ -21,8 +21,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cribbstechnologies.clients.mandrill.exception.RequestFailedException;
-import com.cribbstechnologies.clients.mandrill.model.MandrillRecipient;
 import com.itextpdf.text.pdf.PdfStructTreeController.returnType;
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.Batch;
@@ -55,7 +53,6 @@ import com.kccitm.api.service.GoogleCloudAPI;
 import com.kccitm.api.service.PdfService;
 import com.kccitm.api.service.StudentService;
 import com.kccitm.api.service.StudentProvisioningService;
-import com.microtripit.mandrillapp.lutung.model.MandrillApiError;
 
 @RestController
 public class StudentController {
@@ -175,7 +172,7 @@ public class StudentController {
   public List<Student> updateStudent(
       @RequestBody Map<String, Student> studentDetail,
       @CurrentUser UserPrincipal UserPrincipal)
-      throws RequestFailedException, MandrillApiError, IOException {
+      throws IOException {
     Student r = studentDetail.get("values");
 
     if (r.getGenerate().equals("SI")) {
@@ -190,10 +187,6 @@ public class StudentController {
     }
     // studentRepository.save(r);
 
-    MandrillRecipient[] recipient = {
-        new MandrillRecipient("kcc", "kccproject75@gmail.com"),
-    };
-
     return studentRepository.findByPersonalEmailAddress(
         r.getPersonalEmailAddress());
   }
@@ -203,7 +196,7 @@ public class StudentController {
   @PreAuthorize("@auth.allows('email.send')")
   @GetMapping("/mail")
   public String mail()
-      throws RequestFailedException, MandrillApiError, IOException {
+      throws IOException {
     User user = new User();
     user.setEmail("kccproject75@gmail.com");
     user.setName("abc");
@@ -485,7 +478,7 @@ public class StudentController {
   @ResponseBody
   public String generatePdf(@RequestParam(name = "id") String st, @CurrentUser UserPrincipal userPrincipal,
       HttpServletResponse response)
-      throws Exception, RequestFailedException {
+      throws Exception {
     Map<String, Student> currentStudent = new HashMap<String, Student>();
 
     Student stu = studentRepository.findById(Integer.parseInt(st));
@@ -580,7 +573,7 @@ public class StudentController {
   @ResponseBody
   public boolean emailValidationOfficial(@RequestParam(name = "email") String email,
       HttpServletResponse response)
-      throws Exception, RequestFailedException {
+      throws Exception {
     if (email.toLowerCase().split("@")[1].equals("kccitm.edu.in")) {
       studentService.sendOtpMail(email, studentService.emailToCode(email));
       return true;
@@ -597,7 +590,7 @@ public class StudentController {
   public boolean emailValidationOfficialConfermation(@RequestParam(name = "email") String email,
       @RequestParam(name = "otp") String otp,
       HttpServletResponse response)
-      throws Exception, RequestFailedException {
+      throws Exception {
     System.out.println("SENT OTP = " + studentService.emailToCode(email));
     System.out.println("RECIEVED OTP = " + otp);
     if (studentService.emailToCode(email).equals(otp))
@@ -611,7 +604,7 @@ public class StudentController {
   @ResponseBody
   public String generateIdCard(@RequestParam(name = "id") String st, @CurrentUser UserPrincipal userPrincipal,
       HttpServletResponse response)
-      throws Exception, RequestFailedException {
+      throws Exception {
     Map<String, Student> currentStudent = new HashMap<String, Student>();
 
     Student stu = studentRepository.findById(Integer.parseInt(st));

@@ -1,5 +1,7 @@
 package com.kccitm.api.service.b2c;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 
 import org.slf4j.Logger;
@@ -9,8 +11,12 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.career9.b2c.ServiceDeliveryLog;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
+import com.kccitm.api.model.email.EmailDeliveryMode;
+import com.kccitm.api.model.email.EmailSendRequest;
+import com.kccitm.api.model.email.EmailSendResult;
+import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository;
-import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.email.EmailDispatchService;
 
 /**
  * Wraps the Gmail email service and writes a ServiceDeliveryLog row
@@ -21,7 +27,7 @@ public class NotificationDispatcher {
 
     private static final Logger logger = LoggerFactory.getLogger(NotificationDispatcher.class);
 
-    @Autowired private SmtpEmailService smtpEmailService;
+    @Autowired private EmailDispatchService emailDispatchService;
     @Autowired private ServiceDeliveryLogRepository serviceDeliveryLogRepository;
 
     public ServiceDeliveryLog sendEmail(StudentEntitlement entitlement,
@@ -53,15 +59,45 @@ public class NotificationDispatcher {
         }
 
         try {
-            smtpEmailService.sendHtmlEmail(recipient, subject, htmlBody);
-            log.setDeliveryStatus("sent");
-            log.setSentAt(new Date());
+            // Route through the central dispatcher (universal email_send_log + account routing).
+            // Forced ASYNC to preserve the original fire-and-forget behaviour; this ServiceDeliveryLog
+            // row remains the B2C-specific audit trail.
+            EmailSendRequest req = new EmailSendRequest();
+            req.setEmailType(mapServiceType(serviceType));
+            req.setTo(new ArrayList<>(Collections.singletonList(recipient)));
+            if (entitlement != null) {
+                req.setUserStudentId(entitlement.getUserStudentId());
+            }
+            req.setDeliveryModeOverride(EmailDeliveryMode.ASYNC);
+            req.setSubject(subject);
+            req.setHtmlContent(htmlBody);
+            EmailSendResult result = emailDispatchService.send(req);
+            if (result != null && result.isSuccess()) {
+                log.setDeliveryStatus("sent");
+                log.setSentAt(new Date());
+            } else {
+                log.setDeliveryStatus("failed");
+                log.setFailureReason(result != null ? result.getError() : "dispatch failed");
+            }
         } catch (Exception e) {
             logger.error("Email send failed for serviceType={} to={}", serviceType, recipient, e);
             log.setDeliveryStatus("failed");
             log.setFailureReason(e.getMessage());
         }
         return serviceDeliveryLogRepository.save(log);
+    }
+
+    /** Best-effort mapping of the B2C serviceType to an {@link EmailType} for logging/templating. */
+    private static EmailType mapServiceType(String serviceType) {
+        if (serviceType == null) {
+            return EmailType.GENERIC;
+        }
+        switch (serviceType) {
+            case "assessment_invite": return EmailType.ENTITLEMENT_GRANTED;
+            case "final_report":
+            case "one_pager":         return EmailType.REPORT_READY;
+            default:                  return EmailType.GENERIC;
+        }
     }
 
     public long countSent(Long entitlementId, String serviceType) {

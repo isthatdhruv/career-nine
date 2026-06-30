@@ -78,13 +78,15 @@ export function SendReportEmail(
   emails: string[],
   subject: string,
   htmlContent: string,
-  fromName?: string
+  fromName?: string,
+  overrideAccountId?: number | null
 ) {
   return axios.post(`${API_URL}/contact-person/send-report-email`, {
     emails,
     subject,
     htmlContent,
     fromName,
+    overrideAccountId: overrideAccountId ?? null,
   });
 }
 

@@ -71,6 +71,9 @@
   "email_log.read": [
     "/admin/email-log"
   ],
+  "email_template.read": [
+    "/admin/email-templates"
+  ],
   "generated_report.read": [
     "/student/insight-dashboard"
   ],

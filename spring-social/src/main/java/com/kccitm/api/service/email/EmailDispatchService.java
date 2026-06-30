@@ -15,10 +15,14 @@ import com.kccitm.api.model.email.EmailSendLog;
 import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailSendStatus;
+import com.kccitm.api.model.email.EmailTemplate;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.email.EmailAccountRepository;
 import com.kccitm.api.repository.email.EmailSendLogRepository;
+import com.kccitm.api.repository.email.EmailTemplateRepository;
+
+import java.util.Map;
 
 /**
  * The single entry point every email in the system flows through. Resolves the sending
@@ -44,9 +48,67 @@ public class EmailDispatchService {
     @Autowired
     private AsyncEmailExecutor asyncExecutor;
 
+    @Autowired
+    private InstituteEmailSettingService instituteEmailSettingService;
+
+    @Autowired
+    private EmailTemplateRepository templateRepository;
+
+    @Autowired
+    private PlaceholderResolver placeholderResolver;
+
+    @Autowired
+    private EmailTemplateRenderer templateRenderer;
+
     /** Convenience for the common single-recipient HTML send. */
     public EmailSendResult sendHtml(EmailType type, String to, String subject, String html) {
         return send(EmailSendRequest.html(type, to, subject, html));
+    }
+
+    /** Convenience for a single-recipient plain-text send. */
+    public EmailSendResult sendText(EmailType type, String to, String subject, String text) {
+        EmailSendRequest r = new EmailSendRequest();
+        r.setEmailType(type);
+        if (to != null) {
+            r.getTo().add(to);
+        }
+        r.setSubject(subject);
+        r.setTextContent(text);
+        return send(r);
+    }
+
+    /**
+     * Route a PRE-BUILT message (with attachments / cc / bcc) through the dispatcher, for
+     * callers that already assemble an {@link SmtpEmailRequest}. The from-identity comes from
+     * the resolved account; the message's own from-email/from-name are ignored.
+     */
+    public EmailSendResult send(EmailType type, SmtpEmailRequest msg, Integer instituteCode) {
+        return send(type, msg, instituteCode, null);
+    }
+
+    /** As above, with a manual account override (the send-surface picker). */
+    public EmailSendResult send(EmailType type, SmtpEmailRequest msg, Integer instituteCode,
+                                Long overrideAccountId) {
+        EmailSendRequest r = new EmailSendRequest();
+        r.setEmailType(type != null ? type : EmailType.GENERIC);
+        if (msg.getTo() != null) {
+            r.setTo(new ArrayList<>(msg.getTo()));
+        }
+        if (msg.getCc() != null) {
+            r.setCc(new ArrayList<>(msg.getCc()));
+        }
+        if (msg.getBcc() != null) {
+            r.setBcc(new ArrayList<>(msg.getBcc()));
+        }
+        r.setSubject(msg.getSubject());
+        r.setHtmlContent(msg.getHtmlContent());
+        r.setTextContent(msg.getTextContent());
+        if (msg.getAttachments() != null && !msg.getAttachments().isEmpty()) {
+            r.setAttachments(new ArrayList<>(msg.getAttachments()));
+        }
+        r.setInstituteCode(instituteCode);
+        r.setOverrideAccountId(overrideAccountId);
+        return send(r);
     }
 
     public EmailSendResult send(EmailSendRequest req) {
@@ -61,10 +123,11 @@ public class EmailDispatchService {
             return logSkip(req, null, "No email account configured");
         }
 
-        EmailDeliveryMode mode = resolveDeliveryMode(req);
-        SmtpEmailRequest message = buildMessage(req, account);
+        EmailTemplate template = resolveTemplate(req);
+        EmailDeliveryMode mode = resolveDeliveryMode(req, template);
+        SmtpEmailRequest message = buildMessage(req, account, template);
 
-        EmailSendLog row = saveLog(req, account, mode, EmailSendStatus.QUEUED, null);
+        EmailSendLog row = saveLog(req, account, template, mode, EmailSendStatus.QUEUED, null);
 
         if (mode == EmailDeliveryMode.SYNC) {
             try {
@@ -91,26 +154,67 @@ public class EmailDispatchService {
     // ─── resolution ──────────────────────────────────────────────────────
 
     private EmailAccount resolveAccount(EmailSendRequest req) {
-        if (req.getOverrideAccountId() != null) {
-            Optional<EmailAccount> a = accountRepository.findById(req.getOverrideAccountId());
-            if (a.isPresent() && Boolean.TRUE.equals(a.get().getActive())) {
-                return a.get();
-            }
+        // 1. Manual override — explicit pick at send time wins.
+        EmailAccount override = activeById(req.getOverrideAccountId());
+        if (override != null) {
+            return override;
         }
-        // Phase 2 inserts the per-institute default lookup here (req.getInstituteCode()).
+        // 2. Institute default — the per-institute configured account (Phase 2).
+        EmailAccount institute = activeById(
+                instituteEmailSettingService.resolveDefaultAccountId(req.getInstituteCode()));
+        if (institute != null) {
+            return institute;
+        }
+        // 3. Global default.
         return accountRepository.findFirstByIsGlobalDefaultTrueAndActiveTrue().orElse(null);
     }
 
-    private EmailDeliveryMode resolveDeliveryMode(EmailSendRequest req) {
+    /** Loads an account by id only if it exists and is active; null otherwise. */
+    private EmailAccount activeById(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return accountRepository.findById(id)
+                .filter(a -> Boolean.TRUE.equals(a.getActive()))
+                .orElse(null);
+    }
+
+    /**
+     * Resolve the template: manual override → the send-scenario's default. Returns null when
+     * no template is configured for the type, in which case the dispatcher passes the caller's
+     * subject/html through unchanged (backward compatible).
+     */
+    private EmailTemplate resolveTemplate(EmailSendRequest req) {
+        if (req.getOverrideTemplateId() != null) {
+            EmailTemplate t = templateRepository.findById(req.getOverrideTemplateId()).orElse(null);
+            if (t != null && Boolean.TRUE.equals(t.getActive())) {
+                return t;
+            }
+        }
+        if (req.getEmailType() != null) {
+            return templateRepository
+                    .findFirstByEmailTypeAndIsDefaultTrueAndActiveTrue(req.getEmailType().name())
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private EmailDeliveryMode resolveDeliveryMode(EmailSendRequest req, EmailTemplate template) {
         if (req.getDeliveryModeOverride() != null) {
             return req.getDeliveryModeOverride();
         }
-        // Phase 3 reads the resolved template's mode first; until then use the EmailType default.
+        if (template != null && template.getDeliveryMode() != null) {
+            return template.getDeliveryMode();
+        }
         EmailType type = req.getEmailType();
         return type != null ? type.defaultDeliveryMode() : EmailDeliveryMode.ASYNC;
     }
 
-    private SmtpEmailRequest buildMessage(EmailSendRequest req, EmailAccount account) {
+    /**
+     * Build the message. When a template is resolved, subject + HTML are rendered from it with
+     * the placeholder map; otherwise the caller's pass-through subject/html are used.
+     */
+    private SmtpEmailRequest buildMessage(EmailSendRequest req, EmailAccount account, EmailTemplate template) {
         SmtpEmailRequest m = new SmtpEmailRequest();
         m.setFromEmail(account.getFromEmail());
         m.setFromName(account.getFromName());
@@ -121,9 +225,19 @@ public class EmailDispatchService {
         if (req.getBcc() != null) {
             m.setBcc(new ArrayList<>(req.getBcc()));
         }
-        m.setSubject(req.getSubject());
-        m.setHtmlContent(req.getHtmlContent());
-        m.setTextContent(req.getTextContent());
+        if (template != null) {
+            Map<String, String> ctx = placeholderResolver.resolve(req);
+            String subject = templateRenderer.render(template.getSubjectTemplate(), ctx);
+            if (subject == null || subject.trim().isEmpty()) {
+                subject = req.getSubject(); // fall back to a caller-supplied subject if the template's is blank
+            }
+            m.setSubject(subject);
+            m.setHtmlContent(templateRenderer.render(template.getBodyTemplate(), ctx));
+        } else {
+            m.setSubject(req.getSubject());
+            m.setHtmlContent(req.getHtmlContent());
+            m.setTextContent(req.getTextContent());
+        }
         if (req.getAttachments() != null && !req.getAttachments().isEmpty()) {
             m.setAttachments(new ArrayList<>(req.getAttachments()));
         }
@@ -132,13 +246,14 @@ public class EmailDispatchService {
 
     // ─── logging ─────────────────────────────────────────────────────────
 
-    private EmailSendLog saveLog(EmailSendRequest req, EmailAccount account,
+    private EmailSendLog saveLog(EmailSendRequest req, EmailAccount account, EmailTemplate template,
                                  EmailDeliveryMode mode, EmailSendStatus status, String error) {
         EmailSendLog row = new EmailSendLog();
         row.setEmailType(req.getEmailType() != null ? req.getEmailType().name() : null);
         row.setRecipient(truncate(firstRecipient(req), 320));
         row.setSubject(truncate(req.getSubject(), 500));
         row.setAccountId(account != null ? account.getId() : null);
+        row.setTemplateId(template != null ? template.getId() : null);
         row.setInstituteCode(req.getInstituteCode());
         row.setUserStudentId(req.getUserStudentId());
         row.setDeliveryMode(mode);
@@ -148,7 +263,7 @@ public class EmailDispatchService {
     }
 
     private EmailSendResult logSkip(EmailSendRequest req, EmailAccount account, String reason) {
-        EmailSendLog row = saveLog(req, account, null, EmailSendStatus.SKIPPED, reason);
+        EmailSendLog row = saveLog(req, account, null, null, EmailSendStatus.SKIPPED, reason);
         return EmailSendResult.skipped(row.getId(), reason);
     }
 
@@ -190,9 +305,9 @@ public class EmailDispatchService {
 
         EmailSendRequest req = EmailSendRequest.html(EmailType.ACCOUNT_TEST, to, subject, html);
         req.setDeliveryModeOverride(EmailDeliveryMode.SYNC);
-        SmtpEmailRequest message = buildMessage(req, account);
+        SmtpEmailRequest message = buildMessage(req, account, null);
 
-        EmailSendLog row = saveLog(req, account, EmailDeliveryMode.SYNC, EmailSendStatus.QUEUED, null);
+        EmailSendLog row = saveLog(req, account, null, EmailDeliveryMode.SYNC, EmailSendStatus.QUEUED, null);
         try {
             senderFactory.forAccount(account).send(message);
             row.setStatus(EmailSendStatus.SENT);

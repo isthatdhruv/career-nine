@@ -1,7 +1,9 @@
 package com.kccitm.api.model.email;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 
@@ -36,6 +38,9 @@ public class EmailSendRequest {
     private Long userStudentId;
     /** Optional explicit delivery mode; else template / EmailType default. */
     private EmailDeliveryMode deliveryModeOverride;
+
+    /** Per-send placeholder values (e.g. "username" → "asha01") merged by the resolver (Phase 3). */
+    private Map<String, String> templateContext = new HashMap<>();
 
     private List<SmtpEmailRequest.EmailAttachment> attachments = new ArrayList<>();
 
@@ -78,6 +83,17 @@ public class EmailSendRequest {
     public void setUserStudentId(Long userStudentId) { this.userStudentId = userStudentId; }
     public EmailDeliveryMode getDeliveryModeOverride() { return deliveryModeOverride; }
     public void setDeliveryModeOverride(EmailDeliveryMode deliveryModeOverride) { this.deliveryModeOverride = deliveryModeOverride; }
+    public Map<String, String> getTemplateContext() { return templateContext; }
+    public void setTemplateContext(Map<String, String> templateContext) {
+        this.templateContext = templateContext != null ? templateContext : new HashMap<>();
+    }
+    /** Fluent helper to add a single placeholder value. */
+    public EmailSendRequest put(String key, String value) {
+        if (key != null) {
+            this.templateContext.put(key, value);
+        }
+        return this;
+    }
     public List<SmtpEmailRequest.EmailAttachment> getAttachments() { return attachments; }
     public void setAttachments(List<SmtpEmailRequest.EmailAttachment> attachments) { this.attachments = attachments; }
 }

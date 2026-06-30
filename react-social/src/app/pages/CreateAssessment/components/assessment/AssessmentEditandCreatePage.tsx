@@ -37,6 +37,7 @@ const AssessmentEditPage = (props?: {
       modeofAssessment: false,
       showTimer: true,
       saveLater: true,
+      emailReportEnabled: false,
       questionnaires: [
         {
           questionnaireId: 0,
@@ -122,6 +123,7 @@ const AssessmentEditPage = (props?: {
       showTimer: assessmentData.showTimer !== false,
       saveLater: assessmentData.saveLater !== false,
       collectEmailAndPhone: assessmentData.collectEmailAndPhone !== false,
+      emailReportEnabled: assessmentData.emailReportEnabled === true,
       questionnaires: assessmentData.questionnaires?.map((q: any) => q.questionnaireId) || [],
     },
     validationSchema: validationSchema,
@@ -137,6 +139,7 @@ const AssessmentEditPage = (props?: {
           showTimer: values.showTimer,
           saveLater: values.saveLater,
           collectEmailAndPhone: values.collectEmailAndPhone,
+          emailReportEnabled: values.emailReportEnabled,
         };
 
         if (selectedQuestionnaireId) {
@@ -308,6 +311,20 @@ const AssessmentEditPage = (props?: {
                   />
                   <label className="form-check-label" htmlFor="collectEmailAndPhone">
                     Collect Email & Phone
+                  </label>
+                </div>
+                <div className="form-check form-switch mt-3">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="emailReportEnabled"
+                    checked={formik.values.emailReportEnabled}
+                    onChange={() =>
+                      formik.setFieldValue("emailReportEnabled", !formik.values.emailReportEnabled)
+                    }
+                  />
+                  <label className="form-check-label" htmlFor="emailReportEnabled">
+                    Email report to students
                   </label>
                 </div>
               </div>

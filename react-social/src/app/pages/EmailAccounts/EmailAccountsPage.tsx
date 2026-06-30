@@ -1,5 +1,6 @@
 import PageHeader from "../../components/PageHeader";
 import EmailAccountsTable from "./components/EmailAccountsTable";
+import InstituteEmailDefaults from "./components/InstituteEmailDefaults";
 
 const EmailAccountsPage = () => {
   return (
@@ -10,6 +11,7 @@ const EmailAccountsPage = () => {
         subtitle="Configure sender accounts, credentials and the global default provider"
       />
       <EmailAccountsTable />
+      <InstituteEmailDefaults />
     </div>
   );
 };

@@ -58,7 +58,6 @@ import com.kccitm.api.security.RefreshTokenService.RefreshTokenReuseException;
 import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.security.UserPrincipal;
-import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.StudentProvisioningService;
@@ -81,8 +80,6 @@ import java.util.UUID;
 public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
-    @Autowired
-    private SmtpEmailService smtpEmailService;
 
     @Autowired
     private EmailDispatchService emailDispatchService;
@@ -645,7 +642,7 @@ public class AuthController {
     try {
         String subject = "Welcome to Career-9";
         String body = "Hello " + fullName + ",\n\nThank you for registering.\nYour account is under review.We will get back to you soon.\n\nRegards,\nCareer-9 Team";
-        smtpEmailService.sendSimpleEmail(user.getEmail(), subject, body);
+        emailDispatchService.sendText(EmailType.ACCOUNT_WELCOME, user.getEmail(), subject, body);
     } catch (Exception e) {
         // log and continue - do not fail registration because of email
     }

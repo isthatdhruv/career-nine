@@ -10,9 +10,11 @@ import java.text.SimpleDateFormat;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
-import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
+import com.kccitm.api.model.email.EmailSendRequest;
+import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
+import com.kccitm.api.service.email.EmailDispatchService;
 
 /**
  * Sends a styled assessment-completion email to the student via Gmail.
@@ -23,7 +25,7 @@ public class AssessmentCompletionEmailService {
     private static final Logger logger = LoggerFactory.getLogger(AssessmentCompletionEmailService.class);
 
     @Autowired
-    private SmtpEmailService smtpEmailService;
+    private EmailDispatchService emailDispatchService;
 
     @Autowired
     private InstituteBrandingService brandingService;
@@ -73,19 +75,22 @@ public class AssessmentCompletionEmailService {
                     : "You've completed " + assessmentName + " — Career-9";
             String html = buildEmailHtml(studentName, assessmentName, username, dob, brand);
 
-            if (brand.isWhitelabel()) {
-                // Preserve the whitelabel "From" display name via a full request,
-                // since the simple sendHtmlEmail overload has no display-name arg.
-                SmtpEmailRequest req = new SmtpEmailRequest();
-                req.setTo(java.util.Collections.singletonList(studentEmail));
-                req.setSubject(subject);
-                req.setHtmlContent(html);
-                req.setFromName(brand.getSchoolName() + " (via Career-9)");
-                smtpEmailService.sendEmail(req);
-            } else {
-                smtpEmailService.sendHtmlEmail(studentEmail, subject, html);
+            EmailSendRequest req = new EmailSendRequest();
+            req.setEmailType(EmailType.ASSESSMENT_COMPLETION);
+            req.setTo(new java.util.ArrayList<>(java.util.Collections.singletonList(studentEmail)));
+            req.setUserStudentId(userStudent.getUserStudentId());
+            if (userStudent.getInstitute() != null && userStudent.getInstitute().getInstituteCode() != null) {
+                req.setInstituteCode(userStudent.getInstitute().getInstituteCode());
             }
-            logger.info("Assessment completion email sent to {} for assessment '{}' (whitelabel={})",
+            req.put("student_name", studentName);
+            req.put("assessment_name", assessmentName);
+            if (username != null) req.put("username", username);
+            if (dob != null) req.put("password", dob);
+            // Inline fallback used unless an ASSESSMENT_COMPLETION template is configured.
+            req.setSubject(subject);
+            req.setHtmlContent(html);
+            emailDispatchService.send(req);
+            logger.info("Assessment completion email dispatched to {} for assessment '{}' (whitelabel={})",
                     studentEmail, assessmentName, brand.isWhitelabel());
 
         } catch (Exception e) {

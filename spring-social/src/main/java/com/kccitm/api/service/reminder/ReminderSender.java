@@ -11,7 +11,10 @@ import com.kccitm.api.model.reminder.ReminderDeliveryLog;
 import com.kccitm.api.model.reminder.ReminderDeliveryStatus;
 import com.kccitm.api.model.reminder.ReminderServiceType;
 import com.kccitm.api.model.reminder.ReminderTriggerSource;
-import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.model.email.EmailSendRequest;
+import com.kccitm.api.model.email.EmailSendResult;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.service.email.EmailDispatchService;
 
 /**
  * Single entry point for actually delivering a reminder email. Centralises:
@@ -26,7 +29,7 @@ public class ReminderSender {
     @Autowired private ReminderTemplateRenderer renderer;
     @Autowired private ReminderSuppressionService suppressionService;
     @Autowired private ReminderDeliveryLogService logService;
-    @Autowired private SmtpEmailService emailService;
+    @Autowired private EmailDispatchService emailDispatchService;
 
     public static class Context {
         public ReminderServiceType serviceType;
@@ -102,10 +105,24 @@ public class ReminderSender {
         }
 
         try {
-            emailService.sendHtmlEmail(ctx.recipient, subject, body);
-            log.setDeliveryStatus(ReminderDeliveryStatus.SENT);
-            log.setSentAt(new Date());
-            return logService.save(log);
+            EmailSendRequest req = new EmailSendRequest();
+            req.setEmailType(EmailType.REMINDER);
+            req.getTo().add(ctx.recipient);
+            req.setSubject(subject);
+            req.setHtmlContent(body);
+            if (ctx.instituteCode != null) {
+                req.setInstituteCode(ctx.instituteCode);
+            }
+            if (ctx.userStudentId != null) {
+                req.setUserStudentId(ctx.userStudentId);
+            }
+            EmailSendResult res = emailDispatchService.send(req);
+            if (res != null && res.isSuccess()) {
+                log.setDeliveryStatus(ReminderDeliveryStatus.SENT);
+                log.setSentAt(new Date());
+                return logService.save(log);
+            }
+            return fail(log, res != null ? res.getError() : "dispatch failed");
         } catch (Exception e) {
             return fail(log, e.getMessage() == null ? e.toString() : e.getMessage());
         }
