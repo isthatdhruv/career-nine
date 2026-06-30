@@ -267,6 +267,17 @@ public class AuthController {
         String loginIp = UserActivityLogService.getClientIp(request);
         String refreshJti = refreshTokenService.issue(user.getId(), loginUserAgent, loginIp);
 
+        // Async login activity logging - wrapped in try-catch so login is never affected
+        try {
+            String userName = user.getName() != null ? user.getName() : "";
+            String organisation = user.getOrganisation() != null ? user.getOrganisation() : "";
+
+            userActivityLogService.logLogin(user.getId(), userName, user.getEmail(),
+                    organisation, loginIp, loginUserAgent);
+        } catch (Exception e) {
+            // Silently fail - never block login due to logging
+        }
+
         authCookieService.issueAuthCookies(response, accessJwt);
         authCookieService.setRefreshToken(response, refreshJti);
 
