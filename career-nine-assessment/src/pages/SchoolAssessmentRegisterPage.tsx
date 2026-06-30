@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { showErrorToast } from "../utils/toast";
+import http from "../api/http";
 import { getSchoolInfo, registerSchoolStudent, verifyStudentDetails } from "../api-clients/schoolRegistrationAPI";
 import { validatePromoCode } from "../api-clients/promoCodeAPI";
 import { validateReferralCode } from "../api-clients/referralCodeAPI";
 
 const SchoolAssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
 
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -221,6 +223,33 @@ const SchoolAssessmentRegisterPage = () => {
           showErrorToast("Payment link could not be generated. Please try again.");
         }
         return;
+      }
+
+      // Auto-login: the student account exists server-side now (freshly created,
+      // or already registered). Reuse the student-login endpoint with the returned
+      // username + the DOB they just typed to obtain the session payload, then drop
+      // them straight into their allotted assessments — same UX as the
+      // assessment-register flow. The credentials card below stays as a fallback
+      // for any case where auto-login can't complete.
+      if (res.data.username) {
+        try {
+          const { data: session } = await http.post('/user/auth', {
+            dobDate: dob,
+            username: res.data.username,
+          });
+          if (session && session.userStudentId) {
+            localStorage.clear();
+            localStorage.setItem('userStudentId', String(session.userStudentId));
+            localStorage.setItem('allottedAssessments', JSON.stringify(session.assessments));
+            // Stored so /auth/assessment-session can verify identity later
+            // (DOB requirement) when minting the assessment cookie on Start.
+            localStorage.setItem('studentDob', dob);
+            navigate('/allotted-assessment');
+            return;
+          }
+        } catch {
+          // Fall through to the credentials card on any auto-login failure.
+        }
       }
 
       setResult(res.data);
