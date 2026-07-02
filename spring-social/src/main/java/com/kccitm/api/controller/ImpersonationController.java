@@ -51,6 +51,21 @@ public class ImpersonationController {
     @PostMapping("/admin/impersonate/student/{userStudentId}")
     public ResponseEntity<?> impersonateStudent(@PathVariable Long userStudentId,
                                                 HttpServletRequest request) {
+        // Hard, enforce-mode-independent authorization check. @auth.allows(...) above is a
+        // NO-OP while auth.enforce-mode=log-only (see AuthorizationService.recordAndReturn),
+        // so this endpoint MUST NOT rely on it alone — any authenticated user (including a
+        // student) could otherwise mint an impersonation token for any other student.
+        Authentication authn = SecurityContextHolder.getContext().getAuthentication();
+        if (authn == null || !(authn.getPrincipal() instanceof UserPrincipal)) {
+            return ResponseEntity.status(403).body("Not authorized to impersonate students");
+        }
+        UserPrincipal caller = (UserPrincipal) authn.getPrincipal();
+        boolean permitted = caller.isSuperAdmin()
+                || (caller.getPermissions() != null && caller.getPermissions().contains("student.impersonate"));
+        if (!permitted) {
+            return ResponseEntity.status(403).body("Not authorized to impersonate students");
+        }
+
         Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
         if (!usOpt.isPresent() || usOpt.get().getUserId() == null) {
             return ResponseEntity.status(404).body("Student user not found");
@@ -63,19 +78,13 @@ public class ImpersonationController {
             return ResponseEntity.status(404).body("Student user not found");
         }
 
-        String jwt = tokenProvider.createAccessToken(principal);
+        String jwt = tokenProvider.createImpersonationToken(principal);
 
         // Audit: record who impersonated whom (organisation field carries the
         // impersonating admin's id/email; there is no login event for the student
         // otherwise). Best-effort — never block the mint on a logging failure.
-        Long adminId = null;
-        String adminEmail = null;
-        Authentication authn = SecurityContextHolder.getContext().getAuthentication();
-        if (authn != null && authn.getPrincipal() instanceof UserPrincipal) {
-            UserPrincipal admin = (UserPrincipal) authn.getPrincipal();
-            adminId = admin.getId();
-            adminEmail = admin.getEmail();
-        }
+        Long adminId = caller.getId();
+        String adminEmail = caller.getEmail();
         userActivityLogService.logLogin(
                 principal.getId(), principal.getUsername(), principal.getEmail(),
                 "IMPERSONATED_BY:" + adminId + ":" + adminEmail,
