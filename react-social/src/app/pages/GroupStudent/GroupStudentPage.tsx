@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useReducer, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { toast } from "react-toastify";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
@@ -1348,11 +1347,11 @@ export default function GroupStudentPage() {
           "noopener"
         );
       } else {
-        toast.error("Could not start impersonation.");
+        showErrorToast("Could not start impersonation.");
       }
     } catch (e: any) {
       const code = e?.response?.status;
-      toast.error(
+      showErrorToast(
         code === 403
           ? "You don't have permission to open a student's dashboard."
           : "Could not open the student dashboard."
