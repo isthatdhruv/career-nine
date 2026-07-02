@@ -17,7 +17,7 @@
  * check; `react-scripts test` (Jest under the hood) does its own transpile.
  */
 import axios from "axios";
-import { setupAxios } from "./AuthHelpers";
+import { setupAxios, IMPERSONATION_STORAGE_KEY } from "./AuthHelpers";
 
 // jsdom location mutation for redirect assertions
 const originalLocation = window.location;
@@ -173,5 +173,36 @@ describe("AuthHelpers silent-refresh interceptor", () => {
     ).rejects.toBeDefined();
     expect(refreshCalls).toBe(0);
     expect(window.location.href).toBe("/auth");
+  });
+});
+
+describe("impersonation interceptor", () => {
+  afterEach(() => sessionStorage.removeItem(IMPERSONATION_STORAGE_KEY));
+
+  it("injects Bearer and disables credentials when impersonating an own-API call", async () => {
+    sessionStorage.setItem(IMPERSONATION_STORAGE_KEY, "imp.jwt.token");
+    let seen: any = null;
+    axios.defaults.adapter = (async (config: any) => {
+      seen = config;
+      return { data: {}, status: 200, statusText: "OK", headers: {}, config };
+    }) as any;
+
+    await axios.get(`${process.env.REACT_APP_API_URL}/student-portal/my-info/1`);
+
+    expect(seen.headers.Authorization).toBe("Bearer imp.jwt.token");
+    expect(seen.withCredentials).toBe(false);
+  });
+
+  it("leaves credentials on and adds no Bearer when not impersonating", async () => {
+    let seen: any = null;
+    axios.defaults.adapter = (async (config: any) => {
+      seen = config;
+      return { data: {}, status: 200, statusText: "OK", headers: {}, config };
+    }) as any;
+
+    await axios.get(`${process.env.REACT_APP_API_URL}/student-portal/my-info/1`);
+
+    expect(seen.headers.Authorization).toBeUndefined();
+    expect(seen.withCredentials).toBe(true);
   });
 });
