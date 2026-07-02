@@ -55,6 +55,14 @@ authenticates as the student. The admin's `cn_at` is never transmitted on those
 requests and never overwritten. The Bearer fallback is already documented as a
 supported mode ("external admin scripts keep working").
 
+**One backend caveat discovered during planning:** CSRF is enforced on
+state-changing requests via the `cn_csrf` cookie. Because impersonation sends
+`withCredentials:false`, that cookie is not sent, so GET-based viewing works but
+"full impersonation" writes (e.g. profile PUT) would hit a CSRF 403. The fix is
+standard and small: exempt requests carrying an `Authorization: Bearer` header
+from CSRF (a Bearer header cannot be attached to a forged cross-site request, so
+such requests are inherently CSRF-safe). See the plan's Task 2.
+
 ## Components
 
 ### 1. Backend — mint endpoint
