@@ -133,7 +133,7 @@ export function setupAxios(axios: any) {
       // back to the admin's normal cookie session, so the impersonation tab
       // can never run admin actions as the student.
       const onStudentRoute =
-        typeof window !== "undefined" && window.location.pathname.startsWith("/student");
+        typeof window !== "undefined" && window.location.pathname.startsWith("/student/");
       const impersonating = !!impJwt && ownApi && onStudentRoute;
       const method = (config.method || "get").toUpperCase();
 
@@ -197,7 +197,7 @@ export function setupAxios(axios: any) {
         if (
           readImpersonationJwt() &&
           typeof window !== "undefined" &&
-          window.location.pathname.startsWith("/student")
+          window.location.pathname.startsWith("/student/")
         ) {
           const { showErrorToast } = require("../../../utils/toast");
           showErrorToast("Impersonation session expired. Reopen from Data Download.");
