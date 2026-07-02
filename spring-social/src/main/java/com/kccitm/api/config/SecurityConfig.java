@@ -474,7 +474,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
      *   <li>{@code font-src} — self + Google Fonts ({@code fonts.gstatic.com}) +
      *       {@code data:} URIs for icon fonts.</li>
      *   <li>{@code img-src} — permissive ({@code https:} + {@code http:} + {@code data:}
-     *       + {@code blob:}) to cover Mandrill tracking pixels, Firebase storage,
+     *       + {@code blob:}) to cover email tracking pixels, Firebase storage,
      *       Razorpay logos, base64 inline images, generated PDF previews.</li>
      *   <li>{@code connect-src} — self + Career-9 API origins + Firebase HTTP/WSS.</li>
      *   <li>{@code frame-src} — Razorpay checkout iframe origins.</li>
@@ -500,7 +500,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
                 // fonts: self + Google Fonts + data: URIs
                 "font-src 'self' data: https://fonts.gstatic.com",
-                // images: permissive (Mandrill tracking pixels, Firebase storage, generated previews)
+                // images: permissive (email tracking pixels, Firebase storage, generated previews)
                 "img-src 'self' data: blob: https: http:",
                 // XHR/fetch/WebSocket: self + Career-9 API + Firebase
                 "connect-src 'self' https://*.career-9.com https://*.career-9.net https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com",

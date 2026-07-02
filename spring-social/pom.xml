@@ -237,16 +237,6 @@
 			<version>v1-rev20220404-2.0.0</version>
 		</dependency>
 		<dependency>
-			<groupId>com.cribbstechnologies.clients</groupId>
-			<artifactId>mandrillClient</artifactId>
-			<version>1.1</version>
-		</dependency>
-		<dependency>
-			<groupId>com.mandrillapp.wrapper.lutung</groupId>
-			<artifactId>lutung</artifactId>
-			<version>0.0.8</version>
-		</dependency>
-		<dependency>
 			<groupId>org.xhtmlrenderer</groupId>
 			<artifactId>flying-saucer-pdf-openpdf</artifactId>
 			<version>9.1.20</version>

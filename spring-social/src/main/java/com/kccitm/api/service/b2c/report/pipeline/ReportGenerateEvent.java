@@ -19,6 +19,14 @@ public class ReportGenerateEvent {
     public boolean whitelabel;
     public String schoolName;
     public String logoUrl;
+    /** Assessment toggle: when true, mail the report to non-whitelabel students too (Phase 4). */
+    public boolean emailReportEnabled;
+    /** Resolved sending account (institute default → global). Null → worker's classpath default sender. */
+    public Long emailAccountId;
+    /** Resolved REPORT_READY template id. Null → the built-in composer HTML. */
+    public Long emailTemplateId;
+    /** Student display name (for {{student_name}} in a REPORT_READY template). */
+    public String studentName;
 
     public ReportGenerateEvent() {
     }

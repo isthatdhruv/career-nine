@@ -340,6 +340,9 @@ const PrivateRoutes = () => {
   const B2CCampaignPage = lazy(() => import("../pages/B2C/Campaign/CampaignPage"));
   const B2CCampaignEditPage = lazy(() => import("../pages/B2C/Campaign/CampaignEditPage"));
   const B2CTrackerPage = lazy(() => import("../pages/B2C/Tracker/TrackerPage"));
+  const EmailAccountsPage = lazy(() => import("../pages/EmailAccounts/EmailAccountsPage"));
+  const EmailLogPage = lazy(() => import("../pages/EmailLog/EmailLogPage"));
+  const EmailTemplatesPage = lazy(() => import("../pages/EmailTemplates/EmailTemplatesPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -1658,6 +1661,37 @@ const PrivateRoutes = () => {
             <RequirePermission perm="report_template.read">
               <SuspensedView>
                 <ReportTemplatesPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="/admin/email-accounts"
+          element={
+            <RequirePermission perm="email_account.read">
+              <SuspensedView>
+                <EmailAccountsPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/email-log"
+          element={
+            <RequirePermission perm="email_log.read">
+              <SuspensedView>
+                <EmailLogPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/email-templates"
+          element={
+            <RequirePermission perm="email_template.read">
+              <SuspensedView>
+                <EmailTemplatesPage />
               </SuspensedView>
             </RequirePermission>
           }

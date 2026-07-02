@@ -52,11 +52,11 @@ public class ReportEmailConsumer {
             return; // poison message
         }
 
-        // Invariant: only whitelabel students are emailed. The generate stage already
-        // gates on this, but re-check defensively so a stray or replayed non-whitelabel
-        // event can never result in an email going out.
-        if (!ev.whitelabel) {
-            logger.warn("Report email skipped (non-whitelabel reached email stage) student={} assessment={}",
+        // Invariant: a report is emailed only when the student is whitelabel OR the assessment's
+        // "email report" toggle is on. The generate stage already gates on this; re-check
+        // defensively so a stray/replayed event can never email someone who shouldn't be.
+        if (!ev.whitelabel && !ev.emailReportEnabled) {
+            logger.warn("Report email skipped (neither whitelabel nor toggle) student={} assessment={}",
                     ev.userStudentId, ev.assessmentId);
             return;
         }

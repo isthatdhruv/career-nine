@@ -57,7 +57,8 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.RazorpayService;
-import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
 import com.kccitm.api.service.career9.ReferralService;
 import com.kccitm.api.service.StudentProvisioningService;
@@ -103,7 +104,7 @@ public class AssessmentInstituteMappingController {
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
 
     @Autowired
-    private SmtpEmailService gmailApiEmailService;
+    private EmailDispatchService emailDispatchService;
 
     @Autowired
     private StudentProvisioningService studentProvisioningService;
@@ -1732,7 +1733,7 @@ public class AssessmentInstituteMappingController {
                     + "</div>"
                     + "</div>";
 
-            gmailApiEmailService.sendHtmlEmail(toEmail, subject, htmlContent);
+            emailDispatchService.sendHtml(EmailType.ASSESSMENT_INSTITUTE_MAPPING, toEmail, subject, htmlContent);
             logger.info("Registration email sent to: {}", toEmail);
         } catch (Exception e) {
             logger.error("Failed to send registration email to: {}. Error: {}", toEmail, e.getMessage(), e);

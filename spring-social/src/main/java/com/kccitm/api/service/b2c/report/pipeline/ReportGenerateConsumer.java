@@ -69,9 +69,11 @@ public class ReportGenerateConsumer {
             // students the report is now rendered + stored — ack here without queuing
             // the mail stage, and skip the email-only PDF re-render to spare Gotenberg.
             boolean hasEmail = ev.recipientEmail != null && !ev.recipientEmail.isBlank();
-            if (!ev.whitelabel || !hasEmail) {
-                logger.info("Report generated (not mailed — whitelabel={} hasEmail={}) student={} assessment={}",
-                        ev.whitelabel, hasEmail, ev.userStudentId, ev.assessmentId);
+            // Email whitelabel students always, plus any assessment with the "email report" toggle on.
+            boolean emailEnabled = ev.whitelabel || ev.emailReportEnabled;
+            if (!emailEnabled || !hasEmail) {
+                logger.info("Report generated (not mailed — whitelabel={} toggle={} hasEmail={}) student={} assessment={}",
+                        ev.whitelabel, ev.emailReportEnabled, hasEmail, ev.userStudentId, ev.assessmentId);
                 return;
             }
 

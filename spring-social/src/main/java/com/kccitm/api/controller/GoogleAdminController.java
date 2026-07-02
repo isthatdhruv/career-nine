@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cribbstechnologies.clients.mandrill.exception.RequestFailedException;
 import com.google.api.services.directory.model.Group;
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.InstituteBatch;
@@ -38,7 +37,6 @@ import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.EmailService;
 import com.kccitm.api.service.GoogleAPIAdmin;
-import com.microtripit.mandrillapp.lutung.model.MandrillApiError;
 
 @RestController
 @RequestMapping("/google-api")
@@ -139,7 +137,7 @@ public class GoogleAdminController {
     @PostMapping(value = "/password-reset/update", headers = "Accept=application/json")
     public String updatePassword(@RequestBody Map<String, ForgotPassword> forgotPassword,
             @CurrentUser UserPrincipal users)
-            throws GeneralSecurityException, IOException, RequestFailedException, MandrillApiError {
+            throws GeneralSecurityException, IOException {
         ForgotPassword r = forgotPassword.get("values");
         String user = googleAPIAdmin.resetPassword(users, r);
 

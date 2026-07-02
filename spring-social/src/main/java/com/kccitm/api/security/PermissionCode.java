@@ -552,7 +552,17 @@ public enum PermissionCode {
     // ── Collapsed report_template system (V20260601007 seed) ────────────
     // report_template.{read,create,update,delete} already exist above (~L356).
     REPORT_TEMPLATE_UPLOAD_TEMPLATE   ("report_template.upload_template", "Upload / replace a report template HTML"),
-    REPORT_TEMPLATE_MAP               ("report_template.map",             "Map templates to questionnaires and set the default");
+    REPORT_TEMPLATE_MAP               ("report_template.map",             "Map templates to questionnaires and set the default"),
+
+    // ── Configurable email system (V20260629001 seed) ───────────────────
+    EMAIL_ACCOUNT_READ ("email_account.read", "View configured email accounts"),
+    EMAIL_ACCOUNT_EDIT ("email_account.edit", "Create, edit and delete email accounts"),
+    EMAIL_ACCOUNT_TEST ("email_account.test", "Send a test email through an email account"),
+    EMAIL_LOG_READ     ("email_log.read",     "View the email send log"),
+
+    // ── Email templates (V20260629003 seed) ─────────────────────────────
+    EMAIL_TEMPLATE_READ ("email_template.read", "View email templates"),
+    EMAIL_TEMPLATE_EDIT ("email_template.edit", "Create, edit and delete email templates");
 
     private final String code;
     private final String description;

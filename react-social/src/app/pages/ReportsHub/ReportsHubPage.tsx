@@ -759,11 +759,13 @@ const ReportsHubPage: React.FC = () => {
     setComposeOpen(true);
   };
 
-  const handleComposeSend = async (emails: string[], subject: string, body: string) => {
+  const handleComposeSend = async (
+    emails: string[], subject: string, body: string, overrideAccountId: number | null
+  ) => {
     setComposeSending(true);
     try {
       if (emails.length === 1 && composeStudentIds.length === 1) {
-        await SendReportEmail(emails, subject, body);
+        await SendReportEmail(emails, subject, body, undefined, overrideAccountId);
         showSuccessToast(`Email sent to ${emails[0]}`);
       } else {
         // Bulk: personalize for each student
@@ -781,7 +783,7 @@ const ReportsHubPage: React.FC = () => {
             .replace(/\{\{student_name\}\}/g, student.name)
             .replace(/\{\{report_link\}\}/g, student.reportUrl);
           try {
-            await SendReportEmail([student.email], subject, personalizedBody);
+            await SendReportEmail([student.email], subject, personalizedBody, undefined, overrideAccountId);
             sentCount++;
           } catch { /* continue */ }
         }

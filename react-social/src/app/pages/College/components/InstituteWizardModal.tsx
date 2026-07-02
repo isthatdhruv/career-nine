@@ -11,6 +11,11 @@ import InstituteSessionDetailsPanel, {
   InstituteSessionDetailsPanelHandle,
 } from "./InstituteSessionDetailsPanel";
 import InstituteCatalogPicker from "./InstituteCatalogPicker";
+import { EmailAccount, getEmailAccounts } from "../../EmailAccounts/API/EmailAccount_APIs";
+import {
+  getInstituteEmailSetting,
+  setInstituteEmailSetting,
+} from "../../EmailAccounts/API/InstituteEmailSetting_APIs";
 
 type WizardStep = 1 | 2 | 3;
 
@@ -62,6 +67,12 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
 
+  // Phase 2 — per-institute default sending account. "" = use the global default.
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
+  const [emailAccountsAvailable, setEmailAccountsAvailable] = useState(true);
+  const [defaultAccountId, setDefaultAccountId] = useState<string>("");
+  const [loadedDefaultAccountId, setLoadedDefaultAccountId] = useState<string>("");
+
   const sessionPanelRef = useRef<InstituteSessionDetailsPanelHandle>(null);
 
   const initialValues = {
@@ -95,6 +106,46 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
       }
     }
   }, [show, isEdit, existing?.instituteCode, existing?.instituteName]);
+
+  // Load email accounts + the institute's current default whenever the modal opens.
+  useEffect(() => {
+    if (!show) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await getEmailAccounts();
+        if (cancelled) return;
+        setEmailAccounts(data || []);
+        setEmailAccountsAvailable(true);
+      } catch {
+        // No email_account.read permission (or fetch failed) — hide the control gracefully.
+        if (!cancelled) {
+          setEmailAccounts([]);
+          setEmailAccountsAvailable(false);
+        }
+      }
+    })();
+    if (isEdit && existing?.instituteCode) {
+      getInstituteEmailSetting(existing.instituteCode)
+        .then(({ data }) => {
+          if (cancelled) return;
+          const id = data?.defaultAccountId != null ? String(data.defaultAccountId) : "";
+          setDefaultAccountId(id);
+          setLoadedDefaultAccountId(id);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setDefaultAccountId("");
+          setLoadedDefaultAccountId("");
+        });
+    } else {
+      setDefaultAccountId("");
+      setLoadedDefaultAccountId("");
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [show, isEdit, existing?.instituteCode]);
 
   // Full data URL (incl. "data:image/png;base64," prefix) — the backend detects the
   // content type from the prefix and rejects anything that isn't PNG/JPEG.
@@ -155,6 +206,22 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
           saved && saved.instituteCode != null ? String(saved.instituteCode) : String(values.instituteCode);
         setInstituteCode(serverCode);
         setInstituteName(saved?.instituteName || values.instituteName);
+        // Persist the per-institute default sending account (Phase 2). Non-fatal — the
+        // institute itself is already saved.
+        if (emailAccountsAvailable && defaultAccountId !== loadedDefaultAccountId) {
+          try {
+            await setInstituteEmailSetting(
+              serverCode,
+              defaultAccountId ? Number(defaultAccountId) : null
+            );
+            setLoadedDefaultAccountId(defaultAccountId);
+          } catch (e) {
+            console.error("Failed to save institute default email account:", e);
+            showErrorToast(
+              "Institute saved, but its default email account could not be updated."
+            );
+          }
+        }
         setSavedStep1(true);
         setPageLoading(["true"]);
         setStep(2);
@@ -441,6 +508,32 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
                 </div>
               )}
             </div>
+
+            {emailAccountsAvailable && (
+              <div className="fv-row mb-2 mt-6">
+                <label className="fs-6 fw-bold mb-2">Default email account :</label>
+                <select
+                  className="form-select form-select-lg form-control-solid"
+                  value={defaultAccountId}
+                  onChange={(e) => setDefaultAccountId(e.target.value)}
+                >
+                  <option value="">Use global default</option>
+                  {emailAccounts
+                    .filter((a) => a.active)
+                    .map((a) => (
+                      <option key={a.id} value={String(a.id)}>
+                        {a.name} — {a.fromEmail}
+                        {a.isGlobalDefault ? " (global default)" : ""}
+                      </option>
+                    ))}
+                </select>
+                <div className="text-muted small mt-1">
+                  {formik.values.isWhitelabel
+                    ? "White-label schools usually send from their own identity — pick the account this school's emails should come from."
+                    : "Optional. Choose a specific sending account for this school's emails, or leave on the global default."}
+                </div>
+              </div>
+            )}
           </form>
         )}
 

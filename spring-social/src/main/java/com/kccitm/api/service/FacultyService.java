@@ -13,14 +13,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import com.cribbstechnologies.clients.mandrill.exception.RequestFailedException;
 import com.kccitm.api.model.CheckFacultyRegistrationField;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.Faculty;
 import com.kccitm.api.repository.CheckFacultyRegistrationFieldRepository;
 import com.kccitm.api.repository.FacultyRepository;
 import com.kccitm.api.security.UserPrincipal;
-import com.microtripit.mandrillapp.lutung.model.MandrillApiError;
 
 @Service
 public class FacultyService {
@@ -149,7 +147,7 @@ public class FacultyService {
   // return stu;
   // }
 
-  public boolean initalRegistration(Faculty r) throws RequestFailedException {
+  public boolean initalRegistration(Faculty r) {
     try {
 
       Faculty t = facultyRepository.save(r);
@@ -174,8 +172,7 @@ public class FacultyService {
     }
   }
 
-  public boolean registrarVerification(Faculty r, UserPrincipal userPrincipal)
-      throws RequestFailedException {
+  public boolean registrarVerification(Faculty r, UserPrincipal userPrincipal) {
     try {
       facultyRepository.save(r);
       checkRegistrationFeildRepository.save(r.getCheck());
@@ -218,7 +215,7 @@ public class FacultyService {
     }
   }
 
-  public void facultyRegistarionUpdate(Faculty r) throws MandrillApiError, IOException, RequestFailedException {
+  public void facultyRegistarionUpdate(Faculty r) throws IOException {
     HashMap<String, Object> content1 = new HashMap<>();
     content1.put("student_name", r.getFirstName() + " " + r.getLastName());
     facultyRepository.save(r);
@@ -235,7 +232,7 @@ public class FacultyService {
   }
 
   public void sendFacultyRegisrationWelcomeMail(Faculty r, String idCard_url,String password)
-      throws MandrillApiError, IOException, RequestFailedException {
+      throws IOException {
     HashMap<String, Object> content1 = new HashMap<>();
     password = password==""?r.getAadharCardNo() + "KCCITM!":"*Your Password Did Not Change (As your email id already existed in the system, the new email was not genrated)";
     String institute_name = "KCC Institute of Technology and Management";

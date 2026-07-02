@@ -20,6 +20,8 @@ import com.kccitm.api.model.career9.counselling.Notification;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.Career9.counselling.NotificationRepository;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.service.email.EmailDispatchService;
 
 @Service
 public class CounsellingNotificationService {
@@ -38,8 +40,8 @@ public class CounsellingNotificationService {
     @Autowired
     private IcsService icsService;
 
-    @Autowired(required = false)
-    private SmtpEmailService smtpEmailService;
+    @Autowired
+    private EmailDispatchService emailDispatchService;
 
     // ─── In-app Notifications ────────────────────────────────────────────────────
 
@@ -447,12 +449,11 @@ public class CounsellingNotificationService {
             if (studentEmail != null && !studentEmail.isEmpty()) emailTo.add(studentEmail);
             if (parentEmail != null && !parentEmail.isEmpty()) emailTo.add(parentEmail);
 
-            // Email with .ics attachment, sent via Gmail (SmtpEmailService is @Primary ->
-            // GmailApiEmailServiceImpl). Falls back to a plain-text Gmail send with no
-            // attachment if the invite can't be built or the sender is unavailable.
+            // Email with .ics attachment (falls back to plain text if
+            // the Gmail sender or the invite isn't available).
             byte[] ics = icsService.buildInvite(appointment);
             boolean emailed = false;
-            if (!emailTo.isEmpty() && smtpEmailService != null && ics != null) {
+            if (!emailTo.isEmpty() && ics != null) {
                 try {
                     SmtpEmailRequest req = new SmtpEmailRequest();
                     req.setTo(emailTo);
@@ -463,7 +464,7 @@ public class CounsellingNotificationService {
                     req.setAttachments(Arrays.asList(
                             new SmtpEmailRequest.EmailAttachment(
                                     icsService.fileName(appointment), ics, "text/calendar")));
-                    smtpEmailService.sendEmail(req);
+                    emailDispatchService.send(EmailType.COUNSELLING_BOOKING, req, null);
                     emailed = true;
                 } catch (Exception e) {
                     logger.warn("ICS confirmation email failed for appointment {}: {}", appointment.getId(), e.getMessage());
@@ -736,19 +737,7 @@ public class CounsellingNotificationService {
     // ─── Private Helper ───────────────────────────────────────────────────────────
 
     private void sendEmail(String toEmail, String subject, String body) {
-        // Career-9 standard: all counselling mail goes via Gmail (SmtpEmailService is @Primary ->
-        // GmailApiEmailServiceImpl, From notifications@career-9.net), matching the rest of the
-        // product's transactional email.
-        if (smtpEmailService == null) {
-            logger.error("Cannot send email to {} (subject: {}): Gmail email service is unavailable.",
-                    toEmail, subject);
-            return;
-        }
-        try {
-            smtpEmailService.sendSimpleEmail(toEmail, subject, body);
-            logger.info("Email sent to {} via Gmail. Subject: {}", toEmail, subject);
-        } catch (Exception e) {
-            logger.error("Failed to send email to {}. Subject: {}. Error: {}", toEmail, subject, e.getMessage());
-        }
+        // Routed through the central dispatcher (logged + account-routed); legacy provider retired.
+        emailDispatchService.sendText(EmailType.COUNSELLING_NOTIFICATION, toEmail, subject, body);
     }
 }

@@ -31,7 +31,8 @@ import com.kccitm.api.repository.Career9.LeadRepository;
 import com.kccitm.api.service.LeadStudentService;
 import com.kccitm.api.service.OdooLeadService;
 import com.kccitm.api.service.RecaptchaService;
-import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.service.email.EmailDispatchService;
 
 @RestController
 @RequestMapping("/leads")
@@ -52,7 +53,7 @@ public class LeadController {
     private RecaptchaService recaptchaService;
 
     @Autowired
-    private SmtpEmailService gmailApiEmailService;
+    private EmailDispatchService emailDispatchService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -193,8 +194,15 @@ public class LeadController {
         for (String email : to.split(",")) {
             String trimmed = email.trim();
             if (!trimmed.isEmpty()) {
-                gmailApiEmailService.sendEmailWithAttachment(
-                        trimmed, subject, body, fileName, fileBytes, contentType);
+                com.kccitm.api.model.userDefinedModel.SmtpEmailRequest req =
+                        new com.kccitm.api.model.userDefinedModel.SmtpEmailRequest();
+                req.getTo().add(trimmed);
+                req.setSubject(subject);
+                req.setTextContent(body);
+                req.getAttachments().add(
+                        new com.kccitm.api.model.userDefinedModel.SmtpEmailRequest.EmailAttachment(
+                                fileName, fileBytes, contentType));
+                emailDispatchService.send(EmailType.GENERIC, req, null);
             }
         }
 

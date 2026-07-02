@@ -7,6 +7,7 @@ import {
   SendWhatsApp,
   SendWhatsAppBulk,
 } from "../ContactPerson/API/Contact_Person_APIs";
+import { EmailAccount, getEmailAccounts } from "../EmailAccounts/API/EmailAccount_APIs";
 
 interface ReportStatusEntry {
   userStudentId: number;
@@ -24,6 +25,7 @@ interface EmailComposeData {
   subject: string;
   body: string;
   mode: "email" | "whatsapp";
+  overrideAccountId?: number | null;
 }
 
 const SendReportsPage: React.FC = () => {
@@ -263,7 +265,9 @@ const SendReportsPage: React.FC = () => {
           await SendReportEmail(
             [composeData.recipients[0].email],
             composeData.subject,
-            composeData.body
+            composeData.body,
+            undefined,
+            composeData.overrideAccountId ?? null
           );
         } else {
           // Bulk: send personalized emails to each recipient
@@ -276,7 +280,9 @@ const SendReportsPage: React.FC = () => {
               await SendReportEmail(
                 [student.email!],
                 composeData.subject,
-                personalizedBody
+                personalizedBody,
+                undefined,
+                composeData.overrideAccountId ?? null
               );
               sentCount++;
             } catch {
@@ -785,6 +791,12 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
   onAddRecipient,
 }) => {
   const [newRecipient, setNewRecipient] = useState("");
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  useEffect(() => {
+    getEmailAccounts()
+      .then((r) => setAccounts(r.data || []))
+      .catch(() => setAccounts([]));
+  }, []);
 
   const handleAddRecipient = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && newRecipient.trim()) {
@@ -951,6 +963,29 @@ const ComposeModal: React.FC<ComposeModalProps> = ({
               }}
             />
           </div>
+
+          {/* Send from (optional account override) */}
+          {accounts.length > 0 && (
+            <div style={{ padding: "8px 20px", borderBottom: "1px solid #e5e7eb" }}>
+              <select
+                value={data.overrideAccountId ?? ""}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    overrideAccountId: e.target.value ? Number(e.target.value) : null,
+                  }))
+                }
+                style={{ width: "100%", border: "none", outline: "none", fontSize: "0.85rem", padding: "4px 0", background: "transparent", color: "#374151" }}
+              >
+                <option value="">Send from: Default (institute / global)</option>
+                {accounts.filter((a) => a.active).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    Send from: {a.name} — {a.fromEmail}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Body */}
           <div style={{ padding: "12px 20px" }}>
