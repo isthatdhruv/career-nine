@@ -23,9 +23,34 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
 
     List<CounsellingAppointment> findByCounsellorId(Long counsellorId);
 
+    // Admin booking: which of these students already have an UPCOMING, still-active
+    // counselling appointment (slot today or later, not cancelled/missed/etc.). Used to
+    // surface the "already booked" list the admin chooses whether to re-book, and to skip
+    // them by default during bulk allotment. Returns student ids only — one batch query.
+    @Query("SELECT DISTINCT a.student.userStudentId FROM CounsellingAppointment a " +
+           "WHERE a.student.userStudentId IN :studentIds " +
+           "AND a.status NOT IN ('CANCELLED', 'MISSED', 'RESCHEDULED', 'DECLINED') " +
+           "AND a.slot.date >= :today")
+    List<Long> findStudentIdsWithUpcomingAppointment(
+            @Param("studentIds") List<Long> studentIds,
+            @Param("today") LocalDate today);
+
     @Query("SELECT a FROM CounsellingAppointment a WHERE a.student.userStudentId = :studentId " +
            "ORDER BY a.slot.date DESC, a.slot.startTime DESC")
     List<CounsellingAppointment> findByStudentIdOrdered(@Param("studentId") Long studentId);
+
+    // Admin booking: the actual upcoming, still-active appointments (slot + counsellor eager) for
+    // these students, earliest first. The bulk-allotment preview maps each student to their
+    // earliest upcoming session so the "already booked" list can show with whom and when, and
+    // offer a counsellor change. Companion to findStudentIdsWithUpcomingAppointment (same filter).
+    @Query("SELECT a FROM CounsellingAppointment a " +
+           "WHERE a.student.userStudentId IN :studentIds " +
+           "AND a.status NOT IN ('CANCELLED', 'MISSED', 'RESCHEDULED', 'DECLINED') " +
+           "AND a.slot.date >= :today " +
+           "ORDER BY a.slot.date ASC, a.slot.startTime ASC")
+    List<CounsellingAppointment> findUpcomingAppointmentsForStudents(
+            @Param("studentIds") List<Long> studentIds,
+            @Param("today") LocalDate today);
 
     @Query("SELECT a FROM CounsellingAppointment a WHERE a.counsellor.id = :counsellorId " +
            "AND a.slot.date = :date " +

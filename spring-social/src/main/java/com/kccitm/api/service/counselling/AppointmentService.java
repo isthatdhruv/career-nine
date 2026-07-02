@@ -330,17 +330,31 @@ public class AppointmentService {
      */
     @Transactional
     public CounsellingAppointment reschedule(Long appointmentId, Long newSlotId, User counsellorUser, boolean isAdmin) {
+        return reschedule(appointmentId, newSlotId, counsellorUser, isAdmin, false);
+    }
+
+    /**
+     * As {@link #reschedule(Long, Long, User, boolean)} but can bypass the
+     * {@value #CANCELLATION_WINDOW_HOURS}-hour window. The admin "change counsellor & rebook" of a
+     * session whose time has already passed sets this true — the window check would otherwise
+     * reject every past session outright (now + window is always after a past start time).
+     */
+    @Transactional
+    public CounsellingAppointment reschedule(Long appointmentId, Long newSlotId, User counsellorUser,
+                                             boolean isAdmin, boolean bypassCancellationWindow) {
         CounsellingAppointment oldAppointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
         CounsellingSlot oldSlot = oldAppointment.getSlot();
 
-        // Enforce 4-hour window on old slot
-        LocalDateTime oldSessionTime = LocalDateTime.of(oldSlot.getDate(), oldSlot.getStartTime());
-        if (LocalDateTime.now().plusHours(CANCELLATION_WINDOW_HOURS).isAfter(oldSessionTime)) {
-            throw new BadRequestException(
-                    "Cannot reschedule: session starts within " + CANCELLATION_WINDOW_HOURS
-                            + " hours. Please contact support directly.");
+        // Enforce 4-hour window on old slot (skipped for an admin rebook of an already-passed session).
+        if (!bypassCancellationWindow) {
+            LocalDateTime oldSessionTime = LocalDateTime.of(oldSlot.getDate(), oldSlot.getStartTime());
+            if (LocalDateTime.now().plusHours(CANCELLATION_WINDOW_HOURS).isAfter(oldSessionTime)) {
+                throw new BadRequestException(
+                        "Cannot reschedule: session starts within " + CANCELLATION_WINDOW_HOURS
+                                + " hours. Please contact support directly.");
+            }
         }
 
         // Item 5: students may reschedule a session at most once.

@@ -12,6 +12,7 @@ import GeneralInstructionsPage from './pages/GeneralInstructionsPage'
 import ThankYouPage from './pages/ThankYouPage'
 import AssessmentRegisterPage from './pages/AssessmentRegisterPage'
 import AssessmentInviteRegisterPage from './pages/AssessmentInviteRegisterPage'
+import CounsellingRescheduleUpdatePage from './pages/CounsellingRescheduleUpdatePage'
 import AssessmentUpgradePage from './pages/AssessmentUpgradePage'
 import SchoolAssessmentRegisterPage from './pages/SchoolAssessmentRegisterPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
@@ -51,6 +52,7 @@ export default function App() {
               <Route path="/studentAssessment/completed" element={<ThankYouPage />} />
               <Route path="/assessment-register/:token" element={<AssessmentRegisterPage />} />
               <Route path="/assessment-invite/:token" element={<AssessmentInviteRegisterPage />} />
+              <Route path="/counselling-reschedule/:token" element={<CounsellingRescheduleUpdatePage />} />
               <Route path="/assessment-upgrade/:entitlementId" element={<AssessmentUpgradePage />} />
               <Route path="/school-register/:token" element={<SchoolAssessmentRegisterPage />} />
               <Route path="/assessment/start" element={<AssessmentStartPage />} />

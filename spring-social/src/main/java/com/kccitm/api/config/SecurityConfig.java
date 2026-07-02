@@ -144,6 +144,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/navigator-report-data/public/**",
             "/assessment-mapping/public/**",
             "/school-registration/public/**",
+            // Counsellor-absence self-reschedule: no-login page (token-gated in-controller) where a
+            // student picks a new slot after their counsellor becomes unavailable.
+            "/counselling/public/**",
             // Phase 2 (Task 2.1 / HIGH-B): landing-page lead capture — was not permitAll (401 for
             // external pages). The handler validates/sanitises the body itself.
             "/leads/capture",

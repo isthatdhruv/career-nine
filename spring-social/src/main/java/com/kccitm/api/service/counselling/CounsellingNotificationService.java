@@ -1,7 +1,6 @@
 package com.kccitm.api.service.counselling;
 
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.transaction.Transactional;
@@ -21,10 +20,6 @@ import com.kccitm.api.model.career9.counselling.Notification;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.Career9.counselling.NotificationRepository;
 import com.kccitm.api.service.SmtpEmailService;
-import com.microtripit.mandrillapp.lutung.MandrillApi;
-import com.microtripit.mandrillapp.lutung.view.MandrillMessage;
-import com.microtripit.mandrillapp.lutung.view.MandrillMessage.Recipient;
-import com.microtripit.mandrillapp.lutung.view.MandrillMessageStatus;
 
 @Service
 public class CounsellingNotificationService {
@@ -36,9 +31,6 @@ public class CounsellingNotificationService {
 
     @Autowired
     private NotificationRepository notificationRepository;
-
-    @Autowired
-    private MandrillApi mandrillApi;
 
     @Autowired
     private WhatsAppService whatsAppService;
@@ -243,6 +235,47 @@ public class CounsellingNotificationService {
         }
     }
 
+    /**
+     * Counsellor-absence self-reschedule: the student's counsellor is unavailable, so instead of a
+     * dead-end cancellation we email a tokenized link to a no-login page where the student picks a
+     * new slot with any available counsellor. Sent via Gmail like all counselling mail.
+     */
+    @Async
+    public void sendSelfRescheduleEmail(CounsellingAppointment appointment, String rescheduleUrl) {
+        try {
+            String studentName = studentName(appointment);
+            String studentEmail = studentEmail(appointment);
+            if (studentEmail == null || studentEmail.isEmpty()) {
+                logger.warn("No student email for appointment {} — cannot send self-reschedule link",
+                        appointment != null ? appointment.getId() : "null");
+                return;
+            }
+            String counsellorName = appointment.getCounsellor() != null
+                    && appointment.getCounsellor().getName() != null
+                    ? appointment.getCounsellor().getName() : "Your counsellor";
+            String when = "";
+            if (appointment.getSlot() != null) {
+                when = " on " + appointment.getSlot().getDate().format(DATE_FMT)
+                        + " at " + appointment.getSlot().getStartTime().format(TIME_FMT);
+            }
+
+            String subject = "Reschedule your counselling session";
+            String body = "Dear " + studentName + ",\n\n"
+                    + counsellorName + " is no longer available for your counselling session" + when + ".\n\n"
+                    + "Your session has NOT been cancelled — please pick a new slot that suits you here:\n"
+                    + rescheduleUrl + "\n\n"
+                    + "Once you choose a time, your session is confirmed instantly and you'll get a "
+                    + "confirmation with the meeting details.\n\n"
+                    + "We're sorry for the inconvenience.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            sendEmail(studentEmail, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send self-reschedule email for appointment ID: {}. Error: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
     @Async
     public void sendRescheduleEmail(CounsellingAppointment oldAppointment, CounsellingAppointment newAppointment) {
         try {
@@ -414,8 +447,9 @@ public class CounsellingNotificationService {
             if (studentEmail != null && !studentEmail.isEmpty()) emailTo.add(studentEmail);
             if (parentEmail != null && !parentEmail.isEmpty()) emailTo.add(parentEmail);
 
-            // Email with .ics attachment (falls back to plain Mandrill text if
-            // the Gmail sender or the invite isn't available).
+            // Email with .ics attachment, sent via Gmail (SmtpEmailService is @Primary ->
+            // GmailApiEmailServiceImpl). Falls back to a plain-text Gmail send with no
+            // attachment if the invite can't be built or the sender is unavailable.
             byte[] ics = icsService.buildInvite(appointment);
             boolean emailed = false;
             if (!emailTo.isEmpty() && smtpEmailService != null && ics != null) {
@@ -702,24 +736,17 @@ public class CounsellingNotificationService {
     // ─── Private Helper ───────────────────────────────────────────────────────────
 
     private void sendEmail(String toEmail, String subject, String body) {
+        // Career-9 standard: all counselling mail goes via Gmail (SmtpEmailService is @Primary ->
+        // GmailApiEmailServiceImpl, From notifications@career-9.net), matching the rest of the
+        // product's transactional email.
+        if (smtpEmailService == null) {
+            logger.error("Cannot send email to {} (subject: {}): Gmail email service is unavailable.",
+                    toEmail, subject);
+            return;
+        }
         try {
-            MandrillMessage message = new MandrillMessage();
-            message.setSubject(subject);
-            message.setText(body);
-            message.setAutoText(true);
-            message.setFromEmail("noreply@kccitm.edu.in");
-            message.setFromName("Career-Nine");
-
-            List<Recipient> recipients = new ArrayList<>();
-            Recipient recipient = new Recipient();
-            recipient.setEmail(toEmail);
-            recipients.add(recipient);
-            message.setTo(recipients);
-
-            MandrillMessageStatus[] statuses = mandrillApi.messages().send(message, false);
-            if (statuses != null && statuses.length > 0) {
-                logger.info("Email sent to {}: status={}", toEmail, statuses[0].getStatus());
-            }
+            smtpEmailService.sendSimpleEmail(toEmail, subject, body);
+            logger.info("Email sent to {} via Gmail. Subject: {}", toEmail, subject);
         } catch (Exception e) {
             logger.error("Failed to send email to {}. Subject: {}. Error: {}", toEmail, subject, e.getMessage());
         }

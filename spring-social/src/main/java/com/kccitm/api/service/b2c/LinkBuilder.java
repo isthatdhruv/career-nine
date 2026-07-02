@@ -77,6 +77,14 @@ public class LinkBuilder {
         return frontendBaseUrl + "/counselling/my-sessions?t=" + accessToken + "&e=" + entitlementId;
     }
 
+    /**
+     * Public, no-login self-reschedule page (assessment SPA) reached from the tokenized link we
+     * email a student when their counsellor becomes unavailable. The token is validated server-side.
+     */
+    public String counsellingReschedule(String token) {
+        return assessmentBaseUrl + "/counselling-reschedule/" + token;
+    }
+
     public String lmsLaunch(String accessToken, Long entitlementId) {
         return frontendBaseUrl + "/lms/launch?t=" + accessToken + "&e=" + entitlementId;
     }

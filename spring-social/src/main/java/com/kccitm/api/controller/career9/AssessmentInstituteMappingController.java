@@ -2167,7 +2167,7 @@ public class AssessmentInstituteMappingController {
         inv.setStatus("PAID");
         inviteRepository.save(inv);
         return handleExistingStudent(si, assessmentId, instituteCode,
-                mapping.getMappingId(), tier.getTierId(), httpResponse);
+                mapping.getMappingId(), tier.getTierId(), null, httpResponse);
     }
 
     /**
