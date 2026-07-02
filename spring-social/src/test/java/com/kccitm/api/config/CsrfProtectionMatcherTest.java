@@ -8,7 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CsrfProtectionMatcherTest {
 
-    private static final String[] PUBLIC = { "/auth/login", "/entitlement/redeem-dashboard-token" };
+    private static final String[] PUBLIC = { "/auth/login", "/entitlement/redeem-dashboard-token",
+            "/oauth2/**", "/payment/webhook/**" };
 
     @Test
     void safeMethodsAreNotProtected() {
@@ -33,5 +34,11 @@ class CsrfProtectionMatcherTest {
     void cookieAuthenticatedWritesAreProtected() {
         MockHttpServletRequest req = new MockHttpServletRequest("PUT", "/student-portal/update-info/1");
         assertTrue(SecurityConfig.requiresCsrfProtection(req, PUBLIC));
+    }
+
+    @Test
+    void wildcardPublicPathWritesAreNotProtected() {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/payment/webhook/razorpay");
+        assertFalse(SecurityConfig.requiresCsrfProtection(req, PUBLIC));
     }
 }

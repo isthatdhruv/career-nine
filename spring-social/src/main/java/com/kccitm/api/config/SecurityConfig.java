@@ -62,6 +62,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Value("${app.cookie.domain:}")
     private String cookieDomain;
 
+    // AntPathMatcher is thread-safe for matching (no mutable per-call state), so a
+    // single shared instance avoids reallocating one on every CSRF-protection check.
+    private static final AntPathMatcher CSRF_PATH_MATCHER = new AntPathMatcher();
+
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
 
@@ -181,9 +185,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         String ctx = request.getContextPath();
         String path = (ctx != null && !ctx.isEmpty() && uri.startsWith(ctx))
                 ? uri.substring(ctx.length()) : uri;
-        AntPathMatcher matcher = new AntPathMatcher();
         for (String p : publicPaths) {
-            if (matcher.match(p, path)) return false;
+            if (CSRF_PATH_MATCHER.match(p, path)) return false;
         }
         return true;
     }
