@@ -52,6 +52,7 @@ public enum PermissionCode {
     STUDENT_READ        ("student.read",        "View students"),
     STUDENT_WRITE       ("student.write",       "Create or update students"),
     STUDENT_IMPORT_BULK ("student.import_bulk", "Bulk-import students from CSV/Excel"),
+    STUDENT_IMPERSONATE ("student.impersonate", "Open a student's dashboard as that student (admin impersonation)"),
 
     // ── Assessment (Phase 14 foundation) ────────────────────────────────
     ASSESSMENT_READ    ("assessment.read",    "View assessments"),
