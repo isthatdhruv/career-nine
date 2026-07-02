@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -179,6 +180,40 @@ public class GeneralAssessmentController {
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
         headers.setContentDispositionFormData("attachment",
                 "general_assessment_" + assessmentId + "_student_" + userStudentId + ".xlsx");
+        headers.setContentLength(excelBytes.length);
+
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Export the combined legacy workbook for an assessment:
+     * sheet "Raw Data" (old 167-column OMR answers) + sheet "Master Sheet"
+     * (computed MI/aptitude/RIASEC scores + SOI/Values/Career Aspirations).
+     *
+     * Body: { "assessmentId": 123, "userStudentIds": [1, 2, 3] }
+     * If userStudentIds is empty or absent, exports all students for the assessment.
+     */
+    @PostMapping("/export-combined-excel")
+    @PreAuthorize("@auth.allows('report.export')")
+    public ResponseEntity<?> exportCombinedExcel(@RequestBody Map<String, Object> request) throws Exception {
+        if (request == null || !(request.get("assessmentId") instanceof Number)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+
+        @SuppressWarnings("unchecked")
+        List<Number> selectedIds = (List<Number>) request.get("userStudentIds");
+        List<Long> userStudentIds = (selectedIds == null || selectedIds.isEmpty())
+                ? null
+                : selectedIds.stream().map(Number::longValue).collect(Collectors.toList());
+
+        byte[] excelBytes = exportService.exportCombinedOldFormat(assessmentId, userStudentIds);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment",
+                "general_assessment_" + assessmentId + "_raw_master.xlsx");
         headers.setContentLength(excelBytes.length);
 
         return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);

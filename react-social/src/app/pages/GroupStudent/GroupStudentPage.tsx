@@ -18,6 +18,7 @@ import {
   getDemographicFieldsForStudent,
   getBulkDemographicData,
   exportProctoringExcel,
+  exportCombinedAssessmentExcel,
   generateBetReportOneClick,
   generateNavigatorReportOneClick,
   updateStudentBasicInfo,
@@ -142,6 +143,9 @@ export default function GroupStudentPage() {
 
   // Proctoring
   const [proctoringDownloading, setProctoringDownloading] = useState(false);
+
+  // Combined Raw Data + Master Sheet download state
+  const [combinedDownloading, setCombinedDownloading] = useState(false);
 
   // Report generation (one-click)
   const [reportGeneratingFor, setReportGeneratingFor] = useState<number | null>(null); // assessmentId being generated
@@ -1233,6 +1237,83 @@ export default function GroupStudentPage() {
       showErrorToast(`Failed to download proctoring data: ${msg}`);
     } finally {
       setProctoringDownloading(false);
+    }
+  };
+
+  // Download the combined legacy workbook (Raw Data + Master Sheet) for the
+  // filtered students. The workbook is per-assessment, so the current view
+  // must resolve to a single assessment (via the Assessment filter, or the
+  // institute having only one active assessment).
+  const handleCombinedExcelDownloadClick = async () => {
+    if (filteredStudents.length === 0) return;
+
+    const hasAssessmentFilterApplied = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
+    const assessmentIdSet = new Set<number>();
+    for (const student of filteredStudents) {
+      for (const a of student.assessments || []) {
+        const aid = Number(a.assessmentId);
+        if (isNaN(aid) || aid <= 0) continue;
+        if (hasAssessmentFilterApplied ? appliedAssessmentIds.has(aid) : activeAssessmentIds.has(aid)) {
+          assessmentIdSet.add(aid);
+        }
+      }
+    }
+
+    if (assessmentIdSet.size === 0) {
+      showErrorToast("No assessments found for the filtered students.");
+      return;
+    }
+    if (assessmentIdSet.size > 1) {
+      showErrorToast(
+        `Students in view span ${assessmentIdSet.size} assessments — use the Assessment filter to narrow down to one.`
+      );
+      return;
+    }
+
+    const assessmentId = Array.from(assessmentIdSet)[0];
+    const userStudentIds = filteredStudents
+      .map((s) => s.userStudentId)
+      .filter((id) => !!id);
+
+    setCombinedDownloading(true);
+    try {
+      const response = await exportCombinedAssessmentExcel(assessmentId, userStudentIds);
+
+      if (!response.data || (response.data instanceof Blob && response.data.size === 0)) {
+        showErrorToast("No data found for the filtered students.");
+        return;
+      }
+
+      const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
+      const blob = new Blob([response.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${instituteName}_Raw_Data_Master_Sheet_${Date.now()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      showSuccessToast("Raw Data + Master Sheet downloaded successfully!");
+    } catch (error: any) {
+      console.error("Error downloading combined Excel:", error);
+      let msg = error?.message || String(error);
+      if (error?.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.error) msg = parsed.error;
+          else if (parsed.message) msg = parsed.message;
+        } catch (_) {}
+      } else if (error?.response?.data?.message) {
+        msg = error.response.data.message;
+      }
+      showErrorToast(`Failed to download Raw Data + Master Sheet: ${msg}`);
+    } finally {
+      setCombinedDownloading(false);
     }
   };
 
@@ -2352,6 +2433,37 @@ export default function GroupStudentPage() {
                   >
                     <ActionIcon type="excel" size="sm" />
                     Download All Answers
+                  </button>
+                  <button
+                    className="btn btn-sm d-flex align-items-center gap-1"
+                    onClick={handleCombinedExcelDownloadClick}
+                    disabled={filteredStudents.length === 0 || combinedDownloading}
+                    title="Legacy workbook: Raw Data (OMR answers) + Master Sheet (MI, aptitude, RIASEC, SOI, values, career aspirations)"
+                    style={{
+                      background: filteredStudents.length > 0 && !combinedDownloading
+                        ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                        : "#e0e0e0",
+                      border: "none",
+                      borderRadius: "8px",
+                      padding: "0.45rem 0.8rem",
+                      fontWeight: 600,
+                      fontSize: "0.82rem",
+                      color: filteredStudents.length > 0 && !combinedDownloading ? "#fff" : "#9e9e9e",
+                      cursor: filteredStudents.length > 0 && !combinedDownloading ? "pointer" : "not-allowed",
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    {combinedDownloading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Preparing...
+                      </>
+                    ) : (
+                      <>
+                        <ActionIcon type="excel" size="sm" />
+                        Raw + Master Sheet
+                      </>
+                    )}
                   </button>
                   <button
                     className="btn btn-sm d-flex align-items-center gap-1"
