@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
-import { toast } from 'react-toastify'
 import { toAbsoluteUrl } from '../../../../_metronic/helpers'
 import { useAuth } from '../../../modules/auth/core/Auth'
 import { IMPERSONATION_STORAGE_KEY } from '../../../modules/auth/core/AuthHelpers'
+import { showErrorToast } from '../../../utils/toast'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
 
@@ -29,7 +29,7 @@ const StudentImpersonationLanding: React.FC = () => {
 
     const token = searchParams.get('t')
     if (!token) {
-      toast.error('Missing impersonation link.')
+      showErrorToast('Missing impersonation link.')
       navigate('/auth/login', { replace: true })
       return
     }
@@ -38,14 +38,17 @@ const StudentImpersonationLanding: React.FC = () => {
     sessionStorage.setItem(IMPERSONATION_STORAGE_KEY, token)
     window.history.replaceState({}, document.title, '/student/impersonate')
 
-    let cancelled = false
+    // /auth/me is an idempotent GET, so there's no need to guard the success
+    // path against a stale response the way a mutating call would require —
+    // the `ranRef` guard above is sufficient to prevent a duplicate call
+    // under React 18 StrictMode's dev double-invoke, and the effect always
+    // has exactly one in-flight call to resolve.
     ;(async () => {
       try {
         // Bearer is injected by the global interceptor (reads sessionStorage).
         const { data: me } = await axios.get(`${API_BASE_URL}/auth/me`, {
           headers: { Accept: 'application/json' },
         })
-        if (cancelled) return
         if (me) {
           setCurrentUser(me)
           navigate('/student/dashboard', { replace: true })
@@ -53,16 +56,11 @@ const StudentImpersonationLanding: React.FC = () => {
           throw new Error('no user')
         }
       } catch {
-        if (cancelled) return
         sessionStorage.removeItem(IMPERSONATION_STORAGE_KEY)
         setStatus('failed')
-        toast.error('Could not open the student dashboard. The link may have expired.')
+        showErrorToast('Could not open the student dashboard. The link may have expired.')
       }
     })()
-
-    return () => {
-      cancelled = true
-    }
   }, [navigate, searchParams, setCurrentUser])
 
   return (

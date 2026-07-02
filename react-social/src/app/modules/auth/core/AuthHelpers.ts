@@ -127,7 +127,14 @@ export function setupAxios(axios: any) {
     (config: any) => {
       const impJwt = readImpersonationJwt();
       const ownApi = isOwnApiUrl(config.url);
-      const impersonating = !!impJwt && ownApi;
+      // The impersonation JWT must only authenticate requests originating
+      // from the student portal; on any other route (e.g. an admin tab that
+      // happens to still have a stale sessionStorage entry) the tab falls
+      // back to the admin's normal cookie session, so the impersonation tab
+      // can never run admin actions as the student.
+      const onStudentRoute =
+        typeof window !== "undefined" && window.location.pathname.startsWith("/student");
+      const impersonating = !!impJwt && ownApi && onStudentRoute;
       const method = (config.method || "get").toUpperCase();
 
       if (impersonating) {
@@ -184,7 +191,14 @@ export function setupAxios(axios: any) {
       if (status === 401) {
         // Impersonation sessions have no refresh token; a 401 means the short
         // student JWT lapsed. Don't run the admin refresh path — surface it.
-        if (readImpersonationJwt()) {
+        // Gated on the student route too: a 401 on a non-student route means
+        // this request was never sent with the impersonation Bearer (see the
+        // request interceptor above), so it must follow normal admin handling.
+        if (
+          readImpersonationJwt() &&
+          typeof window !== "undefined" &&
+          window.location.pathname.startsWith("/student")
+        ) {
           const { showErrorToast } = require("../../../utils/toast");
           showErrorToast("Impersonation session expired. Reopen from Data Download.");
           return Promise.reject(error);

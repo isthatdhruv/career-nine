@@ -177,7 +177,17 @@ describe("AuthHelpers silent-refresh interceptor", () => {
 });
 
 describe("impersonation interceptor", () => {
-  afterEach(() => sessionStorage.removeItem(IMPERSONATION_STORAGE_KEY));
+  // Note: window.location is replaced with a plain mock object in the
+  // top-level beforeAll (for redirect assertions), so history.pushState
+  // does not update it — set pathname directly on the mock instead.
+  beforeEach(() => {
+    window.location.pathname = "/student/dashboard";
+  });
+
+  afterEach(() => {
+    sessionStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+    window.location.pathname = "/";
+  });
 
   it("injects Bearer and disables credentials when impersonating an own-API call", async () => {
     sessionStorage.setItem(IMPERSONATION_STORAGE_KEY, "imp.jwt.token");
@@ -194,6 +204,21 @@ describe("impersonation interceptor", () => {
   });
 
   it("leaves credentials on and adds no Bearer when not impersonating", async () => {
+    let seen: any = null;
+    axios.defaults.adapter = (async (config: any) => {
+      seen = config;
+      return { data: {}, status: 200, statusText: "OK", headers: {}, config };
+    }) as any;
+
+    await axios.get(`${process.env.REACT_APP_API_URL}/student-portal/my-info/1`);
+
+    expect(seen.headers.Authorization).toBeUndefined();
+    expect(seen.withCredentials).toBe(true);
+  });
+
+  it("does not inject Bearer even with an impersonation JWT set, when the tab is on a non-student route (admin tab falls back to normal cookie session)", async () => {
+    sessionStorage.setItem(IMPERSONATION_STORAGE_KEY, "imp.jwt.token");
+    window.location.pathname = "/group-student";
     let seen: any = null;
     axios.defaults.adapter = (async (config: any) => {
       seen = config;
