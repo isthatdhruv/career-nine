@@ -71,7 +71,7 @@ public class FourPagerEngineService {
         MI_CREATIVE.put("Spatial-Visual", new String[]{"Visual Thinker", "Thinks in pictures, patterns and spaces."});
         MI_CREATIVE.put("Interpersonal", new String[]{"People Connector", "Reads people, builds bridges, leads teams."});
         MI_CREATIVE.put("Intrapersonal", new String[]{"Reflective Thinker", "Grows through self-reflection and self-awareness."});
-        MI_CREATIVE.put("Bodily-Kinesthetic", new String[]{"Body Mover", "Learns fastest through movement and hands-on practice."});
+        MI_CREATIVE.put("Bodily-Kinesthetic", new String[]{"Body Smart", "Learns fastest through movement and hands-on practice."});
         MI_CREATIVE.put("Musical", new String[]{"Rhythm Master", "Hears pattern, pitch and tempo before words."});
         MI_CREATIVE.put("Naturalistic", new String[]{"Nature Reader", "Senses how living systems and the outdoors connect."});
 
@@ -86,23 +86,23 @@ public class FourPagerEngineService {
         ABILITY_CREATIVE.put("Finger dexterity", new String[]{"Skilled Hands", "Precise, steady fine-motor control."});
         ABILITY_CREATIVE.put("Motor movement", new String[]{"Power Mover", "Strong, coordinated large-muscle performance."});
 
-        VALUE_CREATIVE.put("Mental Activity", "The Deep Thinker");
-        VALUE_CREATIVE.put("High Achievement", "The Achiever");
-        VALUE_CREATIVE.put("Autonomy", "The Free Thinker");
-        VALUE_CREATIVE.put("Good Salary", "The Earner");
-        VALUE_CREATIVE.put("Creativity", "Idea Generator");
-        VALUE_CREATIVE.put("Helping Others", "The Helper");
-        VALUE_CREATIVE.put("Job Security", "The Stable One");
-        VALUE_CREATIVE.put("Prestige", "The Distinguished");
-        VALUE_CREATIVE.put("Prestige / Status", "The Distinguished");
-        VALUE_CREATIVE.put("Physical Activity", "The Active One");
-        VALUE_CREATIVE.put("Working with Hands", "The Craftsperson");
-        VALUE_CREATIVE.put("Leadership", "The Leader");
-        VALUE_CREATIVE.put("Work-Life Balance", "The Balancer");
-        VALUE_CREATIVE.put("Social Impact", "The Impact Maker");
-        VALUE_CREATIVE.put("Routine Activity", "The Steady One");
-        VALUE_CREATIVE.put("Variety", "The Explorer");
-        VALUE_CREATIVE.put("Variety / Adventure", "The Explorer");
+        VALUE_CREATIVE.put("Mental Activity", "Mental Activity");
+        VALUE_CREATIVE.put("High Achievement", "High Achievement");
+        VALUE_CREATIVE.put("Autonomy", "Autonomy");
+        VALUE_CREATIVE.put("Good Salary", "Good Salary");
+        VALUE_CREATIVE.put("Creativity", "Creativity");
+        VALUE_CREATIVE.put("Helping Others", "Helping Others");
+        VALUE_CREATIVE.put("Job Security", "Job Security");
+        VALUE_CREATIVE.put("Prestige", "Prestige");
+        VALUE_CREATIVE.put("Prestige / Status", "Prestige");
+        VALUE_CREATIVE.put("Physical Activity", "Physical Activity");
+        VALUE_CREATIVE.put("Working with Hands", "Working with Hands");
+        VALUE_CREATIVE.put("Leadership", "Leadership");
+        VALUE_CREATIVE.put("Work-Life Balance", "Work-Life Balance");
+        VALUE_CREATIVE.put("Social Impact", "Social Impact");
+        VALUE_CREATIVE.put("Routine Activity", "Routine Activity");
+        VALUE_CREATIVE.put("Variety", "Variety");
+        VALUE_CREATIVE.put("Variety / Adventure", "Variety");
     }
 
     // ═════════════ "Things to do" action recommendations (home / school) ═════════════
