@@ -138,6 +138,63 @@ const GenerateReportsModal: React.FC<Props> = ({
     }
   };
 
+  // ── recalculate (force) → regenerate → download as ZIP ──
+  // Unlike "Generate all" (which reuses the cached calculated data and only
+  // re-fills the template), this passes force=true so the engine recomputes the
+  // intermediary + calculated placeholder data and re-renders HTML/PDF for every
+  // student, then bundles the freshly-rendered PDFs into a ZIP.
+  const recalcAndDownloadZip = async () => {
+    if (templateId === "") { showErrorToast("Pick a report template first"); return; }
+    const ids = students.map((s) => s.userStudentId);
+    setGenerating(true);
+    setProgress({ current: 0, total: ids.length });
+    let done = 0, ok = 0;
+    const CHUNK = 5;
+    const zipItems: { fileName: string; pdfUrl: string | null }[] = [];
+    try {
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        // force=true → recompute calculated data before rendering.
+        const res = await GenerateUnifiedReportsBulk(assessmentId, chunk, tId, true);
+        for (const r of res.data.results || []) {
+          if (r.status === "ok") {
+            ok++;
+            setEntry(r.userStudentId, { reportUrl: r.reportUrl ?? null, status: "generated",
+              pdfUrl: r.pdfUrl ?? null, pdfStatus: r.pdfStatus ?? "pending" });
+            const s = students.find((x) => x.userStudentId === r.userStudentId);
+            zipItems.push({ fileName: `${safe(s?.name ?? "student")}_report`, pdfUrl: r.pdfUrl ?? null });
+          }
+        }
+        done += chunk.length;
+        setProgress({ current: done, total: ids.length });
+      }
+      showSuccessToast(`Recalculated & generated ${ok}/${ids.length}`);
+      onGenerated();
+
+      const ready = zipItems.filter((x) => !!x.pdfUrl);
+      if (ready.length === 0) {
+        showErrorToast("Reports regenerated, but no PDFs were ready to download");
+        return;
+      }
+      setDownloadingAll(true);
+      if (single && ready.length === 1) {
+        await downloadUrlAsFile(ready[0].pdfUrl!, `${ready[0].fileName}.pdf`);
+      } else {
+        const { blob, added, skipped } = await zipStoredPdfs(ready);
+        if (added === 0) { showErrorToast("No PDFs could be downloaded"); return; }
+        triggerDownload(blob, `${safe(assessmentName)}_reports.zip`);
+        if (skipped.length) showErrorToast(`${skipped.length} report(s) skipped (PDF not ready)`);
+      }
+    } catch (e: any) {
+      showErrorToast("Recalculate & download failed: "
+        + (e?.response?.data?.message || e?.response?.data || e?.message || "error"));
+    } finally {
+      setGenerating(false);
+      setDownloadingAll(false);
+      setTimeout(() => setProgress(null), 1500);
+    }
+  };
+
   // ── downloads (straight from Spaces — no client-side rasterization) ──
   const triggerDownload = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob);
@@ -300,11 +357,19 @@ const GenerateReportsModal: React.FC<Props> = ({
         {/* footer actions */}
         <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
           {!single && (
-            <button className="btn btn-primary" disabled={generating || templateId === ""} onClick={generateAll}>
+            <button className="btn btn-primary" disabled={generating || downloadingAll || templateId === ""} onClick={generateAll}>
               {generating ? "Generating…" : `Generate all (${students.length})`}
             </button>
           )}
-          <button className="btn btn-light-success" disabled={downloadingAll || generatedCount === 0}
+          <button className="btn btn-warning" disabled={generating || downloadingAll || templateId === ""}
+            title="Recompute the calculated data for every student, regenerate the report, then download"
+            onClick={recalcAndDownloadZip}>
+            {generating ? "Recalculating…"
+              : downloadingAll ? "Zipping…"
+              : single ? "Recalculate & Download PDF"
+              : `Recalculate & Download all as ZIP (${students.length})`}
+          </button>
+          <button className="btn btn-light-success" disabled={generating || downloadingAll || generatedCount === 0}
             onClick={() => (single ? downloadOnePdf(students[0]) : downloadAllZip())}>
             {downloadingAll ? "Zipping…" : single ? "Download PDF" : `Download all as ZIP (${generatedCount})`}
           </button>
