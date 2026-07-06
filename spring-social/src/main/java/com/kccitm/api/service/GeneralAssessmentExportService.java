@@ -27,6 +27,7 @@ import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
 
 @Service
 public class GeneralAssessmentExportService {
@@ -38,8 +39,23 @@ public class GeneralAssessmentExportService {
     @Autowired private StudentAssessmentMappingRepository mappingRepository;
     @Autowired private SchoolSectionsRepository schoolSectionsRepository;
     @Autowired private QuestionnaireQuestionRepository questionnaireQuestionRepository;
+    @Autowired private NavigatorReportGenerationService navigatorReportGenerationService;
 
     private static final int DEMO_COLS = 5;
+
+    // ── "Master Sheet" layout (legacy OMR workbook) ──────────────────────
+    private static final String[] MASTER_MI_HEADERS = {
+            "Bodily-Kinesthetic", "Interpersonal", "Intrapersonal", "Linguistic",
+            "Logical-Mathematical", "Musical", "Spatial-Visual", "Naturalistic"};
+    // Keys used in IntermediaryScores.miScores ("Spatial-Visual" is stored as "Visual-Spatial")
+    private static final String[] MASTER_MI_KEYS = {
+            "Bodily-Kinesthetic", "Interpersonal", "Intrapersonal", "Linguistic",
+            "Logical-Mathematical", "Musical", "Visual-Spatial", "Naturalistic"};
+    private static final String[] MASTER_APTITUDE_HEADERS = {
+            "Speed and accuracy", "Computational", "Creativity/Artistic",
+            "Language/Communication", "Technical", "Decision making & problem solving",
+            "Finger dexterity", "Form perception", "Logical reasoning", "Motor movement"};
+    private static final String[] MASTER_RIASEC_HEADERS = {"R", "I", "A", "S", "E", "C"};
 
     private enum SectionType { MULTI_SELECT, SINGLE_ANSWER, SELECTION }
 
@@ -66,6 +82,44 @@ public class GeneralAssessmentExportService {
 
     @Transactional(readOnly = true)
     public byte[] exportToOldFormat(Long assessmentId, Long userStudentId) throws Exception {
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        buildRawAnswerSheet(workbook, "General Assessment Data", assessmentId,
+                userStudentId != null ? Collections.singletonList(userStudentId) : null, false);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+        return out.toByteArray();
+    }
+
+    /**
+     * Combined workbook in the legacy OMR-workbook layout: sheet 1 "Raw Data"
+     * (old 167-column answer format, School/Section/Roll Number/Name/Class
+     * first) + sheet 2 "Master Sheet" (identity columns + 8 MI + 10 aptitude
+     * + RIASEC + SOI/Values/Career Aspirations computed per student).
+     *
+     * @param userStudentIds restrict to these students; null = all students
+     */
+    @Transactional(readOnly = true)
+    public byte[] exportCombinedOldFormat(Long assessmentId, List<Long> userStudentIds) throws Exception {
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        buildRawAnswerSheet(workbook, "Raw Data", assessmentId, userStudentIds, true);
+        buildMasterSheet(workbook, "Master Sheet", assessmentId, userStudentIds);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+        return out.toByteArray();
+    }
+
+    /**
+     * Writes the old-format raw answer sheet into the given workbook.
+     *
+     * @param userStudentIds restrict to these students (any mapping status);
+     *                       null = all students with completed/ongoing mappings
+     * @param schoolFirstOrder true = legacy workbook column order
+     *                         (School, Section, Roll Number, Name, Class)
+     */
+    private void buildRawAnswerSheet(XSSFWorkbook workbook, String sheetName, Long assessmentId,
+            List<Long> userStudentIds, boolean schoolFirstOrder) throws Exception {
 
         // ── 1. Validate assessment and get questionnaire ──────────────
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
@@ -75,12 +129,18 @@ public class GeneralAssessmentExportService {
 
         // ── 2. Load target students ─────────────────────────────────
         List<StudentAssessmentMapping> targetStudents;
-        if (userStudentId != null) {
-            targetStudents = mappingRepository
-                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                    .map(Collections::singletonList)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "StudentAssessmentMapping", "studentId/assessmentId", userStudentId + "/" + assessmentId));
+        if (userStudentIds != null) {
+            Set<Long> wanted = new HashSet<>(userStudentIds);
+            Set<Long> seenStudents = new HashSet<>();
+            targetStudents = mappingRepository.findAllByAssessmentId(assessmentId).stream()
+                    .filter(m -> m.getUserStudent() != null
+                              && wanted.contains(m.getUserStudent().getUserStudentId())
+                              && seenStudents.add(m.getUserStudent().getUserStudentId()))
+                    .collect(Collectors.toList());
+            if (targetStudents.isEmpty()) {
+                throw new ResourceNotFoundException("StudentAssessmentMapping", "studentIds/assessmentId",
+                        userStudentIds.size() + " students/" + assessmentId);
+            }
         } else {
             // Include both "completed" and "ongoing" students so Firebase-imported
             // students (which may remain "ongoing" if their questionnaire has more
@@ -182,8 +242,9 @@ public class GeneralAssessmentExportService {
         }
 
         // ── 5. Build headers + column mappings ──────────────────────
-        List<String> headers = new ArrayList<>(Arrays.asList(
-                "Roll Number", "Name", "Class", "School", "Section"));
+        List<String> headers = new ArrayList<>(schoolFirstOrder
+                ? Arrays.asList("School", "Section", "Roll Number", "Name", "Class")
+                : Arrays.asList("Roll Number", "Name", "Class", "School", "Section"));
 
         List<SectionMapping> sectionMappings = new ArrayList<>();
         int colOffset = DEMO_COLS;
@@ -248,8 +309,7 @@ public class GeneralAssessmentExportService {
 
         // ── 7. Build Excel ──────────────────────────────────────────
         Map<Integer, String> sectionNameCache = new HashMap<>();
-        XSSFWorkbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("General Assessment Data");
+        Sheet sheet = workbook.createSheet(sheetName);
 
         CellStyle headerStyle = workbook.createCellStyle();
         Font headerFont = workbook.createFont();
@@ -269,20 +329,25 @@ public class GeneralAssessmentExportService {
             StudentInfo si = us.getStudentInfo();
             Row row = sheet.createRow(rowIdx++);
 
-            row.createCell(0).setCellValue(si != null ? safe(si.getSchoolRollNumber()) : "");
-            row.createCell(1).setCellValue(si != null ? safe(si.getName()) : "");
-            row.createCell(2).setCellValue(si != null && si.getStudentClass() != null
-                    ? si.getStudentClass().toString() : "");
-            row.createCell(3).setCellValue(us.getInstitute() != null
-                    ? safe(us.getInstitute().getInstituteName()) : "");
-
+            String rollNumber = si != null ? safe(si.getSchoolRollNumber()) : "";
+            String studentName = si != null ? safe(si.getName()) : "";
+            String studentClass = si != null && si.getStudentClass() != null
+                    ? si.getStudentClass().toString() : "";
+            String schoolName = us.getInstitute() != null
+                    ? safe(us.getInstitute().getInstituteName()) : "";
             String sectionName = "";
             if (si != null && si.getSchoolSectionId() != null) {
                 sectionName = sectionNameCache.computeIfAbsent(si.getSchoolSectionId(), id ->
                         schoolSectionsRepository.findById(id)
                                 .map(SchoolSections::getSectionName).orElse(""));
             }
-            row.createCell(4).setCellValue(sectionName);
+
+            String[] demoValues = schoolFirstOrder
+                    ? new String[]{schoolName, sectionName, rollNumber, studentName, studentClass}
+                    : new String[]{rollNumber, studentName, studentClass, schoolName, sectionName};
+            for (int i = 0; i < demoValues.length; i++) {
+                row.createCell(i).setCellValue(demoValues[i]);
+            }
 
             List<AssessmentAnswer> studentAnswers = answersByStudent.getOrDefault(
                     us.getUserStudentId(), Collections.emptyList());
@@ -293,12 +358,120 @@ public class GeneralAssessmentExportService {
             sheet.autoSizeColumn(i);
         }
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        workbook.write(out);
-        workbook.close();
+        logger.info("Exported {} students for assessment {} into sheet '{}'",
+                targetStudents.size(), assessmentId, sheetName);
+    }
 
-        logger.info("Exported {} students for assessment {}", targetStudents.size(), assessmentId);
-        return out.toByteArray();
+    /**
+     * Writes the legacy "Master Sheet" (computed scores per student) into the
+     * given workbook. Only students with a completed assessment appear —
+     * intermediary scores cannot be computed for the rest.
+     */
+    private void buildMasterSheet(XSSFWorkbook workbook, String sheetName,
+            Long assessmentId, List<Long> userStudentIds) {
+        Sheet sheet = workbook.createSheet(sheetName);
+
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerStyle.setFont(headerFont);
+
+        List<String> headers = new ArrayList<>(Arrays.asList(
+                "School", "Section", "Roll Number", "Name", "Class"));
+        headers.addAll(Arrays.asList(MASTER_MI_HEADERS));
+        headers.addAll(Arrays.asList(MASTER_APTITUDE_HEADERS));
+        headers.addAll(Arrays.asList(MASTER_RIASEC_HEADERS));
+        for (int i = 1; i <= 5; i++) headers.add("SOI " + i);
+        for (int i = 1; i <= 5; i++) headers.add("Value " + i);
+        for (int i = 1; i <= 4; i++) headers.add("Career Aspiration " + i);
+
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.size(); i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers.get(i));
+            cell.setCellStyle(headerStyle);
+        }
+
+        Set<Long> wanted = userStudentIds != null ? new HashSet<>(userStudentIds) : null;
+        Set<Long> seenStudents = new HashSet<>();
+        List<StudentAssessmentMapping> mappings = mappingRepository.findAllByAssessmentId(assessmentId).stream()
+                .filter(m -> m.getUserStudent() != null
+                          && (wanted == null || wanted.contains(m.getUserStudent().getUserStudentId()))
+                          && seenStudents.add(m.getUserStudent().getUserStudentId()))
+                .collect(Collectors.toList());
+
+        Map<Integer, String> sectionNameCache = new HashMap<>();
+        int rowIdx = 1;
+        int skipped = 0;
+        for (StudentAssessmentMapping sam : mappings) {
+            UserStudent us = sam.getUserStudent();
+
+            NavigatorReportGenerationService.IntermediaryScores scores;
+            try {
+                scores = navigatorReportGenerationService
+                        .computeIntermediaryScores(us.getUserStudentId(), assessmentId);
+            } catch (Exception e) {
+                logger.warn("Master Sheet: scoring failed for student {}: {}",
+                        us.getUserStudentId(), e.getMessage());
+                scores = null;
+            }
+            if (scores == null) {
+                skipped++;
+                continue;
+            }
+
+            StudentInfo si = us.getStudentInfo();
+            Row row = sheet.createRow(rowIdx++);
+            int col = 0;
+
+            row.createCell(col++).setCellValue(us.getInstitute() != null
+                    ? safe(us.getInstitute().getInstituteName()) : "");
+            String sectionName = "";
+            if (si != null && si.getSchoolSectionId() != null) {
+                sectionName = sectionNameCache.computeIfAbsent(si.getSchoolSectionId(), id ->
+                        schoolSectionsRepository.findById(id)
+                                .map(SchoolSections::getSectionName).orElse(""));
+            }
+            row.createCell(col++).setCellValue(sectionName);
+            row.createCell(col++).setCellValue(si != null ? safe(si.getSchoolRollNumber()) : "");
+            row.createCell(col++).setCellValue(si != null ? safe(si.getName()) : "");
+            row.createCell(col++).setCellValue(si != null && si.getStudentClass() != null
+                    ? si.getStudentClass().toString() : safe(scores.studentClass));
+
+            for (String key : MASTER_MI_KEYS) {
+                row.createCell(col++).setCellValue(intVal(scores.miScores, key));
+            }
+            for (String key : MASTER_APTITUDE_HEADERS) {
+                row.createCell(col++).setCellValue(intVal(scores.aptitudeScores, key));
+            }
+            for (String key : MASTER_RIASEC_HEADERS) {
+                row.createCell(col++).setCellValue(intVal(scores.riasecScores, key));
+            }
+            for (int i = 0; i < 5; i++) {
+                row.createCell(col++).setCellValue(scores.selectedSOIs != null
+                        && i < scores.selectedSOIs.size() ? scores.selectedSOIs.get(i) : "");
+            }
+            for (int i = 0; i < 5; i++) {
+                row.createCell(col++).setCellValue(scores.selectedValues != null
+                        && i < scores.selectedValues.size() ? scores.selectedValues.get(i) : "");
+            }
+            for (int i = 0; i < 4; i++) {
+                row.createCell(col++).setCellValue(scores.selectedCareerAsps != null
+                        && i < scores.selectedCareerAsps.size() ? scores.selectedCareerAsps.get(i) : "");
+            }
+        }
+
+        for (int i = 0; i < DEMO_COLS; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        logger.info("Master Sheet: {} students written, {} skipped (no completed assessment) for assessment {}",
+                rowIdx - 1, skipped, assessmentId);
+    }
+
+    private static int intVal(Map<String, Integer> map, String key) {
+        Integer v = map != null ? map.get(key) : null;
+        return v != null ? v : 0;
     }
 
     // ══════════════════════════════════════════════════════════════════

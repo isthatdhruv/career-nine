@@ -234,6 +234,20 @@ export function exportProctoringExcel(pairs: { userStudentId: number; assessment
     });
 }
 
+// Export the combined legacy workbook (Raw Data + Master Sheet) for one assessment
+export function exportCombinedAssessmentExcel(assessmentId: number, userStudentIds: number[]) {
+    return axios.post(`${API_URL}/general-assessment/export-combined-excel`, {
+        assessmentId,
+        userStudentIds,
+    }, {
+        responseType: 'blob',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+            'Content-Type': 'application/json',
+        },
+    });
+}
+
 // Game Results APIs (Firestore via backend)
 export function getAllGameResults() {
     return axios.get<any[]>(`${API_URL}/game-results/getAll`);

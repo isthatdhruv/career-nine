@@ -31,6 +31,7 @@ interface StudentEntry {
   studentName: string;
   email?: string;
   username?: string;
+  dob?: string | null;
   instituteName: string;
   status: string;
   answeredCount: number;
@@ -831,6 +832,7 @@ const LiveTrackingPage = () => {
       Student: s.studentName || "",
       Username: s.username || "",
       Email: s.email || "",
+      DOB: s.dob || "",
       Institute: s.instituteName || "",
       Status: statusLabel(s.status),
       Progress: total > 0
@@ -839,10 +841,10 @@ const LiveTrackingPage = () => {
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows, {
-      header: ["Student", "Username", "Email", "Institute", "Status", "Progress"],
+      header: ["Student", "Username", "Email", "DOB", "Institute", "Status", "Progress"],
     });
     ws["!cols"] = [
-      { wch: 28 }, { wch: 22 }, { wch: 32 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+      { wch: 28 }, { wch: 22 }, { wch: 32 }, { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Live Tracking");
