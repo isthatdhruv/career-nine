@@ -180,7 +180,7 @@ app:
   auth:
     tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
     tokenExpirationMsec: 864000000
-    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    accessTokenExpirationMsec: 7200000      # 2h (Phase 18 short-lived access JWT; raised from 60 min 2026-07-07 — admins were logged out mid Generate-Queue batch, killing the heartbeat lease and cancelling the batch)
     refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
     assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
   # SuperAdminBootstrapper reads these on every boot.

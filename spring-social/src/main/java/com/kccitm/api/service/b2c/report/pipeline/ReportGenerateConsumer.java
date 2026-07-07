@@ -208,6 +208,11 @@ public class ReportGenerateConsumer {
             generatedReportRepository
                     .findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
                             ev.userStudentId, ev.assessmentId, template.getReportTemplateId())
+                    // Never clobber a success: a rebalance storm can publish a record
+                    // to the DLT (CommitFailedException, cause=null) even though its
+                    // report generated fine — or a redelivered duplicate already
+                    // succeeded. "generated" is the terminal good state; keep it.
+                    .filter(gr -> !"generated".equals(gr.getReportStatus()))
                     .ifPresent(gr -> {
                         gr.setReportStatus("failed");
                         gr.setUpdatedAt(new Date());

@@ -14,6 +14,22 @@ spring:
   flyway:
     enabled: false
 
+  # Slow-consumer poll contract. Report generation takes ~10-60s per event
+  # (Gotenberg-bound), while Kafka's DEFAULTS hand a consumer up to 500 records
+  # with a 5-minute processing budget (max.poll.interval.ms). On any large
+  # admin batch that budget blows: the broker evicts the consumer mid-batch
+  # ("poll timeout expired" → LeaveGroup), every commit then fails
+  # (CommitFailedException), the group rebalances in a loop, students get
+  # generated twice, and records land in the DLT with cause=null even though
+  # their reports were fine. One record per poll + a 10-minute budget makes a
+  # poll cycle = one report, far inside the interval; generate-concurrency
+  # (not batch size) provides the parallelism.
+  kafka:
+    consumer:
+      max-poll-records: 1
+      properties:
+        max.poll.interval.ms: 600000
+
 # Pipeline tuning (override per environment / during load testing via env vars, e.g.
 # REPORT_PIPELINE_GENERATE_CONCURRENCY=2). Defaults are tuned for one 8-vCPU box.
 report:
