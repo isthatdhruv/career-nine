@@ -21,12 +21,18 @@ public class ReportEmailEvent {
     public String reportUrl;   // Spaces HTML report URL (always present)
     public String pdfUrl;      // Spaces PDF URL (null when linkOnly)
     public boolean linkOnly;   // true → PDF unavailable, send link without attachment
+    /** Copied from the generate event ("auto" for legacy on-submission events). */
+    public String emailMode = "auto";
+    /** Admin batch id; scopes the idempotency key so a fresh batch can re-email. */
+    public String batchId = null;
 
     public ReportEmailEvent() {
     }
 
     public ReportEmailEvent(ReportGenerateEvent src, String reportUrl, String pdfUrl, boolean linkOnly) {
         this.userStudentId = src.userStudentId;
+        this.emailMode = src.emailMode;
+        this.batchId = src.batchId;
         this.assessmentId = src.assessmentId;
         this.recipientEmail = src.recipientEmail;
         this.whitelabel = src.whitelabel;

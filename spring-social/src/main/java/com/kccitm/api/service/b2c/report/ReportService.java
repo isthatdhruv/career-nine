@@ -220,7 +220,7 @@ public class ReportService {
      * set but exactly one template is mapped, it is adopted and flagged default.
      * Empty mapping → routing error.
      */
-    private ReportTemplate resolveTemplate(Long assessmentId, Long reportTemplateId) {
+    public ReportTemplate resolveTemplate(Long assessmentId, Long reportTemplateId) {
         if (reportTemplateId != null) {
             AssessmentReportTemplate link = assessmentReportTemplateRepository
                     .findByAssessmentIdAndReportTemplate_Id(assessmentId, reportTemplateId)

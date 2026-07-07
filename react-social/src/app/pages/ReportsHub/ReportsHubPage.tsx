@@ -36,6 +36,7 @@ import BulkSendModal from "./components/BulkSendModal";
 import EmailComposeModal from "./components/EmailComposeModal";
 import DownloadsModal, { ZipJob } from "./components/DownloadsModal";
 import GenerateReportsModal, { ModalStudent } from "./components/GenerateReportsModal";
+import GenerateQueueModal from "./components/GenerateQueueModal";
 import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
@@ -162,6 +163,7 @@ const ReportsHubPage: React.FC = () => {
 
   // ── Action states ──
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
+  const [queueModalOpen, setQueueModalOpen] = useState(false);
   const [modalStudents, setModalStudents] = useState<ModalStudent[]>([]);
   const [exportingMQT, setExportingMQT] = useState(false);
   const [exportingDataExcel, setExportingDataExcel] = useState(false);
@@ -542,6 +544,23 @@ const ReportsHubPage: React.FC = () => {
     setGenerateModalOpen(true);
   };
 
+  // Same student-list construction, but opens the async (Kafka → report-worker) modal.
+  const openQueueModal = () => {
+    if (!selectedAssessmentObj) return;
+    const ids = getSelectedOrAllIds();
+    if (ids.length === 0) { showErrorToast("Select at least one student."); return; }
+    if (templates.length === 0) {
+      showErrorToast("No report template is mapped to this assessment. Map one in Report Templates or the assessment editor first.");
+      return;
+    }
+    const list: ModalStudent[] = ids.map((id) => {
+      const s = students.find((st) => st.userStudentId === id);
+      return { userStudentId: id, name: s?.name || `Student ${id}`, username: s?.username };
+    });
+    setModalStudents(list);
+    setQueueModalOpen(true);
+  };
+
   // Refresh page maps after generation inside the modal (component refresh, no reload).
   const onModalGenerated = useCallback(() => {
     refreshReportData();
@@ -856,6 +875,13 @@ const ReportsHubPage: React.FC = () => {
             disabled: !ready || displayedStudents.length === 0,
           },
           {
+            label: `Queue${countLabel}`,
+            iconClass: "bi-stack",
+            onClick: openQueueModal,
+            variant: "ghost",
+            disabled: !ready || displayedStudents.length === 0,
+          },
+          {
             label: "Download ZIP",
             iconClass: "bi-file-earmark-zip",
             onClick: handleDownloadZipClick,
@@ -1089,6 +1115,13 @@ const ReportsHubPage: React.FC = () => {
                       fontWeight: 600, color: "white", fontSize: "0.85rem",
                     }}>
                     {`Generate${countLabel}`}
+                  </button>
+
+                  {/* Generate via Kafka queue → report-worker */}
+                  <button className="btn btn-sm btn-light" disabled={displayedStudents.length === 0}
+                    onClick={openQueueModal}
+                    style={{ borderRadius: 8, padding: "8px 20px", fontWeight: 600, fontSize: "0.85rem" }}>
+                    {`Queue${countLabel}`}
                   </button>
 
                   {/* Download ZIP */}
@@ -1482,6 +1515,19 @@ const ReportsHubPage: React.FC = () => {
         <GenerateReportsModal
           open={generateModalOpen}
           onClose={() => setGenerateModalOpen(false)}
+          assessmentId={selectedAssessmentObj.id}
+          assessmentName={selectedAssessmentName}
+          templates={templates}
+          initialTemplateId={selectedTemplateId}
+          students={modalStudents}
+          onGenerated={onModalGenerated}
+        />
+      )}
+
+      {queueModalOpen && selectedAssessmentObj && (
+        <GenerateQueueModal
+          open={queueModalOpen}
+          onClose={() => setQueueModalOpen(false)}
           assessmentId={selectedAssessmentObj.id}
           assessmentName={selectedAssessmentName}
           templates={templates}

@@ -52,16 +52,16 @@ public class ReportEmailConsumer {
             return; // poison message
         }
 
-        // Invariant: only whitelabel students are emailed. The generate stage already
-        // gates on this, but re-check defensively so a stray or replayed non-whitelabel
-        // event can never result in an email going out.
-        if (!ev.whitelabel) {
-            logger.warn("Report email skipped (non-whitelabel reached email stage) student={} assessment={}",
-                    ev.userStudentId, ev.assessmentId);
+        // Invariant: only whitelabel students are emailed on the automatic path.
+        // Admin enqueues with emailMode="all" legitimately email non-whitelabel
+        // students, so the defensive re-check exempts exactly that mode.
+        if (!ev.whitelabel && !"all".equals(ev.emailMode)) {
+            logger.warn("Report email skipped (non-whitelabel, mode={}) student={} assessment={}",
+                    ev.emailMode, ev.userStudentId, ev.assessmentId);
             return;
         }
 
-        ReportEmailIdempotency.Claim claim = idempotency.claim(ev.userStudentId, ev.assessmentId);
+        ReportEmailIdempotency.Claim claim = idempotency.claim(ev.userStudentId, ev.assessmentId, ev.batchId);
         if (claim == ReportEmailIdempotency.Claim.ALREADY_SENT) {
             logger.info("Dedup: report already emailed student={} assessment={}", ev.userStudentId, ev.assessmentId);
             return;
@@ -82,7 +82,7 @@ public class ReportEmailConsumer {
             }
             rateLimiter.acquire();
             emailSender.sendReportEmail(ev, pdf);
-            idempotency.markSent(ev.userStudentId, ev.assessmentId);
+            idempotency.markSent(ev.userStudentId, ev.assessmentId, ev.batchId);
             logger.info("Report email sent student={} assessment={} withPdf={}",
                     ev.userStudentId, ev.assessmentId, (pdf != null));
         } catch (Exception e) {
@@ -90,7 +90,7 @@ public class ReportEmailConsumer {
             // student wasn't emailed is visible without waiting for the DLT.
             logger.warn("Report email attempt failed student={} assessment={}: {}",
                     ev.userStudentId, ev.assessmentId, e.getMessage());
-            idempotency.release(ev.userStudentId, ev.assessmentId); // let the retry re-claim
+            idempotency.release(ev.userStudentId, ev.assessmentId, ev.batchId); // let the retry re-claim
             throw e; // → @RetryableTopic retry → DLT
         }
     }

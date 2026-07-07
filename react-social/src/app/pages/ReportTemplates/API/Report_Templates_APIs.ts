@@ -148,3 +148,43 @@ export function GenerateUnifiedReportsBulk(
     force,
   });
 }
+
+// ═══════════════════ ASYNC ENQUEUE (Kafka → report-worker) ═══════════════════
+
+export type EnqueueEmailMode = "none" | "all";
+
+export interface EnqueueResultRow {
+  userStudentId: number;
+  status: "queued" | "forbidden" | "error";
+  message?: string;
+}
+
+export interface EnqueueResponse {
+  queued: number;
+  batchId: string;
+  results: EnqueueResultRow[];
+}
+
+export function EnqueueUnifiedReport(
+  userStudentId: number,
+  assessmentId: number,
+  reportTemplateId?: number,
+  force = false,
+  emailMode: EnqueueEmailMode = "none"
+) {
+  return axios.post<EnqueueResponse>(`${API_URL}/generate-report-unified/enqueue`, {
+    userStudentId, assessmentId, reportTemplateId, force, emailMode,
+  });
+}
+
+export function EnqueueUnifiedReportsBulk(
+  assessmentId: number,
+  userStudentIds: number[],
+  reportTemplateId?: number,
+  force = false,
+  emailMode: EnqueueEmailMode = "none"
+) {
+  return axios.post<EnqueueResponse>(`${API_URL}/generate-report-unified/enqueue/bulk`, {
+    assessmentId, userStudentIds, reportTemplateId, force, emailMode,
+  });
+}

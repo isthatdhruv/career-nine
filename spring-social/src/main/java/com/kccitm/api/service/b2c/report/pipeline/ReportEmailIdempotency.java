@@ -32,13 +32,18 @@ public class ReportEmailIdempotency {
     @Value("${report.pipeline.idem-sent-days:7}")
     private long sentDays;
 
-    private String key(long studentId, long assessmentId) {
-        return "report:sent:" + studentId + ":" + assessmentId;
+    private String key(long studentId, long assessmentId, String batchId) {
+        String base = "report:sent:" + studentId + ":" + assessmentId;
+        // Legacy (on-submission) events carry no batchId and keep the exact key
+        // they use today. Admin batches get their own key so a new batch can
+        // re-email inside the 7-day sent window, while retries within the batch
+        // still dedupe.
+        return (batchId == null || batchId.isBlank()) ? base : base + ":" + batchId;
     }
 
     /** Atomically attempt to claim the send. */
-    public Claim claim(long studentId, long assessmentId) {
-        String key = key(studentId, assessmentId);
+    public Claim claim(long studentId, long assessmentId, String batchId) {
+        String key = key(studentId, assessmentId, batchId);
         Boolean acquired = redis.opsForValue()
                 .setIfAbsent(key, "sending", Duration.ofSeconds(lockSeconds));
         if (Boolean.TRUE.equals(acquired)) {
@@ -52,12 +57,12 @@ public class ReportEmailIdempotency {
     }
 
     /** Promote the lock to a durable "sent" marker after a successful send. */
-    public void markSent(long studentId, long assessmentId) {
-        redis.opsForValue().set(key(studentId, assessmentId), "sent", Duration.ofDays(sentDays));
+    public void markSent(long studentId, long assessmentId, String batchId) {
+        redis.opsForValue().set(key(studentId, assessmentId, batchId), "sent", Duration.ofDays(sentDays));
     }
 
     /** Release the lock so a retry can re-claim (call on send failure). */
-    public void release(long studentId, long assessmentId) {
-        redis.delete(key(studentId, assessmentId));
+    public void release(long studentId, long assessmentId, String batchId) {
+        redis.delete(key(studentId, assessmentId, batchId));
     }
 }
