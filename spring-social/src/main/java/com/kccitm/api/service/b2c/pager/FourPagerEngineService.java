@@ -317,6 +317,13 @@ public class FourPagerEngineService {
         return "DEVELOPING";
     }
 
+    /** Plain level word for the {@code *_level_text} placeholders. */
+    private static String levelText(AbsoluteLevel level) {
+        if (level == AbsoluteLevel.HIGH) return "High";
+        if (level == AbsoluteLevel.MODERATE) return "Moderate";
+        return "Low";
+    }
+
     private static List<ScoredDimension> sortDesc(List<ScoredDimension> dims) {
         List<ScoredDimension> sorted = new ArrayList<>(dims);
         sorted.sort(Comparator.comparingDouble((ScoredDimension d) -> d.normPct).reversed());
@@ -426,16 +433,16 @@ public class FourPagerEngineService {
         "student_name", "grade", "age", "school_name", "school_city",
         "report_date", "qr_code", "qr_image_url",
         "holland_code", "ability_aggregate",
-        "cp_1", "cp_1_level", "cp_1_desc",
-        "cp_2", "cp_2_level", "cp_2_desc",
-        "cp_3", "cp_3_level", "cp_3_desc",
-        "mi_1", "mi_1_level", "mi_1_desc",
-        "mi_2", "mi_2_level", "mi_2_desc",
-        "mi_3", "mi_3_level", "mi_3_desc",
-        "ab_1", "ab_1_level", "ab_1_desc",
-        "ab_2", "ab_2_level", "ab_2_desc",
-        "ab_3", "ab_3_level", "ab_3_desc",
-        "ab_4", "ab_4_level", "ab_4_desc",
+        "cp_1", "cp_1_level", "cp_1_level_text", "cp_1_desc",
+        "cp_2", "cp_2_level", "cp_2_level_text", "cp_2_desc",
+        "cp_3", "cp_3_level", "cp_3_level_text", "cp_3_desc",
+        "mi_1", "mi_1_level", "mi_1_level_text", "mi_1_desc",
+        "mi_2", "mi_2_level", "mi_2_level_text", "mi_2_desc",
+        "mi_3", "mi_3_level", "mi_3_level_text", "mi_3_desc",
+        "ab_1", "ab_1_level", "ab_1_level_text", "ab_1_desc",
+        "ab_2", "ab_2_level", "ab_2_level_text", "ab_2_desc",
+        "ab_3", "ab_3_level", "ab_3_level_text", "ab_3_desc",
+        "ab_4", "ab_4_level", "ab_4_level_text", "ab_4_desc",
         "value_1", "value_2", "value_3", "value_4", "value_5", "values_basis",
         "subject_1", "subject_2", "subject_3", "subject_alignment",
         "aspiration_1", "aspiration_2", "aspiration_3", "aspiration_4", "aspiration_coherence",
@@ -493,6 +500,7 @@ public class FourPagerEngineService {
             out.put("cp_" + (i + 1), creative != null ? creative[0] : (key != null ? key.label() : d.name));
             out.put("cp_" + (i + 1) + "_level",
                 "Type " + (i + 1) + " · " + CP_RANK[i] + " · Score: " + levelLabel(d.level));
+            out.put("cp_" + (i + 1) + "_level_text", levelText(d.level));
             out.put("cp_" + (i + 1) + "_desc", creative != null ? creative[1] : "");
         }
 
@@ -507,6 +515,7 @@ public class FourPagerEngineService {
             out.put("mi_" + (i + 1), creative != null ? creative[0] : label);
             out.put("mi_" + (i + 1) + "_level",
                 "MI " + (i + 1) + " · " + CP_RANK[i] + " · Score: " + levelLabel(d.level));
+            out.put("mi_" + (i + 1) + "_level_text", levelText(d.level));
             out.put("mi_" + (i + 1) + "_desc", creative != null ? creative[1] : "");
         }
 
@@ -518,6 +527,7 @@ public class FourPagerEngineService {
             String[] creative = ABILITY_CREATIVE.get(d.name);
             out.put("ab_" + (i + 1), creative != null ? creative[0] : Navigator360EngineService.abilityDisplayName(d.name));
             out.put("ab_" + (i + 1) + "_level", "Ability " + (i + 1) + " · Score: " + levelLabel(d.level));
+            out.put("ab_" + (i + 1) + "_level_text", levelText(d.level));
             out.put("ab_" + (i + 1) + "_desc", creative != null ? creative[1] : "");
         }
 
