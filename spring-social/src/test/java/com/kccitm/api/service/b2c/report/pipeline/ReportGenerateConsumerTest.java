@@ -18,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Date;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -31,6 +32,7 @@ class ReportGenerateConsumerTest {
     @Mock PdfRenderService pdfRenderService;
     @Mock KafkaTemplate<String, String> kafkaTemplate;
     @Mock GeneratedReportRepository generatedReportRepository;
+    @Mock ReportBatchLifecycle batchLifecycle; // isStopped defaults to false → batch alive
     @Spy ObjectMapper objectMapper = new ObjectMapper();
     @InjectMocks ReportGenerateConsumer consumer;
 
@@ -89,6 +91,14 @@ class ReportGenerateConsumerTest {
     void emailModeAll_withoutAddress_generatesButDoesNotEmail() throws Exception {
         when(reportService.generate(5L, 9L, null, false)).thenReturn(okResult());
         consumer.onGenerate(json(false, null, "all", null, false));
+        verify(kafkaTemplate, never()).send(any(), any(), any());
+    }
+
+    @Test
+    void stoppedBatch_skipsGenerationAndEmailEntirely() throws Exception {
+        when(batchLifecycle.isStopped("b1")).thenReturn(true);
+        consumer.onGenerate(json(true, "a@b.c", "all", 7L, true));
+        verify(reportService, never()).generate(any(), any(), any(), anyBoolean());
         verify(kafkaTemplate, never()).send(any(), any(), any());
     }
 }

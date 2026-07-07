@@ -18,6 +18,8 @@ public class UnifiedEnqueueRequest {
     private Boolean force;
     /** "none" (default) or "all". "auto" is reserved for on-submission events. */
     private String emailMode;
+    /** Batch to cancel/heartbeat (cancel + heartbeat endpoints only). */
+    private String batchId;
 
     public UnifiedEnqueueRequest() {}
 
@@ -38,4 +40,7 @@ public class UnifiedEnqueueRequest {
 
     public String getEmailMode() { return emailMode; }
     public void setEmailMode(String emailMode) { this.emailMode = emailMode; }
+
+    public String getBatchId() { return batchId; }
+    public void setBatchId(String batchId) { this.batchId = batchId; }
 }

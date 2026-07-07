@@ -51,6 +51,7 @@ public class UnifiedReportController {
     @Autowired private com.kccitm.api.service.b2c.report.pdf.PdfRenderService pdfRenderService;
     @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
     @Autowired private ReportPipelineProducer reportPipelineProducer;
+    @Autowired private com.kccitm.api.service.b2c.report.pipeline.ReportBatchLifecycle batchLifecycle;
     @Autowired private UserStudentRepository userStudentRepository;
 
     @PostMapping("/generate-report-unified")
@@ -199,6 +200,7 @@ public class UnifiedReportController {
         }
         String batchId = UUID.randomUUID().toString();
         boolean force = Boolean.TRUE.equals(req.getForce());
+        batchLifecycle.start(batchId); // lease BEFORE publish — consumer checks it per event
         try {
             reportPipelineProducer.enqueueAdmin(req.getUserStudentId(), req.getAssessmentId(),
                     template.getReportTemplateId(), force, emailMode, batchId);
@@ -238,6 +240,7 @@ public class UnifiedReportController {
         }
         String batchId = UUID.randomUUID().toString();
         boolean force = Boolean.TRUE.equals(req.getForce());
+        batchLifecycle.start(batchId); // lease BEFORE publish — consumer checks it per event
         List<Map<String, Object>> results = new ArrayList<>();
         int queued = 0;
         for (Long sid : req.getUserStudentIds()) {
@@ -267,6 +270,61 @@ public class UnifiedReportController {
         response.put("batchId", batchId);
         response.put("results", results);
         return ResponseEntity.accepted().body(response);
+    }
+
+    /**
+     * Keep an admin batch alive — called from the modal's poll loop (~4s).
+     * When heartbeats stop (modal closed, tab refreshed, session expired) the
+     * lease expires and the worker skips the batch's remaining events.
+     */
+    @PostMapping("/generate-report-unified/enqueue/heartbeat")
+    @PreAuthorize("@auth.allows('generated_report.create')")
+    public ResponseEntity<Map<String, Object>> enqueueHeartbeat(@RequestBody UnifiedEnqueueRequest req) {
+        if (req == null || req.getBatchId() == null || req.getBatchId().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "batchId is required"));
+        }
+        batchLifecycle.heartbeat(req.getBatchId());
+        return ResponseEntity.ok(Map.of("alive", true));
+    }
+
+    /**
+     * Explicitly cancel an admin batch (confirmed modal close). Marks the batch
+     * cancelled (worker skips all remaining events) and eagerly restores rows
+     * this batch left "queued" so the UI settles instantly; students already
+     * generated keep their new reports.
+     */
+    @PostMapping("/generate-report-unified/enqueue/cancel")
+    @PreAuthorize("@auth.allows('generated_report.create')")
+    public ResponseEntity<Map<String, Object>> enqueueCancel(@RequestBody UnifiedEnqueueRequest req) {
+        if (req == null || req.getBatchId() == null || req.getBatchId().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "batchId is required"));
+        }
+        batchLifecycle.cancel(req.getBatchId());
+        int restored = 0;
+        if (req.getAssessmentId() != null && req.getUserStudentIds() != null
+                && !req.getUserStudentIds().isEmpty()) {
+            try {
+                ReportTemplate template = reportService.resolveTemplate(
+                        req.getAssessmentId(), req.getReportTemplateId());
+                for (Long sid : req.getUserStudentIds()) {
+                    restored += generatedReportRepository
+                            .findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+                                    sid, req.getAssessmentId(), template.getReportTemplateId())
+                            .filter(gr -> "queued".equals(gr.getReportStatus()))
+                            .map(gr -> {
+                                gr.setReportStatus(gr.getReportUrl() != null ? "generated" : "notGenerated");
+                                gr.setUpdatedAt(new Date());
+                                generatedReportRepository.save(gr);
+                                return 1;
+                            }).orElse(0);
+                }
+            } catch (ReportRoutingException ex) {
+                logger.warn("Cancel batch {}: could not resolve template to restore rows: {}",
+                        req.getBatchId(), ex.getMessage());
+            }
+        }
+        logger.info("Admin batch {} cancelled ({} queued rows restored)", req.getBatchId(), restored);
+        return ResponseEntity.ok(Map.of("cancelled", true, "restored", restored));
     }
 
     /** null → "none" (safe default); "none"/"all" pass; anything else → invalid (null). */

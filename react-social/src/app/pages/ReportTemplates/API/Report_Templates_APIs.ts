@@ -188,3 +188,21 @@ export function EnqueueUnifiedReportsBulk(
     assessmentId, userStudentIds, reportTemplateId, force, emailMode,
   });
 }
+
+/** Keep an admin batch's lease alive; when heartbeats stop, the worker skips its remaining events. */
+export function HeartbeatEnqueueBatch(batchId: string) {
+  return axios.post<{ alive: boolean }>(`${API_URL}/generate-report-unified/enqueue/heartbeat`, { batchId });
+}
+
+/** Explicitly cancel a batch (confirmed modal close) and restore its still-queued rows. */
+export function CancelEnqueueBatch(
+  batchId: string,
+  assessmentId: number,
+  userStudentIds: number[],
+  reportTemplateId?: number
+) {
+  return axios.post<{ cancelled: boolean; restored: number }>(
+    `${API_URL}/generate-report-unified/enqueue/cancel`,
+    { batchId, assessmentId, userStudentIds, reportTemplateId }
+  );
+}

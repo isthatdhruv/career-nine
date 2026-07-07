@@ -45,6 +45,7 @@ public class ReportGenerateConsumer {
     @Autowired private PdfRenderService pdfRenderService;
     @Autowired private KafkaTemplate<String, String> kafkaTemplate;
     @Autowired private GeneratedReportRepository generatedReportRepository;
+    @Autowired private ReportBatchLifecycle batchLifecycle;
     @Autowired private ObjectMapper objectMapper;
 
     @Value("${report.pipeline.pdf-attempts:3}")
@@ -64,6 +65,16 @@ public class ReportGenerateConsumer {
         } catch (Exception e) {
             logger.error("Bad report.generate payload (dropping): {}", json, e);
             return; // poison message — don't retry a malformed payload
+        }
+
+        // Admin batch stopped (modal closed/cancelled, tab refreshed, session died)
+        // → skip WITHOUT generating, restore the row from "queued", ack. Legacy
+        // on-submission events have no batchId and never hit this.
+        if (batchLifecycle.isStopped(ev.batchId)) {
+            logger.info("Report generate skipped (batch {} stopped) student={} assessment={}",
+                    ev.batchId, ev.userStudentId, ev.assessmentId);
+            restoreRowAfterCancel(ev);
+            return;
         }
 
         try {
@@ -160,6 +171,29 @@ public class ReportGenerateConsumer {
             markRowFailed(objectMapper.readValue(json, ReportGenerateEvent.class));
         } catch (Exception e) {
             logger.warn("DLT: could not parse payload to mark row failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Best-effort: a cancelled batch leaves rows stamped "queued" — restore them
+     * to what the row content implies: an existing report URL means the previous
+     * report is still valid ("generated"), otherwise "notGenerated".
+     */
+    private void restoreRowAfterCancel(ReportGenerateEvent ev) {
+        try {
+            ReportTemplate template = reportService.resolveTemplate(ev.assessmentId, ev.reportTemplateId);
+            generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+                            ev.userStudentId, ev.assessmentId, template.getReportTemplateId())
+                    .filter(gr -> "queued".equals(gr.getReportStatus()))
+                    .ifPresent(gr -> {
+                        gr.setReportStatus(gr.getReportUrl() != null ? "generated" : "notGenerated");
+                        gr.setUpdatedAt(new Date());
+                        generatedReportRepository.save(gr);
+                    });
+        } catch (Exception e) {
+            logger.warn("Could not restore generated_report row after cancel student={} assessment={}: {}",
+                    ev.userStudentId, ev.assessmentId, e.getMessage());
         }
     }
 

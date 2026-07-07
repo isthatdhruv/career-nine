@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useState } from "react";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 import { zipStoredPdfs } from "../../ReportGeneration/utils/pdfZip";
 import {
+  CancelEnqueueBatch,
   EnqueueUnifiedReport,
   EnqueueUnifiedReportsBulk,
+  HeartbeatEnqueueBatch,
   TemplateMappingDto,
 } from "../../ReportTemplates/API/Report_Templates_APIs";
 import {
@@ -44,6 +46,10 @@ const GenerateQueueModal: React.FC<Props> = ({
   // the modal closes.
   const [batch, setBatch] = useState<Set<number>>(new Set());
   const [batchTotal, setBatchTotal] = useState(0);
+  // Server batch ids backing the pending students (a per-row enqueue during a
+  // running bulk creates a second server batch) — heartbeated while the modal
+  // is open, all cancelled together on confirmed close.
+  const [batchIds, setBatchIds] = useState<Set<string>>(new Set());
 
   const single = students.length === 1;
 
@@ -52,6 +58,7 @@ const GenerateQueueModal: React.FC<Props> = ({
     setEmailOn(false);
     setBatch(new Set());
     setBatchTotal(0);
+    setBatchIds(new Set());
   }, [initialTemplateId, open]);
 
   // Load rows for the chosen template (rows are unique per student+assessment+template).
@@ -85,6 +92,9 @@ const GenerateQueueModal: React.FC<Props> = ({
   useEffect(() => {
     if (!open || batch.size === 0) return;
     const t = setInterval(async () => {
+      // Keep the batch leases alive — when these heartbeats stop for any reason
+      // (close, refresh, logout, crash) the worker stops processing the batch.
+      batchIds.forEach((bid) => { HeartbeatEnqueueBatch(bid).catch(() => {}); });
       const map = await loadEntries();
       setBatch((prev) => {
         const next = new Set(prev);
@@ -94,20 +104,27 @@ const GenerateQueueModal: React.FC<Props> = ({
         }
         if (next.size === 0) {
           showSuccessToast("Queue batch finished");
+          setBatchIds(new Set());
           onGenerated();
         }
         return next;
       });
     }, POLL_MS);
     return () => clearInterval(t);
-  }, [open, batch.size, loadEntries, onGenerated]);
+  }, [open, batch.size, batchIds, loadEntries, onGenerated]);
 
   const tId = templateId === "" ? undefined : Number(templateId);
   const emailMode = emailOn ? ("all" as const) : ("none" as const);
 
-  const startBatch = (ids: number[]) => {
-    setBatch(new Set(ids));
-    setBatchTotal(ids.length);
+  const startBatch = (ids: number[], newBatchId?: string) => {
+    if (newBatchId) setBatchIds((prev) => new Set(prev).add(newBatchId));
+    // Merge into any already-running batch (a per-row enqueue during a bulk run
+    // must not wipe the tracking of the students still pending).
+    const merged = new Set(batch);
+    let added = 0;
+    for (const id of ids) { if (!merged.has(id)) { merged.add(id); added++; } }
+    setBatch(merged);
+    setBatchTotal(batch.size === 0 ? ids.length : batchTotal + added);
     // Chips flip to queued immediately (server stamped rows before the 202).
     setEntries((prev) => {
       const n = new Map(prev);
@@ -129,6 +146,29 @@ const GenerateQueueModal: React.FC<Props> = ({
     if (yes) setEmailOn(true);
   };
 
+  // Closing the modal stops the queue: confirm, then explicitly cancel every
+  // running batch (worker skips remaining students; already-generated reports
+  // are kept). Refresh/logout/crash are covered separately by the heartbeat
+  // lease expiring server-side.
+  const requestClose = () => {
+    if (batch.size > 0) {
+      const yes = window.confirm(
+        `${batch.size} report(s) are still queued.\n\n` +
+        `Closing will CANCEL them — students not yet processed will keep their previous report (or none). ` +
+        `Reports already generated in this batch are kept.\n\nCancel remaining and close?`
+      );
+      if (!yes) return;
+      const pending = Array.from(batch);
+      batchIds.forEach((bid) => {
+        CancelEnqueueBatch(bid, assessmentId, pending, tId).catch(() => {});
+      });
+      setBatch(new Set());
+      setBatchIds(new Set());
+      setBatchTotal(0);
+    }
+    onClose();
+  };
+
   // ── enqueue one (force = which button: Regenerate ✕ = true, Regenerate = false) ──
   const enqueueOne = async (sid: number, force: boolean) => {
     if (templateId === "") { showErrorToast("Pick a report template first"); return; }
@@ -140,7 +180,7 @@ const GenerateQueueModal: React.FC<Props> = ({
         showErrorToast(`Enqueue failed: ${row.message || row.status}`);
         return;
       }
-      startBatch([sid]);
+      startBatch([sid], res.data.batchId);
     } catch (e: any) {
       showErrorToast("Enqueue failed: " + (e?.response?.data?.error || e?.message || "error"));
     } finally {
@@ -159,7 +199,7 @@ const GenerateQueueModal: React.FC<Props> = ({
       const failed = (res.data.results || []).filter((r) => r.status !== "queued");
       if (failed.length) showErrorToast(`${failed.length} student(s) not queued (${failed[0].status})`);
       if (okIds.length === 0) return;
-      startBatch(okIds);
+      startBatch(okIds, res.data.batchId);
       showSuccessToast(`Queued ${okIds.length}/${ids.length}${emailOn ? " (emails ON)" : ""}`);
     } catch (e: any) {
       showErrorToast("Bulk enqueue failed: " + (e?.response?.data?.error || e?.message || "error"));
@@ -230,7 +270,7 @@ const GenerateQueueModal: React.FC<Props> = ({
   };
 
   return (
-    <div style={overlay} onClick={onClose}>
+    <div style={overlay} onClick={requestClose}>
       <div style={panel} onClick={(e) => e.stopPropagation()}>
         {/* header */}
         <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
@@ -240,7 +280,7 @@ const GenerateQueueModal: React.FC<Props> = ({
               {assessmentName} · {students.length} student{students.length !== 1 ? "s" : ""} · via report-worker
             </div>
           </div>
-          <button onClick={onClose} style={closeBtn}>✕</button>
+          <button onClick={requestClose} style={closeBtn}>✕</button>
         </div>
 
         {/* template picker */}
@@ -363,7 +403,7 @@ const GenerateQueueModal: React.FC<Props> = ({
             {downloadingAll ? "Zipping…" : single ? "Download PDF" : `Download all as ZIP (${readyPdfCount})`}
           </button>
           <div style={{ flexGrow: 1 }} />
-          <button className="btn btn-light" onClick={onClose}>Close</button>
+          <button className="btn btn-light" onClick={requestClose}>Close</button>
         </div>
         {loading && <div style={{ fontSize: "0.78rem", color: "#9ca3af", marginTop: 8 }}>Loading current status…</div>}
         {selectedTemplate && (

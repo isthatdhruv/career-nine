@@ -32,6 +32,7 @@ public class ReportEmailConsumer {
     private static final Logger logger = LoggerFactory.getLogger(ReportEmailConsumer.class);
 
     @Autowired private EmailSender emailSender;
+    @Autowired private ReportBatchLifecycle batchLifecycle;
     @Autowired private ReportEmailIdempotency idempotency;
     @Autowired private EmailRateLimiter rateLimiter;
     @Autowired private DigitalOceanSpacesService spacesService;
@@ -50,6 +51,14 @@ public class ReportEmailConsumer {
         } catch (Exception e) {
             logger.error("Bad report.email payload (dropping): {}", json, e);
             return; // poison message
+        }
+
+        // Admin batch stopped → the admin cancelled mid-batch; don't email a
+        // report they no longer want sent. (Null batchId = automatic path.)
+        if (batchLifecycle.isStopped(ev.batchId)) {
+            logger.info("Report email skipped (batch {} stopped) student={} assessment={}",
+                    ev.batchId, ev.userStudentId, ev.assessmentId);
+            return;
         }
 
         // Invariant: only whitelabel students are emailed on the automatic path.
