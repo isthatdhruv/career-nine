@@ -135,10 +135,9 @@ Email toggle — "Email these students":
   timestamp (not status alone — most rows are already `"generated"` before a
   regenerate batch starts).
 - Progress bar = resolved/enqueued for the current batch.
-- Polling stops when nothing is queued, the modal closes, or after a
-  ~10-minute cap; at the cap, still-queued students get a warning chip hinting
-  the report-worker may not be running (it is commented out in local
-  docker-compose, so this state is reachable in dev).
+- Polling stops only when nothing is queued or the modal closes. No time cap
+  (removed 2026-07-07: large bulk regenerates legitimately exceed 10 min).
+  If the report-worker is down, chips stay "Queued…" until it drains the topic.
 - Poll request errors are retried silently; last known state stays on screen.
 
 ## Error handling summary
@@ -152,7 +151,7 @@ Email toggle — "Email these students":
 | Student never completed assessment | Worker retries NOT_COMPLETED, then DLT → row `failed` → definitive ✕ chip |
 | PDF render fails in worker | Existing behavior: HTML saved, `pdf_status=failed`, retry endpoint available |
 | Email fails | Existing email retry/DLT machinery; idempotency releases lock on failure |
-| Worker not running | Rows stay `queued`; UI warns at poll cap |
+| Worker not running | Rows stay `queued`; chips keep showing "Queued…" (no poll cap) until the worker drains the topic |
 
 ## Compatibility & deployment
 

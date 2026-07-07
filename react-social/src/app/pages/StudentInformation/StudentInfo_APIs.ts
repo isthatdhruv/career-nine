@@ -58,6 +58,8 @@ export interface StudentWithMapping {
     studentDob?: string;
     username?: string;
     schoolSectionId?: number;
+    /** Flat student_info.student_class — Grade fallback when schoolSectionId is unset. */
+    studentClass?: number | null;
     gender?: string;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];

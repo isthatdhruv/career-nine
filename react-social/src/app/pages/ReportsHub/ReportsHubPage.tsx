@@ -55,6 +55,8 @@ type StudentRow = {
   phoneNumber?: string;
   studentDob?: string;
   schoolSectionId?: number;
+  /** Flat student_info.student_class — Grade fallback when the section link is unset. */
+  studentClass?: number | null;
   assessments?: { assessmentId: number; assessmentName: string; status: string }[];
   assignedAssessmentIds?: number[];
 };
@@ -416,14 +418,22 @@ const ReportsHubPage: React.FC = () => {
     });
   }, [assessmentStudents, isSuperAdmin, userScopes, selectedInstitute, sectionLookup]);
 
+  // Grade of a student: section hierarchy first, flat student_class as fallback
+  // (many institutes were onboarded without section links — see 2026-07-07 diagnosis).
+  const gradeOf = useCallback((s: StudentRow): string => {
+    const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+    if (info?.className) return info.className;
+    return s.studentClass != null ? String(s.studentClass) : "";
+  }, [sectionLookup]);
+
   const uniqueGrades = useMemo(() => {
     const g = new Set<string>();
     for (const s of scopedStudents) {
-      const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
-      if (info?.className) g.add(info.className);
+      const grade = gradeOf(s);
+      if (grade) g.add(grade);
     }
     return Array.from(g).sort();
-  }, [scopedStudents, sectionLookup]);
+  }, [scopedStudents, gradeOf]);
 
   const uniqueSections = useMemo(() => {
     const sec = new Set<string>();
@@ -455,7 +465,7 @@ const ReportsHubPage: React.FC = () => {
     } else if (usernamePresence === "without") {
       result = result.filter((s) => !(s.username && s.username.trim()));
     }
-    if (selectedGrade) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.className === selectedGrade);
+    if (selectedGrade) result = result.filter((s) => gradeOf(s) === selectedGrade);
     if (selectedSection) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.sectionName === selectedSection);
     if (selectedStatus && selectedAssessmentObj) {
       result = result.filter((s) => {
@@ -464,7 +474,7 @@ const ReportsHubPage: React.FC = () => {
       });
     }
     return result;
-  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
+  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup, gradeOf]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -1268,7 +1278,7 @@ const ReportsHubPage: React.FC = () => {
                             )}
                           </td>
                           <td style={tdStyle}>{statusBadge(asc.bg, asc.color, asmtStatus)}</td>
-                          <td style={tdStyle}>{secInfo?.className || "-"}</td>
+                          <td style={tdStyle}>{gradeOf(s) || "-"}</td>
                           <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
                           <td style={tdStyle}>{statusBadge(rsc.bg, rsc.color, hasReport ? "Generated" : "Not Generated")}</td>
                           <td style={tdStyle}>

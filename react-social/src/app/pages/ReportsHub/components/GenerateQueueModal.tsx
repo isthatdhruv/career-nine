@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 import { zipStoredPdfs } from "../../ReportGeneration/utils/pdfZip";
 import {
@@ -26,7 +26,6 @@ interface Props {
 type Entry = { reportUrl: string | null; status: string; pdfUrl: string | null; pdfStatus: string };
 
 const POLL_MS = 4000;
-const BATCH_CAP_MS = 10 * 60 * 1000; // 10 min → mark remaining as stalled
 
 const GenerateQueueModal: React.FC<Props> = ({
   open, onClose, assessmentId, assessmentName, templates, initialTemplateId, students, onGenerated,
@@ -40,11 +39,11 @@ const GenerateQueueModal: React.FC<Props> = ({
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   // Email toggle: default OFF on every open; confirm required to switch ON.
   const [emailOn, setEmailOn] = useState(false);
-  // Current batch: students still awaiting the worker (+ start time for the cap).
+  // Current batch: students still awaiting the worker. No time cap — large bulk
+  // regenerates legitimately run long; polling stops when all rows resolve or
+  // the modal closes.
   const [batch, setBatch] = useState<Set<number>>(new Set());
   const [batchTotal, setBatchTotal] = useState(0);
-  const [stalled, setStalled] = useState<Set<number>>(new Set());
-  const batchStartRef = useRef<number>(0);
 
   const single = students.length === 1;
 
@@ -53,7 +52,6 @@ const GenerateQueueModal: React.FC<Props> = ({
     setEmailOn(false);
     setBatch(new Set());
     setBatchTotal(0);
-    setStalled(new Set());
   }, [initialTemplateId, open]);
 
   // Load rows for the chosen template (rows are unique per student+assessment+template).
@@ -97,10 +95,6 @@ const GenerateQueueModal: React.FC<Props> = ({
         if (next.size === 0) {
           showSuccessToast("Queue batch finished");
           onGenerated();
-        } else if (Date.now() - batchStartRef.current > BATCH_CAP_MS) {
-          setStalled(new Set(next));
-          showErrorToast(`${next.size} report(s) still queued after 10 min — is the report-worker running?`);
-          return new Set<number>();
         }
         return next;
       });
@@ -112,8 +106,6 @@ const GenerateQueueModal: React.FC<Props> = ({
   const emailMode = emailOn ? ("all" as const) : ("none" as const);
 
   const startBatch = (ids: number[]) => {
-    batchStartRef.current = Date.now();
-    setStalled(new Set());
     setBatch(new Set(ids));
     setBatchTotal(ids.length);
     // Chips flip to queued immediately (server stamped rows before the 202).
@@ -231,7 +223,6 @@ const GenerateQueueModal: React.FC<Props> = ({
 
   const chip = (sid: number) => {
     const e = entries.get(sid);
-    if (stalled.has(sid)) return <span className="badge badge-light-warning" title="Report-worker may not be running">Stalled ⚠</span>;
     if (batch.has(sid) || e?.status === "queued") return <span className="badge badge-light-info">Queued…</span>;
     if (e?.status === "generated" && e.reportUrl) return <span className="badge badge-light-success">Generated</span>;
     if (e?.status === "failed") return <span className="badge badge-light-danger">Failed</span>;

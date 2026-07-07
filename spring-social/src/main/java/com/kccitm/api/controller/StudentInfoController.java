@@ -1017,6 +1017,10 @@ public class StudentInfoController {
                 studentData.put("instituteId", si.getInstituteId());
                 studentData.put("studentDob", si.getStudentDob());
                 studentData.put("schoolSectionId", si.getSchoolSectionId());
+                // Flat class column — many institutes have students with no
+                // school_section_id link (hierarchy never populated at onboarding);
+                // the UI falls back to this for the Grade column.
+                studentData.put("studentClass", si.getStudentClass());
                 studentData.put("controlNumber", si.getControlNumber());
                 try {
                     UserStudent usForGender = studentInfoToUserStudent.get(si.getId());
