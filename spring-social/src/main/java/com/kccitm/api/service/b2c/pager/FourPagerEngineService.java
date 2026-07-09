@@ -49,43 +49,15 @@ public class FourPagerEngineService {
         return "four-pager-template/" + variant.key + "-navigator.html";
     }
 
-    // ═════════════ Creative display names + narrative descriptions ═════════════
+    // ═════════════ Display names + interpretation copy ═════════════
+    // Trait display names and the score/stage-aware summaries live in
+    // PagerInterpretations (transcribed from interpretation.xlsx). Only the
+    // value labels remain here.
 
-    private static final Map<RiasecType, String[]> RIASEC_CREATIVE = new LinkedHashMap<>();
-    private static final Map<String, String[]> MI_CREATIVE = new LinkedHashMap<>();
-    private static final Map<String, String[]> ABILITY_CREATIVE = new LinkedHashMap<>();
     private static final Map<String, String> VALUE_CREATIVE = new LinkedHashMap<>();
     private static final String[] CP_RANK = {"PRIMARY", "SECONDARY", "TERTIARY"};
 
     static {
-        RIASEC_CREATIVE.put(RiasecType.R, new String[]{"The Hands-On Thinker", "Enjoys practical work and learning by doing."});
-        RIASEC_CREATIVE.put(RiasecType.I, new String[]{"The Analyst", "A natural problem-solver and deep thinker."});
-        RIASEC_CREATIVE.put(RiasecType.A, new String[]{"The Creator", "Expresses ideas through design and imagination."});
-        RIASEC_CREATIVE.put(RiasecType.S, new String[]{"The Helper", "Thrives on supporting, teaching and uplifting others."});
-        RIASEC_CREATIVE.put(RiasecType.E, new String[]{"The Persuader", "Leads conversations, opportunities and people."});
-        RIASEC_CREATIVE.put(RiasecType.C, new String[]{"The Organiser", "Brings structure, reliability and precision to work."});
-
-        MI_CREATIVE.put("Logical-Mathematical", new String[]{"Number Wizard", "Patterns, logic and systems are your natural language."});
-        MI_CREATIVE.put("Linguistic", new String[]{"Word Smith", "Reading, writing and speaking come alive for you."});
-        MI_CREATIVE.put("Visual-Spatial", new String[]{"Visual Thinker", "Thinks in pictures, patterns and spaces."});
-        MI_CREATIVE.put("Spatial-Visual", new String[]{"Visual Thinker", "Thinks in pictures, patterns and spaces."});
-        MI_CREATIVE.put("Interpersonal", new String[]{"People Connector", "Reads people, builds bridges, leads teams."});
-        MI_CREATIVE.put("Intrapersonal", new String[]{"Reflective Thinker", "Grows through self-reflection and self-awareness."});
-        MI_CREATIVE.put("Bodily-Kinesthetic", new String[]{"Body Smart", "Learns fastest through movement and hands-on practice."});
-        MI_CREATIVE.put("Musical", new String[]{"Rhythm Master", "Hears pattern, pitch and tempo before words."});
-        MI_CREATIVE.put("Naturalistic", new String[]{"Nature Reader", "Senses how living systems and the outdoors connect."});
-
-        ABILITY_CREATIVE.put("Logical reasoning", new String[]{"Sharp Logical Mind", "Identifies patterns and solves complex problems step-by-step."});
-        ABILITY_CREATIVE.put("Computational", new String[]{"Number Cruncher", "Maths and calculations feel natural and enjoyable."});
-        ABILITY_CREATIVE.put("Technical", new String[]{"Tech Wizard", "Understands how tools and systems actually work."});
-        ABILITY_CREATIVE.put("Language/Communication", new String[]{"Word Smith", "Explains ideas clearly in speech and writing."});
-        ABILITY_CREATIVE.put("Creativity/Artistic", new String[]{"Creative Soul", "Generates original ideas others wouldn’t."});
-        ABILITY_CREATIVE.put("Form perception", new String[]{"Pattern Spotter", "Notices shape, layout and visual detail at a glance."});
-        ABILITY_CREATIVE.put("Speed and accuracy", new String[]{"Precision Master", "Processes information quickly with few mistakes."});
-        ABILITY_CREATIVE.put("Decision making & problem solving", new String[]{"Quick Decider", "Weighs trade-offs and acts well under uncertainty."});
-        ABILITY_CREATIVE.put("Finger dexterity", new String[]{"Skilled Hands", "Precise, steady fine-motor control."});
-        ABILITY_CREATIVE.put("Motor movement", new String[]{"Power Mover", "Strong, coordinated large-muscle performance."});
-
         VALUE_CREATIVE.put("Mental Activity", "Mental Activity");
         VALUE_CREATIVE.put("High Achievement", "High Achievement");
         VALUE_CREATIVE.put("Autonomy", "Autonomy");
@@ -399,22 +371,14 @@ public class FourPagerEngineService {
         List<Object[]> all = new ArrayList<>();
         for (ScoredDimension d : riasec) {
             RiasecType r = safeRiasec(d.name);
-            String label = r != null && RIASEC_CREATIVE.containsKey(r)
-                    ? RIASEC_CREATIVE.get(r)[0]
-                    : (r != null ? r.label() : d.name);
+            String label = r != null ? PagerInterpretations.riasecName(r) : d.name;
             all.add(new Object[]{label, d.level, d.normPct});
         }
         for (ScoredDimension d : mi) {
-            String displayName = Navigator360EngineService.miDisplayName(d.name);
-            String[] creative = MI_CREATIVE.get(displayName);
-            if (creative == null) creative = MI_CREATIVE.get(d.name);
-            String label = creative != null ? creative[0] : displayName;
-            all.add(new Object[]{label, d.level, d.normPct});
+            all.add(new Object[]{PagerInterpretations.miName(d.name), d.level, d.normPct});
         }
         for (ScoredDimension d : abilities) {
-            String[] creative = ABILITY_CREATIVE.get(d.name);
-            String label = creative != null ? creative[0] : Navigator360EngineService.abilityDisplayName(d.name);
-            all.add(new Object[]{label, d.level, d.normPct});
+            all.add(new Object[]{PagerInterpretations.abilityName(d.name), d.level, d.normPct});
         }
         all.sort(Comparator.comparingDouble(o -> (double) o[2]));
         return all.stream().limit(5)
@@ -475,6 +439,10 @@ public class FourPagerEngineService {
         Map<String, String> out = new LinkedHashMap<>();
         for (String k : PLACEHOLDER_KEYS) out.put(k, "");
 
+        // Grade-stage variant drives both the action lists and the
+        // interpretation summaries (Insight / Subject / Career columns).
+        PagerVariant variant = resolveVariant(r.gradeGroup);
+
         // Student / meta
         out.put("student_name", nz(s.studentName, r.studentName));
         out.put("grade", nz(s.studentClass, r.studentClass));
@@ -496,12 +464,12 @@ public class FourPagerEngineService {
         for (int i = 0; i < riasecTop.size(); i++) {
             ScoredDimension d = riasecTop.get(i);
             RiasecType key = safeRiasec(d.name);
-            String[] creative = key != null ? RIASEC_CREATIVE.get(key) : null;
-            out.put("cp_" + (i + 1), creative != null ? creative[0] : (key != null ? key.label() : d.name));
+            out.put("cp_" + (i + 1), key != null ? PagerInterpretations.riasecName(key) : d.name);
             out.put("cp_" + (i + 1) + "_level",
                 "Type " + (i + 1) + " · " + CP_RANK[i] + " · Score: " + levelLabel(d.level));
             out.put("cp_" + (i + 1) + "_level_text", levelText(d.level));
-            out.put("cp_" + (i + 1) + "_desc", creative != null ? creative[1] : "");
+            out.put("cp_" + (i + 1) + "_desc",
+                key != null ? PagerInterpretations.riasecSummary(key, d.level, variant) : "");
         }
 
         // MI — top 3
@@ -509,14 +477,11 @@ public class FourPagerEngineService {
         if (miTop.size() > 3) miTop = miTop.subList(0, 3);
         for (int i = 0; i < miTop.size(); i++) {
             ScoredDimension d = miTop.get(i);
-            String label = Navigator360EngineService.miDisplayName(d.name);
-            String[] creative = MI_CREATIVE.get(label);
-            if (creative == null) creative = MI_CREATIVE.get(d.name);
-            out.put("mi_" + (i + 1), creative != null ? creative[0] : label);
+            out.put("mi_" + (i + 1), PagerInterpretations.miName(d.name));
             out.put("mi_" + (i + 1) + "_level",
                 "MI " + (i + 1) + " · " + CP_RANK[i] + " · Score: " + levelLabel(d.level));
             out.put("mi_" + (i + 1) + "_level_text", levelText(d.level));
-            out.put("mi_" + (i + 1) + "_desc", creative != null ? creative[1] : "");
+            out.put("mi_" + (i + 1) + "_desc", PagerInterpretations.miSummary(d.name, d.level, variant));
         }
 
         // Abilities — top 4
@@ -524,11 +489,10 @@ public class FourPagerEngineService {
         if (abTop.size() > 4) abTop = abTop.subList(0, 4);
         for (int i = 0; i < abTop.size(); i++) {
             ScoredDimension d = abTop.get(i);
-            String[] creative = ABILITY_CREATIVE.get(d.name);
-            out.put("ab_" + (i + 1), creative != null ? creative[0] : Navigator360EngineService.abilityDisplayName(d.name));
+            out.put("ab_" + (i + 1), PagerInterpretations.abilityName(d.name));
             out.put("ab_" + (i + 1) + "_level", "Ability " + (i + 1) + " · Score: " + levelLabel(d.level));
             out.put("ab_" + (i + 1) + "_level_text", levelText(d.level));
-            out.put("ab_" + (i + 1) + "_desc", creative != null ? creative[1] : "");
+            out.put("ab_" + (i + 1) + "_desc", PagerInterpretations.abilitySummary(d.name, d.level, variant));
         }
 
         // Values (up to 5)
@@ -579,7 +543,7 @@ public class FourPagerEngineService {
 
         // "Things to do" actions — keyed by the student's primary RIASEC type and the variant.
         RiasecType topType = riasecTop.isEmpty() ? null : safeRiasec(riasecTop.get(0).name);
-        String[][] actions = actionsFor(resolveVariant(r.gradeGroup), topType);
+        String[][] actions = actionsFor(variant, topType);
         if (actions != null) {
             out.put("school_action", joinActions(actions[0]));
             out.put("home_action", joinActions(actions[1]));
@@ -588,18 +552,14 @@ public class FourPagerEngineService {
         // Strength profile — top item per pillar + top value
         if (!riasecTop.isEmpty()) {
             RiasecType key = safeRiasec(riasecTop.get(0).name);
-            String[] c = key != null ? RIASEC_CREATIVE.get(key) : null;
-            out.put("strength_profile_1", c != null ? c[0] : (key != null ? key.label() : riasecTop.get(0).name));
+            out.put("strength_profile_1", key != null
+                    ? PagerInterpretations.riasecName(key) : riasecTop.get(0).name);
         }
         if (!miTop.isEmpty()) {
-            String label = Navigator360EngineService.miDisplayName(miTop.get(0).name);
-            String[] c = MI_CREATIVE.get(label);
-            out.put("strength_profile_2", c != null ? c[0] : label);
+            out.put("strength_profile_2", PagerInterpretations.miName(miTop.get(0).name));
         }
         if (!abTop.isEmpty()) {
-            String[] c = ABILITY_CREATIVE.get(abTop.get(0).name);
-            out.put("strength_profile_3", c != null ? c[0]
-                    : Navigator360EngineService.abilityDisplayName(abTop.get(0).name));
+            out.put("strength_profile_3", PagerInterpretations.abilityName(abTop.get(0).name));
         }
         if (!values.isEmpty()) {
             String v = values.get(0);
