@@ -565,30 +565,42 @@ public class NavigatorReportGenerationService {
     }
 
     /**
-     * Compute only Phase 0 intermediary scores for a student without running
-     * the full pipeline (no Phase 1-5, no DB writes).
-     * Returns null if student has no completed assessment.
+     * The assessment-wide half of intermediary scoring: every input that depends on the
+     * assessment but NOT on the individual student (all answers, the section layout).
+     *
+     * Bulk exports score every student in one assessment. Deriving this per student meant
+     * re-running findAllByAssessmentIdForExport — which returns the answers of the WHOLE
+     * cohort, not one student's — on every call: 588 students x 72,830 answers is ~43M
+     * rows hydrated into entities to fill a 588-row sheet. That took 3m22s, long enough
+     * that the browser hung up mid-download (nginx 499 / ClientAbortException "Broken
+     * pipe"), and the garbage it churned was a large part of the API's GC pressure.
+     *
+     * Build this ONCE per assessment and hand it to the 3-arg computeIntermediaryScores.
      */
-    public IntermediaryScores computeIntermediaryScores(Long userStudentId, Long assessmentId) {
-        // JOIN-FETCH studentInfo: this runs on the report-worker's Kafka thread
-        // (no OSIV, no @Transactional), where a plain findById leaves studentInfo
-        // as a lazy proxy and the si.getName()/resolveClass(si) reads below throw
-        // LazyInitializationException. Eager-loading it here fixes report generation
-        // for students whose intermediary scores aren't already cached.
-        UserStudent us = userStudentRepository.findByIdWithStudentInfo(userStudentId)
-                .orElseThrow(() -> new RuntimeException("Student not found: " + userStudentId));
+    public static class AssessmentScoringContext {
+        final List<AssessmentAnswer> allAnswers;
+        /**
+         * Answers pre-grouped by student. Scanning allAnswers per student is O(cohort),
+         * so leaving it inline would still be quadratic even with the query hoisted out.
+         */
+        final Map<Long, List<AssessmentAnswer>> answersByStudent;
+        final List<SectionMeta> sectionMetas;
 
-        Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
-                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
-        if (mappingOpt.isEmpty() || !"completed".equals(mappingOpt.get().getStatus())) {
-            return null;
+        AssessmentScoringContext(List<AssessmentAnswer> allAnswers,
+                Map<Long, List<AssessmentAnswer>> answersByStudent,
+                List<SectionMeta> sectionMetas) {
+            this.allAnswers = allAnswers;
+            this.answersByStudent = answersByStudent;
+            this.sectionMetas = sectionMetas;
         }
+    }
 
-        StudentInfo si = us.getStudentInfo();
-        String studentName = (si != null && si.getName() != null) ? si.getName() : "";
-        String studentClass = resolveClass(si);
-
-        // Reuse the same scoring logic as generateForStudent
+    /**
+     * Load and derive the assessment-wide scoring inputs. Callers scoring more than one
+     * student of the same assessment MUST call this once and reuse the result, rather
+     * than letting the 2-arg computeIntermediaryScores rebuild it per student.
+     */
+    public AssessmentScoringContext buildScoringContext(Long assessmentId) {
         List<AssessmentAnswer> allAnswers = assessmentAnswerRepository
                 .findAllByAssessmentIdForExport(assessmentId);
 
@@ -683,10 +695,54 @@ public class NavigatorReportGenerationService {
                     sortedQQIds, sortedOptionIds, singleQQId, qqOptions, sectionName));
         }
 
-        List<AssessmentAnswer> studentAnswers = allAnswers.stream()
-                .filter(a -> a.getUserStudent() != null
-                        && a.getUserStudent().getUserStudentId().equals(userStudentId))
-                .collect(Collectors.toList());
+        Map<Long, List<AssessmentAnswer>> answersByStudent = allAnswers.stream()
+                .filter(a -> a.getUserStudent() != null)
+                .collect(Collectors.groupingBy(a -> a.getUserStudent().getUserStudentId()));
+
+        return new AssessmentScoringContext(allAnswers, answersByStudent, sectionMetas);
+    }
+
+    /**
+     * Compute only Phase 0 intermediary scores for a student without running
+     * the full pipeline (no Phase 1-5, no DB writes).
+     * Returns null if student has no completed assessment.
+     *
+     * Single-student convenience overload: it rebuilds the assessment-wide context on
+     * every call. Do NOT call this in a loop over a cohort — use buildScoringContext()
+     * once and the 3-arg overload instead.
+     */
+    public IntermediaryScores computeIntermediaryScores(Long userStudentId, Long assessmentId) {
+        return computeIntermediaryScores(userStudentId, assessmentId, buildScoringContext(assessmentId));
+    }
+
+    /**
+     * As above, but reusing an assessment-wide context built once by the caller.
+     */
+    public IntermediaryScores computeIntermediaryScores(Long userStudentId, Long assessmentId,
+            AssessmentScoringContext ctx) {
+        // JOIN-FETCH studentInfo: this runs on the report-worker's Kafka thread
+        // (no OSIV, no @Transactional), where a plain findById leaves studentInfo
+        // as a lazy proxy and the si.getName()/resolveClass(si) reads below throw
+        // LazyInitializationException. Eager-loading it here fixes report generation
+        // for students whose intermediary scores aren't already cached.
+        UserStudent us = userStudentRepository.findByIdWithStudentInfo(userStudentId)
+                .orElseThrow(() -> new RuntimeException("Student not found: " + userStudentId));
+
+        Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        if (mappingOpt.isEmpty() || !"completed".equals(mappingOpt.get().getStatus())) {
+            return null;
+        }
+
+        StudentInfo si = us.getStudentInfo();
+        String studentName = (si != null && si.getName() != null) ? si.getName() : "";
+        String studentClass = resolveClass(si);
+
+        List<AssessmentAnswer> allAnswers = ctx.allAnswers;
+        List<SectionMeta> sectionMetas = ctx.sectionMetas;
+
+        List<AssessmentAnswer> studentAnswers =
+                ctx.answersByStudent.getOrDefault(userStudentId, Collections.emptyList());
 
         // Compute scores
         Map<String, Integer> riasecScores = new LinkedHashMap<>();

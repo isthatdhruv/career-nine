@@ -400,6 +400,12 @@ public class GeneralAssessmentExportService {
                           && seenStudents.add(m.getUserStudent().getUserStudentId()))
                 .collect(Collectors.toList());
 
+        // Built ONCE for the whole assessment. The 2-arg computeIntermediaryScores rebuilds
+        // this internally on every call — in this loop that re-read the entire cohort's
+        // answers per student and pushed the export past 3 minutes for ~600 students.
+        NavigatorReportGenerationService.AssessmentScoringContext scoringContext =
+                navigatorReportGenerationService.buildScoringContext(assessmentId);
+
         Map<Integer, String> sectionNameCache = new HashMap<>();
         int rowIdx = 1;
         int skipped = 0;
@@ -409,7 +415,7 @@ public class GeneralAssessmentExportService {
             NavigatorReportGenerationService.IntermediaryScores scores;
             try {
                 scores = navigatorReportGenerationService
-                        .computeIntermediaryScores(us.getUserStudentId(), assessmentId);
+                        .computeIntermediaryScores(us.getUserStudentId(), assessmentId, scoringContext);
             } catch (Exception e) {
                 logger.warn("Master Sheet: scoring failed for student {}: {}",
                         us.getUserStudentId(), e.getMessage());

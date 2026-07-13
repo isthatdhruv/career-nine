@@ -99,10 +99,16 @@ public class CoreTechnicalNavigatorDataService {
         List<NavigatorReportGenerationService.IntermediaryScores> results = new ArrayList<>();
         List<PipelineError> errors = new ArrayList<>();
 
+        // Built ONCE for the whole assessment. The 2-arg computeIntermediaryScores rebuilds
+        // this internally on every call — in this loop that re-read the entire cohort's
+        // answers per student and pushed the export past 3 minutes for ~600 students.
+        NavigatorReportGenerationService.AssessmentScoringContext scoringContext =
+                reportGenerationService.buildScoringContext(assessmentId);
+
         for (Long studentId : userStudentIds) {
             try {
                 NavigatorReportGenerationService.IntermediaryScores scores =
-                        reportGenerationService.computeIntermediaryScores(studentId, assessmentId);
+                        reportGenerationService.computeIntermediaryScores(studentId, assessmentId, scoringContext);
                 if (scores != null) {
                     results.add(scores);
                 } else {
