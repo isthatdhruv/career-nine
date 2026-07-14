@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useReducer, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
@@ -32,6 +33,8 @@ import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from ".
 import { getEntitlementsByStudent, EntitlementSummary } from "../B2C/API/Tracker_APIs";
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 import * as XLSX from "xlsx";
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8091";
 
 // Convert DOB from API (ISO timestamp or dd-MM-yyyy) to dd-MM-yyyy
 function formatDobFromApi(dob: any): string {
@@ -1325,6 +1328,36 @@ export default function GroupStudentPage() {
   };
 
   const closeThankYouPicker = () => setThankYouPicker(null);
+
+  // ── "Open as Student" impersonation ──
+  // Mints a short-lived student JWT via the admin-only impersonation endpoint
+  // (authorized by the admin's cn_at cookie) and opens the landing route in a
+  // new tab, which hydrates the student session from the token.
+  const handleOpenAsStudent = async (student: Student) => {
+    try {
+      const { data } = await axios.post(
+        `${API_BASE_URL}/admin/impersonate/student/${student.userStudentId}`,
+        {},
+        { withCredentials: true } // carries the admin's cn_at to authorize the mint
+      );
+      if (data?.token) {
+        window.open(
+          `/student/impersonate?t=${encodeURIComponent(data.token)}`,
+          "_blank",
+          "noopener"
+        );
+      } else {
+        showErrorToast("Could not start impersonation.");
+      }
+    } catch (e: any) {
+      const code = e?.response?.status;
+      showErrorToast(
+        code === 403
+          ? "You don't have permission to open a student's dashboard."
+          : "Could not open the student dashboard."
+      );
+    }
+  };
 
   const handleEditStudent = (student: Student) => {
     setEditForm({
@@ -2847,6 +2880,26 @@ export default function GroupStudentPage() {
                               >
                                 <i className="bi bi-heart-fill"></i>
                                 {thankYouLoadingFor === student.userStudentId ? "Loading…" : "Thank You"}
+                              </button>
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                onClick={() => handleOpenAsStudent(student)}
+                                title="Open this student's dashboard logged in as them"
+                                style={{
+                                  background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                                  color: "#fff",
+                                  border: "none",
+                                  padding: "5px 10px",
+                                  borderRadius: "6px",
+                                  fontWeight: 600,
+                                  fontSize: "0.78rem",
+                                  transition: "all 0.2s",
+                                  boxShadow: "0 2px 8px rgba(99, 102, 241, 0.3)",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <i className="bi bi-box-arrow-up-right"></i>
+                                Open as Student
                               </button>
                             </div>
                           </td>

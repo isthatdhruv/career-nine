@@ -239,6 +239,9 @@ const PrivateRoutes = () => {
   const StudentPortalDashboard = lazy(
     () => import("../pages/StudentDashboard/student-portal/StudentPortalDashboard")
   );
+  const StudentImpersonationLanding = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentImpersonationLanding")
+  );
   const InsightDashboard = lazy(
     () => import("../pages/StudentDashboard/insight/InsightDashboard")
   );
@@ -379,6 +382,16 @@ const PrivateRoutes = () => {
             <StudentPortalDashboard />
           </SuspensedView>
         </RequirePermission>
+      } />
+
+      {/* Admin impersonation landing — opened in a new tab by the Data Download
+          "Open as Student" button. Establishes a cookie-less student session
+          from ?t=<jwt> and redirects to /student/dashboard. Layout-free; no
+          RequirePermission (the minted student JWT is the authorization). */}
+      <Route path="/student/impersonate" element={
+        <SuspensedView>
+          <StudentImpersonationLanding />
+        </SuspensedView>
       } />
 
       {/* Real per-student assessment Insight Dashboard (data-driven, per engine).
