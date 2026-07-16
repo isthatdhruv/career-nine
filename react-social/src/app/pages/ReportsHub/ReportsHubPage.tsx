@@ -178,8 +178,6 @@ const ReportsHubPage: React.FC = () => {
 
   // ── Selection + pagination ──
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
 
   // ── Search + Filters ──
   const [nameQuery, setNameQuery] = useState("");
@@ -291,6 +289,9 @@ const ReportsHubPage: React.FC = () => {
     ])
       .then(([studentsRes, sessionsRes]) => {
         setStudents(studentsRes.data || []);
+        // Every student starts ticked — the user deselects the ones they
+        // don't want instead of building the selection up from nothing.
+        setSelectedStudentIds(new Set((studentsRes.data || []).map((s: StudentRow) => s.userStudentId)));
         const lookup = new Map<number, SectionInfo>();
         for (const session of sessionsRes.data || []) {
           for (const cls of session.schoolClasses || []) {
@@ -314,13 +315,15 @@ const ReportsHubPage: React.FC = () => {
   // Reset on selection change
   useEffect(() => { setSelectedAssessment(""); }, [selectedInstitute]);
   useEffect(() => {
-    setSelectedStudentIds(new Set());
-    setCurrentPage(1);
+    // Back to the default of everyone ticked (not cleared) — the user
+    // deselects the students they don't want.
+    setSelectedStudentIds(new Set(students.map((s) => s.userStudentId)));
     setNameQuery("");
     setSelectedGrade("");
     setSelectedSection("");
     setReportDataMap(new Map());
     setVisibilityMap(new Map());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedInstitute, selectedAssessment]);
 
   // Load report data + visibility when assessment selected
@@ -518,14 +521,6 @@ const ReportsHubPage: React.FC = () => {
     return result;
   }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo, selectedAssessmentObj, sectionLookup, gradeOf]);
 
-  const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedStudents = useMemo(
-    () => displayedStudents.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize),
-    [displayedStudents, safeCurrentPage, pageSize]
-  );
-
-  useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo]);
 
   // Secret unlock: typing exactly "boom" in the username search toggles admin edit mode.
   useEffect(() => {
@@ -541,10 +536,12 @@ const ReportsHubPage: React.FC = () => {
 
   // ═══════════════════════ HELPERS ═══════════════════════
 
-  const getSelectedOrAllIds = () => {
+  // Visible students that are ticked. Everyone starts ticked when the list
+  // loads, so an empty result means the user deliberately deselected all —
+  // bulk actions then act on nobody rather than silently falling back to all.
+  const getSelectedIds = () => {
     const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
-    const sel = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
-    return sel.length > 0 ? sel : displayedStudents.map((s) => s.userStudentId);
+    return Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
   };
 
   const visibleSelectedCount = useMemo(() => {
@@ -582,7 +579,7 @@ const ReportsHubPage: React.FC = () => {
 
   const openGenerateModal = () => {
     if (!selectedAssessmentObj) return;
-    const ids = getSelectedOrAllIds();
+    const ids = getSelectedIds();
     if (ids.length === 0) { showErrorToast("Select at least one student."); return; }
     if (templates.length === 0) {
       showErrorToast("No report template is mapped to this assessment. Map one in Report Templates or the assessment editor first.");
@@ -599,7 +596,7 @@ const ReportsHubPage: React.FC = () => {
   // Same student-list construction, but opens the async (Kafka → report-worker) modal.
   const openQueueModal = () => {
     if (!selectedAssessmentObj) return;
-    const ids = getSelectedOrAllIds();
+    const ids = getSelectedIds();
     if (ids.length === 0) { showErrorToast("Select at least one student."); return; }
     if (templates.length === 0) {
       showErrorToast("No report template is mapped to this assessment. Map one in Report Templates or the assessment editor first.");
@@ -636,7 +633,7 @@ const ReportsHubPage: React.FC = () => {
   };
 
   const handleBulkVisibility = async (visible: boolean) => {
-    const ids = getSelectedOrAllIds()
+    const ids = getSelectedIds()
       .map((sid) => visibilityMap.get(sid))
       .filter((e): e is { id: number; visible: boolean } => !!e && e.visible !== visible)
       .map((e) => e.id);
@@ -658,7 +655,7 @@ const ReportsHubPage: React.FC = () => {
   // Step 1: Click button → open name prompt
   const handleDownloadZipClick = () => {
     if (!selectedAssessmentObj) return;
-    let ids = getSelectedOrAllIds().filter((id) => {
+    let ids = getSelectedIds().filter((id) => {
       const rd = reportDataMap.get(id);
       return rd && rd.pdfStatus === "ready" && rd.pdfUrl;
     });
@@ -762,7 +759,7 @@ const ReportsHubPage: React.FC = () => {
 
   const handleGenerateDataExcel = async () => {
     if (!selectedAssessmentObj) return;
-    const ids = getSelectedOrAllIds();
+    const ids = getSelectedIds();
     if (ids.length === 0) { showErrorToast("No students."); return; }
     setExportingDataExcel(true);
     try {
@@ -815,7 +812,7 @@ const ReportsHubPage: React.FC = () => {
   };
 
   const handleBulkEmail = () => {
-    const selected = getSelectedOrAllIds()
+    const selected = getSelectedIds()
       .map((id) => {
         const s = displayedStudents.find((st) => st.userStudentId === id);
         const rd = reportDataMap.get(id);
@@ -867,7 +864,7 @@ const ReportsHubPage: React.FC = () => {
   };
 
   const handleBulkWhatsApp = async () => {
-    const selected = getSelectedOrAllIds()
+    const selected = getSelectedIds()
       .map((id) => {
         const s = displayedStudents.find((st) => st.userStudentId === id);
         const rd = reportDataMap.get(id);
@@ -898,7 +895,7 @@ const ReportsHubPage: React.FC = () => {
     <span style={{ background: bg, color, padding: "3px 10px", borderRadius: 6, fontWeight: 600, fontSize: "0.75rem" }}>{text}</span>
   );
 
-  const countLabel = visibleSelectedCount > 0 ? ` (${visibleSelectedCount})` : ` (All ${displayedStudents.length})`;
+  const countLabel = ` (${visibleSelectedCount})`;
 
   // ═══════════════════════ RENDER ═══════════════════════
 
@@ -1289,12 +1286,12 @@ const ReportsHubPage: React.FC = () => {
                     <tr style={{ background: "#f8fafc" }}>
                       <th style={{ ...thStyle, width: 40 }}>
                         <input type="checkbox"
-                          checked={paginatedStudents.length > 0 && paginatedStudents.every((s) => selectedStudentIds.has(s.userStudentId))}
+                          checked={displayedStudents.length > 0 && displayedStudents.every((s) => selectedStudentIds.has(s.userStudentId))}
                           onChange={(e) => {
                             setSelectedStudentIds((prev) => {
                               const next = new Set(prev);
-                              if (e.target.checked) paginatedStudents.forEach((s) => next.add(s.userStudentId));
-                              else paginatedStudents.forEach((s) => next.delete(s.userStudentId));
+                              if (e.target.checked) displayedStudents.forEach((s) => next.add(s.userStudentId));
+                              else displayedStudents.forEach((s) => next.delete(s.userStudentId));
                               return next;
                             });
                           }} />
@@ -1316,8 +1313,8 @@ const ReportsHubPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedStudents.map((s, idx) => {
-                      const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
+                    {displayedStudents.map((s, idx) => {
+                      const globalIdx = idx;
                       const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
                       const asmtDetail = (s.assessments || []).find(
                         (a) => a.assessmentId === selectedAssessmentObj!.id
@@ -1496,52 +1493,10 @@ const ReportsHubPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  marginTop: 12, flexWrap: "wrap", gap: 8,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                      {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
-                    </span>
-                    <select className="form-select form-select-sm form-select-solid"
-                      style={{ width: 68, fontSize: "0.8rem" }} value={pageSize}
-                      onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
-                      {[25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
-                      onClick={() => setCurrentPage(1)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>First</button>
-                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Prev</button>
-                    {(() => {
-                      const pages: (number | string)[] = [];
-                      const maxV = 5;
-                      let start = Math.max(1, safeCurrentPage - Math.floor(maxV / 2));
-                      let end = Math.min(totalPages, start + maxV - 1);
-                      if (end - start + 1 < maxV) start = Math.max(1, end - maxV + 1);
-                      if (start > 1) { pages.push(1); if (start > 2) pages.push("..."); }
-                      for (let i = start; i <= end; i++) pages.push(i);
-                      if (end < totalPages) { if (end < totalPages - 1) pages.push("..."); pages.push(totalPages); }
-                      return pages.map((p, i) =>
-                        typeof p === "string" ? (
-                          <span key={`e-${i}`} style={{ padding: "4px 4px", color: "#9ca3af", fontSize: "0.8rem" }}>...</span>
-                        ) : (
-                          <button key={p} className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
-                            onClick={() => setCurrentPage(p)} style={{ padding: "4px 10px", fontSize: "0.8rem", minWidth: 32 }}>{p}</button>
-                        )
-                      );
-                    })()}
-                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Next</button>
-                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Last</button>
-                  </div>
-                </div>
-              )}
+              {/* All reports render on one page — total shown below the table */}
+              <div style={{ marginTop: 12, fontSize: "0.8rem", color: "#6b7280", textAlign: "right" }}>
+                {displayedStudents.length} student{displayedStudents.length === 1 ? "" : "s"}
+              </div>
             </>
           )}
         </div>
@@ -1581,7 +1536,7 @@ const ReportsHubPage: React.FC = () => {
       <BulkSendModal
         open={bulkSendOpen}
         onClose={() => setBulkSendOpen(false)}
-        selectedCount={visibleSelectedCount > 0 ? visibleSelectedCount : displayedStudents.length}
+        selectedCount={visibleSelectedCount}
         sendingEmail={composeSending}
         sendingWhatsApp={false}
         onBulkEmail={handleBulkEmail}
