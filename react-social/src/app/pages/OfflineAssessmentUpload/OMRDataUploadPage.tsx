@@ -6,6 +6,7 @@ import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../A
 import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire, getAllOmrMappings } from "./API/OfflineUpload_APIs";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
+import SearchableSelect from "../../components/SearchableSelect";
 
 // ============ Types ============
 
@@ -904,12 +905,15 @@ const OMRDataUploadPage = () => {
               {loadingInstitutes ? (
                 <div><Spinner animation="border" size="sm" /> Loading...</div>
               ) : (
-                <Form.Select value={selectedInstitute} onChange={(e) => setSelectedInstitute(e.target.value)}>
-                  <option value="">Select an institute...</option>
-                  {institutes.map((inst: any) => (
-                    <option key={inst.instituteCode} value={inst.instituteCode}>{inst.instituteName}</option>
-                  ))}
-                </Form.Select>
+                <SearchableSelect
+                  options={institutes.map((inst: any) => ({
+                    value: String(inst.instituteCode),
+                    label: String(inst.instituteName ?? ""),
+                  }))}
+                  value={selectedInstitute}
+                  onChange={(v) => setSelectedInstitute(v)}
+                  placeholder="Select an institute..."
+                />
               )}
             </div>
             <div className="col-md-5">

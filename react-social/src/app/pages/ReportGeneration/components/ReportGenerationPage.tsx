@@ -11,6 +11,7 @@ import {
 import { getAssessmentMappingsByInstitute } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
 import { createOrUpdateGeneratedReport } from "../API/GeneratedReport_APIs";
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../API/BetReportData_APIs";
+import SearchableSelect from "../../../components/SearchableSelect";
 
 // ═══════════════════════ CONFIG TYPE ═══════════════════════
 
@@ -363,11 +364,12 @@ const ReportGenerationPage: React.FC<{
         <div>
           <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 6, display: "block" }}>School / Institute</label>
           {institutesLoading ? <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div> : (
-            <select className="form-select form-select-solid" value={selectedInstitute}
-              onChange={(e) => { setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value)); setSelectedAssessment(""); }}>
-              <option value="">-- Select a school --</option>
-              {institutes.map((inst) => <option key={inst.instituteCode} value={inst.instituteCode}>{inst.instituteName}</option>)}
-            </select>
+            <SearchableSelect
+              options={institutes.map((inst) => ({ value: String(inst.instituteCode), label: String(inst.instituteName ?? "") }))}
+              value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+              onChange={(v) => { setSelectedInstitute(v === "" ? "" : Number(v)); setSelectedAssessment(""); }}
+              placeholder="-- Select a school --"
+            />
           )}
         </div>
         <div>

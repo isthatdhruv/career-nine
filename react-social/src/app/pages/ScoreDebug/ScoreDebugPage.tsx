@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { showErrorToast } from '../../utils/toast';
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
+import SearchableSelect from "../../components/SearchableSelect";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -89,7 +90,9 @@ const ScoreDebugPage: React.FC = () => {
         res.data.map((i: any) => ({
           id: i.instituteCode || i.id,
           name: i.instituteName || i.name,
-        }))
+        })).sort((a: any, b: any) =>
+          String(a.name ?? "").trim().localeCompare(String(b.name ?? "").trim(), undefined, { sensitivity: "base" })
+        )
       );
     });
     axios.get(`${API_URL}/assessments/get/list`).then((res) => {
@@ -323,18 +326,12 @@ const ScoreDebugPage: React.FC = () => {
         <div className="row g-3 mb-5">
           <div className="col-md-3">
             <label className="form-label fw-semibold">Institute</label>
-            <select
-              className="form-select"
-              value={selectedInstitute}
-              onChange={(e) => setSelectedInstitute(e.target.value ? Number(e.target.value) : "")}
-            >
-              <option value="">Select Institute</option>
-              {institutes.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              options={institutes.map((i) => ({ value: String(i.id), label: String(i.name ?? "") }))}
+              value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+              onChange={(v) => setSelectedInstitute(v ? Number(v) : "")}
+              placeholder="Select Institute"
+            />
           </div>
           <div className="col-md-3">
             <label className="form-label fw-semibold">Student</label>

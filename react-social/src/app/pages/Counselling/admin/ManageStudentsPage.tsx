@@ -13,6 +13,7 @@ import {
 } from '../../ReportGeneration/API/GeneratedReport_APIs'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import PageHeader from '../../../components/PageHeader'
+import SearchableSelect from '../../../components/SearchableSelect'
 
 const API_URL = process.env.REACT_APP_API_URL
 
@@ -84,7 +85,7 @@ const ManageStudentsPage: React.FC = () => {
         setInstitutes(data.map((i: any) => ({
           code: i.instituteCode || i.institute_code,
           name: i.instituteName || i.institute_name || `Institute ${i.instituteCode}`,
-        })))
+        })).sort((a, b) => a.name.trim().localeCompare(b.name.trim(), undefined, { sensitivity: 'base' })))
       })
       .catch(() => setError('Failed to load institutes.'))
   }, [])
@@ -211,19 +212,13 @@ const ManageStudentsPage: React.FC = () => {
         <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--sp-muted, #5C7A72)', whiteSpace: 'nowrap' }}>
           Select Institute:
         </label>
-        <select
-          value={selectedInstitute}
-          onChange={(e) => setSelectedInstitute(e.target.value ? Number(e.target.value) : '')}
-          style={{
-            padding: '7px 12px', border: '1px solid var(--sp-border, #D1E5DF)',
-            borderRadius: 8, fontSize: 13, outline: 'none', background: '#fff', minWidth: 250,
-          }}
-        >
-          <option value=''>Choose an institute...</option>
-          {institutes.map((i) => (
-            <option key={i.code} value={i.code}>{i.name}</option>
-          ))}
-        </select>
+        <SearchableSelect
+          options={institutes.map((i) => ({ value: String(i.code), label: i.name }))}
+          value={selectedInstitute === '' ? '' : String(selectedInstitute)}
+          onChange={(v) => setSelectedInstitute(v ? Number(v) : '')}
+          placeholder='Choose an institute...'
+          style={{ minWidth: 250 }}
+        />
         {selectedInstitute && (
           <input
             type='text'

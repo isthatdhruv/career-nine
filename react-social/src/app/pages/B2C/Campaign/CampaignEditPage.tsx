@@ -25,6 +25,7 @@ import { useInstitutes } from "../../../lib/queries/lookups";
 import { getActivePricingTiers, PricingTier } from "../API/PricingTier_APIs";
 import { getAssessmentSummariesByInstitute } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
 import RegistrationLinks from "./components/RegistrationLinks";
+import SearchableSelect from "../../../components/SearchableSelect";
 
 const emptyCampaign: Campaign = {
   name: "",
@@ -343,16 +344,15 @@ const CampaignEditPage = () => {
                 <Form.Label>
                   Mapped institute <span className="text-danger">*</span>
                 </Form.Label>
-                <Form.Select
-                  value={campaign.instituteCode ?? ""}
-                  onChange={e => upd("instituteCode", e.target.value === "" ? null : Number(e.target.value))}
-                  isInvalid={!campaign.instituteCode}
-                >
-                  <option value="">— select an institute —</option>
-                  {allInstitutes.map(i => (
-                    <option key={i.instituteCode} value={i.instituteCode}>{i.instituteName}</option>
-                  ))}
-                </Form.Select>
+                <SearchableSelect
+                  options={allInstitutes.map(i => ({
+                    value: String(i.instituteCode),
+                    label: String(i.instituteName ?? ""),
+                  }))}
+                  value={campaign.instituteCode == null ? "" : String(campaign.instituteCode)}
+                  onChange={(v) => upd("instituteCode", v === "" ? null : Number(v))}
+                  placeholder="— select an institute —"
+                />
                 <Form.Text className="text-muted">
                   Every student registering through this campaign will be linked to this institute.
                 </Form.Text>

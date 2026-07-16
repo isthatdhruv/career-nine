@@ -25,12 +25,25 @@ const deleteSectionEndpoint = `${API_URL}/schoolSession/section/delete/`;
 
 // ============ INSTITUTE FUNCTIONS ============
 
+// Institute lists are shown in dropdowns/tables all over the app — sort A→Z by
+// name at the source so every consumer is alphabetical regardless of API order.
+const byInstituteName = (a: any, b: any) =>
+  String(a?.instituteName ?? "")
+    .trim()
+    .localeCompare(String(b?.instituteName ?? "").trim(), undefined, { sensitivity: "base" });
+
 export function ReadCollegeData() {
-  return axios.get(readCollege);
+  return axios.get(readCollege).then((res) => {
+    if (Array.isArray(res.data)) res.data.sort(byInstituteName);
+    return res;
+  });
 }
 
 export function ReadCollegeList() {
-  return axios.get(`${API_URL}/instituteDetail/get/list`);
+  return axios.get(`${API_URL}/instituteDetail/get/list`).then((res) => {
+    if (Array.isArray(res.data)) res.data.sort(byInstituteName);
+    return res;
+  });
 }
 
 export function ReadCollegeByIdData(id: any) {

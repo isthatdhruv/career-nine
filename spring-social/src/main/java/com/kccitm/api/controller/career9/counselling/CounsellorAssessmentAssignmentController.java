@@ -70,6 +70,40 @@ public class CounsellorAssessmentAssignmentController {
     }
 
     /**
+     * Assignment rows for a counsellor enriched with the assessment name — the
+     * counsellor portal dashboard lists "assessments I counsel for", and the raw
+     * assignment rows only carry the assessment id.
+     */
+    @PreAuthorize("@auth.allows('counsellor.read')")
+    @GetMapping("/by-counsellor/{counsellorId}/detailed")
+    public ResponseEntity<List<Map<String, Object>>> byCounsellorDetailed(@PathVariable Long counsellorId) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (CounsellorAssessmentAssignment a : assignmentRepository.findByCounsellorId(counsellorId)) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", a.getId());
+            row.put("assessmentId", a.getAssessmentId());
+            row.put("isActive", a.getIsActive());
+            assessmentTableRepository.findById(a.getAssessmentId())
+                    .ifPresent(t -> row.put("assessmentName", t.getAssessmentName()));
+            out.add(row);
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /**
+     * Assessment ids that have counselling toggled on in at least one active tier
+     * (B2B mapping tier, school tier, or B2C campaign pricing tier). The assignment
+     * page uses this to only offer assessments where counselling is actually part of
+     * the package — assigning a counsellor to any other assessment would be a no-op
+     * for students.
+     */
+    @PreAuthorize("@auth.allows('counsellor.read')")
+    @GetMapping("/counselling-enabled-assessments")
+    public ResponseEntity<List<Long>> counsellingEnabledAssessments() {
+        return ResponseEntity.ok(assignmentRepository.findCounsellingEnabledAssessmentIds());
+    }
+
+    /**
      * Assign a counsellor to an assessment. Idempotent: if the pair already exists it is
      * re-activated rather than duplicated (the unique constraint would otherwise reject it).
      * Body: { counsellorId, assessmentId, assignedBy? }

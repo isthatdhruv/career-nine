@@ -12,6 +12,7 @@ import {
   deleteAccessLevel,
 } from "../API/UserMapping_APIs";
 import { showErrorToast } from "../../../utils/toast";
+import SearchableSelect from "../../../components/SearchableSelect";
 
 interface UserCollegeMappingModalProps {
   show: boolean;
@@ -344,17 +345,15 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
               <div className="row g-3 align-items-end">
                 <div className="col-md-8">
                   <Form.Label>Select Institute</Form.Label>
-                  <Form.Select
+                  <SearchableSelect
+                    options={availableInstitutes.map((inst: any) => ({
+                      value: String(inst.instituteCode),
+                      label: String(inst.instituteName ?? ""),
+                    }))}
                     value={selectedInstitute}
-                    onChange={(e) => setSelectedInstitute(e.target.value)}
-                  >
-                    <option value="">Select an institute...</option>
-                    {availableInstitutes.map((inst: any) => (
-                      <option key={inst.instituteCode} value={inst.instituteCode}>
-                        {inst.instituteName}
-                      </option>
-                    ))}
-                  </Form.Select>
+                    onChange={(v) => setSelectedInstitute(v)}
+                    placeholder="Select an institute..."
+                  />
                 </div>
                 <div className="col-md-4">
                   <Button

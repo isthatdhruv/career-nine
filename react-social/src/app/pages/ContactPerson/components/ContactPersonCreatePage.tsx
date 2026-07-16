@@ -7,6 +7,7 @@ import * as Yup from "yup";
 import axios from "axios";
 import { CreateContactInformationData } from "../API/Contact_Person_APIs";
 import { useInstitutes } from "../../../lib/queries/lookups";
+import SearchableSelect from "../../../components/SearchableSelect";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -161,22 +162,16 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                           <label className="required fs-6 fw-bold mb-1">
                             School / Institute :
                           </label>
-                          <select
-                            value={selectedInstitute}
-                            onChange={(e) =>
-                              setSelectedInstitute(
-                                e.target.value === "" ? "" : Number(e.target.value)
-                              )
-                            }
-                            className="form-select form-select-lg form-select-solid mt-2"
-                          >
-                            <option value="">-- Select an institute --</option>
-                            {institutes.map((inst: any) => (
-                              <option key={inst.instituteCode} value={inst.instituteCode}>
-                                {inst.instituteName}
-                              </option>
-                            ))}
-                          </select>
+                          <SearchableSelect
+                            options={institutes.map((inst: any) => ({
+                              value: String(inst.instituteCode),
+                              label: String(inst.instituteName ?? ""),
+                            }))}
+                            value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+                            onChange={(v) => setSelectedInstitute(v === "" ? "" : Number(v))}
+                            placeholder="-- Select an institute --"
+                            className="mt-2"
+                          />
                         </div>
                       </div>
                     </div>

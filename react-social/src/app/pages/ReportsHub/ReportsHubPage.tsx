@@ -40,6 +40,7 @@ import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
 import PageHeader from "../../components/PageHeader";
+import SearchableSelect from "../../components/SearchableSelect";
 import { useAuth, Scope } from "../../modules/auth";
 
 // ═══════════════════════ TYPES ═══════════════════════
@@ -887,13 +888,15 @@ const ReportsHubPage: React.FC = () => {
           {institutesLoading ? (
             <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
           ) : (
-            <select className="form-select form-select-solid" value={selectedInstitute}
-              onChange={(e) => setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">-- Select a school --</option>
-              {institutes.map((inst) => (
-                <option key={inst.instituteCode} value={inst.instituteCode}>{inst.instituteName}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              options={institutes.map((inst) => ({
+                value: String(inst.instituteCode),
+                label: String(inst.instituteName ?? ""),
+              }))}
+              value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+              onChange={(v) => setSelectedInstitute(v === "" ? "" : Number(v))}
+              placeholder="-- Select a school --"
+            />
           )}
         </div>
         <div>
@@ -1368,49 +1371,32 @@ const ReportsHubPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
+              {/* Pagination — right-aligned "Rows per page: [n]  x - y of z  ‹ ›" bar */}
+              {displayedStudents.length > 0 && (
                 <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  marginTop: 12, flexWrap: "wrap", gap: 8,
+                  display: "flex", alignItems: "center", justifyContent: "flex-end",
+                  marginTop: 12, gap: 14, flexWrap: "wrap",
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                      {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
-                    </span>
-                    <select className="form-select form-select-sm form-select-solid"
-                      style={{ width: 68, fontSize: "0.8rem" }} value={pageSize}
-                      onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
-                      {[25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
+                  <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Rows per page:</span>
+                  <select className="form-select form-select-sm form-select-solid"
+                    style={{ width: 68, fontSize: "0.8rem" }} value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
+                    {[10, 25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <span style={{ fontSize: "0.8rem", color: "#374151" }}>
+                    {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
                     <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
-                      onClick={() => setCurrentPage(1)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>First</button>
-                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Prev</button>
-                    {(() => {
-                      const pages: (number | string)[] = [];
-                      const maxV = 5;
-                      let start = Math.max(1, safeCurrentPage - Math.floor(maxV / 2));
-                      let end = Math.min(totalPages, start + maxV - 1);
-                      if (end - start + 1 < maxV) start = Math.max(1, end - maxV + 1);
-                      if (start > 1) { pages.push(1); if (start > 2) pages.push("..."); }
-                      for (let i = start; i <= end; i++) pages.push(i);
-                      if (end < totalPages) { if (end < totalPages - 1) pages.push("..."); pages.push(totalPages); }
-                      return pages.map((p, i) =>
-                        typeof p === "string" ? (
-                          <span key={`e-${i}`} style={{ padding: "4px 4px", color: "#9ca3af", fontSize: "0.8rem" }}>...</span>
-                        ) : (
-                          <button key={p} className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
-                            onClick={() => setCurrentPage(p)} style={{ padding: "4px 10px", fontSize: "0.8rem", minWidth: 32 }}>{p}</button>
-                        )
-                      );
-                    })()}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} aria-label="Previous page"
+                      style={{ width: 32, height: 32, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <i className="bi bi-chevron-left" style={{ fontSize: "0.8rem" }} />
+                    </button>
                     <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Next</button>
-                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Last</button>
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} aria-label="Next page"
+                      style={{ width: 32, height: 32, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <i className="bi bi-chevron-right" style={{ fontSize: "0.8rem" }} />
+                    </button>
                   </div>
                 </div>
               )}

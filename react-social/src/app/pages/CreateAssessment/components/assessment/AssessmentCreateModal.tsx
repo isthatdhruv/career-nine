@@ -6,6 +6,7 @@ import * as Yup from 'yup';
 import { Modal, Button } from 'react-bootstrap';
 import { ReadCollegeData } from '../../../College/API/College_APIs';
 import CollegeCreateModal from '../../../College/components/CollegeCreateModal';
+import SearchableSelect from '../../../../components/SearchableSelect';
 import { useNavigate } from 'react-router-dom';
 
 interface AssessmentCreateModalProps {
@@ -163,23 +164,22 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                                     show={showCollegeModal}
                                     onHide={() => setShowCollegeModal(false)}
                                 />
-                                <Field
-                                    as="select"
-                                    name="collegeId"
-                                    disabled={collegeLoading}
-                                    className={clsx('form-control form-control-lg form-control-solid', {
-                                        'is-invalid text-danger': touched.collegeId && errors.collegeId,
-                                        'is-valid': touched.collegeId && !errors.collegeId,
-                                    })}
-                                >
-                                    <option value="">
-                                        {collegeLoading ? 'Loading colleges...' : 'Select College'}
-                                    </option>
-                                    {college.map((inst) => (
-                                        <option key={inst.instituteCode || inst.id} value={inst.instituteCode || inst.id}>
-                                            {inst.instituteName || inst.name}
-                                        </option>
-                                    ))}
+                                <Field name="collegeId">
+                                    {({ field, form }: any) => (
+                                        <SearchableSelect
+                                            options={college.map((inst) => ({
+                                                value: String(inst.instituteCode || inst.id),
+                                                label: String(inst.instituteName || inst.name || ''),
+                                            }))}
+                                            value={field.value ?? ''}
+                                            onChange={(v) => {
+                                                form.setFieldValue('collegeId', v)
+                                                form.setFieldTouched('collegeId', true, false)
+                                            }}
+                                            placeholder={collegeLoading ? 'Loading colleges...' : 'Select College'}
+                                            disabled={collegeLoading}
+                                        />
+                                    )}
                                 </Field>
                                 {touched.collegeId && errors.collegeId && (
                                     <div className="fv-plugins-message-container">

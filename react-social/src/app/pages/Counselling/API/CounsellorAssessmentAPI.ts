@@ -10,6 +10,18 @@ export function getAssignmentsByAssessment(assessmentId: number) {
 export function getAssignmentsByCounsellor(counsellorId: number) {
   return axios.get(`${BASE}/by-counsellor/${counsellorId}`)
 }
+
+// Same rows enriched with the assessment name — used by the counsellor portal
+// dashboard to list "assessments I counsel for".
+export interface CounsellorAssessmentDetail {
+  id: number
+  assessmentId: number
+  assessmentName?: string
+  isActive?: boolean
+}
+export function getAssignmentsByCounsellorDetailed(counsellorId: number) {
+  return axios.get<CounsellorAssessmentDetail[]>(`${BASE}/by-counsellor/${counsellorId}/detailed`)
+}
 export function assignCounsellor(counsellorId: number, assessmentId: number, assignedBy?: number) {
   return axios.post(`${BASE}/assign`, { counsellorId, assessmentId, assignedBy })
 }
@@ -18,6 +30,12 @@ export function toggleAssignment(id: number) {
 }
 export function deleteAssignment(id: number) {
   return axios.delete(`${BASE}/${id}`)
+}
+
+// Assessment ids with counselling toggled on in at least one active tier — the
+// assignment page only offers these in its assessment dropdown.
+export function getCounsellingEnabledAssessments() {
+  return axios.get<number[]>(`${BASE}/counselling-enabled-assessments`)
 }
 
 // Students who requested counselling on the thank-you page for an assessment that

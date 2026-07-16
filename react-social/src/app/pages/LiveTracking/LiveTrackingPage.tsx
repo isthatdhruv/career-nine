@@ -23,6 +23,7 @@ import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
 import { useAssessmentsForCurrentUser } from "../../hooks/useScopedAssessments";
 import { useInstitutes } from "../../lib/queries/lookups";
+import SearchableSelect from "../../components/SearchableSelect";
 
 /* ─── Types ─── */
 
@@ -768,7 +769,9 @@ const LiveTrackingPage = () => {
   // Unique institute names for filter dropdown
   const instituteOptions = useMemo(() => {
     const names = new Set(visibleStudents.map((s) => s.instituteName).filter(Boolean));
-    return Array.from(names).sort();
+    return Array.from(names).sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, { sensitivity: "base" })
+    );
   }, [visibleStudents]);
 
   // Filtered & searched students (memoized to avoid re-computation)
@@ -1033,19 +1036,13 @@ const LiveTrackingPage = () => {
                 <option value="completed">Completed</option>
               </select>
               {instituteOptions.length > 1 && (
-                <select
-                  className="form-select form-select-sm"
-                  value={filterInstitute}
-                  onChange={(e) => setFilterInstitute(e.target.value)}
-                  style={{ maxWidth: 240 }}
-                >
-                  <option value="all">All Institutes</option>
-                  {instituteOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  options={instituteOptions.map((name) => ({ value: String(name), label: String(name) }))}
+                  value={filterInstitute === "all" ? "" : filterInstitute}
+                  onChange={(v) => setFilterInstitute(v || "all")}
+                  placeholder="All Institutes"
+                  style={{ minWidth: 240 }}
+                />
               )}
               <select
                 className="form-select form-select-sm"

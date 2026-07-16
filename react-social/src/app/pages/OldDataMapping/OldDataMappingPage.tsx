@@ -5,6 +5,7 @@ import FirebaseMappingOverview from "./FirebaseMappingOverview";
 import UnmappedQuestionsTool from "./UnmappedQuestionsTool";
 import { deleteFirebaseStudents } from "./API/OldDataMapping_APIs";
 import { useInstitutes } from "../../lib/queries/lookups";
+import SearchableSelect from "../../components/SearchableSelect";
 
 // ── Delete Firebase Students Panel ──
 const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
@@ -87,22 +88,19 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
                 {loadingInstitutes ? (
                   <div className="text-muted">Loading institutes...</div>
                 ) : (
-                  <select
-                    className="form-select form-select-solid"
-                    value={selectedInstitute}
-                    onChange={(e) => {
-                      setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value));
+                  <SearchableSelect
+                    options={institutes.map((inst) => ({
+                      value: String(inst.instituteCode),
+                      label: String(inst.instituteName ?? ""),
+                    }))}
+                    value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+                    onChange={(v) => {
+                      setSelectedInstitute(v === "" ? "" : Number(v));
                       setResult(null);
                       setShowOrphanPrompt(false);
                     }}
-                  >
-                    <option value="">-- Select an institute --</option>
-                    {institutes.map((inst) => (
-                      <option key={inst.instituteCode} value={inst.instituteCode}>
-                        {inst.instituteName}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="-- Select an institute --"
+                  />
                 )}
               </div>
 

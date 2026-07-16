@@ -9,6 +9,7 @@ import { getSlotsByCounsellor } from '../API/SlotAPI'
 import CounsellorForm from './components/CounsellorForm'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import PageHeader from '../../../components/PageHeader'
+import SearchableSelect from '../../../components/SearchableSelect'
 import { useAuth } from '../../../modules/auth'
 
 const API_URL = process.env.REACT_APP_API_URL
@@ -326,7 +327,7 @@ const CounsellorManagementPage: React.FC = () => {
       setInstitutes(allInstitutes.map((i: any) => ({
         code: i.instituteCode || i.institute_code,
         name: i.instituteName || i.institute_name || `Institute ${i.instituteCode}`,
-      })))
+      })).sort((a, b) => a.name.trim().localeCompare(b.name.trim(), undefined, { sensitivity: 'base' })))
 
     } catch {
       if (!opts?.silent) setError('Failed to load counsellors. Please try again.')
@@ -712,19 +713,13 @@ const CounsellorManagementPage: React.FC = () => {
             borderRadius: 6, fontSize: 13, outline: 'none', width: 200, boxSizing: 'border-box',
           }}
         />
-        <select
-          value={filterInstitute}
-          onChange={(e) => setFilterInstitute(e.target.value ? Number(e.target.value) : '')}
-          style={{
-            padding: '6px 10px', border: '1px solid var(--sp-border, #D1E5DF)',
-            borderRadius: 6, fontSize: 13, outline: 'none', background: '#fff',
-          }}
-        >
-          <option value=''>All Institutes</option>
-          {institutes.map((i) => (
-            <option key={i.code} value={i.code}>{i.name}</option>
-          ))}
-        </select>
+        <SearchableSelect
+          options={institutes.map((i) => ({ value: String(i.code), label: i.name }))}
+          value={filterInstitute === '' ? '' : String(filterInstitute)}
+          onChange={(v) => setFilterInstitute(v ? Number(v) : '')}
+          placeholder='All Institutes'
+          style={{ minWidth: 200 }}
+        />
         {(filterInstitute || searchName) && (
           <button
             onClick={() => { setFilterInstitute(''); setSearchName('') }}

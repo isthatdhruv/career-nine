@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAllAssessments, getBetReport, BetReportResponse, exportScoresByInstitute } from "../StudentInformation/StudentInfo_APIs";
 import { ActionIcon } from "../../components/ActionIcon";
+import SearchableSelect from "../../components/SearchableSelect";
 
 interface Institute {
   instituteCode: number;
@@ -198,24 +199,15 @@ const ReportsPage: React.FC = () => {
                 ></i>
                 Select Institute
               </label>
-              <select
-                className="form-select"
-                style={{
-                  borderRadius: "10px",
-                  border: "2px solid #e0e0e0",
-                  padding: "0.75rem 1rem",
-                  fontWeight: 500,
-                }}
-                value={selectedInstitute}
-                onChange={(e) => handleInstituteChange(e.target.value)}
-              >
-                <option value="">-- Select Institute --</option>
-                {institutes.map((inst) => (
-                  <option key={inst.instituteCode} value={inst.instituteCode}>
-                    {inst.instituteName}
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                options={institutes.map((inst) => ({
+                  value: String(inst.instituteCode),
+                  label: String(inst.instituteName ?? ""),
+                }))}
+                value={String(selectedInstitute)}
+                onChange={(v) => handleInstituteChange(v)}
+                placeholder="-- Select Institute --"
+              />
             </div>
 
             {/* Assessment Selection (BET only) */}
