@@ -38,6 +38,8 @@ export interface AssessmentDetail {
     assessmentId: number;
     assessmentName: string;
     status: string; // 'notstarted' | 'inprogress' | 'completed'
+    /** ISO timestamp of when the student finished. Null unless status is 'completed'. */
+    completedAt?: string | null;
 }
 
 export interface StudentRoleGroupRef {

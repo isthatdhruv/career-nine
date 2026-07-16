@@ -234,7 +234,8 @@
       "PowerShell(docker exec career-nine-mysql_db_api-1 mysql -uuser -pCareer-qCsfeuECc3MW --port 3307 -h 127.0.0.1 -e \"SHOW DATABASES;\")",
       "PowerShell(docker exec career-nine-mysql_db_api-1 sh -c \"cat /etc/mysql/conf.d/custom.cnf; echo ---; mysql -uuser -pCareer-qCsfeuECc3MW -h 127.0.0.1 -P 3306 -e 'SELECT @@port; SHOW DATABASES;'\")",
       "PowerShell(docker inspect career-nine-mysql_db_api-1 --format \"{{json .Config.Env}} | {{json .HostConfig.PortBindings}} | compose file: {{index .Config.Labels \\\\\"com.docker.compose.project.config_files\\\\\"}}\")",
-      "PowerShell(docker exec career-nine-mysql_db_api-1 sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e \"SHOW DATABASES;\"')"
+      "PowerShell(docker exec career-nine-mysql_db_api-1 sh -c 'mysql -uroot -p\"$MYSQL_ROOT_PASSWORD\" -e \"SHOW DATABASES;\"')",
+      "Bash(npx tsc *)"
     ],
     "additionalDirectories": [
       "/home/kccsw/.claude/plans",

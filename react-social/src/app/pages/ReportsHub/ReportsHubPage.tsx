@@ -92,6 +92,32 @@ async function downloadSpacesFile(url: string, fileName: string) {
   URL.revokeObjectURL(objectUrl);
 }
 
+/**
+ * Local calendar day of an ISO timestamp, as YYYY-MM-DD.
+ *
+ * The completion-date filter compares against `<input type="date">` values, which
+ * are bare local dates. Reducing both sides to the same local-day key keeps the
+ * range ends inclusive without any end-of-day arithmetic, and sidesteps the
+ * off-by-one you get comparing a UTC instant to a local date near midnight.
+ * Returns "" for null/unparseable input, which never matches a range.
+ */
+function localDayKey(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const month = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
+/** Compact display date, e.g. "16 Jul 2026". */
+function formatCompletedOn(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+}
+
 // ═══════════════════════ COMPONENT ═══════════════════════
 
 const ReportsHubPage: React.FC = () => {
@@ -162,6 +188,9 @@ const ReportsHubPage: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<"" | "completed" | "ongoing" | "notstarted">("");
+  // Completion date range, as YYYY-MM-DD local dates. Both ends inclusive; either may stand alone.
+  const [completedFrom, setCompletedFrom] = useState("");
+  const [completedTo, setCompletedTo] = useState("");
 
   // ── Action states ──
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
@@ -473,8 +502,21 @@ const ReportsHubPage: React.FC = () => {
         return st === selectedStatus;
       });
     }
+    if ((completedFrom || completedTo) && selectedAssessmentObj) {
+      result = result.filter((s) => {
+        const day = localDayKey(
+          (s.assessments || []).find((a: any) => a.assessmentId === selectedAssessmentObj.id)?.completedAt
+        );
+        // No completion date — never in range. Filtering by *when* someone finished
+        // implies they finished, so unfinished students drop out here.
+        if (!day) return false;
+        if (completedFrom && day < completedFrom) return false;
+        if (completedTo && day > completedTo) return false;
+        return true;
+      });
+    }
     return result;
-  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup, gradeOf]);
+  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo, selectedAssessmentObj, sectionLookup, gradeOf]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -483,7 +525,7 @@ const ReportsHubPage: React.FC = () => {
     [displayedStudents, safeCurrentPage, pageSize]
   );
 
-  useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus]);
+  useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo]);
 
   // Secret unlock: typing exactly "boom" in the username search toggles admin edit mode.
   useEffect(() => {
@@ -1032,6 +1074,41 @@ const ReportsHubPage: React.FC = () => {
                     <option value="notstarted">Not Started</option>
                   </select>
                 </div>
+                <div style={{ minWidth: 150 }}>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Completed From</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm form-control-solid"
+                    value={completedFrom}
+                    max={completedTo || undefined}
+                    onChange={(e) => setCompletedFrom(e.target.value)}
+                    disabled={!selectedAssessmentObj}
+                    title={!selectedAssessmentObj ? "Select an assessment first" : ""}
+                  />
+                </div>
+                <div style={{ minWidth: 150 }}>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Completed To</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm form-control-solid"
+                    value={completedTo}
+                    min={completedFrom || undefined}
+                    onChange={(e) => setCompletedTo(e.target.value)}
+                    disabled={!selectedAssessmentObj}
+                    title={!selectedAssessmentObj ? "Select an assessment first" : ""}
+                  />
+                </div>
+                {(completedFrom || completedTo) && (
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-light"
+                      onClick={() => { setCompletedFrom(""); setCompletedTo(""); }}
+                    >
+                      Clear dates
+                    </button>
+                  </div>
+                )}
                 <div style={{ minWidth: 180 }}>
                   <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Username</label>
                   <input className="form-control form-control-sm form-control-solid"
@@ -1226,6 +1303,7 @@ const ReportsHubPage: React.FC = () => {
                       <th style={thStyle}>Name</th>
                       <th style={thStyle}>Username</th>
                       <th style={thStyle}>Status</th>
+                      <th style={thStyle}>Completed On</th>
                       <th style={thStyle}>Grade</th>
                       <th style={thStyle}>Section</th>
                       <th style={thStyle}>Report</th>
@@ -1241,9 +1319,11 @@ const ReportsHubPage: React.FC = () => {
                     {paginatedStudents.map((s, idx) => {
                       const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
                       const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
-                      const asmtStatus = (s.assessments || []).find(
+                      const asmtDetail = (s.assessments || []).find(
                         (a) => a.assessmentId === selectedAssessmentObj!.id
-                      )?.status || "notstarted";
+                      );
+                      const asmtStatus = asmtDetail?.status || "notstarted";
+                      const completedOn = formatCompletedOn(asmtDetail?.completedAt);
                       const rd = reportDataMap.get(s.userStudentId);
                       const reportStatus = rd?.reportStatus || "notGenerated";
                       const reportUrl = rd?.reportUrl || null;
@@ -1278,6 +1358,13 @@ const ReportsHubPage: React.FC = () => {
                             )}
                           </td>
                           <td style={tdStyle}>{statusBadge(asc.bg, asc.color, asmtStatus)}</td>
+                          <td style={tdStyle}>
+                            {completedOn ? (
+                              <span title={new Date(asmtDetail!.completedAt!).toLocaleString()}>{completedOn}</span>
+                            ) : (
+                              <span style={{ color: "#9ca3af", fontStyle: "italic", fontSize: "0.8rem" }}>—</span>
+                            )}
+                          </td>
                           <td style={tdStyle}>{gradeOf(s) || "-"}</td>
                           <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
                           <td style={tdStyle}>{statusBadge(rsc.bg, rsc.color, hasReport ? "Generated" : "Not Generated")}</td>
