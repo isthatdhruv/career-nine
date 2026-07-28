@@ -7,6 +7,14 @@ import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
+import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.email.EmailAccount;
+import com.kccitm.api.model.email.EmailTemplate;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.email.EmailAccountRepository;
+import com.kccitm.api.repository.email.EmailTemplateRepository;
+import com.kccitm.api.service.email.InstituteEmailSettingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +44,10 @@ public class ReportPipelineProducer {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private InstituteBrandingService brandingService;
     @Autowired private UserStudentRepository userStudentRepository;
+    @Autowired private AssessmentTableRepository assessmentTableRepository;
+    @Autowired private InstituteEmailSettingService instituteEmailSettingService;
+    @Autowired private EmailAccountRepository accountRepository;
+    @Autowired private EmailTemplateRepository templateRepository;
 
     @Value("${report.pipeline.enabled:true}")
     private boolean enabled;
@@ -69,13 +81,24 @@ public class ReportPipelineProducer {
         StudentInfo info = userStudent.getStudentInfo();
         String email = info != null ? info.getEmail() : null;
         String recipient = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
-        if (whitelabel && recipient == null) {
-            logger.warn("Report pipeline: whitelabel student {} has no email; report will be generated but not mailed (assessment {})",
+        // Email gate (Phase 4): whitelabel students always, plus any assessment with the
+        // "email report" toggle on. Account + template are resolved here (produce-time) and
+        // travel as IDs on the event — never secrets.
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+        boolean emailReportEnabled = assessment != null && Boolean.TRUE.equals(assessment.getEmailReportEnabled());
+        boolean emailEnabled = whitelabel || emailReportEnabled;
+        if (emailEnabled && recipient == null) {
+            logger.warn("Report pipeline: student {} qualifies for a report email but has no address (assessment {})",
                     userStudent.getUserStudentId(), assessmentId);
         }
+        Integer instituteCode = institute != null ? institute.getInstituteCode() : null;
         ReportGenerateEvent ev = new ReportGenerateEvent(
                 userStudent.getUserStudentId(), assessmentId, recipient,
                 whitelabel, brand.getSchoolName(), brand.getLogoUrl());
+        ev.emailReportEnabled = emailReportEnabled;
+        ev.emailAccountId = resolveAccountId(instituteCode);
+        ev.emailTemplateId = resolveReportTemplateId();
+        ev.studentName = info != null ? info.getName() : null;
         try {
             kafkaTemplate.send(ReportPipelineConfig.TOPIC_GENERATE, ev.key(),
                     objectMapper.writeValueAsString(ev));
@@ -89,38 +112,22 @@ public class ReportPipelineProducer {
         return true;
     }
 
-    /**
-     * Admin-triggered enqueue (Generate Queue modal). Unlike {@link #enqueue},
-     * failures must SURFACE to the caller: the controller maps them to 404/502
-     * and does NOT stamp the row "queued", so a dead broker can never strand a
-     * chip in the queued state.
-     *
-     * @throws IllegalArgumentException student not found
-     * @throws IllegalStateException    serialization/Kafka failure
-     */
-    public void enqueueAdmin(Long userStudentId, Long assessmentId, Long reportTemplateId,
-                             boolean force, String emailMode, String batchId) {
-        UserStudent userStudent = userStudentRepository.findByIdWithStudentInfo(userStudentId)
-                .orElseThrow(() -> new IllegalArgumentException("UserStudent not found: " + userStudentId));
-        BrandingDto brand = brandingService.forInstitute(userStudent.getInstitute());
-        StudentInfo info = userStudent.getStudentInfo();
-        String email = info != null ? info.getEmail() : null;
-        String recipient = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
-
-        ReportGenerateEvent ev = new ReportGenerateEvent(userStudentId, assessmentId, recipient,
-                brand.isWhitelabel(), brand.getSchoolName(), brand.getLogoUrl());
-        ev.force = force;
-        ev.reportTemplateId = reportTemplateId;
-        ev.emailMode = emailMode;
-        ev.batchId = batchId;
-        try {
-            kafkaTemplate.send(ReportPipelineConfig.TOPIC_GENERATE, ev.key(),
-                    objectMapper.writeValueAsString(ev));
-            logger.info("Report pipeline: admin enqueue student={} assessment={} template={} force={} emailMode={} batch={}",
-                    userStudentId, assessmentId, reportTemplateId, force, emailMode, batchId);
-        } catch (Exception e) {
-            throw new IllegalStateException("Kafka enqueue failed for student " + userStudentId
-                    + ": " + e.getMessage(), e);
+    /** Institute default account (if active) → global default; null if neither resolves. */
+    private Long resolveAccountId(Integer instituteCode) {
+        Long instituteAccountId = instituteEmailSettingService.resolveDefaultAccountId(instituteCode);
+        if (instituteAccountId != null
+                && accountRepository.findById(instituteAccountId)
+                        .map(a -> Boolean.TRUE.equals(a.getActive())).orElse(false)) {
+            return instituteAccountId;
         }
+        return accountRepository.findFirstByIsGlobalDefaultTrueAndActiveTrue()
+                .map(EmailAccount::getId).orElse(null);
+    }
+
+    /** The default REPORT_READY template id, or null to fall back to the composer HTML. */
+    private Long resolveReportTemplateId() {
+        return templateRepository
+                .findFirstByEmailTypeAndIsDefaultTrueAndActiveTrue(EmailType.REPORT_READY.name())
+                .map(EmailTemplate::getId).orElse(null);
     }
 }

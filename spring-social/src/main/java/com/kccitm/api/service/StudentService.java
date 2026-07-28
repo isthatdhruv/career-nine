@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import com.cribbstechnologies.clients.mandrill.exception.RequestFailedException;
 import com.kccitm.api.model.BoardName;
 import com.kccitm.api.model.CheckRegistrationFeild;
 import com.kccitm.api.model.InstituteBatch;
@@ -33,7 +32,6 @@ import com.kccitm.api.repository.InstituteSessionRepository;
 import com.kccitm.api.repository.StudentRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.UserPrincipal;
-import com.microtripit.mandrillapp.lutung.model.MandrillApiError;
 
 @Service
 public class StudentService {
@@ -167,7 +165,7 @@ public class StudentService {
     return stu;
   }
 
-  public boolean initalRegistration(Student r) throws RequestFailedException {
+  public boolean initalRegistration(Student r) {
     try {
       if (r.getOther10thBoard() != "") {
         String board = r.getOther10thBoard();
@@ -207,8 +205,7 @@ public class StudentService {
     }
   }
 
-  public boolean registrarVarification(Student r, UserPrincipal userPrincipal)
-      throws RequestFailedException {
+  public boolean registrarVarification(Student r, UserPrincipal userPrincipal) {
     try {
       studentRepository.save(r);
       checkRegistrationFeildRepository.save(r.getCheck());
@@ -255,7 +252,7 @@ public class StudentService {
     }
   }
 
-  public void studentRegistarionUpdate(Student r) throws MandrillApiError, IOException, RequestFailedException {
+  public void studentRegistarionUpdate(Student r) throws IOException {
     HashMap<String, Object> content1 = new HashMap<>();
     content1.put("student_name", r.getFirstName() + " " + r.getLastName());
     studentRepository.save(r);
@@ -272,7 +269,7 @@ public class StudentService {
   }
 
   public void sendstudentRegisrationWelcomeMail(Student r, String idCard_url)
-      throws MandrillApiError, IOException, RequestFailedException {
+      throws IOException {
     HashMap<String, Object> content1 = new HashMap<>();
     String institute_name = "KCC Institute of Technology and Management";
     content1.put("student_name", r.getFirstName() + " " + r.getLastName());
@@ -290,7 +287,7 @@ public class StudentService {
   }
 
   public void sendIdCardMail(Student r, String idCard_url)
-      throws MandrillApiError, IOException, RequestFailedException {
+      throws IOException {
     HashMap<String, Object> content1 = new HashMap<>();
     String institute_name = "KCC Institute of Technology and Management";
     content1.put("student_name", r.getFirstName() + " " + r.getLastName());
@@ -309,7 +306,7 @@ public class StudentService {
   }
 
   public void sendOtpMail(String email, String otp)
-      throws MandrillApiError, IOException, RequestFailedException {
+      throws IOException {
     HashMap<String, Object> content1 = new HashMap<>();
     String institute_name = "KCC Institute of Technology and Management";
     content1.put("otp", otp);

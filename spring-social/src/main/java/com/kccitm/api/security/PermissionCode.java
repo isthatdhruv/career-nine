@@ -32,6 +32,10 @@ public enum PermissionCode {
     INSTITUTE_WRITE  ("institute.write",  "Create or update institutes"),
     INSTITUTE_DELETE ("institute.delete", "Delete institutes"),
 
+    // ── School cohort insights dashboard (Dashboard 2) ──────────────────
+    DASHBOARD_SCHOOL_INSIGHTS_GENERATE("dashboard.school.insights.generate", "Generate/refresh school cohort insight payloads (superadmin)"),
+    DASHBOARD_SCHOOL_INSIGHTS_READ("dashboard.school.insights.read", "View the school cohort insights dashboard"),
+
     // ── Session (Phase 14 foundation) ───────────────────────────────────
     SESSION_READ  ("session.read",  "View academic sessions"),
     SESSION_WRITE ("session.write", "Create or update sessions"),
@@ -48,6 +52,7 @@ public enum PermissionCode {
     STUDENT_READ        ("student.read",        "View students"),
     STUDENT_WRITE       ("student.write",       "Create or update students"),
     STUDENT_IMPORT_BULK ("student.import_bulk", "Bulk-import students from CSV/Excel"),
+    STUDENT_IMPERSONATE ("student.impersonate", "Open a student's dashboard as that student (admin impersonation)"),
 
     // ── Assessment (Phase 14 foundation) ────────────────────────────────
     ASSESSMENT_READ    ("assessment.read",    "View assessments"),
@@ -548,7 +553,17 @@ public enum PermissionCode {
     // ── Collapsed report_template system (V20260601007 seed) ────────────
     // report_template.{read,create,update,delete} already exist above (~L356).
     REPORT_TEMPLATE_UPLOAD_TEMPLATE   ("report_template.upload_template", "Upload / replace a report template HTML"),
-    REPORT_TEMPLATE_MAP               ("report_template.map",             "Map templates to questionnaires and set the default");
+    REPORT_TEMPLATE_MAP               ("report_template.map",             "Map templates to questionnaires and set the default"),
+
+    // ── Configurable email system (V20260629001 seed) ───────────────────
+    EMAIL_ACCOUNT_READ ("email_account.read", "View configured email accounts"),
+    EMAIL_ACCOUNT_EDIT ("email_account.edit", "Create, edit and delete email accounts"),
+    EMAIL_ACCOUNT_TEST ("email_account.test", "Send a test email through an email account"),
+    EMAIL_LOG_READ     ("email_log.read",     "View the email send log"),
+
+    // ── Email templates (V20260629003 seed) ─────────────────────────────
+    EMAIL_TEMPLATE_READ ("email_template.read", "View email templates"),
+    EMAIL_TEMPLATE_EDIT ("email_template.edit", "Create, edit and delete email templates");
 
     private final String code;
     private final String description;

@@ -46,7 +46,8 @@ import com.kccitm.api.repository.Career9.NavigatorReportDataRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.service.CommunicationLogService;
-import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.service.email.EmailDispatchService;
 
 @RestController
 @RequestMapping("/contact-person")
@@ -74,7 +75,7 @@ public class ContactPersonController {
     private SchoolSectionsRepository schoolSectionsRepository;
 
     @Autowired
-    private SmtpEmailService smtpEmailService;
+    private EmailDispatchService emailDispatchService;
 
     @Autowired
     private CommunicationLogService communicationLogService;
@@ -376,7 +377,7 @@ public class ContactPersonController {
             boolean ok = true;
             String err = null;
             try {
-                smtpEmailService.sendHtmlEmail(cp.getEmail(), subject, htmlBody);
+                emailDispatchService.sendHtml(EmailType.GENERIC, cp.getEmail(), subject, htmlBody);
             } catch (Exception e) {
                 ok = false;
                 err = e.getMessage();
@@ -551,6 +552,9 @@ public class ContactPersonController {
         String subject = (String) payload.get("subject");
         String htmlContent = (String) payload.get("htmlContent");
         String fromName = (String) payload.get("fromName");
+        Long overrideAccountId = payload.get("overrideAccountId") != null
+                ? Long.valueOf(String.valueOf(payload.get("overrideAccountId")))
+                : null;
 
         if (emails == null || emails.isEmpty()) {
             return ResponseEntity.badRequest().body("At least one email is required");
@@ -572,7 +576,7 @@ public class ContactPersonController {
         boolean sendSuccess = true;
         String sendError = null;
         try {
-            smtpEmailService.sendEmail(request);
+            emailDispatchService.send(EmailType.CONTACT_PERSON_REPORT, request, null, overrideAccountId);
         } catch (Exception e) {
             sendSuccess = false;
             sendError = e.getMessage();
@@ -749,7 +753,7 @@ public class ContactPersonController {
         boolean sendSuccess = true;
         String sendError = null;
         try {
-            smtpEmailService.sendEmail(emailRequest);
+            emailDispatchService.send(EmailType.CONTACT_PERSON_REPORT, emailRequest, null);
         } catch (Exception e) {
             sendSuccess = false;
             sendError = e.getMessage();
@@ -1065,7 +1069,7 @@ public class ContactPersonController {
         boolean sendSuccess = true;
         String sendError = null;
         try {
-            smtpEmailService.sendEmail(emailRequest);
+            emailDispatchService.send(EmailType.CONTACT_PERSON_REPORT, emailRequest, null);
         } catch (Exception e) {
             sendSuccess = false;
             sendError = e.getMessage();

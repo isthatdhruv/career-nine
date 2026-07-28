@@ -142,6 +142,16 @@ public class TokenProvider {
     }
 
     /**
+     * Admin-impersonation minter: mints a short-lived (5 min) access token for
+     * {@link com.kccitm.api.controller.ImpersonationController}. A URL/sessionStorage-borne
+     * impersonation token should live only long enough for the admin to open the student
+     * dashboard tab — not the full 60-min {@link #createAccessToken(UserPrincipal)} TTL.
+     */
+    public String createImpersonationToken(UserPrincipal userPrincipal) {
+        return buildJwt(userPrincipal, 5 * 60 * 1000L, TokenType.ACCESS);
+    }
+
+    /**
      * Opaque refresh-token string generator. Refresh tokens are NOT JWTs — they are
      * UUID v4 strings whose only server-side state lives in the {@code refresh_token}
      * table (Phase 14). The {@code RefreshTokenService.issue} method calls this and

@@ -105,4 +105,15 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
         "  AND m.persistenceState IN ('pending', 'failed')")
     List<StudentAssessmentMapping> findAllCompletedPendingPersistence();
 
+    // Cohort insights coverage denominator: students who COMPLETED this assessment
+    // in this institute (at generation time).
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT COUNT(m) FROM StudentAssessmentMapping m " +
+        "WHERE m.assessmentId = :assessmentId " +
+        "  AND m.status = 'completed' " +
+        "  AND m.userStudent.institute.instituteCode = :instituteCode")
+    long countCompletedByInstituteAndAssessment(
+        @org.springframework.data.repository.query.Param("instituteCode") Long instituteCode,
+        @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
+
 }

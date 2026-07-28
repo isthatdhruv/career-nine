@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.kccitm.api.model.career9.GeneratedReport;
@@ -41,4 +43,15 @@ public interface GeneratedReportRepository extends JpaRepository<GeneratedReport
     void deleteByUserStudentUserStudentId(Long userStudentId);
 
     void deleteByAssessmentIdAndTypeOfReport(Long assessmentId, String typeOfReport);
+
+    // Cohort insights: all pager reports (with a stored navigator dashboard) for an
+    // institute + assessment — the source set for cohort aggregation.
+    @Query("SELECT gr FROM GeneratedReport gr "
+         + "WHERE gr.assessmentId = :assessmentId "
+         + "AND gr.typeOfReport = 'pager' "
+         + "AND gr.navigatorDashboardJson IS NOT NULL "
+         + "AND gr.userStudent.institute.instituteCode = :instituteCode")
+    List<GeneratedReport> findPagerReportsByInstituteAndAssessment(
+            @Param("instituteCode") Long instituteCode,
+            @Param("assessmentId") Long assessmentId);
 }

@@ -69,6 +69,19 @@ public class SchoolReport implements Serializable {
     @Column(name = "status", length = 50)
     private String status = "generated";
 
+    // --- Cohort-insights generation lifecycle (V20260624001) ---
+    @Column(name = "generation_status", length = 20)
+    private String generationStatus;   // "PENDING" | "GENERATING" | "GENERATED" | "FAILED"
+
+    @Column(name = "logic_version", length = 64)
+    private String logicVersion;       // aggregator logic version stamped at generation
+
+    @Column(name = "generated_by")
+    private Long generatedBy;          // superadmin user id who triggered generation
+
+    @Column(name = "completed_count")
+    private Integer completedCount;    // students who had COMPLETED the assessment at generation time
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", updatable = false)
     private Date createdAt;
@@ -121,6 +134,18 @@ public class SchoolReport implements Serializable {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public String getGenerationStatus() { return generationStatus; }
+    public void setGenerationStatus(String generationStatus) { this.generationStatus = generationStatus; }
+
+    public String getLogicVersion() { return logicVersion; }
+    public void setLogicVersion(String logicVersion) { this.logicVersion = logicVersion; }
+
+    public Long getGeneratedBy() { return generatedBy; }
+    public void setGeneratedBy(Long generatedBy) { this.generatedBy = generatedBy; }
+
+    public Integer getCompletedCount() { return completedCount; }
+    public void setCompletedCount(Integer completedCount) { this.completedCount = completedCount; }
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }

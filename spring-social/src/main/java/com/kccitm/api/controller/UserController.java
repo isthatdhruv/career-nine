@@ -36,7 +36,8 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
-import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.dashboard.StudentDashboardDataService;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
@@ -46,7 +47,7 @@ import com.kccitm.api.model.userDefinedModel.StudentPortalComputedData;
 public class UserController {
 
     @Autowired
-    private SmtpEmailService smtpEmailService;
+    private EmailDispatchService emailDispatchService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -508,8 +509,8 @@ public class UserController {
                             "— Career-9 Team";
                     // Gmail path is @Async fire-and-forget — returns immediately and the
                     // actual send happens on a worker thread. We only know the request
-                    // was queued; SmtpEmailService logs the eventual success/failure.
-                    smtpEmailService.sendSimpleEmail(user.getEmail(), subject, text);
+                    // was queued; the dispatcher records the eventual status in email_send_log.
+                    emailDispatchService.sendText(EmailType.ADMIN_PASSWORD_RESET, user.getEmail(), subject, text);
                     emailQueued = true;
                 } catch (Exception e) {
                     emailError = e.getMessage();
@@ -543,7 +544,7 @@ public class UserController {
             userRepository.save(user);
             String subject = "Congratulations! Account Activated";
             // Send email notification
-            smtpEmailService.sendSimpleEmail(user.getEmail(), subject,
+            emailDispatchService.sendText(EmailType.ACCOUNT_ACTIVATED, user.getEmail(), subject,
                     "Your Dashboard account has been activated.\nYou can login at https://dashboard.career-9.com using your registered email and password.\n\nBest regards,\nCareer-9 Team");
         } catch (Exception e) {
         }

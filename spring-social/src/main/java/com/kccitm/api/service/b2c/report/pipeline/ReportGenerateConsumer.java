@@ -86,14 +86,11 @@ public class ReportGenerateConsumer {
             //   "none" → generate only (admin toggle OFF)
             //   "auto" → legacy on-submission behavior: whitelabel students only
             boolean hasEmail = ev.recipientEmail != null && !ev.recipientEmail.isBlank();
-            String mode = ev.emailMode == null ? "auto" : ev.emailMode;
-            boolean shouldEmail =
-                    "all".equals(mode)  ? hasEmail
-                  : "none".equals(mode) ? false
-                  :                       (ev.whitelabel && hasEmail);
-            if (!shouldEmail) {
-                logger.info("Report generated (not mailed — mode={} whitelabel={} hasEmail={}) student={} assessment={}",
-                        mode, ev.whitelabel, hasEmail, ev.userStudentId, ev.assessmentId);
+            // Email whitelabel students always, plus any assessment with the "email report" toggle on.
+            boolean emailEnabled = ev.whitelabel || ev.emailReportEnabled;
+            if (!emailEnabled || !hasEmail) {
+                logger.info("Report generated (not mailed — whitelabel={} toggle={} hasEmail={}) student={} assessment={}",
+                        ev.whitelabel, ev.emailReportEnabled, hasEmail, ev.userStudentId, ev.assessmentId);
                 return;
             }
 

@@ -25,6 +25,21 @@ const STATE_CHANGING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const AUTH_SCOPE_HEADER = "X-Auth-Scope";
 const AUTH_SCOPE_VALUE = "session";
 
+// Per-tab impersonation JWT (set by the admin "Data Download" landing flow —
+// see Task 5). When present, own-API requests carry it as a Bearer token
+// instead of the admin's cn_at cookie (see setupAxios request interceptor).
+export const IMPERSONATION_STORAGE_KEY = "cn_impersonation_jwt";
+
+function readImpersonationJwt(): string | null {
+  try {
+    return typeof sessionStorage !== "undefined"
+      ? sessionStorage.getItem(IMPERSONATION_STORAGE_KEY)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 // True for requests that target our own API (relative URLs or the configured
 // API base) — third-party calls must not receive our auth-routing header.
 function isOwnApiUrl(url: string | undefined): boolean {
@@ -110,23 +125,43 @@ export function setupAxios(axios: any) {
   axios.interceptors.request.use(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (config: any) => {
+      const impJwt = readImpersonationJwt();
+      const ownApi = isOwnApiUrl(config.url);
+      // The impersonation JWT must only authenticate requests originating
+      // from the student portal; on any other route (e.g. an admin tab that
+      // happens to still have a stale sessionStorage entry) the tab falls
+      // back to the admin's normal cookie session, so the impersonation tab
+      // can never run admin actions as the student.
+      const onStudentRoute =
+        typeof window !== "undefined" && window.location.pathname.startsWith("/student/");
+      const impersonating = !!impJwt && ownApi && onStudentRoute;
       const method = (config.method || "get").toUpperCase();
-      if (STATE_CHANGING.has(method)) {
+
+      if (impersonating) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${impJwt}`;
+      } else if (STATE_CHANGING.has(method)) {
         const csrf = readCookie(CSRF_COOKIE_NAME);
         if (csrf) {
           config.headers = config.headers || {};
           config.headers[CSRF_HEADER_NAME] = csrf;
         }
       }
-      if (isOwnApiUrl(config.url)) {
+
+      if (ownApi) {
         config.headers = config.headers || {};
         config.headers[AUTH_SCOPE_HEADER] = AUTH_SCOPE_VALUE;
       }
-      // Ensure withCredentials at the per-call level too (defensive — some
-      // call sites pass their own `config` and may have overridden defaults).
-      if (config.withCredentials !== false) {
+
+      // Impersonation is cookie-less: never send the admin's cn_at on these
+      // requests (that would authenticate as the admin, not the student, and the
+      // backend prefers the cookie over the Bearer token).
+      if (impersonating) {
+        config.withCredentials = false;
+      } else if (config.withCredentials !== false) {
         config.withCredentials = true;
       }
+
       if (config.data && !(config.data instanceof FormData)) {
         const { sanitizePayload } = require("../../../utils/sanitizeText");
         config.data = sanitizePayload(config.data);
@@ -154,6 +189,21 @@ export function setupAxios(axios: any) {
       const url: string | undefined = originalConfig?.url;
 
       if (status === 401) {
+        // Impersonation sessions have no refresh token; a 401 means the short
+        // student JWT lapsed. Don't run the admin refresh path — surface it.
+        // Gated on the student route too: a 401 on a non-student route means
+        // this request was never sent with the impersonation Bearer (see the
+        // request interceptor above), so it must follow normal admin handling.
+        if (
+          readImpersonationJwt() &&
+          typeof window !== "undefined" &&
+          window.location.pathname.startsWith("/student/")
+        ) {
+          const { showErrorToast } = require("../../../utils/toast");
+          showErrorToast("Impersonation session expired. Reopen from Data Download.");
+          return Promise.reject(error);
+        }
+
         console.log(
           "[SESSION-DEBUG] interceptor 401 url=" + url +
           " __skipAuthRedirect=" + !!originalConfig.__skipAuthRedirect +

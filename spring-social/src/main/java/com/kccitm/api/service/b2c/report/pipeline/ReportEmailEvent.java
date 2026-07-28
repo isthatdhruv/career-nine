@@ -21,10 +21,10 @@ public class ReportEmailEvent {
     public String reportUrl;   // Spaces HTML report URL (always present)
     public String pdfUrl;      // Spaces PDF URL (null when linkOnly)
     public boolean linkOnly;   // true → PDF unavailable, send link without attachment
-    /** Copied from the generate event ("auto" for legacy on-submission events). */
-    public String emailMode = "auto";
-    /** Admin batch id; scopes the idempotency key so a fresh batch can re-email. */
-    public String batchId = null;
+    public boolean emailReportEnabled; // assessment toggle — mail non-whitelabel students too (Phase 4)
+    public Long emailAccountId;        // resolved sending account (institute → global); null = worker default
+    public Long emailTemplateId;       // resolved REPORT_READY template; null = composer HTML
+    public String studentName;         // for {{student_name}} in a REPORT_READY template
 
     public ReportEmailEvent() {
     }
@@ -41,6 +41,10 @@ public class ReportEmailEvent {
         this.reportUrl = reportUrl;
         this.pdfUrl = pdfUrl;
         this.linkOnly = linkOnly;
+        this.emailReportEnabled = src.emailReportEnabled;
+        this.emailAccountId = src.emailAccountId;
+        this.emailTemplateId = src.emailTemplateId;
+        this.studentName = src.studentName;
     }
 
     public String key() {

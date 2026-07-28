@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cribbstechnologies.clients.mandrill.exception.RequestFailedException;
 import com.google.protobuf.TextFormat.ParseException;
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.CheckFacultyRegistrationField;
@@ -40,7 +39,6 @@ import com.kccitm.api.service.FacultyService;
 import com.kccitm.api.service.GoogleAPIAdmin;
 import com.kccitm.api.service.GoogleCloudAPI;
 import com.kccitm.api.service.PdfService;
-import com.microtripit.mandrillapp.lutung.model.MandrillApiError;
 
 import io.jsonwebtoken.io.IOException;
 
@@ -104,7 +102,7 @@ public class FacultyContoller {
   @PostMapping(value = "faculty/update")
   public Faculty updateFaculty(@RequestBody Map<String, Faculty> inputData,
       @CurrentUser com.kccitm.api.security.UserPrincipal UserPrincipal)
-      throws RequestFailedException, MandrillApiError, IOException, java.io.IOException {
+      throws java.io.IOException {
     Faculty f = inputData.get("values");
 
     if (f.getGenerate().equals("FI")) {
@@ -191,7 +189,7 @@ public class FacultyContoller {
   public String generatePdf(@RequestParam(name = "id") String st, @RequestParam(name = "email") String email,
       @CurrentUser UserPrincipal userPrincipal,
       HttpServletResponse response)
-      throws Exception, RequestFailedException {
+      throws Exception {
     Map<String, Faculty> currentFaculty = new HashMap<String, Faculty>();
 
     Faculty ftu = facultyRepository.findById(Integer.parseInt(st));

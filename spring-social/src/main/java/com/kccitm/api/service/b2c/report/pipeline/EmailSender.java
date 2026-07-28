@@ -2,7 +2,7 @@ package com.kccitm.api.service.b2c.report.pipeline;
 
 /**
  * Swappable transport for report emails. Default impl = {@link OdooEmailSender}.
- * Swapping to a Workspace SMTP relay / SES / Mandrill later is a new impl + a
+ * Swapping to a Workspace SMTP relay / SES later is a new impl + a
  * config switch — no consumer change.
  *
  * <p>Contract: <b>synchronous</b> and <b>throws on failure</b>, so the email

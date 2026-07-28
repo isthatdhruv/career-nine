@@ -92,8 +92,7 @@ public class CampaignPublicController {
     @Autowired private TokenProvider tokenProvider;
     @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
     @Autowired(required = false) private com.kccitm.api.repository.Career9.counselling.CounsellingRequestRepository counsellingRequestRepository;
-    // Optional: only present when app.email.provider=smtp. Guard for null before sending.
-    @Autowired(required = false) private com.kccitm.api.service.SmtpEmailService smtpEmailService;
+    @Autowired private com.kccitm.api.service.email.EmailDispatchService emailDispatchService;
 
     // Where "forward my counselling request" notices go, and the address shown to
     // students on the thank-you page. Kept configurable; defaults to the canonical
@@ -1254,7 +1253,7 @@ public class CampaignPublicController {
     /** Best-effort email to the Career-9 team; the DB row is the source of truth. */
     private void notifyCounsellingForwarded(String assessmentName, String studentName,
             String studentEmail, String studentPhone, String instituteName) {
-        if (smtpEmailService == null || supportEmail == null || supportEmail.isEmpty()) return;
+        if (supportEmail == null || supportEmail.isEmpty()) return;
         try {
             String subject = "Counselling request — " + assessmentName;
             StringBuilder b = new StringBuilder();
@@ -1265,7 +1264,7 @@ public class CampaignPublicController {
             if (studentPhone != null) b.append("Phone: ").append(studentPhone).append('\n');
             if (instituteName != null) b.append("Institute: ").append(instituteName).append('\n');
             b.append("\nAssign a counsellor on the Counsellor ↔ Assessment page to let the student book.");
-            smtpEmailService.sendSimpleEmail(supportEmail, subject, b.toString());
+            emailDispatchService.sendText(com.kccitm.api.model.email.EmailType.COUNSELLING_REQUEST, supportEmail, subject, b.toString());
         } catch (Exception ex) {
             // Forwarding email is best-effort — never fail the request on a mail error.
             logger.warn("Failed to email counselling request notice to {}: {}", supportEmail, ex.getMessage());

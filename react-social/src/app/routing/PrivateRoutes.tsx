@@ -239,6 +239,9 @@ const PrivateRoutes = () => {
   const StudentPortalDashboard = lazy(
     () => import("../pages/StudentDashboard/student-portal/StudentPortalDashboard")
   );
+  const StudentImpersonationLanding = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentImpersonationLanding")
+  );
   const InsightDashboard = lazy(
     () => import("../pages/StudentDashboard/insight/InsightDashboard")
   );
@@ -274,6 +277,7 @@ const PrivateRoutes = () => {
   );
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
   const College = lazy(() => import("../pages/College/CollegePage"));
+  const CohortInsightsPage = lazy(() => import("../pages/SchoolAdmin/CohortInsightsPage"));
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
   const AssessmentMappingPage = lazy(() => import("../pages/AssessmentMapping/AssessmentMappingPage"));
@@ -339,6 +343,9 @@ const PrivateRoutes = () => {
   const B2CCampaignPage = lazy(() => import("../pages/B2C/Campaign/CampaignPage"));
   const B2CCampaignEditPage = lazy(() => import("../pages/B2C/Campaign/CampaignEditPage"));
   const B2CTrackerPage = lazy(() => import("../pages/B2C/Tracker/TrackerPage"));
+  const EmailAccountsPage = lazy(() => import("../pages/EmailAccounts/EmailAccountsPage"));
+  const EmailLogPage = lazy(() => import("../pages/EmailLog/EmailLogPage"));
+  const EmailTemplatesPage = lazy(() => import("../pages/EmailTemplates/EmailTemplatesPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -375,6 +382,16 @@ const PrivateRoutes = () => {
             <StudentPortalDashboard />
           </SuspensedView>
         </RequirePermission>
+      } />
+
+      {/* Admin impersonation landing — opened in a new tab by the Data Download
+          "Open as Student" button. Establishes a cookie-less student session
+          from ?t=<jwt> and redirects to /student/dashboard. Layout-free; no
+          RequirePermission (the minted student JWT is the authorization). */}
+      <Route path="/student/impersonate" element={
+        <SuspensedView>
+          <StudentImpersonationLanding />
+        </SuspensedView>
       } />
 
       {/* Real per-student assessment Insight Dashboard (data-driven, per engine).
@@ -1467,6 +1484,16 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path="/school-admin/cohort-insights"
+          element={
+            <RequirePermission perm="dashboard.school.insights.read">
+              <SuspensedView>
+                <CohortInsightsPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/admin-assessment-edit/:assessmentId/:studentId"
           element={
             <RequirePermission perm="assessment.create">
@@ -1647,6 +1674,37 @@ const PrivateRoutes = () => {
             <RequirePermission perm="report_template.read">
               <SuspensedView>
                 <ReportTemplatesPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+
+        <Route
+          path="/admin/email-accounts"
+          element={
+            <RequirePermission perm="email_account.read">
+              <SuspensedView>
+                <EmailAccountsPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/email-log"
+          element={
+            <RequirePermission perm="email_log.read">
+              <SuspensedView>
+                <EmailLogPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/email-templates"
+          element={
+            <RequirePermission perm="email_template.read">
+              <SuspensedView>
+                <EmailTemplatesPage />
               </SuspensedView>
             </RequirePermission>
           }

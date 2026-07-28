@@ -2,6 +2,8 @@ package com.kccitm.api.config;
 
 import java.util.Arrays;
 
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +20,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.firewall.HttpFirewall;
 import org.springframework.security.web.firewall.StrictHttpFirewall;
@@ -58,6 +61,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Value("${app.cookie.domain:}")
     private String cookieDomain;
+
+    // AntPathMatcher is thread-safe for matching (no mutable per-call state), so a
+    // single shared instance avoids reallocating one on every CSRF-protection check.
+    private static final AntPathMatcher CSRF_PATH_MATCHER = new AntPathMatcher();
 
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
@@ -152,6 +159,37 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/api/counsellor/self-register",
             "/api/counsellor/login"
     };
+
+    /**
+     * CSRF-protection predicate. Returns false (no CSRF token required) for:
+     *   - safe/idempotent methods (GET/HEAD/TRACE/OPTIONS),
+     *   - the anonymous-by-design PUBLIC_PATHS set (no prior cn_csrf exists),
+     *   - any request carrying an Authorization: Bearer header — the browser
+     *     never attaches that header on a forged cross-site request, so a
+     *     Bearer-authenticated call cannot be CSRF-forged. This is what lets the
+     *     cookie-less admin student-impersonation session issue writes.
+     * Returns true (CSRF required) for every other state-changing request —
+     * i.e. cookie-authenticated writes, exactly as before.
+     */
+    static boolean requiresCsrfProtection(HttpServletRequest request, String[] publicPaths) {
+        String method = request.getMethod();
+        if ("GET".equals(method) || "HEAD".equals(method)
+                || "TRACE".equals(method) || "OPTIONS".equals(method)) {
+            return false;
+        }
+        String authz = request.getHeader("Authorization");
+        if (authz != null && authz.startsWith("Bearer ")) {
+            return false;
+        }
+        String uri = request.getRequestURI();
+        String ctx = request.getContextPath();
+        String path = (ctx != null && !ctx.isEmpty() && uri.startsWith(ctx))
+                ? uri.substring(ctx.length()) : uri;
+        for (String p : publicPaths) {
+            if (CSRF_PATH_MATCHER.match(p, path)) return false;
+        }
+        return true;
+    }
 
     /** Static assets + root/error/favicon — always anonymous (Phase 0 Task 0.1 extraction). */
     private static final String[] STATIC_ASSET_PATHS = {
@@ -352,7 +390,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 // Phase 0 (Task 0.1): exempt the shared PUBLIC_PATHS set. Sourced from the
                 // SAME constant fed to permitAll() below so the CSRF-exempt and
                 // authentication-exempt sets can never drift (audit MED-C / HIGH-B root cause).
-                .ignoringAntMatchers(PUBLIC_PATHS)
+                .requireCsrfProtectionMatcher(
+                        request -> requiresCsrfProtection(request, PUBLIC_PATHS))
                 .and()
                 .formLogin()
                 .disable()
@@ -471,7 +510,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
      *   <li>{@code font-src} — self + Google Fonts ({@code fonts.gstatic.com}) +
      *       {@code data:} URIs for icon fonts.</li>
      *   <li>{@code img-src} — permissive ({@code https:} + {@code http:} + {@code data:}
-     *       + {@code blob:}) to cover Mandrill tracking pixels, Firebase storage,
+     *       + {@code blob:}) to cover email tracking pixels, Firebase storage,
      *       Razorpay logos, base64 inline images, generated PDF previews.</li>
      *   <li>{@code connect-src} — self + Career-9 API origins + Firebase HTTP/WSS.</li>
      *   <li>{@code frame-src} — Razorpay checkout iframe origins.</li>
@@ -497,7 +536,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
                 // fonts: self + Google Fonts + data: URIs
                 "font-src 'self' data: https://fonts.gstatic.com",
-                // images: permissive (Mandrill tracking pixels, Firebase storage, generated previews)
+                // images: permissive (email tracking pixels, Firebase storage, generated previews)
                 "img-src 'self' data: blob: https: http:",
                 // XHR/fetch/WebSocket: self + Career-9 API + Firebase
                 "connect-src 'self' https://*.career-9.com https://*.career-9.net https://*.firebaseio.com https://*.googleapis.com wss://*.firebaseio.com",

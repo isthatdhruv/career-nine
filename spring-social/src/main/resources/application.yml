@@ -197,7 +197,6 @@ app:
     access-max-age-seconds: 864000
   openai:
     api-key: ${OPENAI_API_KEY:}
-  mandrill: ${APP_MANDRILL:}
   # Google Analytics (GA4) server-side conversion tracking via the Measurement
   # Protocol. The measurement-id is public (it also ships in the frontend
   # index.html). The api-secret IS sensitive — supply it per-profile via the
@@ -223,6 +222,12 @@ app:
     api-key: ${ODOO_API_KEY:}
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  email:
+    # AES-256 key (base64, 32 bytes) used to encrypt email-account credentials at rest
+    # (EncryptedStringConverter). Supply per-profile via EMAIL_CRYPTO_KEY (.env.*). When
+    # blank, credentials are stored UNENCRYPTED with a one-time warning (dev only) — set
+    # this before production. Generate with: openssl rand -base64 32
+    crypto-key: ${EMAIL_CRYPTO_KEY:}
   # Base URL of the public-facing React app — used to build absolute links
   # emailed to users (e.g. password-reset link). Each profile may override.
   frontend:
@@ -386,7 +391,7 @@ spring:
       - optional:file:./.env.staging[.properties]
       - optional:file:../.env.staging[.properties]
   datasource:
-    url: jdbc:mysql://mysql_db_staging:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&maxAllowedPacket=536870912&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+    url: jdbc:mysql://mysql_db_staging:3306/career-9-staging-v2?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&maxAllowedPacket=536870912&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
     username: root
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
@@ -406,6 +411,12 @@ spring:
         max-active: 30
         max-idle: 10
         min-idle: 2
+  # Dedicated staging Kafka broker for the report-on-completion pipeline. Defaults to
+  # the kafka-staging service (NOT the shared "kafka" default, which is production's
+  # broker) so the sandbox profile is self-consistent; docker-compose still passes
+  # KAFKA_BOOTSTRAP to override. Consumed by report-worker-staging (sandbox,report-worker).
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:kafka-staging:9092}
   mail:
     properties:
       mail:
@@ -464,6 +475,12 @@ app:
     spaces:
       access-key: ${DO_SPACES_ACCESS_KEY:}
       secret-key: ${DO_SPACES_SECRET_KEY:}
+  # Common headless-Chromium PDF renderer (one shared instance serves staging + prod).
+  # Defaults to the gotenberg service name (NOT the shared localhost default) so report
+  # PDF rendering works for both api-staging and report-worker-staging; docker-compose
+  # still passes GOTENBERG_URL to override.
+  gotenberg:
+    url: ${GOTENBERG_URL:http://gotenberg:3000}
   b2c:
     frontendBaseUrl: https://staging-dashboard.career-9.com
     assessmentBaseUrl: https://staging-assessment.career-9.com

@@ -8,7 +8,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.career9.PaymentTransaction;
+import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
+import com.kccitm.api.service.email.EmailDispatchService;
 
 @Service
 public class PaymentEmailService {
@@ -16,7 +18,7 @@ public class PaymentEmailService {
     private static final Logger logger = LoggerFactory.getLogger(PaymentEmailService.class);
 
     @Autowired
-    private SmtpEmailService emailService;
+    private EmailDispatchService emailDispatchService;
 
     @Autowired
     private PaymentTransactionRepository paymentTransactionRepository;
@@ -58,7 +60,7 @@ public class PaymentEmailService {
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                     + "</div></div>";
 
-            emailService.sendHtmlEmail(email, subject, htmlContent);
+            emailDispatchService.sendHtml(EmailType.PAYMENT_SUCCESS, email, subject, htmlContent);
 
             txn.setWelcomeEmailSent(true);
             paymentTransactionRepository.save(txn);
@@ -113,7 +115,7 @@ public class PaymentEmailService {
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                     + "</div></div>";
 
-            emailService.sendHtmlEmail(txn.getStudentEmail(), subject, htmlContent);
+            emailDispatchService.sendHtml(EmailType.PAYMENT_FAILED, txn.getStudentEmail(), subject, htmlContent);
             txn.setNudgeEmailSent(true);
             paymentTransactionRepository.save(txn);
             logger.info("Automated {} email sent to: {} for transaction: {}", status, txn.getStudentEmail(), txn.getTransactionId());
@@ -144,7 +146,7 @@ public class PaymentEmailService {
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated reminder. Please do not reply.</p>"
                     + "</div></div>";
 
-            emailService.sendHtmlEmail(txn.getStudentEmail(), subject, htmlContent);
+            emailDispatchService.sendHtml(EmailType.PAYMENT_REMINDER, txn.getStudentEmail(), subject, htmlContent);
             logger.info("Nudge email sent to: {} for transaction: {}", txn.getStudentEmail(), txn.getTransactionId());
         } catch (Exception e) {
             logger.error("Failed to send nudge email to: {}", txn.getStudentEmail(), e);
@@ -172,7 +174,7 @@ public class PaymentEmailService {
                 + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                 + "</div></div>";
 
-        emailService.sendHtmlEmail(email, subject, htmlContent);
+        emailDispatchService.sendHtml(EmailType.PAYMENT_LINK, email, subject, htmlContent);
         logger.info("Payment link email sent to: {} for transaction: {}", email, txn.getTransactionId());
     }
 
@@ -197,7 +199,7 @@ public class PaymentEmailService {
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                     + "</div></div>";
 
-            emailService.sendHtmlEmail(txn.getStudentEmail(), subject, htmlContent);
+            emailDispatchService.sendHtml(EmailType.PAYMENT_SUCCESS, txn.getStudentEmail(), subject, htmlContent);
             logger.info("Welcome resend email sent to: {} for transaction: {}", txn.getStudentEmail(), txn.getTransactionId());
         } catch (Exception e) {
             logger.error("Failed to resend welcome email to: {}", txn.getStudentEmail(), e);

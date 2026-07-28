@@ -21,10 +21,8 @@ import com.kccitm.api.model.career9.counselling.Notification;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.Career9.counselling.NotificationRepository;
 import com.kccitm.api.service.SmtpEmailService;
-import com.microtripit.mandrillapp.lutung.MandrillApi;
-import com.microtripit.mandrillapp.lutung.view.MandrillMessage;
-import com.microtripit.mandrillapp.lutung.view.MandrillMessage.Recipient;
-import com.microtripit.mandrillapp.lutung.view.MandrillMessageStatus;
+import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.service.email.EmailDispatchService;
 
 @Service
 public class CounsellingNotificationService {
@@ -38,16 +36,13 @@ public class CounsellingNotificationService {
     private NotificationRepository notificationRepository;
 
     @Autowired
-    private MandrillApi mandrillApi;
-
-    @Autowired
     private WhatsAppService whatsAppService;
 
     @Autowired
     private IcsService icsService;
 
-    @Autowired(required = false)
-    private SmtpEmailService smtpEmailService;
+    @Autowired
+    private EmailDispatchService emailDispatchService;
 
     // ─── In-app Notifications ────────────────────────────────────────────────────
 
@@ -414,11 +409,11 @@ public class CounsellingNotificationService {
             if (studentEmail != null && !studentEmail.isEmpty()) emailTo.add(studentEmail);
             if (parentEmail != null && !parentEmail.isEmpty()) emailTo.add(parentEmail);
 
-            // Email with .ics attachment (falls back to plain Mandrill text if
+            // Email with .ics attachment (falls back to plain text if
             // the Gmail sender or the invite isn't available).
             byte[] ics = icsService.buildInvite(appointment);
             boolean emailed = false;
-            if (!emailTo.isEmpty() && smtpEmailService != null && ics != null) {
+            if (!emailTo.isEmpty() && ics != null) {
                 try {
                     SmtpEmailRequest req = new SmtpEmailRequest();
                     req.setTo(emailTo);
@@ -429,7 +424,7 @@ public class CounsellingNotificationService {
                     req.setAttachments(Arrays.asList(
                             new SmtpEmailRequest.EmailAttachment(
                                     icsService.fileName(appointment), ics, "text/calendar")));
-                    smtpEmailService.sendEmail(req);
+                    emailDispatchService.send(EmailType.COUNSELLING_BOOKING, req, null);
                     emailed = true;
                 } catch (Exception e) {
                     logger.warn("ICS confirmation email failed for appointment {}: {}", appointment.getId(), e.getMessage());
@@ -702,26 +697,7 @@ public class CounsellingNotificationService {
     // ─── Private Helper ───────────────────────────────────────────────────────────
 
     private void sendEmail(String toEmail, String subject, String body) {
-        try {
-            MandrillMessage message = new MandrillMessage();
-            message.setSubject(subject);
-            message.setText(body);
-            message.setAutoText(true);
-            message.setFromEmail("noreply@kccitm.edu.in");
-            message.setFromName("Career-Nine");
-
-            List<Recipient> recipients = new ArrayList<>();
-            Recipient recipient = new Recipient();
-            recipient.setEmail(toEmail);
-            recipients.add(recipient);
-            message.setTo(recipients);
-
-            MandrillMessageStatus[] statuses = mandrillApi.messages().send(message, false);
-            if (statuses != null && statuses.length > 0) {
-                logger.info("Email sent to {}: status={}", toEmail, statuses[0].getStatus());
-            }
-        } catch (Exception e) {
-            logger.error("Failed to send email to {}. Subject: {}. Error: {}", toEmail, subject, e.getMessage());
-        }
+        // Routed through the central dispatcher (logged + account-routed); legacy provider retired.
+        emailDispatchService.sendText(EmailType.COUNSELLING_NOTIFICATION, toEmail, subject, body);
     }
 }

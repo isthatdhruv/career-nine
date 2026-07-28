@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getEmailRecipientsForStudent, EmailRecipient } from "../../ReportGeneration/API/BetReportData_APIs";
+import { EmailAccount, getEmailAccounts } from "../../EmailAccounts/API/EmailAccount_APIs";
 
 type Props = {
   open: boolean;
@@ -10,7 +11,7 @@ type Props = {
   initialSubject: string;
   initialBody: string;
   sending: boolean;
-  onSend: (recipients: string[], subject: string, body: string) => void;
+  onSend: (recipients: string[], subject: string, body: string, overrideAccountId: number | null) => void;
 };
 
 const EmailComposeModal: React.FC<Props> = ({
@@ -23,6 +24,8 @@ const EmailComposeModal: React.FC<Props> = ({
   const [newEmail, setNewEmail] = useState("");
   const [suggestedRecipients, setSuggestedRecipients] = useState<EmailRecipient[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [accountId, setAccountId] = useState<number | null>(null);
 
   // Initialize when modal opens
   useEffect(() => {
@@ -32,8 +35,17 @@ const EmailComposeModal: React.FC<Props> = ({
       setBody(initialBody);
       setNewEmail("");
       setSuggestedRecipients([]);
+      setAccountId(null);
     }
   }, [open, initialRecipients, initialSubject, initialBody]);
+
+  // Email accounts for the optional "send from" override (hidden if none / no permission).
+  useEffect(() => {
+    if (!open) return;
+    getEmailAccounts()
+      .then((res) => setAccounts(res.data || []))
+      .catch(() => setAccounts([]));
+  }, [open]);
 
   // Fetch contact person emails for autofill
   useEffect(() => {
@@ -209,6 +221,27 @@ const EmailComposeModal: React.FC<Props> = ({
             </div>
           </div>
 
+          {/* Send-from account (optional override) */}
+          {accounts.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", display: "block", marginBottom: 6 }}>
+                Send from
+              </label>
+              <select
+                className="form-select form-select-solid"
+                value={accountId ?? ""}
+                onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Default (institute / global)</option>
+                {accounts.filter((a) => a.active).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} — {a.fromEmail}{a.isGlobalDefault ? " (default)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Send */}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <button className="btn btn-light" onClick={onClose} style={{ borderRadius: 8 }}>
@@ -217,7 +250,7 @@ const EmailComposeModal: React.FC<Props> = ({
             <button
               className="btn"
               disabled={sending || recipients.length === 0}
-              onClick={() => onSend(recipients.map((r) => r.email), subject, body)}
+              onClick={() => onSend(recipients.map((r) => r.email), subject, body, accountId)}
               style={{
                 background: sending ? "#6c757d" : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
                 border: "none", borderRadius: 8, padding: "10px 24px",
