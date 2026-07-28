@@ -84,13 +84,17 @@ public class ReportGenerateConsumer {
             // Email decision — emailMode and force are fully orthogonal.
             //   "all"  → email anyone with an address (whitelabel ignored; admin toggle ON)
             //   "none" → generate only (admin toggle OFF)
-            //   "auto" → legacy on-submission behavior: whitelabel students only
+            //   "auto" → automatic pipeline: whitelabel students always, plus any
+            //            assessment with the "email report" toggle on (Phase 4)
             boolean hasEmail = ev.recipientEmail != null && !ev.recipientEmail.isBlank();
-            // Email whitelabel students always, plus any assessment with the "email report" toggle on.
-            boolean emailEnabled = ev.whitelabel || ev.emailReportEnabled;
-            if (!emailEnabled || !hasEmail) {
-                logger.info("Report generated (not mailed — whitelabel={} toggle={} hasEmail={}) student={} assessment={}",
-                        ev.whitelabel, ev.emailReportEnabled, hasEmail, ev.userStudentId, ev.assessmentId);
+            String mode = ev.emailMode == null ? "auto" : ev.emailMode;
+            boolean shouldEmail =
+                    "all".equals(mode)  ? hasEmail
+                  : "none".equals(mode) ? false
+                  :                       ((ev.whitelabel || ev.emailReportEnabled) && hasEmail);
+            if (!shouldEmail) {
+                logger.info("Report generated (not mailed — mode={} whitelabel={} toggle={} hasEmail={}) student={} assessment={}",
+                        mode, ev.whitelabel, ev.emailReportEnabled, hasEmail, ev.userStudentId, ev.assessmentId);
                 return;
             }
 

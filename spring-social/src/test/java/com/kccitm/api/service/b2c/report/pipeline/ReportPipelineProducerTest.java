@@ -2,9 +2,13 @@ package com.kccitm.api.service.b2c.report.pipeline;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.email.EmailAccountRepository;
+import com.kccitm.api.repository.email.EmailTemplateRepository;
 import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
+import com.kccitm.api.service.email.InstituteEmailSettingService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -31,6 +35,11 @@ class ReportPipelineProducerTest {
     @Spy ObjectMapper objectMapper = new ObjectMapper();
     @Mock InstituteBrandingService brandingService;
     @Mock UserStudentRepository userStudentRepository;
+    // Phase 4 email-routing deps (Optional-returning mocks default to empty → null ids)
+    @Mock AssessmentTableRepository assessmentTableRepository;
+    @Mock InstituteEmailSettingService instituteEmailSettingService;
+    @Mock EmailAccountRepository accountRepository;
+    @Mock EmailTemplateRepository templateRepository;
     @InjectMocks ReportPipelineProducer producer;
 
     @Test
