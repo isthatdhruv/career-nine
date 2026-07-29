@@ -42,6 +42,9 @@ public class GeneralAssessmentController {
     @Autowired
     private GeneralAssessmentExportService exportService;
 
+    @Autowired
+    private com.kccitm.api.service.AssessmentDataExcelExportService dataExcelExportService;
+
     /**
      * Process a single student's general assessment.
      * Runs the full pipeline and stores the result.
@@ -159,6 +162,46 @@ public class GeneralAssessmentController {
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
         headers.setContentDispositionFormData("attachment",
                 "general_assessment_" + assessmentId + ".xlsx");
+        headers.setContentLength(excelBytes.length);
+
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * "Generate Data Excel" — one row per student with registration-page data
+     * (student info + demographic form) followed by one column per
+     * questionnaire question holding the student's answer(s).
+     *
+     * Body: { "assessmentId": 18, "userStudentIds": [1, 2, 3] }
+     * userStudentIds is optional — omitted/empty means all attempted students.
+     */
+    @PostMapping("/export-data-excel")
+    @PreAuthorize("@auth.allows('report.export')")
+    public ResponseEntity<?> exportDataExcel(@RequestBody Map<String, Object> request) throws Exception {
+        Object rawAssessmentId = request.get("assessmentId");
+        if (!(rawAssessmentId instanceof Number)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+        }
+        Long assessmentId = ((Number) rawAssessmentId).longValue();
+
+        List<Long> userStudentIds = null;
+        Object rawIds = request.get("userStudentIds");
+        if (rawIds instanceof List) {
+            userStudentIds = new ArrayList<>();
+            for (Object o : (List<?>) rawIds) {
+                if (o instanceof Number) {
+                    userStudentIds.add(((Number) o).longValue());
+                }
+            }
+        }
+
+        byte[] excelBytes = dataExcelExportService.exportStudentData(assessmentId, userStudentIds);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment",
+                "assessment_data_" + assessmentId + ".xlsx");
         headers.setContentLength(excelBytes.length);
 
         return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);

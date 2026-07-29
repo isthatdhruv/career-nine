@@ -3,7 +3,6 @@ import React from "react";
 type Props = {
   open: boolean;
   onClose: () => void;
-  isNavigator: boolean;
   generating: boolean;
   exportingMQT: boolean;
   onGenerateDataExcel: () => void;
@@ -14,7 +13,7 @@ type Props = {
 };
 
 const MiraDesaiModal: React.FC<Props> = ({
-  open, onClose, isNavigator, generating, exportingMQT,
+  open, onClose, generating, exportingMQT,
   onGenerateDataExcel, onExportBetCoreData, onSchoolReport,
   visibleSelectedCount, displayedCount,
 }) => {
@@ -59,24 +58,22 @@ const MiraDesaiModal: React.FC<Props> = ({
 
         {/* Body */}
         <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 12 }}>
-          {isNavigator && (
-            <button
-              className="btn"
-              onClick={onGenerateDataExcel}
-              disabled={generating}
-              style={{
-                background: generating
-                  ? "#6c757d"
-                  : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
-                border: "none", borderRadius: 10, padding: "12px 20px",
-                fontWeight: 600, color: "white", fontSize: "0.9rem",
-                boxShadow: generating ? "none" : "0 4px 12px rgba(67, 97, 238, 0.3)",
-                width: "100%", textAlign: "left",
-              }}
-            >
-              {generating ? "Generating..." : `Generate Data Excel${countLabel}`}
-            </button>
-          )}
+          <button
+            className="btn"
+            onClick={onGenerateDataExcel}
+            disabled={generating}
+            style={{
+              background: generating
+                ? "#6c757d"
+                : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+              border: "none", borderRadius: 10, padding: "12px 20px",
+              fontWeight: 600, color: "white", fontSize: "0.9rem",
+              boxShadow: generating ? "none" : "0 4px 12px rgba(67, 97, 238, 0.3)",
+              width: "100%", textAlign: "left",
+            }}
+          >
+            {generating ? "Generating..." : `Generate Data Excel${countLabel}`}
+          </button>
 
           <button
             className="btn"
