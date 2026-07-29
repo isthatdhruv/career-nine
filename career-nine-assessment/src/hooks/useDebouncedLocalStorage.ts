@@ -20,10 +20,20 @@ export function useDebouncedLocalStorage(delayMs: number = 500) {
         // On quota exceeded, try clearing non-critical keys to make space
         if (e instanceof DOMException && e.name === 'QuotaExceededError') {
           try {
-            // Remove the largest non-critical cached items first
-            const expendable = ['assessmentSeenSectionInstructions', 'assessmentCompletedGames', 'assessmentSkipped', 'assessmentSavedForLater'];
+            // Remove the largest non-critical cached items first. Never touch
+            // pendingGameResult:* — those are the only copy of a game result
+            // that has not yet been confirmed written to Firestore.
+            const expendable = ['assessmentSeenSectionInstructions', 'assessmentSkipped', 'assessmentSavedForLater'];
             for (const k of expendable) {
               if (k !== key) localStorage.removeItem(k);
+            }
+            // Game-completion markers are per-(student, assessment) now; drop
+            // them all. Worst case a game becomes replayable, which is the
+            // safe direction.
+            for (const k of Object.keys(localStorage)) {
+              if (k !== key && k.startsWith('assessmentCompletedGames')) {
+                localStorage.removeItem(k);
+              }
             }
             localStorage.setItem(key, value);
           } catch {

@@ -1,18 +1,25 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import { GameRenderer } from "./GameRenderer";
 import { useGameData } from "../contexts/DataContext";
 
 interface AssessmentGameWrapperProps {
   gameCode: number;
   userStudentId: string;
+  assessmentId: string;
   playerName: string;
-  onComplete: () => void;
+  /**
+   * `saved` reports whether the result actually reached Firestore. The caller
+   * must NOT mark the question answered when it is false — the game has to
+   * stay replayable, otherwise the run is lost with no way to redo it.
+   */
+  onComplete: (saved: boolean) => void;
   onExit: () => void;
 }
 
 export function AssessmentGameWrapper({
   gameCode,
   userStudentId,
+  assessmentId,
   playerName,
   onComplete,
   onExit
@@ -20,10 +27,20 @@ export function AssessmentGameWrapper({
 
   const { saveAnimalReaction, saveRabbitPath, saveHydroTube } = useGameData();
 
+  // RabbitPathGame and HydroTubeGame fire onComplete from an effect whose deps
+  // include the callback itself, so it can re-run and submit the same result
+  // twice. One completion per mount.
+  const completionHandledRef = useRef(false);
+
   const handleGameComplete = useCallback(async (data: any) => {
+    if (completionHandledRef.current) return;
+    completionHandledRef.current = true;
+
     console.log("=== Game Complete Handler Called ===");
     console.log("Received data:", data);
     console.log("Game code:", gameCode);
+
+    let saved = false;
 
     try {
       // Save to Firestore via DataContext based on game type
@@ -39,8 +56,9 @@ export function AssessmentGameWrapper({
             misses: data.misses,
             falsePositives: data.falsePositives,
             hitRTsMs: data.hitRTsMs || [],
-          }, userStudentId);
+          }, userStudentId, assessmentId);
           console.log("Jungle-Spot results saved via DataContext!");
+          saved = true;
           break;
 
         case 102: // Rabbit-Path
@@ -50,8 +68,9 @@ export function AssessmentGameWrapper({
             totalRounds: data.totalRounds,
             roundsPlayed: data.roundsPlayed,
             history: data.history,
-          }, userStudentId);
+          }, userStudentId, assessmentId);
           console.log("Rabbit-Path results saved via DataContext!");
+          saved = true;
           break;
 
         case 103: // Hydro-Tube
@@ -64,8 +83,9 @@ export function AssessmentGameWrapper({
             tilesCorrect: data.tilesCorrect,
             totalTiles: data.totalTiles,
             timeSpentSeconds: data.timeSpentSeconds,
-          }, userStudentId);
+          }, userStudentId, assessmentId);
           console.log("Hydro-Tube results saved via DataContext!");
+          saved = true;
           break;
 
         default:
@@ -74,11 +94,13 @@ export function AssessmentGameWrapper({
     } catch (error: any) {
       console.error("Failed to save game results:", error);
       console.error("Error message:", error?.message);
+      // Allow another attempt on relaunch — the result is also buffered in
+      // localStorage by DataContext and retried on the next app load.
+      completionHandledRef.current = false;
     }
 
-    // Always call onComplete to close the game UI
-    onComplete();
-  }, [onComplete, userStudentId, gameCode, saveAnimalReaction, saveRabbitPath, saveHydroTube]);
+    onComplete(saved);
+  }, [onComplete, userStudentId, assessmentId, gameCode, saveAnimalReaction, saveRabbitPath, saveHydroTube]);
 
   const handleGameExit = useCallback(() => {
     onExit();

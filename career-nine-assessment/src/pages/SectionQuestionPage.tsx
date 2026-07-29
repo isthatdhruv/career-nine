@@ -24,6 +24,7 @@ import { useHeartbeat } from "../hooks/useHeartbeat";
 import { timeoutSignal } from "../utils/timeoutSignal";
 import { apiUrl } from "../utils/apiUrl";
 import { PROCTORING_ENABLED } from "../utils/proctoringFlag";
+import { showErrorToast } from "../utils/toast";
 
 type GameTable = {
   gameId: number;
@@ -78,6 +79,21 @@ type Question = {
 type QuestionnaireLanguage = {
   id: number;
   language: Language;
+};
+
+/**
+ * Storage key for the "this game is done" markers, scoped to the current
+ * (student, assessment). The old key was a bare `assessmentCompletedGames`
+ * holding a gameCode→boolean map shared by every run, so a second assessment
+ * — or a restart in the same browser session — opened with all three games
+ * pre-marked "✓ Completed", the launch buttons disabled, and the questions
+ * counted as answered. The student then submitted without ever playing, and
+ * nothing was ever written to Firestore.
+ */
+const completedGamesStorageKey = (): string => {
+  const studentId = localStorage.getItem("userStudentId") || "anon";
+  const assessmentId = localStorage.getItem("assessmentId") || "na";
+  return `assessmentCompletedGames:${studentId}:${assessmentId}`;
 };
 
 const SectionQuestionPage: React.FC = () => {
@@ -262,11 +278,16 @@ const SectionQuestionPage: React.FC = () => {
     };
   }, []);
 
-  // Track completed games: gameCode -> boolean
+  // Track completed games: gameCode -> boolean. Only set once the result has
+  // actually reached Firestore (see handleGameComplete).
   const [completedGames, setCompletedGames] = useState<Record<number, boolean>>(
     () => {
-      const stored = localStorage.getItem("assessmentCompletedGames");
-      return stored ? JSON.parse(stored) : {};
+      try {
+        const stored = localStorage.getItem(completedGamesStorageKey());
+        return stored ? JSON.parse(stored) : {};
+      } catch {
+        return {};
+      }
     },
   );
 
@@ -418,7 +439,7 @@ const SectionQuestionPage: React.FC = () => {
   }, [elapsedTime, scheduleWrite]);
 
   useEffect(() => {
-    scheduleWrite("assessmentCompletedGames", JSON.stringify(completedGames));
+    scheduleWrite(completedGamesStorageKey(), JSON.stringify(completedGames));
   }, [completedGames, scheduleWrite]);
 
   // Hydrate answer state from the Redis partial-restore endpoint on mount.
@@ -1274,7 +1295,7 @@ const SectionQuestionPage: React.FC = () => {
           localStorage.removeItem("assessmentSavedForLater");
           localStorage.removeItem("assessmentSkipped");
           localStorage.removeItem("assessmentElapsedTime");
-          localStorage.removeItem("assessmentCompletedGames");
+          localStorage.removeItem(completedGamesStorageKey());
 
           navigate("/studentAssessment/completed");
           return;
@@ -1477,7 +1498,19 @@ const SectionQuestionPage: React.FC = () => {
     setIsGameActive(true);
   };
 
-  const handleGameComplete = () => {
+  const handleGameComplete = (saved: boolean) => {
+    // A result that never reached Firestore must not mark the question
+    // answered: doing so disabled the launch button permanently and the run
+    // was gone. Keep the game replayable and tell the student to redo it.
+    if (!saved) {
+      setIsGameActive(false);
+      setActiveGameCode(null);
+      showErrorToast(
+        "Your game result could not be saved. Please launch the game again — if it keeps failing, tell your invigilator.",
+      );
+      return;
+    }
+
     // Read from ref to get the current sectionId (avoids stale closure)
     const curSectionId = sectionIdRef.current;
     // Auto-select the game option when game is completed
@@ -1536,13 +1569,17 @@ const SectionQuestionPage: React.FC = () => {
 
   // Render game wrapper if active
   if (isGameActive && activeGameCode) {
-    const userStudentId = localStorage.getItem("User Student id") || "";
+    // "User Student id" was never a key anything writes — this only ever
+    // worked because DataContext fell back to the real one.
+    const userStudentId = localStorage.getItem("userStudentId") || "";
+    const gameAssessmentId = localStorage.getItem("assessmentId") || "";
     const userName = localStorage.getItem("userName") || "Student";
 
     return (
       <AssessmentGameWrapper
         gameCode={activeGameCode}
         userStudentId={userStudentId}
+        assessmentId={gameAssessmentId}
         playerName={userName}
         onComplete={handleGameComplete}
         onExit={handleGameExit}
