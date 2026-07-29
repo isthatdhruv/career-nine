@@ -546,6 +546,7 @@ public class AuthController {
             if (r.s != null) row.put("s", r.s);
             if (r.c != null) row.put("c", r.c);
             if (r.x != null) row.put("x", r.x);
+            if (r.g != null) row.put("g", r.g); // student group
             out.add(row);
         }
         return out;

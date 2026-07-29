@@ -19,6 +19,7 @@ import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.UserRoleScope;
+import com.kccitm.api.repository.Career9.StudentGroupRepository;
 import com.kccitm.api.repository.PermissionRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.UserRoleScopeRepository;
@@ -52,6 +53,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Autowired
     PermissionRepository permissionRepository;
 
+    /** Optional so auth bootstrap still works if the group tables are absent. */
+    @Autowired(required = false)
+    StudentGroupRepository studentGroupRepository;
+
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email)
@@ -80,6 +85,60 @@ public class CustomUserDetailsService implements UserDetailsService {
      * success handler will have an empty {@code perms} claim and the user
      * sees Permission Denied despite valid role-group assignments.
      */
+    /**
+     * Unions explicit {@code user_role_scope.group_id} grants with the groups the
+     * user reaches by being a contact person on them.
+     *
+     * <p>Two sources, on purpose. The explicit path keeps the group dimension
+     * consistent with the other four and lets any staff user be group-scoped
+     * without a contact-person record. The derived path means "allot a contact
+     * person to a group" grants access without a second trip through
+     * user-management, and can never drift out of sync with the admin list.
+     *
+     * <p>Deriving rather than writing a {@code user_role_scope} row on allot is
+     * deliberate: scope rows hang off {@code user_role_group_mapping}, so a
+     * write would have to guess which of the user's role assignments to attach
+     * the grant to, and unpick it correctly on removal.
+     *
+     * <p><strong>Only additive.</strong> Derived rows are appended, never
+     * substituted, so a user who already holds an institute-wide (group-null)
+     * row stays institute-wide — {@code CurrentScopes.isGroupScoped()} sees that
+     * wildcard row and leaves the strict group filter off. Being made a group
+     * admin can therefore only ever widen reach, never silently narrow it.
+     */
+    private List<CurrentScopes.ScopeRow> withDerivedGroupScopes(
+            User user, List<CurrentScopes.ScopeRow> explicit) {
+        if (studentGroupRepository == null) {
+            return explicit;
+        }
+        try {
+            List<Long> derivedGroupIds = studentGroupRepository.findGroupIdsAdministeredByUser(user.getId());
+            if (derivedGroupIds == null || derivedGroupIds.isEmpty()) {
+                return explicit;
+            }
+            Set<Long> alreadyGranted = new HashSet<Long>();
+            for (CurrentScopes.ScopeRow r : explicit) {
+                if (r.g != null) {
+                    alreadyGranted.add(r.g);
+                }
+            }
+            List<CurrentScopes.ScopeRow> combined =
+                    new ArrayList<CurrentScopes.ScopeRow>(explicit);
+            for (Long groupId : derivedGroupIds) {
+                if (groupId != null && alreadyGranted.add(groupId)) {
+                    // Group alone — the group already implies its institute, and
+                    // binding a second dim here would over-constrain the row.
+                    combined.add(new CurrentScopes.ScopeRow(null, null, null, null, groupId));
+                }
+            }
+            return combined;
+        } catch (Exception e) {
+            log.warn("loadUser: derived group-scope hydration failed for user={} — "
+                    + "falling back to explicit scopes only", user.getId(), e);
+            return explicit;
+        }
+    }
+
     public UserPrincipal hydrate(User user) {
         UserPrincipal up = UserPrincipal.create(user);
 
@@ -94,10 +153,11 @@ public class CustomUserDetailsService implements UserDetailsService {
                             urs.getInstituteId(),
                             urs.getSessionId(),
                             urs.getCourseCode(),
-                            sectionLong));
+                            sectionLong,
+                            urs.getGroupId()));
                 }
             }
-            up.setScopes(scopes);
+            up.setScopes(withDerivedGroupScopes(user, scopes));
         } catch (Exception e) {
             // Be resilient — empty scopes are safe in log-only mode.
             log.warn("loadUser: scope hydration failed for user={} — defaulting to empty scopes",

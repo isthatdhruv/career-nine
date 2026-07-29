@@ -252,6 +252,28 @@ export function exportCombinedAssessmentExcel(assessmentId: number, userStudentI
     });
 }
 
+// Export the Navigator360 school dashboard (9 sheets, already filled in).
+// userStudentIds carries whatever the caller's filters and selection left in
+// view; an empty array means the whole assessment. classFilter is sheet 2's own
+// filter — "All", or a class number.
+export function exportSchoolDashboardExcel(
+    assessmentId: number,
+    userStudentIds: number[],
+    classFilter: string = "All",
+) {
+    return axios.post(`${API_URL}/general-assessment/export-school-dashboard`, {
+        assessmentId,
+        userStudentIds,
+        classFilter,
+    }, {
+        responseType: 'blob',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+            'Content-Type': 'application/json',
+        },
+    });
+}
+
 // Game Results APIs (Firestore via backend)
 export function getAllGameResults() {
     return axios.get<any[]>(`${API_URL}/game-results/getAll`);

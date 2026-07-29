@@ -66,6 +66,18 @@ public class UserRoleScope implements Serializable {
     @Column(name = "section_id")
     private Integer sectionId;
 
+    /**
+     * Student-group scope (FK to {@code student_group.id}). NULL = wildcard,
+     * i.e. this row places no group restriction.
+     *
+     * <p>Group is stricter than the other four dimensions once bound: a caller
+     * whose every scope row binds a group sees ONLY students in those groups,
+     * with no "ungrouped students are visible" carve-out. See
+     * {@code docs/STUDENT_GROUP_PLAN.md} §5.1.
+     */
+    @Column(name = "group_id")
+    private Long groupId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -91,6 +103,9 @@ public class UserRoleScope implements Serializable {
 
     public Integer getSectionId() { return sectionId; }
     public void setSectionId(Integer sectionId) { this.sectionId = sectionId; }
+
+    public Long getGroupId() { return groupId; }
+    public void setGroupId(Long groupId) { this.groupId = groupId; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

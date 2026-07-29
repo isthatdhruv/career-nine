@@ -39,19 +39,33 @@ public class CurrentScopes {
      *   <li>{@code s} = session id (nullable = wildcard across all sessions)</li>
      *   <li>{@code c} = course/class code (nullable = wildcard across all classes)</li>
      *   <li>{@code x} = section id (nullable = wildcard across all sections)</li>
+     *   <li>{@code g} = student group id (nullable = wildcard, i.e. this row
+     *       places no group restriction)</li>
      * </ul>
+     *
+     * <p>Group differs from the other four on the <em>data</em> side, not here:
+     * once a row binds a group, the row filter shows only students in that
+     * group, with no "ungrouped rows stay visible" carve-out. On this side null
+     * still means wildcard, which is what keeps every pre-group scope row —
+     * and every institute-level admin — behaving exactly as before.
      */
     public static class ScopeRow {
         public final Integer i; // institute id (nullable = wildcard)
         public final Integer s; // session id (nullable = wildcard)
         public final Integer c; // course / class code (nullable = wildcard)
         public final Long    x; // section id (nullable = wildcard)
+        public final Long    g; // student group id (nullable = wildcard)
 
         public ScopeRow(Integer i, Integer s, Integer c, Long x) {
+            this(i, s, c, x, null);
+        }
+
+        public ScopeRow(Integer i, Integer s, Integer c, Long x, Long g) {
             this.i = i;
             this.s = s;
             this.c = c;
             this.x = x;
+            this.g = g;
         }
 
         /**
@@ -62,12 +76,20 @@ public class CurrentScopes {
          * any target value (including null). A null target dim against a non-null
          * row dim does NOT match — the row is more specific than the request, so
          * authorization fails.
+         *
+         * <p>That last rule is what gives group its strictness for free: a row
+         * bound to group 7 does not authorize an endpoint that binds no group.
          */
         public boolean matches(Integer ti, Integer ts, Integer tc, Long tx) {
+            return matches(ti, ts, tc, tx, null);
+        }
+
+        public boolean matches(Integer ti, Integer ts, Integer tc, Long tx, Long tg) {
             return (i == null || Objects.equals(i, ti))
                 && (s == null || Objects.equals(s, ts))
                 && (c == null || Objects.equals(c, tc))
-                && (x == null || Objects.equals(x, tx));
+                && (x == null || Objects.equals(x, tx))
+                && (g == null || Objects.equals(g, tg));
         }
     }
 
@@ -83,11 +105,39 @@ public class CurrentScopes {
 
     /** True iff at least one stored scope row matches the requested target tuple. */
     public boolean anyMatch(Integer i, Integer s, Integer c, Long x) {
+        return anyMatch(i, s, c, x, null);
+    }
+
+    public boolean anyMatch(Integer i, Integer s, Integer c, Long x, Long g) {
         for (ScopeRow r : rows) {
-            if (r.matches(i, s, c, x)) {
+            if (r.matches(i, s, c, x, g)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * True iff EVERY row binds a group. Only then does the row-level filter
+     * apply its group clause.
+     *
+     * <p>This is the highest-risk line in the group feature. Scope rows are
+     * OR'd, so a single group-wildcard row means the caller is not group-scoped
+     * at all. Invert this and an institute admin with no group grants sees zero
+     * students, because none of their rows would satisfy the strict
+     * {@code EXISTS} in the filter.
+     *
+     * <p>An empty row list returns false — no rows means no group restriction.
+     */
+    public boolean isGroupScoped() {
+        if (rows.isEmpty()) {
+            return false;
+        }
+        for (ScopeRow r : rows) {
+            if (r.g == null) {
+                return false;
+            }
+        }
+        return true;
     }
 }
