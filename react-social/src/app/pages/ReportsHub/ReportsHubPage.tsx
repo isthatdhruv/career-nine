@@ -7,6 +7,7 @@ import { useInstitutes } from "../../lib/queries/lookups";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
+  exportSchoolDashboardExcel,
   Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getCatalog } from "../AssessmentMapping/API/AssessmentMapping_APIs";
@@ -196,6 +197,7 @@ const ReportsHubPage: React.FC = () => {
   const [modalStudents, setModalStudents] = useState<ModalStudent[]>([]);
   const [exportingMQT, setExportingMQT] = useState(false);
   const [exportingDataExcel, setExportingDataExcel] = useState(false);
+  const [exportingDashboard, setExportingDashboard] = useState(false);
   // downloadingZip / zipProgress removed — replaced by zipJobs
 
   // ── ZIP jobs (persisted across re-renders via ref+state) ──
@@ -781,6 +783,41 @@ const ReportsHubPage: React.FC = () => {
       downloadBlob(res.data, `bet_core_data_${selectedAssessmentObj.id}.xlsx`);
     } catch (err: any) { showErrorToast("Export failed: " + (err?.response?.data?.error || err.message)); }
     finally { setExportingMQT(false); }
+  };
+
+  // Navigator360 school dashboard. Every active filter is already baked into
+  // displayedStudents, so sending those ids is what keeps the export in step
+  // with the table — unlike the other exports, an empty selection falls back to
+  // the filtered list rather than to the whole assessment.
+  const handleExportDashboardSheet = async () => {
+    if (!selectedAssessmentObj) return;
+    const ticked = getSelectedIds();
+    const ids = ticked.length > 0 ? ticked : displayedStudents.map((s) => s.userStudentId);
+    if (ids.length === 0) { showErrorToast("No students match the current filters."); return; }
+
+    // The grade filter doubles as sheet 2's CLASS FILTER when it is a plain
+    // class number; named grades ("Class 10", "X") have no numeric equivalent,
+    // and the id list already restricts the cohort either way.
+    const classFilter = /^\d+$/.test(selectedGrade.trim()) ? selectedGrade.trim() : "All";
+
+    setExportingDashboard(true);
+    try {
+      const res = await exportSchoolDashboardExcel(selectedAssessmentObj.id, ids, classFilter);
+      downloadBlob(res.data, `school_dashboard_${selectedAssessmentObj.id}.xlsx`);
+      showSuccessToast(`Dashboard built for ${ids.length} student(s).`);
+      setMiraDesaiOpen(false);
+    } catch (err: any) {
+      // The endpoint answers with JSON on failure, so a blob response has to be
+      // read back as text before the message is visible.
+      let message = err?.message || "Unknown error";
+      const blob = err?.response?.data;
+      if (blob instanceof Blob) {
+        try { message = JSON.parse(await blob.text()).error || message; } catch { /* keep message */ }
+      } else if (err?.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      showErrorToast("Dashboard export failed: " + message);
+    } finally { setExportingDashboard(false); }
   };
 
   // ═══════════════════════ SEND ACTIONS ═══════════════════════
@@ -1512,8 +1549,10 @@ const ReportsHubPage: React.FC = () => {
         isNavigator={isNavigator}
         generating={exportingDataExcel}
         exportingMQT={exportingMQT}
+        exportingDashboard={exportingDashboard}
         onGenerateDataExcel={handleGenerateDataExcel}
         onExportBetCoreData={handleExportBetCoreData}
+        onExportDashboardSheet={handleExportDashboardSheet}
         onSchoolReport={() => setSchoolReportOpen(true)}
         visibleSelectedCount={visibleSelectedCount}
         displayedCount={displayedStudents.length}

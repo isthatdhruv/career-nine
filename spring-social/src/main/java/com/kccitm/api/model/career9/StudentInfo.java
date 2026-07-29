@@ -46,13 +46,31 @@ import com.kccitm.api.model.User;
         @ParamDef(name = "instituteIds", type = "integer"),
         @ParamDef(name = "sessionIds",   type = "integer"),
         @ParamDef(name = "courseCodes",  type = "integer"),
-        @ParamDef(name = "sectionIds",   type = "long")
+        @ParamDef(name = "sectionIds",   type = "long"),
+        // Student group — see the strictness note below. groupScopeOn is the
+        // on/off switch because a @Filter condition is static SQL and this
+        // clause must vanish entirely for callers who are not group-scoped.
+        @ParamDef(name = "groupIds",     type = "long"),
+        @ParamDef(name = "groupScopeOn", type = "integer")
 })
 @Filter(name = "scopeFilter", condition =
         "(institute_id IN (:instituteIds) OR institute_id IS NULL)"
       + " AND (session_id IN (:sessionIds) OR session_id IS NULL)"
       + " AND (course_code IN (:courseCodes) OR course_code IS NULL)"
-      + " AND (school_section_id IN (:sectionIds) OR school_section_id IS NULL)")
+      + " AND (school_section_id IN (:sectionIds) OR school_section_id IS NULL)"
+      // Group is STRICT: no "OR ... IS NULL" twin. A group-scoped caller sees
+      // only students in their groups, never ungrouped ones. The
+      // ":groupScopeOn = 0" guard makes the whole clause a tautology for every
+      // caller who is not group-scoped — without it, an institute admin with no
+      // group grants would match nothing and see zero students.
+      // user_student.id is the FK to student_info.id; user_student_id is its own PK.
+      // {alias} is mandatory, not cosmetic: user_student also has an `id`
+      // column, so an unqualified outer reference would resolve to the
+      // subquery's own table and make the EXISTS trivially true.
+      + " AND (:groupScopeOn = 0 OR EXISTS ("
+      + "   SELECT 1 FROM student_group_member sgm"
+      + "     JOIN user_student sgu ON sgu.user_student_id = sgm.user_student_id"
+      + "    WHERE sgu.id = {alias}.id AND sgm.student_group_id IN (:groupIds)))")
 @Entity
 @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @Table(name = "student_info")

@@ -278,6 +278,11 @@ const PrivateRoutes = () => {
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
   const College = lazy(() => import("../pages/College/CollegePage"));
   const CohortInsightsPage = lazy(() => import("../pages/SchoolAdmin/CohortInsightsPage"));
+  // Named apart from the module-scope SchoolDashboardPage import (the per-institute
+  // "Dashboard 1" popup) — a local const of that name would shadow it in here.
+  const SchoolInsightsDashboardPage = lazy(
+    () => import("../pages/SchoolDashboard/SchoolDashboardPage")
+  );
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
   const AssessmentMappingPage = lazy(() => import("../pages/AssessmentMapping/AssessmentMappingPage"));
@@ -1489,6 +1494,16 @@ const PrivateRoutes = () => {
             <RequirePermission perm="dashboard.school.insights.read">
               <SuspensedView>
                 <CohortInsightsPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/school-dashboard"
+          element={
+            <RequirePermission perm="dashboard.school.insights.read">
+              <SuspensedView>
+                <SchoolInsightsDashboardPage />
               </SuspensedView>
             </RequirePermission>
           }

@@ -181,6 +181,11 @@ public class TokenProvider {
                 if (r.s != null) row.put("s", r.s);
                 if (r.c != null) row.put("c", r.c);
                 if (r.x != null) row.put("x", r.x);
+                // Student group — omitted when null, exactly like the others, so
+                // an old server reading a new token simply ignores the key and a
+                // new server reading an old token parses it back as wildcard.
+                // No forced logout is needed for the group dimension.
+                if (r.g != null) row.put("g", r.g);
                 scopes.add(row);
             }
         }
@@ -424,7 +429,11 @@ public class TokenProvider {
                     Integer s = num(m.get("s"));
                     Integer cc = num(m.get("c"));
                     Long x = m.get("x") == null ? null : Long.valueOf(m.get("x").toString());
-                    rows.add(new CurrentScopes.ScopeRow(i, s, cc, x));
+                    // Absent on every token minted before the group dimension —
+                    // parses to null, i.e. group wildcard, which is exactly the
+                    // pre-group behaviour.
+                    Long g = m.get("g") == null ? null : Long.valueOf(m.get("g").toString());
+                    rows.add(new CurrentScopes.ScopeRow(i, s, cc, x, g));
                 }
             }
             out.scopes = rows;

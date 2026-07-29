@@ -36,6 +36,14 @@ public enum PermissionCode {
     DASHBOARD_SCHOOL_INSIGHTS_GENERATE("dashboard.school.insights.generate", "Generate/refresh school cohort insight payloads (superadmin)"),
     DASHBOARD_SCHOOL_INSIGHTS_READ("dashboard.school.insights.read", "View the school cohort insights dashboard"),
 
+    // ── Student groups (named cohorts inside an institute) ──────────────
+    STUDENT_GROUP_READ           ("student_group.read",           "View student groups, their members and their contact persons"),
+    STUDENT_GROUP_CREATE         ("student_group.create",         "Create a student group in an institute"),
+    STUDENT_GROUP_UPDATE         ("student_group.update",         "Rename, describe, activate or deactivate a student group"),
+    STUDENT_GROUP_DELETE         ("student_group.delete",         "Delete a student group"),
+    STUDENT_GROUP_MEMBER_MANAGE  ("student_group.member.manage",  "Add or remove students in a student group"),
+    STUDENT_GROUP_CONTACT_ASSIGN ("student_group.contact.assign", "Allot or remove contact persons on a student group"),
+
     // ── Session (Phase 14 foundation) ───────────────────────────────────
     SESSION_READ  ("session.read",  "View academic sessions"),
     SESSION_WRITE ("session.write", "Create or update sessions"),
