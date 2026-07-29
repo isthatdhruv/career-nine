@@ -2,6 +2,7 @@ import { FC, useEffect, useState } from "react";
 import { Modal, Button } from "react-bootstrap";
 import axios from "axios";
 import { showSuccessToast, showErrorToast } from "../../../utils/toast";
+import SearchableSelect from "../../../components/SearchableSelect";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
 
@@ -110,22 +111,14 @@ const InstituteLimitsModal: FC<Props> = ({ show, onHide, institutes }) => {
 
         <div className="fv-row mb-3">
           <label className="fs-6 fw-bold mb-2">Institute</label>
-          <select
-            className="form-control form-control-solid"
+          <SearchableSelect
+            options={institutes
+              .filter((i) => idOf(i) != null)
+              .map((i) => ({ value: String(idOf(i)), label: String(instituteName(i) ?? "") }))}
             value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-          >
-            <option value="">Select institute…</option>
-            {institutes.map((i) => {
-              const id = idOf(i);
-              if (id == null) return null;
-              return (
-                <option key={id} value={id}>
-                  {instituteName(i)}
-                </option>
-              );
-            })}
-          </select>
+            onChange={(v) => setSelectedId(v)}
+            placeholder="Select institute…"
+          />
         </div>
 
         <div className="fv-row mb-3">

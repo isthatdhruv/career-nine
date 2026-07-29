@@ -177,3 +177,35 @@ export function payLaterBook(body: {
 }) {
   return http.post('/assessment-mapping/public/pay-later-book', body);
 }
+
+// ── Per-student invite (admin-generated, student-locked link) ────────────────
+// The link is bound to one already-known student, so the registration page is
+// pre-filled from `student` and identity fields are locked. The price is the
+// chosen tier's amount; on submit the student pays (PAY_FIRST) and takes the
+// assessment — reusing the same payment + provisioning pipeline.
+export type InviteInfo = {
+  status: 'PENDING' | 'PAID' | 'REVOKED';
+  registrationClosed: boolean;
+  alreadyRegistered: boolean;
+  assessmentId: number;
+  assessmentName?: string;
+  instituteName?: string;
+  tierName?: string;
+  amount: number;
+  payableTotal?: number;
+  inclusions: MappingInclusions;
+  paymentTiming?: 'PAY_FIRST' | 'PAY_LATER';
+  counsellingFeePerSession?: number;
+  counsellingSessionCount?: number;
+  counsellingFeeTotal?: number;
+  student: { name?: string; email?: string; phone?: string; dob?: string };
+  branding?: StudentBranding;
+};
+
+export function getInviteInfoByToken(token: string) {
+  return http.get<InviteInfo>(`/assessment-mapping/public/student-invite/info/${token}`);
+}
+
+export function registerInviteByToken(token: string, body?: { phone?: string }) {
+  return http.post(`/assessment-mapping/public/student-invite/register/${token}`, body ?? {});
+}

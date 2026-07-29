@@ -8,6 +8,7 @@ import {
   Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
 import { generateBetReportData, exportBetReportExcel, exportGeneralAssessmentExcel, exportGeneralAssessmentExcelForStudent } from "./API/BetReportData_APIs";
+import SearchableSelect from "../../components/SearchableSelect";
 
 type StudentRow = {
   userStudentId: number;
@@ -267,21 +268,18 @@ const ReportGenerationPage: React.FC = () => {
           {institutesLoading ? (
             <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
           ) : (
-            <select
-              className="form-select form-select-solid"
-              value={selectedInstitute}
-              onChange={(e) => {
-                setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value));
+            <SearchableSelect
+              options={institutes.map((inst) => ({
+                value: String(inst.instituteCode),
+                label: String(inst.instituteName ?? ""),
+              }))}
+              value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+              onChange={(v) => {
+                setSelectedInstitute(v === "" ? "" : Number(v));
                 setSelectedAssessment("");
               }}
-            >
-              <option value="">-- Select a school --</option>
-              {institutes.map((inst) => (
-                <option key={inst.instituteCode} value={inst.instituteCode}>
-                  {inst.instituteName}
-                </option>
-              ))}
-            </select>
+              placeholder="-- Select a school --"
+            />
           )}
         </div>
         <div>

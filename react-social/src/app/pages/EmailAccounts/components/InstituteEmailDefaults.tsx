@@ -8,6 +8,7 @@ import {
   setInstituteEmailSetting,
 } from "../API/InstituteEmailSetting_APIs";
 import { ReadCollegeList } from "../../College/API/College_APIs";
+import SearchableSelect from "../../../components/SearchableSelect";
 
 interface InstituteOption {
   code: number;
@@ -47,7 +48,10 @@ const InstituteEmailDefaults: FC = () => {
           code: Number(row.instituteCode),
           name: row.instituteName || `Institute ${row.instituteCode}`,
         }))
-        .filter((o: InstituteOption) => !Number.isNaN(o.code));
+        .filter((o: InstituteOption) => !Number.isNaN(o.code))
+        .sort((a: InstituteOption, b: InstituteOption) =>
+          a.name.trim().localeCompare(b.name.trim(), undefined, { sensitivity: "base" })
+        );
       setInstitutes(list);
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || "Failed to load institute defaults");
@@ -153,20 +157,16 @@ const InstituteEmailDefaults: FC = () => {
             <div className="d-flex align-items-end gap-2 mb-3 flex-wrap">
               <div style={{ flex: "1 0 220px", maxWidth: "320px" }}>
                 <label style={{ fontSize: "0.78rem", fontWeight: 600, color: "#374151" }}>Institute</label>
-                <select
-                  className="form-select form-select-sm"
+                <SearchableSelect
+                  options={unmappedInstitutes.map((i) => ({
+                    value: String(i.code),
+                    label: `${i.name} (#${i.code})`,
+                  }))}
                   value={newInstitute}
-                  onChange={(e) => setNewInstitute(e.target.value)}
-                  style={selectStyle}
+                  onChange={(v) => setNewInstitute(v)}
+                  placeholder={unmappedInstitutes.length ? "Select institute…" : "All institutes mapped"}
                   disabled={unmappedInstitutes.length === 0}
-                >
-                  <option value="">{unmappedInstitutes.length ? "Select institute…" : "All institutes mapped"}</option>
-                  {unmappedInstitutes.map((i) => (
-                    <option key={i.code} value={String(i.code)}>
-                      {i.name} (#{i.code})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div style={{ flex: "1 0 220px", maxWidth: "320px" }}>
                 <label style={{ fontSize: "0.78rem", fontWeight: 600, color: "#374151" }}>Default account</label>

@@ -33,18 +33,28 @@ const CatalogSelector = ({ assessments, catalog, onAdd, onRemove, busy }: Props)
   return (
     <div>
       <div className="d-flex align-items-center gap-2 flex-wrap">
-        <Dropdown autoClose="outside">
+        <Dropdown autoClose="outside" drop="down">
           <Dropdown.Toggle variant="outline-secondary" size="sm" disabled={busy}>
             {catalog.length
               ? `${catalog.length} assessment${catalog.length === 1 ? "" : "s"} enabled`
               : "Select assessments"}
           </Dropdown.Toggle>
-          {/* strategy:"fixed" lets the menu float above any overflow-clipping ancestor
-              and flip when near the viewport bottom, so the last option is always
-              reachable. paddingBottom adds a gap so the last row isn't flush/clipped. */}
+          {/* Always open BELOW the toggle: strategy:"fixed" floats the menu above any
+              overflow-clipping ancestor, and disabling Popper's "flip" stops it from
+              jumping above the toggle (which used to cover the whole modal). The list
+              scrolls internally (overflowY) when it's taller than maxHeight. */}
           <Dropdown.Menu
-            popperConfig={{ strategy: "fixed" }}
-            style={{ maxHeight: 380, overflowY: "auto", minWidth: 320, paddingTop: 6, paddingBottom: 10 }}
+            popperConfig={{
+              strategy: "fixed",
+              modifiers: [{ name: "flip", enabled: false }],
+            }}
+            style={{
+              maxHeight: 340,
+              overflowY: "auto",
+              minWidth: 380,
+              paddingTop: 8,
+              paddingBottom: 14,
+            }}
           >
             {assessments.length === 0 ? (
               <Dropdown.ItemText className="text-muted small">No assessments available</Dropdown.ItemText>

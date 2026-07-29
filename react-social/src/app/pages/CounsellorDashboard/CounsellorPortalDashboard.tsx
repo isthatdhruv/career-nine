@@ -4,6 +4,7 @@ import { toAbsoluteUrl } from '../../../_metronic/helpers'
 import PortalLayout from '../portal/PortalLayout'
 import AppointmentCalendar from './components/AppointmentCalendar'
 import SessionNotes from './components/SessionNotes'
+import CounsellorEngagements from './components/CounsellorEngagements'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { useAuth } from '../../modules/auth'
 import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
@@ -69,6 +70,9 @@ const CounsellorPortalDashboard: React.FC = () => {
         subtitle='Career-9 · Counsellor Dashboard'
       />
       <div style={{ height: 16 }} />
+
+      {/* Institutes & assessments — conducted and upcoming sessions */}
+      <CounsellorEngagements counsellorId={counsellorId} />
 
       {/* Appointments + Session Notes */}
       <div className='cp-page-card'>
