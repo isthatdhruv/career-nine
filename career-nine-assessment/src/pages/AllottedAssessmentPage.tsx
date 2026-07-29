@@ -14,6 +14,24 @@ type Assessment = {
   isLocked?: boolean;
 };
 
+/**
+ * Wipe every game-completion marker: the legacy unscoped key plus the
+ * per-(student, assessment) keys SectionQuestionPage now writes. A stale
+ * marker disables the "Launch Game" button, which silently costs the run.
+ */
+const clearGameCompletionMarkers = () => {
+  try {
+    localStorage.removeItem('assessmentCompletedGames');
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('assessmentCompletedGames:')) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch (e) {
+    console.warn('Could not clear game completion markers:', e);
+  }
+};
+
 export default function AllottedAssessmentPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loadingId, setLoadingId] = useState<number | null>(null);
@@ -54,6 +72,13 @@ export default function AllottedAssessmentPage() {
 
     try {
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
+
+      // Drop game-completion markers from any previous run. Without this the
+      // three game questions opened pre-marked "✓ Completed" with the launch
+      // buttons disabled, so the student submitted without playing and no
+      // result was ever written to Firestore. Only the dev auto-fill path
+      // used to clear these.
+      clearGameCompletionMarkers();
 
       // A stale prefill from a prior Dev: Auto-fill run would otherwise be
       // picked up by SectionQuestionPage on this real-user flow.
@@ -130,7 +155,7 @@ export default function AllottedAssessmentPage() {
       localStorage.removeItem('assessmentSavedForLater');
       localStorage.removeItem('assessmentSkipped');
       localStorage.removeItem('assessmentElapsedTime');
-      localStorage.removeItem('assessmentCompletedGames');
+      clearGameCompletionMarkers();
       sessionStorage.removeItem('devAutoFillPrefill');
 
       await mintAssessmentSessionCookie(
