@@ -100,6 +100,16 @@ export function getNavigatorReportUrls(assessmentId: number, userStudentIds: num
   );
 }
 
+// "Generate Data Excel": one row per student — registration-page data +
+// demographic form + one column per questionnaire question with the
+// student's answer(s). Works for any assessment (not just Navigator).
+export function exportAssessmentDataExcel(assessmentId: number, userStudentIds?: number[]) {
+  return axios.post(`${API_URL}/general-assessment/export-data-excel`, {
+    assessmentId,
+    userStudentIds,
+  }, { responseType: 'blob' });
+}
+
 export function exportGeneralAssessmentExcel(assessmentId: number) {
   return axios.get(`${API_URL}/general-assessment/export-excel/${assessmentId}`, {
     responseType: 'blob',

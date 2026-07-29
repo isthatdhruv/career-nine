@@ -6,7 +6,7 @@ import {
   getStudentsWithMappingByInstituteId,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import { generateAndExportNavigatorExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
+import { exportAssessmentDataExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
 import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
 import SchoolReportModal from "./SchoolReportModal";
 import SearchableSelect from "../../components/SearchableSelect";
@@ -231,11 +231,11 @@ const ReportsPage: React.FC = () => {
 
     setGenerating(true);
     try {
-      const res = await generateAndExportNavigatorExcel(Number(selectedAssessment), ids);
+      const res = await exportAssessmentDataExcel(Number(selectedAssessment), ids);
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `navigator_data_${selectedAssessment}.xlsx`;
+      a.download = `assessment_data_${selectedAssessment}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -279,8 +279,6 @@ const ReportsPage: React.FC = () => {
     institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
   const selectedAssessmentObj = assessments.find((a) => a.id === selectedAssessment);
   const selectedAssessmentName = selectedAssessmentObj?.assessmentName || "";
-  // questionnaireType: true = BET, false/null = Navigator
-  const isNavigator = selectedAssessmentObj ? !selectedAssessmentObj.questionnaireType : false;
 
   const ready = selectedInstitute !== "" && selectedAssessment !== "";
 
@@ -483,30 +481,28 @@ const ReportsPage: React.FC = () => {
                     </span>
                   )}
                 </span>
-                {isNavigator && (
-                  <button
-                    className="btn btn-sm"
-                    onClick={handleGenerateExcel}
-                    disabled={displayedStudents.length === 0 || generating}
-                    style={{
-                      background: generating
-                        ? "#6c757d"
-                        : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
-                      border: "none", borderRadius: 8, padding: "8px 20px",
-                      fontWeight: 600, color: "white", fontSize: "0.85rem",
-                      boxShadow: generating ? "none" : "0 4px 12px rgba(67, 97, 238, 0.3)",
-                    }}
-                  >
-                    {generating ? "Generating..." : (
-                      <>
-                        Generate Data Excel
-                        {visibleSelectedCount > 0
-                          ? ` (${visibleSelectedCount} selected)`
-                          : ` (All ${displayedStudents.length})`}
-                      </>
-                    )}
-                  </button>
-                )}
+                <button
+                  className="btn btn-sm"
+                  onClick={handleGenerateExcel}
+                  disabled={displayedStudents.length === 0 || generating}
+                  style={{
+                    background: generating
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: generating ? "none" : "0 4px 12px rgba(67, 97, 238, 0.3)",
+                  }}
+                >
+                  {generating ? "Generating..." : (
+                    <>
+                      Generate Data Excel
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All ${displayedStudents.length})`}
+                    </>
+                  )}
+                </button>
                 <button
                   className="btn btn-sm"
                   onClick={handleExportMQT}

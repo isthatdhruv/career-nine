@@ -23,7 +23,7 @@ import {
   GenerateUnifiedReport,
   TemplateMappingDto,
 } from "../ReportTemplates/API/Report_Templates_APIs";
-import { generateAndExportNavigatorExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
+import { exportAssessmentDataExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
 import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
 import {
   SendReportEmail,
@@ -335,7 +335,6 @@ const ReportsHubPage: React.FC = () => {
 
   const reportType: ReportType = selectedAssessmentObj ? getReportType(selectedAssessmentObj) : "bet";
   const isBet = reportType === "bet";
-  const isNavigator = !isBet;
 
   // Source report status/URL from the unified generated_report rows, filtered
   // to the selected template (or any, when none is selected). Keeps the rest of
@@ -764,8 +763,8 @@ const ReportsHubPage: React.FC = () => {
     if (ids.length === 0) { showErrorToast("No students."); return; }
     setExportingDataExcel(true);
     try {
-      const res = await generateAndExportNavigatorExcel(selectedAssessmentObj.id, ids);
-      downloadBlob(res.data, `navigator_data_${selectedAssessmentObj.id}.xlsx`);
+      const res = await exportAssessmentDataExcel(selectedAssessmentObj.id, ids);
+      downloadBlob(res.data, `assessment_data_${selectedAssessmentObj.id}.xlsx`);
       showSuccessToast(`Generated data for ${ids.length} student(s).`);
     } catch (err: any) { showErrorToast("Generation failed: " + (err?.response?.data?.error || err.message)); }
     finally { setExportingDataExcel(false); }
@@ -1537,7 +1536,6 @@ const ReportsHubPage: React.FC = () => {
       <MiraDesaiModal
         open={miraDesaiOpen}
         onClose={() => setMiraDesaiOpen(false)}
-        isNavigator={isNavigator}
         generating={exportingDataExcel}
         exportingMQT={exportingMQT}
         onGenerateDataExcel={handleGenerateDataExcel}
