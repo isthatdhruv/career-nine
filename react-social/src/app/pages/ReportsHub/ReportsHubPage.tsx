@@ -180,6 +180,8 @@ const ReportsHubPage: React.FC = () => {
 
   // ── Selection + pagination ──
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // ── Search + Filters ──
   const [nameQuery, setNameQuery] = useState("");
@@ -321,6 +323,7 @@ const ReportsHubPage: React.FC = () => {
     // Back to the default of everyone ticked (not cleared) — the user
     // deselects the students they don't want.
     setSelectedStudentIds(new Set(students.map((s) => s.userStudentId)));
+    setCurrentPage(1);
     setNameQuery("");
     setSelectedGrade("");
     setSelectedSection("");
@@ -523,6 +526,16 @@ const ReportsHubPage: React.FC = () => {
     return result;
   }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo, selectedAssessmentObj, sectionLookup, gradeOf]);
 
+  const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
+  // Clamped rather than reset, so shrinking the result set past the current page
+  // still renders rows instead of an empty table.
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedStudents = useMemo(
+    () => displayedStudents.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize),
+    [displayedStudents, safeCurrentPage, pageSize]
+  );
+
+  useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo]);
 
   // Secret unlock: typing exactly "boom" in the username search toggles admin edit mode.
   useEffect(() => {
@@ -1354,8 +1367,8 @@ const ReportsHubPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {displayedStudents.map((s, idx) => {
-                      const globalIdx = idx;
+                    {paginatedStudents.map((s, idx) => {
+                      const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
                       const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
                       const asmtDetail = (s.assessments || []).find(
                         (a) => a.assessmentId === selectedAssessmentObj!.id
