@@ -36,6 +36,11 @@ public enum PermissionCode {
     DASHBOARD_SCHOOL_INSIGHTS_GENERATE("dashboard.school.insights.generate", "Generate/refresh school cohort insight payloads (superadmin)"),
     DASHBOARD_SCHOOL_INSIGHTS_READ("dashboard.school.insights.read", "View the school cohort insights dashboard"),
 
+    // ── School Dashboard (aside menu → Reports → School Dashboard) ──────
+    // Its own code rather than reusing insights.read: the two are separate
+    // features, and one grant must not silently confer the other.
+    DASHBOARD_SCHOOL_READ("dashboard.school.read", "View the School Dashboard (Navigator360 school insights)"),
+
     // ── Student groups (named cohorts inside an institute) ──────────────
     STUDENT_GROUP_READ           ("student_group.read",           "View student groups, their members and their contact persons"),
     STUDENT_GROUP_CREATE         ("student_group.create",         "Create a student group in an institute"),
