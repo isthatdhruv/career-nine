@@ -1501,7 +1501,7 @@ const PrivateRoutes = () => {
         <Route
           path="/school-dashboard"
           element={
-            <RequirePermission perm="dashboard.school.insights.read">
+            <RequirePermission perm="dashboard.school.read">
               <SuspensedView>
                 <SchoolInsightsDashboardPage />
               </SuspensedView>
