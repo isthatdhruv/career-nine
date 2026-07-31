@@ -51,6 +51,9 @@ public class GeneralAssessmentController {
     private com.kccitm.api.service.AssessmentDataExcelExportService dataExcelExportService;
 
     @Autowired
+    private com.kccitm.api.service.BetTemplateExcelExportService betTemplateExcelExportService;
+
+    @Autowired
     private SchoolDashboardDataService schoolDashboardDataService;
 
     @Autowired
@@ -209,7 +212,12 @@ public class GeneralAssessmentController {
             }
         }
 
-        byte[] excelBytes = dataExcelExportService.exportStudentData(assessmentId, userStudentIds);
+        // BET assessments get the analyst's fixed "BET_ template" layout;
+        // everything else keeps the generic dynamic export.
+        byte[] excelBytes = betTemplateExcelExportService.exportIfBetTemplate(assessmentId, userStudentIds);
+        if (excelBytes == null) {
+            excelBytes = dataExcelExportService.exportStudentData(assessmentId, userStudentIds);
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(
