@@ -1017,6 +1017,10 @@ public class StudentInfoController {
                 studentData.put("instituteId", si.getInstituteId());
                 studentData.put("studentDob", si.getStudentDob());
                 studentData.put("schoolSectionId", si.getSchoolSectionId());
+                // Flat class column — many institutes have students with no
+                // school_section_id link (hierarchy never populated at onboarding);
+                // the UI falls back to this for the Grade column.
+                studentData.put("studentClass", si.getStudentClass());
                 studentData.put("controlNumber", si.getControlNumber());
                 try {
                     UserStudent usForGender = studentInfoToUserStudent.get(si.getId());
@@ -1063,6 +1067,9 @@ public class StudentInfoController {
                         java.util.Map<String, Object> detail = new java.util.HashMap<>();
                         detail.put("assessmentId", mapping.getAssessmentId());
                         detail.put("status", mapping.getStatus());
+                        // Null for anything not completed, and for pre-V20260716001 completions
+                        // that never had a report to backfill from.
+                        detail.put("completedAt", mapping.getCompletedAt());
                         detail.put("assessmentName", assessmentNames.getOrDefault(mapping.getAssessmentId(), "Unknown"));
                         assessmentDetails.add(detail);
                     }
@@ -1315,9 +1322,12 @@ public class StudentInfoController {
                     submissionFailureRepository.save(row);
                 });
 
-        // Reset status to 'notstarted', clear persistenceState, and bump the reset counter
+        // Reset status to 'notstarted', clear persistenceState, and bump the reset counter.
+        // completedAt clears with the status — the student is taking this fresh, so a
+        // leftover date would outlive the completion it describes.
         mapping.setStatus("notstarted");
         mapping.setPersistenceState(null);
+        mapping.setCompletedAt(null);
         mapping.setResetCount(alreadyReset + 1);
         studentAssessmentMappingRepository.save(mapping);
 

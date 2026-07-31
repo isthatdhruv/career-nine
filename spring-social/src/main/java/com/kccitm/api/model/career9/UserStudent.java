@@ -24,7 +24,18 @@ import com.kccitm.api.model.career9.school.InstituteDetail;
  * on this entity because those columns don't exist on user_student.
  */
 @Filter(name = "scopeFilter", condition =
-        "(institute_id IN (:instituteIds) OR institute_id IS NULL)")
+        "(institute_id IN (:instituteIds) OR institute_id IS NULL)"
+      // Group is STRICT — no "OR IS NULL" twin, so an ungrouped student is
+      // invisible to a group-scoped caller. ":groupScopeOn = 0" switches the
+      // whole clause off for callers who hold any group-wildcard scope row,
+      // which is every institute-level admin.
+      // {alias} is mandatory, not cosmetic: student_group_member also has a
+      // user_student_id column, so an unqualified outer reference would resolve
+      // to the subquery's own table and make the EXISTS trivially true.
+      + " AND (:groupScopeOn = 0 OR EXISTS ("
+      + "   SELECT 1 FROM student_group_member sgm"
+      + "    WHERE sgm.user_student_id = {alias}.user_student_id"
+      + "      AND sgm.student_group_id IN (:groupIds)))")
 @Entity
 @Table(name = "user_student")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})

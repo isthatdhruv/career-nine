@@ -14,7 +14,7 @@ each email, the trigger, and the transport in use.
 |---|---|---|---|
 | **Gmail API** | `GmailApiEmailServiceImpl` (`@Primary` impl of `SmtpEmailService`) | `notifications@career-9.net` (`GMAIL_SENDER`), domain-wide-delegation impersonation via `firebase-service-account.json` | **ACTIVE** — backs every `SmtpEmailService` injection; all transactional mail |
 | **SMTP** | `SmtpEmailServiceImpl` (`smtp.gmail.com:587`) | `spring.mail.username` (`SMTP_USERNAME`) | **DORMANT** — only registers when `app.email.provider=smtp` (set nowhere; DigitalOcean blocks outbound SMTP ports) |
-| **Mandrill** | `EmailService`, `StudentGoogleEmailGenerateServiceImpl`, counselling fallback | caller-supplied / `noreply@kccitm.edu.in` / `support@kccitm.email` | **LEGACY** — hard-coded, almost-certainly-stale API keys; wired but likely non-delivering |
+| **Mandrill** | `EmailService`, `StudentGoogleEmailGenerateServiceImpl` (KCCITM college flows only) | caller-supplied / `noreply@kccitm.edu.in` / `support@kccitm.email` | **LEGACY** — hard-coded, almost-certainly-stale API keys; wired but likely non-delivering |
 | **Odoo** | `OdooEmailService` (JSON-RPC `mail.mail`) | `ODOO_USERNAME` envelope, header `"Career-9" <odooUsername>` | **UNUSED** by active flows — only the dormant `OdooEmailSender` (report pipeline, `REPORT_EMAIL_TRANSPORT=odoo`, off by default) |
 
 **Report pipeline** uses dedicated synchronous senders selected by `REPORT_EMAIL_TRANSPORT`
@@ -114,20 +114,24 @@ Source file: `ReminderSender` — Gmail _(was Odoo)_
 
 Source file: `CounsellingNotificationService`
 
+All counselling email now goes through the shared `sendEmail()` helper, which sends via
+**Gmail** (`SmtpEmailService` → `GmailApiEmailServiceImpl`, From `notifications@career-9.net`).
+The legacy Mandrill transport was removed from this service.
+
 | Source (trigger) | Purpose | Transport |
 |---|---|---|
-| Booking auto-confirm | Confirmation **+ .ics** invite | **Gmail** _(was Odoo)_ — Mandrill fallback |
-| `PUT /assign/{id}` | "Session assigned" → counsellor | Mandrill |
-| `PUT /confirm/{id}` | "Session confirmed" → student | Mandrill |
-| `PUT /cancel/{id}` | Cancellation → student / counsellor | Mandrill |
-| Block-date approval (no replacement) | "Please rebook" → student | Mandrill |
-| `PUT /reschedule/{id}` | Reschedule → student | Mandrill |
-| Session notes saved | "Remarks available" → student | Mandrill |
-| Cron `*/5 min` | Session reminders (student / parent / counsellor, WhatsApp-first) | Mandrill |
-| `POST /start/{id}` | Check-in OTP (WhatsApp-first) | Mandrill |
-| Cron `8pm` | Counsellor daily digest | Mandrill |
-| Cron `10:30am` | Counselling booking nudge | Mandrill |
-| Cron `*/5 min` lifecycle | No-show notice | Mandrill |
+| Booking auto-confirm | Confirmation **+ .ics** invite | **Gmail** _(was Odoo)_ |
+| `PUT /assign/{id}` | "Session assigned" → counsellor | Gmail _(was Mandrill)_ |
+| `PUT /confirm/{id}` | "Session confirmed" → student | Gmail _(was Mandrill)_ |
+| `PUT /cancel/{id}` | Cancellation → student / counsellor | Gmail _(was Mandrill)_ |
+| Block-date approval (no replacement) | "Please rebook" → student | Gmail _(was Mandrill)_ |
+| `PUT /reschedule/{id}` | Reschedule → student | Gmail _(was Mandrill)_ |
+| Session notes saved | "Remarks available" → student | Gmail _(was Mandrill)_ |
+| Cron `*/5 min` | Session reminders (student / parent / counsellor, WhatsApp-first) | Gmail _(was Mandrill)_ |
+| `POST /start/{id}` | Check-in OTP (WhatsApp-first) | Gmail _(was Mandrill)_ |
+| Cron `8pm` | Counsellor daily digest | Gmail _(was Mandrill)_ |
+| Cron `10:30am` | Counselling booking nudge | Gmail _(was Mandrill)_ |
+| Cron `*/5 min` lifecycle | No-show notice | Gmail _(was Mandrill)_ |
 
 ## 10. Legacy KCCITM (separate college product)
 
@@ -147,11 +151,10 @@ Source files: `StudentService`, `FacultyService`, `GoogleAdminController` / `Stu
 
 - **Gmail** (`GmailApiEmailServiceImpl` via the `SmtpEmailService` interface, From
   `notifications@career-9.net`): **all transactional mail** — auth, credentials, payments, B2C
-  entitlement, registration, reminders, report PDFs, contact-person reports, and the counselling
-  booking `.ics` confirmation.
+  entitlement, registration, reminders, report PDFs, contact-person reports, and **all counselling
+  email** (booking `.ics` confirmation + every lifecycle/reminder/OTP/digest/nudge message).
 - **Mandrill** (legacy, From `noreply@kccitm.edu.in` / `support@kccitm.email`, stale hard-coded
-  keys): all KCCITM college flows + every counselling lifecycle/reminder email + the admin test
-  endpoint + the counselling booking fallback.
+  keys): KCCITM college flows + the admin test endpoint only. No longer used by counselling.
 - **Odoo**: no longer used by any active flow (only the dormant `OdooEmailSender`, off by default).
 
 ## 12. Dead code & risks

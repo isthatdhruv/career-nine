@@ -188,6 +188,13 @@ const CollegeTable = (props: {
           return d.display !== "0" && d.display !== "false";
         return Boolean(d.display);
       })
+      // Alphabetical by name — the Name cell is a JSX element (logo + text),
+      // so the datatable's own column sort can't order it.
+      .sort((a, b) =>
+        (a.instituteName ?? "").trim().localeCompare((b.instituteName ?? "").trim(), undefined, {
+          sensitivity: "base",
+        })
+      )
       .map((data) => ({
         name: (
           <div className="d-flex align-items-center gap-2">

@@ -78,8 +78,10 @@ public class ScopeFilterInterceptor implements HandlerInterceptor {
         Set<Integer> sessionIds   = new HashSet<Integer>();
         Set<Integer> courseCodes  = new HashSet<Integer>();
         Set<Long>    sectionIds   = new HashSet<Long>();
+        Set<Long>    groupIds     = new HashSet<Long>();
         boolean anyWildcardInstitute = false, anyWildcardSession = false,
-                anyWildcardCourse = false, anyWildcardSection = false;
+                anyWildcardCourse = false, anyWildcardSection = false,
+                anyWildcardGroup = false;
 
         if (up.getScopes() != null) {
             for (CurrentScopes.ScopeRow r : up.getScopes()) {
@@ -87,11 +89,21 @@ public class ScopeFilterInterceptor implements HandlerInterceptor {
                 if (r.s == null) anyWildcardSession   = true; else sessionIds.add(r.s);
                 if (r.c == null) anyWildcardCourse    = true; else courseCodes.add(r.c);
                 if (r.x == null) anyWildcardSection   = true; else sectionIds.add(r.x);
+                if (r.g == null) anyWildcardGroup     = true; else groupIds.add(r.g);
             }
         }
 
+        // Scope rows are OR'd, so ONE group-wildcard row means the caller is not
+        // group-scoped at all and the strict group clause must stay off. Getting
+        // this backwards makes an institute admin see zero students, because the
+        // clause has no "OR IS NULL" escape the way the other four dims do.
+        boolean groupScoped = !anyWildcardGroup && !groupIds.isEmpty();
+
         // Full wildcard across every dim → effectively super-admin reach; skip filter.
-        if (anyWildcardInstitute && anyWildcardSession && anyWildcardCourse && anyWildcardSection) {
+        // Group is included: a caller who is group-scoped is NOT unrestricted,
+        // even if the other four dims are all wildcard.
+        if (anyWildcardInstitute && anyWildcardSession && anyWildcardCourse
+                && anyWildcardSection && !groupScoped) {
             log.debug("scopeFilter skipped (full wildcard) for user={}", up.getId());
             return true;
         }
@@ -107,10 +119,17 @@ public class ScopeFilterInterceptor implements HandlerInterceptor {
                     courseCodes.isEmpty()  ? Collections.singleton(NONE_INT) : courseCodes);
             f.setParameterList("sectionIds",
                     sectionIds.isEmpty()   ? Collections.singleton(NONE_LONG) : sectionIds);
+            // Both group params are always bound — Hibernate requires every
+            // FilterDef parameter to be set once the filter is enabled, even
+            // for entities whose condition never references them.
+            f.setParameterList("groupIds",
+                    groupIds.isEmpty()     ? Collections.singleton(NONE_LONG) : groupIds);
+            f.setParameter("groupScopeOn", groupScoped ? 1 : 0);
 
             request.setAttribute(ATTR_ENABLED, Boolean.TRUE);
-            log.debug("scopeFilter enabled for user={} institutes={} sessions={} courses={} sections={}",
-                    up.getId(), instituteIds, sessionIds, courseCodes, sectionIds);
+            log.debug("scopeFilter enabled for user={} institutes={} sessions={} courses={} sections={} "
+                    + "groups={} (groupScoped={})",
+                    up.getId(), instituteIds, sessionIds, courseCodes, sectionIds, groupIds, groupScoped);
         } catch (Exception e) {
             log.warn("Failed to enable scopeFilter (will pass-through unfiltered): {}", e.getMessage());
         }

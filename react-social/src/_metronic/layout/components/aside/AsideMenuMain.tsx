@@ -97,7 +97,8 @@ export function AsideMenuMain() {
     allowed("/promo-codes") ||
     allowed("/referral-codes");
 
-  const showReports = allowed("/reports") || allowed("/reports-hub") || allowed("/admin/report-templates");
+  const showReports = allowed("/reports") || allowed("/reports-hub")
+    || allowed("/admin/report-templates") || allowed("/school-dashboard");
 
   const showRoles =
     allowed("/user-management/roles/manage") ||
@@ -568,6 +569,16 @@ export function AsideMenuMain() {
               icon="/media/icons/duotune/graphs/gra010.svg"
               title="Reports Hub"
               fontIcon="bi-grid-3x3-gap"
+            />
+          )}
+          {/* Piggybacks on the reports-hub whitelist entry, the same way Report
+              Templates does, so the page is reachable without a role_url seed. */}
+          {(allowed("/school-dashboard") || allowed("/reports-hub")) && (
+            <AsideMenuItem
+              to="/school-dashboard"
+              icon="/media/icons/duotune/graphs/gra008.svg"
+              title="School Dashboard"
+              fontIcon="bi-buildings"
             />
           )}
           {(allowed("/admin/report-templates") || allowed("/reports-hub")) && (

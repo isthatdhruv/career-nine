@@ -32,6 +32,7 @@ public class ReportEmailConsumer {
     private static final Logger logger = LoggerFactory.getLogger(ReportEmailConsumer.class);
 
     @Autowired private EmailSender emailSender;
+    @Autowired private ReportBatchLifecycle batchLifecycle;
     @Autowired private ReportEmailIdempotency idempotency;
     @Autowired private EmailRateLimiter rateLimiter;
     @Autowired private DigitalOceanSpacesService spacesService;
@@ -52,16 +53,25 @@ public class ReportEmailConsumer {
             return; // poison message
         }
 
-        // Invariant: a report is emailed only when the student is whitelabel OR the assessment's
-        // "email report" toggle is on. The generate stage already gates on this; re-check
-        // defensively so a stray/replayed event can never email someone who shouldn't be.
-        if (!ev.whitelabel && !ev.emailReportEnabled) {
-            logger.warn("Report email skipped (neither whitelabel nor toggle) student={} assessment={}",
-                    ev.userStudentId, ev.assessmentId);
+        // Admin batch stopped → the admin cancelled mid-batch; don't email a
+        // report they no longer want sent. (Null batchId = automatic path.)
+        if (batchLifecycle.isStopped(ev.batchId)) {
+            logger.info("Report email skipped (batch {} stopped) student={} assessment={}",
+                    ev.batchId, ev.userStudentId, ev.assessmentId);
             return;
         }
 
-        ReportEmailIdempotency.Claim claim = idempotency.claim(ev.userStudentId, ev.assessmentId);
+        // Invariant: a report is emailed only when the student is whitelabel, the
+        // assessment's "email report" toggle is on (Phase 4), or an admin enqueued
+        // with emailMode="all". The generate stage already gates on this; re-check
+        // defensively so a stray/replayed event can never email someone who shouldn't be.
+        if (!ev.whitelabel && !ev.emailReportEnabled && !"all".equals(ev.emailMode)) {
+            logger.warn("Report email skipped (neither whitelabel, toggle, nor admin-all; mode={}) student={} assessment={}",
+                    ev.emailMode, ev.userStudentId, ev.assessmentId);
+            return;
+        }
+
+        ReportEmailIdempotency.Claim claim = idempotency.claim(ev.userStudentId, ev.assessmentId, ev.batchId);
         if (claim == ReportEmailIdempotency.Claim.ALREADY_SENT) {
             logger.info("Dedup: report already emailed student={} assessment={}", ev.userStudentId, ev.assessmentId);
             return;
@@ -82,7 +92,7 @@ public class ReportEmailConsumer {
             }
             rateLimiter.acquire();
             emailSender.sendReportEmail(ev, pdf);
-            idempotency.markSent(ev.userStudentId, ev.assessmentId);
+            idempotency.markSent(ev.userStudentId, ev.assessmentId, ev.batchId);
             logger.info("Report email sent student={} assessment={} withPdf={}",
                     ev.userStudentId, ev.assessmentId, (pdf != null));
         } catch (Exception e) {
@@ -90,7 +100,7 @@ public class ReportEmailConsumer {
             // student wasn't emailed is visible without waiting for the DLT.
             logger.warn("Report email attempt failed student={} assessment={}: {}",
                     ev.userStudentId, ev.assessmentId, e.getMessage());
-            idempotency.release(ev.userStudentId, ev.assessmentId); // let the retry re-claim
+            idempotency.release(ev.userStudentId, ev.assessmentId, ev.batchId); // let the retry re-claim
             throw e; // → @RetryableTopic retry → DLT
         }
     }

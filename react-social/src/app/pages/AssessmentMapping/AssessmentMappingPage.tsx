@@ -3,8 +3,9 @@ import { Form, Spinner } from "react-bootstrap";
 import { useInstitutes } from "../../lib/queries/lookups";
 import SchoolAssessmentMappingPanel from "../College/components/SchoolAssessmentMappingPanel";
 import AssessmentMappingPanel from "../College/components/AssessmentMappingPanel";
+import StudentInvitePanel from "../College/components/StudentInvitePanel";
 
-type Level = "SCHOOL" | "DETAIL";
+type Level = "SCHOOL" | "DETAIL" | "INVITE";
 
 interface Institute {
   instituteCode: number;
@@ -107,6 +108,13 @@ const AssessmentMappingPage = () => {
               onClick={() => setLevel("DETAIL")}
               accent="#1e293b"
             />
+            <LevelOption
+              label="Per-Student Invite"
+              description="Pick a student + custom-priced tier → personalised pay-and-take link"
+              active={level === "INVITE"}
+              onClick={() => setLevel("INVITE")}
+              accent="#7c3aed"
+            />
           </div>
         </div>
       )}
@@ -136,11 +144,17 @@ const AssessmentMappingPage = () => {
             padding: "16px 24px",
             background: level === "SCHOOL"
               ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
+              : level === "INVITE"
+              ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"
               : "linear-gradient(135deg, #1e293b 0%, #334155 100%)",
             color: "#fff",
           }}>
             <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
-              {level === "SCHOOL" ? "School Level Mapping" : "Class / Section / Session Level Mapping"}
+              {level === "SCHOOL"
+                ? "School Level Mapping"
+                : level === "INVITE"
+                ? "Per-Student Invite"
+                : "Class / Section / Session Level Mapping"}
             </div>
             <div style={{ fontSize: "0.8rem", opacity: 0.85, marginTop: 2 }}>
               {selectedInstitute.instituteName}
@@ -148,6 +162,12 @@ const AssessmentMappingPage = () => {
           </div>
           {level === "SCHOOL" ? (
             <SchoolAssessmentMappingPanel
+              instituteCode={selectedInstitute.instituteCode}
+              instituteName={selectedInstitute.instituteName}
+              active
+            />
+          ) : level === "INVITE" ? (
+            <StudentInvitePanel
               instituteCode={selectedInstitute.instituteCode}
               instituteName={selectedInstitute.instituteName}
               active

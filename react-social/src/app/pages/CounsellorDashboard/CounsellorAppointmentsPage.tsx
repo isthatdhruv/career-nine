@@ -73,6 +73,11 @@ function getStudentName(appt: any): string {
   return appt.studentName || 'Unknown Student'
 }
 
+/** Institute the booking student belongs to; null for B2C/individual students. */
+function getInstituteName(appt: any): string | null {
+  return appt?.student?.institute?.instituteName || null
+}
+
 function hasSlotEnded(appt: any): boolean {
   const date = appt?.slot?.date
   const endTime = appt?.slot?.endTime
@@ -456,6 +461,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
             const ended = isEndedConfirmed(appt)
             const status = ended ? 'ENDED' : rawStatus
             const studentName = getStudentName(appt)
+            const instituteName = getInstituteName(appt)
             const meetingLink = appt.meetingLink || appt.slot?.meetingLink || ''
             const reason = appt.studentReason || appt.reason || ''
             const rescheduledFrom = appt.rescheduledFromAppointmentId
@@ -481,6 +487,12 @@ const CounsellorAppointmentsPage: React.FC = () => {
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1F2E', marginBottom: 4 }}>
                       {studentName}
                     </div>
+                    {instituteName && (
+                      <div style={{ fontSize: 12, color: '#6B7A8D', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <i className='bi bi-building' style={{ fontSize: 11 }} />
+                        {instituteName}
+                      </div>
+                    )}
                     {reason && (
                       <div style={{ fontSize: 12, color: '#6B7A8D' }}>
                         Reason: {reason}

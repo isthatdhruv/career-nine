@@ -65,6 +65,9 @@ public class AuthorizationService {
     @Autowired(required = false)
     private com.kccitm.api.repository.Career9.UserStudentRepository userStudentRepository;
 
+    @Autowired(required = false)
+    private com.kccitm.api.repository.Career9.StudentGroupRepository studentGroupRepository;
+
     /**
      * Resolve the institute_code of a student (by {@code userStudentId}) so student-facing
      * endpoints can ABAC-scope on the <em>resource's</em> institute rather than misusing the
@@ -86,7 +89,7 @@ public class AuthorizationService {
 
     /** No-scope endpoints (e.g., {@code GET /user/me}, {@code POST /auth/logout}). */
     public boolean allows(String permission) {
-        return decide(permission, null, null, null, null);
+        return decide(permission, null, null, null, null, null);
     }
 
     /**
@@ -97,7 +100,7 @@ public class AuthorizationService {
      * method to bind to. ~26 controller annotations rely on this shape.
      */
     public boolean allows(String permission, Integer instituteId) {
-        return decide(permission, instituteId, null, null, null);
+        return decide(permission, instituteId, null, null, null, null);
     }
 
     /**
@@ -106,7 +109,7 @@ public class AuthorizationService {
      * annotations use this shape.
      */
     public boolean allows(String permission, Integer instituteId, Integer sessionId) {
-        return decide(permission, instituteId, sessionId, null, null);
+        return decide(permission, instituteId, sessionId, null, null, null);
     }
 
     /**
@@ -118,10 +121,38 @@ public class AuthorizationService {
      */
     public boolean allows(String permission, Integer instituteId, Integer sessionId,
                           Integer courseCode, Long sectionId) {
-        return decide(permission, instituteId, sessionId, courseCode, sectionId);
+        return decide(permission, instituteId, sessionId, courseCode, sectionId, null);
     }
 
-    private boolean decide(String permission, Integer i, Integer s, Integer c, Long x) {
+    /**
+     * 5-dim ABAC endpoint — the four above plus the student group. Use from a
+     * {@code @PreAuthorize} that can name a group, e.g.
+     * {@code @auth.allows('student_group.read', #instituteCode, null, null, null, #groupId)}.
+     *
+     * <p>Group binds strictly: a caller whose scope row names group 7 is not
+     * authorized for a request that binds no group, because a row more specific
+     * than the request never matches.
+     */
+    public boolean allows(String permission, Integer instituteId, Integer sessionId,
+                          Integer courseCode, Long sectionId, Long groupId) {
+        return decide(permission, instituteId, sessionId, courseCode, sectionId, groupId);
+    }
+
+    /**
+     * Resolve the institute of a student group so group endpoints can ABAC-scope
+     * on the group's own institute rather than trusting a request body. Mirrors
+     * {@link #instituteOfStudent(Long)}. Null when the group is unknown.
+     */
+    public Integer instituteOfGroup(Long groupId) {
+        if (groupId == null || studentGroupRepository == null) {
+            return null;
+        }
+        return studentGroupRepository.findById(groupId)
+                .map(g -> g.getInstituteCode())
+                .orElse(null);
+    }
+
+    private boolean decide(String permission, Integer i, Integer s, Integer c, Long x, Long g) {
         UserPrincipal principal = currentPrincipal();
         if (principal == null) {
             return recordAndReturn(false, "ANONYMOUS", permission, i, s, c, x, null);
@@ -139,12 +170,12 @@ public class AuthorizationService {
         }
 
         // No scope args supplied → permission alone is sufficient (e.g., /user/me).
-        if (i == null && s == null && c == null && x == null) {
+        if (i == null && s == null && c == null && x == null && g == null) {
             return true;
         }
 
         boolean scopeOk = principal.getScopes() != null
-                && new CurrentScopes(principal.getScopes()).anyMatch(i, s, c, x);
+                && new CurrentScopes(principal.getScopes()).anyMatch(i, s, c, x, g);
         if (!scopeOk) {
             return recordAndReturn(false, "SCOPE_MISMATCH", permission, i, s, c, x, principal.getId());
         }

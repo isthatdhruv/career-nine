@@ -1,0 +1,697 @@
+/*
+ * School Dashboard — corporate school-insight view.
+ *
+ * Colour is split in two on purpose:
+ *  - CHROME (header, section rules, surfaces) follows the app's existing
+ *    dashboard identity, the indigo→violet pair used by PrincipalDashboard.
+ *  - DATA SERIES use --series-*, --div-*, --seq-* and --status-*, which are the
+ *    validated data-viz slots. Both modes were run through the palette
+ *    validator against the surfaces below; do not hand-tune a series hex
+ *    without re-validating, the slot ORDER is the colourblind-safety mechanism.
+ */
+
+.school-dashboard {
+  /* Chrome — app dashboard identity */
+  --brand-a: #667eea;
+  --brand-b: #764ba2;
+  --brand-ink: #4c3d8f;
+
+  /* Surfaces & ink */
+  --page: #f4f5f9;
+  --surface: #ffffff;
+  --surface-sunken: #f7f8fc;
+  --ink-primary: #16161d;
+  --ink-secondary: #55555f;
+  --ink-muted: #8a8a96;
+  --hairline: #e6e7ee;
+  --grid: #eceef4;
+
+  /* Categorical data slots (validated, light) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+
+  /* Diverging pair + neutral midpoint */
+  --div-pos: #2a78d6;
+  --div-neg: #e34948;
+  --div-mid: #f0efec;
+
+  /* Sequential blue ramp (heatmap) */
+  --seq-100: #cde2fb;
+  --seq-250: #86b6ef;
+  --seq-400: #3987e5;
+  --seq-550: #1c5cab;
+  --seq-700: #0d366b;
+
+  /* Status — reserved, always shipped with a label */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-muted: #8a8a96;
+
+  color: var(--ink-primary);
+  background: var(--page);
+  min-height: 100%;
+  padding: 24px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+:root[data-theme="dark"] .school-dashboard {
+  --page: #0f1014;
+  --surface: #1b1b29;
+  --surface-sunken: #16161f;
+  --ink-primary: #f5f5f7;
+  --ink-secondary: #b6b6c2;
+  --ink-muted: #8a8a96;
+  --hairline: #2b2b3a;
+  --grid: #26263a;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+
+  --div-pos: #3987e5;
+  --div-neg: #e66767;
+  --div-mid: #383835;
+
+  --seq-100: #0d366b;
+  --seq-250: #184f95;
+  --seq-400: #2a78d6;
+  --seq-550: #5598e7;
+  --seq-700: #9ec5f4;
+}
+
+/* ─────────────────────────── Header ─────────────────────────── */
+
+.sd-header {
+  background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 100%);
+  border-radius: 16px;
+  padding: 26px 28px;
+  color: #fff;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
+}
+
+.sd-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.sd-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.sd-subtitle {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+  max-width: 62ch;
+}
+
+.sd-institute-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  padding: 8px 12px;
+  backdrop-filter: blur(6px);
+}
+
+.sd-institute-picker label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.sd-institute-picker select {
+  background: rgba(255, 255, 255, 0.95);
+  color: #16161d;
+  border: none;
+  border-radius: 7px;
+  padding: 7px 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  min-width: 230px;
+  cursor: pointer;
+}
+
+.sd-institute-picker select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ──────────────────────── Filter row ─────────────────────────
+   One filter row above everything it scopes — never per-card. */
+
+.sd-filters {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.sd-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sd-filter-group > span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.sd-chip {
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.sd-chip:hover {
+  background: var(--surface-sunken);
+  color: var(--ink-primary);
+}
+
+.sd-chip.is-active {
+  background: var(--brand-ink);
+  border-color: var(--brand-ink);
+  color: #fff;
+}
+
+.sd-filter-note {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+/* ───────────────────────── Stat tiles ────────────────────────
+   A single headline number is a stat tile, never a one-bar chart. */
+
+.sd-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.sd-kpi {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sd-kpi::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--kpi-accent, var(--brand-a));
+}
+
+.sd-kpi-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-muted);
+  margin-bottom: 10px;
+}
+
+.sd-kpi-value {
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--ink-primary);
+  /* Proportional figures: tabular-nums makes big standalone numbers look loose. */
+}
+
+.sd-kpi-sub {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--ink-secondary);
+}
+
+/* A meter is the right form for one ratio against a limit. */
+.sd-meter {
+  margin-top: 10px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--grid);
+  overflow: hidden;
+}
+
+.sd-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--meter-color, var(--series-1));
+}
+
+/* ───────────────────────── Sections ──────────────────────── */
+
+.sd-tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 6px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+}
+
+.sd-tab {
+  border: none;
+  background: transparent;
+  color: var(--ink-secondary);
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 0.87rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sd-tab:hover {
+  background: var(--surface-sunken);
+  color: var(--ink-primary);
+}
+
+.sd-tab.is-active {
+  background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 100%);
+  color: #fff;
+}
+
+.sd-grid {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.sd-grid.cols-2 {
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+}
+
+.sd-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 20px 22px;
+  min-width: 0;
+}
+
+.sd-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.sd-card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink-primary);
+}
+
+.sd-card-sub {
+  margin: 4px 0 16px;
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  max-width: 70ch;
+}
+
+/* Table view — the WCAG-clean twin every chart carries. */
+.sd-toggle {
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  border-radius: 7px;
+  padding: 4px 11px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sd-toggle:hover {
+  background: var(--surface-sunken);
+  color: var(--ink-primary);
+}
+
+.sd-chart {
+  width: 100%;
+}
+
+/* ───────────────────── Insight callouts ────────────────────── */
+
+.sd-headline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.sd-headline {
+  background: var(--surface-sunken);
+  border: 1px solid var(--hairline);
+  border-radius: 11px;
+  padding: 14px 16px;
+}
+
+.sd-headline-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+}
+
+.sd-headline-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  line-height: 1.3;
+}
+
+.sd-note {
+  background: var(--surface-sunken);
+  border-left: 3px solid var(--brand-a);
+  border-radius: 0 9px 9px 0;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: var(--ink-secondary);
+  line-height: 1.55;
+  margin-top: 16px;
+}
+
+.sd-note strong {
+  color: var(--ink-primary);
+}
+
+/* ─────────────────────────── Tables ────────────────────────── */
+
+.sd-table-wrap {
+  overflow-x: auto;
+  margin: 0 -4px;
+}
+
+.sd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  /* tabular-nums belongs here — columns must align vertically. */
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-table th {
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+
+.sd-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--grid);
+  color: var(--ink-secondary);
+}
+
+.sd-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sd-table tbody tr:hover td {
+  background: var(--surface-sunken);
+}
+
+.sd-table td.num,
+.sd-table th.num {
+  text-align: right;
+}
+
+.sd-table td.name {
+  color: var(--ink-primary);
+  font-weight: 600;
+}
+
+/* In-cell diverging bar for the cluster gap column. */
+.sd-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 130px;
+}
+
+.sd-bar-track {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  background: var(--div-mid);
+  border-radius: 3px;
+}
+
+.sd-bar-fill {
+  position: absolute;
+  top: 0;
+  height: 8px;
+  border-radius: 3px;
+}
+
+/* ───────────────────────── Heatmap ─────────────────────────── */
+
+.sd-heatmap {
+  display: grid;
+  gap: 2px; /* the 2px surface gap between fills */
+  font-size: 0.78rem;
+  min-width: 560px;
+}
+
+.sd-heat-head {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-muted);
+  padding: 6px 4px;
+  text-align: center;
+}
+
+.sd-heat-row-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-primary);
+  padding: 6px 10px 6px 0;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.sd-heat-cell {
+  border-radius: 5px;
+  padding: 10px 4px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-scale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.sd-scale-swatches {
+  display: flex;
+  gap: 2px;
+}
+
+.sd-scale-swatch {
+  width: 26px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* ───────────────────────── Legend ──────────────────────────── */
+
+.sd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: var(--ink-secondary);
+}
+
+.sd-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sd-legend-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* ─────────────────── Completion stacked bar ────────────────── */
+
+.sd-stack {
+  display: flex;
+  height: 26px;
+  border-radius: 6px;
+  overflow: hidden;
+  gap: 2px; /* 2px surface gap between segments, never a border */
+  background: var(--surface);
+}
+
+.sd-stack-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #fff;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sd-assessment-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--grid);
+}
+
+.sd-assessment-row:last-child {
+  border-bottom: none;
+}
+
+.sd-assessment-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.sd-assessment-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+}
+
+.sd-assessment-meta {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ──────────────────── States & tooltip ─────────────────────── */
+
+.sd-empty {
+  background: var(--surface);
+  border: 1px dashed var(--hairline);
+  border-radius: 14px;
+  padding: 56px 24px;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.sd-empty-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  margin-bottom: 8px;
+}
+
+/* Hold the previous render at reduced opacity on refetch — no skeleton flash. */
+.sd-refetching {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.sd-tooltip {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  padding: 9px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 0.8rem;
+  color: var(--ink-primary);
+}
+
+.sd-tooltip-title {
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.sd-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+  .school-dashboard {
+    padding: 14px;
+  }
+  .sd-grid.cols-2 {
+    grid-template-columns: 1fr;
+  }
+  .sd-institute-picker {
+    width: 100%;
+  }
+  .sd-institute-picker select {
+    flex: 1;
+    min-width: 0;
+  }
+}

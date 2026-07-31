@@ -148,3 +148,61 @@ export function GenerateUnifiedReportsBulk(
     force,
   });
 }
+
+// ═══════════════════ ASYNC ENQUEUE (Kafka → report-worker) ═══════════════════
+
+export type EnqueueEmailMode = "none" | "all";
+
+export interface EnqueueResultRow {
+  userStudentId: number;
+  status: "queued" | "forbidden" | "error";
+  message?: string;
+}
+
+export interface EnqueueResponse {
+  queued: number;
+  batchId: string;
+  results: EnqueueResultRow[];
+}
+
+export function EnqueueUnifiedReport(
+  userStudentId: number,
+  assessmentId: number,
+  reportTemplateId?: number,
+  force = false,
+  emailMode: EnqueueEmailMode = "none"
+) {
+  return axios.post<EnqueueResponse>(`${API_URL}/generate-report-unified/enqueue`, {
+    userStudentId, assessmentId, reportTemplateId, force, emailMode,
+  });
+}
+
+export function EnqueueUnifiedReportsBulk(
+  assessmentId: number,
+  userStudentIds: number[],
+  reportTemplateId?: number,
+  force = false,
+  emailMode: EnqueueEmailMode = "none"
+) {
+  return axios.post<EnqueueResponse>(`${API_URL}/generate-report-unified/enqueue/bulk`, {
+    assessmentId, userStudentIds, reportTemplateId, force, emailMode,
+  });
+}
+
+/** Keep an admin batch's lease alive; when heartbeats stop, the worker skips its remaining events. */
+export function HeartbeatEnqueueBatch(batchId: string) {
+  return axios.post<{ alive: boolean }>(`${API_URL}/generate-report-unified/enqueue/heartbeat`, { batchId });
+}
+
+/** Explicitly cancel a batch (confirmed modal close) and restore its still-queued rows. */
+export function CancelEnqueueBatch(
+  batchId: string,
+  assessmentId: number,
+  userStudentIds: number[],
+  reportTemplateId?: number
+) {
+  return axios.post<{ cancelled: boolean; restored: number }>(
+    `${API_URL}/generate-report-unified/enqueue/cancel`,
+    { batchId, assessmentId, userStudentIds, reportTemplateId }
+  );
+}

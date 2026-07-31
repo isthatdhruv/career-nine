@@ -64,6 +64,13 @@ public class AssessmentMappingTier implements Serializable {
     @Column(name = "is_free", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean isFree = false;
 
+    // Source B2C pricing tier (pricing_tiers.tier_id) when this row was
+    // materialised from a reusable pricing tier for a per-student invite. NULL for
+    // hand-built per-mapping tiers. Lets the invite flow find-or-create one row per
+    // (mapping, pricing tier).
+    @Column(name = "pricing_tier_id")
+    private Long pricingTierId;
+
     // ── Service-inclusion toggles (mirrors B2C PricingTier) ───────────────────
     // What this paid B2B tier entitles the student to. Stored on the tier so the
     // admin can configure report/counselling/LMS per tier, same as the campaign
@@ -154,6 +161,9 @@ public class AssessmentMappingTier implements Serializable {
 
     public Boolean getIsFree() { return isFree; }
     public void setIsFree(Boolean isFree) { this.isFree = isFree; }
+
+    public Long getPricingTierId() { return pricingTierId; }
+    public void setPricingTierId(Long pricingTierId) { this.pricingTierId = pricingTierId; }
 
     public Boolean getIncludesFinalReport() { return includesFinalReport; }
     public void setIncludesFinalReport(Boolean includesFinalReport) { this.includesFinalReport = includesFinalReport; }

@@ -7,6 +7,7 @@ import { useInstitutes } from "../../lib/queries/lookups";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
+  exportSchoolDashboardExcel,
   Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getCatalog } from "../AssessmentMapping/API/AssessmentMapping_APIs";
@@ -36,10 +37,12 @@ import BulkSendModal from "./components/BulkSendModal";
 import EmailComposeModal from "./components/EmailComposeModal";
 import DownloadsModal, { ZipJob } from "./components/DownloadsModal";
 import GenerateReportsModal, { ModalStudent } from "./components/GenerateReportsModal";
+import GenerateQueueModal from "./components/GenerateQueueModal";
 import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
 import PageHeader from "../../components/PageHeader";
+import SearchableSelect from "../../components/SearchableSelect";
 import { useAuth, Scope } from "../../modules/auth";
 
 // ═══════════════════════ TYPES ═══════════════════════
@@ -54,6 +57,8 @@ type StudentRow = {
   phoneNumber?: string;
   studentDob?: string;
   schoolSectionId?: number;
+  /** Flat student_info.student_class — Grade fallback when the section link is unset. */
+  studentClass?: number | null;
   assessments?: { assessmentId: number; assessmentName: string; status: string }[];
   assignedAssessmentIds?: number[];
 };
@@ -87,6 +92,32 @@ async function downloadSpacesFile(url: string, fileName: string) {
   a.href = objectUrl; a.download = fileName;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(objectUrl);
+}
+
+/**
+ * Local calendar day of an ISO timestamp, as YYYY-MM-DD.
+ *
+ * The completion-date filter compares against `<input type="date">` values, which
+ * are bare local dates. Reducing both sides to the same local-day key keeps the
+ * range ends inclusive without any end-of-day arithmetic, and sidesteps the
+ * off-by-one you get comparing a UTC instant to a local date near midnight.
+ * Returns "" for null/unparseable input, which never matches a range.
+ */
+function localDayKey(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const month = `${d.getMonth() + 1}`.padStart(2, "0");
+  const day = `${d.getDate()}`.padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
+/** Compact display date, e.g. "16 Jul 2026". */
+function formatCompletedOn(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 // ═══════════════════════ COMPONENT ═══════════════════════
@@ -159,12 +190,17 @@ const ReportsHubPage: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<"" | "completed" | "ongoing" | "notstarted">("");
+  // Completion date range, as YYYY-MM-DD local dates. Both ends inclusive; either may stand alone.
+  const [completedFrom, setCompletedFrom] = useState("");
+  const [completedTo, setCompletedTo] = useState("");
 
   // ── Action states ──
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
+  const [queueModalOpen, setQueueModalOpen] = useState(false);
   const [modalStudents, setModalStudents] = useState<ModalStudent[]>([]);
   const [exportingMQT, setExportingMQT] = useState(false);
   const [exportingDataExcel, setExportingDataExcel] = useState(false);
+  const [exportingDashboard, setExportingDashboard] = useState(false);
   // downloadingZip / zipProgress removed — replaced by zipJobs
 
   // ── ZIP jobs (persisted across re-renders via ref+state) ──
@@ -258,6 +294,9 @@ const ReportsHubPage: React.FC = () => {
     ])
       .then(([studentsRes, sessionsRes]) => {
         setStudents(studentsRes.data || []);
+        // Every student starts ticked — the user deselects the ones they
+        // don't want instead of building the selection up from nothing.
+        setSelectedStudentIds(new Set((studentsRes.data || []).map((s: StudentRow) => s.userStudentId)));
         const lookup = new Map<number, SectionInfo>();
         for (const session of sessionsRes.data || []) {
           for (const cls of session.schoolClasses || []) {
@@ -281,13 +320,16 @@ const ReportsHubPage: React.FC = () => {
   // Reset on selection change
   useEffect(() => { setSelectedAssessment(""); }, [selectedInstitute]);
   useEffect(() => {
-    setSelectedStudentIds(new Set());
+    // Back to the default of everyone ticked (not cleared) — the user
+    // deselects the students they don't want.
+    setSelectedStudentIds(new Set(students.map((s) => s.userStudentId)));
     setCurrentPage(1);
     setNameQuery("");
     setSelectedGrade("");
     setSelectedSection("");
     setReportDataMap(new Map());
     setVisibilityMap(new Map());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedInstitute, selectedAssessment]);
 
   // Load report data + visibility when assessment selected
@@ -413,14 +455,22 @@ const ReportsHubPage: React.FC = () => {
     });
   }, [assessmentStudents, isSuperAdmin, userScopes, selectedInstitute, sectionLookup]);
 
+  // Grade of a student: section hierarchy first, flat student_class as fallback
+  // (many institutes were onboarded without section links — see 2026-07-07 diagnosis).
+  const gradeOf = useCallback((s: StudentRow): string => {
+    const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+    if (info?.className) return info.className;
+    return s.studentClass != null ? String(s.studentClass) : "";
+  }, [sectionLookup]);
+
   const uniqueGrades = useMemo(() => {
     const g = new Set<string>();
     for (const s of scopedStudents) {
-      const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
-      if (info?.className) g.add(info.className);
+      const grade = gradeOf(s);
+      if (grade) g.add(grade);
     }
     return Array.from(g).sort();
-  }, [scopedStudents, sectionLookup]);
+  }, [scopedStudents, gradeOf]);
 
   const uniqueSections = useMemo(() => {
     const sec = new Set<string>();
@@ -452,7 +502,7 @@ const ReportsHubPage: React.FC = () => {
     } else if (usernamePresence === "without") {
       result = result.filter((s) => !(s.username && s.username.trim()));
     }
-    if (selectedGrade) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.className === selectedGrade);
+    if (selectedGrade) result = result.filter((s) => gradeOf(s) === selectedGrade);
     if (selectedSection) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.sectionName === selectedSection);
     if (selectedStatus && selectedAssessmentObj) {
       result = result.filter((s) => {
@@ -460,17 +510,32 @@ const ReportsHubPage: React.FC = () => {
         return st === selectedStatus;
       });
     }
+    if ((completedFrom || completedTo) && selectedAssessmentObj) {
+      result = result.filter((s) => {
+        const day = localDayKey(
+          (s.assessments || []).find((a: any) => a.assessmentId === selectedAssessmentObj.id)?.completedAt
+        );
+        // No completion date — never in range. Filtering by *when* someone finished
+        // implies they finished, so unfinished students drop out here.
+        if (!day) return false;
+        if (completedFrom && day < completedFrom) return false;
+        if (completedTo && day > completedTo) return false;
+        return true;
+      });
+    }
     return result;
-  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
+  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo, selectedAssessmentObj, sectionLookup, gradeOf]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
+  // Clamped rather than reset, so shrinking the result set past the current page
+  // still renders rows instead of an empty table.
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedStudents = useMemo(
     () => displayedStudents.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize),
     [displayedStudents, safeCurrentPage, pageSize]
   );
 
-  useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus]);
+  useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo]);
 
   // Secret unlock: typing exactly "boom" in the username search toggles admin edit mode.
   useEffect(() => {
@@ -486,10 +551,12 @@ const ReportsHubPage: React.FC = () => {
 
   // ═══════════════════════ HELPERS ═══════════════════════
 
-  const getSelectedOrAllIds = () => {
+  // Visible students that are ticked. Everyone starts ticked when the list
+  // loads, so an empty result means the user deliberately deselected all —
+  // bulk actions then act on nobody rather than silently falling back to all.
+  const getSelectedIds = () => {
     const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
-    const sel = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
-    return sel.length > 0 ? sel : displayedStudents.map((s) => s.userStudentId);
+    return Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
   };
 
   const visibleSelectedCount = useMemo(() => {
@@ -527,7 +594,7 @@ const ReportsHubPage: React.FC = () => {
 
   const openGenerateModal = () => {
     if (!selectedAssessmentObj) return;
-    const ids = getSelectedOrAllIds();
+    const ids = getSelectedIds();
     if (ids.length === 0) { showErrorToast("Select at least one student."); return; }
     if (templates.length === 0) {
       showErrorToast("No report template is mapped to this assessment. Map one in Report Templates or the assessment editor first.");
@@ -539,6 +606,23 @@ const ReportsHubPage: React.FC = () => {
     });
     setModalStudents(list);
     setGenerateModalOpen(true);
+  };
+
+  // Same student-list construction, but opens the async (Kafka → report-worker) modal.
+  const openQueueModal = () => {
+    if (!selectedAssessmentObj) return;
+    const ids = getSelectedIds();
+    if (ids.length === 0) { showErrorToast("Select at least one student."); return; }
+    if (templates.length === 0) {
+      showErrorToast("No report template is mapped to this assessment. Map one in Report Templates or the assessment editor first.");
+      return;
+    }
+    const list: ModalStudent[] = ids.map((id) => {
+      const s = students.find((st) => st.userStudentId === id);
+      return { userStudentId: id, name: s?.name || `Student ${id}`, username: s?.username };
+    });
+    setModalStudents(list);
+    setQueueModalOpen(true);
   };
 
   // Refresh page maps after generation inside the modal (component refresh, no reload).
@@ -564,7 +648,7 @@ const ReportsHubPage: React.FC = () => {
   };
 
   const handleBulkVisibility = async (visible: boolean) => {
-    const ids = getSelectedOrAllIds()
+    const ids = getSelectedIds()
       .map((sid) => visibilityMap.get(sid))
       .filter((e): e is { id: number; visible: boolean } => !!e && e.visible !== visible)
       .map((e) => e.id);
@@ -586,7 +670,7 @@ const ReportsHubPage: React.FC = () => {
   // Step 1: Click button → open name prompt
   const handleDownloadZipClick = () => {
     if (!selectedAssessmentObj) return;
-    let ids = getSelectedOrAllIds().filter((id) => {
+    let ids = getSelectedIds().filter((id) => {
       const rd = reportDataMap.get(id);
       return rd && rd.pdfStatus === "ready" && rd.pdfUrl;
     });
@@ -690,7 +774,7 @@ const ReportsHubPage: React.FC = () => {
 
   const handleGenerateDataExcel = async () => {
     if (!selectedAssessmentObj) return;
-    const ids = getSelectedOrAllIds();
+    const ids = getSelectedIds();
     if (ids.length === 0) { showErrorToast("No students."); return; }
     setExportingDataExcel(true);
     try {
@@ -712,6 +796,41 @@ const ReportsHubPage: React.FC = () => {
       downloadBlob(res.data, `bet_core_data_${selectedAssessmentObj.id}.xlsx`);
     } catch (err: any) { showErrorToast("Export failed: " + (err?.response?.data?.error || err.message)); }
     finally { setExportingMQT(false); }
+  };
+
+  // Navigator360 school dashboard. Every active filter is already baked into
+  // displayedStudents, so sending those ids is what keeps the export in step
+  // with the table — unlike the other exports, an empty selection falls back to
+  // the filtered list rather than to the whole assessment.
+  const handleExportDashboardSheet = async () => {
+    if (!selectedAssessmentObj) return;
+    const ticked = getSelectedIds();
+    const ids = ticked.length > 0 ? ticked : displayedStudents.map((s) => s.userStudentId);
+    if (ids.length === 0) { showErrorToast("No students match the current filters."); return; }
+
+    // The grade filter doubles as sheet 2's CLASS FILTER when it is a plain
+    // class number; named grades ("Class 10", "X") have no numeric equivalent,
+    // and the id list already restricts the cohort either way.
+    const classFilter = /^\d+$/.test(selectedGrade.trim()) ? selectedGrade.trim() : "All";
+
+    setExportingDashboard(true);
+    try {
+      const res = await exportSchoolDashboardExcel(selectedAssessmentObj.id, ids, classFilter);
+      downloadBlob(res.data, `school_dashboard_${selectedAssessmentObj.id}.xlsx`);
+      showSuccessToast(`Dashboard built for ${ids.length} student(s).`);
+      setMiraDesaiOpen(false);
+    } catch (err: any) {
+      // The endpoint answers with JSON on failure, so a blob response has to be
+      // read back as text before the message is visible.
+      let message = err?.message || "Unknown error";
+      const blob = err?.response?.data;
+      if (blob instanceof Blob) {
+        try { message = JSON.parse(await blob.text()).error || message; } catch { /* keep message */ }
+      } else if (err?.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      showErrorToast("Dashboard export failed: " + message);
+    } finally { setExportingDashboard(false); }
   };
 
   // ═══════════════════════ SEND ACTIONS ═══════════════════════
@@ -743,7 +862,7 @@ const ReportsHubPage: React.FC = () => {
   };
 
   const handleBulkEmail = () => {
-    const selected = getSelectedOrAllIds()
+    const selected = getSelectedIds()
       .map((id) => {
         const s = displayedStudents.find((st) => st.userStudentId === id);
         const rd = reportDataMap.get(id);
@@ -797,7 +916,7 @@ const ReportsHubPage: React.FC = () => {
   };
 
   const handleBulkWhatsApp = async () => {
-    const selected = getSelectedOrAllIds()
+    const selected = getSelectedIds()
       .map((id) => {
         const s = displayedStudents.find((st) => st.userStudentId === id);
         const rd = reportDataMap.get(id);
@@ -828,7 +947,7 @@ const ReportsHubPage: React.FC = () => {
     <span style={{ background: bg, color, padding: "3px 10px", borderRadius: 6, fontWeight: 600, fontSize: "0.75rem" }}>{text}</span>
   );
 
-  const countLabel = visibleSelectedCount > 0 ? ` (${visibleSelectedCount})` : ` (All ${displayedStudents.length})`;
+  const countLabel = ` (${visibleSelectedCount})`;
 
   // ═══════════════════════ RENDER ═══════════════════════
 
@@ -854,6 +973,13 @@ const ReportsHubPage: React.FC = () => {
             iconClass: "bi-play-circle",
             onClick: openGenerateModal,
             variant: "primary",
+            disabled: !ready || displayedStudents.length === 0,
+          },
+          {
+            label: `Queue${countLabel}`,
+            iconClass: "bi-stack",
+            onClick: openQueueModal,
+            variant: "ghost",
             disabled: !ready || displayedStudents.length === 0,
           },
           {
@@ -886,13 +1012,15 @@ const ReportsHubPage: React.FC = () => {
           {institutesLoading ? (
             <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
           ) : (
-            <select className="form-select form-select-solid" value={selectedInstitute}
-              onChange={(e) => setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">-- Select a school --</option>
-              {institutes.map((inst) => (
-                <option key={inst.instituteCode} value={inst.instituteCode}>{inst.instituteName}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              options={institutes.map((inst) => ({
+                value: String(inst.instituteCode),
+                label: String(inst.instituteName ?? ""),
+              }))}
+              value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+              onChange={(v) => setSelectedInstitute(v === "" ? "" : Number(v))}
+              placeholder="-- Select a school --"
+            />
           )}
         </div>
         <div>
@@ -997,6 +1125,41 @@ const ReportsHubPage: React.FC = () => {
                     <option value="notstarted">Not Started</option>
                   </select>
                 </div>
+                <div style={{ minWidth: 150 }}>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Completed From</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm form-control-solid"
+                    value={completedFrom}
+                    max={completedTo || undefined}
+                    onChange={(e) => setCompletedFrom(e.target.value)}
+                    disabled={!selectedAssessmentObj}
+                    title={!selectedAssessmentObj ? "Select an assessment first" : ""}
+                  />
+                </div>
+                <div style={{ minWidth: 150 }}>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Completed To</label>
+                  <input
+                    type="date"
+                    className="form-control form-control-sm form-control-solid"
+                    value={completedTo}
+                    min={completedFrom || undefined}
+                    onChange={(e) => setCompletedTo(e.target.value)}
+                    disabled={!selectedAssessmentObj}
+                    title={!selectedAssessmentObj ? "Select an assessment first" : ""}
+                  />
+                </div>
+                {(completedFrom || completedTo) && (
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-light"
+                      onClick={() => { setCompletedFrom(""); setCompletedTo(""); }}
+                    >
+                      Clear dates
+                    </button>
+                  </div>
+                )}
                 <div style={{ minWidth: 180 }}>
                   <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Username</label>
                   <input className="form-control form-control-sm form-control-solid"
@@ -1092,6 +1255,13 @@ const ReportsHubPage: React.FC = () => {
                     {`Generate${countLabel}`}
                   </button>
 
+                  {/* Generate via Kafka queue → report-worker */}
+                  <button className="btn btn-sm btn-light" disabled={displayedStudents.length === 0}
+                    onClick={openQueueModal}
+                    style={{ borderRadius: 8, padding: "8px 20px", fontWeight: 600, fontSize: "0.85rem" }}>
+                    {`Queue${countLabel}`}
+                  </button>
+
                   {/* Download ZIP */}
                   <button className="btn btn-sm" disabled={reportStats.generated === 0}
                     onClick={handleDownloadZipClick}
@@ -1170,12 +1340,12 @@ const ReportsHubPage: React.FC = () => {
                     <tr style={{ background: "#f8fafc" }}>
                       <th style={{ ...thStyle, width: 40 }}>
                         <input type="checkbox"
-                          checked={paginatedStudents.length > 0 && paginatedStudents.every((s) => selectedStudentIds.has(s.userStudentId))}
+                          checked={displayedStudents.length > 0 && displayedStudents.every((s) => selectedStudentIds.has(s.userStudentId))}
                           onChange={(e) => {
                             setSelectedStudentIds((prev) => {
                               const next = new Set(prev);
-                              if (e.target.checked) paginatedStudents.forEach((s) => next.add(s.userStudentId));
-                              else paginatedStudents.forEach((s) => next.delete(s.userStudentId));
+                              if (e.target.checked) displayedStudents.forEach((s) => next.add(s.userStudentId));
+                              else displayedStudents.forEach((s) => next.delete(s.userStudentId));
                               return next;
                             });
                           }} />
@@ -1184,6 +1354,7 @@ const ReportsHubPage: React.FC = () => {
                       <th style={thStyle}>Name</th>
                       <th style={thStyle}>Username</th>
                       <th style={thStyle}>Status</th>
+                      <th style={thStyle}>Completed On</th>
                       <th style={thStyle}>Grade</th>
                       <th style={thStyle}>Section</th>
                       <th style={thStyle}>Report</th>
@@ -1199,9 +1370,11 @@ const ReportsHubPage: React.FC = () => {
                     {paginatedStudents.map((s, idx) => {
                       const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
                       const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
-                      const asmtStatus = (s.assessments || []).find(
+                      const asmtDetail = (s.assessments || []).find(
                         (a) => a.assessmentId === selectedAssessmentObj!.id
-                      )?.status || "notstarted";
+                      );
+                      const asmtStatus = asmtDetail?.status || "notstarted";
+                      const completedOn = formatCompletedOn(asmtDetail?.completedAt);
                       const rd = reportDataMap.get(s.userStudentId);
                       const reportStatus = rd?.reportStatus || "notGenerated";
                       const reportUrl = rd?.reportUrl || null;
@@ -1236,7 +1409,14 @@ const ReportsHubPage: React.FC = () => {
                             )}
                           </td>
                           <td style={tdStyle}>{statusBadge(asc.bg, asc.color, asmtStatus)}</td>
-                          <td style={tdStyle}>{secInfo?.className || "-"}</td>
+                          <td style={tdStyle}>
+                            {completedOn ? (
+                              <span title={new Date(asmtDetail!.completedAt!).toLocaleString()}>{completedOn}</span>
+                            ) : (
+                              <span style={{ color: "#9ca3af", fontStyle: "italic", fontSize: "0.8rem" }}>—</span>
+                            )}
+                          </td>
+                          <td style={tdStyle}>{gradeOf(s) || "-"}</td>
                           <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
                           <td style={tdStyle}>{statusBadge(rsc.bg, rsc.color, hasReport ? "Generated" : "Not Generated")}</td>
                           <td style={tdStyle}>
@@ -1367,49 +1547,32 @@ const ReportsHubPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
+              {/* Pagination — right-aligned "Rows per page: [n]  x - y of z  ‹ ›" bar */}
+              {displayedStudents.length > 0 && (
                 <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  marginTop: 12, flexWrap: "wrap", gap: 8,
+                  display: "flex", alignItems: "center", justifyContent: "flex-end",
+                  marginTop: 12, gap: 14, flexWrap: "wrap",
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                      {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
-                    </span>
-                    <select className="form-select form-select-sm form-select-solid"
-                      style={{ width: 68, fontSize: "0.8rem" }} value={pageSize}
-                      onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
-                      {[25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
+                  <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Rows per page:</span>
+                  <select className="form-select form-select-sm form-select-solid"
+                    style={{ width: 68, fontSize: "0.8rem" }} value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
+                    {[10, 25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <span style={{ fontSize: "0.8rem", color: "#374151" }}>
+                    {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
                     <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
-                      onClick={() => setCurrentPage(1)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>First</button>
-                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
-                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Prev</button>
-                    {(() => {
-                      const pages: (number | string)[] = [];
-                      const maxV = 5;
-                      let start = Math.max(1, safeCurrentPage - Math.floor(maxV / 2));
-                      let end = Math.min(totalPages, start + maxV - 1);
-                      if (end - start + 1 < maxV) start = Math.max(1, end - maxV + 1);
-                      if (start > 1) { pages.push(1); if (start > 2) pages.push("..."); }
-                      for (let i = start; i <= end; i++) pages.push(i);
-                      if (end < totalPages) { if (end < totalPages - 1) pages.push("..."); pages.push(totalPages); }
-                      return pages.map((p, i) =>
-                        typeof p === "string" ? (
-                          <span key={`e-${i}`} style={{ padding: "4px 4px", color: "#9ca3af", fontSize: "0.8rem" }}>...</span>
-                        ) : (
-                          <button key={p} className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
-                            onClick={() => setCurrentPage(p)} style={{ padding: "4px 10px", fontSize: "0.8rem", minWidth: 32 }}>{p}</button>
-                        )
-                      );
-                    })()}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} aria-label="Previous page"
+                      style={{ width: 32, height: 32, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <i className="bi bi-chevron-left" style={{ fontSize: "0.8rem" }} />
+                    </button>
                     <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Next</button>
-                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
-                      onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Last</button>
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} aria-label="Next page"
+                      style={{ width: 32, height: 32, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <i className="bi bi-chevron-right" style={{ fontSize: "0.8rem" }} />
+                    </button>
                   </div>
                 </div>
               )}
@@ -1425,8 +1588,10 @@ const ReportsHubPage: React.FC = () => {
         onClose={() => setMiraDesaiOpen(false)}
         generating={exportingDataExcel}
         exportingMQT={exportingMQT}
+        exportingDashboard={exportingDashboard}
         onGenerateDataExcel={handleGenerateDataExcel}
         onExportBetCoreData={handleExportBetCoreData}
+        onExportDashboardSheet={handleExportDashboardSheet}
         onSchoolReport={() => setSchoolReportOpen(true)}
         visibleSelectedCount={visibleSelectedCount}
         displayedCount={displayedStudents.length}
@@ -1451,7 +1616,7 @@ const ReportsHubPage: React.FC = () => {
       <BulkSendModal
         open={bulkSendOpen}
         onClose={() => setBulkSendOpen(false)}
-        selectedCount={visibleSelectedCount > 0 ? visibleSelectedCount : displayedStudents.length}
+        selectedCount={visibleSelectedCount}
         sendingEmail={composeSending}
         sendingWhatsApp={false}
         onBulkEmail={handleBulkEmail}
@@ -1482,6 +1647,19 @@ const ReportsHubPage: React.FC = () => {
         <GenerateReportsModal
           open={generateModalOpen}
           onClose={() => setGenerateModalOpen(false)}
+          assessmentId={selectedAssessmentObj.id}
+          assessmentName={selectedAssessmentName}
+          templates={templates}
+          initialTemplateId={selectedTemplateId}
+          students={modalStudents}
+          onGenerated={onModalGenerated}
+        />
+      )}
+
+      {queueModalOpen && selectedAssessmentObj && (
+        <GenerateQueueModal
+          open={queueModalOpen}
+          onClose={() => setQueueModalOpen(false)}
           assessmentId={selectedAssessmentObj.id}
           assessmentName={selectedAssessmentName}
           templates={templates}

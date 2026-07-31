@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Form, Spinner } from "react-bootstrap";
 import { getReferralInstitutes, getInstituteAssessments } from "../API/ReferralCode_APIs";
+import SearchableSelect from "../../../components/SearchableSelect";
 
 type Institute = { instituteCode: number; instituteName: string };
 type Assessment = { assessmentId: number; assessmentName: string };
@@ -29,7 +30,17 @@ const InstituteAssessmentPicker = ({
 
   useEffect(() => {
     getReferralInstitutes()
-      .then((res) => setInstitutes(res.data || []))
+      .then((res) =>
+        setInstitutes(
+          (res.data || []).sort((a: Institute, b: Institute) =>
+            String(a.instituteName ?? "").trim().localeCompare(
+              String(b.instituteName ?? "").trim(),
+              undefined,
+              { sensitivity: "base" }
+            )
+          )
+        )
+      )
       .catch(() => setInstitutes([]))
       .finally(() => setLoadingInstitutes(false));
   }, []);
@@ -63,22 +74,18 @@ const InstituteAssessmentPicker = ({
         {loadingInstitutes ? (
           <div className="text-muted"><Spinner animation="border" size="sm" /> Loading institutes...</div>
         ) : (
-          <Form.Select
+          <SearchableSelect
+            options={institutes.map((i) => ({
+              value: String(i.instituteCode),
+              label: `${i.instituteName} (#${i.instituteCode})`,
+            }))}
             value={instituteCode === "" ? "" : String(instituteCode)}
-            onChange={(e) => {
-              const v = e.target.value;
+            onChange={(v) => {
               onInstituteChange(v === "" ? "" : Number(v));
               onAssessmentsChange([]); // reset assessments when institute changes
             }}
-            style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0" }}
-          >
-            <option value="">Select an institute</option>
-            {institutes.map((i) => (
-              <option key={i.instituteCode} value={i.instituteCode}>
-                {i.instituteName} (#{i.instituteCode})
-              </option>
-            ))}
-          </Form.Select>
+            placeholder="Select an institute"
+          />
         )}
       </Form.Group>
 

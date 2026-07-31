@@ -92,6 +92,13 @@ function levelLabel(level: AbsoluteLevel): string {
   return 'DEVELOPING';
 }
 
+/** Plain level word for the *_level_text placeholders. */
+function levelText(level: AbsoluteLevel): string {
+  if (level === 'HIGH') return 'High';
+  if (level === 'MODERATE') return 'Moderate';
+  return 'Low';
+}
+
 function sortDesc(dims: ScoredDimension[]): ScoredDimension[] {
   return [...dims].sort((a, b) => b.normPct - a.normPct);
 }
@@ -203,6 +210,7 @@ export function buildFourPagerPlaceholders(
     const creative = RIASEC_CREATIVE[key];
     out[`cp_${i + 1}`] = creative?.name || RIASEC_LABELS[key] || d.name;
     out[`cp_${i + 1}_level`] = `Type ${i + 1} · ${CP_RANK[i]} · Score: ${levelLabel(d.level)}`;
+    out[`cp_${i + 1}_level_text`] = levelText(d.level);
     out[`cp_${i + 1}_desc`] = creative?.desc || '';
   });
 
@@ -213,6 +221,7 @@ export function buildFourPagerPlaceholders(
     const creative = MI_CREATIVE[label] || MI_CREATIVE[d.name];
     out[`mi_${i + 1}`] = creative?.name || label;
     out[`mi_${i + 1}_level`] = `MI ${i + 1} · ${CP_RANK[i]} · Score: ${levelLabel(d.level)}`;
+    out[`mi_${i + 1}_level_text`] = levelText(d.level);
     out[`mi_${i + 1}_desc`] = creative?.desc || '';
   });
 
@@ -222,6 +231,7 @@ export function buildFourPagerPlaceholders(
     const creative = ABILITY_CREATIVE[d.name];
     out[`ab_${i + 1}`] = creative?.name || abilityDisplayName(d.name);
     out[`ab_${i + 1}_level`] = `Ability ${i + 1} · Score: ${levelLabel(d.level)}`;
+    out[`ab_${i + 1}_level_text`] = levelText(d.level);
     out[`ab_${i + 1}_desc`] = creative?.desc || '';
   });
 

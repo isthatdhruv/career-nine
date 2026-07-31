@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -23,6 +24,10 @@ import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.repository.Career9.GeneralAssessmentResultRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.service.GeneralAssessmentProcessingService;
+import com.kccitm.api.service.schoolreport.SchoolDashboard;
+import com.kccitm.api.service.schoolreport.SchoolDashboardDataService;
+import com.kccitm.api.service.schoolreport.SchoolDashboardWorkbookWriter;
+import com.kccitm.api.service.schoolreport.SchoolReportService;
 
 @RestController
 @RequestMapping("/general-assessment")
@@ -44,6 +49,18 @@ public class GeneralAssessmentController {
 
     @Autowired
     private com.kccitm.api.service.AssessmentDataExcelExportService dataExcelExportService;
+
+    @Autowired
+    private com.kccitm.api.service.BetTemplateExcelExportService betTemplateExcelExportService;
+
+    @Autowired
+    private SchoolDashboardDataService schoolDashboardDataService;
+
+    @Autowired
+    private SchoolReportService schoolReportService;
+
+    @Autowired
+    private SchoolDashboardWorkbookWriter schoolDashboardWorkbookWriter;
 
     /**
      * Process a single student's general assessment.
@@ -195,7 +212,12 @@ public class GeneralAssessmentController {
             }
         }
 
-        byte[] excelBytes = dataExcelExportService.exportStudentData(assessmentId, userStudentIds);
+        // BET assessments get the analyst's fixed "BET_ template" layout;
+        // everything else keeps the generic dynamic export.
+        byte[] excelBytes = betTemplateExcelExportService.exportIfBetTemplate(assessmentId, userStudentIds);
+        if (excelBytes == null) {
+            excelBytes = dataExcelExportService.exportStudentData(assessmentId, userStudentIds);
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(
@@ -225,5 +247,123 @@ public class GeneralAssessmentController {
         headers.setContentLength(excelBytes.length);
 
         return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Export the combined legacy workbook for an assessment:
+     * sheet "Raw Data" (old 167-column OMR answers) + sheet "Master Sheet"
+     * (computed MI/aptitude/RIASEC scores + SOI/Values/Career Aspirations).
+     *
+     * Body: { "assessmentId": 123, "userStudentIds": [1, 2, 3] }
+     * If userStudentIds is empty or absent, exports all students for the assessment.
+     */
+    @PostMapping("/export-combined-excel")
+    @PreAuthorize("@auth.allows('report.export')")
+    public ResponseEntity<?> exportCombinedExcel(@RequestBody Map<String, Object> request) throws Exception {
+        if (request == null || !(request.get("assessmentId") instanceof Number)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+
+        @SuppressWarnings("unchecked")
+        List<Number> selectedIds = (List<Number>) request.get("userStudentIds");
+        List<Long> userStudentIds = (selectedIds == null || selectedIds.isEmpty())
+                ? null
+                : selectedIds.stream().map(Number::longValue).collect(Collectors.toList());
+
+        byte[] excelBytes = exportService.exportCombinedOldFormat(assessmentId, userStudentIds);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment",
+                "general_assessment_" + assessmentId + "_raw_master.xlsx");
+        headers.setContentLength(excelBytes.length);
+
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Export the Navigator360 school dashboard: the nine-sheet workbook
+     * (paste data, summary, personality, learning style, abilities, values,
+     * career gap, by class, charts) already filled in, so nobody has to paste a
+     * Master Sheet into the template by hand.
+     *
+     * <p>Body: <code>{ "assessmentId": 123, "userStudentIds": [1, 2, 3],
+     * "classFilter": "All" }</code>
+     *
+     * <p>{@code userStudentIds} carries whatever the Reports Hub's filters and
+     * tick-boxes left in view; empty or absent means the whole assessment.
+     * {@code classFilter} is sheet 2's own filter — "All", or a class number.
+     */
+    @PostMapping("/export-school-dashboard")
+    @PreAuthorize("@auth.allows('report.export')")
+    public ResponseEntity<?> exportSchoolDashboard(@RequestBody Map<String, Object> request) throws Exception {
+        if (request == null || !(request.get("assessmentId") instanceof Number)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+
+        @SuppressWarnings("unchecked")
+        List<Number> selectedIds = (List<Number>) request.get("userStudentIds");
+        List<Long> userStudentIds = (selectedIds == null || selectedIds.isEmpty())
+                ? null
+                : selectedIds.stream().map(Number::longValue).collect(Collectors.toList());
+
+        SchoolDashboard.ClassFilter classFilter = parseClassFilter(request.get("classFilter"));
+
+        List<SchoolReportService.PasteDataRow> rows =
+                schoolDashboardDataService.loadRows(assessmentId, userStudentIds);
+        if (rows.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "No students with a completed assessment in the current selection."));
+        }
+        SchoolDashboard dashboard = schoolReportService.calculateDashboard(rows, classFilter);
+        byte[] excelBytes = schoolDashboardWorkbookWriter.write(dashboard);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment",
+                "school_dashboard_" + assessmentId + ".xlsx");
+        headers.setContentLength(excelBytes.length);
+
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * School Dashboard page payload for one institute: assessment participation
+     * across every assessment (the headline cards) plus the nine-sheet
+     * Navigator360 dashboard scored from everyone who completed one.
+     *
+     * <p>Returns 200 with a null {@code dashboard} when the institute exists but
+     * nobody has completed an assessment yet — the page still renders its
+     * participation cards, which is the useful answer in that case.
+     */
+    @GetMapping("/school-dashboard/{instituteCode}")
+    @PreAuthorize("@auth.allows('dashboard.school.insights.read', #instituteCode)")
+    public ResponseEntity<?> getSchoolDashboard(
+            @PathVariable Integer instituteCode,
+            @RequestParam(required = false) String classFilter) {
+        return ResponseEntity.ok(schoolDashboardDataService.buildInstituteView(
+                instituteCode, parseClassFilter(classFilter)));
+    }
+
+    /** "All", null, or a class number; anything unparseable falls back to All. */
+    private SchoolDashboard.ClassFilter parseClassFilter(Object raw) {
+        if (raw instanceof Number) {
+            return SchoolDashboard.ClassFilter.of(((Number) raw).intValue());
+        }
+        if (raw instanceof String) {
+            String text = ((String) raw).trim();
+            if (!text.isEmpty() && !"All".equalsIgnoreCase(text)) {
+                try {
+                    return SchoolDashboard.ClassFilter.of(Integer.parseInt(text));
+                } catch (NumberFormatException e) {
+                    logger.warn("School dashboard: unrecognised classFilter '{}', exporting all classes", text);
+                }
+            }
+        }
+        return SchoolDashboard.ClassFilter.all();
     }
 }

@@ -112,6 +112,49 @@ public class ReportPipelineProducer {
         return true;
     }
 
+    /**
+     * Admin-triggered enqueue (Generate Queue modal). Unlike {@link #enqueue},
+     * failures must SURFACE to the caller: the controller maps them to 404/502
+     * and does NOT stamp the row "queued", so a dead broker can never strand a
+     * chip in the queued state.
+     *
+     * @throws IllegalArgumentException student not found
+     * @throws IllegalStateException    serialization/Kafka failure
+     */
+    public void enqueueAdmin(Long userStudentId, Long assessmentId, Long reportTemplateId,
+                             boolean force, String emailMode, String batchId) {
+        UserStudent userStudent = userStudentRepository.findByIdWithStudentInfo(userStudentId)
+                .orElseThrow(() -> new IllegalArgumentException("UserStudent not found: " + userStudentId));
+        BrandingDto brand = brandingService.forInstitute(userStudent.getInstitute());
+        StudentInfo info = userStudent.getStudentInfo();
+        String email = info != null ? info.getEmail() : null;
+        String recipient = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
+
+        ReportGenerateEvent ev = new ReportGenerateEvent(userStudentId, assessmentId, recipient,
+                brand.isWhitelabel(), brand.getSchoolName(), brand.getLogoUrl());
+        ev.force = force;
+        ev.reportTemplateId = reportTemplateId;
+        ev.emailMode = emailMode;
+        ev.batchId = batchId;
+        // Phase 4 email routing — resolved identically to the automatic enqueue()
+        // path so admin-triggered emails use the same account/template selection.
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+        ev.emailReportEnabled = assessment != null && Boolean.TRUE.equals(assessment.getEmailReportEnabled());
+        InstituteDetail institute = userStudent.getInstitute();
+        ev.emailAccountId = resolveAccountId(institute != null ? institute.getInstituteCode() : null);
+        ev.emailTemplateId = resolveReportTemplateId();
+        ev.studentName = info != null ? info.getName() : null;
+        try {
+            kafkaTemplate.send(ReportPipelineConfig.TOPIC_GENERATE, ev.key(),
+                    objectMapper.writeValueAsString(ev));
+            logger.info("Report pipeline: admin enqueue student={} assessment={} template={} force={} emailMode={} batch={}",
+                    userStudentId, assessmentId, reportTemplateId, force, emailMode, batchId);
+        } catch (Exception e) {
+            throw new IllegalStateException("Kafka enqueue failed for student " + userStudentId
+                    + ": " + e.getMessage(), e);
+        }
+    }
+
     /** Institute default account (if active) → global default; null if neither resolves. */
     private Long resolveAccountId(Integer instituteCode) {
         Long instituteAccountId = instituteEmailSettingService.resolveDefaultAccountId(instituteCode);

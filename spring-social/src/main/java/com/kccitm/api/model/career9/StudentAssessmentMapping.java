@@ -1,6 +1,7 @@
 package com.kccitm.api.model.career9;
 
 import java.io.Serializable;
+import java.util.Date;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -12,6 +13,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.PrePersist;
 import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
 import javax.persistence.UniqueConstraint;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -61,6 +64,20 @@ public class StudentAssessmentMapping implements Serializable {
      */
     @Column(name = "reset_count", columnDefinition = "INT DEFAULT 0")
     private Integer resetCount = 0;
+
+    /**
+     * When the student finished this assessment. Stamped alongside the flip to
+     * status = "completed" in AssessmentSubmissionProcessorService, in the same
+     * transaction, so it cannot disagree with the status.
+     *
+     * Null for anything not completed. Also null for students who completed
+     * before this column existed and never had a report generated — rows that
+     * did have one were backfilled from the earliest generated_report.created_at
+     * by V20260716001, which is report-generation time, not true completion.
+     */
+    @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "completed_at")
+    private Date completedAt;
 
     @PrePersist
     public void prePersist() {
@@ -134,6 +151,14 @@ public class StudentAssessmentMapping implements Serializable {
 
     public void setPersistenceState(String persistenceState) {
         this.persistenceState = persistenceState;
+    }
+
+    public Date getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(Date completedAt) {
+        this.completedAt = completedAt;
     }
 
     // public String getStatus() {

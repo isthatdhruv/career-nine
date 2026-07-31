@@ -58,9 +58,9 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
     List<StudentAssessmentMapping> findByUserStudentUserStudentIdIn(
         @org.springframework.data.repository.query.Param("ids") List<Long> userStudentIds);
 
-    // Lightweight projection: only student id, name, email, username, status in a single query
+    // Lightweight projection: only student id, name, email, username, status, dob in a single query
     @org.springframework.data.jpa.repository.Query(
-        "SELECT m.userStudent.userStudentId, si.name, si.email, m.status, u.username " +
+        "SELECT m.userStudent.userStudentId, si.name, si.email, m.status, u.username, si.studentDob " +
         "FROM StudentAssessmentMapping m " +
         "JOIN m.userStudent us " +
         "JOIN us.studentInfo si " +
@@ -115,5 +115,19 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
     long countCompletedByInstituteAndAssessment(
         @org.springframework.data.repository.query.Param("instituteCode") Long instituteCode,
         @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
+
+    // School Dashboard: every mapping in an institute, across all assessments.
+    // Feeds both the completed/ongoing/not-started headline cards and the list of
+    // student-assessment pairs the dashboard is scored from, so the page needs a
+    // single round trip. student_info is joined eagerly because the dashboard
+    // reads name/class/section/gender off every completed row.
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT m FROM StudentAssessmentMapping m " +
+        "JOIN FETCH m.userStudent us " +
+        "LEFT JOIN FETCH us.studentInfo " +
+        "LEFT JOIN FETCH us.institute " +
+        "WHERE us.institute.instituteCode = :instituteCode")
+    List<StudentAssessmentMapping> findAllByInstituteCode(
+        @org.springframework.data.repository.query.Param("instituteCode") Integer instituteCode);
 
 }

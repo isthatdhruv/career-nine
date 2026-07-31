@@ -3,6 +3,7 @@ package com.kccitm.api.service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -644,7 +645,15 @@ public class AssessmentSubmissionProcessorService {
         // Atomic mapping flip — only commits if the answer/score saves above
         // succeed. status moves to "completed" ONLY here, inside the DB
         // transaction. /submit no longer pre-flips status.
+        //
+        // completedAt is stamped in the same breath as the status so the two can
+        // never disagree. Only set it on the first flip: this method is re-run on
+        // retry for an already-completed row, and re-stamping would drift the date
+        // to the retry time rather than when the student actually finished.
         mapping.setStatus("completed");
+        if (mapping.getCompletedAt() == null) {
+            mapping.setCompletedAt(new Date());
+        }
         mapping.setPersistenceState(hadWarnings ? "persisted_with_warnings" : "persisted");
         studentAssessmentMappingRepository.save(mapping);
 

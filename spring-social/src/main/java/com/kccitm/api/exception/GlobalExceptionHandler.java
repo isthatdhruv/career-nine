@@ -1,5 +1,6 @@
 package com.kccitm.api.exception;
 
+import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import javax.servlet.http.HttpServletRequest;
@@ -155,9 +157,34 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
     }
 
+    /**
+     * The client hung up before we finished writing the response (browser cancelled a
+     * download, tab closed, network dropped). The socket is gone, so there is nothing to
+     * respond to and no error to report — returning a body here just triggers a second
+     * exception while writing it.
+     *
+     * Handled separately from Exception so it does not log a full stack trace at ERROR:
+     * it is a client-side event, not a server fault, and the traces were drowning out
+     * real errors on the export endpoints.
+     */
+    @ExceptionHandler(ClientAbortException.class)
+    public void handleClientAbort(ClientAbortException ex, HttpServletRequest request) {
+        logger.warn("Client disconnected before response completed at {} ({}). " +
+                        "Usually a cancelled download or a request the client gave up on.",
+                request.getRequestURI(), ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
         logger.error("Unexpected error at {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+
+        // Endpoints declaring produces=xlsx (the exports) pin a producible media type on the
+        // request. Content negotiation for THIS error body then honours it, finds no converter
+        // that can write ApiErrorResponse as a spreadsheet, and throws
+        // HttpMessageNotWritableException — masking the real error with a bogus one. Clearing
+        // the attribute lets the error be negotiated as JSON, which is what the client expects.
+        request.removeAttribute(HandlerMapping.PRODUCIBLE_MEDIA_TYPES_ATTRIBUTE);
+
         ApiErrorResponse response = new ApiErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),

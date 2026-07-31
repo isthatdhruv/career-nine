@@ -14,13 +14,26 @@ const StudentLoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    // Game results that have not yet been confirmed written to Firestore are
+    // buffered under pendingGameResult:* and are the ONLY copy — each entry
+    // carries its own userStudentId, so it still lands on the right document
+    // after a different student logs in here. Never let the wipe take them;
+    // DataProvider retries them on the next app load.
+    const preservePending: Record<string, string> = {};
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('pendingGameResult:')) {
+        const val = localStorage.getItem(key);
+        if (val) preservePending[key] = val;
+      }
+    }
+
     const hasUnsavedAnswers = localStorage.getItem('assessmentAnswers');
     if (hasUnsavedAnswers) {
       console.warn('Unsaved assessment answers detected - preserving for recovery');
       const keysToPreserve = [
         'assessmentAnswers', 'assessmentRankingAnswers', 'assessmentTextAnswers',
         'assessmentSavedForLater', 'assessmentSkipped', 'assessmentElapsedTime',
-        'assessmentCompletedGames', 'assessmentId', 'userStudentId'
+        'assessmentId', 'userStudentId'
       ];
       const preserved: Record<string, string> = {};
       keysToPreserve.forEach(key => {
@@ -32,6 +45,7 @@ const StudentLoginPage: React.FC = () => {
     } else {
       localStorage.clear();
     }
+    Object.entries(preservePending).forEach(([key, val]) => localStorage.setItem(key, val));
     sessionStorage.clear();
     // Reset auth carriers so a prior student's tab state does not bleed into
     // the new session: in-memory http flag + JS-readable cn_csrf cookie locally,

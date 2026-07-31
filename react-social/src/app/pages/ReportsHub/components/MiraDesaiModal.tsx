@@ -5,16 +5,18 @@ type Props = {
   onClose: () => void;
   generating: boolean;
   exportingMQT: boolean;
+  exportingDashboard: boolean;
   onGenerateDataExcel: () => void;
   onExportBetCoreData: () => void;
+  onExportDashboardSheet: () => void;
   onSchoolReport: () => void;
   visibleSelectedCount: number;
   displayedCount: number;
 };
 
 const MiraDesaiModal: React.FC<Props> = ({
-  open, onClose, generating, exportingMQT,
-  onGenerateDataExcel, onExportBetCoreData, onSchoolReport,
+  open, onClose, isNavigator, generating, exportingMQT, exportingDashboard,
+  onGenerateDataExcel, onExportBetCoreData, onExportDashboardSheet, onSchoolReport,
   visibleSelectedCount, displayedCount,
 }) => {
   if (!open) return null;
@@ -90,6 +92,24 @@ const MiraDesaiModal: React.FC<Props> = ({
             }}
           >
             {exportingMQT ? "Exporting..." : `BET Core Data${countLabel}`}
+          </button>
+
+          <button
+            className="btn"
+            onClick={onExportDashboardSheet}
+            disabled={exportingDashboard}
+            title="The 9-sheet Navigator360 school dashboard, already filled in for the students currently in view"
+            style={{
+              background: exportingDashboard
+                ? "#6c757d"
+                : "linear-gradient(135deg, #0d9488 0%, #115e59 100%)",
+              border: "none", borderRadius: 10, padding: "12px 20px",
+              fontWeight: 600, color: "white", fontSize: "0.9rem",
+              boxShadow: exportingDashboard ? "none" : "0 4px 12px rgba(13, 148, 136, 0.3)",
+              width: "100%", textAlign: "left",
+            }}
+          >
+            {exportingDashboard ? "Building..." : `Dashboard Sheet${countLabel}`}
           </button>
 
           <button

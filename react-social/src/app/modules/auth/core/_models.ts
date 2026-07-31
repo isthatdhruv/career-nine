@@ -26,4 +26,11 @@ export interface User {
 
 // ABAC scope row (institute / session / course / section).
 // Short keys mirror the JWT claim shape so the same parser can be reused.
-export type Scope = { i?: number; s?: number; c?: number; x?: number };
+// ABAC scope row. i=institute, s=session, c=course/class, x=section,
+// g=student group. An absent key is a wildcard on that dimension.
+//
+// `g` is stricter than the rest on the server: once every one of a user's rows
+// binds a group, they see only students in those groups — ungrouped students
+// are hidden, with no "OR IS NULL" escape. A row without `g` places no group
+// restriction, which is why existing sessions are unaffected.
+export type Scope = { i?: number; s?: number; c?: number; x?: number; g?: number };

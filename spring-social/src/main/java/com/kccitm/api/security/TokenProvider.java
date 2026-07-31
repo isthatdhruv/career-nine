@@ -181,6 +181,11 @@ public class TokenProvider {
                 if (r.s != null) row.put("s", r.s);
                 if (r.c != null) row.put("c", r.c);
                 if (r.x != null) row.put("x", r.x);
+                // Student group — omitted when null, exactly like the others, so
+                // an old server reading a new token simply ignores the key and a
+                // new server reading an old token parses it back as wildcard.
+                // No forced logout is needed for the group dimension.
+                if (r.g != null) row.put("g", r.g);
                 scopes.add(row);
             }
         }
@@ -289,6 +294,41 @@ public class TokenProvider {
                     now, expiryDate, TokenType.ASSESSMENT);
         }
         return token;
+    }
+
+    /**
+     * Mint a counselling self-reschedule token bound to a single appointment. Emailed to a student
+     * when their counsellor becomes unavailable so they can pick a new slot from a public
+     * (no-login) page. Carries {@code scope="counselling_reschedule"} and the appointment id as the
+     * subject. This token NEVER travels in the auth cookie/header — it is validated manually by the
+     * public reschedule controller, so it does not interact with {@link TokenAuthenticationFilter}.
+     * TTL: 30 days (generous, since a counsellor's absence may be days ahead of the session).
+     */
+    public String createCounsellingRescheduleToken(Long appointmentId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + 30L * 24 * 60 * 60 * 1000); // 30 days
+        return Jwts.builder()
+                .setSubject(String.valueOf(appointmentId))
+                .claim("scope", "counselling_reschedule")
+                .setId(UUID.randomUUID().toString())
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(signingKey, SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    /**
+     * Returns the appointment id carried by a counselling-reschedule token, or {@code null} if the
+     * token is invalid, expired, or not a {@code counselling_reschedule}-scoped token. Never throws.
+     */
+    public Long getCounsellingRescheduleAppointmentId(String token) {
+        try {
+            Claims claims = parseSigned(token).getBody();
+            if (!"counselling_reschedule".equals(String.valueOf(claims.get("scope")))) return null;
+            return Long.valueOf(claims.getSubject());
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     /**
@@ -424,7 +464,11 @@ public class TokenProvider {
                     Integer s = num(m.get("s"));
                     Integer cc = num(m.get("c"));
                     Long x = m.get("x") == null ? null : Long.valueOf(m.get("x").toString());
-                    rows.add(new CurrentScopes.ScopeRow(i, s, cc, x));
+                    // Absent on every token minted before the group dimension —
+                    // parses to null, i.e. group wildcard, which is exactly the
+                    // pre-group behaviour.
+                    Long g = m.get("g") == null ? null : Long.valueOf(m.get("g").toString());
+                    rows.add(new CurrentScopes.ScopeRow(i, s, cc, x, g));
                 }
             }
             out.scopes = rows;

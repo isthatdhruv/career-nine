@@ -1,6 +1,8 @@
 package com.kccitm.api.service.b2c.report.pipeline;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kccitm.api.model.career9.ReportTemplate;
+import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.service.b2c.report.ReportResult;
 import com.kccitm.api.service.b2c.report.ReportRoutingException;
 import com.kccitm.api.service.b2c.report.ReportService;
@@ -22,6 +24,8 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
 
+import java.util.Date;
+
 /**
  * Generate stage (report-worker only). Consumes {@code report.generate}, renders
  * the default-template (pager) report via {@link ReportService#generate} for
@@ -40,6 +44,8 @@ public class ReportGenerateConsumer {
     @Autowired private ReportService reportService;
     @Autowired private PdfRenderService pdfRenderService;
     @Autowired private KafkaTemplate<String, String> kafkaTemplate;
+    @Autowired private GeneratedReportRepository generatedReportRepository;
+    @Autowired private ReportBatchLifecycle batchLifecycle;
     @Autowired private ObjectMapper objectMapper;
 
     @Value("${report.pipeline.pdf-attempts:3}")
@@ -61,19 +67,34 @@ public class ReportGenerateConsumer {
             return; // poison message — don't retry a malformed payload
         }
 
-        try {
-            ReportResult r = reportService.generate(ev.userStudentId, ev.assessmentId, null, false);
+        // Admin batch stopped (modal closed/cancelled, tab refreshed, session died)
+        // → skip WITHOUT generating, restore the row from "queued", ack. Legacy
+        // on-submission events have no batchId and never hit this.
+        if (batchLifecycle.isStopped(ev.batchId)) {
+            logger.info("Report generate skipped (batch {} stopped) student={} assessment={}",
+                    ev.batchId, ev.userStudentId, ev.assessmentId);
+            restoreRowAfterCancel(ev);
+            return;
+        }
 
-            // Reports are generated for everyone, but only whitelabel students with a
-            // recipient address are emailed. For non-whitelabel (or address-less)
-            // students the report is now rendered + stored — ack here without queuing
-            // the mail stage, and skip the email-only PDF re-render to spare Gotenberg.
+        try {
+            ReportResult r = reportService.generate(
+                    ev.userStudentId, ev.assessmentId, ev.reportTemplateId, ev.force);
+
+            // Email decision — emailMode and force are fully orthogonal.
+            //   "all"  → email anyone with an address (whitelabel ignored; admin toggle ON)
+            //   "none" → generate only (admin toggle OFF)
+            //   "auto" → automatic pipeline: whitelabel students always, plus any
+            //            assessment with the "email report" toggle on (Phase 4)
             boolean hasEmail = ev.recipientEmail != null && !ev.recipientEmail.isBlank();
-            // Email whitelabel students always, plus any assessment with the "email report" toggle on.
-            boolean emailEnabled = ev.whitelabel || ev.emailReportEnabled;
-            if (!emailEnabled || !hasEmail) {
-                logger.info("Report generated (not mailed — whitelabel={} toggle={} hasEmail={}) student={} assessment={}",
-                        ev.whitelabel, ev.emailReportEnabled, hasEmail, ev.userStudentId, ev.assessmentId);
+            String mode = ev.emailMode == null ? "auto" : ev.emailMode;
+            boolean shouldEmail =
+                    "all".equals(mode)  ? hasEmail
+                  : "none".equals(mode) ? false
+                  :                       ((ev.whitelabel || ev.emailReportEnabled) && hasEmail);
+            if (!shouldEmail) {
+                logger.info("Report generated (not mailed — mode={} whitelabel={} toggle={} hasEmail={}) student={} assessment={}",
+                        mode, ev.whitelabel, ev.emailReportEnabled, hasEmail, ev.userStudentId, ev.assessmentId);
                 return;
             }
 
@@ -105,6 +126,7 @@ public class ReportGenerateConsumer {
             // Other sanity failures are terminal → not retried → DLT.
             logger.error("Report generate TERMINAL (sanity {}) student={} assessment={}: {}",
                     e.getCode(), ev.userStudentId, ev.assessmentId, e.getMessage());
+            markRowFailed(ev);
             throw new IllegalStateException("sanity terminal " + e.getCode() + ": " + e.getMessage(), e);
         } catch (ReportRoutingException e) {
             // No template / no default mapped → nothing to generate. Now that ALL
@@ -144,5 +166,62 @@ public class ReportGenerateConsumer {
         // them here the DLT entry is just the payload with no cause.
         logger.error("REPORT-GENERATE DLT (needs ops attention — no report produced): payload={} cause={}: {}\n{}",
                 json, excClass, excMessage, excStack);
+        // Best-effort: flip the row to "failed" so an admin-enqueued chip resolves
+        // to a definitive ✕ instead of spinning at "queued" forever.
+        try {
+            markRowFailed(objectMapper.readValue(json, ReportGenerateEvent.class));
+        } catch (Exception e) {
+            logger.warn("DLT: could not parse payload to mark row failed: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Best-effort: a cancelled batch leaves rows stamped "queued" — restore them
+     * to what the row content implies: an existing report URL means the previous
+     * report is still valid ("generated"), otherwise "notGenerated".
+     */
+    private void restoreRowAfterCancel(ReportGenerateEvent ev) {
+        try {
+            ReportTemplate template = reportService.resolveTemplate(ev.assessmentId, ev.reportTemplateId);
+            generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+                            ev.userStudentId, ev.assessmentId, template.getReportTemplateId())
+                    .filter(gr -> "queued".equals(gr.getReportStatus()))
+                    .ifPresent(gr -> {
+                        gr.setReportStatus(gr.getReportUrl() != null ? "generated" : "notGenerated");
+                        gr.setUpdatedAt(new Date());
+                        generatedReportRepository.save(gr);
+                    });
+        } catch (Exception e) {
+            logger.warn("Could not restore generated_report row after cancel student={} assessment={}: {}",
+                    ev.userStudentId, ev.assessmentId, e.getMessage());
+        }
+    }
+
+    /**
+     * Best-effort: mark the (student, assessment, template) row failed. Resolving
+     * the template can itself fail (e.g. no template mapped) — then there is no
+     * row to mark and we just log.
+     */
+    private void markRowFailed(ReportGenerateEvent ev) {
+        try {
+            ReportTemplate template = reportService.resolveTemplate(ev.assessmentId, ev.reportTemplateId);
+            generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+                            ev.userStudentId, ev.assessmentId, template.getReportTemplateId())
+                    // Never clobber a success: a rebalance storm can publish a record
+                    // to the DLT (CommitFailedException, cause=null) even though its
+                    // report generated fine — or a redelivered duplicate already
+                    // succeeded. "generated" is the terminal good state; keep it.
+                    .filter(gr -> !"generated".equals(gr.getReportStatus()))
+                    .ifPresent(gr -> {
+                        gr.setReportStatus("failed");
+                        gr.setUpdatedAt(new Date());
+                        generatedReportRepository.save(gr);
+                    });
+        } catch (Exception e) {
+            logger.warn("Could not mark generated_report failed student={} assessment={}: {}",
+                    ev.userStudentId, ev.assessmentId, e.getMessage());
+        }
     }
 }

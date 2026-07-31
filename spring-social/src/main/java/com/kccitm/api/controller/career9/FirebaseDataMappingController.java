@@ -425,6 +425,14 @@ public class FirebaseDataMappingController {
             if (samOpt.isPresent()) {
                 StudentAssessmentMapping sam = samOpt.get();
                 sam.setStatus("completed");
+                // Force-complete writes straight to the DB without going through
+                // AssessmentSubmissionProcessorService, so it has to stamp its own
+                // date or the row would sit completed with no completion date. The
+                // real finish time is unknown here — the admin action time is the
+                // only defensible value. Existing stamps are left alone.
+                if (sam.getCompletedAt() == null) {
+                    sam.setCompletedAt(new java.util.Date());
+                }
                 studentAssessmentMappingRepository.save(sam);
                 updated++;
             }

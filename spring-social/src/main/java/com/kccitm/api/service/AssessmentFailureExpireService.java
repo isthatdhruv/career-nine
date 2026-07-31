@@ -107,9 +107,11 @@ public class AssessmentFailureExpireService {
         // Clear all Redis state
         sessionService.clearAllForMapping(studentId, assessmentId);
 
-        // Reset mapping
+        // Reset mapping — completedAt clears with the status so a stale date can't
+        // outlive the completion it described.
         mapping.setStatus("notstarted");
         mapping.setPersistenceState(null);
+        mapping.setCompletedAt(null);
         mappingRepository.save(mapping);
 
         // Resolve failure row

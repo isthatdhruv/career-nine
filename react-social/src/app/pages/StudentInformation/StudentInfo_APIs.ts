@@ -38,6 +38,8 @@ export interface AssessmentDetail {
     assessmentId: number;
     assessmentName: string;
     status: string; // 'notstarted' | 'inprogress' | 'completed'
+    /** ISO timestamp of when the student finished. Null unless status is 'completed'. */
+    completedAt?: string | null;
 }
 
 export interface StudentRoleGroupRef {
@@ -58,6 +60,8 @@ export interface StudentWithMapping {
     studentDob?: string;
     username?: string;
     schoolSectionId?: number;
+    /** Flat student_info.student_class — Grade fallback when schoolSectionId is unset. */
+    studentClass?: number | null;
     gender?: string;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];
@@ -226,6 +230,42 @@ export function getBulkProctoringData(pairs: { userStudentId: number; assessment
 // Export proctoring data as Excel from backend (server-side generation)
 export function exportProctoringExcel(pairs: { userStudentId: number; assessmentId: number }[]) {
     return axios.post(`${API_URL}/assessment-proctoring/export-excel`, pairs, {
+        responseType: 'blob',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+            'Content-Type': 'application/json',
+        },
+    });
+}
+
+// Export the combined legacy workbook (Raw Data + Master Sheet) for one assessment
+export function exportCombinedAssessmentExcel(assessmentId: number, userStudentIds: number[]) {
+    return axios.post(`${API_URL}/general-assessment/export-combined-excel`, {
+        assessmentId,
+        userStudentIds,
+    }, {
+        responseType: 'blob',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+            'Content-Type': 'application/json',
+        },
+    });
+}
+
+// Export the Navigator360 school dashboard (9 sheets, already filled in).
+// userStudentIds carries whatever the caller's filters and selection left in
+// view; an empty array means the whole assessment. classFilter is sheet 2's own
+// filter — "All", or a class number.
+export function exportSchoolDashboardExcel(
+    assessmentId: number,
+    userStudentIds: number[],
+    classFilter: string = "All",
+) {
+    return axios.post(`${API_URL}/general-assessment/export-school-dashboard`, {
+        assessmentId,
+        userStudentIds,
+        classFilter,
+    }, {
         responseType: 'blob',
         headers: {
             'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',

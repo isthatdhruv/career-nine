@@ -1,6 +1,8 @@
 package com.kccitm.api.controller.career9;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,11 @@ public class LiveTrackingController {
     @Autowired
     private AssessmentSessionService assessmentSessionService;
 
+    // Matches the @JsonFormat(pattern = "dd-MM-yyyy") used on StudentInfo.studentDob
+    private static String formatDob(Date dob) {
+        return dob != null ? new SimpleDateFormat("dd-MM-yyyy").format(dob) : "";
+    }
+
     /**
      * Lightweight endpoint: returns only student id, name, email, status.
      * Single JPQL query — no Redis, no answer counts, no N+1.
@@ -67,6 +74,7 @@ public class LiveTrackingController {
             String email = (String) row[2];
             String status = row[3] != null ? (String) row[3] : "notstarted";
             String username = row.length > 4 ? (String) row[4] : null;
+            Date dob = row.length > 5 ? (Date) row[5] : null;
 
             switch (status) {
                 case "ongoing": ongoing++; break;
@@ -79,6 +87,7 @@ public class LiveTrackingController {
             entry.put("studentName", name != null ? name : "Unknown");
             entry.put("email", email != null ? email : "");
             entry.put("username", username != null ? username : "");
+            entry.put("dob", formatDob(dob));
             entry.put("status", status);
             students.add(entry);
         }
@@ -179,6 +188,7 @@ public class LiveTrackingController {
                     si != null && si.getUser() != null && si.getUser().getUsername() != null
                             ? si.getUser().getUsername()
                             : "");
+            entry.put("dob", formatDob(si != null ? si.getStudentDob() : null));
             entry.put("instituteName",
                     us.getInstitute() != null ? us.getInstitute().getInstituteName() : "");
 

@@ -25,5 +25,5 @@ public final class EngineVersions {
     public static final String LEGACY_V1 = "legacy-v1";
 
     /** Bumped when PagerPlaceholderCalculator's placeholder mapping changes (incl. FourPagerEngineService.buildPlaceholders). */
-    public static final String PAGER_V1 = "pager-v2";
+    public static final String PAGER_V1 = "pager-v3";
 }
