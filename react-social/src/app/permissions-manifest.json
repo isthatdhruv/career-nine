@@ -63,7 +63,9 @@
     "/counsellor/dashboard"
   ],
   "dashboard.school.insights.read": [
-    "/school-admin/cohort-insights",
+    "/school-admin/cohort-insights"
+  ],
+  "dashboard.school.read": [
     "/school-dashboard"
   ],
   "email_account.read": [
