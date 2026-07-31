@@ -341,7 +341,7 @@ public class GeneralAssessmentController {
      * participation cards, which is the useful answer in that case.
      */
     @GetMapping("/school-dashboard/{instituteCode}")
-    @PreAuthorize("@auth.allows('dashboard.school.insights.read', #instituteCode)")
+    @PreAuthorize("@auth.allows('dashboard.school.read', #instituteCode)")
     public ResponseEntity<?> getSchoolDashboard(
             @PathVariable Integer instituteCode,
             @RequestParam(required = false) String classFilter) {
