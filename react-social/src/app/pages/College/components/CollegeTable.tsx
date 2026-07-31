@@ -6,13 +6,14 @@ import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { Dropdown } from "react-bootstrap";
-import { MdOutlineDashboard } from "react-icons/md";
+import { MdOutlineDashboard, MdGroups } from "react-icons/md";
 import { ActionIcon } from "../../../components/ActionIcon";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import InstituteWizardModal from "./InstituteWizardModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
+import InstituteGroupsModal from "./InstituteGroupsModal";
 import { showErrorToast } from '../../../utils/toast';
 // import InstituteStudentsModal from "./InstituteStudentsModal"; // disabled: see "Students at this institute" below
 
@@ -131,6 +132,14 @@ const CollegeTable = (props: {
   const [infoModalData, setInfoModalData] = useState<ModalData | undefined>(
     undefined
   );
+
+  // Named student groups for one institute. Held here rather than per row so
+  // only one modal instance exists no matter how many rows are rendered.
+  const [groupsModalShow, setGroupsModalShow] = useState(false);
+  const [groupsModalInstitute, setGroupsModalInstitute] = useState<{
+    code: number;
+    name: string;
+  } | null>(null);
 
   const [infoRolesModalShow, setInfoRolesModalShow] = useState(false);
   const [infoRolesModalData, setInfoRolesModalData] = useState<ModalData | undefined>(
@@ -300,6 +309,20 @@ const CollegeTable = (props: {
                   Assign Roles
                 </Dropdown.Item>
 
+                {/* Groups — named student cohorts inside this institute */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setGroupsModalInstitute({
+                      code: Number(data.instituteCode),
+                      name: data.instituteName || "",
+                    });
+                    setGroupsModalShow(true);
+                  }}
+                >
+                  <MdGroups size={18} className="me-2" />
+                  Groups
+                </Dropdown.Item>
+
                 {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx (opens in new tab) */}
                 <Dropdown.Item
                   onClick={() =>
@@ -447,6 +470,16 @@ const CollegeTable = (props: {
         data={infoRolesModalData}
         setPageLoading={props.setPageLoading}
       />
+
+      {/* Student groups for one institute */}
+      {groupsModalInstitute && (
+        <InstituteGroupsModal
+          show={groupsModalShow}
+          onHide={() => setGroupsModalShow(false)}
+          instituteCode={groupsModalInstitute.code}
+          instituteName={groupsModalInstitute.name}
+        />
+      )}
     </>
   );
 };

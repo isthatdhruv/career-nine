@@ -29,7 +29,6 @@ public class SpringSocialApplication {
 		TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
 	}
 
-	
 	public static void main(String[] args) {
 		SpringApplication.run(SpringSocialApplication.class, args);
 	}
