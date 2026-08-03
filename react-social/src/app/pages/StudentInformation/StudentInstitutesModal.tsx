@@ -11,6 +11,7 @@ import {
 } from "../B2C/API/Membership_APIs";
 import { InstituteOption } from "../B2C/API/Campaign_APIs";
 import { useInstitutes } from "../../lib/queries/lookups";
+import SearchableSelect from "../../components/SearchableSelect";
 
 interface Props {
   show: boolean;
@@ -164,12 +165,16 @@ const StudentInstitutesModal = ({ show, onHide, userStudentId, studentName }: Pr
             <hr />
             <h6>Add institute</h6>
             <div className="d-flex gap-2">
-              <Form.Select value={addCode} onChange={e => setAddCode(e.target.value)}>
-                <option value="">— pick an institute —</option>
-                {addableInstitutes.map(i => (
-                  <option key={i.instituteCode} value={i.instituteCode}>{i.instituteName}</option>
-                ))}
-              </Form.Select>
+              <SearchableSelect
+                options={addableInstitutes.map(i => ({
+                  value: String(i.instituteCode),
+                  label: String(i.instituteName ?? ""),
+                }))}
+                value={addCode}
+                onChange={(v) => setAddCode(v)}
+                placeholder="— pick an institute —"
+                style={{ flex: 1 }}
+              />
               <Button variant="primary" disabled={!addCode || busyCode !== null} onClick={handleAdd}>Add</Button>
             </div>
           </>

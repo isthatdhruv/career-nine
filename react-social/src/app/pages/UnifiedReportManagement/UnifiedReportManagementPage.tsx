@@ -5,6 +5,7 @@ import { useInstitutes } from "../../lib/queries/lookups";
 import { getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
 import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { getReportType } from "./API/UnifiedReport_APIs";
+import SearchableSelect from "../../components/SearchableSelect";
 
 // ═══════════════════════ COMPONENT ═══════════════════════
 
@@ -91,13 +92,15 @@ const UnifiedReportManagementPage: React.FC = () => {
           {institutesLoading ? (
             <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
           ) : (
-            <select className="form-select form-select-solid" value={selectedInstitute}
-              onChange={(e) => setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">-- Select a school --</option>
-              {institutes.map((inst) => (
-                <option key={inst.instituteCode} value={inst.instituteCode}>{inst.instituteName}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              options={institutes.map((inst) => ({
+                value: String(inst.instituteCode),
+                label: String(inst.instituteName ?? ""),
+              }))}
+              value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+              onChange={(v) => setSelectedInstitute(v === "" ? "" : Number(v))}
+              placeholder="-- Select a school --"
+            />
           )}
         </div>
         <div>

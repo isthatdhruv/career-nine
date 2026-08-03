@@ -24,7 +24,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: dev
+    active: production
   servlet:
     multipart:
       max-file-size: 1GB
@@ -454,7 +454,7 @@ app:
     secure: true
     domain: career-9.com
   cors:
-    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com,http://localhost:5173,http://localhost:3000
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com,http://localhost:5173,http://localhost:3000,https://staging-dashboard.career-9.com,https://staging-assessment.career-9.com,https://api-staging.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://api.career-9.com
   oauth2:
     authorizedRedirectUris:
       - https://dashboard.career-9.com/oauth2/redirect

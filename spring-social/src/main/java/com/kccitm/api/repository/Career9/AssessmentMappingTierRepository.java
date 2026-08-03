@@ -21,6 +21,9 @@ public interface AssessmentMappingTierRepository extends JpaRepository<Assessmen
     // Free tier (the is_free=true row backing the free link). Expected: at most one per mapping.
     Optional<AssessmentMappingTier> findFirstByMappingIdAndIsFreeTrue(Long mappingId);
 
+    // The tier materialised on this mapping from a given B2C pricing tier (per-student invites).
+    Optional<AssessmentMappingTier> findFirstByMappingIdAndPricingTierId(Long mappingId, Long pricingTierId);
+
     // Paid waves only (is_free=false), for active-tier resolution on the paid link.
     List<AssessmentMappingTier> findByMappingIdAndIsFreeAndIsActiveOrderBySortOrderAsc(
             Long mappingId, Boolean isFree, Boolean isActive);

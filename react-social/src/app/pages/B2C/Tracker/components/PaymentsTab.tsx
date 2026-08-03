@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Form, Pagination, Spinner, Table } from "react-bootstrap";
 import { showErrorToast, showSuccessToast } from "../../../../utils/toast";
+import SearchableSelect from "../../../../components/SearchableSelect";
 import {
   InstituteOption,
   PaymentRow,
@@ -230,17 +231,17 @@ const PaymentsTab = ({
                 </td>
                 <td style={{ minWidth: 180 }}>
                   {r.userStudentId ? (
-                    <Form.Select
-                      size="sm"
-                      value={r.instituteCode ?? ""}
+                    <SearchableSelect
+                      options={institutes.map(i => ({
+                        value: String(i.instituteCode),
+                        label: String(i.instituteName ?? ""),
+                      }))}
+                      value={r.instituteCode == null ? "" : String(r.instituteCode)}
+                      onChange={(v) => { if (v) changeInstitute(r, Number(v)) }}
+                      placeholder={r.instituteName ?? "— select —"}
                       disabled={savingInstitute === r.transactionId}
-                      onChange={(e) => changeInstitute(r, Number(e.target.value))}
-                    >
-                      <option value="" disabled>{r.instituteName ?? "— select —"}</option>
-                      {institutes.map(i => (
-                        <option key={i.instituteCode} value={i.instituteCode}>{i.instituteName}</option>
-                      ))}
-                    </Form.Select>
+                      isClearable={false}
+                    />
                   ) : (
                     <em className="text-muted small">no student yet</em>
                   )}

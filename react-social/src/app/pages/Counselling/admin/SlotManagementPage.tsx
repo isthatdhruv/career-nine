@@ -2,12 +2,17 @@ import React, { useEffect, useState } from 'react'
 import '../Counselling.css'
 import { createSlotConfig, getAllSlotConfigs, deleteSlotConfig, cleanupLegacy, SlotConfig } from '../API/SlotConfigurationAPI'
 import PageHeader from '../../../components/PageHeader'
+import BulkCounsellingAllotmentPage from './BulkCounsellingAllotmentPage'
+import SingleStudentBookingPage from './SingleStudentBookingPage'
 
 const SlotManagementPage: React.FC = () => {
   const [configs, setConfigs] = useState<SlotConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // Which tool is shown: slot creation, or one of the two admin-booking tools.
+  const [activeTab, setActiveTab] = useState<'slots' | 'bulk' | 'single'>('slots')
 
   // Form state
   const [showForm, setShowForm] = useState(false)
@@ -127,23 +132,69 @@ const SlotManagementPage: React.FC = () => {
         icon={<i className="bi bi-calendar-week" />}
         title="Counselling Slots"
         subtitle="Create slot configurations and assign them to counsellors from Manage Counsellors page"
-        actions={[
-          {
-            label: showForm ? 'Cancel' : 'New Configuration',
-            iconClass: showForm ? 'bi-x-lg' : 'bi-plus-lg',
-            onClick: () => setShowForm(!showForm),
-            variant: 'primary',
-          },
-          {
-            label: cleaning ? 'Cleaning...' : 'Cleanup Legacy Slots',
-            iconClass: 'bi-trash',
-            onClick: handleCleanupLegacy,
-            variant: 'danger',
-            disabled: cleaning,
-          },
-        ]}
       />
 
+      {/* Tool selector — card style, mirrors the "Mapping Level" selector */}
+      <div style={{
+        background: '#fff', borderRadius: 16, padding: '16px 24px',
+        border: '1px solid #e2e8f0', marginBottom: 16,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      }}>
+        <div style={{ fontWeight: 600, fontSize: '0.8rem', color: '#475569', marginBottom: 10 }}>
+          Counselling Tool
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <TabOption
+            label="Create Slots"
+            description="Define counsellor availability — create slot configurations"
+            active={activeTab === 'slots'}
+            onClick={() => setActiveTab('slots')}
+            accent="#059669"
+          />
+          <TabOption
+            label="Bulk Allotment"
+            description="Auto-book counselling for everyone who completed an assessment"
+            active={activeTab === 'bulk'}
+            onClick={() => setActiveTab('bulk')}
+            accent="#2563eb"
+          />
+          <TabOption
+            label="Book for Student"
+            description="Pick one student + a slot → book a single counselling session"
+            active={activeTab === 'single'}
+            onClick={() => setActiveTab('single')}
+            accent="#7c3aed"
+          />
+        </div>
+      </div>
+
+      {activeTab === 'bulk' && <BulkCounsellingAllotmentPage />}
+      {activeTab === 'single' && <SingleStudentBookingPage />}
+
+      {activeTab === 'slots' && (
+        <>
+      {/* Slot actions — moved out of the page header into this tab */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+        <button
+          className='cl-btn-primary'
+          onClick={() => setShowForm(!showForm)}
+          style={{ fontSize: 14, padding: '10px 20px' }}
+        >
+          {showForm ? '✕ Cancel' : '＋ New Configuration'}
+        </button>
+        <button
+          onClick={handleCleanupLegacy}
+          disabled={cleaning}
+          style={{
+            fontSize: 14, padding: '10px 20px', borderRadius: 8,
+            background: '#fff', border: '1.5px solid #FECACA',
+            color: '#991B1B', fontWeight: 600,
+            cursor: cleaning ? 'not-allowed' : 'pointer', opacity: cleaning ? 0.6 : 1,
+          }}
+        >
+          {cleaning ? 'Cleaning…' : 'Cleanup Legacy Slots'}
+        </button>
+      </div>
       {/* Alerts */}
       {error && (
         <div style={{
@@ -285,9 +336,53 @@ const SlotManagementPage: React.FC = () => {
           ))}
         </div>
       )}
+        </>
+      )}
     </div>
     </div>
   )
 }
+
+interface TabOptionProps {
+  label: string
+  description: string
+  active: boolean
+  onClick: () => void
+  accent: string
+}
+
+// Card-style selector matching the AssessmentMapping "Mapping Level" options:
+// radio dot + bold title + description, accent-tinted border/background when active.
+const TabOption = ({ label, description, active, onClick, accent }: TabOptionProps) => (
+  <button
+    type="button"
+    onClick={onClick}
+    style={{
+      flex: '1 1 220px',
+      textAlign: 'left',
+      padding: '14px 18px',
+      borderRadius: 12,
+      border: active ? `2px solid ${accent}` : '1.5px solid #e2e8f0',
+      background: active ? `${accent}10` : '#fff',
+      cursor: 'pointer',
+      transition: 'all 0.15s',
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{
+        width: 16, height: 16, borderRadius: '50%',
+        border: `2px solid ${accent}`,
+        background: active ? accent : 'transparent',
+        flexShrink: 0,
+      }} />
+      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: active ? accent : '#1e293b' }}>
+        {label}
+      </div>
+    </div>
+    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 6, marginLeft: 26 }}>
+      {description}
+    </div>
+  </button>
+)
 
 export default SlotManagementPage

@@ -1,7 +1,6 @@
 package com.kccitm.api.service.counselling;
 
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.transaction.Transactional;
@@ -234,6 +233,47 @@ public class CounsellingNotificationService {
             sendEmail(studentEmail, subject, body);
         } catch (Exception e) {
             logger.error("Failed to send counsellor-leave cancellation email for appointment ID: {}. Error: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * Counsellor-absence self-reschedule: the student's counsellor is unavailable, so instead of a
+     * dead-end cancellation we email a tokenized link to a no-login page where the student picks a
+     * new slot with any available counsellor. Sent via Gmail like all counselling mail.
+     */
+    @Async
+    public void sendSelfRescheduleEmail(CounsellingAppointment appointment, String rescheduleUrl) {
+        try {
+            String studentName = studentName(appointment);
+            String studentEmail = studentEmail(appointment);
+            if (studentEmail == null || studentEmail.isEmpty()) {
+                logger.warn("No student email for appointment {} — cannot send self-reschedule link",
+                        appointment != null ? appointment.getId() : "null");
+                return;
+            }
+            String counsellorName = appointment.getCounsellor() != null
+                    && appointment.getCounsellor().getName() != null
+                    ? appointment.getCounsellor().getName() : "Your counsellor";
+            String when = "";
+            if (appointment.getSlot() != null) {
+                when = " on " + appointment.getSlot().getDate().format(DATE_FMT)
+                        + " at " + appointment.getSlot().getStartTime().format(TIME_FMT);
+            }
+
+            String subject = "Reschedule your counselling session";
+            String body = "Dear " + studentName + ",\n\n"
+                    + counsellorName + " is no longer available for your counselling session" + when + ".\n\n"
+                    + "Your session has NOT been cancelled — please pick a new slot that suits you here:\n"
+                    + rescheduleUrl + "\n\n"
+                    + "Once you choose a time, your session is confirmed instantly and you'll get a "
+                    + "confirmation with the meeting details.\n\n"
+                    + "We're sorry for the inconvenience.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            sendEmail(studentEmail, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send self-reschedule email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
         }
     }

@@ -7,6 +7,7 @@ import {
   assignCounsellor,
   deleteAssignment,
   getPendingCounsellingRequests,
+  getCounsellingEnabledAssessments,
   PendingCounsellingRequest,
 } from '../API/CounsellorAssessmentAPI'
 import { getAssessmentSummaryList } from '../../AssessmentMapping/API/AssessmentMapping_APIs'
@@ -42,6 +43,9 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
   const { currentUser } = useAuth()
   const [counsellors, setCounsellors] = useState<Counsellor[]>([])
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([])
+  // Assessment ids with counselling toggled on in an active tier; null = the
+  // lookup hasn't loaded (or failed), in which case no filtering is applied.
+  const [counsellingEnabledIds, setCounsellingEnabledIds] = useState<Set<number> | null>(null)
   const [loadedAssessmentId, setLoadedAssessmentId] = useState<number | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(false)
@@ -66,6 +70,9 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
         setAssessments(list)
       })
       .catch(() => setError('Failed to load assessments.'))
+    getCounsellingEnabledAssessments()
+      .then((res) => setCounsellingEnabledIds(new Set(res.data || [])))
+      .catch(() => { /* non-fatal — dropdown falls back to showing all assessments */ })
     loadPending()
   }, [])
 
@@ -111,13 +118,22 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
     }
   }
 
+  // Only offer assessments where counselling is toggled on in an active tier —
+  // assigning a counsellor to any other assessment would be a no-op for students.
+  // The currently-loaded assessment stays visible regardless (the pending-requests
+  // panel can open one directly), and if the lookup failed we show everything.
+  const selectableAssessments = assessments.filter(
+    (a) => counsellingEnabledIds === null || counsellingEnabledIds.has(a.id) || a.id === loadedAssessmentId
+  )
+
   return (
     <div style={{ padding: 24 }}>
       <PageHeader title="Counsellor — Assessment Assignment" />
       <p style={{ color: '#5C7A72', fontSize: 14, marginBottom: 16 }}>
         Choose which counsellors handle counselling for a given assessment. Students who
         finish that assessment are only offered slots from the assigned counsellors. If an
-        assessment has no assignments, all institute counsellors remain available.
+        assessment has no assignments, all institute counsellors remain available. Only
+        assessments whose package includes counselling appear in the list.
       </p>
 
       {pending.length > 0 && (
@@ -174,7 +190,7 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
           }}
         >
           <option value="">— Select an assessment —</option>
-          {assessments.map((a) => (
+          {selectableAssessments.map((a) => (
             <option key={a.id} value={a.id}>{a.assessmentName}</option>
           ))}
         </select>

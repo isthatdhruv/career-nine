@@ -6,6 +6,7 @@ import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../A
 import { getOfflineMapping, bulkSubmitByRollNumber } from "./API/OfflineUpload_APIs";
 import { showErrorToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
+import SearchableSelect from "../../components/SearchableSelect";
 
 // ============ Interfaces ============
 
@@ -563,17 +564,15 @@ const OfflineAssessmentUploadPage = () => {
               {loadingInstitutes ? (
                 <div><Spinner animation="border" size="sm" /> Loading...</div>
               ) : (
-                <Form.Select
+                <SearchableSelect
+                  options={institutes.map((inst: any) => ({
+                    value: String(inst.instituteCode),
+                    label: String(inst.instituteName ?? ""),
+                  }))}
                   value={selectedInstitute}
-                  onChange={(e) => setSelectedInstitute(e.target.value)}
-                >
-                  <option value="">Select an institute...</option>
-                  {institutes.map((inst: any) => (
-                    <option key={inst.instituteCode} value={inst.instituteCode}>
-                      {inst.instituteName}
-                    </option>
-                  ))}
-                </Form.Select>
+                  onChange={(v) => setSelectedInstitute(v)}
+                  placeholder="Select an institute..."
+                />
               )}
             </div>
             <div className="col-md-5">

@@ -24,7 +24,7 @@ import {
   GenerateUnifiedReport,
   TemplateMappingDto,
 } from "../ReportTemplates/API/Report_Templates_APIs";
-import { generateAndExportNavigatorExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
+import { exportAssessmentDataExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
 import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
 import {
   SendReportEmail,
@@ -42,6 +42,7 @@ import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
 import PageHeader from "../../components/PageHeader";
+import SearchableSelect from "../../components/SearchableSelect";
 import { useAuth, Scope } from "../../modules/auth";
 
 // ═══════════════════════ TYPES ═══════════════════════
@@ -179,6 +180,8 @@ const ReportsHubPage: React.FC = () => {
 
   // ── Selection + pagination ──
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // ── Search + Filters ──
   const [nameQuery, setNameQuery] = useState("");
@@ -320,6 +323,7 @@ const ReportsHubPage: React.FC = () => {
     // Back to the default of everyone ticked (not cleared) — the user
     // deselects the students they don't want.
     setSelectedStudentIds(new Set(students.map((s) => s.userStudentId)));
+    setCurrentPage(1);
     setNameQuery("");
     setSelectedGrade("");
     setSelectedSection("");
@@ -336,7 +340,6 @@ const ReportsHubPage: React.FC = () => {
 
   const reportType: ReportType = selectedAssessmentObj ? getReportType(selectedAssessmentObj) : "bet";
   const isBet = reportType === "bet";
-  const isNavigator = !isBet;
 
   // Source report status/URL from the unified generated_report rows, filtered
   // to the selected template (or any, when none is selected). Keeps the rest of
@@ -523,6 +526,16 @@ const ReportsHubPage: React.FC = () => {
     return result;
   }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo, selectedAssessmentObj, sectionLookup, gradeOf]);
 
+  const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
+  // Clamped rather than reset, so shrinking the result set past the current page
+  // still renders rows instead of an empty table.
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedStudents = useMemo(
+    () => displayedStudents.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize),
+    [displayedStudents, safeCurrentPage, pageSize]
+  );
+
+  useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo]);
 
   // Secret unlock: typing exactly "boom" in the username search toggles admin edit mode.
   useEffect(() => {
@@ -765,8 +778,8 @@ const ReportsHubPage: React.FC = () => {
     if (ids.length === 0) { showErrorToast("No students."); return; }
     setExportingDataExcel(true);
     try {
-      const res = await generateAndExportNavigatorExcel(selectedAssessmentObj.id, ids);
-      downloadBlob(res.data, `navigator_data_${selectedAssessmentObj.id}.xlsx`);
+      const res = await exportAssessmentDataExcel(selectedAssessmentObj.id, ids);
+      downloadBlob(res.data, `assessment_data_${selectedAssessmentObj.id}.xlsx`);
       showSuccessToast(`Generated data for ${ids.length} student(s).`);
     } catch (err: any) { showErrorToast("Generation failed: " + (err?.response?.data?.error || err.message)); }
     finally { setExportingDataExcel(false); }
@@ -999,13 +1012,15 @@ const ReportsHubPage: React.FC = () => {
           {institutesLoading ? (
             <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
           ) : (
-            <select className="form-select form-select-solid" value={selectedInstitute}
-              onChange={(e) => setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">-- Select a school --</option>
-              {institutes.map((inst) => (
-                <option key={inst.instituteCode} value={inst.instituteCode}>{inst.instituteName}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              options={institutes.map((inst) => ({
+                value: String(inst.instituteCode),
+                label: String(inst.instituteName ?? ""),
+              }))}
+              value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+              onChange={(v) => setSelectedInstitute(v === "" ? "" : Number(v))}
+              placeholder="-- Select a school --"
+            />
           )}
         </div>
         <div>
@@ -1352,8 +1367,8 @@ const ReportsHubPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {displayedStudents.map((s, idx) => {
-                      const globalIdx = idx;
+                    {paginatedStudents.map((s, idx) => {
+                      const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
                       const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
                       const asmtDetail = (s.assessments || []).find(
                         (a) => a.assessmentId === selectedAssessmentObj!.id
@@ -1532,10 +1547,35 @@ const ReportsHubPage: React.FC = () => {
                 </table>
               </div>
 
-              {/* All reports render on one page — total shown below the table */}
-              <div style={{ marginTop: 12, fontSize: "0.8rem", color: "#6b7280", textAlign: "right" }}>
-                {displayedStudents.length} student{displayedStudents.length === 1 ? "" : "s"}
-              </div>
+              {/* Pagination — right-aligned "Rows per page: [n]  x - y of z  ‹ ›" bar */}
+              {displayedStudents.length > 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "flex-end",
+                  marginTop: 12, gap: 14, flexWrap: "wrap",
+                }}>
+                  <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>Rows per page:</span>
+                  <select className="form-select form-select-sm form-select-solid"
+                    style={{ width: 68, fontSize: "0.8rem" }} value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>
+                    {[10, 25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <span style={{ fontSize: "0.8rem", color: "#374151" }}>
+                    {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} aria-label="Previous page"
+                      style={{ width: 32, height: 32, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <i className="bi bi-chevron-left" style={{ fontSize: "0.8rem" }} />
+                    </button>
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} aria-label="Next page"
+                      style={{ width: 32, height: 32, borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <i className="bi bi-chevron-right" style={{ fontSize: "0.8rem" }} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1546,7 +1586,6 @@ const ReportsHubPage: React.FC = () => {
       <MiraDesaiModal
         open={miraDesaiOpen}
         onClose={() => setMiraDesaiOpen(false)}
-        isNavigator={isNavigator}
         generating={exportingDataExcel}
         exportingMQT={exportingMQT}
         exportingDashboard={exportingDashboard}

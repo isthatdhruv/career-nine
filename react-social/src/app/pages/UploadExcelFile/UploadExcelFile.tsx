@@ -10,6 +10,7 @@ import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 import CreateStudentModal from "../StudentInformation/CreateStudentModal";
+import SearchableSelect from "../../components/SearchableSelect";
 
 /* ================= MASTER SCHEMA ================= */
 
@@ -399,28 +400,16 @@ export default function UploadExcelFile() {
           <div className="d-flex align-items-center justify-content-end flex-wrap gap-3">
             <div className="d-flex align-items-center gap-3 flex-wrap">
               <div className="position-relative">
-                <select
-                  className="form-select shadow-sm"
-                  style={{
-                    minWidth: '220px',
-                    borderRadius: '10px',
-                    border: '2px solid #e0e0e0',
-                    padding: '0.6rem 1rem',
-                    fontWeight: 500,
-                    transition: 'all 0.3s ease'
-                  }}
-                  value={selectedInstitute}
-                  onChange={(e) => {
-                    setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
-                  }}
-                >
-                  <option value="">Select Institute</option>
-                  {institutes.map((inst) => (
-                    <option key={inst.instituteCode} value={inst.instituteCode}>
-                      {inst.instituteName}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  options={institutes.map((inst) => ({
+                    value: String(inst.instituteCode),
+                    label: String(inst.instituteName ?? ""),
+                  }))}
+                  value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+                  onChange={(v) => setSelectedInstitute(v ? Number(v) : "")}
+                  placeholder="Select Institute"
+                  style={{ minWidth: '220px' }}
+                />
               </div>
               <div className="position-relative">
                 <select

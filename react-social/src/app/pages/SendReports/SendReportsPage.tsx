@@ -8,6 +8,7 @@ import {
   SendWhatsAppBulk,
 } from "../ContactPerson/API/Contact_Person_APIs";
 import { EmailAccount, getEmailAccounts } from "../EmailAccounts/API/EmailAccount_APIs";
+import SearchableSelect from "../../components/SearchableSelect";
 
 interface ReportStatusEntry {
   userStudentId: number;
@@ -370,20 +371,15 @@ const SendReportsPage: React.FC = () => {
             {institutesLoading ? (
               <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
             ) : (
-              <select
-                className="form-select form-select-solid"
-                value={selectedInstitute}
-                onChange={(e) =>
-                  setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value))
-                }
-              >
-                <option value="">-- Select a school --</option>
-                {institutes.map((inst: any) => (
-                  <option key={inst.instituteCode} value={inst.instituteCode}>
-                    {inst.instituteName}
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                options={institutes.map((inst: any) => ({
+                  value: String(inst.instituteCode),
+                  label: String(inst.instituteName ?? ""),
+                }))}
+                value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+                onChange={(v) => setSelectedInstitute(v === "" ? "" : Number(v))}
+                placeholder="-- Select a school --"
+              />
             )}
           </div>
 

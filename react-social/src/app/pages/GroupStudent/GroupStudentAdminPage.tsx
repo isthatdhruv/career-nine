@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import { useInstitutes } from "../../lib/queries/lookups";
+import SearchableSelect from "../../components/SearchableSelect";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
@@ -1232,11 +1233,14 @@ export default function GroupStudentAdminPage() {
           <i className="bi bi-building" style={{ color: "#4361ee" }}></i>
           Select Institute
         </label>
-        <select
-          className="form-select-custom"
-          value={selectedInstitute}
-          onChange={(e) => {
-            const newValue = e.target.value ? Number(e.target.value) : "";
+        <SearchableSelect
+          options={institutes.map((inst: any) => ({
+            value: String(inst.instituteCode),
+            label: String(inst.instituteName ?? ""),
+          }))}
+          value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+          onChange={(v) => {
+            const newValue = v ? Number(v) : "";
             setSelectedInstitute(newValue);
             if (!newValue) {
               setStudents([]);
@@ -1245,14 +1249,8 @@ export default function GroupStudentAdminPage() {
               setHasChanges(false);
             }
           }}
-        >
-          <option value="">🏫 Select Institute</option>
-          {institutes.map((inst) => (
-            <option key={inst.instituteCode} value={inst.instituteCode}>
-              {inst.instituteName}
-            </option>
-          ))}
-        </select>
+          placeholder="🏫 Select Institute"
+        />
       </div>
 
       {/* Students List Section - Only shown when institute is selected */}

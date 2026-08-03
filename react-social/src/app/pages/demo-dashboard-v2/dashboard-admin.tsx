@@ -6,6 +6,7 @@ import { PageTitle } from "../../../_metronic/layout/core";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
 import { useAuth } from "../../modules/auth/core/Auth";
 import { Scope } from "../../modules/auth";
+import SearchableSelect from "../../components/SearchableSelect";
 import {
   AdminDashboardSnapshot,
   fetchAdminDashboardSnapshot,
@@ -3351,8 +3352,8 @@ const CounsellingDrillDownCard: FC<{
           v.counselled.has(sid)
         ).length,
       }))
-      .sort(
-        (a, b) => b.completedAssessment - a.completedAssessment || a.name.localeCompare(b.name)
+      .sort((a, b) =>
+        a.name.trim().localeCompare(b.name.trim(), undefined, { sensitivity: "base" })
       );
   }, [institutes, studentMappings, studentsWithCounselling]);
 
@@ -3425,24 +3426,22 @@ const CounsellingDrillDownCard: FC<{
               } · of students who completed assessment, how many took counselling`
         }
         right={
-          <select
-            className="ds-select"
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            disabled={loading || mappingsLoading || perInstitute.length === 0}
-          >
-            <option value="" disabled>
-              {loading || mappingsLoading ? "Loading…" : "Select institute"}
-            </option>
-            {perInstitute.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
-                {i.completedAssessment > 0
+          <SearchableSelect
+            options={perInstitute.map((i) => ({
+              value: String(i.id),
+              label:
+                i.name +
+                (i.completedAssessment > 0
                   ? ` · ${i.counselled}/${i.completedAssessment} counselled`
-                  : ""}
-              </option>
-            ))}
-          </select>
+                  : ""),
+            }))}
+            value={selectedId}
+            onChange={(v) => { if (v) setSelectedId(v) }}
+            placeholder={loading || mappingsLoading ? "Loading…" : "Select institute"}
+            disabled={loading || mappingsLoading || perInstitute.length === 0}
+            isClearable={false}
+            style={{ minWidth: 260 }}
+          />
         }
       />
       <div style={{ padding: "0 24px 24px" }}>
