@@ -11,6 +11,14 @@
 # production
 
 /public/*
+
+# The standalone school dashboards (/school/dashboard, /school/navigator-dashboard)
+# ship their behaviour as static assets that the page fetches at runtime, so these
+# have to be committed. They were previously only ever present in build output, which
+# a rebuild wipes — leaving both pages with dead role tabs and no charts.
+!/public/career-navigator-school-dashboard.js
+!/public/career-navigator-school-navigator-dashboard.js
+
 # misc
 .DS_Store
 .env.local
