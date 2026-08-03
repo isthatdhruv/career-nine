@@ -6,17 +6,20 @@ type Props = {
   generating: boolean;
   exportingMQT: boolean;
   exportingDashboard: boolean;
+  exportingPsychometric: boolean;
   onGenerateDataExcel: () => void;
   onExportBetCoreData: () => void;
   onExportDashboardSheet: () => void;
+  onExportPsychometricProperties: () => void;
   onSchoolReport: () => void;
   visibleSelectedCount: number;
   displayedCount: number;
 };
 
 const MiraDesaiModal: React.FC<Props> = ({
-  open, onClose, isNavigator, generating, exportingMQT, exportingDashboard,
-  onGenerateDataExcel, onExportBetCoreData, onExportDashboardSheet, onSchoolReport,
+  open, onClose, isNavigator, generating, exportingMQT, exportingDashboard, exportingPsychometric,
+  onGenerateDataExcel, onExportBetCoreData, onExportDashboardSheet,
+  onExportPsychometricProperties, onSchoolReport,
   visibleSelectedCount, displayedCount,
 }) => {
   if (!open) return null;
@@ -110,6 +113,26 @@ const MiraDesaiModal: React.FC<Props> = ({
             }}
           >
             {exportingDashboard ? "Building..." : `Dashboard Sheet${countLabel}`}
+          </button>
+
+          <button
+            className="btn"
+            onClick={onExportPsychometricProperties}
+            disabled={exportingPsychometric}
+            title="The Navigator 360 psychometric raw-data sheet — one row per student with scale totals, item-level marks, tops and suitability indices — for the students currently in view"
+            style={{
+              background: exportingPsychometric
+                ? "#6c757d"
+                : "linear-gradient(135deg, #b45309 0%, #78350f 100%)",
+              border: "none", borderRadius: 10, padding: "12px 20px",
+              fontWeight: 600, color: "white", fontSize: "0.9rem",
+              boxShadow: exportingPsychometric ? "none" : "0 4px 12px rgba(180, 83, 9, 0.3)",
+              width: "100%", textAlign: "left",
+            }}
+          >
+            {exportingPsychometric
+              ? "Computing statistics..."
+              : `Psychometric Properties of Navigator 360${countLabel}`}
           </button>
 
           <button
