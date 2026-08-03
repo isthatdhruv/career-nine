@@ -57,6 +57,7 @@ export function AsideMenuMain() {
   const showInstitute =
     allowed("/college") ||
     allowed("/contact-person") ||
+    allowed("/group-management") ||
     allowed("/group-student") ||
     allowed("/student-management") ||
     allowed("/student-list") ||
@@ -225,6 +226,14 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen044.svg"
                 title="Add Contact Person Information"
                 fontIcon="bi-app-indicator"
+              />
+            )}
+            {allowed("/group-management") && (
+              <AsideMenuItem
+                to="/group-management"
+                icon="/media/icons/duotune/communication/com014.svg"
+                title="Group Management"
+                fontIcon="bi-people"
               />
             )}
             {allowed("/group-student") && (

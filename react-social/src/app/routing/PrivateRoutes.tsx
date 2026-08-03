@@ -277,6 +277,10 @@ const PrivateRoutes = () => {
   );
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
   const College = lazy(() => import("../pages/College/CollegePage"));
+  // Standalone twin of the institute list's "Groups" action — same manager panel.
+  const GroupManagementPage = lazy(
+    () => import("../pages/GroupManagement/GroupManagementPage")
+  );
   const CohortInsightsPage = lazy(() => import("../pages/SchoolAdmin/CohortInsightsPage"));
   // Named apart from the module-scope SchoolDashboardPage import (the per-institute
   // "Dashboard 1" popup) — a local const of that name would shadow it in here.
@@ -956,6 +960,19 @@ const PrivateRoutes = () => {
             <RequirePermission perm="institute.write">
               <SuspensedView>
                 <CollegeCreatePage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        {/* Group Management — the institute list's Groups modal as its own page.
+            Read is the entry gate; the create / update / delete / member.manage /
+            contact.assign permissions gate the individual controls inside. */}
+        <Route
+          path="/group-management"
+          element={
+            <RequirePermission perm="student_group.read">
+              <SuspensedView>
+                <GroupManagementPage />
               </SuspensedView>
             </RequirePermission>
           }
