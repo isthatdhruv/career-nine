@@ -585,13 +585,17 @@ public class NavigatorReportGenerationService {
          */
         final Map<Long, List<AssessmentAnswer>> answersByStudent;
         final List<SectionMeta> sectionMetas;
+        /** Question text per questionnaire-question id, for exports that label item columns. */
+        final Map<Long, String> questionTextByQQId;
 
         AssessmentScoringContext(List<AssessmentAnswer> allAnswers,
                 Map<Long, List<AssessmentAnswer>> answersByStudent,
-                List<SectionMeta> sectionMetas) {
+                List<SectionMeta> sectionMetas,
+                Map<Long, String> questionTextByQQId) {
             this.allAnswers = allAnswers;
             this.answersByStudent = answersByStudent;
             this.sectionMetas = sectionMetas;
+            this.questionTextByQQId = questionTextByQQId;
         }
     }
 
@@ -699,7 +703,35 @@ public class NavigatorReportGenerationService {
                 .filter(a -> a.getUserStudent() != null)
                 .collect(Collectors.groupingBy(a -> a.getUserStudent().getUserStudentId()));
 
-        return new AssessmentScoringContext(allAnswers, answersByStudent, sectionMetas);
+        Map<Long, String> questionTextByQQId = new LinkedHashMap<>();
+        for (Map.Entry<Long, QuestionnaireQuestion> entry : qqById.entrySet()) {
+            QuestionnaireQuestion qq = entry.getValue();
+            if (qq.getQuestion() != null && qq.getQuestion().getQuestionText() != null) {
+                questionTextByQQId.put(entry.getKey(), qq.getQuestion().getQuestionText());
+            }
+        }
+
+        return new AssessmentScoringContext(allAnswers, answersByStudent, sectionMetas, questionTextByQQId);
+    }
+
+    /**
+     * The RIASEC (personality) section's question statements in question order,
+     * aligned with {@link ItemLevelMarks#riasec}. Empty array when the
+     * assessment has no such section; entries may be null when a question has
+     * no stored text.
+     */
+    public String[] riasecQuestionTexts(AssessmentScoringContext ctx) {
+        for (SectionMeta sm : ctx.sectionMetas) {
+            int qCount = sm.sortedQQIds.size();
+            if (sm.isSingleAnswer && qCount >= 48 && qCount <= 60) {
+                String[] texts = new String[qCount];
+                for (int qIdx = 0; qIdx < qCount; qIdx++) {
+                    texts[qIdx] = ctx.questionTextByQQId.get(sm.sortedQQIds.get(qIdx));
+                }
+                return texts;
+            }
+        }
+        return new String[0];
     }
 
     /**
@@ -795,6 +827,68 @@ public class NavigatorReportGenerationService {
         scores.selectedValues = selectedValues;
         scores.selectedCareerAsps = selectedCareerAsps;
         return scores;
+    }
+
+    /**
+     * Per-question marks for one student, in question order within each scored
+     * section: RIASEC weights YES=2/NO=1, aptitude and MI weights A=4..D=1.
+     * A null entry means the student never answered that question.
+     */
+    public static class ItemLevelMarks {
+        public Integer[] riasec = new Integer[0];   // 54 in RIASEC question order
+        public Integer[] aptitude = new Integer[0]; // 30 in aptitude question order
+        public Integer[] mi = new Integer[0];       // 24 in MI question order
+    }
+
+    /**
+     * Item-level companion to {@link #computeIntermediaryScores(Long, Long,
+     * AssessmentScoringContext)}: same section detection (first single-answer
+     * section of 48-60 questions is RIASEC, 25-35 aptitude, 20-26 MI), but keeps
+     * each question's mark instead of summing them. Used by the psychometric
+     * properties export, whose item statistics need the per-question matrix.
+     */
+    public ItemLevelMarks computeItemLevelMarks(Long userStudentId, AssessmentScoringContext ctx) {
+        List<AssessmentAnswer> studentAnswers =
+                ctx.answersByStudent.getOrDefault(userStudentId, Collections.emptyList());
+
+        ItemLevelMarks marks = new ItemLevelMarks();
+        boolean riasecDone = false, aptitudeDone = false, miDone = false;
+
+        for (SectionMeta sm : ctx.sectionMetas) {
+            if (!sm.isSingleAnswer) {
+                continue;
+            }
+            int qCount = sm.sortedQQIds.size();
+            if (qCount >= 48 && qCount <= 60 && !riasecDone) {
+                riasecDone = true;
+                marks.riasec = new Integer[qCount];
+                for (int qIdx = 0; qIdx < qCount; qIdx++) {
+                    String label = getStudentAnswerLabel(studentAnswers, sm.sortedQQIds.get(qIdx), sm.qqOptions);
+                    if (label == null || label.isEmpty()) {
+                        marks.riasec[qIdx] = null;
+                    } else if ("YES".equalsIgnoreCase(label) || "Y".equalsIgnoreCase(label)) {
+                        marks.riasec[qIdx] = 2;
+                    } else {
+                        marks.riasec[qIdx] = 1;
+                    }
+                }
+            } else if (qCount >= 25 && qCount <= 35 && !aptitudeDone) {
+                aptitudeDone = true;
+                marks.aptitude = new Integer[qCount];
+                for (int qIdx = 0; qIdx < qCount; qIdx++) {
+                    String label = getStudentAnswerLabel(studentAnswers, sm.sortedQQIds.get(qIdx), sm.qqOptions);
+                    marks.aptitude[qIdx] = (label == null || label.isEmpty()) ? null : aptitudeWeight(label);
+                }
+            } else if (qCount >= 20 && qCount <= 26 && !miDone) {
+                miDone = true;
+                marks.mi = new Integer[qCount];
+                for (int qIdx = 0; qIdx < qCount; qIdx++) {
+                    String label = getStudentAnswerLabel(studentAnswers, sm.sortedQQIds.get(qIdx), sm.qqOptions);
+                    marks.mi[qIdx] = (label == null || label.isEmpty()) ? null : miWeight(label);
+                }
+            }
+        }
+        return marks;
     }
 
     // ═══════════════════════ MULTI-SELECT EXTRACTION ═══════════════════════
