@@ -2,8 +2,9 @@
  * School Dashboard — corporate school-insight view.
  *
  * Colour is split in two on purpose:
- *  - CHROME (header, section rules, surfaces) follows the app's existing
- *    dashboard identity, the indigo→violet pair used by PrincipalDashboard.
+ *  - CHROME (header, section rules, surfaces) is flat corporate navy, drawn
+ *    from this page's own --seq-700 / --seq-550 so it shares a hue family with
+ *    the charts. No gradients: the page reads as an instrument, not a banner.
  *  - DATA SERIES use --series-*, --div-*, --seq-* and --status-*, which are the
  *    validated data-viz slots. Both modes were run through the palette
  *    validator against the surfaces below; do not hand-tune a series hex
@@ -11,20 +12,39 @@
  */
 
 .school-dashboard {
-  /* Chrome — app dashboard identity */
-  --brand-a: #667eea;
-  --brand-b: #764ba2;
-  --brand-ink: #4c3d8f;
+  /* Chrome — corporate navy, drawn from this page's own validated sequential
+     ramp (--seq-700 / --seq-550) so chrome and charts share a hue family.
+     Flat: no gradients anywhere in the chrome. */
+  --brand-deep: #0d366b;
+  --brand: #1c5cab;
+  --brand-soft: #dbe7f7;
+  --brand-tint: #eef3fa;
+  --field-border: #d6dce6;
+  --field-border-hover: #b9c4d3;
 
   /* Surfaces & ink */
   --page: #f4f5f9;
   --surface: #ffffff;
-  --surface-sunken: #f7f8fc;
-  --ink-primary: #16161d;
-  --ink-secondary: #55555f;
-  --ink-muted: #8a8a96;
-  --hairline: #e6e7ee;
+  --surface-sunken: #f7f9fc;
+  --ink-primary: #0d1b2e;
+  --ink-secondary: #46566a;
+  --ink-muted: #7b8a9c;
+  --hairline: #e4e8ef;
+  --hairline-soft: #eef1f6;
   --grid: #eceef4;
+
+  /* Status ink — darker than the chart slots on purpose. The chart greens sit
+     at ~2.7:1 against the surface, which is fine for a bar but fails as text,
+     so pills and flags get these instead. */
+  --status-good-ink: #0a7d0a;
+  --status-good-bg: #e6f4e6;
+  --status-warning-ink: #8a6100;
+  --status-warning-bg: #fdf3dd;
+  --status-critical-ink: #c02c2b;
+  --status-critical-bg: #fbe9e9;
+
+  --shadow: 0 1px 2px rgba(13, 27, 46, 0.04), 0 2px 10px rgba(13, 27, 46, 0.05);
+  --shadow-lg: 0 1px 2px rgba(13, 27, 46, 0.05), 0 8px 28px rgba(13, 27, 46, 0.07);
 
   /* Categorical data slots (validated, light) */
   --series-1: #2a78d6;
@@ -63,7 +83,22 @@
   --ink-secondary: #b6b6c2;
   --ink-muted: #8a8a96;
   --hairline: #2b2b3a;
+  --hairline-soft: #242432;
   --grid: #26263a;
+
+  --brand-deep: #9ec5f4;
+  --brand: #5598e7;
+  --brand-soft: #1b3358;
+  --brand-tint: #16233a;
+  --field-border: #343447;
+  --field-border-hover: #4a4a61;
+
+  --status-good-ink: #4fc44f;
+  --status-good-bg: #14301a;
+  --status-warning-ink: #f2bd4a;
+  --status-warning-bg: #33280d;
+  --status-critical-ink: #f27a79;
+  --status-critical-bg: #351a1a;
 
   --series-1: #3987e5;
   --series-2: #d95926;
@@ -83,71 +118,236 @@
 /* ─────────────────────────── Header ─────────────────────────── */
 
 .sd-header {
-  background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 100%);
-  border-radius: 16px;
-  padding: 26px 28px;
-  color: #fff;
-  margin-bottom: 20px;
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+/* The one piece of chrome colour on the page. */
+.sd-header::before {
+  content: "";
+  display: block;
+  height: 3px;
+  background: var(--brand-deep);
 }
 
 .sd-header-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 20px;
+  gap: 26px;
   flex-wrap: wrap;
+  padding: 21px 24px 19px;
+}
+
+.sd-eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--brand);
 }
 
 .sd-title {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  color: var(--ink-primary);
+  text-wrap: balance;
 }
 
 .sd-subtitle {
-  margin: 6px 0 0;
-  font-size: 0.9rem;
-  opacity: 0.85;
-  max-width: 62ch;
+  margin: 7px 0 0;
+  font-size: 0.865rem;
+  color: var(--ink-muted);
+  max-width: 58ch;
+  text-wrap: balance;
 }
 
 .sd-institute-picker {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 10px;
-  padding: 8px 12px;
-  backdrop-filter: blur(6px);
+  flex-direction: column;
+  gap: 6px;
+  min-width: 252px;
 }
 
 .sd-institute-picker label {
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.655rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.9;
+  letter-spacing: 0.09em;
+  color: var(--ink-muted);
   margin: 0;
 }
 
-.sd-institute-picker select {
-  background: rgba(255, 255, 255, 0.95);
-  color: #16161d;
-  border: none;
-  border-radius: 7px;
-  padding: 7px 12px;
-  font-size: 0.88rem;
+/* Shared field styling for the picker and every rail control. */
+.sd-header select {
+  font: inherit;
+  font-size: 0.855rem;
   font-weight: 600;
-  min-width: 230px;
+  color: var(--ink-primary);
+  background: var(--surface);
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  padding: 9px 30px 9px 11px;
+  width: 100%;
+  appearance: none;
   cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
+    linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
+  background-position: calc(100% - 16px) 53%, calc(100% - 11px) 53%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
 }
 
-.sd-institute-picker select:disabled {
-  opacity: 0.6;
+.sd-header select:hover:not(:disabled) {
+  border-color: var(--field-border-hover);
+}
+
+.sd-header select:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.sd-header select:disabled {
+  background-color: var(--surface-sunken);
+  color: var(--ink-secondary);
   cursor: not-allowed;
+}
+
+/* ─────────────────── Hero filter rail (Session / Grade / Section / Group) ───
+   One row above everything it scopes, inside the hero it belongs to. */
+
+.sd-rail {
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--hairline-soft);
+  padding: 15px 24px 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.sd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+  flex: 1 1 140px;
+}
+
+.sd-field > label {
+  font-size: 0.655rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-muted);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The ABAC tell: a dimension the user's scope pins is locked, and says so. */
+.sd-lock {
+  font-size: 0.565rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  border-radius: 3px;
+  padding: 2px 5px;
+  text-transform: uppercase;
+}
+
+.sd-rail-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sd-inview {
+  text-align: right;
+  line-height: 1.25;
+}
+
+.sd-inview b {
+  font-size: 1.32rem;
+  font-weight: 700;
+  color: var(--brand-deep);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.sd-inview span {
+  display: block;
+  font-size: 0.655rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.sd-reset {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--surface);
+  color: var(--ink-secondary);
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+
+.sd-reset:hover:not(:disabled) {
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+.sd-reset:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sd-reset:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+/* What this user is allowed to see — stated plainly, not implied. */
+.sd-scope {
+  padding: 10px 24px;
+  background: var(--brand-tint);
+  border-top: 1px solid var(--hairline-soft);
+  font-size: 0.755rem;
+  color: var(--ink-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sd-scope b {
+  color: var(--brand-deep);
+  font-weight: 700;
+}
+
+.sd-scope-key {
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand);
 }
 
 /* ──────────────────────── Filter row ─────────────────────────
@@ -163,43 +363,6 @@
   border-radius: 12px;
   padding: 12px 16px;
   margin-bottom: 20px;
-}
-
-.sd-filter-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sd-filter-group > span {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-muted);
-}
-
-.sd-chip {
-  border: 1px solid var(--hairline);
-  background: var(--surface);
-  color: var(--ink-secondary);
-  border-radius: 999px;
-  padding: 5px 14px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.sd-chip:hover {
-  background: var(--surface-sunken);
-  color: var(--ink-primary);
-}
-
-.sd-chip.is-active {
-  background: var(--brand-ink);
-  border-color: var(--brand-ink);
-  color: #fff;
 }
 
 .sd-filter-note {
@@ -234,7 +397,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  background: var(--kpi-accent, var(--brand-a));
+  background: var(--kpi-accent, var(--brand));
 }
 
 .sd-kpi-label {
@@ -311,7 +474,7 @@
 }
 
 .sd-tab.is-active {
-  background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 100%);
+  background: var(--brand-deep);
   color: #fff;
 }
 
@@ -412,7 +575,7 @@
 
 .sd-note {
   background: var(--surface-sunken);
-  border-left: 3px solid var(--brand-a);
+  border-left: 3px solid var(--brand);
   border-radius: 0 9px 9px 0;
   padding: 12px 16px;
   font-size: 0.85rem;
@@ -474,6 +637,63 @@
 .sd-table td.name {
   color: var(--ink-primary);
   font-weight: 600;
+}
+
+/* ── Sortable column headers ──────────────────────────────────────────────
+   The whole header is the hit target. The arrow is always present so the
+   column reads as sortable before you hover it — it just dims until active. */
+
+.sd-sort {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.14s ease;
+}
+
+.sd-table th.num .sd-sort {
+  justify-content: flex-end;
+}
+
+.sd-sort:hover {
+  color: var(--brand);
+}
+
+.sd-sort:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.sd-sort.is-active {
+  color: var(--brand);
+}
+
+.sd-sort-arrow {
+  font-size: 0.6em;
+  opacity: 0.35;
+  flex: none;
+  transition: opacity 0.14s ease;
+}
+
+.sd-sort:hover .sd-sort-arrow,
+.sd-sort.is-active .sd-sort-arrow {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-sort,
+  .sd-sort-arrow {
+    transition: none;
+  }
 }
 
 /* In-cell diverging bar for the cluster gap column. */
@@ -591,6 +811,13 @@
   background: var(--surface);
 }
 
+/* Inside a collapsed assessment row the bar is a glance, not a labelled chart. */
+.sd-stack.is-compact {
+  height: 16px;
+  border-radius: 4px;
+  background: var(--hairline-soft);
+}
+
 .sd-stack-seg {
   display: flex;
   align-items: center;
@@ -603,36 +830,398 @@
   white-space: nowrap;
 }
 
-.sd-assessment-row {
-  padding: 14px 0;
-  border-bottom: 1px solid var(--grid);
+/* ── Collapsible card ────────────────────────────────────────────────────
+   The whole card folds, not just its rows. Collapsed, the subtitle swaps to a
+   one-line summary so folding never costs the headline answer. */
+
+.sd-card-toggle {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--hairline-soft);
+  color: inherit;
+  cursor: pointer;
+  align-items: center;
+  transition: background 0.14s ease;
 }
 
-.sd-assessment-row:last-child {
+.sd-card-toggle:hover {
+  background: var(--surface-sunken);
+}
+
+.sd-card-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.sd-card.is-collapsed .sd-card-toggle {
+  border-bottom: 0;
+}
+
+.sd-card-toggle .sd-card-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.sd-card-toggle .sd-chevron {
+  transform: rotate(90deg);
+}
+
+.sd-card.is-collapsed .sd-card-toggle .sd-chevron {
+  transform: rotate(0deg);
+}
+
+.sd-card-hint {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+  flex: none;
+}
+
+/* Compact by default, expandable on demand: collapsed shows the school-level
+   answer, expanded shows the class-by-class split a principal actually acts on. */
+
+.sd-assessment-row {
+  border-bottom: 1px solid var(--hairline-soft);
+}
+
+.sd-assessment-row:last-of-type {
   border-bottom: none;
 }
 
-.sd-assessment-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 9px;
+.sd-assessment-row.is-open {
+  background: var(--surface-sunken);
+}
+
+.sd-assessment-sum {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  color: inherit;
+  display: grid;
+  grid-template-columns: 14px 1fr 136px 120px;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 4px;
+  transition: background 0.14s ease;
+}
+
+.sd-assessment-sum:hover {
+  background: var(--surface-sunken);
+}
+
+.sd-assessment-row.is-open .sd-assessment-sum:hover {
+  background: transparent;
+}
+
+.sd-assessment-sum:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.sd-chevron {
+  color: var(--ink-muted);
+  font-size: 0.62rem;
+  transition: transform 0.18s ease;
+}
+
+.sd-assessment-row.is-open .sd-chevron {
+  transform: rotate(90deg);
+  color: var(--brand);
 }
 
 .sd-assessment-name {
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 0.885rem;
+  font-weight: 650;
   color: var(--ink-primary);
+  display: block;
 }
 
 .sd-assessment-meta {
-  font-size: 0.78rem;
+  font-size: 0.715rem;
   color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  display: block;
+}
+
+.sd-assessment-count {
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
+.sd-assessment-count b {
+  font-size: 0.97rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sd-assessment-count span {
+  display: block;
+  font-size: 0.715rem;
+  color: var(--ink-muted);
+}
+
+.sd-assessment-body {
+  padding: 2px 4px 18px 32px;
+}
+
+.sd-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0 14px;
+}
+
+.sd-chip-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 20px;
+  padding: 5px 12px 5px 9px;
+  font-size: 0.775rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-chip-stat small {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+/* Status pill — colour plus a word, never colour alone. */
+.sd-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.72rem;
+  border-radius: 20px;
+  padding: 2px 9px 2px 7px;
+  white-space: nowrap;
+  background: var(--flag-bg);
+  color: var(--flag-ink);
+}
+
+.sd-flag::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--flag-ink);
+  flex: none;
+}
+
+@media (max-width: 720px) {
+  .sd-assessment-sum {
+    grid-template-columns: 14px 1fr;
+    row-gap: 9px;
+  }
+
+  .sd-assessment-sum .sd-stack,
+  .sd-assessment-sum .sd-assessment-count {
+    grid-column: 2;
+  }
+
+  .sd-assessment-count {
+    text-align: left;
+  }
+
+  .sd-assessment-body {
+    padding-left: 4px;
+  }
+
+  .sd-rail-end {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-chevron,
+  .sd-assessment-sum,
+  .sd-reset,
+  .sd-header select {
+    transition: none;
+  }
+}
+
 /* ──────────────────── States & tooltip ─────────────────────── */
+
+/* ── Generated narrative ──────────────────────────────────────────────────
+   The interpretive layer, rendered from ai_response. It sits above the charts
+   because it answers "so what" rather than "what" — and it is visually distinct
+   from them so nobody mistakes a written judgement for a measured figure. */
+
+.sd-headline {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-left: 4px solid var(--brand-deep);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+
+.sd-headline-key {
+  font-size: 0.615rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--brand);
+  margin-bottom: 7px;
+}
+
+.sd-headline-date {
+  color: var(--ink-muted);
+  font-weight: 700;
+}
+
+.sd-headline-title {
+  margin: 0 0 9px;
+  font-size: 1.16rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  text-wrap: balance;
+  color: var(--ink-primary);
+}
+
+.sd-headline-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-secondary);
+  max-width: 76ch;
+}
+
+/* Written analysis outlives the numbers it was written about. */
+.sd-stale {
+  background: var(--status-warning-bg);
+  border: 1px solid #f3e0b4;
+  border-radius: 9px;
+  padding: 11px 15px;
+  font-size: 0.81rem;
+  color: #5c4408;
+  margin-bottom: 16px;
+}
+
+.sd-findings {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.sd-finding {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-left: 4px solid var(--finding-accent, var(--brand));
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.sd-finding-sum {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  gap: 13px;
+  align-items: center;
+  padding: 13px 17px;
+  transition: background 0.14s ease;
+}
+
+.sd-finding-sum:hover {
+  background: var(--surface-sunken);
+}
+
+.sd-finding-sum:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.sd-finding.is-open .sd-chevron {
+  transform: rotate(90deg);
+  color: var(--brand);
+}
+
+.sd-finding-label {
+  font-weight: 650;
+  font-size: 0.885rem;
+}
+
+.sd-finding-body {
+  padding: 0 17px 16px 44px;
+}
+
+.sd-finding-detail {
+  margin: 0 0 11px;
+  font-size: 0.83rem;
+  color: var(--ink-secondary);
+  max-width: 76ch;
+}
+
+.sd-finding-action {
+  background: var(--brand-tint);
+  border-left: 3px solid var(--brand);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 13px;
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+}
+
+.sd-finding-action-key {
+  display: block;
+  font-size: 0.585rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--brand);
+  margin-bottom: 3px;
+}
+
+/* Body of a narrative section card. The chart cards pad their own contents; these
+   hold prose, so the padding belongs to the container. */
+.sd-card-body {
+  padding: 16px 18px;
+}
+
+.sd-insight-para {
+  margin: 0 0 11px;
+  font-size: 0.835rem;
+  color: var(--ink-secondary);
+  max-width: 78ch;
+}
+
+.sd-insight-para:last-child {
+  margin-bottom: 0;
+}
+
+.sd-note-brand {
+  border-left-color: var(--brand);
+  background: var(--brand-tint);
+}
+
+.sd-empty-detail {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
 
 .sd-empty {
   background: var(--surface);

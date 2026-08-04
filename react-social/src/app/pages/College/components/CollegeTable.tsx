@@ -14,6 +14,7 @@ import InstituteWizardModal from "./InstituteWizardModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
 import InstituteGroupsModal from "./InstituteGroupsModal";
+import ReleaseDashboardModal from "./ReleaseDashboardModal";
 import { showErrorToast } from '../../../utils/toast';
 // import InstituteStudentsModal from "./InstituteStudentsModal"; // disabled: see "Students at this institute" below
 
@@ -135,6 +136,12 @@ const CollegeTable = (props: {
 
   // Named student groups for one institute. Held here rather than per row so
   // only one modal instance exists no matter how many rows are rendered.
+  const [releaseModalShow, setReleaseModalShow] = useState(false);
+  const [releaseInstitute, setReleaseInstitute] = useState<{
+    code: number;
+    name: string;
+  } | null>(null);
+
   const [groupsModalShow, setGroupsModalShow] = useState(false);
   const [groupsModalInstitute, setGroupsModalInstitute] = useState<{
     code: number;
@@ -323,6 +330,24 @@ const CollegeTable = (props: {
                   Groups
                 </Dropdown.Item>
 
+                {/* Release Dashboard — generates every scope on the filter lattice.
+                    Sits above the "open a dashboard" items because it is the action
+                    that makes them show anything at all. */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setReleaseInstitute({
+                      code: Number(data.instituteCode || data.id),
+                      name: data.instituteName || "",
+                    });
+                    setReleaseModalShow(true);
+                  }}
+                >
+                  <MdOutlineDashboard size={18} className="me-2" />
+                  Release Dashboard
+                </Dropdown.Item>
+
+                <Dropdown.Divider />
+
                 {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx (opens in new tab) */}
                 <Dropdown.Item
                   onClick={() =>
@@ -480,6 +505,13 @@ const CollegeTable = (props: {
           instituteName={groupsModalInstitute.name}
         />
       )}
+
+      <ReleaseDashboardModal
+        show={releaseModalShow}
+        onHide={() => setReleaseModalShow(false)}
+        instituteCode={releaseInstitute?.code ?? null}
+        instituteName={releaseInstitute?.name}
+      />
     </>
   );
 };

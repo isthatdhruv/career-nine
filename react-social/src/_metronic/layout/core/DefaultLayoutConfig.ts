@@ -41,7 +41,12 @@ export const DefaultLayoutConfig: ILayout = {
     layout: "default",
   },
   toolbar: {
-    display: true, // Display toolbar
+    // Off. Toolbar1's contents are entirely commented out, so all it ever
+    // rendered was a 55px empty white bar above every page. Turning it off here
+    // (rather than hiding it in CSS) also stops initToolbar adding the
+    // toolbar-enabled / toolbar-fixed body classes and the --kt-toolbar-height
+    // var, so the wrapper stops reserving 55px for it and no gap is left behind.
+    display: false, // Display toolbar
     width: "fluid", // Set fixed|fluid to change width type,
     fixed: {
       desktop: true,
