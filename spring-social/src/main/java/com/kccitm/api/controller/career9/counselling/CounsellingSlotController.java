@@ -2,6 +2,7 @@ package com.kccitm.api.controller.career9.counselling;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,6 +136,23 @@ public class CounsellingSlotController {
         slotRepository.deleteById(id);
         logger.info("Deleted counselling slot {}", id);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * How many bookable slots each counsellor still has from today onward, as
+     * { counsellorId: count }. The assessment-assignment screen uses it to show
+     * availability per counsellor and to stop an assignment with nothing to book.
+     */
+    // no scope arg: cross-counsellor admin summary
+    @PreAuthorize("@auth.allows('counselling.slot.read')")
+    @GetMapping("/available-counts")
+    public ResponseEntity<Map<String, Long>> availableCounts() {
+        Map<String, Long> out = new java.util.HashMap<>();
+        for (Object[] row : slotRepository.countUpcomingAvailableByCounsellor(LocalDate.now())) {
+            if (row.length < 2 || row[0] == null) continue;
+            out.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
+        }
+        return ResponseEntity.ok(out);
     }
 
     // no scope arg: identifies by counsellorId

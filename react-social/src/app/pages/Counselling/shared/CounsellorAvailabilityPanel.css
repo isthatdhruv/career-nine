@@ -1,0 +1,7 @@
+/* react-datepicker: make the wrapper fill its column like a native input.
+   Mirrors the rule in CounsellorPortal.css so the panel is styled correctly
+   wherever it renders — the admin portal does not load the portal stylesheet. */
+.cp-datepicker {
+  display: block;
+  width: 100%;
+}

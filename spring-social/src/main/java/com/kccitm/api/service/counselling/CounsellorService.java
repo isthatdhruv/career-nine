@@ -31,6 +31,9 @@ public class CounsellorService {
     @Autowired
     private CounsellorProvisioningService provisioningService;
 
+    @Autowired
+    private com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository appointmentRepository;
+
     public Counsellor create(Counsellor counsellor) {
         return counsellorRepository.save(counsellor);
     }
@@ -85,6 +88,14 @@ public class CounsellorService {
         if (updated.getQualifications() != null) {
             existing.setQualifications(updated.getQualifications());
         }
+        if (updated.getCompanyName() != null) {
+            existing.setCompanyName(updated.getCompanyName());
+        }
+        String newMeetingLink = null;
+        if (updated.getMeetingLink() != null) {
+            newMeetingLink = updated.getMeetingLink().trim();
+            existing.setMeetingLink(newMeetingLink);
+        }
         if (updated.getYearsOfExperience() != null) {
             existing.setYearsOfExperience(updated.getYearsOfExperience());
         }
@@ -114,7 +125,34 @@ public class CounsellorService {
         }
 
         logger.debug("Updating counsellor with id: {}", id);
-        return counsellorRepository.save(existing);
+        Counsellor saved = counsellorRepository.save(existing);
+
+        // The Teams room is copied onto each appointment at booking time, so a counsellor
+        // swapping their permanent link would leave already-booked sessions pointing at the
+        // old room. Re-point the ones that haven't happened yet.
+        if (newMeetingLink != null && !newMeetingLink.isEmpty()) {
+            try {
+                List<com.kccitm.api.model.career9.counselling.CounsellingAppointment> upcoming =
+                        appointmentRepository.findUpcomingOnlineByCounsellor(id, java.time.LocalDate.now());
+                int repointed = 0;
+                for (com.kccitm.api.model.career9.counselling.CounsellingAppointment a : upcoming) {
+                    // Never clobber a link an admin set by hand for one specific session.
+                    if ("MANUAL".equals(a.getMeetingLinkSource())) continue;
+                    if (newMeetingLink.equals(a.getMeetingLink())) continue;
+                    a.setMeetingLink(newMeetingLink);
+                    appointmentRepository.save(a);
+                    repointed++;
+                }
+                if (repointed > 0) {
+                    logger.info("Re-pointed {} upcoming online appointment(s) to counsellor {}'s new Teams link",
+                            repointed, id);
+                }
+            } catch (Exception e) {
+                logger.warn("Could not re-point upcoming appointments for counsellor {}: {}", id, e.getMessage());
+            }
+        }
+
+        return saved;
     }
 
     public Counsellor toggleActive(Long id) {

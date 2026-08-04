@@ -24,13 +24,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    # This branch is the staging/sandbox branch, so the DEFAULT profile is the
-    # staging one — `sandbox` (Document 3 below). There is no profile document
-    # named `staging`; `sandbox` IS staging. Running `mvn spring-boot:run` with
-    # no args on this branch therefore boots against the staging DB/Redis/Kafka.
-    # docker-compose still passes --spring.profiles.active explicitly, which
-    # overrides this.
-    active: sandbox
+    active: dev
   servlet:
     multipart:
       max-file-size: 1GB

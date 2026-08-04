@@ -52,8 +52,23 @@ public class AvailabilityTemplateController {
         // already has a slot for, in any mode) are skipped — the rest are created.
         SlotMaterializationService.MaterializationResult result =
                 materializationService.materializeForTemplate(saved, days);
+
         java.util.Map<String, Object> body = new java.util.HashMap<>();
-        body.put("template", saved);
+        if (result.created == 0) {
+            // Every slot clashed with one that already exists (or the range yields none),
+            // so this template produced no bookable time. Keeping it would leave a phantom
+            // row in "Weekly Schedule" promising availability that isn't in Upcoming Slots.
+            // Nothing references it yet — no slots were created — so drop it again.
+            templateRepository.delete(saved);
+            logger.info("Discarded availability template for counsellor {} on {}: 0 slots created, {} skipped",
+                    saved.getCounsellor() != null ? saved.getCounsellor().getId() : null,
+                    saved.getDayOfWeek(), result.skipped);
+            body.put("template", null);
+            body.put("discarded", true);
+        } else {
+            body.put("template", saved);
+            body.put("discarded", false);
+        }
         body.put("slotsCreated", result.created);
         body.put("slotsSkipped", result.skipped);
         return ResponseEntity.ok(body);
@@ -86,6 +101,12 @@ public class AvailabilityTemplateController {
             }
             if (updated.getMode() != null) {
                 existing.setMode(updated.getMode());
+            }
+            if (updated.getStartDate() != null) {
+                existing.setStartDate(updated.getStartDate());
+            }
+            if (updated.getEndDate() != null) {
+                existing.setEndDate(updated.getEndDate());
             }
             logger.info("Updating availability template with id: {}", id);
             return ResponseEntity.ok(templateRepository.save(existing));

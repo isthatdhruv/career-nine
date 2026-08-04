@@ -162,6 +162,9 @@
     "/student/registrar/page",
     "/upload-excel"
   ],
+  "student_group.read": [
+    "/group-management"
+  ],
   "student_management.read": [
     "/student-management"
   ],

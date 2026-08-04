@@ -48,6 +48,9 @@ public class CounsellorAssessmentAssignmentController {
     @Autowired
     private CounsellorRepository counsellorRepository;
 
+    @Autowired
+    private com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository slotRepository;
+
     @Autowired(required = false)
     private CounsellingRequestRepository counsellingRequestRepository;
 
@@ -120,6 +123,20 @@ public class CounsellorAssessmentAssignmentController {
         Optional<Counsellor> cOpt = counsellorRepository.findById(counsellorId);
         if (!cOpt.isPresent()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Counsellor not found"));
+        }
+
+        // Assigning a counsellor with nothing bookable strands every student who finishes
+        // this assessment: the booking screen offers only assigned counsellors' slots, so
+        // they would be sent to an empty calendar. Require availability first.
+        long availableSlots = slotRepository.countUpcomingAvailable(counsellorId, java.time.LocalDate.now());
+        if (availableSlots == 0) {
+            logger.info("Refused assignment of counsellor {} to assessment {}: no upcoming available slots",
+                    counsellorId, assessmentId);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", cOpt.get().getName() + " has no upcoming available slots. "
+                           + "Set up their availability from Manage Counsellors first.",
+                    "code", "NO_AVAILABLE_SLOTS",
+                    "counsellorId", counsellorId));
         }
 
         // Reactivate an existing (possibly deactivated) pair instead of duplicating it.

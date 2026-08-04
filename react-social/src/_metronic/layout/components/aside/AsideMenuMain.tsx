@@ -57,6 +57,7 @@ export function AsideMenuMain() {
   const showInstitute =
     allowed("/college") ||
     allowed("/contact-person") ||
+    allowed("/group-management") ||
     allowed("/group-student") ||
     allowed("/student-management") ||
     allowed("/student-list") ||
@@ -225,6 +226,14 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen044.svg"
                 title="Add Contact Person Information"
                 fontIcon="bi-app-indicator"
+              />
+            )}
+            {allowed("/group-management") && (
+              <AsideMenuItem
+                to="/group-management"
+                icon="/media/icons/duotune/communication/com014.svg"
+                title="Group Management"
+                fontIcon="bi-people"
               />
             )}
             {allowed("/group-student") && (
@@ -805,7 +814,7 @@ export function AsideMenuMain() {
               <AsideMenuItem to="/admin/counselling-students" title="Manage Students" hasBullet={true} />
             )}
             {allowed("/admin/counselling-slots") && (
-              <AsideMenuItem to="/admin/counselling-slots" title="Create Slots" hasBullet={true} />
+              <AsideMenuItem to="/admin/counselling-slots" title="Bookings" hasBullet={true} />
             )}
             {allowed("/admin/counselling-assignments") && (
               <AsideMenuItem to="/admin/counselling-assignments" title="Assessment Assignments" hasBullet={true} />

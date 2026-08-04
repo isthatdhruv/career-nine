@@ -1,0 +1,254 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1740 760" width="1740" height="760"
+     role="img" aria-label="How counsellor and counselling data is created and saved, step by step">
+<title>Career-9 · how counselling data is written</title>
+<style>
+  svg {
+    --ground:#F3F6F4; --surface:#FFFFFF; --surface-2:#EAEFEC;
+    --ink:#131A17; --muted:#5B6B64; --faint:#8A9A92; --line:#C6D2CB;
+    --accent:#2C7A57; --accent-soft:#E2F0E8;
+    --upd:#9A6B18; --rd:#2A5FA8;
+  }
+  @media (prefers-color-scheme: dark) {
+    svg {
+      --ground:#101614; --surface:#18211E; --surface-2:#1F2A26;
+      --ink:#E4EDE8; --muted:#9AAAA2; --faint:#6E7F77; --line:#33423B;
+      --accent:#62BF92; --accent-soft:#1B2E26;
+      --upd:#D5A752; --rd:#7FAEE8;
+    }
+  }
+  .bg   { fill:var(--ground); }
+  .card { fill:var(--surface); stroke:var(--line); stroke-width:1; }
+  .band { fill:var(--surface-2); stroke:var(--line); stroke-width:1; }
+  .num  { fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.2; }
+  .numt { font:700 10px ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,monospace; fill:var(--accent); text-anchor:middle; }
+  .rule { stroke:var(--line); stroke-width:1; }
+  .h1   { font:700 19px 'Iowan Old Style',Palatino,Georgia,serif; fill:var(--ink); }
+  .h2   { font:12.5px system-ui,'Segoe UI',sans-serif; fill:var(--muted); }
+  .lane { font:700 10px ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,monospace;
+          fill:var(--accent); letter-spacing:1.6px; }
+  .st   { font:700 11.5px system-ui,'Segoe UI',sans-serif; fill:var(--ink); }
+  .op   { font:9px ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,monospace; fill:var(--ink); }
+  .ins  { font-weight:700; fill:var(--accent); }
+  .upd  { font-weight:700; fill:var(--upd); }
+  .rd   { font-weight:700; fill:var(--rd); }
+  .nt   { font-weight:700; fill:var(--faint); }
+  .dt   { font:8.5px system-ui,'Segoe UI',sans-serif; fill:var(--muted); }
+  .arw  { fill:none; stroke:var(--accent); stroke-width:1.6; }
+  .amk  { fill:var(--accent); }
+  .fh   { font:700 10px ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,monospace;
+          fill:var(--faint); letter-spacing:1.4px; }
+  .ft   { font:10.5px system-ui,'Segoe UI',sans-serif; fill:var(--muted); }
+  .key  { font:9px ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,monospace; fill:var(--faint); }
+</style>
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+    <path class="amk" d="M0,0 L9,5 L0,10 Z"/>
+  </marker>
+</defs>
+
+<rect class="bg" x="0" y="0" width="1740" height="760"/>
+
+<!-- ═══ title ═══ -->
+<text class="h1" x="40" y="44">How counsellor and counselling data gets saved</text>
+<text class="h2" x="40" y="66">Each step shows the action and the rows it writes. Every table in the module appears exactly once.</text>
+<text class="key" x="1180" y="40"><tspan class="ins">INSERT</tspan>  creates a row</text>
+<text class="key" x="1180" y="56"><tspan class="upd">UPDATE</tspan>  changes one</text>
+<text class="key" x="1180" y="72"><tspan class="rd">READ</tspan>    only looked at</text>
+<text class="key" x="1420" y="40"><tspan class="nt">NOTE</tspan>    behaviour, not a write</text>
+<text class="key" x="1420" y="56">Green boxes run in order, left to right.</text>
+
+<!-- ═══════════════ LANE 1 ═══════════════ -->
+<text class="lane" x="40" y="118">STAGE 1 — SETTING UP A COUNSELLOR</text>
+
+<path class="arw" d="M292,225 H314" marker-end="url(#ar)"/>
+<path class="arw" d="M572,225 H594" marker-end="url(#ar)"/>
+<path class="arw" d="M852,225 H874" marker-end="url(#ar)"/>
+<path class="arw" d="M1132,225 H1154" marker-end="url(#ar)"/>
+<path class="arw" d="M1412,225 H1434" marker-end="url(#ar)"/>
+
+<!-- A1 -->
+<g>
+  <rect class="card" x="40" y="130" width="250" height="190" rx="4"/>
+  <circle class="num" cx="58" cy="152" r="10"/><text class="numt" x="58" y="156">1</text>
+  <text class="st" x="76" y="156">Counsellor registers</text>
+  <line class="rule" x1="40" y1="172" x2="290" y2="172"/>
+  <text class="op" x="54" y="192"><tspan class="ins">INSERT</tspan> counsellors</text>
+  <text class="dt" x="54" y="204">profile, KYC, bank details, bcrypt hash</text>
+  <text class="op" x="54" y="224"><tspan class="nt">NOTE</tspan> onboarding_status = PENDING</text>
+  <text class="dt" x="54" y="236">no login yet, invisible to students</text>
+</g>
+<!-- A2 -->
+<g>
+  <rect class="card" x="320" y="130" width="250" height="190" rx="4"/>
+  <circle class="num" cx="338" cy="152" r="10"/><text class="numt" x="338" y="156">2</text>
+  <text class="st" x="356" y="156">Admin approves</text>
+  <line class="rule" x1="320" y1="172" x2="570" y2="172"/>
+  <text class="op" x="334" y="192"><tspan class="upd">UPDATE</tspan> counsellors</text>
+  <text class="dt" x="334" y="204">onboarding_status = ACTIVE</text>
+  <text class="op" x="334" y="224"><tspan class="ins">INSERT</tspan> student_user</text>
+  <text class="dt" x="334" y="236">the login row, reusing the same hash</text>
+  <text class="op" x="334" y="256"><tspan class="ins">INSERT</tspan> counselling_activity_log</text>
+  <text class="dt" x="334" y="268">COUNSELLOR_ACTIVATED</text>
+  <text class="op" x="334" y="288"><tspan class="nt">NOTE</tspan> COUNSELLOR role granted here</text>
+  <text class="dt" x="334" y="300">unlocks the /counsellor/* portal</text>
+</g>
+<!-- A3 -->
+<g>
+  <rect class="card" x="600" y="130" width="250" height="190" rx="4"/>
+  <circle class="num" cx="618" cy="152" r="10"/><text class="numt" x="618" y="156">3</text>
+  <text class="st" x="636" y="156">Admin scopes them</text>
+  <line class="rule" x1="600" y1="172" x2="850" y2="172"/>
+  <text class="op" x="614" y="192"><tspan class="ins">INSERT</tspan> counsellor_institute_mapping</text>
+  <text class="dt" x="614" y="204">which schools they serve</text>
+  <text class="op" x="614" y="224"><tspan class="ins">INSERT</tspan> counsellor_assessment_assignment</text>
+  <text class="dt" x="614" y="236">which assessments they handle</text>
+  <text class="op" x="614" y="256"><tspan class="nt">NOTE</tspan> both filters must match</text>
+  <text class="dt" x="614" y="268">or the student never sees them</text>
+</g>
+<!-- A4 -->
+<g>
+  <rect class="card" x="880" y="130" width="250" height="190" rx="4"/>
+  <circle class="num" cx="898" cy="152" r="10"/><text class="numt" x="898" y="156">4</text>
+  <text class="st" x="916" y="156">Counsellor sets hours</text>
+  <line class="rule" x1="880" y1="172" x2="1130" y2="172"/>
+  <text class="op" x="894" y="192"><tspan class="ins">INSERT</tspan> availability_template</text>
+  <text class="dt" x="894" y="204">day_of_week, start, end, duration, mode</text>
+  <text class="op" x="894" y="224"><tspan class="rd">READ</tspan> slot_configuration</text>
+  <text class="dt" x="894" y="236">an optional preset the admin saved</text>
+  <text class="op" x="894" y="256"><tspan class="nt">NOTE</tspan> one row covers every week</text>
+  <text class="dt" x="894" y="268">nobody types 400 slots by hand</text>
+</g>
+<!-- A5 -->
+<g>
+  <rect class="card" x="1160" y="130" width="250" height="190" rx="4"/>
+  <circle class="num" cx="1178" cy="152" r="10"/><text class="numt" x="1178" y="156">5</text>
+  <text class="st" x="1196" y="156">Job builds the calendar</text>
+  <line class="rule" x1="1160" y1="172" x2="1410" y2="172"/>
+  <text class="op" x="1174" y="192"><tspan class="ins">INSERT</tspan> counselling_slot  × many</text>
+  <text class="dt" x="1174" y="204">one row per bookable window</text>
+  <text class="op" x="1174" y="224"><tspan class="nt">NOTE</tspan> status = AVAILABLE</text>
+  <text class="dt" x="1174" y="236">mode inherited from the template</text>
+  <text class="op" x="1174" y="256"><tspan class="nt">NOTE</tspan> runs from tomorrow onward</text>
+  <text class="dt" x="1174" y="268">never backfills past dates</text>
+</g>
+<!-- A6 -->
+<g>
+  <rect class="card" x="1440" y="130" width="250" height="190" rx="4"/>
+  <circle class="num" cx="1458" cy="152" r="10"/><text class="numt" x="1458" y="156">6</text>
+  <text class="st" x="1476" y="156">Counsellor takes leave</text>
+  <line class="rule" x1="1440" y1="172" x2="1690" y2="172"/>
+  <text class="op" x="1454" y="192"><tspan class="ins">INSERT</tspan> block_date_request</text>
+  <text class="dt" x="1454" y="204">PENDING until an admin decides</text>
+  <text class="op" x="1454" y="224"><tspan class="upd">UPDATE</tspan> counselling_slot</text>
+  <text class="dt" x="1454" y="236">BLOCKED once approved</text>
+  <text class="op" x="1454" y="256"><tspan class="upd">UPDATE</tspan> counselling_appointment</text>
+  <text class="dt" x="1454" y="268">AWAITING_RESCHEDULE, student emailed</text>
+  <text class="op" x="1454" y="288"><tspan class="nt">NOTE</tspan> the link needs no login</text>
+  <text class="dt" x="1454" y="300">it carries a signed token, not a row</text>
+</g>
+
+<!-- ═══════════════ LANE 2 ═══════════════ -->
+<text class="lane" x="40" y="393">STAGE 2 — RUNNING A COUNSELLING SESSION</text>
+
+<path class="arw" d="M292,500 H314" marker-end="url(#ar)"/>
+<path class="arw" d="M572,500 H594" marker-end="url(#ar)"/>
+<path class="arw" d="M852,500 H874" marker-end="url(#ar)"/>
+<path class="arw" d="M1132,500 H1154" marker-end="url(#ar)"/>
+<path class="arw" d="M1412,500 H1434" marker-end="url(#ar)"/>
+
+<!-- B1 -->
+<g>
+  <rect class="card" x="40" y="405" width="250" height="190" rx="4"/>
+  <circle class="num" cx="58" cy="427" r="10"/><text class="numt" x="58" y="431">1</text>
+  <text class="st" x="76" y="431">May this student book?</text>
+  <line class="rule" x1="40" y1="447" x2="290" y2="447"/>
+  <text class="op" x="54" y="467"><tspan class="rd">READ</tspan> counselling_plan</text>
+  <text class="dt" x="54" y="479">the school bought sessions</text>
+  <text class="op" x="54" y="499"><tspan class="rd">READ</tspan> counselling_payment</text>
+  <text class="dt" x="54" y="511">they paid for one themselves</text>
+  <text class="op" x="54" y="531"><tspan class="rd">READ</tspan> student_entitlements</text>
+  <text class="dt" x="54" y="543">sessions came with their package</text>
+  <text class="op" x="54" y="563"><tspan class="ins">INSERT</tspan> counselling_request</text>
+  <text class="dt" x="54" y="575">only if no counsellor is mapped yet</text>
+</g>
+<!-- B2 -->
+<g>
+  <rect class="card" x="320" y="405" width="250" height="190" rx="4"/>
+  <circle class="num" cx="338" cy="427" r="10"/><text class="numt" x="338" y="431">2</text>
+  <text class="st" x="356" y="431">Student picks a slot</text>
+  <line class="rule" x1="320" y1="447" x2="570" y2="447"/>
+  <text class="op" x="334" y="467"><tspan class="upd">UPDATE</tspan> counselling_slot</text>
+  <text class="dt" x="334" y="479">status = REQUESTED, held_until set</text>
+  <text class="op" x="334" y="499"><tspan class="ins">INSERT</tspan> payment_transaction</text>
+  <text class="dt" x="334" y="511">pay-later stashes the chosen slot</text>
+  <text class="op" x="334" y="531"><tspan class="nt">NOTE</tspan> version column guards the race</text>
+  <text class="dt" x="334" y="543">two students cannot win one slot</text>
+  <text class="op" x="334" y="563"><tspan class="nt">NOTE</tspan> a sweep frees expired holds</text>
+  <text class="dt" x="334" y="575">unpaid slots return to AVAILABLE</text>
+</g>
+<!-- B3 -->
+<g>
+  <rect class="card" x="600" y="405" width="250" height="190" rx="4"/>
+  <circle class="num" cx="618" cy="427" r="10"/><text class="numt" x="618" y="431">3</text>
+  <text class="st" x="636" y="431">Booking confirms</text>
+  <line class="rule" x1="600" y1="447" x2="850" y2="447"/>
+  <text class="op" x="614" y="467"><tspan class="ins">INSERT</tspan> counselling_appointment</text>
+  <text class="dt" x="614" y="479">status = CONFIRMED, meeting link made</text>
+  <text class="op" x="614" y="499"><tspan class="upd">UPDATE</tspan> counselling_slot</text>
+  <text class="dt" x="614" y="511">status = BOOKED</text>
+  <text class="op" x="614" y="531"><tspan class="upd">UPDATE</tspan> student_entitlements</text>
+  <text class="dt" x="614" y="543">sessions_used + 1</text>
+  <text class="op" x="614" y="563"><tspan class="nt">NOTE</tspan> contact + address are copied</text>
+  <text class="dt" x="614" y="575">so the sent email can never drift</text>
+</g>
+<!-- B4 -->
+<g>
+  <rect class="card" x="880" y="405" width="250" height="190" rx="4"/>
+  <circle class="num" cx="898" cy="427" r="10"/><text class="numt" x="898" y="431">4</text>
+  <text class="st" x="916" y="431">Reminders go out</text>
+  <line class="rule" x1="880" y1="447" x2="1130" y2="447"/>
+  <text class="op" x="894" y="467"><tspan class="ins">INSERT</tspan> counselling_reminder_sent</text>
+  <text class="dt" x="894" y="479">one row per reminder dispatched</text>
+  <text class="op" x="894" y="499"><tspan class="ins">INSERT</tspan> counselling_notification</text>
+  <text class="dt" x="894" y="511">the in-app bell for the counsellor</text>
+  <text class="op" x="894" y="531"><tspan class="nt">NOTE</tspan> unique per audience + offset</text>
+  <text class="dt" x="894" y="543">re-running the job never double-sends</text>
+</g>
+<!-- B5 -->
+<g>
+  <rect class="card" x="1160" y="405" width="250" height="190" rx="4"/>
+  <circle class="num" cx="1178" cy="427" r="10"/><text class="numt" x="1178" y="431">5</text>
+  <text class="st" x="1196" y="431">Session starts</text>
+  <line class="rule" x1="1160" y1="447" x2="1410" y2="447"/>
+  <text class="op" x="1174" y="467"><tspan class="ins">INSERT</tspan> counselling_checkin_otp</text>
+  <text class="dt" x="1174" y="479">hash only, attempts capped</text>
+  <text class="op" x="1174" y="499"><tspan class="upd">UPDATE</tspan> counselling_appointment</text>
+  <text class="dt" x="1174" y="511">session_started_at, attended = true</text>
+  <text class="op" x="1174" y="531"><tspan class="nt">NOTE</tspan> student reads the code aloud</text>
+  <text class="dt" x="1174" y="543">counsellor types it in to prove arrival</text>
+</g>
+<!-- B6 -->
+<g>
+  <rect class="card" x="1440" y="405" width="250" height="190" rx="4"/>
+  <circle class="num" cx="1458" cy="427" r="10"/><text class="numt" x="1458" y="431">6</text>
+  <text class="st" x="1476" y="431">Session closes</text>
+  <line class="rule" x1="1440" y1="447" x2="1690" y2="447"/>
+  <text class="op" x="1454" y="467"><tspan class="ins">INSERT</tspan> session_notes</text>
+  <text class="dt" x="1454" y="479">public remarks + private notes</text>
+  <text class="op" x="1454" y="499"><tspan class="upd">UPDATE</tspan> counselling_appointment</text>
+  <text class="dt" x="1454" y="511">status = COMPLETED</text>
+  <text class="op" x="1454" y="531"><tspan class="ins">INSERT</tspan> counselling_rating</text>
+  <text class="dt" x="1454" y="543">the student's score, one per session</text>
+  <text class="op" x="1454" y="563"><tspan class="nt">NOTE</tspan> a no-show credits the session back</text>
+  <text class="dt" x="1454" y="575">status = MISSED, always rebookable</text>
+</g>
+
+<!-- ═══ footer band ═══ -->
+<g>
+  <rect class="band" x="40" y="640" width="1650" height="88" rx="4"/>
+  <text class="fh" x="58" y="664">RUNS ALONGSIDE EVERY STEP</text>
+  <text class="ft" x="58" y="686">Any change to an appointment also writes <tspan class="op"><tspan class="ins">INSERT</tspan> appointment_audit_log</tspan> — old values, new values, who did it and why.</text>
+  <text class="ft" x="58" y="706">Off this path: <tspan class="op">student_counsellor_mapping</tspan> pins a student to one counsellor, and <tspan class="op">slot_configuration</tspan> stores reusable presets an admin applies to counsellors.</text>
+</g>
+
+</svg>

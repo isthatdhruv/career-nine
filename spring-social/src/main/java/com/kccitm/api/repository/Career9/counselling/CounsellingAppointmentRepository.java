@@ -52,6 +52,17 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
             @Param("studentIds") List<Long> studentIds,
             @Param("today") LocalDate today);
 
+    /**
+     * A counsellor's still-to-happen online sessions — used to re-point their meeting link
+     * when they change the permanent Teams room it points at.
+     */
+    @Query("SELECT a FROM CounsellingAppointment a WHERE a.counsellor.id = :counsellorId "
+         + "AND a.slot.date >= :fromDate AND a.mode = 'ONLINE' "
+         + "AND a.status IN ('PENDING', 'ASSIGNED', 'CONFIRMED', 'AWAITING_RESCHEDULE')")
+    List<CounsellingAppointment> findUpcomingOnlineByCounsellor(
+            @Param("counsellorId") Long counsellorId,
+            @Param("fromDate") java.time.LocalDate fromDate);
+
     @Query("SELECT a FROM CounsellingAppointment a WHERE a.counsellor.id = :counsellorId " +
            "AND a.slot.date = :date " +
            "ORDER BY a.slot.startTime ASC")

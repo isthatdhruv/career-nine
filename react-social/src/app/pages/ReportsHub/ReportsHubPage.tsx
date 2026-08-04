@@ -24,7 +24,7 @@ import {
   GenerateUnifiedReport,
   TemplateMappingDto,
 } from "../ReportTemplates/API/Report_Templates_APIs";
-import { exportAssessmentDataExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
+import { exportAssessmentDataExcel, exportPsychometricProperties } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
 import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
 import {
   SendReportEmail,
@@ -201,6 +201,7 @@ const ReportsHubPage: React.FC = () => {
   const [exportingMQT, setExportingMQT] = useState(false);
   const [exportingDataExcel, setExportingDataExcel] = useState(false);
   const [exportingDashboard, setExportingDashboard] = useState(false);
+  const [exportingPsychometric, setExportingPsychometric] = useState(false);
   // downloadingZip / zipProgress removed — replaced by zipJobs
 
   // ── ZIP jobs (persisted across re-renders via ref+state) ──
@@ -831,6 +832,34 @@ const ReportsHubPage: React.FC = () => {
       }
       showErrorToast("Dashboard export failed: " + message);
     } finally { setExportingDashboard(false); }
+  };
+
+  // The full psychometric-properties study workbook (reliability, EFA, item
+  // analysis, IRT, norms, CFA screening). Statistics need the whole cohort to
+  // be meaningful, so like the dashboard an empty selection falls back to the
+  // filtered list rather than aborting.
+  const handleExportPsychometricProperties = async () => {
+    if (!selectedAssessmentObj) return;
+    const ticked = getSelectedIds();
+    const ids = ticked.length > 0 ? ticked : displayedStudents.map((s) => s.userStudentId);
+    if (ids.length === 0) { showErrorToast("No students match the current filters."); return; }
+
+    setExportingPsychometric(true);
+    try {
+      const res = await exportPsychometricProperties(selectedAssessmentObj.id, ids);
+      downloadBlob(res.data, `psychometric_properties_navigator360_${selectedAssessmentObj.id}.xlsx`);
+      showSuccessToast(`Psychometric properties computed for ${ids.length} student(s).`);
+      setMiraDesaiOpen(false);
+    } catch (err: any) {
+      let message = err?.message || "Unknown error";
+      const blob = err?.response?.data;
+      if (blob instanceof Blob) {
+        try { message = JSON.parse(await blob.text()).error || message; } catch { /* keep message */ }
+      } else if (err?.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      showErrorToast("Psychometric export failed: " + message);
+    } finally { setExportingPsychometric(false); }
   };
 
   // ═══════════════════════ SEND ACTIONS ═══════════════════════
@@ -1589,9 +1618,11 @@ const ReportsHubPage: React.FC = () => {
         generating={exportingDataExcel}
         exportingMQT={exportingMQT}
         exportingDashboard={exportingDashboard}
+        exportingPsychometric={exportingPsychometric}
         onGenerateDataExcel={handleGenerateDataExcel}
         onExportBetCoreData={handleExportBetCoreData}
         onExportDashboardSheet={handleExportDashboardSheet}
+        onExportPsychometricProperties={handleExportPsychometricProperties}
         onSchoolReport={() => setSchoolReportOpen(true)}
         visibleSelectedCount={visibleSelectedCount}
         displayedCount={displayedStudents.length}
