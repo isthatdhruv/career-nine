@@ -120,6 +120,20 @@ public class CounsellorController {
         if (body.get("maxSessionsPerDay") != null) counsellor.setMaxSessionsPerDay(((Number) body.get("maxSessionsPerDay")).intValue());
         if (body.get("workTime") != null) counsellor.setWorkTime((String) body.get("workTime"));
         if (body.get("counsellorType") != null) counsellor.setCounsellorType((String) body.get("counsellorType"));
+        if (body.get("companyName") != null) counsellor.setCompanyName(((String) body.get("companyName")).trim());
+        if (body.get("meetingLink") != null) {
+            // Teams-only: a link from any other platform is rejected at signup rather than
+            // stored and later emailed to a student.
+            String meetingLink = ((String) body.get("meetingLink")).trim();
+            if (!meetingLink.isEmpty()) {
+                if (!com.kccitm.api.service.counselling.MeetingLinkService.isTeamsLink(meetingLink)) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "error", "Enter a Microsoft Teams meeting link (it should start with "
+                                   + "https://teams.microsoft.com/ or https://teams.live.com/)."));
+                }
+                counsellor.setMeetingLink(meetingLink);
+            }
+        }
         if (body.get("profileImageUrl") != null) counsellor.setProfileImageUrl((String) body.get("profileImageUrl"));
 
         // Counselling Phase 1: create the linked local User now (inactive until admin
@@ -392,7 +406,16 @@ public class CounsellorController {
     // no scope arg: update by id; admin-only
     @PreAuthorize("@auth.allows('counsellor.update')")
     @PutMapping("/update/{id}")
-    public ResponseEntity<Counsellor> update(@PathVariable Long id, @RequestBody Counsellor counsellor) {
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Counsellor counsellor) {
+        // Sessions run on Microsoft Teams only — refuse any other provider's link rather
+        // than storing one that would be emailed to students and not work as expected.
+        String link = counsellor.getMeetingLink();
+        if (link != null && !link.trim().isEmpty()
+                && !com.kccitm.api.service.counselling.MeetingLinkService.isTeamsLink(link)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Enter a Microsoft Teams meeting link (it should start with "
+                           + "https://teams.microsoft.com/ or https://teams.live.com/)."));
+        }
         logger.info("Updating counsellor with id: {}", id);
         return ResponseEntity.ok(counsellorService.update(id, counsellor));
     }

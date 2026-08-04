@@ -805,7 +805,7 @@ export function AsideMenuMain() {
               <AsideMenuItem to="/admin/counselling-students" title="Manage Students" hasBullet={true} />
             )}
             {allowed("/admin/counselling-slots") && (
-              <AsideMenuItem to="/admin/counselling-slots" title="Create Slots" hasBullet={true} />
+              <AsideMenuItem to="/admin/counselling-slots" title="Bookings" hasBullet={true} />
             )}
             {allowed("/admin/counselling-assignments") && (
               <AsideMenuItem to="/admin/counselling-assignments" title="Assessment Assignments" hasBullet={true} />

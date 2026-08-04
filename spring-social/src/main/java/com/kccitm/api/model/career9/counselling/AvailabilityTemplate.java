@@ -56,6 +56,11 @@ public class AvailabilityTemplate implements Serializable {
     @Column(name = "start_date")
     private LocalDate startDate;
 
+    // Last date this availability applies to. Slots are never materialized beyond it;
+    // null means "keep going" (bounded only by the materialization window).
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
     @JsonProperty("isActive")
     @Column(name = "is_active")
     private Boolean isActive = true;
@@ -147,6 +152,14 @@ public class AvailabilityTemplate implements Serializable {
 
     public void setStartDate(LocalDate startDate) {
         this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
     }
 
     @JsonProperty("isActive")
