@@ -250,6 +250,22 @@ const SchoolCombinedDashboardPage: React.FC = () => {
 
   const [activeNav, setActiveNav] = useState<NavId>("overview");
 
+  // This route renders outside MasterLayout, so nothing else tears down the boot splash
+  // that index.html puts up — without this the dashboard mounts underneath the overlay.
+  // Same teardown the sibling standalone dashboards do.
+  useEffect(() => {
+    const splash = document.getElementById("splash-screen");
+    if (splash) splash.style.display = "none";
+    document.body.classList.remove("page-loading", "splash-screen");
+
+    const previousBodyBg = document.body.style.background;
+    document.body.style.background = "#F2F7F5";
+
+    return () => {
+      document.body.style.background = previousBodyBg;
+    };
+  }, []);
+
   useEffect(() => {
     const original = document.title;
     document.title = `Career-9 | School Dashboard${instituteCode ? ` · ${instituteCode}` : ""}`;

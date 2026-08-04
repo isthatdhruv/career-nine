@@ -1,3 +1,4 @@
+import { Chart } from "chart.js";
 import { FC, useEffect } from "react";
 
 const SCHOOL_DASHBOARD_CSS = String.raw`
@@ -1161,7 +1162,6 @@ const SCHOOL_DASHBOARD_BODY = String.raw`
 
 `;
 
-const CHART_JS_SRC = "/chart.umd.min.js";
 const DASHBOARD_SCRIPT_SRC = "/career-navigator-school-dashboard.js";
 
 const SchoolDashboardPage: FC = () => {
@@ -1197,22 +1197,11 @@ const SchoolDashboardPage: FC = () => {
       document.body.appendChild(appScript);
     };
 
-    if (typeof (window as unknown as { Chart?: unknown }).Chart !== "undefined") {
-      ensureAppScript();
-    } else if (document.querySelector(`script[data-school-dashboard="chart"]`)) {
-      const existing = document.querySelector(
-        `script[data-school-dashboard="chart"]`
-      ) as HTMLScriptElement;
-      existing.addEventListener("load", ensureAppScript);
-    } else {
-      const chartScript = document.createElement("script");
-      chartScript.src = CHART_JS_SRC;
-      chartScript.async = false;
-      chartScript.dataset.schoolDashboard = "chart";
-      chartScript.onload = ensureAppScript;
-      chartScript.onerror = (e) => console.error("[SchoolDashboard] Chart.js failed:", e);
-      document.head.appendChild(chartScript);
-    }
+    // The dashboard script was written for a standalone page that pulled Chart.js off a
+    // CDN, so it expects a global. Hand it the copy the app already bundles and registers
+    // in src/index.tsx rather than re-fetching the library.
+    (window as unknown as { Chart?: unknown }).Chart = Chart;
+    ensureAppScript();
 
     return () => {
       document.body.style.background = previousBodyBg;
