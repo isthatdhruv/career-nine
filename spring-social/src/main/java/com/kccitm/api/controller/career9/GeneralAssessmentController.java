@@ -54,6 +54,9 @@ public class GeneralAssessmentController {
     private com.kccitm.api.service.BetTemplateExcelExportService betTemplateExcelExportService;
 
     @Autowired
+    private com.kccitm.api.service.psychometric.PsychometricPropertiesExportService psychometricPropertiesExportService;
+
+    @Autowired
     private SchoolDashboardDataService schoolDashboardDataService;
 
     @Autowired
@@ -224,6 +227,57 @@ public class GeneralAssessmentController {
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
         headers.setContentDispositionFormData("attachment",
                 "assessment_data_" + assessmentId + ".xlsx");
+        headers.setContentLength(excelBytes.length);
+
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * "Psychometric Properties of Navigator 360" — the validation-study
+     * workbook (reliability, EFA, item analysis, IRT, norms, CFA screening)
+     * recomputed for the selected cohort in the original study's layout.
+     *
+     * Body: { "assessmentId": 18, "userStudentIds": [1, 2, 3] }
+     * userStudentIds optional — omitted/empty means all attempted students.
+     */
+    @PostMapping("/export-psychometric-properties")
+    @PreAuthorize("@auth.allows('report.export')")
+    public ResponseEntity<?> exportPsychometricProperties(@RequestBody Map<String, Object> request)
+            throws Exception {
+        Object rawAssessmentId = request.get("assessmentId");
+        if (!(rawAssessmentId instanceof Number)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+        }
+        Long assessmentId = ((Number) rawAssessmentId).longValue();
+
+        List<Long> userStudentIds = null;
+        Object rawIds = request.get("userStudentIds");
+        if (rawIds instanceof List) {
+            userStudentIds = new ArrayList<>();
+            for (Object o : (List<?>) rawIds) {
+                if (o instanceof Number) {
+                    userStudentIds.add(((Number) o).longValue());
+                }
+            }
+        }
+
+        byte[] excelBytes;
+        try {
+            excelBytes = psychometricPropertiesExportService.export(assessmentId, userStudentIds);
+        } catch (IllegalArgumentException e) {
+            // e.g. a BET assessment — none of the Navigator 360 sections exist
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+        if (excelBytes == null) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "No scoreable students found for this assessment/selection"));
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment",
+                "psychometric_properties_navigator360_" + assessmentId + ".xlsx");
         headers.setContentLength(excelBytes.length);
 
         return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
