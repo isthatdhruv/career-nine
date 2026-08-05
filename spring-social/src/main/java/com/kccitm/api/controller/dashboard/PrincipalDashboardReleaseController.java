@@ -2,9 +2,11 @@ package com.kccitm.api.controller.dashboard;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -61,6 +63,11 @@ public class PrincipalDashboardReleaseController {
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("scopeCount", plan.scopeCount);
+        // Priced alongside the default so "Release All" is an informed choice: it
+        // covers combinations the filter rail cannot even select, at one OpenAI call
+        // each.
+        out.put("fullScopeCount", plan.fullScopeCount);
+        out.put("minCohortSize", plan.minCohortSize);
         out.put("canRelease", plan.accepted);
         out.put("reason", plan.reason);
 
@@ -82,11 +89,21 @@ public class PrincipalDashboardReleaseController {
     @PostMapping("/release/{instituteCode}")
     public ResponseEntity<?> release(@PathVariable Long instituteCode,
                                      @RequestParam Long assessmentId,
+                                     @RequestParam(required = false, defaultValue = "LATTICE") String mode,
                                      @AuthenticationPrincipal UserPrincipal principal) {
         Long userId = principal == null ? null : principal.getId();
 
+        PrincipalDashboardReleaseService.ReleaseMode releaseMode;
+        try {
+            releaseMode = PrincipalDashboardReleaseService.ReleaseMode.valueOf(mode.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            // Default rather than guess: an unrecognised mode must not silently
+            // trigger the expensive one.
+            releaseMode = PrincipalDashboardReleaseService.ReleaseMode.LATTICE;
+        }
+
         PrincipalDashboardReleaseService.ReleasePlan plan =
-                releaseService.prepareRelease(instituteCode, assessmentId, userId);
+                releaseService.prepareRelease(instituteCode, assessmentId, userId, releaseMode);
 
         if (!plan.accepted) {
             return ResponseEntity.status(409).body(Map.of("error", plan.reason));
@@ -116,12 +133,27 @@ public class PrincipalDashboardReleaseController {
                   + counts.getOrDefault(PrincipalDashboardData.STATUS_SKIPPED_SMALL_COHORT, 0L)
                   + counts.getOrDefault(PrincipalDashboardData.STATUS_FAILED, 0L);
 
-        return ResponseEntity.ok(Map.of(
-                "releaseId", releaseId,
-                "total", total,
-                "done", done,
-                "complete", total > 0 && done == total,
-                "byStatus", counts));
+        // Distinct reasons rather than one per scope: 25 scopes failing on the same
+        // missing API key is one problem to fix, not 25.
+        List<Map<String, String>> failures = new ArrayList<>();
+        Set<String> seenReasons = new LinkedHashSet<>();
+        for (Object[] row : repository.findFailuresForRelease(releaseId)) {
+            String reason = row[1] == null ? "No error recorded." : (String) row[1];
+            if (!seenReasons.add(reason)) continue;
+            Map<String, String> f = new LinkedHashMap<>();
+            f.put("scopeKey", (String) row[0]);
+            f.put("reason", reason);
+            failures.add(f);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("releaseId", releaseId);
+        out.put("total", total);
+        out.put("done", done);
+        out.put("complete", total > 0 && done == total);
+        out.put("byStatus", counts);
+        out.put("failures", failures);
+        return ResponseEntity.ok(out);
     }
 
     /**

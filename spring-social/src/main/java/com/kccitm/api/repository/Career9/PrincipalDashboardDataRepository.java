@@ -54,6 +54,18 @@ public interface PrincipalDashboardDataRepository extends JpaRepository<Principa
          + "WHERE p.releaseId = :releaseId GROUP BY p.generationStatus")
     List<Object[]> countByStatusForRelease(@Param("releaseId") String releaseId);
 
+    /**
+     * Why the failed scopes in a release failed.
+     *
+     * <p>A count of failures on its own is not actionable — "2 failed" gives an admin
+     * nothing to do. The stored message usually names the cause outright (a missing
+     * API key, a token limit, a timeout), so the dialog can say it instead of sending
+     * someone to the server logs.
+     */
+    @Query("SELECT p.scopeKey, p.errorMessage FROM PrincipalDashboardData p "
+         + "WHERE p.releaseId = :releaseId AND p.generationStatus = 'FAILED'")
+    List<Object[]> findFailuresForRelease(@Param("releaseId") String releaseId);
+
     @Modifying
     @Query("DELETE FROM PrincipalDashboardData p "
          + "WHERE p.instituteCode = :instituteCode AND p.assessmentId = :assessmentId")

@@ -11,8 +11,22 @@ const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
  * than generating itself on a principal's first visit.
  */
 
+/**
+ * How much of the scope space a release covers.
+ *
+ * LATTICE is every combination the filter rail can actually select — institute,
+ * session, class, section, group. FULL adds the cross-combinations (a group within one
+ * section, a class without its session), which costs one OpenAI call each for scopes
+ * the UI offers no way to reach.
+ */
+export type ReleaseMode = "LATTICE" | "FULL";
+
 export interface ReleasePreview {
   scopeCount: number;
+  /** Size of a FULL release, so the dialog can price it against the default. */
+  fullScopeCount: number;
+  /** Students a scope needs before it gets a written narrative. */
+  minCohortSize: number;
   canRelease: boolean;
   reason: string | null;
   /** Present only when this institute already has a released dashboard. */
@@ -25,12 +39,19 @@ export interface ReleaseAccepted {
   scopeCount: number;
 }
 
+export interface ReleaseFailure {
+  scopeKey: string;
+  reason: string;
+}
+
 export interface ReleaseStatus {
   releaseId: string;
   total: number;
   done: number;
   complete: boolean;
   byStatus: Record<string, number>;
+  /** Distinct failure reasons — 25 scopes failing on one missing key is one problem. */
+  failures?: ReleaseFailure[];
 }
 
 /** Scope status without the payloads — drives the "not generated" state. */
@@ -87,12 +108,21 @@ export function previewRelease(instituteCode: number, assessmentId: number) {
   );
 }
 
-/** Trigger a release. Returns 202 immediately; generation continues server-side. */
-export function releaseDashboard(instituteCode: number, assessmentId: number) {
+/**
+ * Trigger a release. Returns 202 immediately; generation continues server-side.
+ *
+ * Mode defaults to LATTICE — an omitted or unrecognised mode must never silently
+ * trigger the expensive one.
+ */
+export function releaseDashboard(
+  instituteCode: number,
+  assessmentId: number,
+  mode: ReleaseMode = "LATTICE"
+) {
   return axios.post<ReleaseAccepted>(
     `${API_URL}/dashboard/principal/release/${instituteCode}`,
     null,
-    { params: { assessmentId } }
+    { params: { assessmentId, mode } }
   );
 }
 

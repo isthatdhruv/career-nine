@@ -44,11 +44,18 @@ public final class ScopeLattice {
         public final Long sessionId;
         public final Long classId;
         public final Long sectionId;
+        /** Groups this student belongs to; empty when they are in none. */
+        public final List<Long> groupIds;
 
         public RosterEntry(Long sessionId, Long classId, Long sectionId) {
+            this(sessionId, classId, sectionId, java.util.Collections.<Long>emptyList());
+        }
+
+        public RosterEntry(Long sessionId, Long classId, Long sectionId, List<Long> groupIds) {
             this.sessionId = sessionId;
             this.classId = classId;
             this.sectionId = sectionId;
+            this.groupIds = groupIds == null ? java.util.Collections.<Long>emptyList() : groupIds;
         }
     }
 
@@ -117,5 +124,56 @@ public final class ScopeLattice {
      */
     public static int size(Long assessmentId, List<RosterEntry> roster, Set<Long> groupIds) {
         return build(assessmentId, roster, groupIds).size();
+    }
+
+    /**
+     * Every combination, not just the lattice — "Release All".
+     *
+     * <p>Where {@link #build} deliberately keeps the levels additive, this generates
+     * every combination of bound and unbound dimensions: session alone, class alone,
+     * class without its session, group crossed with a section, and so on. Each student
+     * position contributes up to 2<sup>4</sup> masks over (session, class, section,
+     * group), deduplicated across the roster.
+     *
+     * <p>It stays populated-only — a mask is emitted only because some real student
+     * sits at that intersection — so it is bounded by the data rather than by the
+     * product of the lookup tables. That bound is still much larger than the lattice's:
+     * the additive ~25 becomes a multiplicative figure that grows with how many
+     * distinct positions the school actually has, and every one of them is an OpenAI
+     * call. The caller is expected to show the count before spending it.
+     */
+    public static List<ScopeKey> buildFull(Long assessmentId, List<RosterEntry> roster) {
+        // LinkedHashSet: dedup across students, stable order for reproducible releases.
+        Set<ScopeKey> scopes = new LinkedHashSet<>();
+        scopes.add(ScopeKey.institute(assessmentId));
+
+        for (RosterEntry e : roster) {
+            // A student in no group still contributes their session/class/section
+            // combinations, with the group dimension left unbound.
+            List<Long> groups = e.groupIds.isEmpty()
+                    ? java.util.Collections.<Long>singletonList(null)
+                    : new ArrayList<>(e.groupIds);
+            if (!e.groupIds.isEmpty()) groups.add(null);
+
+            for (Long groupId : groups) {
+                // 4 dimensions, so 16 masks; bit set = that dimension is bound.
+                for (int mask = 0; mask < 16; mask++) {
+                    Long s = (mask & 1) != 0 ? e.sessionId : null;
+                    Long c = (mask & 2) != 0 ? e.classId : null;
+                    Long x = (mask & 4) != 0 ? e.sectionId : null;
+                    Long g = (mask & 8) != 0 ? groupId : null;
+
+                    // A mask that binds a dimension the student has no value for would
+                    // describe a scope they are not actually in.
+                    if ((mask & 1) != 0 && s == null) continue;
+                    if ((mask & 2) != 0 && c == null) continue;
+                    if ((mask & 4) != 0 && x == null) continue;
+                    if ((mask & 8) != 0 && g == null) continue;
+
+                    scopes.add(ScopeKey.of(assessmentId, s, c, x, g));
+                }
+            }
+        }
+        return new ArrayList<>(scopes);
     }
 }

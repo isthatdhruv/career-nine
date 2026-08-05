@@ -2,9 +2,10 @@ package com.kccitm.api.service.dashboard.principal;
 
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -83,10 +84,25 @@ public class PrincipalDashboardReleaseService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * How much of the scope space a release covers.
+     *
+     * <p>{@code LATTICE} is the additive default — institute, session, class, section,
+     * group — which is every combination the filter rail actually offers.
+     * {@code FULL} adds the cross-combinations (a group within one section, a class
+     * without its session), which multiplies the OpenAI spend for scopes a principal
+     * has no way to select from the UI.
+     */
+    public enum ReleaseMode { LATTICE, FULL }
+
     /** What {@link #prepareRelease} tells the caller. */
     public static final class ReleasePlan {
         public String releaseId;
         public int scopeCount;
+        /** Size of the full cross-combination release, so the dialog can price it. */
+        public int fullScopeCount;
+        /** So the dialog can name the threshold rather than say "too few". */
+        public int minCohortSize;
         public boolean accepted;
         public String reason;
 
@@ -108,7 +124,13 @@ public class PrincipalDashboardReleaseService {
         ReleasePlan plan = new ReleasePlan();
         plan.accepted = repository.countInFlight(instituteCode, assessmentId) == 0;
         plan.reason = plan.accepted ? null : "A release for this school is already running.";
-        plan.scopeCount = buildLattice(instituteCode, assessmentId).size();
+
+        // Both counts, so the dialog can put the cost of "Release All" next to the
+        // cost of the default rather than letting an admin discover it afterwards.
+        List<ScopeLattice.RosterEntry> roster = loadRoster(instituteCode, assessmentId);
+        plan.scopeCount = ScopeLattice.build(assessmentId, roster, collectGroups(roster)).size();
+        plan.fullScopeCount = ScopeLattice.buildFull(assessmentId, roster).size();
+        plan.minCohortSize = minCohortSize;
         return plan;
     }
 
@@ -121,12 +143,14 @@ public class PrincipalDashboardReleaseService {
      * click harmless.
      */
     @Transactional
-    public ReleasePlan prepareRelease(Long instituteCode, Long assessmentId, Long triggeredBy) {
+    public ReleasePlan prepareRelease(Long instituteCode, Long assessmentId, Long triggeredBy,
+                                      ReleaseMode mode) {
         if (repository.countInFlight(instituteCode, assessmentId) > 0) {
             return ReleasePlan.rejected("A release for this school is already running.");
         }
 
-        List<ScopeKey> scopes = buildLattice(instituteCode, assessmentId);
+        List<ScopeKey> scopes = buildScopes(instituteCode, assessmentId,
+                mode == null ? ReleaseMode.LATTICE : mode);
         if (scopes.isEmpty()) {
             return ReleasePlan.rejected("No scoreable students found for this assessment.");
         }
@@ -250,43 +274,63 @@ public class PrincipalDashboardReleaseService {
     }
 
     /**
-     * Derive the populated lattice from the roster.
+     * The scoreable roster for one institute+assessment, each student carrying their
+     * position on all four dimensions.
      *
-     * <p>Only students who have actually completed the assessment count: an empty
-     * section that exists in the lookup tables must never become a scope.
+     * <p>Only completed sittings count: a section whose students are all still
+     * mid-assessment has nothing to report on, and an empty section that exists in the
+     * lookup tables must never become a scope.
      */
-    private List<ScopeKey> buildLattice(Long instituteCode, Long assessmentId) {
+    private List<ScopeLattice.RosterEntry> loadRoster(Long instituteCode, Long assessmentId) {
         List<StudentAssessmentMapping> mappings =
                 mappingRepository.findAllByInstituteCode(instituteCode.intValue());
 
-        List<ScopeLattice.RosterEntry> roster = new ArrayList<>();
-        Set<Long> studentIds = new LinkedHashSet<>();
-
+        // Collect students first so group membership is one query rather than N.
+        List<UserStudent> students = new ArrayList<>();
+        List<Long> studentIds = new ArrayList<>();
         for (StudentAssessmentMapping m : mappings) {
             if (!assessmentId.equals(m.getAssessmentId())) continue;
-            // Only completed sittings shape the lattice. A section whose students are
-            // all still mid-assessment has nothing to report on yet.
             String status = m.getStatus() == null ? "" : m.getStatus().trim().toLowerCase();
             if (!"completed".equals(status)) continue;
             UserStudent us = m.getUserStudent();
-            if (us == null) continue;
-            StudentInfo info = us.getStudentInfo();
-            if (info == null) continue;
-
+            if (us == null || us.getStudentInfo() == null) continue;
+            students.add(us);
             studentIds.add(us.getUserStudentId());
+        }
+        if (students.isEmpty()) return new ArrayList<>();
+
+        Map<Long, List<Long>> groupsByStudent = new LinkedHashMap<>();
+        for (Object[] row : groupMemberRepository.findGroupIdsByStudentIds(studentIds)) {
+            Long studentId = ((Number) row[0]).longValue();
+            Long groupId = ((Number) row[1]).longValue();
+            groupsByStudent.computeIfAbsent(studentId, k -> new ArrayList<>()).add(groupId);
+        }
+
+        List<ScopeLattice.RosterEntry> roster = new ArrayList<>();
+        for (UserStudent us : students) {
+            StudentInfo info = us.getStudentInfo();
             roster.add(new ScopeLattice.RosterEntry(
                     longOf(info.getSessionId()),
                     longOf(info.getStudentClass()),
-                    longOf(info.getSchoolSectionId())));
+                    longOf(info.getSchoolSectionId()),
+                    groupsByStudent.getOrDefault(us.getUserStudentId(), new ArrayList<>())));
         }
+        return roster;
+    }
 
-        Set<Long> groupIds = new HashSet<>();
-        if (!studentIds.isEmpty()) {
-            groupIds.addAll(groupMemberRepository.findDistinctGroupIdsByStudentIds(
-                    new ArrayList<>(studentIds)));
-        }
+    /** Every group with at least one scoreable student, for the lattice's group level. */
+    private static Set<Long> collectGroups(List<ScopeLattice.RosterEntry> roster) {
+        Set<Long> groups = new LinkedHashSet<>();
+        for (ScopeLattice.RosterEntry e : roster) groups.addAll(e.groupIds);
+        return groups;
+    }
 
-        return ScopeLattice.build(assessmentId, roster, groupIds);
+    /** The scopes a release of this mode would cover. */
+    private List<ScopeKey> buildScopes(Long instituteCode, Long assessmentId, ReleaseMode mode) {
+        List<ScopeLattice.RosterEntry> roster = loadRoster(instituteCode, assessmentId);
+        return mode == ReleaseMode.FULL
+                ? ScopeLattice.buildFull(assessmentId, roster)
+                : ScopeLattice.build(assessmentId, roster, collectGroups(roster));
     }
 
     private static Long longOf(Number n) {
