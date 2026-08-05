@@ -110,6 +110,16 @@ export function exportAssessmentDataExcel(assessmentId: number, userStudentIds?:
   }, { responseType: 'blob' });
 }
 
+// "Psychometric Properties of Navigator 360": the validation-study workbook
+// (Cronbach's alpha, EFA, item analysis, IRT, norms, CFA screening) recomputed
+// for the selected students in the original study's layout.
+export function exportPsychometricProperties(assessmentId: number, userStudentIds?: number[]) {
+  return axios.post(`${API_URL}/general-assessment/export-psychometric-properties`, {
+    assessmentId,
+    userStudentIds,
+  }, { responseType: 'blob' });
+}
+
 export function exportGeneralAssessmentExcel(assessmentId: number) {
   return axios.get(`${API_URL}/general-assessment/export-excel/${assessmentId}`, {
     responseType: 'blob',

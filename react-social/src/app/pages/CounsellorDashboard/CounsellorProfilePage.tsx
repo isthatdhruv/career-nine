@@ -19,6 +19,8 @@ interface ProfileForm {
   modeCapability: string
   officeAddress: string
   qualifications: string
+  companyName: string
+  meetingLink: string
   yearsOfExperience: string
   linkedinProfile: string
   maxSessionsPerDay: string
@@ -39,7 +41,7 @@ const CounsellorProfilePage: React.FC = () => {
   const [form, setForm] = useState<ProfileForm>({
     name: '', email: '', phone: '', specializations: '', bio: '',
     languagesSpoken: '', modeCapability: 'BOTH', officeAddress: '', qualifications: '',
-    yearsOfExperience: '', linkedinProfile: '', maxSessionsPerDay: '',
+    companyName: '', meetingLink: '', yearsOfExperience: '', linkedinProfile: '', maxSessionsPerDay: '',
     hourlyRatePreference: '', govtIdLast4: '', bankName: '', bankAccount: '', bankIfsc: '', bankBranch: '',
   })
   const [saving, setSaving] = useState(false)
@@ -69,6 +71,8 @@ const CounsellorProfilePage: React.FC = () => {
             modeCapability: d?.modeCapability || 'BOTH',
             officeAddress: d?.officeAddress || '',
             qualifications: d?.qualifications || '',
+            companyName: d?.companyName || '',
+            meetingLink: d?.meetingLink || '',
             yearsOfExperience: d?.yearsOfExperience ? String(d.yearsOfExperience) : '',
             linkedinProfile: d?.linkedinProfile || '',
             maxSessionsPerDay: d?.maxSessionsPerDay ? String(d.maxSessionsPerDay) : '',
@@ -118,6 +122,8 @@ const CounsellorProfilePage: React.FC = () => {
         modeCapability: form.modeCapability,
         officeAddress: form.officeAddress.trim(),
         qualifications: form.qualifications.trim(),
+        companyName: form.companyName.trim(),
+        meetingLink: form.meetingLink.trim(),
         yearsOfExperience: form.yearsOfExperience ? Number(form.yearsOfExperience) : null,
         linkedinProfile: form.linkedinProfile.trim(),
         maxSessionsPerDay: form.maxSessionsPerDay ? Number(form.maxSessionsPerDay) : null,
@@ -135,8 +141,9 @@ const CounsellorProfilePage: React.FC = () => {
       // refactor can re-call /auth/me here.
       setSuccess('Profile updated successfully.')
       setTimeout(() => setSuccess(''), 4000)
-    } catch {
-      setError('Failed to update profile.')
+    } catch (e: any) {
+      // The backend rejects a non-Teams meeting link with an explanatory message.
+      setError(e?.response?.data?.error || 'Failed to update profile.')
     } finally {
       setSaving(false)
     }
@@ -308,6 +315,23 @@ const CounsellorProfilePage: React.FC = () => {
               </div>
             </div>
           )}
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Microsoft Teams meeting link *</label>
+            <input value={form.meetingLink} placeholder='https://teams.microsoft.com/l/meetup-join/...'
+              onChange={(e) => setForm({ ...form, meetingLink: e.target.value })} style={inputStyle} />
+            <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 5 }}>
+              Used for all your online sessions. In Teams: Calendar → New meeting → set it to repeat
+              with no end date → Save → open it and copy the "Join the meeting now" link.
+            </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>Company Name</label>
+            <input value={form.companyName} placeholder='Company / organisation you are employed with'
+              onChange={(e) => setForm({ ...form, companyName: e.target.value })} style={inputStyle} />
+            <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 5 }}>
+              Leave blank if you work independently.
+            </div>
+          </div>
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Qualifications</label>
             <textarea value={form.qualifications} placeholder='e.g. M.Ed in Counselling Psychology'

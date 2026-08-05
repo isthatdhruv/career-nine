@@ -1,4 +1,18 @@
 version: '3.3'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PRODUCTION stack (compose project: career-nine).
+#
+# Extracted from docker-compose.production.yml — this file carries the six
+# prod services ONLY. The staging stack lives in its own project/directory
+# (/root/project/career-nine-sandbox/docker-compose.yml, project
+# career-nine-sandbox) and must NOT be duplicated here: doing so is what left
+# docker-compose.production.yml with two `api:` keys and two
+# `mysql_db_staging:` keys, where YAML silently keeps only the last one.
+#
+#   mysql_db_api   redis_cache   gotenberg   api   kafka   report-worker
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
   mysql_db_api:
     image: mysql:latest
@@ -79,10 +93,6 @@ services:
   # GOTENBERG_URL=http://gotenberg:3000. No host port is published, so the render
   # endpoint is never exposed outside the Docker network.
   #
-  # Both backends are on this network, so one `networks` entry suffices. If the
-  # staging backend lives on a DIFFERENT network, also attach that network below
-  # (a service can join multiple networks) so both can resolve `gotenberg`.
-  #
   # PDFs render synchronously during report generation; concurrent load on this
   # instance is just however many generate requests run at once across both
   # backends. Bump the memory limit if you generate very large cohorts in parallel.
@@ -100,8 +110,13 @@ services:
         limits:
           memory: 1.5g
           cpus: "3.0"          # cap Chromium renders so they can't starve the live API
+    # BOTH networks on purpose: the live container is attached to both, and the
+    # staging stack sits on career_staging_net. Dropping the second entry (as
+    # docker-compose.production.yml does) would detach it on the next `up` and
+    # change live behaviour, so it is kept here to match what is actually running.
     networks:
       - career_shared_net
+      - career_staging_net
 
   api:
     container_name: api
@@ -225,6 +240,14 @@ services:
 
   # ── Report worker — runs the Kafka consumers (generate + email) in its own JVM,
   #    isolated from the live API. Same image, profile report-worker, no HTTP server. ──
+  #
+  # KNOWN ISSUE (unchanged from docker-compose.production.yml, kept as-is so this
+  # extraction does not alter prod behaviour): the heap flags below are in
+  # `command:`, and the dockerfile's exec-form ENTRYPOINT means they are APPENDED
+  # as Spring argv rather than reaching the JVM — exactly the bug fixed for `api`
+  # on 2026-07-13 by overriding `entrypoint`. This worker therefore still boots at
+  # the container default (25% of its 1.5g limit ≈ 384m), not -Xmx1g. Fix by
+  # moving these into an `entrypoint:` block the same way `api` does.
   report-worker:
     container_name: report-worker
     build:
@@ -255,337 +278,19 @@ services:
     networks:
       - career_shared_net
 
-  # ── STAGING stack (disabled) — re-enable alongside career_staging_net when soaking ──
-  # redis_staging:
-  #   image: redis:7.2-alpine
-  #   restart: always
-  #   command: >
-  #     redis-server
-  #     --maxmemory 384mb
-  #     --maxmemory-policy allkeys-lru
-  #     --appendonly yes
-  #     --appendfsync everysec
-  #   ports:
-  #     - '127.0.0.1:6380:6379'   # loopback only — never publish redis to 0.0.0.0
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 768m
-  #   networks:
-  #     - career_staging_net
-  #   volumes:
-  #     - redis_staging_data:/data
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 3s
-  #     retries: 3
-  #     start_period: 5s
-  #   networks:
-  #     - career_shared_net
-
-  # # # # Shared headless-Chromium HTML→PDF service for server-rendered report PDFs.
-  # # # # Stateless, so ONE instance serves BOTH the production and staging backends over
-  # # # # the internal Docker network — each reaches it by service name at
-  # # # # GOTENBERG_URL=http://gotenberg:3000. No host port is published, so the render
-  # # # # endpoint is never exposed outside the Docker network.
-  # # # #
-  # # # # Both backends are on this network, so one `networks` entry suffices. If the
-  # # # # staging backend lives on a DIFFERENT network, also attach that network below
-  # # # # (a service can join multiple networks) so both can resolve `gotenberg`.
-  # # # #
-  # # # # PDFs render synchronously during report generation; concurrent load on this
-  # # # # instance is just however many generate requests run at once across both
-  # # # # backends. Bump the memory limit if you generate very large cohorts in parallel.
-  # gotenberg:
-  #   image: gotenberg/gotenberg:8
-  #   restart: unless-stopped
-  #   command:
-  #     - "gotenberg"
-  #     - "--chromium-disable-javascript=false"   # reports draw charts client-side
-  #     - "--api-timeout=120s"
-  #   expose:
-  #     - "3000"          # internal-only; reachable as http://gotenberg:3000 on the Docker network
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 1.5g
-  #         cpus: "3.0"          # cap Chromium renders so they can't starve the live API
-  #   networks:
-  #     - career_shared_net
-  #     - career_staging_net   # uncomment/add if the staging backend is on a different network
-
-  # api:
-  #   container_name: api
-  #   build:
-  #     context: ./spring-social
-  #     dockerfile: dockerfile
-  #   ports:
-  #     - 8081:8080
-  #   command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
-  #   restart: always
-  #   volumes:
-  #     - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
-  #   env_file:
-  #     - .env.staging
-  #   environment:
-  #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
-  #     # HTML→PDF render service, reached by compose service name on the Docker network.
-  #     # Without this the backend falls back to the application.yml default localhost:3000
-  #     # (nothing listens there inside the container) and every PDF render fails.
-  #     - GOTENBERG_URL=http://gotenberg:3000
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 3g
-  #   depends_on:
-  #     mysql_db_staging:
-  #       condition: service_healthy
-  #     redis_staging:
-  #       condition: service_healthy
-  #   networks:
-  #     - career_staging_net
-
-  # mysql_db_staging:
-  #   image: mysql:latest
-  #   restart: always
-  #   environment:
-  #     MYSQL_DATABASE: 'career-9-staging'
-  #     MYSQL_USER: 'user'
-  #     MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-  #     MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
-  #   ports:
-  #     - '3307:3306'
-  #   volumes:
-  #     - mysql_staging_data:/var/lib/mysql
-  #     - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 1.5g
-  #   healthcheck:
-  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #     start_period: 30s
-  #   networks:
-  #     - career_shared_net
-      
-  redis_staging:
-    image: redis:7.2-alpine
-    restart: always
-    command: >
-      redis-server
-      --maxmemory 384mb
-      --maxmemory-policy allkeys-lru
-      --appendonly yes
-      --appendfsync everysec
-    ports:
-      - '6380:6379'
-    deploy:
-      resources:
-        limits:
-          memory: 768m
-    networks:
-      - career_staging_net
-    volumes:
-      - redis_staging_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
-
-  # # # ── Kafka (KRaft, single broker) — staging report-on-completion pipeline queue.
-  # # #    Dedicated to staging (the staging stack is isolated on career_staging_net);
-  # # #    api-staging produces here and report-worker-staging consumes. ──
-  kafka-staging:
-    image: apache/kafka:latest
-    container_name: kafka-staging
-    restart: unless-stopped
-    expose:
-      - "9092"
-    # apache/kafka official image → KAFKA_* env (NOT bitnami's KAFKA_CFG_*).
-    # Single-node KRaft (broker + controller in one process), advertised by service name.
-    environment:
-      - KAFKA_NODE_ID=1
-      - KAFKA_PROCESS_ROLES=broker,controller
-      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka-staging:9093
-      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka-staging:9092
-      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
-      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
-      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
-      - KAFKA_LOG_DIRS=/var/lib/kafka/data
-    volumes:
-      - kafka_staging_data:/var/lib/kafka/data
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-          cpus: "1.0"
-    networks:
-      - career_staging_net
-
-  api-staging:
-    container_name: api-staging
-    build:
-      context: ./spring-social
-      dockerfile: dockerfile
-    ports:
-      - 8081:8080
-    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
-    restart: always
-    volumes:
-      - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
-    env_file:
-      - .env.staging
-    environment:
-      - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
-      # HTML→PDF render service, reached by compose service name on the Docker network.
-      # Without this the backend falls back to the application.yml default localhost:3000
-      # (nothing listens there inside the container) and every PDF render fails.
-      - GOTENBERG_URL=http://gotenberg:3000
-      # Staging Kafka broker (KRaft) — the report-on-completion pipeline queue that
-      # report-worker-staging consumes from. Without it the report pipeline can't enqueue.
-      - KAFKA_BOOTSTRAP=kafka-staging:9092
-    deploy:
-      resources:
-        limits:
-          memory: 3g
-    depends_on:
-      mysql_db_staging:
-        condition: service_healthy
-      redis_staging:
-        condition: service_healthy
-      kafka-staging:
-        condition: service_started
-    networks:
-      - career_staging_net
-
-  # # # ── Report worker (staging) — runs the Kafka consumers (report generate + email)
-  # # #    in their own JVM on the sandbox profile, isolated from the staging API.
-  # # #    Same image, profile sandbox,report-worker, no HTTP server. Shares the staging
-  # # #    DB + Redis (via .env.staging), the common Kafka, and the COMMON gotenberg. ──
-  report-worker-staging:
-    container_name: report-worker-staging
-    build:
-      context: ./spring-social
-      dockerfile: dockerfile
-    command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox,report-worker"]
-    restart: always
-    env_file:
-      - .env.staging
-    environment:
-      # Worker only consumes Kafka → generates reports → emails. Firebase Admin SDK
-      # (FCM/push) is unused here, so disable it and skip mounting the secret; report
-      # emails still send via the classpath Gmail service account baked into the jar.
-      - APP_FIREBASE_ENABLED=false
-      # The SAME common headless-Chromium PDF renderer the staging/live APIs use,
-      # reached by service name on the Docker network (one shared instance on :3000).
-      - GOTENBERG_URL=http://gotenberg:3000
-      # Same Kafka the staging API (api-staging) produces to, so the worker consumes
-      # the report.generate / report.email events it emits.
-      - KAFKA_BOOTSTRAP=kafka-staging:9092
-    deploy:
-      resources:
-        limits:
-          memory: 1.5g
-          cpus: "3.0"          # the worker's render budget
-    depends_on:
-      mysql_db_staging:
-        condition: service_healthy
-      redis_staging:
-        condition: service_healthy
-      kafka-staging:
-        condition: service_started
-    networks:
-      - career_staging_net
-
-  mysql_db_staging:
-    image: mysql:latest
-    restart: always
-    environment:
-      MYSQL_DATABASE: 'career-9-staging'
-      MYSQL_USER: 'user'
-      MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-      MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
-    ports:
-      - '3307:3306'
-    volumes:
-      - mysql_staging_data:/var/lib/mysql
-      - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
-    deploy:
-      resources:
-        limits:
-          memory: 1.5g
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - career_staging_net
-
-  # sync_cron:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.cron
-  #   restart: always
-  #   environment:
-  #     MASTER_HOST: 'mysql_db_api'
-  #     STAGING_HOST: 'mysql_db_staging'
-  #     DB_NAME: 'career-9'
-  #     STAGING_DB_NAME: 'career-9-staging'
-  #     DB_USER: 'root'
-  #     DB_PASSWORD: 'Career-qCsfeuECc3MW'
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 256m
-  #   depends_on:
-  #     mysql_db_api:
-  #       condition: service_healthy
-  #     mysql_db_staging:
-  #       condition: service_healthy
-  #   networks:
-  #     - career_shared_net
-  # redisinsight:
-  #   image: redis/redisinsight:latest
-  #   restart: always
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 1g
-  #   ports:
-  #     - '5540:5540'
-  #   networks:
-  #     - career_shared_net
-  #   depends_on:
-  #     redis_cache:
-  #       condition: service_healthy
-  #   volumes:
-  #     - redisinsight_data:/data
-
+# Only the volumes the prod services mount. The staging volumes
+# (career-nine_mysql_staging_data, career-nine_redis_staging_data,
+# career-nine_kafka_staging_data, career-nine_redisinsight_data) still exist on
+# disk untouched — they are simply declared by the sandbox project instead.
 volumes:
   mysql_data:
-  mysql_staging_data:
   redis_data:
-  redis_staging_data:
-  redisinsight_data:
   kafka_data:
-  kafka_staging_data:
 
 networks:
   career_shared_net:
     external: true
+  # Declared because gotenberg attaches to it (see the service above), not
+  # because any staging container is defined in this file.
   career_staging_net:
     external: true

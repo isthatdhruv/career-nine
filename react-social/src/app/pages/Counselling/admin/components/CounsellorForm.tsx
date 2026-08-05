@@ -7,6 +7,8 @@ interface CounsellorData {
   email: string
   phone?: string
   specializations?: string
+  companyName?: string
+  meetingLink?: string
   bio?: string
   isExternal?: boolean
 }
@@ -22,6 +24,8 @@ const EMPTY_FORM: CounsellorData = {
   email: '',
   phone: '',
   specializations: '',
+  companyName: '',
+  meetingLink: '',
   bio: '',
   isExternal: false,
 }
@@ -54,6 +58,11 @@ const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave, onC
       newErrors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       newErrors.email = 'Enter a valid email address'
+    }
+    // Sessions run on Microsoft Teams only, so no other provider's link is accepted.
+    const link = (form.meetingLink ?? '').trim()
+    if (link && !/^https:\/\/teams\.(microsoft|live)\.com\//i.test(link)) {
+      newErrors.meetingLink = 'Enter a Microsoft Teams link (teams.microsoft.com or teams.live.com)'
     }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -172,6 +181,43 @@ const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave, onC
             placeholder='e.g. Career Guidance, Academic Stress'
             style={inputStyle}
           />
+        </div>
+
+        {/* Company Name */}
+        <div style={fieldStyle}>
+          <label style={labelStyle} htmlFor='cf-companyName'>
+            Company Name
+          </label>
+          <input
+            id='cf-companyName'
+            name='companyName'
+            type='text'
+            value={form.companyName ?? ''}
+            onChange={handleChange}
+            placeholder='Company / organisation the counsellor is employed with'
+            style={inputStyle}
+          />
+        </div>
+
+        {/* Teams meeting link — used for every online session this counsellor takes */}
+        <div style={fieldStyle}>
+          <label style={labelStyle} htmlFor='cf-meetingLink'>
+            Microsoft Teams meeting link
+          </label>
+          <input
+            id='cf-meetingLink'
+            name='meetingLink'
+            type='text'
+            value={form.meetingLink ?? ''}
+            onChange={handleChange}
+            placeholder='https://teams.microsoft.com/l/meetup-join/...'
+            style={{ ...inputStyle, borderColor: errors.meetingLink ? '#EF4444' : 'var(--sp-border, #D1E5DF)' }}
+          />
+          {errors.meetingLink
+            ? <div style={errorStyle}>{errors.meetingLink}</div>
+            : <div style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 4 }}>
+                Required before this counsellor can take online sessions.
+              </div>}
         </div>
 
         {/* Bio */}

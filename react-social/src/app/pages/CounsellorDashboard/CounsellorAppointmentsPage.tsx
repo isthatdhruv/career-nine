@@ -246,7 +246,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
 
   // Session check-in: counsellor sends the OTP to the student, then enters the code
   // the student shares back. Verifying it is what actually starts the session
-  // (status -> IN_PROGRESS) and unlocks the meeting link — Jitsi included.
+  // (status -> IN_PROGRESS) and unlocks the Teams meeting link.
   const handleStartSession = async (appointmentId: number, meetingLink?: string) => {
     setActionLoading(appointmentId)
     setCheckinMsg((p) => ({ ...p, [appointmentId]: '' }))
@@ -568,7 +568,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                                 className='cp-action-btn cp-action-btn-primary'
                                 style={{ textDecoration: 'none', display: 'inline-block' }}
                               >
-                                Join Meet
+                                Join Teams meeting
                               </a>
                             )}
                             <input
@@ -622,7 +622,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                             className='cp-action-btn cp-action-btn-primary'
                             style={{ textDecoration: 'none', display: 'inline-block' }}
                           >
-                            Join Meet
+                            Join Teams meeting
                           </a>
                         )}
                         <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>● In progress</span>
