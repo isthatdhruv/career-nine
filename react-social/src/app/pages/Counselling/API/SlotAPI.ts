@@ -12,6 +12,10 @@ export function getAvailableSlots(week?: string, instituteCode?: number) {
 export function createManualSlot(data: any) { return axios.post(`${BASE}/create-manual`, data) }
 export function blockDate(data: any) { return axios.post(`${BASE}/block-date`, data) }
 export function deleteSlot(id: number) { return axios.delete(`${BASE}/delete/${id}`) }
+/** { counsellorId: bookable-slots-from-today } for every counsellor that has any. */
+export function getAvailableSlotCounts() {
+  return axios.get<Record<string, number>>(`${BASE}/available-counts`)
+}
 export function getSlotsByCounsellor(counsellorId: number, start?: string, end?: string) {
   let params = start && end ? `?start=${start}&end=${end}` : ''
   return axios.get(`${BASE}/by-counsellor/${counsellorId}${params}`)

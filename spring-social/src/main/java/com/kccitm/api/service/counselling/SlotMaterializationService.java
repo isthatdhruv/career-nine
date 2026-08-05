@@ -91,6 +91,11 @@ public class SlotMaterializationService {
                 ? template.getStartDate()
                 : tomorrow;
         LocalDate endDate = start.plusDays(days);
+        // Honour the template's last effective date: never generate past it. A window
+        // that ends before it begins yields nothing, which the caller reports.
+        if (template.getEndDate() != null && template.getEndDate().isBefore(endDate)) {
+            endDate = template.getEndDate();
+        }
         int created = 0;
         int skipped = 0;
 

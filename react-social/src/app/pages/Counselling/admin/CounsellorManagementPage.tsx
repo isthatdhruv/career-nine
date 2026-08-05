@@ -4,9 +4,10 @@ import '../Counselling.css'
 import { getAllCounsellors, createCounsellor, updateCounsellor, toggleCounsellorActive } from '../API/CounsellorAPI'
 import { getCounsellorAppointments } from '../API/AppointmentAPI'
 import { getAllMappings, allocateCounsellor, deallocateCounsellor, CounsellorInstituteMapping } from '../API/CounsellorInstituteAPI'
-import { getAllSlotConfigs, applySlotConfig, SlotConfig } from '../API/SlotConfigurationAPI'
 import { getSlotsByCounsellor } from '../API/SlotAPI'
 import CounsellorForm from './components/CounsellorForm'
+import CounsellorAvailabilityPanel from '../shared/CounsellorAvailabilityPanel'
+import WeeklySchedulePanel from '../shared/WeeklySchedulePanel'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import PageHeader from '../../../components/PageHeader'
 import SearchableSelect from '../../../components/SearchableSelect'
@@ -21,6 +22,8 @@ interface Counsellor {
   email: string
   phone?: string
   specializations?: string
+  companyName?: string
+  officeAddress?: string
   bio?: string
   isExternal?: boolean
   isActive?: boolean
@@ -298,11 +301,11 @@ const CounsellorManagementPage: React.FC = () => {
   const [showAllocateModal, setShowAllocateModal] = useState(false)
   const [allocating, setAllocating] = useState(false)
 
-  // Slot config modal
+  // Availability modal: the counsellor's own availability workspace for a single
+  // selection, or the bulk weekly-schedule form when several are ticked.
   const [showSlotModal, setShowSlotModal] = useState(false)
-  const [slotConfigs, setSlotConfigs] = useState<SlotConfig[]>([])
-  const [slotConfigsLoading, setSlotConfigsLoading] = useState(false)
-  const [applyingSlots, setApplyingSlots] = useState(false)
+  // Office address used when an admin schedules in-person slots for one counsellor.
+  const [scheduleOfficeAddress, setScheduleOfficeAddress] = useState('')
 
 
   // Phase 19: admin identity comes from the unified cookie session, not from
@@ -441,34 +444,15 @@ const CounsellorManagementPage: React.FC = () => {
     }
   }
 
-  const openSlotModal = async () => {
+  const openSlotModal = () => {
     setShowSlotModal(true)
-    setSlotConfigsLoading(true)
-    try {
-      const res = await getAllSlotConfigs()
-      setSlotConfigs(Array.isArray(res.data) ? res.data : [])
-    } catch {
-      setError('Failed to load slot configurations.')
-    } finally {
-      setSlotConfigsLoading(false)
-    }
+    // In-person scheduling writes back to Counsellor.officeAddress, so seed the
+    // field with what that counsellor already has (single selection only).
+    const onlyId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : null
+    const onlyCounsellor = onlyId ? counsellors.find((c) => getCounsellorId(c) === onlyId) : null
+    setScheduleOfficeAddress(onlyCounsellor?.officeAddress || '')
   }
 
-  const handleApplySlotConfig = async (configId: number) => {
-    setApplyingSlots(true)
-    setError(null)
-    try {
-      const res = await applySlotConfig(configId, Array.from(selectedIds))
-      const data = res.data as any
-      showSuccess(`Slots created: ${data.totalSlots} slots for ${data.counsellorsProcessed} counsellor(s).`)
-      setShowSlotModal(false)
-      setSelectedIds(new Set())
-    } catch (err: any) {
-      setError(err?.response?.data?.error || 'Failed to apply slot configuration.')
-    } finally {
-      setApplyingSlots(false)
-    }
-  }
 
   const handleAllocateToInstitute = async (instituteCode: number) => {
     setAllocating(true)
@@ -506,7 +490,7 @@ const CounsellorManagementPage: React.FC = () => {
         subtitle="Review, approve, and manage counsellor profiles"
         actions={selectedIds.size > 0 ? [
           { label: `Institute Allocation (${selectedIds.size})`, iconClass: 'bi-building', onClick: () => setShowAllocateModal(true), variant: 'primary' },
-          { label: `Create Slots (${selectedIds.size})`, iconClass: 'bi-calendar-plus', onClick: openSlotModal, variant: 'ghost' },
+          { label: `Manage Availability (${selectedIds.size})`, iconClass: 'bi-calendar-plus', onClick: openSlotModal, variant: 'ghost' },
         ] : []}
       />
 
@@ -582,77 +566,54 @@ const CounsellorManagementPage: React.FC = () => {
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0,0,0,0.4)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }} onClick={() => !applyingSlots && setShowSlotModal(false)}>
+        }} onClick={() => setShowSlotModal(false)}>
           <div style={{
-            background: '#fff', borderRadius: 12, padding: 28, width: 480, maxHeight: '80vh',
+            background: '#fff', borderRadius: 12, padding: 28, maxHeight: '92vh',
+            // The full availability workspace needs the counsellor portal's two-column
+            // width; the bulk schedule form on its own is narrow.
+            width: selectedIds.size === 1 ? 'min(1160px, 95vw)' : 580,
             overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
           }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700, color: '#1A2B28' }}>
-              Assign Slot Configuration
+              {selectedIds.size === 1 ? 'Manage Availability' : 'Add Weekly Schedule'}
             </h3>
-            <p style={{ margin: '0 0 20px', fontSize: 13, color: '#5C7A72' }}>
-              Select a slot configuration to apply to {selectedIds.size} counsellor(s)
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#5C7A72' }}>
+              {(() => {
+                const only = selectedIds.size === 1
+                  ? counsellors.find((c) => getCounsellorId(c) === Array.from(selectedIds)[0])
+                  : null
+                return only ? `For ${only.name}` : `For ${selectedIds.size} selected counsellors`
+              })()}
             </p>
 
-            {applyingSlots ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: '#5C7A72', fontSize: 14 }}>
-                Generating slots...
-              </div>
-            ) : slotConfigsLoading ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: '#5C7A72', fontSize: 14 }}>
-                Loading configurations...
-              </div>
-            ) : slotConfigs.filter((c) => c.endDate >= new Date().toISOString().slice(0, 10)).length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: '#5C7A72', fontSize: 13 }}>
-                No active slot configurations. Create one from the <strong>Create Slots</strong> page first.
-              </div>
+            {selectedIds.size === 1 ? (
+              // One counsellor: the full availability workspace they see in their
+              // own portal — weekly schedule, upcoming slots, extra slots, blocking.
+              <CounsellorAvailabilityPanel
+                counsellorId={Array.from(selectedIds)[0]}
+                asAdmin
+                onChanged={() => loadCounsellors({ silent: true })}
+              />
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {slotConfigs
-                  .filter((c) => c.endDate >= new Date().toISOString().slice(0, 10))
-                  .map((cfg) => {
-                  const formatDate = (d: string) => {
-                    try { return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }
-                    catch { return d }
-                  }
-                  const formatTime = (t: string) => t?.slice(0, 5) || t
-                  return (
-                    <button
-                      key={cfg.id}
-                      onClick={() => handleApplySlotConfig(cfg.id)}
-                      style={{
-                        display: 'flex', flexDirection: 'column', gap: 4,
-                        padding: '14px 16px', border: '1.5px solid #D1E5DF', borderRadius: 10,
-                        background: '#fff', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#F0FFF4'; e.currentTarget.style.borderColor = '#0C6B5A' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#D1E5DF' }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: 14, color: '#1A2B28' }}>{cfg.name}</div>
-                      <div style={{ display: 'flex', gap: 12, fontSize: 12, color: '#5C7A72', flexWrap: 'wrap' }}>
-                        <span>{formatDate(cfg.startDate)} — {formatDate(cfg.endDate)}</span>
-                        <span>{formatTime(cfg.startTime)} - {formatTime(cfg.endTime)}</span>
-                        <span>{cfg.slotDuration}min</span>
-                        {cfg.hasBreak && cfg.breakStart && cfg.breakEnd && (
-                          <span>Break: {formatTime(cfg.breakStart)}-{formatTime(cfg.breakEnd)}</span>
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+              // Several counsellors: only the recurring schedule can be applied in
+              // bulk — slots and blocked dates belong to one counsellor at a time.
+              <WeeklySchedulePanel
+                counsellorIds={Array.from(selectedIds)}
+                officeAddress={scheduleOfficeAddress}
+                onOfficeAddressChange={setScheduleOfficeAddress}
+                onChanged={() => loadCounsellors({ silent: true })}
+              />
             )}
 
             <button
               onClick={() => setShowSlotModal(false)}
-              disabled={applyingSlots}
               style={{
                 marginTop: 20, width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
                 border: '1.5px solid #D1E5DF', borderRadius: 8, background: '#fff',
                 color: '#5C7A72', cursor: 'pointer',
               }}
             >
-              Cancel
+              Close
             </button>
           </div>
         </div>

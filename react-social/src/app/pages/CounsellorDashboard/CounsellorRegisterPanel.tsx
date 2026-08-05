@@ -18,13 +18,15 @@ interface FormData {
   yearsOfExperience: string
   workTime: string
   counsellorType: string
+  companyName: string
+  meetingLink: string
 }
 
 const initialForm: FormData = {
   name: '', email: '', phone: '', password: '', confirmPassword: '',
   specializations: '', bio: '', languagesSpoken: '', modeCapability: 'BOTH',
   qualifications: '', yearsOfExperience: '',
-  workTime: 'FULL_TIME', counsellorType: 'CAREER',
+  workTime: 'FULL_TIME', counsellorType: 'CAREER', companyName: '', meetingLink: '',
 }
 
 interface CounsellorRegisterPanelProps {
@@ -84,6 +86,11 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
   const validateStep2 = (): string | null => {
     if (!form.specializations.trim()) return 'Please enter your specializations'
     if (!form.languagesSpoken.trim()) return 'Please enter languages you speak'
+    // Optional at signup, but if given it has to be Teams — nothing else is accepted.
+    const link = form.meetingLink.trim()
+    if (link && !/^https:\/\/teams\.(microsoft|live)\.com\//i.test(link)) {
+      return 'The meeting link must be a Microsoft Teams link (teams.microsoft.com or teams.live.com)'
+    }
     return null
   }
 
@@ -122,6 +129,8 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
       yearsOfExperience: form.yearsOfExperience ? Number(form.yearsOfExperience) : undefined,
       workTime: form.workTime,
       counsellorType: form.counsellorType,
+      companyName: form.companyName.trim() || undefined,
+      meetingLink: form.meetingLink.trim() || undefined,
       profileImageUrl: photoUrl || undefined,
     }).catch(() => {})
   }
@@ -327,6 +336,25 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             </div>
           </div>
           <div>
+            <label style={labelStyle}>Microsoft Teams meeting link</label>
+            <input style={inputStyle} placeholder='https://teams.microsoft.com/l/meetup-join/...'
+              autoComplete='off' name='c9-teams-link' data-lpignore='true'
+              value={form.meetingLink} onChange={(e) => update('meetingLink', e.target.value)} />
+            <div style={{ fontSize: 11, color: '#5C7A72', marginTop: 4 }}>
+              Used for all your online sessions. Teams → Calendar → New meeting → repeat with no
+              end date → copy the join link. You can add it later from your profile.
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Company Name</label>
+            <input style={inputStyle} placeholder='Company / organisation you are employed with'
+              autoComplete='off' name='c9-company' data-lpignore='true'
+              value={form.companyName} onChange={(e) => update('companyName', e.target.value)} />
+            <div style={{ fontSize: 11, color: '#5C7A72', marginTop: 4 }}>
+              Leave blank if you work independently
+            </div>
+          </div>
+          <div>
             <label style={labelStyle}>Qualifications</label>
             <textarea
               style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }}
@@ -369,6 +397,8 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             { label: 'Mode', value: form.modeCapability === 'BOTH' ? 'Online & Offline' : form.modeCapability === 'ONLINE' ? 'Online Only' : 'Offline Only' },
             { label: 'Work-time', value: form.workTime === 'FULL_TIME' ? 'Full-time' : 'Part-time' },
             { label: 'Counsellor Type', value: form.counsellorType === 'SCHOOL' ? 'School' : 'Career' },
+            { label: 'Company', value: form.companyName || '-' },
+            { label: 'Teams link', value: form.meetingLink || '-' },
             { label: 'Qualifications', value: form.qualifications || '-' },
             { label: 'Experience', value: form.yearsOfExperience ? `${form.yearsOfExperience} years` : '-' },
             { label: 'About Me', value: form.bio || '-' },

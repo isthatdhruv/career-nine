@@ -386,7 +386,13 @@ public class AppointmentService {
         CounsellingAppointment newAppointment = new CounsellingAppointment();
         newAppointment.setSlot(newSlot);
         newAppointment.setStudent(oldAppointment.getStudent());
-        newAppointment.setCounsellor(oldAppointment.getCounsellor());
+        // The session belongs to whoever owns the NEW slot — a student rescheduling after a
+        // block-date can land on a different counsellor entirely. Carrying the old counsellor
+        // over used to be invisible (links were generated per appointment); with each
+        // counsellor having their own permanent Teams room it would send the student to the
+        // wrong room while the new counsellor waits in theirs.
+        newAppointment.setCounsellor(
+                newSlot.getCounsellor() != null ? newSlot.getCounsellor() : oldAppointment.getCounsellor());
         newAppointment.setAssignedBy(oldAppointment.getAssignedBy());
         newAppointment.setStudentReason(oldAppointment.getStudentReason());
         newAppointment.setStatus("CONFIRMED");

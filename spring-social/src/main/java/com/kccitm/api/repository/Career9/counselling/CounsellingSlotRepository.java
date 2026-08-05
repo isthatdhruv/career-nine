@@ -33,6 +33,19 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
 
     List<CounsellingSlot> findByCounsellorIdAndDateAndIsBlockedTrue(Long counsellorId, LocalDate date);
 
+    /** Bookable slots a counsellor still has from {@code today} onward. */
+    @Query("SELECT COUNT(s) FROM CounsellingSlot s WHERE s.counsellor.id = :counsellorId "
+         + "AND s.status = 'AVAILABLE' AND s.isBlocked = false AND s.date >= :today")
+    long countUpcomingAvailable(@Param("counsellorId") Long counsellorId, @Param("today") LocalDate today);
+
+    /**
+     * Bookable slot count per counsellor from {@code today} onward, as [counsellorId, count]
+     * rows — one query for the whole admin list rather than one call per counsellor.
+     */
+    @Query("SELECT s.counsellor.id, COUNT(s) FROM CounsellingSlot s WHERE s.status = 'AVAILABLE' "
+         + "AND s.isBlocked = false AND s.date >= :today GROUP BY s.counsellor.id")
+    List<Object[]> countUpcomingAvailableByCounsellor(@Param("today") LocalDate today);
+
     /** Soft-hold sweep: REQUESTED slots whose hold TTL has expired (Counselling Phase 3). */
     List<CounsellingSlot> findByStatusAndHeldUntilBefore(String status, LocalDateTime cutoff);
 

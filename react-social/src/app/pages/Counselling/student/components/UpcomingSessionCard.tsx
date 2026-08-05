@@ -4,6 +4,8 @@ import CountdownTimer from '../../shared/CountdownTimer'
 import '../../Counselling.css'
 
 const RESCHEDULE_CUTOFF_MS = 4 * 60 * 60 * 1000
+/** How early the Join button appears before the session's start time. */
+const JOIN_OPENS_BEFORE_MS = 10 * 60 * 1000
 
 function formatTimeRemaining(ms: number): string {
   if (ms <= 0) return 'less than a minute'
@@ -79,11 +81,17 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
 
   const startMs = buildSlotDateTime(slot.date, slot.startTime)
   const endMs = buildSlotDateTime(slot.date, slot.endTime)
-  // The meeting opens only after the counsellor verifies the check-in code (OTP)
-  // sent to you — i.e. the session is IN_PROGRESS. Time alone no longer unlocks Join,
-  // so the Jitsi link cannot be used to bypass check-in.
-  const sessionLive = (status || '').toUpperCase() === 'IN_PROGRESS'
-  const canJoin = !!meetingLink && sessionLive && !isNaN(endMs) && now < endMs
+  // Join opens shortly before the slot and stays open until it ends: the student needs
+  // to be in the meeting to read the check-in code out to the counsellor, who enters it
+  // to mark the session started. Teams' lobby is what actually holds them back until
+  // the counsellor admits them, so the link alone gives no early access.
+  const upperStatus = (status || '').toUpperCase()
+  const sessionLive = upperStatus === 'IN_PROGRESS'
+  // A cancelled, declined or finished session never offers Join, whatever the clock says.
+  const sessionActive = ['CONFIRMED', 'ASSIGNED', 'PENDING', 'IN_PROGRESS'].includes(upperStatus)
+  const withinJoinWindow =
+    !isNaN(startMs) && !isNaN(endMs) && now >= startMs - JOIN_OPENS_BEFORE_MS && now < endMs
+  const canJoin = !!meetingLink && sessionActive && (sessionLive || withinJoinWindow)
 
   const msUntilStart = isNaN(startMs) ? Infinity : startMs - now
   const rescheduleWithinCutoff = msUntilStart < RESCHEDULE_CUTOFF_MS
@@ -146,7 +154,7 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
         </div>
       )}
 
-      {/* Meeting Link — visible only within 5 minutes of the session start */}
+      {/* Meeting link — opens 10 minutes before the slot, or as soon as the session is live */}
       {canJoin ? (
         <div style={{ marginBottom: 14 }}>
           <a
@@ -164,8 +172,8 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
         </div>
       ) : meetingLink ? (
         <div style={{ marginBottom: 14, fontSize: 12, color: 'var(--sp-muted, #5C7A72)' }}>
-          Your counsellor will start the session and verify the check-in code sent to you.
-          The Join button appears once check-in is done.
+          The Join button opens 10 minutes before your session. Once you're in, share the
+          check-in code sent to you with your counsellor to begin.
         </div>
       ) : null}
 

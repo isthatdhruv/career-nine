@@ -10,6 +10,7 @@ import {
   getCounsellingEnabledAssessments,
   PendingCounsellingRequest,
 } from '../API/CounsellorAssessmentAPI'
+import { getAvailableSlotCounts } from '../API/SlotAPI'
 import { getAssessmentSummaryList } from '../../AssessmentMapping/API/AssessmentMapping_APIs'
 import { useAuth } from '../../../modules/auth'
 
@@ -52,6 +53,18 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [pending, setPending] = useState<PendingCounsellingRequest[]>([])
+  // Bookable slots per counsellor from today onward. A counsellor with none can't be
+  // assigned — students finishing the assessment would land on an empty calendar.
+  const [slotCounts, setSlotCounts] = useState<Record<string, number>>({})
+  const [noSlotsFor, setNoSlotsFor] = useState<string | null>(null)
+
+  const loadSlotCounts = () => {
+    getAvailableSlotCounts()
+      .then((res) => setSlotCounts(res.data || {}))
+      .catch(() => { /* non-fatal — the backend still refuses an empty counsellor */ })
+  }
+
+  const availableSlots = (counsellorId: number) => slotCounts[String(counsellorId)] || 0
 
   const loadPending = () => {
     getPendingCounsellingRequests()
@@ -74,6 +87,7 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
       .then((res) => setCounsellingEnabledIds(new Set(res.data || [])))
       .catch(() => { /* non-fatal — dropdown falls back to showing all assessments */ })
     loadPending()
+    loadSlotCounts()
   }, [])
 
   const load = async (id: number) => {
@@ -106,6 +120,8 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
         await deleteAssignment(existing.id)
         setInfo(`Removed ${c.name} from "${assessmentName}".`)
       } else {
+        // Counts are a snapshot; the backend is the one that decides. A refusal here
+        // means the counsellor's last free slot went between page load and this click.
         await assignCounsellor(counsellorId, loadedAssessmentId, currentUser?.id)
         setInfo(`Assigned ${c.name} to "${assessmentName}".`)
       }
@@ -113,7 +129,13 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
       setAssignments(res.data || [])
       // Assigning a counsellor auto-closes any pending requests for the assessment.
       loadPending()
-    } catch {
+      loadSlotCounts()
+    } catch (e: any) {
+      if (e?.response?.data?.code === 'NO_AVAILABLE_SLOTS') {
+        setNoSlotsFor(c.name)
+        loadSlotCounts()
+        return
+      }
       setError('Could not update the assignment. Please try again.')
     }
   }
@@ -129,6 +151,43 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
   return (
     <div style={{ padding: 24 }}>
       <PageHeader title="Counsellor — Assessment Assignment" />
+
+      {/* No-slots popup — the assign attempt is refused until availability exists. */}
+      {noSlotsFor && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.4)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setNoSlotsFor(null)}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 12, padding: 24, width: 380,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: '#1A2B28' }}>
+              No slots available
+            </h3>
+            <p style={{ margin: '0 0 18px', fontSize: 14, color: '#5C7A72', lineHeight: 1.5 }}>
+              <strong>{noSlotsFor}</strong> has no upcoming slots. Add availability from Manage
+              Counsellors first.
+            </p>
+            <button
+              onClick={() => setNoSlotsFor(null)}
+              style={{
+                width: '100%', padding: '9px 0', fontSize: 14, fontWeight: 600,
+                border: 'none', borderRadius: 8, background: '#0C6B5A', color: '#fff', cursor: 'pointer',
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
       <p style={{ color: '#5C7A72', fontSize: 14, marginBottom: 16 }}>
         Choose which counsellors handle counselling for a given assessment. Students who
         finish that assessment are only offered slots from the assigned counsellors. If an
@@ -206,6 +265,7 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
             <tr style={{ textAlign: 'left', background: '#F1F8F6' }}>
               <th style={{ padding: 12 }}>Counsellor</th>
               <th style={{ padding: 12 }}>Email</th>
+              <th style={{ padding: 12 }}>Available slots</th>
               <th style={{ padding: 12 }}>Assigned</th>
               <th style={{ padding: 12 }}>Action</th>
             </tr>
@@ -213,17 +273,35 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
           <tbody>
             {counsellors.map((c) => {
               const assigned = !!assignmentFor(cid(c))
+              const slots = availableSlots(cid(c))
+              // Only assignment needs slots — removing one always stays possible.
+              const blocked = !assigned && slots === 0
               return (
                 <tr key={cid(c)} style={{ borderTop: '1px solid #EEF4F2' }}>
                   <td style={{ padding: 12 }}>{c.name}</td>
                   <td style={{ padding: 12, color: '#5C7A72' }}>{c.email}</td>
+                  <td style={{ padding: 12 }}>
+                    {slots > 0 ? (
+                      <span style={{ color: '#065F46', fontWeight: 600 }}>{slots}</span>
+                    ) : (
+                      <span style={{
+                        display: 'inline-block', padding: '2px 10px', borderRadius: 999,
+                        background: '#FEE2E2', color: '#991B1B', fontSize: 12, fontWeight: 600,
+                      }}>
+                        None
+                      </span>
+                    )}
+                  </td>
                   <td style={{ padding: 12 }}>{assigned ? '✓ Yes' : '—'}</td>
                   <td style={{ padding: 12 }}>
                     <button
-                      onClick={() => toggle(c)}
+                      onClick={() => (blocked ? setNoSlotsFor(c.name) : toggle(c))}
+                      title={blocked ? 'This counsellor has no upcoming available slots' : undefined}
                       style={{
-                        padding: '6px 16px', borderRadius: 8, border: '1.5px solid #D1E5DF', cursor: 'pointer',
-                        background: assigned ? '#FEE2E2' : '#E8F5E9', color: assigned ? '#991B1B' : '#065F46',
+                        padding: '6px 16px', borderRadius: 8, cursor: blocked ? 'not-allowed' : 'pointer',
+                        border: '1.5px solid #D1E5DF',
+                        background: blocked ? '#F3F4F6' : assigned ? '#FEE2E2' : '#E8F5E9',
+                        color: blocked ? '#9CA3AF' : assigned ? '#991B1B' : '#065F46',
                       }}
                     >
                       {assigned ? 'Remove' : 'Assign'}
@@ -233,7 +311,7 @@ const CounsellorAssessmentAssignmentPage: React.FC = () => {
               )
             })}
             {counsellors.length === 0 && (
-              <tr><td colSpan={4} style={{ padding: 16, textAlign: 'center', color: '#9CA3AF' }}>No counsellors found.</td></tr>
+              <tr><td colSpan={5} style={{ padding: 16, textAlign: 'center', color: '#9CA3AF' }}>No counsellors found.</td></tr>
             )}
           </tbody>
         </table>
