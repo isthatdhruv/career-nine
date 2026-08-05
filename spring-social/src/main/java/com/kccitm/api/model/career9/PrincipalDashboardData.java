@@ -84,6 +84,17 @@ public class PrincipalDashboardData implements Serializable {
     @Column(name = "scope_level", nullable = false, length = 16)
     private String scopeLevel;
 
+    /**
+     * What this scope is called, resolved when it was released.
+     *
+     * <p>Stored rather than derived: the dimension columns hold ids, and naming a section
+     * or a group needs lookup tables the read path has no reason to join on every
+     * dropdown. It is also the name the report went out under — renaming a group later
+     * should not retitle what a principal already read.
+     */
+    @Column(name = "scope_label", length = 255)
+    private String scopeLabel;
+
     /** NULL on any dimension means "unconstrained", not "unknown". */
     @Column(name = "session_id")
     private Long sessionId;
@@ -130,6 +141,16 @@ public class PrincipalDashboardData implements Serializable {
     @Column(name = "release_id", length = 36)
     private String releaseId;
 
+    /**
+     * Whether this row belongs to the assessment the school's dashboard currently shows.
+     *
+     * <p>A school can have released more than one Navigator assessment over the years.
+     * Which one is live has to be a decision, not a consequence of which was regenerated
+     * most recently — so a release marks its own assessment current and clears the rest.
+     */
+    @Column(name = "is_current", nullable = false)
+    private Boolean isCurrent = Boolean.TRUE;
+
     /** Scored students in this scope right now, refreshed on read. */
     @Column(name = "scored_count")
     private Integer scoredCount;
@@ -172,23 +193,39 @@ public class PrincipalDashboardData implements Serializable {
     public PrincipalDashboardData() {}
 
     /**
-     * True when enough new students have been scored since generation to make the
-     * stored content worth regenerating.
+     * New scored students in this scope since it was generated.
      *
-     * <p>Staleness is a flag, never a spend: nothing regenerates on its own, because
-     * a regeneration costs money and rewrites wording a principal may already have
-     * circulated. An admin decides.
+     * <p>Takes the live count as an argument rather than reading a second stored
+     * column. Both stored counts are written in the same transaction at generation, so
+     * any comparison between them is zero forever — the delta only exists against a
+     * number counted now.
+     *
+     * @param liveScoredCount students currently scored in this scope
      */
-    public boolean isStale() {
-        if (!STATUS_GENERATED.equals(generationStatus)) return false;
-        if (scoredCount == null || scoredAtGeneration == null || staleThreshold == null) return false;
-        return (scoredCount - scoredAtGeneration) >= staleThreshold;
+    public int newStudentsSince(int liveScoredCount) {
+        if (scoredAtGeneration == null) return 0;
+        return Math.max(0, liveScoredCount - scoredAtGeneration);
     }
 
-    /** New scored students since this scope was generated; 0 when unknown. */
-    public int newStudentsSinceGeneration() {
-        if (scoredCount == null || scoredAtGeneration == null) return 0;
-        return Math.max(0, scoredCount - scoredAtGeneration);
+    /**
+     * Whether enough has changed to be worth regenerating this scope's narrative.
+     *
+     * <p>Staleness is a flag, never a spend: nothing regenerates on its own, because a
+     * regeneration costs money and rewrites wording a principal may already have
+     * circulated. An admin decides, and this only tells them it would be justified.
+     *
+     * @param liveScoredCount students currently scored in this scope
+     */
+    public boolean isStale(int liveScoredCount) {
+        if (!STATUS_GENERATED.equals(generationStatus)) return false;
+        if (staleThreshold == null) return false;
+        return newStudentsSince(liveScoredCount) >= staleThreshold;
+    }
+
+    /** Hours since this scope was generated; {@link Long#MAX_VALUE} when never. */
+    public long hoursSinceGeneration(Date now) {
+        if (generatedAt == null) return Long.MAX_VALUE;
+        return (now.getTime() - generatedAt.getTime()) / 3_600_000L;
     }
 
     public Long getId() { return id; }
@@ -205,6 +242,9 @@ public class PrincipalDashboardData implements Serializable {
 
     public String getScopeLevel() { return scopeLevel; }
     public void setScopeLevel(String scopeLevel) { this.scopeLevel = scopeLevel; }
+
+    public String getScopeLabel() { return scopeLabel; }
+    public void setScopeLabel(String scopeLabel) { this.scopeLabel = scopeLabel; }
 
     public Long getSessionId() { return sessionId; }
     public void setSessionId(Long sessionId) { this.sessionId = sessionId; }
@@ -241,6 +281,9 @@ public class PrincipalDashboardData implements Serializable {
 
     public String getReleaseId() { return releaseId; }
     public void setReleaseId(String releaseId) { this.releaseId = releaseId; }
+
+    public Boolean getIsCurrent() { return isCurrent; }
+    public void setIsCurrent(Boolean isCurrent) { this.isCurrent = isCurrent; }
 
     public Integer getScoredCount() { return scoredCount; }
     public void setScoredCount(Integer scoredCount) { this.scoredCount = scoredCount; }

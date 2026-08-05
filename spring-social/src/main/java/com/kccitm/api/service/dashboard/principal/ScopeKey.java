@@ -71,6 +71,41 @@ public final class ScopeKey {
     }
 
     /**
+     * The one true key for a requested scope, given what the school actually has.
+     *
+     * <p>Two scopes with identical membership must not become two rows — that stores
+     * the same payload twice and bills OpenAI twice for one cohort. Which pairs are
+     * identical depends on the school, so it cannot be decided by the key format
+     * alone:
+     *
+     * <ul>
+     *   <li><b>One session</b> — every scope is inside it, so binding it distinguishes
+     *       nothing. Dropped.</li>
+     *   <li><b>A class with one populated section</b> — the section scope and the class
+     *       scope hold the same students. The section is dropped in favour of the
+     *       class, which is the one an admin selected by name.</li>
+     *   <li><b>A group</b> — deliberately independent of session, class and section, so
+     *       those dimensions are cleared rather than carried alongside it.</li>
+     * </ul>
+     *
+     * <p>Every write goes through here. The read path does <em>not</em> re-derive this
+     * — it would need a snapshot it has no reason to build — and instead resolves
+     * against the stored dimension columns, reporting which scope it matched.
+     */
+    public static ScopeKey canonical(Long assessmentId, Long sessionId, Long classId,
+                                     Long sectionId, Long groupId, ReleaseSnapshot snapshot) {
+        if (groupId != null) {
+            return group(assessmentId, groupId);
+        }
+        Long session = snapshot.sessions().size() <= 1 ? null : sessionId;
+        Long section = sectionId;
+        if (section != null && snapshot.sectionsOf(session, classId).size() <= 1) {
+            section = null;
+        }
+        return new ScopeKey(assessmentId, session, classId, section, null);
+    }
+
+    /**
      * The stored form: {@code a:<assessment>|s:<session>|c:<class>|x:<section>|g:<group>}
      * with {@code null} for any unconstrained dimension. Fixed field order, so the
      * string is stable across callers.

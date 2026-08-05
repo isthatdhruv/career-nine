@@ -35,9 +35,23 @@ public interface PrincipalDashboardDataRepository extends JpaRepository<Principa
      */
     @Query("SELECT p FROM PrincipalDashboardData p "
          + "WHERE p.instituteCode = :instituteCode AND p.scopeLevel = 'INSTITUTE' "
-         + "AND p.generatedAt IS NOT NULL "
+         + "AND p.isCurrent = true AND p.generatedAt IS NOT NULL "
          + "ORDER BY p.generatedAt DESC")
     List<PrincipalDashboardData> findInstituteScopesNewestFirst(@Param("instituteCode") Long instituteCode);
+
+    /**
+     * Make one assessment the school's live dashboard and clear the others.
+     *
+     * <p>Ordering by {@code generatedAt} alone answered the wrong question: re-releasing
+     * an older assessment would make it live purely because it was regenerated last.
+     * A release states which assessment is current instead.
+     */
+    @Modifying
+    @Query("UPDATE PrincipalDashboardData p "
+         + "SET p.isCurrent = CASE WHEN p.assessmentId = :assessmentId THEN true ELSE false END "
+         + "WHERE p.instituteCode = :instituteCode")
+    void markCurrentAssessment(@Param("instituteCode") Long instituteCode,
+                               @Param("assessmentId") Long assessmentId);
 
     /**
      * Whether a release is already in flight for this institute+assessment — the

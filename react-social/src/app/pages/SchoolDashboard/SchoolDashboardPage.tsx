@@ -22,9 +22,24 @@ import { showErrorToast } from "../../utils/toast";
 import {
   AbilityRow,
   ClusterRow,
+  SchoolDashboardData,
   SchoolDashboardView,
 } from "./SchoolDashboard_APIs";
-import { getLatestRelease, getScope, ScopeView } from "./PrincipalDashboardRelease_APIs";
+import {
+  getLatestRelease,
+  getReleasedScopes,
+  getScope,
+  ScopeSummary,
+  ScopeView,
+} from "./PrincipalDashboardRelease_APIs";
+import {
+  byLabel,
+  Narrative,
+  parseNarrative,
+  parseStoredPayload,
+  StoredFlags,
+  StoredScope,
+} from "./StoredDashboard";
 import SchoolDashboardInsights from "./SchoolDashboardInsights";
 import "./SchoolDashboard.css";
 
@@ -54,6 +69,31 @@ type Dim = "s" | "c" | "x";
  * The server re-checks every request against AccessScope.allows(); this is UI
  * honesty, not the security boundary.
  */
+/** One selectable value on the rail, named as it was when it was released. */
+type RailOption = { id: number; label: string };
+
+/**
+ * Turn released scopes into rail options: one per distinct id, named, and cut down to
+ * what the user's grant allows.
+ *
+ * `allowed` of null means unrestricted — a wildcard grant or a super-admin — which is a
+ * different thing from an empty set, where the user may see nothing.
+ */
+function dedupeScopes(
+  scopes: ScopeSummary[],
+  id: (s: ScopeSummary) => number | null,
+  allowed: Set<number> | null
+): RailOption[] {
+  const seen = new Map<number, string>();
+  for (const scope of scopes) {
+    const value = id(scope);
+    if (value == null || seen.has(value)) continue;
+    if (allowed != null && !allowed.has(value)) continue;
+    seen.set(value, scope.scopeLabel || String(value));
+  }
+  return Array.from(seen, ([id, label]) => ({ id, label }));
+}
+
 function allowedValues(scopes: Scope[], dim: Dim, isSuperAdmin: boolean): Set<number> | null {
   if (isSuperAdmin || !scopes.length) return null;
   if (scopes.some((s) => s[dim] == null)) return null;
@@ -343,6 +383,29 @@ const shortLabel = (label: string) => label.split("  (")[0].trim();
 
 const CHART_MARGIN = { top: 8, right: 28, bottom: 8, left: 8 };
 
+/**
+ * How this cohort's figure sits against the whole school's.
+ *
+ * Signed and in percentage points, because the question is direction and size, not the
+ * school's own number — that is one column to the left and always available. A dash when
+ * the school-wide sheet has no matching row, never a zero, which would read as "the same"
+ * rather than "not comparable".
+ *
+ * Colour is not the only cue: the sign carries the meaning on its own for anyone who
+ * cannot separate the two inks.
+ */
+const VsSchool: React.FC<{ value: number; baseline?: number }> = ({ value, baseline }) => {
+  if (typeof baseline !== "number") return <span className="sd-vs sd-vs--none">—</span>;
+  const diff = Math.round(value - baseline);
+  if (diff === 0) return <span className="sd-vs sd-vs--same">same</span>;
+  return (
+    <span className={`sd-vs sd-vs--${diff > 0 ? "up" : "down"}`}>
+      {diff > 0 ? "+" : "−"}
+      {Math.abs(diff)} pts
+    </span>
+  );
+};
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 const SchoolDashboardPage: React.FC = () => {
@@ -376,6 +439,35 @@ const SchoolDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("Overview");
 
+  /**
+   * The rail's other three dimensions.
+   *
+   * Session, grade and section combine; group does not. A group is stored as
+   * independent of all three — cutting across classes is what a group is for — so
+   * "Class 10 and the debate team" is not a scope that exists, and picking a group
+   * clears the academic filters rather than pretending to intersect them.
+   */
+  const [sessionFilter, setSessionFilter] = useState<number | "All">("All");
+  const [sectionFilter, setSectionFilter] = useState<number | "All">("All");
+  const [groupFilter, setGroupFilter] = useState<number | "All">("All");
+
+  /** Scopes this school actually had generated — what the rail is allowed to offer. */
+  const [availableScopes, setAvailableScopes] = useState<ScopeSummary[]>([]);
+  /** The narrative for the scope in view. */
+  const [narrative, setNarrative] = useState<Narrative | null>(null);
+  /** Screening counts for the scope in view. */
+  const [flags, setFlags] = useState<StoredFlags | null>(null);
+  /** The scope the payload was generated for, named as it was at release time. */
+  const [storedScope, setStoredScope] = useState<StoredScope | null>(null);
+  /**
+   * The whole school, held alongside a narrowed view purely for comparison.
+   *
+   * "42% strong on speed and accuracy" is a fact; "42% against 58% school-wide" is the
+   * finding a principal opened a class view to get. Fetched once per school, and null
+   * while the school-wide scope is itself what's being shown.
+   */
+  const [baseline, setBaseline] = useState<SchoolDashboardData | null>(null);
+
   // A single institute in scope needs no picking.
   useEffect(() => {
     if (institutes.length === 1 && selectedInstitute === "") {
@@ -390,17 +482,17 @@ const SchoolDashboardPage: React.FC = () => {
   const [assessmentId, setAssessmentId] = useState<number | null>(null);
 
   /**
-   * Pull the stored payload out of a scope row. The generator nests the dashboard view
-   * under `schoolDashboard`, so unwrapping happens in exactly one place.
+   * Unpack one scope row into everything the page draws from.
+   *
+   * Both stored payloads are read here, in one place, so the figures and the narrative
+   * beside them can never come from different scopes.
    */
-  const readStoredView = (row: ScopeView): SchoolDashboardView | null => {
-    if (!row.released || !row.internalCalculation) return null;
-    try {
-      const payload = JSON.parse(row.internalCalculation);
-      return (payload?.schoolDashboard as SchoolDashboardView) ?? null;
-    } catch {
-      return null;
-    }
+  const applyScopeRow = (row: ScopeView) => {
+    const stored = row.released ? parseStoredPayload(row.internalCalculation) : null;
+    setView(stored?.view ?? null);
+    setFlags(stored?.flags ?? null);
+    setStoredScope(stored?.scope ?? null);
+    setNarrative(row.released ? parseNarrative(row.aiResponse) : null);
   };
 
   // Entry point: the newest release for this school. It also carries the assessmentId,
@@ -419,12 +511,20 @@ const SchoolDashboardPage: React.FC = () => {
         if (cancelled) return;
         setRelease(res.data);
         setAssessmentId(res.data.assessmentId ?? null);
-        setView(readStoredView(res.data));
+        applyScopeRow(res.data);
+        // The school-wide sheets double as the comparison every narrowed view is read
+        // against, so they are kept aside before any filter narrows the page.
+        const stored = res.data.released
+          ? parseStoredPayload(res.data.internalCalculation)
+          : null;
+        setBaseline(stored?.view.dashboard ?? null);
       })
       .catch((err: any) => {
         if (cancelled) return;
         setRelease(null);
         setView(null);
+        setNarrative(null);
+        setBaseline(null);
         showErrorToast(
           "Could not load the dashboard: " + (err?.response?.data?.error || err.message)
         );
@@ -437,11 +537,40 @@ const SchoolDashboardPage: React.FC = () => {
     };
   }, [selectedInstitute]);
 
-  // Switching school resets the class filter — class 11 in one school says
-  // nothing about the next, and a stale filter would silently narrow the load.
+  // Switching school resets every filter — class 11 in one school says nothing about
+  // the next, and a stale filter would silently narrow the load.
   useEffect(() => {
     setClassFilter("All");
+    setSessionFilter("All");
+    setSectionFilter("All");
+    setGroupFilter("All");
   }, [selectedInstitute]);
+
+  /**
+   * Which scopes were actually generated.
+   *
+   * The rail offers only these. A filter that resolves to a scope nobody released would
+   * show "not generated yet" on a page that was working a moment ago, which reads as a
+   * fault rather than as an admin decision.
+   */
+  useEffect(() => {
+    if (selectedInstitute === "" || assessmentId == null) {
+      setAvailableScopes([]);
+      return;
+    }
+    let cancelled = false;
+    getReleasedScopes(Number(selectedInstitute), assessmentId)
+      .then((res) => {
+        if (!cancelled) setAvailableScopes(res.data ?? []);
+      })
+      .catch(() => {
+        // The rail falls back to the grades in the payload; not fatal.
+        if (!cancelled) setAvailableScopes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInstitute, assessmentId]);
 
   // Narrowing the filter swaps to that scope's generated row. Nothing is computed —
   // if the scope was never released, the page says so rather than inventing it.
@@ -449,14 +578,18 @@ const SchoolDashboardPage: React.FC = () => {
     if (selectedInstitute === "" || assessmentId == null) return;
     let cancelled = false;
     setLoading(true);
+    const academic = groupFilter === "All";
     getScope(Number(selectedInstitute), {
       assessmentId,
-      classId: classFilter === "All" ? null : Number(classFilter),
+      sessionId: academic && sessionFilter !== "All" ? Number(sessionFilter) : null,
+      classId: academic && classFilter !== "All" ? Number(classFilter) : null,
+      sectionId: academic && sectionFilter !== "All" ? Number(sectionFilter) : null,
+      groupId: academic ? null : Number(groupFilter),
     })
       .then((res) => {
         if (cancelled) return;
         setRelease(res.data);
-        setView(readStoredView(res.data));
+        applyScopeRow(res.data);
       })
       .catch(() => {
         if (!cancelled) setRelease(null);
@@ -467,7 +600,14 @@ const SchoolDashboardPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedInstitute, assessmentId, classFilter]);
+  }, [selectedInstitute, assessmentId, sessionFilter, classFilter, sectionFilter, groupFilter]);
+
+  /** Whether the view in hand is the school itself — nothing to compare it against. */
+  const isSchoolWide =
+    sessionFilter === "All" &&
+    classFilter === "All" &&
+    sectionFilter === "All" &&
+    groupFilter === "All";
 
   const d = view?.dashboard ?? null;
   const p = view?.participation;
@@ -479,9 +619,6 @@ const SchoolDashboardPage: React.FC = () => {
     (institutes.find((i: any) => Number(i.instituteCode) === selectedInstitute) as any)
       ?.instituteName ||
     "School Dashboard";
-
-  // Not in SchoolDashboardView yet — shown only when the user's grant pins one.
-  const sessionLabel = "";
 
   // Which rail dimensions the user's ABAC grant pins to a single value.
   const allowedSessions = useMemo(
@@ -498,20 +635,101 @@ const SchoolDashboardPage: React.FC = () => {
   );
 
   const lockedSession = allowedSessions != null && allowedSessions.size === 1;
-  const lockedSection = allowedSections != null && allowedSections.size === 1;
 
   /**
-   * Grades offered are the classes that actually have scoreable students,
-   * intersected with the user's class grants — a school-scoped head of Grade 9
-   * should not be shown Grade 10 just because the school has one.
+   * The rail is built from scopes that were actually released, intersected with the
+   * user's grants.
+   *
+   * Two filters, and both matter. Offering a combination nobody generated puts the page
+   * into "not generated yet" on a click that looked ordinary; offering one outside a
+   * user's grant invites a request the server will refuse. Only scopes holding real
+   * content are listed — a failed or still-running scope is not a destination.
+   */
+  const usableScopes = useMemo(
+    () =>
+      availableScopes.filter(
+        (s) => s.status === "GENERATED" || s.status === "SKIPPED_SMALL_COHORT"
+      ),
+    [availableScopes]
+  );
+
+  const sessionOptions = useMemo(
+    () =>
+      dedupeScopes(
+        usableScopes.filter((s) => s.scopeLevel === "SESSION"),
+        (s) => s.sessionId,
+        allowedSessions
+      ),
+    [usableScopes, allowedSessions]
+  );
+
+  const classScopes = useMemo(
+    () =>
+      usableScopes.filter(
+        (s) =>
+          s.scopeLevel === "CLASS" &&
+          (sessionFilter === "All" || s.sessionId === Number(sessionFilter))
+      ),
+    [usableScopes, sessionFilter]
+  );
+
+  /**
+   * Grades offered are the classes that were released, intersected with the user's class
+   * grants — a school-scoped head of Grade 9 should not be shown Grade 10 just because
+   * the school has one. Falls back to the payload's own grade list when the scope
+   * lookup is unavailable, so the rail degrades rather than emptying.
    */
   const gradeOptions = useMemo(() => {
-    const present = view?.classesPresent ?? [];
-    if (allowedClasses == null) return present;
-    return present.filter((c) => allowedClasses.has(c));
-  }, [view, allowedClasses]);
+    const released = classScopes
+      .map((s) => s.classId)
+      .filter((c): c is number => c != null);
+    const present = released.length > 0 ? released : view?.classesPresent ?? [];
+    const unique = Array.from(new Set(present)).sort((a, b) => a - b);
+    if (allowedClasses == null) return unique;
+    return unique.filter((c) => allowedClasses.has(c));
+  }, [classScopes, view, allowedClasses]);
 
+  const sectionOptions = useMemo(
+    () =>
+      classFilter === "All"
+        ? []
+        : dedupeScopes(
+            usableScopes.filter(
+              (s) => s.scopeLevel === "SECTION" && s.classId === Number(classFilter)
+            ),
+            (s) => s.sectionId,
+            allowedSections
+          ),
+    [usableScopes, classFilter, allowedSections]
+  );
+
+  const groupOptions = useMemo(
+    () =>
+      dedupeScopes(
+        usableScopes.filter((s) => s.scopeLevel === "GROUP"),
+        (s) => s.groupId,
+        null
+      ),
+    [usableScopes]
+  );
+
+  const lockedSection = allowedSections != null && allowedSections.size === 1;
   const lockedGrade = gradeOptions.length === 1 && allowedClasses != null;
+
+  // A group cuts across classes, so an academic filter alongside it would describe a
+  // cohort nobody generated. Picking one clears the other.
+  useEffect(() => {
+    if (groupFilter !== "All") {
+      setSessionFilter("All");
+      setClassFilter("All");
+      setSectionFilter("All");
+    }
+  }, [groupFilter]);
+
+  // A section belongs to a class; changing the class abandons it.
+  useEffect(() => {
+    setSectionFilter("All");
+  }, [classFilter]);
 
   // A grant that pins exactly one grade should pin the request too, not just
   // the control — otherwise the page loads school-wide behind a locked filter.
@@ -535,7 +753,7 @@ const SchoolDashboardPage: React.FC = () => {
     parts.push(
       allowedClasses == null
         ? "all grades"
-        : `grade${allowedClasses.size === 1 ? "" : "s"} ${[...allowedClasses]
+        : `grade${allowedClasses.size === 1 ? "" : "s"} ${Array.from(allowedClasses)
             .sort((a, b) => a - b)
             .join(", ")}`
     );
@@ -548,7 +766,13 @@ const SchoolDashboardPage: React.FC = () => {
       <header className="sd-header">
         <div className="sd-header-top">
           <div>
-            <p className="sd-eyebrow">Navigator 360{sessionLabel ? ` · Session ${sessionLabel}` : ""}</p>
+            {/* The session comes off the generated payload rather than the rail: it is
+                the session the figures were computed for, which stays right even when
+                the rail leaves the dimension unbound. */}
+            <p className="sd-eyebrow">
+              Navigator 360
+              {storedScope?.sessionLabel ? ` · ${storedScope.sessionLabel}` : ""}
+            </p>
             <h1 className="sd-title">{schoolName}</h1>
             <p className="sd-subtitle">
               Where every class stands right now — who has finished, who has stalled,
@@ -577,19 +801,34 @@ const SchoolDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* One filter row above everything it scopes. Grade drives the live
-            request; the rest are pinned to the user's grant until the endpoint
-            accepts them (it takes classFilter only today). */}
+        {/* One filter row above everything it scopes. Each control offers only what was
+            released, so a selection always lands on generated content. Group sits apart
+            from the other three: it is stored as independent of them, so choosing one
+            clears the rest rather than implying an intersection that has no scope. */}
         <div className="sd-rail">
-          <div className="sd-field">
-            <label htmlFor="sd-f-session">
-              Session
-              {lockedSession && <span className="sd-lock">Scoped</span>}
-            </label>
-            <select id="sd-f-session" value={sessionLabel || "Current"} disabled readOnly>
-              <option value={sessionLabel || "Current"}>{sessionLabel || "Current"}</option>
-            </select>
-          </div>
+          {sessionOptions.length > 0 && (
+            <div className="sd-field">
+              <label htmlFor="sd-f-session">
+                Session
+                {lockedSession && <span className="sd-lock">Scoped</span>}
+              </label>
+              <select
+                id="sd-f-session"
+                value={sessionFilter}
+                disabled={!view || groupFilter !== "All"}
+                onChange={(e) =>
+                  setSessionFilter(e.target.value === "All" ? "All" : Number(e.target.value))
+                }
+              >
+                <option value="All">All sessions</option>
+                {sessionOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="sd-field">
             <label htmlFor="sd-f-grade">
@@ -599,7 +838,7 @@ const SchoolDashboardPage: React.FC = () => {
             <select
               id="sd-f-grade"
               value={classFilter}
-              disabled={!view || lockedGrade}
+              disabled={!view || lockedGrade || groupFilter !== "All"}
               onChange={(e) => setClassFilter(e.target.value)}
             >
               <option value="All">All grades</option>
@@ -616,15 +855,47 @@ const SchoolDashboardPage: React.FC = () => {
               Section
               {lockedSection && <span className="sd-lock">Scoped</span>}
             </label>
-            <select id="sd-f-section" value="All" disabled>
-              <option value="All">All sections</option>
+            <select
+              id="sd-f-section"
+              value={sectionFilter}
+              disabled={!view || classFilter === "All" || sectionOptions.length === 0 || groupFilter !== "All"}
+              onChange={(e) =>
+                setSectionFilter(e.target.value === "All" ? "All" : Number(e.target.value))
+              }
+            >
+              <option value="All">
+                {classFilter === "All"
+                  ? "Pick a grade first"
+                  : sectionOptions.length === 0
+                  ? "No sections released"
+                  : "All sections"}
+              </option>
+              {sectionOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="sd-field">
             <label htmlFor="sd-f-group">Group</label>
-            <select id="sd-f-group" value="All" disabled>
-              <option value="All">All groups</option>
+            <select
+              id="sd-f-group"
+              value={groupFilter}
+              disabled={!view || groupOptions.length === 0}
+              onChange={(e) =>
+                setGroupFilter(e.target.value === "All" ? "All" : Number(e.target.value))
+              }
+            >
+              <option value="All">
+                {groupOptions.length === 0 ? "No groups released" : "All groups"}
+              </option>
+              {groupOptions.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.label}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -636,8 +907,13 @@ const SchoolDashboardPage: React.FC = () => {
             <button
               type="button"
               className="sd-reset"
-              onClick={() => setClassFilter("All")}
-              disabled={classFilter === "All"}
+              onClick={() => {
+                setSessionFilter("All");
+                setClassFilter("All");
+                setSectionFilter("All");
+                setGroupFilter("All");
+              }}
+              disabled={isSchoolWide}
             >
               Reset
             </button>
@@ -657,49 +933,67 @@ const SchoolDashboardPage: React.FC = () => {
         </div>
       ) : !view && loading ? (
         <div className="sd-empty">
-          <div className="sd-empty-title">Building the dashboard…</div>
-          Scoring every completed assessment in this school.
+          <div className="sd-empty-title">Loading the dashboard…</div>
+          Reading the analysis Career-9 generated for this school.
+        </div>
+      ) : !release || !release.released ? (
+        /* Checked before the empty-data case, and deliberately so: an ungenerated scope
+           has no view either, and "nothing to show" would blame the school for a step
+           nobody has run. The dashboard is produced by an explicit Release, never
+           computed on view, so this tells the reader who to ask. */
+        <div className="sd-empty">
+          <div className="sd-empty-title">Dashboard is not Generated Yet</div>
+          Please contact your administrator / Career-9 team.
+          {release?.status === "FAILED" && (
+            <div className="sd-empty-detail">
+              The last attempt to generate this dashboard failed. The Career-9 team can
+              retry it.
+            </div>
+          )}
+          {(release?.status === "PENDING" || release?.status === "GENERATING") && (
+            <div className="sd-empty-detail">
+              Generation is running now. This page will have data shortly.
+            </div>
+          )}
+          {!isSchoolWide && (
+            <div className="sd-empty-detail">
+              This applies to {release?.scopeLabel || "the selection above"} — other views
+              of this school may already be generated.
+            </div>
+          )}
         </div>
       ) : !view ? (
         <div className="sd-empty">
           <div className="sd-empty-title">Nothing to show</div>
           This school has no assessment data yet.
         </div>
-      ) : release && !release.released ? (
-        /* The dashboard is generated by an explicit Release, not computed on view —
-           so an unreleased school gets told who to ask rather than an empty page. */
-        <div className="sd-empty">
-          <div className="sd-empty-title">Dashboard is not Generated Yet</div>
-          Please contact your administrator / Career-9 team.
-          {release.status === "FAILED" && (
-            <div className="sd-empty-detail">
-              The last attempt to generate this dashboard failed. The Career-9 team can
-              retry it.
-            </div>
-          )}
-          {(release.status === "PENDING" || release.status === "GENERATING") && (
-            <div className="sd-empty-detail">
-              Generation is currently running. This page will have data shortly.
-            </div>
-          )}
-        </div>
       ) : (
         <div className={loading ? "sd-refetching" : undefined}>
           {/* The generated narrative leads: the charts below say what the numbers are,
               this says what they mean and what to do — which is the part a principal
               cannot read off a bar chart. */}
-          {release && release.released && <SchoolDashboardInsights release={release} />}
+          {release && release.released && (
+            <SchoolDashboardInsights
+              release={release}
+              narrative={narrative}
+              flags={flags}
+              scopeLabel={release.scopeLabel || "Whole school"}
+            />
+          )}
 
           <ParticipationCards view={view} palette={palette} />
 
           {d && (
             <>
-              {/* Grade lives in the hero rail now; this is only the caveat that
-                  the participation cards above stay school-wide when it moves. */}
-              {classFilter !== "All" && (
+              {/* Every figure below is this scope's own — participation included, which
+                  is why the old school-wide caveat is gone. What a narrowed view cannot
+                  say on its own is how it compares, so that is what this line carries. */}
+              {!isSchoolWide && (
                 <div className="sd-filters">
                   <span className="sd-filter-note">
-                    Showing Grade {classFilter} · participation cards stay school-wide
+                    {release?.scopeLabel || "This selection"} ·{" "}
+                    {view.scoredStudents} scored of {view.participation.total}
+                    {baseline && " · figures compared against the whole school below"}
                   </span>
                 </div>
               )}
@@ -729,8 +1023,22 @@ const SchoolDashboardPage: React.FC = () => {
           ) : (
             <>
               {tab === "Overview" && <OverviewTab view={view} palette={palette} />}
-              {tab === "Personality & Learning" && <PersonalityTab view={view} palette={palette} />}
-              {tab === "Abilities" && <AbilitiesTab view={view} palette={palette} />}
+              {/* The whole school is passed only when the view is narrower than it —
+                  comparing the school to itself is a column of zeroes. */}
+              {tab === "Personality & Learning" && (
+                <PersonalityTab
+                  view={view}
+                  palette={palette}
+                  baseline={isSchoolWide ? null : baseline}
+                />
+              )}
+              {tab === "Abilities" && (
+                <AbilitiesTab
+                  view={view}
+                  palette={palette}
+                  baseline={isSchoolWide ? null : baseline}
+                />
+              )}
               {tab === "Careers" && <CareersTab view={view} palette={palette} />}
               {tab === "By Class" && <ByClassTab view={view} palette={palette} />}
             </>
@@ -1187,11 +1495,13 @@ const OverviewTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = (
 
 // ── Personality & Learning ────────────────────────────────────────────────
 
-const PersonalityTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const PersonalityTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  baseline: SchoolDashboardData | null;
+}> = ({ view, palette, baseline }) => {
   const d = view.dashboard!;
+  const schoolWide = byLabel(baseline?.personality.traits);
   const traits = d.personality.traits.map((t) => ({
     ...t,
     short: shortLabel(t.label),
@@ -1227,6 +1537,26 @@ const PersonalityTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> 
                   sortValue: (t) => t.pctAsTopTrait,
                   cell: (t) => `${t.pctAsTopTrait}%`,
                 },
+                // Only on a narrowed view — a class's character is only interesting
+                // against the school it sits in.
+                ...(schoolWide.size > 0
+                  ? [
+                      {
+                        key: "vsSchool",
+                        label: "vs school",
+                        num: true,
+                        sortValue: (t: typeof traits[number]) =>
+                          t.pctAsTopTrait -
+                          (schoolWide.get(t.label)?.pctAsTopTrait ?? t.pctAsTopTrait),
+                        cell: (t: typeof traits[number]) => (
+                          <VsSchool
+                            value={t.pctAsTopTrait}
+                            baseline={schoolWide.get(t.label)?.pctAsTopTrait}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
                 {
                   key: "top3",
                   label: "% in top three",
@@ -1458,14 +1788,16 @@ const PersonalityTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> 
 
 // ── Abilities ─────────────────────────────────────────────────────────────
 
-const AbilitiesTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const AbilitiesTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  baseline: SchoolDashboardData | null;
+}> = ({ view, palette, baseline }) => {
   const d = view.dashboard!;
   // Sorted by gap so the teaching priorities sit at one end.
   const sorted: AbilityRow[] = [...d.abilities.abilities].sort((a, b) => b.gap - a.gap);
   const worst = sorted[0];
+  const schoolWide = byLabel(baseline?.abilities.abilities);
 
   return (
     <>
@@ -1516,6 +1848,25 @@ const AbilitiesTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = 
                   sortValue: (a) => a.pctStrong,
                   cell: (a) => `${a.pctStrong}%`,
                 },
+                // Only present on a narrowed view: "42% strong" is a fact, "42% against
+                // 58% school-wide" is the reason someone opened a class.
+                ...(schoolWide.size > 0
+                  ? [
+                      {
+                        key: "vsSchool",
+                        label: "vs school",
+                        num: true,
+                        sortValue: (a: AbilityRow) =>
+                          a.pctStrong - (schoolWide.get(a.label)?.pctStrong ?? a.pctStrong),
+                        cell: (a: AbilityRow) => (
+                          <VsSchool
+                            value={a.pctStrong}
+                            baseline={schoolWide.get(a.label)?.pctStrong}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
                 {
                   key: "lowPct",
                   label: "% low",

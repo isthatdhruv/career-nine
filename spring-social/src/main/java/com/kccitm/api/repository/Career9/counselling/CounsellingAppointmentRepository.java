@@ -35,6 +35,15 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
             @Param("studentIds") List<Long> studentIds,
             @Param("today") LocalDate today);
 
+    // Dashboard release: which of these students have actually been counselled — a
+    // completed appointment, not merely an assigned counsellor. The distinction matters
+    // because the figure is printed in a school's report as "students counselled".
+    // Student ids only, one batch query for the whole institute.
+    @Query("SELECT DISTINCT a.student.userStudentId FROM CounsellingAppointment a " +
+           "WHERE a.student.userStudentId IN :studentIds " +
+           "AND UPPER(a.status) = 'COMPLETED'")
+    List<Long> findCounselledStudentIds(@Param("studentIds") List<Long> studentIds);
+
     @Query("SELECT a FROM CounsellingAppointment a WHERE a.student.userStudentId = :studentId " +
            "ORDER BY a.slot.date DESC, a.slot.startTime DESC")
     List<CounsellingAppointment> findByStudentIdOrdered(@Param("studentId") Long studentId);

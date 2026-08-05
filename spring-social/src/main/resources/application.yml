@@ -196,6 +196,7 @@ app:
     same-site: Strict
     access-max-age-seconds: 864000
   openai:
+    # Supplied via the OPENAI_API_KEY environment variable. Never commit a key here.
     api-key: ${OPENAI_API_KEY:}
   # Principal dashboard release. Both thresholds are stamped onto every row at
   # generation time, so changing them here never retroactively reinterprets

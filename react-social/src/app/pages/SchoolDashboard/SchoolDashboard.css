@@ -1284,3 +1284,531 @@
     min-width: 0;
   }
 }
+
+/* ═══════════════════ Generated analysis ═══════════════════
+   The layer that reads what a release stored. Everything below the narrative
+   block is chart-side; this is the part that says what the numbers mean.
+
+   All ink comes from the status tokens rather than the categorical series
+   slots: the series colours sit around 2.7:1 on this surface, which carries a
+   bar fine and fails as text. Every state that uses colour also carries a word
+   or a sign, so nothing here depends on telling two hues apart. */
+
+.sd-narrative {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 22px 24px 20px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.sd-narrative--muted {
+  background: var(--surface-sunken);
+  box-shadow: none;
+}
+
+.sd-narrative-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.sd-narrative-eyebrow {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--brand);
+  margin-bottom: 4px;
+}
+
+.sd-narrative-title {
+  margin: 0;
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--ink-primary);
+  text-wrap: balance;
+}
+
+.sd-narrative-lede {
+  margin: 8px 0 0;
+  font-size: 0.88rem;
+  color: var(--ink-secondary);
+  max-width: 70ch;
+}
+
+.sd-narrative-stamp {
+  font-size: 0.76rem;
+  color: var(--ink-muted);
+  text-align: right;
+}
+
+/* Written before the cohort moved on. Warning rather than error: the figures
+   below it are current, only the wording is behind. */
+.sd-stale {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-ink);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  margin-bottom: 16px;
+}
+
+.sd-stale b {
+  font-weight: 700;
+}
+
+/* ── KPI strip ── */
+
+.sd-ins-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sd-ins-kpi {
+  background: var(--brand-tint);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sd-ins-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--brand-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ins-kpi-value em {
+  font-style: normal;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-left: 1px;
+}
+
+.sd-ins-kpi-label {
+  font-size: 0.76rem;
+  color: var(--ink-secondary);
+  line-height: 1.3;
+}
+
+.sd-ins-kpi-target {
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+}
+
+/* ── Alerts: a count, and the thing to do about it ── */
+
+.sd-alerts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.sd-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--status-warning-bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.sd-alert-count {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--status-warning-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.sd-alert-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-primary);
+}
+
+.sd-alert-action {
+  font-size: 0.78rem;
+  color: var(--ink-secondary);
+  margin-top: 2px;
+}
+
+/* ── Insight cards ──
+   The severity stripe is the scanning cue; the word beside it carries the same
+   meaning for anyone the colour does not reach. */
+
+.sd-ins-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sd-ins-card {
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--ink-muted);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sd-ins-card--risk { border-left-color: var(--status-critical-ink); }
+.sd-ins-card--gap { border-left-color: var(--status-warning-ink); }
+.sd-ins-card--opportunity { border-left-color: var(--brand); }
+.sd-ins-card--strength { border-left-color: var(--status-good-ink); }
+
+.sd-ins-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sd-ins-card-kind {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.sd-ins-card--risk .sd-ins-card-kind { color: var(--status-critical-ink); }
+.sd-ins-card--gap .sd-ins-card-kind { color: var(--status-warning-ink); }
+.sd-ins-card--opportunity .sd-ins-card-kind { color: var(--brand); }
+.sd-ins-card--strength .sd-ins-card-kind { color: var(--status-good-ink); }
+
+.sd-ins-card-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  letter-spacing: -0.01em;
+}
+
+.sd-ins-card-insight {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+}
+
+.sd-ins-card-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+}
+
+.sd-ins-card-numbers div {
+  display: flex;
+  flex-direction: column;
+}
+
+.sd-ins-card-numbers dt {
+  font-size: 0.68rem;
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+.sd-ins-card-numbers dd {
+  margin: 0;
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-ins-card-link {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.sd-ins-card-link:hover { text-decoration: underline; }
+.sd-ins-card-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ── Screening tiers ──
+   Anonymous counts. A tier is a queue for a conversation, not a label. */
+
+.sd-flags {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: var(--surface-sunken);
+}
+
+.sd-flags-title {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 10px;
+}
+
+.sd-flags-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.sd-flag {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--hairline-soft);
+}
+
+.sd-flag b {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-primary);
+}
+
+.sd-flag span {
+  font-size: 0.76rem;
+  color: var(--ink-secondary);
+  line-height: 1.35;
+}
+
+.sd-flag--critical b { color: var(--status-critical-ink); }
+.sd-flag--warning b { color: var(--status-warning-ink); }
+.sd-flag--clear b { color: var(--status-good-ink); }
+
+.sd-flags-note {
+  margin: 10px 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  max-width: 70ch;
+}
+
+/* ── The long-form report ── */
+
+.sd-report {
+  border-top: 1px solid var(--hairline);
+  padding-top: 14px;
+}
+
+.sd-report-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.sd-report-toggle:hover { text-decoration: underline; }
+.sd-report-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+.sd-report-count {
+  font-weight: 500;
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.sd-report-body { margin-top: 14px; }
+
+.sd-section {
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.sd-section.is-open { border-color: var(--brand-soft); }
+
+.sd-section-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--surface);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sd-section-head:hover { background: var(--surface-sunken); }
+.sd-section-head:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+
+.sd-section-number {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--brand-tint);
+  color: var(--brand-deep);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-section-title {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-primary);
+  min-width: 0;
+}
+
+.sd-section-chev {
+  flex: none;
+  color: var(--ink-muted);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.sd-section-body {
+  padding: 4px 14px 16px 48px;
+  border-top: 1px solid var(--hairline-soft);
+}
+
+.sd-section-body p {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.62;
+  color: var(--ink-secondary);
+  max-width: 74ch;
+}
+
+.sd-bullet {
+  margin-top: 14px;
+  padding-left: 12px;
+  border-left: 2px solid var(--brand-soft);
+}
+
+.sd-bullet-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+}
+
+.sd-bullet p { margin-top: 4px; }
+
+.sd-bullet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sd-bullet-meta li {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 0.74rem;
+}
+
+.sd-bullet-meta span { color: var(--ink-muted); }
+.sd-bullet-meta b { color: var(--ink-primary); font-variant-numeric: tabular-nums; }
+
+.sd-chart-caption {
+  margin: 6px 0 0;
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+}
+
+.sd-callout {
+  margin-top: 14px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: var(--brand-tint);
+  color: var(--brand-deep);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* What the figures leave out. A report that quietly drops part of its cohort
+   is worse than one that says it did. */
+.sd-provenance {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--hairline-soft);
+}
+
+.sd-provenance-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+}
+
+.sd-provenance ul {
+  margin: 0 0 10px;
+  padding-left: 18px;
+}
+
+.sd-provenance li {
+  font-size: 0.78rem;
+  color: var(--ink-secondary);
+  line-height: 1.5;
+}
+
+.sd-provenance ul:last-child { margin-bottom: 0; }
+
+/* ── Against the whole school ──
+   Sign and unit carry the meaning; colour only reinforces it. */
+
+.sd-vs {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.sd-vs--up { color: var(--status-good-ink); }
+.sd-vs--down { color: var(--status-critical-ink); }
+.sd-vs--same,
+.sd-vs--none { color: var(--ink-muted); font-weight: 500; }
+
+/* Titles above the tables the narrative carries. The tables themselves reuse
+   .sd-table from the chart side — one table style for the whole page. */
+.sd-table-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  margin: 16px 0 6px;
+}
