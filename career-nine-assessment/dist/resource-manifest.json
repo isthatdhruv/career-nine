@@ -1,11 +1,6 @@
 {
-<<<<<<< HEAD
-  "version": "msfndsuc",
-  "generated": "2026-08-05T05:29:43.236Z",
-=======
-  "version": "msfpzsek",
-  "generated": "2026-08-05T06:42:48.332Z",
->>>>>>> 57f7363b52a833c0b1163c7fb4e8f6831ea2b8b9
+  "version": "msfqriv4",
+  "generated": "2026-08-05T07:04:22.336Z",
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -63,11 +58,6 @@
       "priority": "game"
     },
     {
-      "url": "/mediapipe/face_mesh/README.md",
-      "size": 389,
-      "priority": "deferred"
-    },
-    {
       "url": "/mediapipe/face_mesh/face_mesh.binarypb",
       "size": 939,
       "priority": "deferred"
@@ -123,9 +113,6 @@
       "priority": "deferred"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/HydroTubeGame-DCoEvztr.js",
-=======
       "url": "/mediapipe/face_mesh/README.md",
       "size": 389,
       "priority": "deferred"
@@ -147,53 +134,12 @@
     },
     {
       "url": "/assets/HydroTubeGame-DdsiIi3D.js",
->>>>>>> 57f7363b52a833c0b1163c7fb4e8f6831ea2b8b9
       "size": 23331,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/JungleSpotGame-Dky12Yj2.js",
-      "size": 23397,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/RabbitPathGame-Ck9FyJSs.js",
-      "size": 26981,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/SectionInstructionPage-Bt8peRwg.js",
-      "size": 4206,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/SectionQuestionPage-DDcNoaMn.js",
-      "size": 176422,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/SelectSectionPage-CFulacXD.js",
-      "size": 5255,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/assessmentApi-xGNAoyQD.js",
-      "size": 826,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/firebase-CgWpvm-H.js",
-      "size": 360,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/firebase-TqC7GSCI.js",
-      "size": 222583,
-=======
       "url": "/assets/index-C22iJ_mE.js",
       "size": 1274010,
->>>>>>> 57f7363b52a833c0b1163c7fb4e8f6831ea2b8b9
       "priority": "critical"
     },
     {
@@ -207,20 +153,6 @@
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-      "url": "/assets/index-_KXtw5dh.js",
-      "size": 1101399,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/index-t0T0PCaI.js",
-      "size": 1274010,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/index.es-d22w36VK.js",
-      "size": 158432,
-=======
       "url": "/assets/index.es-MarkbL3S.js",
       "size": 158825,
       "priority": "critical"
@@ -228,7 +160,6 @@
     {
       "url": "/assets/JungleSpotGame-CkCWSiPB.js",
       "size": 23397,
->>>>>>> 57f7363b52a833c0b1163c7fb4e8f6831ea2b8b9
       "priority": "critical"
     },
     {
@@ -237,26 +168,21 @@
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-=======
       "url": "/assets/RabbitPathGame-jR_C6TIE.js",
       "size": 26981,
       "priority": "critical"
     },
     {
->>>>>>> 57f7363b52a833c0b1163c7fb4e8f6831ea2b8b9
       "url": "/assets/react-l0sNRNKZ.js",
       "size": 1,
       "priority": "critical"
     },
     {
-      "url": "/assets/router-Df5zuH9P.js",
+      "url": "/assets/router-iAnXovsC.js",
       "size": 31101,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
-=======
       "url": "/assets/SectionInstructionPage-CFgKwpOp.js",
       "size": 4211,
       "priority": "critical"
@@ -272,20 +198,14 @@
       "priority": "critical"
     },
     {
->>>>>>> 57f7363b52a833c0b1163c7fb4e8f6831ea2b8b9
       "url": "/index.html",
-      "size": 23783,
+      "size": 23846,
       "priority": "critical"
     },
     {
-      "url": "/workbox-66610c77.js",
-      "size": 21445,
+      "url": "/workbox-dcde9eb3.js",
+      "size": 21434,
       "priority": "critical"
-    },
-    {
-      "url": "/_headers",
-      "size": 189,
-      "priority": "other"
     },
     {
       "url": "/manifest.webmanifest",
@@ -301,15 +221,16 @@
       "url": "/media/logos/kcc.webp",
       "size": 274630,
       "priority": "other"
+    },
+    {
+      "url": "/_headers",
+      "size": 197,
+      "priority": "other"
     }
   ],
   "summary": {
     "total": 45,
-<<<<<<< HEAD
-    "totalSize": 23810433,
-=======
     "totalSize": 23811589,
->>>>>>> 57f7363b52a833c0b1163c7fb4e8f6831ea2b8b9
     "byPriority": {
       "game": {
         "count": 11,
@@ -321,15 +242,11 @@
       },
       "critical": {
         "count": 18,
-<<<<<<< HEAD
-        "size": 3379809
-=======
         "size": 3380957
->>>>>>> 57f7363b52a833c0b1163c7fb4e8f6831ea2b8b9
       },
       "other": {
         "count": 4,
-        "size": 927428
+        "size": 927436
       }
     }
   }
