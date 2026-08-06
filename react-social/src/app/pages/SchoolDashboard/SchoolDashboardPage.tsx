@@ -32,8 +32,10 @@ import {
   ScopeSummary,
   ScopeView,
 } from "./PrincipalDashboardRelease_APIs";
+import ChartCommentary from "./ChartCommentary";
 import {
   byLabel,
+  ChartNotes,
   Narrative,
   parseNarrative,
   parseStoredPayload,
@@ -161,7 +163,22 @@ function useVizPalette(ref: React.RefObject<HTMLElement>): Palette {
 
 // ── Small building blocks ─────────────────────────────────────────────────
 
-const TABS = ["Overview", "Personality & Learning", "Abilities", "Careers", "By Class"] as const;
+/**
+ * The page's tabs, in reading order.
+ *
+ * "Analysis" leads and is the landing tab: it is what a release actually produces and
+ * what a principal opens the page for. "Act" holds the three things to do about it and
+ * the students behind each one. Everything after those is the evidence.
+ */
+const TABS = [
+  "Analysis",
+  "Act",
+  "Overview",
+  "Personality & Learning",
+  "Abilities",
+  "Careers",
+  "By Class",
+] as const;
 type Tab = typeof TABS[number];
 
 const StatTile: React.FC<{
@@ -194,12 +211,30 @@ const StatTile: React.FC<{
 );
 
 /** A chart and its WCAG-clean table twin, toggled per card. */
+/**
+ * The chart ids the model writes commentary against.
+ *
+ * Must match CHART_IDS in PrincipalDashboardAiService — the block is looked up by id, so
+ * a mismatch drops that chart's commentary silently rather than erroring.
+ */
+export type ChartId =
+  | "students-by-class"
+  | "stream-fit-vs-ambition"
+  | "personality-profile"
+  | "trait-leadership"
+  | "learning-styles"
+  | "ability-gaps"
+  | "work-values"
+  | "clarity-by-class";
+
 const ChartCard: React.FC<{
   title: string;
   subtitle?: string;
   table: React.ReactNode;
   children: React.ReactNode;
-}> = ({ title, subtitle, table, children }) => {
+  /** Commentary for this chart, when the release generated any. */
+  notes?: ChartNotes;
+}> = ({ title, subtitle, table, children, notes }) => {
   const [showTable, setShowTable] = useState(false);
   return (
     <div className="sd-card">
@@ -218,6 +253,7 @@ const ChartCard: React.FC<{
         </button>
       </div>
       {showTable ? <div className="sd-table-wrap">{table}</div> : children}
+      <ChartCommentary notes={notes} />
     </div>
   );
 };
@@ -383,6 +419,9 @@ const shortLabel = (label: string) => label.split("  (")[0].trim();
 
 const CHART_MARGIN = { top: 8, right: 28, bottom: 8, left: 8 };
 
+/** Stable identity so tabs do not re-render on every parent pass. */
+const EMPTY_NOTES: Map<string, ChartNotes> = new Map();
+
 /**
  * How this cohort's figure sits against the whole school's.
  *
@@ -437,7 +476,7 @@ const SchoolDashboardPage: React.FC = () => {
   const [classFilter, setClassFilter] = useState("All");
   const [view, setView] = useState<SchoolDashboardView | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<Tab>("Overview");
+  const [tab, setTab] = useState<Tab>("Analysis");
 
   /**
    * The rail's other three dimensions.
@@ -467,6 +506,22 @@ const SchoolDashboardPage: React.FC = () => {
    * while the school-wide scope is itself what's being shown.
    */
   const [baseline, setBaseline] = useState<SchoolDashboardData | null>(null);
+
+  /**
+   * Use the whole content area, not Bootstrap's fixed container.
+   *
+   * Metronic centres every page inside `.container`, which caps at 1320px. That suits a
+   * form; it wastes a third of a wide screen on a page whose charts, comparison tables
+   * and analysis all read better with the room. The layout config that sets it
+   * (`content.width`) is global, so this opts out for as long as the dashboard is
+   * mounted and restores the container on the way out rather than reflowing every other
+   * page in the app.
+   */
+  useEffect(() => {
+    const container = document.getElementById("kt_content_container");
+    container?.classList.add("sd-fluid");
+    return () => container?.classList.remove("sd-fluid");
+  }, []);
 
   // A single institute in scope needs no picking.
   useEffect(() => {
@@ -599,6 +654,39 @@ const SchoolDashboardPage: React.FC = () => {
       });
     return () => {
       cancelled = true;
+    };
+  }, [selectedInstitute, assessmentId, sessionFilter, classFilter, sectionFilter, groupFilter]);
+
+  /**
+   * The scope currently in view, in the shape the read endpoints take.
+   *
+   * Assembled once so the flagged-student lookup and the chart-data dump ask about
+   * exactly the cohort the page is showing, rather than each rebuilding the dimensions.
+   */
+  /** Chart commentary for the scope in view; empty when the release wrote none. */
+  const chartNotes = narrative?.chartNotes ?? EMPTY_NOTES;
+
+  /** Shown wherever a tab needs scored students and there are none. */
+  const noScoredYet = (
+    <div className="sd-empty">
+      <div className="sd-empty-title">No completed assessments yet</div>
+      {view?.participation && view.participation.total > 0
+        ? `${view.participation.ongoing + view.participation.notStarted} of ${
+            view.participation.total
+          } assessments are still open. The insight sections appear as soon as the first student submits.`
+        : "Assign an assessment to this school to get started."}
+    </div>
+  );
+
+  const scopeParams = useMemo(() => {
+    const academic = groupFilter === "All";
+    return {
+      instituteCode: selectedInstitute === "" ? null : Number(selectedInstitute),
+      assessmentId,
+      sessionId: academic && sessionFilter !== "All" ? Number(sessionFilter) : null,
+      classId: academic && classFilter !== "All" ? Number(classFilter) : null,
+      sectionId: academic && sectionFilter !== "All" ? Number(sectionFilter) : null,
+      groupId: academic ? null : Number(groupFilter),
     };
   }, [selectedInstitute, assessmentId, sessionFilter, classFilter, sectionFilter, groupFilter]);
 
@@ -969,60 +1057,69 @@ const SchoolDashboardPage: React.FC = () => {
         </div>
       ) : (
         <div className={loading ? "sd-refetching" : undefined}>
-          {/* The generated narrative leads: the charts below say what the numbers are,
-              this says what they mean and what to do — which is the part a principal
-              cannot read off a bar chart. */}
+          {/* The nav leads the page. It is how a principal chooses what they came for,
+              so it sits above the figures rather than after them. */}
           {release && release.released && (
-            <SchoolDashboardInsights
-              release={release}
-              narrative={narrative}
-              flags={flags}
-              scopeLabel={release.scopeLabel || "Whole school"}
-            />
+            <nav className="sd-tabs sd-tabs--top">
+              {TABS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`sd-tab${tab === t ? " is-active" : ""}`}
+                  onClick={() => setTab(t)}
+                >
+                  {t}
+                </button>
+              ))}
+            </nav>
           )}
 
-          <ParticipationCards view={view} palette={palette} />
-
-          {d && (
-            <>
-              {/* Every figure below is this scope's own — participation included, which
-                  is why the old school-wide caveat is gone. What a narrowed view cannot
-                  say on its own is how it compares, so that is what this line carries. */}
-              {!isSchoolWide && (
-                <div className="sd-filters">
-                  <span className="sd-filter-note">
-                    {release?.scopeLabel || "This selection"} ·{" "}
-                    {view.scoredStudents} scored of {view.participation.total}
-                    {baseline && " · figures compared against the whole school below"}
-                  </span>
-                </div>
-              )}
-
-              <nav className="sd-tabs">
-                {TABS.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    className={`sd-tab${tab === t ? " is-active" : ""}`}
-                    onClick={() => setTab(t)}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </nav>
-            </>
-          )}
-
-          {!d ? (
-            <div className="sd-empty">
-              <div className="sd-empty-title">No completed assessments yet</div>
-              {p && p.total > 0
-                ? `${p.ongoing + p.notStarted} of ${p.total} assessments are still open. The insight sections appear as soon as the first student submits.`
-                : "Assign an assessment to this school to get started."}
+          {/* What a narrowed view cannot say on its own is how it compares. */}
+          {!isSchoolWide && d && (
+            <div className="sd-filters">
+              <span className="sd-filter-note">
+                {release?.scopeLabel || "This selection"} ·{" "}
+                {view.scoredStudents} scored of {view.participation.total}
+                {baseline && " · figures compared against the whole school below"}
+              </span>
             </div>
+          )}
+
+          {tab === "Analysis" || tab === "Act" ? (
+            release && release.released ? (
+              <SchoolDashboardInsights
+                section={tab === "Analysis" ? "analysis" : "act"}
+                release={release}
+                narrative={narrative}
+                flags={flags}
+                scopeLabel={release.scopeLabel || "Whole school"}
+                scopeParams={scopeParams}
+              />
+            ) : null
+          ) : tab === "Overview" ? (
+            /* Headcounts live here rather than above the tabs: they answer "who has
+               finished", which is the Overview question, and repeating them over the
+               analysis and the actions crowded out what those tabs are for. */
+            <>
+              {release && release.released && (
+                <SchoolDashboardInsights
+                  section="stats"
+                  release={release}
+                  narrative={narrative}
+                  flags={flags}
+                  scopeLabel={release.scopeLabel || "Whole school"}
+                  scopeParams={scopeParams}
+                />
+              )}
+              <ParticipationCards view={view} palette={palette} />
+              {/* Participation still shows when nothing is scored — that is exactly the
+                  case where a principal needs to see who has not started. */}
+              {d ? <OverviewTab view={view} palette={palette} notes={chartNotes} /> : noScoredYet}
+            </>
+          ) : !d ? (
+            noScoredYet
           ) : (
             <>
-              {tab === "Overview" && <OverviewTab view={view} palette={palette} />}
               {/* The whole school is passed only when the view is narrower than it —
                   comparing the school to itself is a column of zeroes. */}
               {tab === "Personality & Learning" && (
@@ -1030,6 +1127,7 @@ const SchoolDashboardPage: React.FC = () => {
                   view={view}
                   palette={palette}
                   baseline={isSchoolWide ? null : baseline}
+                  notes={chartNotes}
                 />
               )}
               {tab === "Abilities" && (
@@ -1037,10 +1135,11 @@ const SchoolDashboardPage: React.FC = () => {
                   view={view}
                   palette={palette}
                   baseline={isSchoolWide ? null : baseline}
+                  notes={chartNotes}
                 />
               )}
-              {tab === "Careers" && <CareersTab view={view} palette={palette} />}
-              {tab === "By Class" && <ByClassTab view={view} palette={palette} />}
+              {tab === "Careers" && <CareersTab view={view} palette={palette} notes={chartNotes} />}
+              {tab === "By Class" && <ByClassTab view={view} palette={palette} notes={chartNotes} />}
             </>
           )}
         </div>
@@ -1249,10 +1348,11 @@ const ParticipationCards: React.FC<{ view: SchoolDashboardView; palette: Palette
 
 // ── Overview ──────────────────────────────────────────────────────────────
 
-const OverviewTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const OverviewTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, notes }) => {
   const d = view.dashboard!;
   const s = d.summary;
   const clarityGap = d.careerGap.streams.reduce(
@@ -1336,6 +1436,7 @@ const OverviewTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = (
 
       <div className="sd-grid cols-2">
         <ChartCard
+          notes={notes.get("students-by-class")}
           title="Students by class"
           subtitle="How the scored cohort is spread across the school."
           table={
@@ -1398,6 +1499,7 @@ const OverviewTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = (
         </ChartCard>
 
         <ChartCard
+          notes={notes.get("stream-fit-vs-ambition")}
           title="Fit versus ambition, by stream"
           subtitle="Suited is what their profile points to. Aspiring is what they picked. The distance between the two is the school's guidance workload."
           table={
@@ -1499,7 +1601,8 @@ const PersonalityTab: React.FC<{
   view: SchoolDashboardView;
   palette: Palette;
   baseline: SchoolDashboardData | null;
-}> = ({ view, palette, baseline }) => {
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, baseline, notes }) => {
   const d = view.dashboard!;
   const schoolWide = byLabel(baseline?.personality.traits);
   const traits = d.personality.traits.map((t) => ({
@@ -1515,6 +1618,7 @@ const PersonalityTab: React.FC<{
     <>
       <div className="sd-grid cols-2">
         <ChartCard
+          notes={notes.get("personality-profile")}
           title="Personality profile"
           subtitle="Average raw RIASEC score across the cohort — the shape of the school's temperament."
           table={
@@ -1608,6 +1712,7 @@ const PersonalityTab: React.FC<{
         </ChartCard>
 
         <ChartCard
+          notes={notes.get("trait-leadership")}
           title="Which trait leads"
           subtitle="Share of students with each trait as their strongest, and anywhere in their top three."
           table={
@@ -1698,6 +1803,7 @@ const PersonalityTab: React.FC<{
 
       <div className="sd-grid">
         <ChartCard
+          notes={notes.get("learning-styles")}
           title="Learning styles"
           subtitle="Share scoring strong (10+ out of 12) against share scoring low (8 or under) on each of the eight intelligences. A student scoring 9 is in neither."
           table={
@@ -1792,7 +1898,8 @@ const AbilitiesTab: React.FC<{
   view: SchoolDashboardView;
   palette: Palette;
   baseline: SchoolDashboardData | null;
-}> = ({ view, palette, baseline }) => {
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, baseline, notes }) => {
   const d = view.dashboard!;
   // Sorted by gap so the teaching priorities sit at one end.
   const sorted: AbilityRow[] = [...d.abilities.abilities].sort((a, b) => b.gap - a.gap);
@@ -1833,6 +1940,7 @@ const AbilitiesTab: React.FC<{
 
       <div className="sd-grid">
         <ChartCard
+          notes={notes.get("ability-gaps")}
           title="Where the cohort is weak, ability by ability"
           subtitle="Gap = share scoring low minus share scoring strong. Bars to the right are abilities where far more students struggle than excel; bars to the left are genuine strengths."
           table={
@@ -1964,10 +2072,11 @@ const AbilitiesTab: React.FC<{
 
 // ── Careers ───────────────────────────────────────────────────────────────
 
-const CareersTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const CareersTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, notes }) => {
   const d = view.dashboard!;
   const values = [...d.values.values].sort((a, b) => b.pctInTopFive - a.pctInTopFive);
   // Only clusters somebody engaged with; the rest are noise at school level.
@@ -1980,6 +2089,7 @@ const CareersTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
     <>
       <div className="sd-grid">
         <ChartCard
+          notes={notes.get("work-values")}
           title="What students want out of work"
           subtitle="Share placing each value anywhere in their top five. This is the language that lands in assemblies and parent evenings."
           table={
@@ -2125,10 +2235,11 @@ const CareersTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
 
 // ── By class ──────────────────────────────────────────────────────────────
 
-const ByClassTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const ByClassTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, notes }) => {
   const d = view.dashboard!;
   const b = d.byClass;
   // Classes with nobody in them would render as a column of empty cells.
@@ -2209,6 +2320,7 @@ const ByClassTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
     <>
       <div className="sd-grid">
         <ChartCard
+          notes={notes.get("clarity-by-class")}
           title="Career clarity by class"
           subtitle="Share of each class with at least one aspiration that matches their suitability. This sheet ignores the class filter on purpose — the point is the comparison."
           table={

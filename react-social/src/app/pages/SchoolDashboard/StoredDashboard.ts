@@ -368,6 +368,8 @@ export interface InsightCard {
   title: string;
   /** One sentence, carrying its number and its base. */
   insight: string;
+  /** The concrete next step. Printed under the insight, so a card without one is half a card. */
+  action: string;
   numbers: { key: string; value: number; unit: string }[];
   type: CardType;
   /** The report section that expands this card. */
@@ -415,7 +417,28 @@ export interface ReportSection {
   callouts: { type: string; text: string }[];
 }
 
+/**
+ * Commentary for one chart.
+ *
+ * Ids match the roster in PrincipalDashboardAiService — the page looks each block up by
+ * id rather than by title, so renaming a chart heading never orphans its commentary.
+ * The prompt asks for three to five entries per list. Only the ceiling is enforced here —
+ * it is a display decision, and a model that returns six should not quietly get six. The
+ * floor is not enforced: a short list is worth showing, and dropping a chart's commentary
+ * because it came back with two would lose the two.
+ */
+export interface ChartNotes {
+  chartId: string;
+  insights: string[];
+  implications: string[];
+  actions: string[];
+}
+
 export interface Narrative {
+  /** The one sentence the page leads with. */
+  headline: string;
+  /** Chart commentary, keyed by chart id. */
+  chartNotes: Map<string, ChartNotes>;
   school: { name: string; location: string | null; location_status: string };
   cohort: { label: string; n: number; girls: number; boys: number; grades_present: number[] };
   pending: { field: string; note: string }[];
@@ -440,7 +463,26 @@ export function parseNarrative(aiResponse?: string | null): Narrative | null {
   if (!parsed) return null;
 
   const insights = parsed.dashboard_insights ?? {};
+  const chartNotes = new Map<string, ChartNotes>();
+  for (const raw of list(parsed.chart_notes)) {
+    const chartId = text(raw?.chart_id);
+    if (!chartId) continue;
+    const notes: ChartNotes = {
+      chartId,
+      insights: sentences(raw?.insights),
+      implications: sentences(raw?.implications),
+      actions: sentences(raw?.actions),
+    };
+    // An entry with nothing in it is a chart the model declined to comment on; an
+    // empty block under a chart reads as a fault rather than as silence.
+    if (notes.insights.length || notes.implications.length || notes.actions.length) {
+      chartNotes.set(chartId, notes);
+    }
+  }
+
   return {
+    headline: text(parsed.headline),
+    chartNotes,
     school: {
       name: text(parsed.school?.name),
       location: typeof parsed.school?.location === "string" ? parsed.school.location : null,
@@ -477,6 +519,7 @@ export function parseNarrative(aiResponse?: string | null): Narrative | null {
           id: text(c?.id),
           title: text(c?.title),
           insight: text(c?.insight),
+          action: text(c?.action),
           numbers: list(c?.numbers).map((n: any) => ({
             key: text(n?.key),
             value: num(n?.value),
@@ -559,6 +602,13 @@ function cardType(value: any): CardType {
 
 function auditEntries(value: any): { what: string; n: number }[] {
   return list(value).map((e: any) => ({ what: text(e?.what), n: num(e?.n) }));
+}
+
+/** Non-empty strings only, capped at five. */
+function sentences(value: any): string[] {
+  return list(value)
+    .filter((v: any) => typeof v === "string" && v.trim().length > 0)
+    .slice(0, 5);
 }
 
 function list(value: any): any[] {

@@ -1,6 +1,7 @@
 package com.kccitm.api.controller.dashboard;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,9 +19,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.PrincipalDashboardData;
+import com.kccitm.api.service.dashboard.principal.PrincipalDashboardNotificationService;
+import com.kccitm.api.service.dashboard.principal.PrincipalDashboardReleaseLogger;
+import com.kccitm.api.model.career9.PrincipalDashboardReleaseLog;
+import com.kccitm.api.model.career9.StudentInfo;
+import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.PrincipalDashboardDataRepository;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.dashboard.principal.PrincipalDashboardChartLogger;
 import com.kccitm.api.service.dashboard.principal.PrincipalDashboardReleaseService;
 import com.kccitm.api.service.dashboard.principal.ScopeExpansion;
 import com.kccitm.api.service.dashboard.principal.ScopeKey;
@@ -49,11 +59,27 @@ public class PrincipalDashboardReleaseController {
 
     private final PrincipalDashboardReleaseService releaseService;
     private final PrincipalDashboardDataRepository repository;
+    private final UserStudentRepository userStudentRepository;
+    private final ObjectMapper objectMapper;
+    /** TEMPORARY — remove with the /log-chart-data endpoint. */
+    private final PrincipalDashboardChartLogger chartLogger;
+    private final PrincipalDashboardReleaseLogger trace;
+    private final PrincipalDashboardNotificationService notifications;
 
     public PrincipalDashboardReleaseController(PrincipalDashboardReleaseService releaseService,
-                                               PrincipalDashboardDataRepository repository) {
+                                               PrincipalDashboardDataRepository repository,
+                                               UserStudentRepository userStudentRepository,
+                                               ObjectMapper objectMapper,
+                                               PrincipalDashboardChartLogger chartLogger,
+                                               PrincipalDashboardReleaseLogger trace,
+                                               PrincipalDashboardNotificationService notifications) {
         this.releaseService = releaseService;
         this.repository = repository;
+        this.userStudentRepository = userStudentRepository;
+        this.objectMapper = objectMapper;
+        this.chartLogger = chartLogger;
+        this.trace = trace;
+        this.notifications = notifications;
     }
 
     /**
@@ -264,6 +290,117 @@ public class PrincipalDashboardReleaseController {
         return ResponseEntity.ok(describe(row, out, instituteCode, scope));
     }
 
+    // ─────────────────────── TEMPORARY: chart data dump ───────────────────────
+    // Added on request to inspect what the page's charts are drawn from. Delete this
+    // endpoint, the button that calls it, and PrincipalDashboardChartLogger together.
+
+    /**
+     * Print the computed chart data for the scope in view to the server console.
+     *
+     * <p>Reads the stored payload — the same numbers the page is rendering — rather than
+     * recomputing, so what is logged is exactly what the charts show.
+     */
+    @PreAuthorize("@auth.allows('dashboard.school.read', #instituteCode)")
+    @PostMapping("/{instituteCode}/log-chart-data")
+    public ResponseEntity<?> logChartData(@PathVariable Long instituteCode,
+                                          @RequestParam Long assessmentId,
+                                          @RequestParam(required = false) Long sessionId,
+                                          @RequestParam(required = false) Long classId,
+                                          @RequestParam(required = false) Long sectionId,
+                                          @RequestParam(required = false) Long groupId) {
+
+        ScopeKey scope = ScopeKey.of(assessmentId, sessionId, classId, sectionId, groupId);
+        Optional<PrincipalDashboardData> found =
+                repository.findByInstituteCodeAndScopeKey(instituteCode, scope.key());
+
+        if (found.isEmpty() || found.get().getInternalCalculation() == null) {
+            return ResponseEntity.ok(Map.of(
+                    "logged", false,
+                    "message", "Nothing stored for " + scope.key()));
+        }
+
+        int charts = chartLogger.dump(found.get().getScopeLabel(), scope.key(),
+                found.get().getInternalCalculation(), found.get().getAiResponse());
+
+        return ResponseEntity.ok(Map.of(
+                "logged", true,
+                "scope", String.valueOf(found.get().getScopeLabel()),
+                "charts", charts,
+                "message", "Printed to the server console."));
+    }
+
+    /**
+     * The students behind one screening tier.
+     *
+     * <p>The counts travel with every dashboard load; the names do not. They are resolved
+     * here, on request, so identifiable screening data crosses the wire only when someone
+     * has actually asked which students a tier refers to.
+     *
+     * <p>Reads the ids the release stored rather than recomputing the tier — recomputing
+     * would mean re-scoring the cohort on a read.
+     *
+     * <p>Gated on {@code dashboard.school.read}: anyone who can open this school's
+     * dashboard can see which of its students are flagged.
+     */
+    @PreAuthorize("@auth.allows('dashboard.school.read', #instituteCode)")
+    @GetMapping("/{instituteCode}/flagged")
+    public ResponseEntity<?> flagged(@PathVariable Long instituteCode,
+                                     @RequestParam Long assessmentId,
+                                     @RequestParam String tier,
+                                     @RequestParam(required = false) Long sessionId,
+                                     @RequestParam(required = false) Long classId,
+                                     @RequestParam(required = false) Long sectionId,
+                                     @RequestParam(required = false) Long groupId) {
+
+        ScopeKey scope = ScopeKey.of(assessmentId, sessionId, classId, sectionId, groupId);
+        Optional<PrincipalDashboardData> found =
+                repository.findByInstituteCodeAndScopeKey(instituteCode, scope.key());
+        if (found.isEmpty() || found.get().getInternalCalculation() == null) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<Long> ids = flaggedIds(found.get().getInternalCalculation(), tier);
+        if (ids.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (UserStudent student : userStudentRepository.findAllById(ids)) {
+            StudentInfo info = student.getStudentInfo();
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("userStudentId", student.getUserStudentId());
+            m.put("name", info == null || info.getName() == null ? "Unnamed student" : info.getName());
+            m.put("studentClass", info == null ? null : info.getStudentClass());
+            m.put("rollNumber", info == null ? null : info.getSchoolRollNumber());
+            out.add(m);
+        }
+        // Alphabetical: this is a list to work through, not a ranking.
+        out.sort(Comparator.comparing(m -> String.valueOf(m.get("name")).toLowerCase()));
+        return ResponseEntity.ok(out);
+    }
+
+    /**
+     * Pull one tier's stored ids out of the payload.
+     *
+     * <p>An unknown tier, an older payload written before ids were stored, or malformed
+     * JSON all resolve to an empty list — the dashboard shows "no students recorded"
+     * rather than an error, because the counts beside it are still valid.
+     */
+    private List<Long> flaggedIds(String internalCalculation, String tier) {
+        try {
+            JsonNode students = objectMapper.readTree(internalCalculation)
+                    .path("flags").path("students").path(tier);
+            if (!students.isArray()) return List.of();
+            List<Long> ids = new ArrayList<>();
+            students.forEach(node -> {
+                if (node.canConvertToLong()) ids.add(node.asLong());
+            });
+            return ids;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
     /**
      * Every released scope for an institute, without payloads — lets the dashboard's
      * filter rail grey out combinations that were never generated instead of offering them
@@ -334,5 +471,148 @@ public class PrincipalDashboardReleaseController {
             out.put("error", row.getErrorMessage());
         }
         return out;
+    }
+
+    // ───────────────────────── administration ─────────────────────────
+
+    /**
+     * Take a school's dashboard off the air, or put it back.
+     *
+     * <p>A flag, not a delete. The principal's page filters on it, so the dashboard is
+     * gated immediately while the computed figures and the paid narrative survive —
+     * republishing costs nothing, where regenerating would be another full run of OpenAI
+     * calls. Pass a scopeKey to withdraw one cohort instead of the school.
+     */
+    @PreAuthorize("@auth.allows('dashboard.school.release', #instituteCode)")
+    @PostMapping("/release/{instituteCode}/publish")
+    public ResponseEntity<Map<String, Object>> setPublished(
+            @PathVariable Long instituteCode,
+            @RequestParam Long assessmentId,
+            @RequestParam boolean published,
+            @RequestParam(required = false) String scopeKey) {
+
+        int affected = scopeKey == null || scopeKey.isBlank()
+                ? repository.setCurrentForInstitute(instituteCode, assessmentId, published)
+                : repository.setCurrentForScope(instituteCode, assessmentId, scopeKey, published);
+
+        trace.run("admin-" + instituteCode, instituteCode, assessmentId,
+                published ? PrincipalDashboardReleaseLog.STEP_REPUBLISHED
+                          : PrincipalDashboardReleaseLog.STEP_UNPUBLISHED,
+                PrincipalDashboardReleaseLog.OUTCOME_OK,
+                (scopeKey == null || scopeKey.isBlank() ? "Whole school" : scopeKey)
+                        + " — " + affected + " scope(s) "
+                        + (published ? "republished" : "withdrawn"));
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("published", published);
+        out.put("affected", affected);
+        return ResponseEntity.ok(out);
+    }
+
+    /**
+     * Every stored scope for a school, withdrawn ones included.
+     *
+     * <p>Distinct from {@code /scopes}, which the principal's filter rail uses and which
+     * deliberately hides anything not published — the admin page needs to see exactly what
+     * it is being asked to republish.
+     */
+    @PreAuthorize("@auth.allows('dashboard.school.release', #instituteCode)")
+    @GetMapping("/release/{instituteCode}/scopes")
+    public ResponseEntity<List<Map<String, Object>>> adminScopes(
+            @PathVariable Long instituteCode,
+            @RequestParam Long assessmentId) {
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (PrincipalDashboardData row : repository.findAllScopesForAdmin(instituteCode, assessmentId)) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("scopeKey", row.getScopeKey());
+            item.put("scopeLabel", row.getScopeLabel());
+            item.put("scopeLevel", row.getScopeLevel());
+            item.put("status", row.getGenerationStatus());
+            item.put("published", Boolean.TRUE.equals(row.getIsCurrent()));
+            item.put("studentCount", row.getScoredCount());
+            item.put("generatedAt", row.getGeneratedAt());
+            item.put("error", row.getErrorMessage());
+            item.put("hasNarrative", row.getAiResponse() != null);
+            out.add(item);
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /** The step-by-step trace of one run. */
+    @PreAuthorize("@auth.allows('dashboard.school.release', #instituteCode)")
+    @GetMapping("/release/{instituteCode}/log")
+    public ResponseEntity<List<Map<String, Object>>> releaseLog(
+            @PathVariable Long instituteCode,
+            @RequestParam(required = false) String releaseId,
+            @RequestParam(defaultValue = "300") int limit) {
+
+        List<PrincipalDashboardReleaseLog> entries = releaseId == null || releaseId.isBlank()
+                ? trace.forInstitute(instituteCode, limit)
+                : trace.forRelease(releaseId);
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (PrincipalDashboardReleaseLog entry : entries) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", entry.getId());
+            item.put("releaseId", entry.getReleaseId());
+            item.put("scopeKey", entry.getScopeKey());
+            item.put("scopeLabel", entry.getScopeLabel());
+            item.put("step", entry.getStep());
+            item.put("outcome", entry.getOutcome());
+            item.put("message", entry.getMessage());
+            item.put("durationMs", entry.getDurationMs());
+            item.put("createdAt", entry.getCreatedAt());
+            out.add(item);
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /** The runs this school has had, for the log viewer's picker. */
+    @PreAuthorize("@auth.allows('dashboard.school.release', #instituteCode)")
+    @GetMapping("/release/{instituteCode}/runs")
+    public ResponseEntity<List<Map<String, Object>>> releaseRuns(
+            @PathVariable Long instituteCode,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object[] row : trace.runsFor(instituteCode, limit)) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("releaseId", row[0]);
+            item.put("startedAt", row[1]);
+            item.put("finishedAt", row[2]);
+            item.put("entries", row[3]);
+            out.add(item);
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /** Who could be told the dashboard is live. */
+    @PreAuthorize("@auth.allows('dashboard.school.release', #instituteCode)")
+    @GetMapping("/release/{instituteCode}/contacts")
+    public ResponseEntity<List<PrincipalDashboardNotificationService.Recipient>> contacts(
+            @PathVariable Long instituteCode) {
+        return ResponseEntity.ok(notifications.recipientsFor(instituteCode));
+    }
+
+    /**
+     * Mail the chosen contacts that the dashboard is live.
+     *
+     * <p>Returns one outcome per recipient rather than a single success flag: one bad
+     * address among five is the normal case, and the admin needs to know which.
+     */
+    @PreAuthorize("@auth.allows('dashboard.school.release', #instituteCode)")
+    @PostMapping("/release/{instituteCode}/notify")
+    public ResponseEntity<List<PrincipalDashboardNotificationService.SendOutcome>> notifyContacts(
+            @PathVariable Long instituteCode,
+            @RequestParam(required = false) String instituteName,
+            @RequestParam(required = false) String assessmentName,
+            @RequestParam List<Long> contactPersonIds) {
+
+        return ResponseEntity.ok(notifications.notify(
+                instituteCode,
+                instituteName == null || instituteName.isBlank() ? "your school" : instituteName,
+                assessmentName,
+                contactPersonIds));
     }
 }

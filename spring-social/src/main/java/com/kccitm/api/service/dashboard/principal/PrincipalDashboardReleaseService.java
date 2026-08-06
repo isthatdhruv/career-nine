@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.PrincipalDashboardData;
+import com.kccitm.api.model.career9.PrincipalDashboardReleaseLog;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.group.StudentGroup;
@@ -93,6 +94,9 @@ public class PrincipalDashboardReleaseService {
     @Autowired
     @Lazy
     private PrincipalDashboardReleaseService self;
+
+    @Autowired
+    private PrincipalDashboardReleaseLogger trace;
 
     @Value("${app.principal-dashboard.min-cohort-size:10}")
     private int minCohortSize;
@@ -495,6 +499,14 @@ public class PrincipalDashboardReleaseService {
         List<PrincipalDashboardData> rows = repository.findByReleaseId(releaseId);
         log.info("Principal dashboard release {}: generating {} scopes", releaseId, rows.size());
 
+        Long instituteCode = rows.isEmpty() ? null : rows.get(0).getInstituteCode();
+        Long assessmentId = rows.isEmpty() ? null : rows.get(0).getAssessmentId();
+        long runStarted = System.currentTimeMillis();
+        trace.run(releaseId, instituteCode, assessmentId,
+                PrincipalDashboardReleaseLog.STEP_RELEASE_STARTED,
+                PrincipalDashboardReleaseLog.OUTCOME_OK,
+                rows.size() + " scope(s) queued");
+
         // The institute scope is what every other scope is written against, so it is
         // computed once here rather than recomputed inside each one.
         Map<String, Object> baselineSheets = null;
@@ -504,18 +516,43 @@ public class PrincipalDashboardReleaseService {
                     calculator.compute(snapshot, ScopeKey.institute(snapshot.assessmentId()));
             baselineSheets = institute.sheets;
             event = buildEvent(snapshot);
+            trace.run(releaseId, instituteCode, assessmentId,
+                    PrincipalDashboardReleaseLog.STEP_SNAPSHOT,
+                    PrincipalDashboardReleaseLog.OUTCOME_OK,
+                    "School-wide baseline computed; scopes will carry comparison columns");
         } catch (Exception e) {
             log.warn("Principal dashboard release {}: baseline unavailable, scopes will be "
                     + "narrated without a school-wide comparison: {}", releaseId, e.toString());
+            // Not fatal, but it silently changes what every narrowed scope can say, so it
+            // is recorded rather than left to the application log.
+            trace.run(releaseId, instituteCode, assessmentId,
+                    PrincipalDashboardReleaseLog.STEP_SNAPSHOT,
+                    PrincipalDashboardReleaseLog.OUTCOME_FAILED,
+                    "Baseline unavailable — scopes narrated without a school-wide comparison. "
+                            + PrincipalDashboardReleaseLogger.describe(e));
         }
 
         int ok = 0, skipped = 0, failed = 0;
         for (PrincipalDashboardData row : rows) {
+            long scopeStarted = System.currentTimeMillis();
             try {
                 // Through the proxy, so each scope really does get its own transaction.
                 String outcome = self.generateOneScope(row.getId(), snapshot, baselineSheets, event);
-                if (PrincipalDashboardData.STATUS_GENERATED.equals(outcome)) ok++;
-                else skipped++;
+                long took = System.currentTimeMillis() - scopeStarted;
+                if (PrincipalDashboardData.STATUS_GENERATED.equals(outcome)) {
+                    ok++;
+                    trace.scope(releaseId, instituteCode, assessmentId, row.getScopeKey(),
+                            row.getScopeLabel(), PrincipalDashboardReleaseLog.STEP_SAVED,
+                            PrincipalDashboardReleaseLog.OUTCOME_OK,
+                            "Figures and narrative stored", took);
+                } else {
+                    skipped++;
+                    trace.scope(releaseId, instituteCode, assessmentId, row.getScopeKey(),
+                            row.getScopeLabel(), PrincipalDashboardReleaseLog.STEP_SKIPPED,
+                            PrincipalDashboardReleaseLog.OUTCOME_SKIPPED,
+                            "Figures stored; no narrative written — cohort below the minimum size",
+                            took);
+                }
             } catch (Exception e) {
                 failed++;
                 // Per-scope failure: record it on the row and keep going. One bad OpenAI
@@ -523,10 +560,23 @@ public class PrincipalDashboardReleaseService {
                 self.markFailed(row.getId(), e);
                 log.warn("Principal dashboard release {}: scope {} failed: {}",
                         releaseId, row.getScopeKey(), e.toString());
+                // Written on its own transaction, so the reason outlives the rollback of
+                // the work that produced it.
+                trace.scope(releaseId, instituteCode, assessmentId, row.getScopeKey(),
+                        row.getScopeLabel(), PrincipalDashboardReleaseLog.STEP_FAILED,
+                        PrincipalDashboardReleaseLog.OUTCOME_FAILED,
+                        PrincipalDashboardReleaseLogger.describe(e),
+                        System.currentTimeMillis() - scopeStarted);
             }
         }
         log.info("Principal dashboard release {} finished: {} generated, {} skipped, {} failed",
                 releaseId, ok, skipped, failed);
+        trace.run(releaseId, instituteCode, assessmentId,
+                PrincipalDashboardReleaseLog.STEP_RELEASE_FINISHED,
+                failed > 0 ? PrincipalDashboardReleaseLog.OUTCOME_FAILED
+                           : PrincipalDashboardReleaseLog.OUTCOME_OK,
+                ok + " generated, " + skipped + " skipped, " + failed + " failed"
+                        + " in " + ((System.currentTimeMillis() - runStarted) / 1000) + "s");
     }
 
     /**
@@ -552,7 +602,14 @@ public class PrincipalDashboardReleaseService {
 
         // 1. Deterministic half — a filter over the snapshot, then the same aggregation
         //    the Mira Desai dashboard export uses.
+        long metricsStarted = System.currentTimeMillis();
         PrincipalDashboardScopeCalculator.ScopeResult result = calculator.compute(snapshot, scope);
+        trace.scope(row.getReleaseId(), row.getInstituteCode(), row.getAssessmentId(),
+                row.getScopeKey(), row.getScopeLabel(),
+                PrincipalDashboardReleaseLog.STEP_METRICS,
+                PrincipalDashboardReleaseLog.OUTCOME_OK,
+                result.scoredCount + " scored student(s) aggregated",
+                System.currentTimeMillis() - metricsStarted);
 
         row.setInternalCalculation(writeJson(result.payload));
         row.setScoredCount(result.scoredCount);
@@ -584,7 +641,21 @@ public class PrincipalDashboardReleaseService {
         Map<String, Object> request = requestBuilder.build(
                 result.payload, baseline, event, scope.level());
 
+        trace.scope(row.getReleaseId(), row.getInstituteCode(), row.getAssessmentId(),
+                row.getScopeKey(), row.getScopeLabel(),
+                PrincipalDashboardReleaseLog.STEP_AI_REQUEST,
+                PrincipalDashboardReleaseLog.OUTCOME_OK,
+                "Sent to " + PrincipalDashboardAiService.PROMPT_VERSION, null);
+
+        long aiStarted = System.currentTimeMillis();
         PrincipalDashboardAiService.AiResult ai = aiService.generate(request, scope);
+        trace.scope(row.getReleaseId(), row.getInstituteCode(), row.getAssessmentId(),
+                row.getScopeKey(), row.getScopeLabel(),
+                PrincipalDashboardReleaseLog.STEP_AI_RESPONSE,
+                PrincipalDashboardReleaseLog.OUTCOME_OK,
+                ai.promptTokens + " prompt + " + ai.completionTokens + " completion tokens",
+                System.currentTimeMillis() - aiStarted);
+
         row.setAiResponse(ai.json);
         row.setPromptVersion(ai.promptVersion);
         row.setGenerationStatus(PrincipalDashboardData.STATUS_GENERATED);

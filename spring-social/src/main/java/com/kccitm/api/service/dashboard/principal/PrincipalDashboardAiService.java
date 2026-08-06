@@ -46,10 +46,29 @@ public class PrincipalDashboardAiService {
     private static final String ENDPOINT = "https://api.openai.com/v1/chat/completions";
 
     /**
+     * The charts the dashboard draws, by id.
+     *
+     * <p>These ids are a contract with the page: it looks each block up by id to place it
+     * under the right chart. Changing one here without changing
+     * {@code SchoolDashboardPage.tsx} silently drops that chart's commentary, so they are
+     * listed in one place on each side and named the same.
+     */
+    private static final String[] CHART_IDS = {
+            "students-by-class",
+            "stream-fit-vs-ambition",
+            "personality-profile",
+            "trait-leadership",
+            "learning-styles",
+            "ability-gaps",
+            "work-values",
+            "clarity-by-class",
+    };
+
+    /**
      * Bump whenever the prompt or schema changes meaningfully. Stamped onto every row so
      * a later revision does not silently make old and new content look alike.
      */
-    public static final String PROMPT_VERSION = "principal-dashboard-v2";
+    public static final String PROMPT_VERSION = "principal-dashboard-v6";
 
     private final ObjectMapper objectMapper;
     private final HttpClient http;
@@ -226,19 +245,72 @@ public class PrincipalDashboardAiService {
         " 11  Action plan table — the Career-9 career library and monthly industry visits always, plus what",
         "     this scope's data justifies. A closing paragraph.",
         "",
+        "THE HEADLINE",
+        "`headline` is the single sentence the dashboard opens with, set large. Write the one thing a",
+        "principal must know if they read nothing else — the sharpest tension or risk in this cohort's",
+        "data, carrying its numbers. Prefer a contrast the figures actually show (\"three in five want",
+        "Science, but only one in three has the profile for it\") over a summary of what the report covers.",
+        "Under 30 words. Never a greeting, a title, or a description of the document.",
+        "",
         "DASHBOARD LAYER",
         "dashboard_insights is rendered directly and must stand on its own.",
-        "  kpis    students assessed, students counselled, career clarity, and any other headline the data",
-        "          supports. value is a number; put the symbol in unit.",
-        "  cards   six to ten. Each carries one sentence with its number and base, machine-readable",
-        "          numbers, a type (strength | gap | risk | opportunity), and section_ref to the section",
-        "          that expands it. Cover at minimum: the stream suited-vs-aspiring gap, the most fixable",
-        "          readiness gap, the cohort's personality character, the top weak ability, the values",
-        "          pattern, and the flagged-student picture.",
+        "  kpis    four at most, and only ones this scope's data supports: completion, career clarity, the",
+        "          headline gap, the count needing support. value is a number; put the symbol in unit.",
+        "          Omit any KPI whose input is missing rather than printing a zero.",
+        "  cards   six to ten, ordered so the most urgent is first. Each carries: one sentence with its",
+        "          number and base; `action`, a concrete next step the school can take this term, phrased",
+        "          as an instruction (\"Run a stream-counselling round before Class 11 forms go out\") and",
+        "          never as an observation; machine-readable numbers; a type (strength | gap | risk |",
+        "          opportunity); and section_ref to the section that expands it. Only the first three are",
+        "          shown by default, so put the ones that most need acting on at the top. Cover at minimum:",
+        "          the stream suited-vs-aspiring gap, the most fixable readiness gap, the cohort's",
+        "          personality character, the top weak ability, the values pattern, and the flagged picture.",
         "  alerts  anonymised counts needing action, each with the action to take.",
         "",
         "Charts are always ready to bind: id, type, title, caption, labels, series[{name, values, unit}].",
-        "Series values must be index-aligned with labels.");
+        "Series values must be index-aligned with labels.",
+        "",
+        "CHART COMMENTARY",
+        "`chart_notes` is what a principal reads underneath each chart on the dashboard. Produce one",
+        "entry for every chart id below, drawn from the block named beside it. Every entry needs all",
+        "three lists.",
+        "  students-by-class       sheets.summary.studentsByClass and byClass.headline `students`.",
+        "  stream-fit-vs-ambition  sheets.careerGap.streams — suited against aspiring, and the gap.",
+        "  personality-profile     sheets.personality, the avgRaw column across the six traits.",
+        "  trait-leadership        sheets.personality, topTraitPct and topThreePct.",
+        "  learning-styles         sheets.learningStyle — strongPct against lowPct per intelligence.",
+        "  ability-gaps            sheets.abilities — the gap column, plus nWith5PlusWeak.",
+        "  work-values             sheets.values — topFivePct across the fifteen values.",
+        "  clarity-by-class        sheets.byClass.headline `careerClarityPct`, class by class.",
+        "",
+        "  insights      three to five. What the chart actually shows, each with its number and base.",
+        "  implications  three to five. What it means for this school if nothing changes — consequences",
+        "                for students, not restatements of the number.",
+        "  actions       three to five. What Career-9 advises the school do about it, phrased as an",
+        "                instruction and scoped to this term.",
+        "",
+        "Three is a floor, not a target: every list needs at least three entries, and a chart that",
+        "seems to support only one or two has more in it than you have looked at — the same block",
+        "carries other columns, other rows, and the comparison between them. Do not pad to reach",
+        "three by rephrasing an earlier entry; draw the third from a different column or a different",
+        "row of the same block.",
+        "",
+        "Write these on the alerting side: name the risk plainly, say who it lands on and when, and do",
+        "not soften a real problem into \"worth monitoring\". Where a chart genuinely shows the school",
+        "doing well, say so with the same directness rather than inventing a concern.",
+        "",
+        "",
+        "EMPHASIS",
+        "Wrap the part of a sentence that carries the finding in double asterisks — the figure and what",
+        "it applies to, as in \"**48% of Grade 10** are aiming at a stream their profile does not",
+        "support\". Double asterisks are the only markup allowed anywhere in this response.",
+        "",
+        "Use it in: the headline, card titles, insights and actions, alert labels and actions, section",
+        "body paragraphs, bullets, callouts, and every chart_notes sentence.",
+        "",
+        "At most one emphasis per sentence, and never the whole sentence — a paragraph where every",
+        "line is emphasised reads as none of it being. Emphasise the number and its subject, not the",
+        "verb around them.");
     }
 
     // ─────────────────────────────── schema ───────────────────────────────
@@ -299,6 +371,9 @@ public class PrincipalDashboardAiService {
                 "id", str(),
                 "title", str(),
                 "insight", str(),
+                // Required, not optional. A finding a principal cannot act on is a
+                // statistic, and the dashboard prints this directly under the insight.
+                "action", str(),
                 // Strict mode cannot express a free-form object, so the machine-readable
                 // figures are a typed list rather than an open map.
                 "numbers", arr(obj(props("key", str(), "value", num(), "unit", str()))),
@@ -312,6 +387,14 @@ public class PrincipalDashboardAiService {
                 "action", str()));
 
         Map<String, Object> auditEntry = obj(props("what", str(), "n", num()));
+
+        // Commentary for the charts the dashboard draws. Keyed by a fixed id so the page
+        // can put each block under the right chart without matching on titles.
+        Map<String, Object> chartNote = obj(props(
+                "chart_id", enumOf(CHART_IDS),
+                "insights", arr(str()),
+                "implications", arr(str()),
+                "actions", arr(str())));
 
         Map<String, Object> schema = obj(props(
                 "school", obj(props(
@@ -329,10 +412,15 @@ public class PrincipalDashboardAiService {
                         "excluded", arr(auditEntry),
                         "cured", arr(auditEntry),
                         "noted", arr(str()))),
+                // The one sentence the page leads with. It sits at the root rather than
+                // inside dashboard_insights because it is the whole report's verdict,
+                // not one of its cards.
+                "headline", str(),
                 "dashboard_insights", obj(props(
                         "kpis", arr(kpi),
                         "cards", arr(card),
                         "alerts", arr(alert))),
+                "chart_notes", arr(chartNote),
                 "report", obj(props("sections", arr(section)))));
 
         return Map.of("type", "json_schema",

@@ -267,3 +267,195 @@ export function getReleasedScopes(instituteCode: number, assessmentId: number) {
     { params: { assessmentId } }
   );
 }
+
+/** One student behind a screening tier. */
+export interface FlaggedStudent {
+  userStudentId: number;
+  name: string;
+  studentClass: number | null;
+  rollNumber: string | null;
+}
+
+export type FlagTier = "acute" | "abilitySupport" | "guidanceMismatch";
+
+/** The dimensions a read is scoped to, as the page has them in hand. */
+export interface ScopeParams {
+  instituteCode: number | null;
+  assessmentId: number | null;
+  sessionId: number | null;
+  classId: number | null;
+  sectionId: number | null;
+  groupId: number | null;
+}
+
+function scopeQuery(scope: ScopeParams) {
+  return {
+    assessmentId: scope.assessmentId,
+    sessionId: scope.sessionId ?? undefined,
+    classId: scope.classId ?? undefined,
+    sectionId: scope.sectionId ?? undefined,
+    groupId: scope.groupId ?? undefined,
+  };
+}
+
+/**
+ * Which students sit in one screening tier.
+ *
+ * Counts travel with every dashboard load; names do not. They are fetched only when
+ * someone opens a tier, so identifiable screening data crosses the wire on request
+ * rather than on every page view.
+ */
+export function getFlaggedStudents(scope: ScopeParams, tier: FlagTier) {
+  return axios.get<FlaggedStudent[]>(
+    `${API_URL}/dashboard/principal/${scope.instituteCode}/flagged`,
+    { params: { ...scopeQuery(scope), tier } }
+  );
+}
+
+/**
+ * TEMPORARY — print the chart data for this scope to the server console.
+ *
+ * Remove with the button that calls it and the backend's /log-chart-data endpoint.
+ */
+export function logChartData(scope: ScopeParams) {
+  return axios.post<{ logged: boolean; charts?: number; message: string }>(
+    `${API_URL}/dashboard/principal/${scope.instituteCode}/log-chart-data`,
+    null,
+    { params: scopeQuery(scope) }
+  );
+}
+
+// ───────────────────────── administration ─────────────────────────
+
+/**
+ * A stored scope as the admin page sees it — withdrawn ones included.
+ *
+ * Distinct from `ScopeSummary`, which drives the principal's filter rail and hides
+ * anything unpublished. The admin needs to see what it is being asked to republish.
+ */
+export interface AdminScope {
+  scopeKey: string;
+  scopeLabel: string | null;
+  scopeLevel: "INSTITUTE" | "SESSION" | "CLASS" | "SECTION" | "GROUP";
+  status: ScopeStatus;
+  published: boolean;
+  studentCount: number | null;
+  generatedAt: string | null;
+  error: string | null;
+  hasNarrative: boolean;
+}
+
+export type ReleaseStep =
+  | "RELEASE_STARTED"
+  | "PLANNED"
+  | "SNAPSHOT"
+  | "METRICS"
+  | "AI_REQUEST"
+  | "AI_RESPONSE"
+  | "SAVED"
+  | "SKIPPED"
+  | "FAILED"
+  | "RELEASE_FINISHED"
+  | "UNPUBLISHED"
+  | "REPUBLISHED"
+  | "EMAILED";
+
+export interface ReleaseLogEntry {
+  id: number;
+  releaseId: string;
+  scopeKey: string | null;
+  scopeLabel: string | null;
+  step: ReleaseStep;
+  outcome: "OK" | "FAILED" | "SKIPPED";
+  message: string | null;
+  durationMs: number | null;
+  createdAt: string;
+}
+
+export interface ReleaseRun {
+  releaseId: string;
+  startedAt: string;
+  finishedAt: string;
+  entries: number;
+}
+
+export interface ContactRecipient {
+  id: number;
+  name: string | null;
+  email: string | null;
+  designation: string | null;
+  /** False when there is no address on file — listed, but not selectable. */
+  emailable: boolean;
+}
+
+export interface NotifyOutcome {
+  contactPersonId: number;
+  name: string | null;
+  email: string | null;
+  sent: boolean;
+  error: string | null;
+}
+
+/**
+ * Take a school's dashboard off the air, or put it back.
+ *
+ * Flips `is_current`; the payload and its narrative survive, so this is reversible at no
+ * cost. Omit `scopeKey` for the whole school.
+ */
+export function setPublished(
+  instituteCode: number,
+  assessmentId: number,
+  published: boolean,
+  scopeKey?: string
+) {
+  return axios.post<{ published: boolean; affected: number }>(
+    `${API_URL}/dashboard/principal/release/${instituteCode}/publish`,
+    null,
+    { params: { assessmentId, published, scopeKey: scopeKey || undefined } }
+  );
+}
+
+export function getAdminScopes(instituteCode: number, assessmentId: number) {
+  return axios.get<AdminScope[]>(
+    `${API_URL}/dashboard/principal/release/${instituteCode}/scopes`,
+    { params: { assessmentId } }
+  );
+}
+
+/** One run's trace, or the school's recent activity when releaseId is omitted. */
+export function getReleaseLog(
+  instituteCode: number,
+  releaseId?: string,
+  limit = 300
+) {
+  return axios.get<ReleaseLogEntry[]>(
+    `${API_URL}/dashboard/principal/release/${instituteCode}/log`,
+    { params: { releaseId: releaseId || undefined, limit } }
+  );
+}
+
+export function getReleaseRuns(instituteCode: number, limit = 20) {
+  return axios.get<ReleaseRun[]>(
+    `${API_URL}/dashboard/principal/release/${instituteCode}/runs`,
+    { params: { limit } }
+  );
+}
+
+export function getContacts(instituteCode: number) {
+  return axios.get<ContactRecipient[]>(
+    `${API_URL}/dashboard/principal/release/${instituteCode}/contacts`
+  );
+}
+
+export function notifyContacts(
+  instituteCode: number,
+  contactPersonIds: number[],
+  instituteName?: string,
+  assessmentName?: string
+) {
+  return axios.post<NotifyOutcome[]>(
+    `${API_URL}/dashboard/principal/release/${instituteCode}/notify`,
+    null,
+    { params: { contactPersonIds, instituteName, assessmentName } }
+  );
+}

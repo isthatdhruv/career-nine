@@ -76,6 +76,45 @@ public interface PrincipalDashboardDataRepository extends JpaRepository<Principa
      * API key, a token limit, a timeout), so the dialog can say it instead of sending
      * someone to the server logs.
      */
+    /**
+     * Take a school's dashboard off the air, or put it back.
+     *
+     * A flag rather than a delete: the principal's page filters on {@code isCurrent}, so
+     * flipping it gates the dashboard while the payload and its narrative survive. Undoing
+     * an unpublish is then free, where regenerating would be another run of OpenAI calls.
+     *
+     * <p>Scoped to one assessment because a school can hold rows for more than one, and
+     * withdrawing this year's report must not disturb last year's.
+     */
+    @Modifying
+    @Query("UPDATE PrincipalDashboardData p SET p.isCurrent = :current "
+         + "WHERE p.instituteCode = :instituteCode AND p.assessmentId = :assessmentId")
+    int setCurrentForInstitute(@Param("instituteCode") Long instituteCode,
+                               @Param("assessmentId") Long assessmentId,
+                               @Param("current") boolean current);
+
+    /** The same, for a single cohort — withdrawing one class rather than the school. */
+    @Modifying
+    @Query("UPDATE PrincipalDashboardData p SET p.isCurrent = :current "
+         + "WHERE p.instituteCode = :instituteCode AND p.assessmentId = :assessmentId "
+         + "AND p.scopeKey = :scopeKey")
+    int setCurrentForScope(@Param("instituteCode") Long instituteCode,
+                           @Param("assessmentId") Long assessmentId,
+                           @Param("scopeKey") String scopeKey,
+                           @Param("current") boolean current);
+
+    /**
+     * Every stored scope for a school, published or not.
+     *
+     * The admin page needs the withdrawn ones too — they are what the "Re-publish" control
+     * acts on, and {@link #findInstituteScopesNewestFirst} deliberately hides them.
+     */
+    @Query("SELECT p FROM PrincipalDashboardData p "
+         + "WHERE p.instituteCode = :instituteCode AND p.assessmentId = :assessmentId "
+         + "ORDER BY p.scopeLevel, p.scopeLabel")
+    List<PrincipalDashboardData> findAllScopesForAdmin(@Param("instituteCode") Long instituteCode,
+                                                       @Param("assessmentId") Long assessmentId);
+
     @Query("SELECT p.scopeKey, p.errorMessage FROM PrincipalDashboardData p "
          + "WHERE p.releaseId = :releaseId AND p.generationStatus = 'FAILED'")
     List<Object[]> findFailuresForRelease(@Param("releaseId") String releaseId);

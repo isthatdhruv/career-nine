@@ -590,6 +590,17 @@ export function AsideMenuMain() {
               fontIcon="bi-buildings"
             />
           )}
+          {/* The admin side of the dashboard above. Gated on the release whitelist so
+              a principal who can read their dashboard does not see the controls that
+              generate and withdraw it. */}
+          {(allowed("/school-dashboard/releases") || allowed("/reports-hub")) && (
+            <AsideMenuItem
+              to="/school-dashboard/releases"
+              icon="/media/icons/duotune/general/gen019.svg"
+              title="Dashboard Releases"
+              fontIcon="bi-send"
+            />
+          )}
           {(allowed("/admin/report-templates") || allowed("/reports-hub")) && (
             <AsideMenuItem
               to="/admin/report-templates"

@@ -109,7 +109,7 @@ public class PrincipalDashboardScopeCalculator {
 
         payload.put("sheets", sheets);
         // Counted after calculateDashboard, which is what populates row.calculations.
-        payload.put("flags", flags(rows));
+        payload.put("flags", flags(students));
         payload.put("provenance", provenance(snapshot));
 
         result.sheets = sheets;
@@ -197,25 +197,47 @@ public class PrincipalDashboardScopeCalculator {
      *
      * <p>These are screening thresholds, not diagnoses.
      */
-    private Map<String, Object> flags(List<PasteDataRow> rows) {
-        int acute = 0, abilitySupport = 0, guidanceMismatch = 0;
-        for (PasteDataRow r : rows) {
-            SchoolReportService.PasteDataCalculations c = r.calculations;
+    private Map<String, Object> flags(List<ScoredStudent> students) {
+        List<Long> acute = new ArrayList<>();
+        List<Long> abilitySupport = new ArrayList<>();
+        List<Long> guidanceMismatch = new ArrayList<>();
+        int base = 0;
+
+        for (ScoredStudent s : students) {
+            if (!s.isScored()) continue;
+            base++;
+            SchoolReportService.PasteDataCalculations c = s.row.calculations;
             if (c == null) continue;
             int strong = c.abilities10Plus == null ? 0 : c.abilities10Plus;
             int weak = c.abilities8OrLess == null ? 0 : c.abilities8OrLess;
 
-            if (strong == 0 && weak >= 8) acute++;
-            if (weak >= 5) abilitySupport++;
-            if (c.hasMatch != null && c.hasMatch == 0) guidanceMismatch++;
+            if (strong == 0 && weak >= 8) acute.add(s.userStudentId);
+            if (weak >= 5) abilitySupport.add(s.userStudentId);
+            if (c.hasMatch != null && c.hasMatch == 0) guidanceMismatch.add(s.userStudentId);
         }
+
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("acute", acute);
-        m.put("abilitySupport", abilitySupport);
-        m.put("guidanceMismatch", guidanceMismatch);
-        m.put("base", rows.size());
+        m.put("acute", acute.size());
+        m.put("abilitySupport", abilitySupport.size());
+        m.put("guidanceMismatch", guidanceMismatch.size());
+        m.put("base", base);
+
+        // Ids, not names. The dashboard needs to be able to answer "which students",
+        // and recomputing a tier on demand would mean re-scoring the cohort — but a
+        // payload that travels on every page load should not carry identifiable data.
+        // Names are resolved by a separate request, only when someone asks for them.
+        Map<String, Object> ids = new LinkedHashMap<>();
+        ids.put(TIER_ACUTE, acute);
+        ids.put(TIER_ABILITY_SUPPORT, abilitySupport);
+        ids.put(TIER_GUIDANCE_MISMATCH, guidanceMismatch);
+        m.put("students", ids);
         return m;
     }
+
+    /** Tier keys, shared with the endpoint that resolves them to names. */
+    public static final String TIER_ACUTE = "acute";
+    public static final String TIER_ABILITY_SUPPORT = "abilitySupport";
+    public static final String TIER_GUIDANCE_MISMATCH = "guidanceMismatch";
 
     private Map<String, Object> provenance(ReleaseSnapshot snapshot) {
         Map<String, Object> m = new LinkedHashMap<>();

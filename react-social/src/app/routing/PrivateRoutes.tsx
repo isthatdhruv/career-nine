@@ -287,6 +287,13 @@ const PrivateRoutes = () => {
   const SchoolInsightsDashboardPage = lazy(
     () => import("../pages/SchoolDashboard/SchoolDashboardPage")
   );
+
+  // The admin side of the same feature: generate, withdraw, trace and announce a
+  // school's dashboard. Lazy for the same reason the dashboard is — neither is on the
+  // path most users take through the app.
+  const SchoolDashboardReleasePage = lazy(
+    () => import("../pages/SchoolDashboard/SchoolDashboardReleasePage")
+  );
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
   const AssessmentMappingPage = lazy(() => import("../pages/AssessmentMapping/AssessmentMappingPage"));
@@ -1521,6 +1528,18 @@ const PrivateRoutes = () => {
             <RequirePermission perm="dashboard.school.read">
               <SuspensedView>
                 <SchoolInsightsDashboardPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        {/* Releasing is an administrative act — it spends money and changes what a
+            school can see — so it is gated on release, not on read. */}
+        <Route
+          path="/school-dashboard/releases"
+          element={
+            <RequirePermission perm="dashboard.school.release">
+              <SuspensedView>
+                <SchoolDashboardReleasePage />
               </SuspensedView>
             </RequirePermission>
           }
