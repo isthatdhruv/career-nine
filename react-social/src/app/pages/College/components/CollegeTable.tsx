@@ -323,6 +323,26 @@ const CollegeTable = (props: {
                   Groups
                 </Dropdown.Item>
 
+                {/* Release Dashboard — now a deep link rather than a modal.
+                    Releasing grew past what a dialog can hold (a step-by-step log and a
+                    recipient picker beside the plan), so it lives on its own page and
+                    this navigates there with the school preselected. One implementation,
+                    two ways in. */}
+                <Dropdown.Item
+                  onClick={() =>
+                    navigate(
+                      `/school-dashboard/releases?institute=${Number(
+                        data.instituteCode || data.id
+                      )}`
+                    )
+                  }
+                >
+                  <MdOutlineDashboard size={18} className="me-2" />
+                  Release Dashboard
+                </Dropdown.Item>
+
+                <Dropdown.Divider />
+
                 {/* Dashboard 1 -> Dashboards/SchoolDashboardPage.tsx (opens in new tab) */}
                 <Dropdown.Item
                   onClick={() =>
@@ -480,6 +500,7 @@ const CollegeTable = (props: {
           instituteName={groupsModalInstitute.name}
         />
       )}
+
     </>
   );
 };

@@ -38,6 +38,28 @@ public interface StudentGroupMemberRepository extends JpaRepository<StudentGroup
     List<Long> findGroupIdsByUserStudentId(@Param("userStudentId") Long userStudentId);
 
     /**
+     * Groups that contain at least one of these students, in one query.
+     *
+     * <p>Used when building the principal-dashboard scope lattice: a group only
+     * becomes a scope if it actually holds scoreable students, so this is fed the
+     * completed-assessment roster rather than the institute's whole student list.
+     */
+    @Query("SELECT DISTINCT m.studentGroup.id FROM StudentGroupMember m "
+         + "WHERE m.userStudentId IN :userStudentIds")
+    List<Long> findDistinctGroupIdsByStudentIds(@Param("userStudentIds") List<Long> userStudentIds);
+
+    /**
+     * (studentId, groupId) pairs for a roster, in one query rather than N.
+     *
+     * <p>The full "Release All" scope set crosses group with session/class/section, so
+     * it needs each student's own groups rather than the institute's group list — which
+     * is why this returns pairs instead of a flat distinct set.
+     */
+    @Query("SELECT m.userStudentId, m.studentGroup.id FROM StudentGroupMember m "
+         + "WHERE m.userStudentId IN :userStudentIds")
+    List<Object[]> findGroupIdsByStudentIds(@Param("userStudentIds") List<Long> userStudentIds);
+
+    /**
      * Member counts for a page of groups in one query rather than N — the group
      * list shows a count per row.
      */

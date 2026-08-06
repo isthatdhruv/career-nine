@@ -22,9 +22,27 @@ import { showErrorToast } from "../../utils/toast";
 import {
   AbilityRow,
   ClusterRow,
-  getSchoolDashboard,
+  SchoolDashboardData,
   SchoolDashboardView,
 } from "./SchoolDashboard_APIs";
+import {
+  getLatestRelease,
+  getReleasedScopes,
+  getScope,
+  ScopeSummary,
+  ScopeView,
+} from "./PrincipalDashboardRelease_APIs";
+import ChartCommentary from "./ChartCommentary";
+import {
+  byLabel,
+  ChartNotes,
+  Narrative,
+  parseNarrative,
+  parseStoredPayload,
+  StoredFlags,
+  StoredScope,
+} from "./StoredDashboard";
+import SchoolDashboardInsights from "./SchoolDashboardInsights";
 import "./SchoolDashboard.css";
 
 // recharts' polar typings fight TS in this version — the same escape hatch
@@ -32,7 +50,57 @@ import "./SchoolDashboard.css";
 const PolarAngleAxisFixed = PolarAngleAxis as any;
 const PolarRadiusAxisFixed = PolarRadiusAxis as any;
 
-type Scope = { i?: number | null };
+/**
+ * One ABAC grant row, as the JWT carries it: institute / session / class /
+ * section, mirroring AccessScope.Rule on the server. A null on any dimension
+ * is a wildcard — "this grant does not constrain that dimension".
+ */
+type Scope = { i?: number | null; s?: number | null; c?: number | null; x?: number | null };
+
+/** The hero filter rail's dimensions, in the order they appear. */
+type Dim = "s" | "c" | "x";
+
+/**
+ * Collapse the user's grants down to a single allowed value set per dimension.
+ *
+ * null means unrestricted: super-admin, no grant rows at all, or at least one
+ * grant that wildcards this dimension. A set with exactly one member is what
+ * locks a control — the user has no choice to make, so the select is fixed and
+ * labelled "Scoped" rather than pretending to offer options.
+ *
+ * The server re-checks every request against AccessScope.allows(); this is UI
+ * honesty, not the security boundary.
+ */
+/** One selectable value on the rail, named as it was when it was released. */
+type RailOption = { id: number; label: string };
+
+/**
+ * Turn released scopes into rail options: one per distinct id, named, and cut down to
+ * what the user's grant allows.
+ *
+ * `allowed` of null means unrestricted — a wildcard grant or a super-admin — which is a
+ * different thing from an empty set, where the user may see nothing.
+ */
+function dedupeScopes(
+  scopes: ScopeSummary[],
+  id: (s: ScopeSummary) => number | null,
+  allowed: Set<number> | null
+): RailOption[] {
+  const seen = new Map<number, string>();
+  for (const scope of scopes) {
+    const value = id(scope);
+    if (value == null || seen.has(value)) continue;
+    if (allowed != null && !allowed.has(value)) continue;
+    seen.set(value, scope.scopeLabel || String(value));
+  }
+  return Array.from(seen, ([id, label]) => ({ id, label }));
+}
+
+function allowedValues(scopes: Scope[], dim: Dim, isSuperAdmin: boolean): Set<number> | null {
+  if (isSuperAdmin || !scopes.length) return null;
+  if (scopes.some((s) => s[dim] == null)) return null;
+  return new Set(scopes.map((s) => s[dim] as number));
+}
 
 // ── Palette ───────────────────────────────────────────────────────────────
 // Resolved from the CSS custom properties in SchoolDashboard.css so the
@@ -95,7 +163,22 @@ function useVizPalette(ref: React.RefObject<HTMLElement>): Palette {
 
 // ── Small building blocks ─────────────────────────────────────────────────
 
-const TABS = ["Overview", "Personality & Learning", "Abilities", "Careers", "By Class"] as const;
+/**
+ * The page's tabs, in reading order.
+ *
+ * "Analysis" leads and is the landing tab: it is what a release actually produces and
+ * what a principal opens the page for. "Act" holds the three things to do about it and
+ * the students behind each one. Everything after those is the evidence.
+ */
+const TABS = [
+  "Analysis",
+  "Act",
+  "Overview",
+  "Personality & Learning",
+  "Abilities",
+  "Careers",
+  "By Class",
+] as const;
 type Tab = typeof TABS[number];
 
 const StatTile: React.FC<{
@@ -128,12 +211,30 @@ const StatTile: React.FC<{
 );
 
 /** A chart and its WCAG-clean table twin, toggled per card. */
+/**
+ * The chart ids the model writes commentary against.
+ *
+ * Must match CHART_IDS in PrincipalDashboardAiService — the block is looked up by id, so
+ * a mismatch drops that chart's commentary silently rather than erroring.
+ */
+export type ChartId =
+  | "students-by-class"
+  | "stream-fit-vs-ambition"
+  | "personality-profile"
+  | "trait-leadership"
+  | "learning-styles"
+  | "ability-gaps"
+  | "work-values"
+  | "clarity-by-class";
+
 const ChartCard: React.FC<{
   title: string;
   subtitle?: string;
   table: React.ReactNode;
   children: React.ReactNode;
-}> = ({ title, subtitle, table, children }) => {
+  /** Commentary for this chart, when the release generated any. */
+  notes?: ChartNotes;
+}> = ({ title, subtitle, table, children, notes }) => {
   const [showTable, setShowTable] = useState(false);
   return (
     <div className="sd-card">
@@ -152,9 +253,140 @@ const ChartCard: React.FC<{
         </button>
       </div>
       {showTable ? <div className="sd-table-wrap">{table}</div> : children}
+      <ChartCommentary notes={notes} />
     </div>
   );
 };
+
+// ── Sortable table ────────────────────────────────────────────────────────
+
+type SortDir = "asc" | "desc";
+
+type Column<T> = {
+  /** Stable id for the column; also the sort key. */
+  key: string;
+  label: React.ReactNode;
+  /** Right-aligned numeric column. */
+  num?: boolean;
+  /** The emphasised label column. */
+  name?: boolean;
+  /**
+   * Value to sort on. Numbers compare numerically, strings naturally (so
+   * "Class 9" precedes "Class 10"). Return null for "no value" — those rows
+   * sink to the bottom in BOTH directions rather than pretending to be zero.
+   */
+  sortValue?: (row: T) => number | string | null;
+  /** Cell content. Defaults to the sort value. */
+  cell?: (row: T) => React.ReactNode;
+  /** Columns that render a graphic rather than a value opt out. */
+  sortable?: boolean;
+  thStyle?: React.CSSProperties;
+};
+
+/**
+ * A table whose columns sort ascending on first click and descending on the
+ * next. Sorting is local to the table and never mutates the caller's array, so
+ * the chart beside it keeps the order its author intended.
+ *
+ * Unsorted, rows render in the order given — several of these tables arrive
+ * pre-sorted meaningfully (biggest ability gap first), and that default is
+ * worth preserving until the user asks for something else.
+ */
+function SortableTable<T>({
+  columns,
+  rows,
+  rowKey,
+}: {
+  columns: Column<T>[];
+  rows: T[];
+  rowKey: (row: T) => string;
+}) {
+  const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
+
+  const ordered = useMemo(() => {
+    if (!sort) return rows;
+    const col = columns.find((c) => c.key === sort.key);
+    if (!col?.sortValue) return rows;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    // Decorate with the original index so ties keep their incoming order —
+    // Array.prototype.sort is only guaranteed stable from ES2019 and this also
+    // documents the intent.
+    return rows
+      .map((row, i) => [row, i] as [T, number])
+      .sort((a, b) => {
+        const av = col.sortValue!(a[0]);
+        const bv = col.sortValue!(b[0]);
+        if (av == null || bv == null) {
+          if (av == null && bv == null) return a[1] - b[1];
+          return av == null ? 1 : -1;
+        }
+        let cmp: number;
+        if (typeof av === "number" && typeof bv === "number") {
+          cmp = av - bv;
+        } else {
+          cmp = String(av).localeCompare(String(bv), undefined, {
+            numeric: true,
+            sensitivity: "base",
+          });
+        }
+        return cmp === 0 ? a[1] - b[1] : cmp * dir;
+      })
+      .map(([row]) => row);
+  }, [rows, sort, columns]);
+
+  const toggle = (key: string) =>
+    setSort((s) => (s && s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+
+  return (
+    <table className="sd-table">
+      <thead>
+        <tr>
+          {columns.map((col) => {
+            const canSort = col.sortable !== false && !!col.sortValue;
+            const active = sort?.key === col.key;
+            return (
+              <th
+                key={col.key}
+                className={col.num ? "num" : undefined}
+                style={col.thStyle}
+                aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"}
+              >
+                {canSort ? (
+                  <button
+                    type="button"
+                    className={`sd-sort${active ? " is-active" : ""}`}
+                    onClick={() => toggle(col.key)}
+                  >
+                    <span>{col.label}</span>
+                    <span className="sd-sort-arrow" aria-hidden="true">
+                      {active ? (sort!.dir === "asc" ? "▲" : "▼") : "▾"}
+                    </span>
+                  </button>
+                ) : (
+                  col.label
+                )}
+              </th>
+            );
+          })}
+        </tr>
+      </thead>
+      <tbody>
+        {ordered.map((row) => (
+          <tr key={rowKey(row)}>
+            {columns.map((col) => (
+              <td
+                key={col.key}
+                className={col.num ? "num" : col.name ? "name" : undefined}
+              >
+                {col.cell ? col.cell(row) : col.sortValue ? col.sortValue(row) : null}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 const Legend: React.FC<{ items: { label: string; color: string }[] }> = ({ items }) => (
   <div className="sd-legend">
@@ -187,6 +419,32 @@ const shortLabel = (label: string) => label.split("  (")[0].trim();
 
 const CHART_MARGIN = { top: 8, right: 28, bottom: 8, left: 8 };
 
+/** Stable identity so tabs do not re-render on every parent pass. */
+const EMPTY_NOTES: Map<string, ChartNotes> = new Map();
+
+/**
+ * How this cohort's figure sits against the whole school's.
+ *
+ * Signed and in percentage points, because the question is direction and size, not the
+ * school's own number — that is one column to the left and always available. A dash when
+ * the school-wide sheet has no matching row, never a zero, which would read as "the same"
+ * rather than "not comparable".
+ *
+ * Colour is not the only cue: the sign carries the meaning on its own for anyone who
+ * cannot separate the two inks.
+ */
+const VsSchool: React.FC<{ value: number; baseline?: number }> = ({ value, baseline }) => {
+  if (typeof baseline !== "number") return <span className="sd-vs sd-vs--none">—</span>;
+  const diff = Math.round(value - baseline);
+  if (diff === 0) return <span className="sd-vs sd-vs--same">same</span>;
+  return (
+    <span className={`sd-vs sd-vs--${diff > 0 ? "up" : "down"}`}>
+      {diff > 0 ? "+" : "−"}
+      {Math.abs(diff)} pts
+    </span>
+  );
+};
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 const SchoolDashboardPage: React.FC = () => {
@@ -218,7 +476,52 @@ const SchoolDashboardPage: React.FC = () => {
   const [classFilter, setClassFilter] = useState("All");
   const [view, setView] = useState<SchoolDashboardView | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<Tab>("Overview");
+  const [tab, setTab] = useState<Tab>("Analysis");
+
+  /**
+   * The rail's other three dimensions.
+   *
+   * Session, grade and section combine; group does not. A group is stored as
+   * independent of all three — cutting across classes is what a group is for — so
+   * "Class 10 and the debate team" is not a scope that exists, and picking a group
+   * clears the academic filters rather than pretending to intersect them.
+   */
+  const [sessionFilter, setSessionFilter] = useState<number | "All">("All");
+  const [sectionFilter, setSectionFilter] = useState<number | "All">("All");
+  const [groupFilter, setGroupFilter] = useState<number | "All">("All");
+
+  /** Scopes this school actually had generated — what the rail is allowed to offer. */
+  const [availableScopes, setAvailableScopes] = useState<ScopeSummary[]>([]);
+  /** The narrative for the scope in view. */
+  const [narrative, setNarrative] = useState<Narrative | null>(null);
+  /** Screening counts for the scope in view. */
+  const [flags, setFlags] = useState<StoredFlags | null>(null);
+  /** The scope the payload was generated for, named as it was at release time. */
+  const [storedScope, setStoredScope] = useState<StoredScope | null>(null);
+  /**
+   * The whole school, held alongside a narrowed view purely for comparison.
+   *
+   * "42% strong on speed and accuracy" is a fact; "42% against 58% school-wide" is the
+   * finding a principal opened a class view to get. Fetched once per school, and null
+   * while the school-wide scope is itself what's being shown.
+   */
+  const [baseline, setBaseline] = useState<SchoolDashboardData | null>(null);
+
+  /**
+   * Use the whole content area, not Bootstrap's fixed container.
+   *
+   * Metronic centres every page inside `.container`, which caps at 1320px. That suits a
+   * form; it wastes a third of a wide screen on a page whose charts, comparison tables
+   * and analysis all read better with the room. The layout config that sets it
+   * (`content.width`) is global, so this opts out for as long as the dashboard is
+   * mounted and restores the container on the way out rather than reflowing every other
+   * page in the app.
+   */
+  useEffect(() => {
+    const container = document.getElementById("kt_content_container");
+    container?.classList.add("sd-fluid");
+    return () => container?.classList.remove("sd-fluid");
+  }, []);
 
   // A single institute in scope needs no picking.
   useEffect(() => {
@@ -227,20 +530,56 @@ const SchoolDashboardPage: React.FC = () => {
     }
   }, [institutes, selectedInstitute]);
 
+  // Release state for the scope the filter rail resolves to. This IS the data source:
+  // the page renders what was generated, never a fresh computation, so a principal and
+  // the narrative beside them are always looking at the same numbers.
+  const [release, setRelease] = useState<ScopeView | null>(null);
+  const [assessmentId, setAssessmentId] = useState<number | null>(null);
+
+  /**
+   * Unpack one scope row into everything the page draws from.
+   *
+   * Both stored payloads are read here, in one place, so the figures and the narrative
+   * beside them can never come from different scopes.
+   */
+  const applyScopeRow = (row: ScopeView) => {
+    const stored = row.released ? parseStoredPayload(row.internalCalculation) : null;
+    setView(stored?.view ?? null);
+    setFlags(stored?.flags ?? null);
+    setStoredScope(stored?.scope ?? null);
+    setNarrative(row.released ? parseNarrative(row.aiResponse) : null);
+  };
+
+  // Entry point: the newest release for this school. It also carries the assessmentId,
+  // which the page has no other way to learn without recomputing.
   useEffect(() => {
     if (selectedInstitute === "") {
       setView(null);
+      setRelease(null);
+      setAssessmentId(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    getSchoolDashboard(Number(selectedInstitute), classFilter)
+    getLatestRelease(Number(selectedInstitute))
       .then((res) => {
-        if (!cancelled) setView(res.data);
+        if (cancelled) return;
+        setRelease(res.data);
+        setAssessmentId(res.data.assessmentId ?? null);
+        applyScopeRow(res.data);
+        // The school-wide sheets double as the comparison every narrowed view is read
+        // against, so they are kept aside before any filter narrows the page.
+        const stored = res.data.released
+          ? parseStoredPayload(res.data.internalCalculation)
+          : null;
+        setBaseline(stored?.view.dashboard ?? null);
       })
       .catch((err: any) => {
         if (cancelled) return;
+        setRelease(null);
         setView(null);
+        setNarrative(null);
+        setBaseline(null);
         showErrorToast(
           "Could not load the dashboard: " + (err?.response?.data?.error || err.message)
         );
@@ -251,27 +590,281 @@ const SchoolDashboardPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedInstitute, classFilter]);
+  }, [selectedInstitute]);
 
-  // Switching school resets the class filter — class 11 in one school says
-  // nothing about the next, and a stale filter would silently narrow the load.
+  // Switching school resets every filter — class 11 in one school says nothing about
+  // the next, and a stale filter would silently narrow the load.
   useEffect(() => {
     setClassFilter("All");
+    setSessionFilter("All");
+    setSectionFilter("All");
+    setGroupFilter("All");
   }, [selectedInstitute]);
+
+  /**
+   * Which scopes were actually generated.
+   *
+   * The rail offers only these. A filter that resolves to a scope nobody released would
+   * show "not generated yet" on a page that was working a moment ago, which reads as a
+   * fault rather than as an admin decision.
+   */
+  useEffect(() => {
+    if (selectedInstitute === "" || assessmentId == null) {
+      setAvailableScopes([]);
+      return;
+    }
+    let cancelled = false;
+    getReleasedScopes(Number(selectedInstitute), assessmentId)
+      .then((res) => {
+        if (!cancelled) setAvailableScopes(res.data ?? []);
+      })
+      .catch(() => {
+        // The rail falls back to the grades in the payload; not fatal.
+        if (!cancelled) setAvailableScopes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInstitute, assessmentId]);
+
+  // Narrowing the filter swaps to that scope's generated row. Nothing is computed —
+  // if the scope was never released, the page says so rather than inventing it.
+  useEffect(() => {
+    if (selectedInstitute === "" || assessmentId == null) return;
+    let cancelled = false;
+    setLoading(true);
+    const academic = groupFilter === "All";
+    getScope(Number(selectedInstitute), {
+      assessmentId,
+      sessionId: academic && sessionFilter !== "All" ? Number(sessionFilter) : null,
+      classId: academic && classFilter !== "All" ? Number(classFilter) : null,
+      sectionId: academic && sectionFilter !== "All" ? Number(sectionFilter) : null,
+      groupId: academic ? null : Number(groupFilter),
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setRelease(res.data);
+        applyScopeRow(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setRelease(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInstitute, assessmentId, sessionFilter, classFilter, sectionFilter, groupFilter]);
+
+  /**
+   * The scope currently in view, in the shape the read endpoints take.
+   *
+   * Assembled once so the flagged-student lookup and the chart-data dump ask about
+   * exactly the cohort the page is showing, rather than each rebuilding the dimensions.
+   */
+  /** Chart commentary for the scope in view; empty when the release wrote none. */
+  const chartNotes = narrative?.chartNotes ?? EMPTY_NOTES;
+
+  /** Shown wherever a tab needs scored students and there are none. */
+  const noScoredYet = (
+    <div className="sd-empty">
+      <div className="sd-empty-title">No completed assessments yet</div>
+      {view?.participation && view.participation.total > 0
+        ? `${view.participation.ongoing + view.participation.notStarted} of ${
+            view.participation.total
+          } assessments are still open. The insight sections appear as soon as the first student submits.`
+        : "Assign an assessment to this school to get started."}
+    </div>
+  );
+
+  const scopeParams = useMemo(() => {
+    const academic = groupFilter === "All";
+    return {
+      instituteCode: selectedInstitute === "" ? null : Number(selectedInstitute),
+      assessmentId,
+      sessionId: academic && sessionFilter !== "All" ? Number(sessionFilter) : null,
+      classId: academic && classFilter !== "All" ? Number(classFilter) : null,
+      sectionId: academic && sectionFilter !== "All" ? Number(sectionFilter) : null,
+      groupId: academic ? null : Number(groupFilter),
+    };
+  }, [selectedInstitute, assessmentId, sessionFilter, classFilter, sectionFilter, groupFilter]);
+
+  /** Whether the view in hand is the school itself — nothing to compare it against. */
+  const isSchoolWide =
+    sessionFilter === "All" &&
+    classFilter === "All" &&
+    sectionFilter === "All" &&
+    groupFilter === "All";
 
   const d = view?.dashboard ?? null;
   const p = view?.participation;
+
+  // ── Hero ────────────────────────────────────────────────────────────────
+  // Lead with the school's own name; the page title is the eyebrow's job.
+  const schoolName =
+    view?.instituteName ||
+    (institutes.find((i: any) => Number(i.instituteCode) === selectedInstitute) as any)
+      ?.instituteName ||
+    "School Dashboard";
+
+  // Which rail dimensions the user's ABAC grant pins to a single value.
+  const allowedSessions = useMemo(
+    () => allowedValues(userScopes, "s", isSuperAdmin),
+    [userScopes, isSuperAdmin]
+  );
+  const allowedClasses = useMemo(
+    () => allowedValues(userScopes, "c", isSuperAdmin),
+    [userScopes, isSuperAdmin]
+  );
+  const allowedSections = useMemo(
+    () => allowedValues(userScopes, "x", isSuperAdmin),
+    [userScopes, isSuperAdmin]
+  );
+
+  const lockedSession = allowedSessions != null && allowedSessions.size === 1;
+
+  /**
+   * The rail is built from scopes that were actually released, intersected with the
+   * user's grants.
+   *
+   * Two filters, and both matter. Offering a combination nobody generated puts the page
+   * into "not generated yet" on a click that looked ordinary; offering one outside a
+   * user's grant invites a request the server will refuse. Only scopes holding real
+   * content are listed — a failed or still-running scope is not a destination.
+   */
+  const usableScopes = useMemo(
+    () =>
+      availableScopes.filter(
+        (s) => s.status === "GENERATED" || s.status === "SKIPPED_SMALL_COHORT"
+      ),
+    [availableScopes]
+  );
+
+  const sessionOptions = useMemo(
+    () =>
+      dedupeScopes(
+        usableScopes.filter((s) => s.scopeLevel === "SESSION"),
+        (s) => s.sessionId,
+        allowedSessions
+      ),
+    [usableScopes, allowedSessions]
+  );
+
+  const classScopes = useMemo(
+    () =>
+      usableScopes.filter(
+        (s) =>
+          s.scopeLevel === "CLASS" &&
+          (sessionFilter === "All" || s.sessionId === Number(sessionFilter))
+      ),
+    [usableScopes, sessionFilter]
+  );
+
+  /**
+   * Grades offered are the classes that were released, intersected with the user's class
+   * grants — a school-scoped head of Grade 9 should not be shown Grade 10 just because
+   * the school has one. Falls back to the payload's own grade list when the scope
+   * lookup is unavailable, so the rail degrades rather than emptying.
+   */
+  const gradeOptions = useMemo(() => {
+    const released = classScopes
+      .map((s) => s.classId)
+      .filter((c): c is number => c != null);
+    const present = released.length > 0 ? released : view?.classesPresent ?? [];
+    const unique = Array.from(new Set(present)).sort((a, b) => a - b);
+    if (allowedClasses == null) return unique;
+    return unique.filter((c) => allowedClasses.has(c));
+  }, [classScopes, view, allowedClasses]);
+
+  const sectionOptions = useMemo(
+    () =>
+      classFilter === "All"
+        ? []
+        : dedupeScopes(
+            usableScopes.filter(
+              (s) => s.scopeLevel === "SECTION" && s.classId === Number(classFilter)
+            ),
+            (s) => s.sectionId,
+            allowedSections
+          ),
+    [usableScopes, classFilter, allowedSections]
+  );
+
+  const groupOptions = useMemo(
+    () =>
+      dedupeScopes(
+        usableScopes.filter((s) => s.scopeLevel === "GROUP"),
+        (s) => s.groupId,
+        null
+      ),
+    [usableScopes]
+  );
+
+  const lockedSection = allowedSections != null && allowedSections.size === 1;
+  const lockedGrade = gradeOptions.length === 1 && allowedClasses != null;
+
+  // A group cuts across classes, so an academic filter alongside it would describe a
+  // cohort nobody generated. Picking one clears the other.
+  useEffect(() => {
+    if (groupFilter !== "All") {
+      setSessionFilter("All");
+      setClassFilter("All");
+      setSectionFilter("All");
+    }
+  }, [groupFilter]);
+
+  // A section belongs to a class; changing the class abandons it.
+  useEffect(() => {
+    setSectionFilter("All");
+  }, [classFilter]);
+
+  // A grant that pins exactly one grade should pin the request too, not just
+  // the control — otherwise the page loads school-wide behind a locked filter.
+  useEffect(() => {
+    if (lockedGrade && classFilter !== String(gradeOptions[0])) {
+      setClassFilter(String(gradeOptions[0]));
+    }
+  }, [lockedGrade, gradeOptions, classFilter]);
+
+  const studentsInView = d ? d.summary.studentsInView : view?.distinctStudents ?? null;
+
+  const scopeSummary = useMemo(() => {
+    if (isSuperAdmin) return "Full access — every school, grade and section.";
+    if (!userScopes.length) return "No access restrictions are set on your account.";
+    const parts: string[] = [];
+    parts.push(
+      allowedInstituteIds == null
+        ? "All schools"
+        : `${allowedInstituteIds.size} school${allowedInstituteIds.size === 1 ? "" : "s"}`
+    );
+    parts.push(
+      allowedClasses == null
+        ? "all grades"
+        : `grade${allowedClasses.size === 1 ? "" : "s"} ${Array.from(allowedClasses)
+            .sort((a, b) => a - b)
+            .join(", ")}`
+    );
+    parts.push(allowedSections == null ? "all sections" : `${allowedSections.size} section(s)`);
+    return `${parts.join(" · ")} — locked filters are fixed by your role and cannot be widened here.`;
+  }, [isSuperAdmin, userScopes, allowedInstituteIds, allowedClasses, allowedSections]);
 
   return (
     <div className="school-dashboard" ref={rootRef}>
       <header className="sd-header">
         <div className="sd-header-top">
           <div>
-            <h1 className="sd-title">School Dashboard</h1>
+            {/* The session comes off the generated payload rather than the rail: it is
+                the session the figures were computed for, which stays right even when
+                the rail leaves the dimension unbound. */}
+            <p className="sd-eyebrow">
+              Navigator 360
+              {storedScope?.sessionLabel ? ` · ${storedScope.sessionLabel}` : ""}
+            </p>
+            <h1 className="sd-title">{schoolName}</h1>
             <p className="sd-subtitle">
-              What the Navigator360 results say about this school — participation, the
-              personality and ability profile of the cohort, and where students&rsquo;
-              ambitions line up with what they are suited to.
+              Where every class stands right now — who has finished, who has stalled,
+              and which sections need a teacher to step in this week.
             </p>
           </div>
           <div className="sd-institute-picker">
@@ -282,7 +875,7 @@ const SchoolDashboardPage: React.FC = () => {
               onChange={(e) =>
                 setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value))
               }
-              disabled={institutesLoading}
+              disabled={institutesLoading || institutes.length === 1}
             >
               <option value="">
                 {institutesLoading ? "Loading schools…" : "Select a school"}
@@ -295,6 +888,130 @@ const SchoolDashboardPage: React.FC = () => {
             </select>
           </div>
         </div>
+
+        {/* One filter row above everything it scopes. Each control offers only what was
+            released, so a selection always lands on generated content. Group sits apart
+            from the other three: it is stored as independent of them, so choosing one
+            clears the rest rather than implying an intersection that has no scope. */}
+        <div className="sd-rail">
+          {sessionOptions.length > 0 && (
+            <div className="sd-field">
+              <label htmlFor="sd-f-session">
+                Session
+                {lockedSession && <span className="sd-lock">Scoped</span>}
+              </label>
+              <select
+                id="sd-f-session"
+                value={sessionFilter}
+                disabled={!view || groupFilter !== "All"}
+                onChange={(e) =>
+                  setSessionFilter(e.target.value === "All" ? "All" : Number(e.target.value))
+                }
+              >
+                <option value="All">All sessions</option>
+                {sessionOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="sd-field">
+            <label htmlFor="sd-f-grade">
+              Grade
+              {lockedGrade && <span className="sd-lock">Scoped</span>}
+            </label>
+            <select
+              id="sd-f-grade"
+              value={classFilter}
+              disabled={!view || lockedGrade || groupFilter !== "All"}
+              onChange={(e) => setClassFilter(e.target.value)}
+            >
+              <option value="All">All grades</option>
+              {gradeOptions.map((c) => (
+                <option key={c} value={String(c)}>
+                  Grade {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sd-field">
+            <label htmlFor="sd-f-section">
+              Section
+              {lockedSection && <span className="sd-lock">Scoped</span>}
+            </label>
+            <select
+              id="sd-f-section"
+              value={sectionFilter}
+              disabled={!view || classFilter === "All" || sectionOptions.length === 0 || groupFilter !== "All"}
+              onChange={(e) =>
+                setSectionFilter(e.target.value === "All" ? "All" : Number(e.target.value))
+              }
+            >
+              <option value="All">
+                {classFilter === "All"
+                  ? "Pick a grade first"
+                  : sectionOptions.length === 0
+                  ? "No sections released"
+                  : "All sections"}
+              </option>
+              {sectionOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sd-field">
+            <label htmlFor="sd-f-group">Group</label>
+            <select
+              id="sd-f-group"
+              value={groupFilter}
+              disabled={!view || groupOptions.length === 0}
+              onChange={(e) =>
+                setGroupFilter(e.target.value === "All" ? "All" : Number(e.target.value))
+              }
+            >
+              <option value="All">
+                {groupOptions.length === 0 ? "No groups released" : "All groups"}
+              </option>
+              {groupOptions.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sd-rail-end">
+            <div className="sd-inview">
+              <b>{studentsInView == null ? "—" : studentsInView.toLocaleString()}</b>
+              <span>in view</span>
+            </div>
+            <button
+              type="button"
+              className="sd-reset"
+              onClick={() => {
+                setSessionFilter("All");
+                setClassFilter("All");
+                setSectionFilter("All");
+                setGroupFilter("All");
+              }}
+              disabled={isSchoolWide}
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div className="sd-scope">
+          <span className="sd-scope-key">Your access</span>
+          {scopeSummary}
+        </div>
       </header>
 
       {selectedInstitute === "" ? (
@@ -304,8 +1021,34 @@ const SchoolDashboardPage: React.FC = () => {
         </div>
       ) : !view && loading ? (
         <div className="sd-empty">
-          <div className="sd-empty-title">Building the dashboard…</div>
-          Scoring every completed assessment in this school.
+          <div className="sd-empty-title">Loading the dashboard…</div>
+          Reading the analysis Career-9 generated for this school.
+        </div>
+      ) : !release || !release.released ? (
+        /* Checked before the empty-data case, and deliberately so: an ungenerated scope
+           has no view either, and "nothing to show" would blame the school for a step
+           nobody has run. The dashboard is produced by an explicit Release, never
+           computed on view, so this tells the reader who to ask. */
+        <div className="sd-empty">
+          <div className="sd-empty-title">Dashboard is not Generated Yet</div>
+          Please contact your administrator / Career-9 team.
+          {release?.status === "FAILED" && (
+            <div className="sd-empty-detail">
+              The last attempt to generate this dashboard failed. The Career-9 team can
+              retry it.
+            </div>
+          )}
+          {(release?.status === "PENDING" || release?.status === "GENERATING") && (
+            <div className="sd-empty-detail">
+              Generation is running now. This page will have data shortly.
+            </div>
+          )}
+          {!isSchoolWide && (
+            <div className="sd-empty-detail">
+              This applies to {release?.scopeLabel || "the selection above"} — other views
+              of this school may already be generated.
+            </div>
+          )}
         </div>
       ) : !view ? (
         <div className="sd-empty">
@@ -314,68 +1057,89 @@ const SchoolDashboardPage: React.FC = () => {
         </div>
       ) : (
         <div className={loading ? "sd-refetching" : undefined}>
-          <ParticipationCards view={view} palette={palette} />
-
-          {d && (
-            <>
-              {/* One filter row above everything it scopes. */}
-              <div className="sd-filters">
-                <div className="sd-filter-group">
-                  <span>Class</span>
-                  <button
-                    type="button"
-                    className={`sd-chip${classFilter === "All" ? " is-active" : ""}`}
-                    onClick={() => setClassFilter("All")}
-                  >
-                    All
-                  </button>
-                  {(view.classesPresent ?? []).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`sd-chip${classFilter === String(c) ? " is-active" : ""}`}
-                      onClick={() => setClassFilter(String(c))}
-                    >
-                      Class {c}
-                    </button>
-                  ))}
-                </div>
-                <span className="sd-filter-note">
-                  {d.summary.studentsInView} student
-                  {d.summary.studentsInView === 1 ? "" : "s"} in view
-                  {classFilter !== "All" && " · participation cards stay school-wide"}
-                </span>
-              </div>
-
-              <nav className="sd-tabs">
-                {TABS.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    className={`sd-tab${tab === t ? " is-active" : ""}`}
-                    onClick={() => setTab(t)}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </nav>
-            </>
+          {/* The nav leads the page. It is how a principal chooses what they came for,
+              so it sits above the figures rather than after them. */}
+          {release && release.released && (
+            <nav className="sd-tabs sd-tabs--top">
+              {TABS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`sd-tab${tab === t ? " is-active" : ""}`}
+                  onClick={() => setTab(t)}
+                >
+                  {t}
+                </button>
+              ))}
+            </nav>
           )}
 
-          {!d ? (
-            <div className="sd-empty">
-              <div className="sd-empty-title">No completed assessments yet</div>
-              {p && p.total > 0
-                ? `${p.ongoing + p.notStarted} of ${p.total} assessments are still open. The insight sections appear as soon as the first student submits.`
-                : "Assign an assessment to this school to get started."}
+          {/* What a narrowed view cannot say on its own is how it compares. */}
+          {!isSchoolWide && d && (
+            <div className="sd-filters">
+              <span className="sd-filter-note">
+                {release?.scopeLabel || "This selection"} ·{" "}
+                {view.scoredStudents} scored of {view.participation.total}
+                {baseline && " · figures compared against the whole school below"}
+              </span>
             </div>
+          )}
+
+          {tab === "Analysis" || tab === "Act" ? (
+            release && release.released ? (
+              <SchoolDashboardInsights
+                section={tab === "Analysis" ? "analysis" : "act"}
+                release={release}
+                narrative={narrative}
+                flags={flags}
+                scopeLabel={release.scopeLabel || "Whole school"}
+                scopeParams={scopeParams}
+              />
+            ) : null
+          ) : tab === "Overview" ? (
+            /* Headcounts live here rather than above the tabs: they answer "who has
+               finished", which is the Overview question, and repeating them over the
+               analysis and the actions crowded out what those tabs are for. */
+            <>
+              {release && release.released && (
+                <SchoolDashboardInsights
+                  section="stats"
+                  release={release}
+                  narrative={narrative}
+                  flags={flags}
+                  scopeLabel={release.scopeLabel || "Whole school"}
+                  scopeParams={scopeParams}
+                />
+              )}
+              <ParticipationCards view={view} palette={palette} />
+              {/* Participation still shows when nothing is scored — that is exactly the
+                  case where a principal needs to see who has not started. */}
+              {d ? <OverviewTab view={view} palette={palette} notes={chartNotes} /> : noScoredYet}
+            </>
+          ) : !d ? (
+            noScoredYet
           ) : (
             <>
-              {tab === "Overview" && <OverviewTab view={view} palette={palette} />}
-              {tab === "Personality & Learning" && <PersonalityTab view={view} palette={palette} />}
-              {tab === "Abilities" && <AbilitiesTab view={view} palette={palette} />}
-              {tab === "Careers" && <CareersTab view={view} palette={palette} />}
-              {tab === "By Class" && <ByClassTab view={view} palette={palette} />}
+              {/* The whole school is passed only when the view is narrower than it —
+                  comparing the school to itself is a column of zeroes. */}
+              {tab === "Personality & Learning" && (
+                <PersonalityTab
+                  view={view}
+                  palette={palette}
+                  baseline={isSchoolWide ? null : baseline}
+                  notes={chartNotes}
+                />
+              )}
+              {tab === "Abilities" && (
+                <AbilitiesTab
+                  view={view}
+                  palette={palette}
+                  baseline={isSchoolWide ? null : baseline}
+                  notes={chartNotes}
+                />
+              )}
+              {tab === "Careers" && <CareersTab view={view} palette={palette} notes={chartNotes} />}
+              {tab === "By Class" && <ByClassTab view={view} palette={palette} notes={chartNotes} />}
             </>
           )}
         </div>
@@ -386,11 +1150,113 @@ const SchoolDashboardPage: React.FC = () => {
 
 // ── Participation ─────────────────────────────────────────────────────────
 
+/**
+ * How a completion rate reads to a principal. The thresholds are the point of
+ * the row: a bare percentage makes you do the arithmetic, a word does not.
+ */
+function completionFlag(pct: number): { label: string; ink: string; bg: string } {
+  if (pct >= 85) return { label: "On track", ink: "var(--status-good-ink)", bg: "var(--status-good-bg)" };
+  if (pct >= 60) return { label: "Slipping", ink: "var(--status-warning-ink)", bg: "var(--status-warning-bg)" };
+  return { label: "Needs attention", ink: "var(--status-critical-ink)", bg: "var(--status-critical-bg)" };
+}
+
+/**
+ * One assessment, collapsed to a single line: name, progress bar, and the
+ * completed/total count. Expanding reveals the four counts as chips.
+ *
+ * The class-by-class split a principal ultimately wants lives behind
+ * SchoolDashboardView.assessments, which is school-wide per assessment — the
+ * per-class breakdown needs the endpoint to return it, so the expanded body
+ * says what it knows rather than inventing a table.
+ */
+const AssessmentRow: React.FC<{
+  a: SchoolDashboardView["assessments"][number];
+  palette: Palette;
+}> = ({ a, palette }) => {
+  const [open, setOpen] = useState(false);
+  const seg = (n: number) => (a.total ? (n / a.total) * 100 : 0);
+  const flag = completionFlag(a.completedPct);
+
+  return (
+    <div className={`sd-assessment-row${open ? " is-open" : ""}`}>
+      <button
+        type="button"
+        className="sd-assessment-sum"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="sd-chevron" aria-hidden="true">
+          ▶
+        </span>
+        <span>
+          <span className="sd-assessment-name">{a.assessmentName}</span>
+          <span className="sd-assessment-meta">
+            {a.scored > 0 ? `${a.scored} scored & ready` : "Not scored yet"}
+          </span>
+        </span>
+        <span
+          className="sd-stack is-compact"
+          role="img"
+          aria-label={`${a.assessmentName}: ${a.completed} completed, ${a.ongoing} ongoing, ${a.notStarted} not started`}
+        >
+          {a.completed > 0 && (
+            <span className="sd-stack-seg" style={{ width: `${seg(a.completed)}%`, background: palette.good }} />
+          )}
+          {a.ongoing > 0 && (
+            <span className="sd-stack-seg" style={{ width: `${seg(a.ongoing)}%`, background: palette.warning }} />
+          )}
+          {a.notStarted > 0 && (
+            <span className="sd-stack-seg" style={{ width: `${seg(a.notStarted)}%`, background: palette.muted }} />
+          )}
+        </span>
+        <span className="sd-assessment-count">
+          <b>
+            {a.completed} / {a.total}
+          </b>
+          <span>{a.completedPct}% complete</span>
+        </span>
+      </button>
+
+      {open && (
+        <div className="sd-assessment-body">
+          <div className="sd-chips">
+            <span className="sd-flag" style={{ ["--flag-ink" as any]: flag.ink, ["--flag-bg" as any]: flag.bg }}>
+              {flag.label}
+            </span>
+            <span className="sd-chip-stat">
+              <span className="sd-legend-dot" style={{ background: palette.good }} aria-hidden="true" />
+              {a.completed} <small>completed</small>
+            </span>
+            <span className="sd-chip-stat">
+              <span className="sd-legend-dot" style={{ background: palette.warning }} aria-hidden="true" />
+              {a.ongoing} <small>ongoing</small>
+            </span>
+            <span className="sd-chip-stat">
+              <span className="sd-legend-dot" style={{ background: palette.muted }} aria-hidden="true" />
+              {a.notStarted} <small>not started</small>
+            </span>
+            <span className="sd-chip-stat">
+              <span className="sd-legend-dot" style={{ background: palette.s1 }} aria-hidden="true" />
+              {a.scored} <small>scored &amp; ready</small>
+            </span>
+          </div>
+          <p className="sd-note">
+            <strong>{a.notStarted}</strong> student{a.notStarted === 1 ? " has" : "s have"} not opened
+            this assessment yet, and <strong>{a.ongoing}</strong> started without submitting. Use the
+            Grade filter above to see how a single grade is doing.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ParticipationCards: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
   view,
   palette,
 }) => {
   const p = view.participation;
+  const [cardOpen, setCardOpen] = useState(true);
   return (
     <>
       <div className="sd-kpi-row">
@@ -422,79 +1288,56 @@ const ParticipationCards: React.FC<{ view: SchoolDashboardView; palette: Palette
       </div>
 
       <div className="sd-grid">
-        <div className="sd-card">
-          <div className="sd-card-head">
+        <div className={`sd-card${cardOpen ? "" : " is-collapsed"}`}>
+          {/* The whole card folds away, not just its rows — a principal who has
+              read the participation numbers wants the insight tabs, not this. */}
+          <button
+            type="button"
+            className="sd-card-head sd-card-toggle"
+            aria-expanded={cardOpen}
+            aria-controls="sd-assessment-panel"
+            onClick={() => setCardOpen((v) => !v)}
+          >
             <div>
-              <h3 className="sd-card-title">Progress by assessment</h3>
+              <h3 className="sd-card-title">
+                <span className="sd-chevron" aria-hidden="true">
+                  ▶
+                </span>
+                Progress by assessment
+              </h3>
               <p className="sd-card-sub">
-                Every assessment assigned in this school. Counts are
-                student&ndash;assessment pairs, so a student sitting three assessments
-                appears three times.
+                {cardOpen
+                  ? "Every assessment assigned in this school. Counts are student–assessment pairs, so a student sitting three assessments appears three times."
+                  : `${view.assessments.length} assessment${
+                      view.assessments.length === 1 ? "" : "s"
+                    } · ${p.completedPct}% complete overall`}
               </p>
             </div>
-          </div>
-          {view.assessments.map((a) => {
-            const seg = (n: number) => (a.total ? (n / a.total) * 100 : 0);
-            return (
-              <div className="sd-assessment-row" key={a.assessmentId}>
-                <div className="sd-assessment-head">
-                  <span className="sd-assessment-name">{a.assessmentName}</span>
-                  <span className="sd-assessment-meta">
-                    {a.completed} of {a.total} complete ({a.completedPct}%)
-                    {a.scored > 0 && ` · ${a.scored} scored`}
-                  </span>
+            <span className="sd-card-hint">{cardOpen ? "Hide" : "Show"}</span>
+          </button>
+
+          {cardOpen && (
+            <div id="sd-assessment-panel">
+              {view.assessments.map((a) => (
+                <AssessmentRow key={a.assessmentId} a={a} palette={palette} />
+              ))}
+              <Legend
+                items={[
+                  { label: "Completed", color: palette.good },
+                  { label: "Ongoing", color: palette.warning },
+                  { label: "Not started", color: palette.muted },
+                ]}
+              />
+              {view.unscoredStudents > 0 && (
+                <div className="sd-note">
+                  <strong>{view.unscoredStudents}</strong> completed assessment
+                  {view.unscoredStudents === 1 ? "" : "s"} could not be scored — usually a
+                  partial submission missing whole sections. Those students are counted as
+                  complete above but are left out of the insight sections below, which are
+                  built from <strong>{view.scoredStudents}</strong> scored profile
+                  {view.scoredStudents === 1 ? "" : "s"}.
                 </div>
-                <div
-                  className="sd-stack"
-                  role="img"
-                  aria-label={`${a.assessmentName}: ${a.completed} completed, ${a.ongoing} ongoing, ${a.notStarted} not started`}
-                >
-                  {a.completed > 0 && (
-                    <div
-                      className="sd-stack-seg"
-                      style={{ width: `${seg(a.completed)}%`, background: palette.good }}
-                      title={`Completed: ${a.completed}`}
-                    >
-                      {seg(a.completed) > 9 ? a.completed : ""}
-                    </div>
-                  )}
-                  {a.ongoing > 0 && (
-                    <div
-                      className="sd-stack-seg"
-                      style={{ width: `${seg(a.ongoing)}%`, background: palette.warning, color: "#16161d" }}
-                      title={`Ongoing: ${a.ongoing}`}
-                    >
-                      {seg(a.ongoing) > 9 ? a.ongoing : ""}
-                    </div>
-                  )}
-                  {a.notStarted > 0 && (
-                    <div
-                      className="sd-stack-seg"
-                      style={{ width: `${seg(a.notStarted)}%`, background: palette.muted }}
-                      title={`Not started: ${a.notStarted}`}
-                    >
-                      {seg(a.notStarted) > 9 ? a.notStarted : ""}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          <Legend
-            items={[
-              { label: "Completed", color: palette.good },
-              { label: "Ongoing", color: palette.warning },
-              { label: "Not started", color: palette.muted },
-            ]}
-          />
-          {view.unscoredStudents > 0 && (
-            <div className="sd-note">
-              <strong>{view.unscoredStudents}</strong> completed assessment
-              {view.unscoredStudents === 1 ? "" : "s"} could not be scored — usually a
-              partial submission missing whole sections. Those students are counted as
-              complete above but are left out of the insight sections below, which are
-              built from <strong>{view.scoredStudents}</strong> scored profile
-              {view.scoredStudents === 1 ? "" : "s"}.
+              )}
             </div>
           )}
         </div>
@@ -505,10 +1348,11 @@ const ParticipationCards: React.FC<{ view: SchoolDashboardView; palette: Palette
 
 // ── Overview ──────────────────────────────────────────────────────────────
 
-const OverviewTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const OverviewTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, notes }) => {
   const d = view.dashboard!;
   const s = d.summary;
   const clarityGap = d.careerGap.streams.reduce(
@@ -592,27 +1436,25 @@ const OverviewTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = (
 
       <div className="sd-grid cols-2">
         <ChartCard
+          notes={notes.get("students-by-class")}
           title="Students by class"
           subtitle="How the scored cohort is spread across the school."
           table={
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th>Class</th>
-                  <th className="num">Students</th>
-                  <th className="num">% of school</th>
-                </tr>
-              </thead>
-              <tbody>
-                {classData.map((c) => (
-                  <tr key={c.name}>
-                    <td className="name">{c.name}</td>
-                    <td className="num">{c.students}</td>
-                    <td className="num">{c.pct}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableTable
+              rows={classData}
+              rowKey={(c) => c.name}
+              columns={[
+                { key: "name", label: "Class", name: true, sortValue: (c) => c.name },
+                { key: "students", label: "Students", num: true, sortValue: (c) => c.students },
+                {
+                  key: "pct",
+                  label: "% of school",
+                  num: true,
+                  sortValue: (c) => c.pct,
+                  cell: (c) => `${c.pct}%`,
+                },
+              ]}
+            />
           }
         >
           <ResponsiveContainer width="100%" height={260} className="sd-chart">
@@ -657,32 +1499,38 @@ const OverviewTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = (
         </ChartCard>
 
         <ChartCard
+          notes={notes.get("stream-fit-vs-ambition")}
           title="Fit versus ambition, by stream"
           subtitle="Suited is what their profile points to. Aspiring is what they picked. The distance between the two is the school's guidance workload."
           table={
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th>Stream</th>
-                  <th className="num">Suited %</th>
-                  <th className="num">Aspiring %</th>
-                  <th className="num">Gap</th>
-                </tr>
-              </thead>
-              <tbody>
-                {d.careerGap.streams.map((r) => (
-                  <tr key={r.label}>
-                    <td className="name">{r.label}</td>
-                    <td className="num">{r.suitedPct}%</td>
-                    <td className="num">{r.aspiringPct}%</td>
-                    <td className="num">
-                      {r.gap > 0 ? "+" : ""}
-                      {r.gap}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableTable
+              rows={d.careerGap.streams}
+              rowKey={(r) => r.label}
+              columns={[
+                { key: "label", label: "Stream", name: true, sortValue: (r) => r.label },
+                {
+                  key: "suited",
+                  label: "Suited %",
+                  num: true,
+                  sortValue: (r) => r.suitedPct,
+                  cell: (r) => `${r.suitedPct}%`,
+                },
+                {
+                  key: "aspiring",
+                  label: "Aspiring %",
+                  num: true,
+                  sortValue: (r) => r.aspiringPct,
+                  cell: (r) => `${r.aspiringPct}%`,
+                },
+                {
+                  key: "gap",
+                  label: "Gap",
+                  num: true,
+                  sortValue: (r) => r.gap,
+                  cell: (r) => `${r.gap > 0 ? "+" : ""}${r.gap}`,
+                },
+              ]}
+            />
           }
         >
           <ResponsiveContainer width="100%" height={260} className="sd-chart">
@@ -749,11 +1597,14 @@ const OverviewTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = (
 
 // ── Personality & Learning ────────────────────────────────────────────────
 
-const PersonalityTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const PersonalityTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  baseline: SchoolDashboardData | null;
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, baseline, notes }) => {
   const d = view.dashboard!;
+  const schoolWide = byLabel(baseline?.personality.traits);
   const traits = d.personality.traits.map((t) => ({
     ...t,
     short: shortLabel(t.label),
@@ -767,29 +1618,58 @@ const PersonalityTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> 
     <>
       <div className="sd-grid cols-2">
         <ChartCard
+          notes={notes.get("personality-profile")}
           title="Personality profile"
           subtitle="Average raw RIASEC score across the cohort — the shape of the school's temperament."
           table={
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th>Trait</th>
-                  <th className="num">Avg score</th>
-                  <th className="num">% top trait</th>
-                  <th className="num">% in top three</th>
-                </tr>
-              </thead>
-              <tbody>
-                {traits.map((t) => (
-                  <tr key={t.label}>
-                    <td className="name">{t.label}</td>
-                    <td className="num">{t.avgRawScore.toFixed(1)}</td>
-                    <td className="num">{t.pctAsTopTrait}%</td>
-                    <td className="num">{t.pctInTopThree}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableTable
+              rows={traits}
+              rowKey={(t) => t.label}
+              columns={[
+                { key: "label", label: "Trait", name: true, sortValue: (t) => t.label },
+                {
+                  key: "avg",
+                  label: "Avg score",
+                  num: true,
+                  sortValue: (t) => t.avgRawScore,
+                  cell: (t) => t.avgRawScore.toFixed(1),
+                },
+                {
+                  key: "top",
+                  label: "% top trait",
+                  num: true,
+                  sortValue: (t) => t.pctAsTopTrait,
+                  cell: (t) => `${t.pctAsTopTrait}%`,
+                },
+                // Only on a narrowed view — a class's character is only interesting
+                // against the school it sits in.
+                ...(schoolWide.size > 0
+                  ? [
+                      {
+                        key: "vsSchool",
+                        label: "vs school",
+                        num: true,
+                        sortValue: (t: typeof traits[number]) =>
+                          t.pctAsTopTrait -
+                          (schoolWide.get(t.label)?.pctAsTopTrait ?? t.pctAsTopTrait),
+                        cell: (t: typeof traits[number]) => (
+                          <VsSchool
+                            value={t.pctAsTopTrait}
+                            baseline={schoolWide.get(t.label)?.pctAsTopTrait}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
+                {
+                  key: "top3",
+                  label: "% in top three",
+                  num: true,
+                  sortValue: (t) => t.pctInTopThree,
+                  cell: (t) => `${t.pctInTopThree}%`,
+                },
+              ]}
+            />
           }
         >
           <ResponsiveContainer width="100%" height={300} className="sd-chart">
@@ -832,29 +1712,37 @@ const PersonalityTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> 
         </ChartCard>
 
         <ChartCard
+          notes={notes.get("trait-leadership")}
           title="Which trait leads"
           subtitle="Share of students with each trait as their strongest, and anywhere in their top three."
           table={
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th>Trait</th>
-                  <th className="num">Top trait</th>
-                  <th className="num">In top three</th>
-                  <th className="num">Students</th>
-                </tr>
-              </thead>
-              <tbody>
-                {traits.map((t) => (
-                  <tr key={t.label}>
-                    <td className="name">{t.label}</td>
-                    <td className="num">{t.pctAsTopTrait}%</td>
-                    <td className="num">{t.pctInTopThree}%</td>
-                    <td className="num">{t.studentsTopTrait}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableTable
+              rows={traits}
+              rowKey={(t) => t.label}
+              columns={[
+                { key: "label", label: "Trait", name: true, sortValue: (t) => t.label },
+                {
+                  key: "top",
+                  label: "Top trait",
+                  num: true,
+                  sortValue: (t) => t.pctAsTopTrait,
+                  cell: (t) => `${t.pctAsTopTrait}%`,
+                },
+                {
+                  key: "top3",
+                  label: "In top three",
+                  num: true,
+                  sortValue: (t) => t.pctInTopThree,
+                  cell: (t) => `${t.pctInTopThree}%`,
+                },
+                {
+                  key: "students",
+                  label: "Students",
+                  num: true,
+                  sortValue: (t) => t.studentsTopTrait,
+                },
+              ]}
+            />
           }
         >
           <ResponsiveContainer width="100%" height={300} className="sd-chart">
@@ -915,33 +1803,40 @@ const PersonalityTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> 
 
       <div className="sd-grid">
         <ChartCard
+          notes={notes.get("learning-styles")}
           title="Learning styles"
           subtitle="Share scoring strong (10+ out of 12) against share scoring low (8 or under) on each of the eight intelligences. A student scoring 9 is in neither."
           table={
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th>Intelligence</th>
-                  <th className="num">% strong</th>
-                  <th className="num">% low</th>
-                  <th className="num">Avg score</th>
-                  <th className="num">Strong</th>
-                  <th className="num">Low</th>
-                </tr>
-              </thead>
-              <tbody>
-                {intelligences.map((i) => (
-                  <tr key={i.label}>
-                    <td className="name">{i.label}</td>
-                    <td className="num">{i.pctStrong}%</td>
-                    <td className="num">{i.pctLow}%</td>
-                    <td className="num">{i.avgScore.toFixed(1)}</td>
-                    <td className="num">{i.studentsStrong}</td>
-                    <td className="num">{i.studentsLow}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableTable
+              rows={intelligences}
+              rowKey={(i) => i.label}
+              columns={[
+                { key: "label", label: "Intelligence", name: true, sortValue: (i) => i.label },
+                {
+                  key: "strongPct",
+                  label: "% strong",
+                  num: true,
+                  sortValue: (i) => i.pctStrong,
+                  cell: (i) => `${i.pctStrong}%`,
+                },
+                {
+                  key: "lowPct",
+                  label: "% low",
+                  num: true,
+                  sortValue: (i) => i.pctLow,
+                  cell: (i) => `${i.pctLow}%`,
+                },
+                {
+                  key: "avg",
+                  label: "Avg score",
+                  num: true,
+                  sortValue: (i) => i.avgScore,
+                  cell: (i) => i.avgScore.toFixed(1),
+                },
+                { key: "strong", label: "Strong", num: true, sortValue: (i) => i.studentsStrong },
+                { key: "low", label: "Low", num: true, sortValue: (i) => i.studentsLow },
+              ]}
+            />
           }
         >
           <ResponsiveContainer width="100%" height={340} className="sd-chart">
@@ -999,14 +1894,17 @@ const PersonalityTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> 
 
 // ── Abilities ─────────────────────────────────────────────────────────────
 
-const AbilitiesTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const AbilitiesTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  baseline: SchoolDashboardData | null;
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, baseline, notes }) => {
   const d = view.dashboard!;
   // Sorted by gap so the teaching priorities sit at one end.
   const sorted: AbilityRow[] = [...d.abilities.abilities].sort((a, b) => b.gap - a.gap);
   const worst = sorted[0];
+  const schoolWide = byLabel(baseline?.abilities.abilities);
 
   return (
     <>
@@ -1042,34 +1940,64 @@ const AbilitiesTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = 
 
       <div className="sd-grid">
         <ChartCard
+          notes={notes.get("ability-gaps")}
           title="Where the cohort is weak, ability by ability"
           subtitle="Gap = share scoring low minus share scoring strong. Bars to the right are abilities where far more students struggle than excel; bars to the left are genuine strengths."
           table={
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th>Ability</th>
-                  <th className="num">% strong</th>
-                  <th className="num">% low</th>
-                  <th className="num">Gap</th>
-                  <th className="num">Avg score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((a) => (
-                  <tr key={a.label}>
-                    <td className="name">{a.label}</td>
-                    <td className="num">{a.pctStrong}%</td>
-                    <td className="num">{a.pctLow}%</td>
-                    <td className="num">
-                      {a.gap > 0 ? "+" : ""}
-                      {a.gap}
-                    </td>
-                    <td className="num">{a.avgScore.toFixed(1)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableTable
+              rows={sorted}
+              rowKey={(a) => a.label}
+              columns={[
+                { key: "label", label: "Ability", name: true, sortValue: (a) => a.label },
+                {
+                  key: "strongPct",
+                  label: "% strong",
+                  num: true,
+                  sortValue: (a) => a.pctStrong,
+                  cell: (a) => `${a.pctStrong}%`,
+                },
+                // Only present on a narrowed view: "42% strong" is a fact, "42% against
+                // 58% school-wide" is the reason someone opened a class.
+                ...(schoolWide.size > 0
+                  ? [
+                      {
+                        key: "vsSchool",
+                        label: "vs school",
+                        num: true,
+                        sortValue: (a: AbilityRow) =>
+                          a.pctStrong - (schoolWide.get(a.label)?.pctStrong ?? a.pctStrong),
+                        cell: (a: AbilityRow) => (
+                          <VsSchool
+                            value={a.pctStrong}
+                            baseline={schoolWide.get(a.label)?.pctStrong}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
+                {
+                  key: "lowPct",
+                  label: "% low",
+                  num: true,
+                  sortValue: (a) => a.pctLow,
+                  cell: (a) => `${a.pctLow}%`,
+                },
+                {
+                  key: "gap",
+                  label: "Gap",
+                  num: true,
+                  sortValue: (a) => a.gap,
+                  cell: (a) => `${a.gap > 0 ? "+" : ""}${a.gap}`,
+                },
+                {
+                  key: "avg",
+                  label: "Avg score",
+                  num: true,
+                  sortValue: (a) => a.avgScore,
+                  cell: (a) => a.avgScore.toFixed(1),
+                },
+              ]}
+            />
           }
         >
           <ResponsiveContainer width="100%" height={380} className="sd-chart">
@@ -1144,10 +2072,11 @@ const AbilitiesTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = 
 
 // ── Careers ───────────────────────────────────────────────────────────────
 
-const CareersTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const CareersTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, notes }) => {
   const d = view.dashboard!;
   const values = [...d.values.values].sort((a, b) => b.pctInTopFive - a.pctInTopFive);
   // Only clusters somebody engaged with; the rest are noise at school level.
@@ -1160,29 +2089,34 @@ const CareersTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
     <>
       <div className="sd-grid">
         <ChartCard
+          notes={notes.get("work-values")}
           title="What students want out of work"
           subtitle="Share placing each value anywhere in their top five. This is the language that lands in assemblies and parent evenings."
           table={
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th className="num">Rank</th>
-                  <th>Value</th>
-                  <th className="num">% in top five</th>
-                  <th className="num">Students</th>
-                </tr>
-              </thead>
-              <tbody>
-                {values.map((v) => (
-                  <tr key={v.label}>
-                    <td className="num">{v.rank ?? "—"}</td>
-                    <td className="name">{v.label}</td>
-                    <td className="num">{v.pctInTopFive}%</td>
-                    <td className="num">{v.students}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableTable
+              rows={values}
+              rowKey={(v) => v.label}
+              columns={[
+                {
+                  key: "rank",
+                  label: "Rank",
+                  num: true,
+                  // Unranked values sink to the bottom either way — a missing
+                  // rank is not rank zero.
+                  sortValue: (v) => v.rank,
+                  cell: (v) => v.rank ?? "—",
+                },
+                { key: "label", label: "Value", name: true, sortValue: (v) => v.label },
+                {
+                  key: "pct",
+                  label: "% in top five",
+                  num: true,
+                  sortValue: (v) => v.pctInTopFive,
+                  cell: (v) => `${v.pctInTopFive}%`,
+                },
+                { key: "students", label: "Students", num: true, sortValue: (v) => v.students },
+              ]}
+            />
           }
         >
           <ResponsiveContainer width="100%" height={430} className="sd-chart">
@@ -1240,50 +2174,52 @@ const CareersTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
             </div>
           </div>
           <div className="sd-table-wrap">
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th>Career cluster</th>
-                  <th>Stream</th>
-                  <th className="num">Suited</th>
-                  <th className="num">Aspiring</th>
-                  <th style={{ minWidth: 150 }}>Gap</th>
-                  <th className="num">Readiness</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clusters.map((c) => {
-                  const width = (Math.abs(c.gap) / maxAbsGap) * 50;
-                  return (
-                    <tr key={c.label}>
-                      <td className="name">{c.label}</td>
-                      <td>{c.stream}</td>
-                      <td className="num">{c.suitedTop3}</td>
-                      <td className="num">{c.aspiring}</td>
-                      <td>
-                        <div className="sd-bar-cell">
-                          <div className="sd-bar-track">
-                            <div
-                              className="sd-bar-fill"
-                              style={{
-                                width: `${width}%`,
-                                left: c.gap >= 0 ? "50%" : `${50 - width}%`,
-                                background: c.gap >= 0 ? palette.divNeg : palette.divPos,
-                              }}
-                            />
-                          </div>
-                          <span style={{ minWidth: 26, textAlign: "right" }}>
-                            {c.gap > 0 ? "+" : ""}
-                            {c.gap}
-                          </span>
+            <SortableTable
+              rows={clusters}
+              rowKey={(c) => c.label}
+              columns={[
+                { key: "label", label: "Career cluster", name: true, sortValue: (c) => c.label },
+                { key: "stream", label: "Stream", sortValue: (c) => c.stream },
+                { key: "suited", label: "Suited", num: true, sortValue: (c) => c.suitedTop3 },
+                { key: "aspiring", label: "Aspiring", num: true, sortValue: (c) => c.aspiring },
+                {
+                  key: "gap",
+                  label: "Gap",
+                  thStyle: { minWidth: 150 },
+                  // Sorts on the signed gap, so ascending runs from the most
+                  // under-subscribed cluster to the most over-subscribed.
+                  sortValue: (c) => c.gap,
+                  cell: (c) => {
+                    const width = (Math.abs(c.gap) / maxAbsGap) * 50;
+                    return (
+                      <div className="sd-bar-cell">
+                        <div className="sd-bar-track">
+                          <div
+                            className="sd-bar-fill"
+                            style={{
+                              width: `${width}%`,
+                              left: c.gap >= 0 ? "50%" : `${50 - width}%`,
+                              background: c.gap >= 0 ? palette.divNeg : palette.divPos,
+                            }}
+                          />
                         </div>
-                      </td>
-                      <td className="num">{c.readinessPct == null ? "—" : `${c.readinessPct}%`}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <span style={{ minWidth: 26, textAlign: "right" }}>
+                          {c.gap > 0 ? "+" : ""}
+                          {c.gap}
+                        </span>
+                      </div>
+                    );
+                  },
+                },
+                {
+                  key: "readiness",
+                  label: "Readiness",
+                  num: true,
+                  sortValue: (c) => c.readinessPct,
+                  cell: (c) => (c.readinessPct == null ? "—" : `${c.readinessPct}%`),
+                },
+              ]}
+            />
           </div>
           <Legend
             items={[
@@ -1299,10 +2235,11 @@ const CareersTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
 
 // ── By class ──────────────────────────────────────────────────────────────
 
-const ByClassTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
-  view,
-  palette,
-}) => {
+const ByClassTab: React.FC<{
+  view: SchoolDashboardView;
+  palette: Palette;
+  notes: Map<string, ChartNotes>;
+}> = ({ view, palette, notes }) => {
   const d = view.dashboard!;
   const b = d.byClass;
   // Classes with nobody in them would render as a column of empty cells.
@@ -1383,29 +2320,26 @@ const ByClassTab: React.FC<{ view: SchoolDashboardView; palette: Palette }> = ({
     <>
       <div className="sd-grid">
         <ChartCard
+          notes={notes.get("clarity-by-class")}
           title="Career clarity by class"
           subtitle="Share of each class with at least one aspiration that matches their suitability. This sheet ignores the class filter on purpose — the point is the comparison."
           table={
-            <table className="sd-table">
-              <thead>
-                <tr>
-                  <th>Class</th>
-                  <th className="num">Students</th>
-                  <th className="num">Career clarity</th>
-                  <th className="num">5+ weak abilities</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clarityData.map((c) => (
-                  <tr key={c.name}>
-                    <td className="name">{c.name}</td>
-                    <td className="num">{c.students}</td>
-                    <td className="num">{c.clarity}%</td>
-                    <td className="num">{c.weak}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SortableTable
+              rows={clarityData}
+              rowKey={(c) => c.name}
+              columns={[
+                { key: "name", label: "Class", name: true, sortValue: (c) => c.name },
+                { key: "students", label: "Students", num: true, sortValue: (c) => c.students },
+                {
+                  key: "clarity",
+                  label: "Career clarity",
+                  num: true,
+                  sortValue: (c) => c.clarity,
+                  cell: (c) => `${c.clarity}%`,
+                },
+                { key: "weak", label: "5+ weak abilities", num: true, sortValue: (c) => c.weak },
+              ]}
+            />
           }
         >
           <ResponsiveContainer width="100%" height={280} className="sd-chart">

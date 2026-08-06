@@ -41,6 +41,12 @@ public enum PermissionCode {
     // features, and one grant must not silently confer the other.
     DASHBOARD_SCHOOL_READ("dashboard.school.read", "View the School Dashboard (Navigator360 school insights)"),
 
+    // Releasing is deliberately not the same authority as reading. Reading a
+    // released dashboard is an everyday act for a principal or teacher; releasing
+    // one regenerates every scope on the filter lattice, spends money on an OpenAI
+    // call per scope, and overwrites content a school may already have circulated.
+    DASHBOARD_SCHOOL_RELEASE("dashboard.school.release", "Release (generate) the school dashboard for an institute"),
+
     // ── Student groups (named cohorts inside an institute) ──────────────
     STUDENT_GROUP_READ           ("student_group.read",           "View student groups, their members and their contact persons"),
     STUDENT_GROUP_CREATE         ("student_group.create",         "Create a student group in an institute"),
