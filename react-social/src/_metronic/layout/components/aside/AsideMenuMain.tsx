@@ -3,6 +3,7 @@ import { useIntl } from "react-intl";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../app/modules/auth";
 import { urlAllowed } from "../../../../app/modules/auth/core/permissions";
+import { getImpersonationMode } from "../../../../app/modules/auth/core/AuthHelpers";
 import { AsideMenuItem } from "./AsideMenuItem";
 import { AsideMenuItemWithSub } from "./AsideMenuItemWithSub";
 
@@ -143,15 +144,24 @@ export function AsideMenuMain() {
       return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
     });
 
+  // "Open as Counsellor" opens a new tab that impersonates a counsellor. That tab must show
+  // the counsellor's own navigation and nothing else — an admin opened it precisely to see
+  // what the counsellor sees. Role alone can't decide it: counsellor logins are ordinary
+  // user accounts and several also carry Admin roles, so without this per-tab marker those
+  // tabs would render the full admin sidebar. The marker is sessionStorage, so it never
+  // leaks into the admin's other tabs.
+  const impersonatingCounsellor = getImpersonationMode() === "counsellor";
+
   // A pure COUNSELLOR (not also a super-admin) sees ONLY the counsellor portal menu —
   // none of the admin sections. The pages render inside this same admin shell, so the
   // counsellor gets the unified UI but a focused, counsellor-only navigation.
   const isCounsellorOnly =
-    !isSuperAdmin &&
-    userRoles.some((r) => {
-      const u = typeof r === "string" ? r.toUpperCase() : "";
-      return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
-    });
+    impersonatingCounsellor ||
+    (!isSuperAdmin &&
+      userRoles.some((r) => {
+        const u = typeof r === "string" ? r.toUpperCase() : "";
+        return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
+      }));
 
   if (isCounsellorOnly) {
     return (
@@ -588,6 +598,17 @@ export function AsideMenuMain() {
               icon="/media/icons/duotune/graphs/gra008.svg"
               title="School Dashboard"
               fontIcon="bi-buildings"
+            />
+          )}
+          {/* The admin side of the dashboard above. Gated on the release whitelist so
+              a principal who can read their dashboard does not see the controls that
+              generate and withdraw it. */}
+          {(allowed("/school-dashboard/releases") || allowed("/reports-hub")) && (
+            <AsideMenuItem
+              to="/school-dashboard/releases"
+              icon="/media/icons/duotune/general/gen019.svg"
+              title="Dashboard Releases"
+              fontIcon="bi-send"
             />
           )}
           {(allowed("/admin/report-templates") || allowed("/reports-hub")) && (

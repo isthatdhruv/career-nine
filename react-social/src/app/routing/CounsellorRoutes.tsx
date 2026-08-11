@@ -9,6 +9,9 @@ const CounsellorAuthPage = lazy(
 const CounsellorPortalDashboard = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorPortalDashboard')
 )
+const CounsellorImpersonationLanding = lazy(
+  () => import('../pages/CounsellorDashboard/CounsellorImpersonationLanding')
+)
 const CounsellorAppointmentsPage = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorAppointmentsPage')
 )
@@ -124,6 +127,13 @@ const CounsellorRoutes: FC = () => {
           the counsellor CTA when currentUser has the COUNSELLOR role.
         */}
         <Route path='permission-denied' element={<PermissionDeniedPage />} />
+
+        {/*
+          Admin "Open as Counsellor" landing. Outside the auth guard on purpose: the tab has
+          no cookie yet — it arrives holding only the impersonation JWT in the query string,
+          which this page moves into per-tab sessionStorage before hydrating the user.
+        */}
+        <Route path='impersonate' element={<CounsellorImpersonationLanding />} />
 
         {/* Protected — now rendered INSIDE the main admin shell (MasterLayout) so the
             counsellor gets the same sidebar/header/UI as the rest of the project. The

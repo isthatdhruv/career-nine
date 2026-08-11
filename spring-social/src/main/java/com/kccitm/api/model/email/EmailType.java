@@ -88,6 +88,16 @@ public enum EmailType {
             EmailPlaceholder.REPORT_LINK, EmailPlaceholder.REPORT_PDF_LINK, EmailPlaceholder.REPORT_TYPE,
             EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
 
+    /**
+     * Sent by an admin after releasing a school's principal dashboard: tells the contact
+     * person the dashboard is live, how to open it, and who to contact if it misbehaves.
+     * SYNC because it is sent from a button and the admin is told whether it went.
+     */
+    SCHOOL_DASHBOARD_READY("School dashboard released", "Report", EmailDeliveryMode.SYNC,
+            EmailPlaceholder.FIRST_NAME, EmailPlaceholder.SCHOOL_NAME,
+            EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.ASSESSMENT_NAME,
+            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+
     // ── B2B / school registration ───────────────────────────────────────────
     SCHOOL_REGISTRATION("School registration", "B2B", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.ACTION_LINK,

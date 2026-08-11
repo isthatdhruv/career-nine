@@ -3,7 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import '../Counselling.css'
 import { showErrorToast } from '../../../utils/toast'
 import { getAvailableSlots } from '../API/SlotAPI'
-import { bookSlot, rescheduleAppointment } from '../API/AppointmentAPI'
+import {
+  bookSlot,
+  rescheduleAppointment,
+  getStudentAppointments,
+  getStudentCancellationInfo,
+} from '../API/AppointmentAPI'
 import { getStudentEligibility, EligibilityResponse } from '../API/EligibilityAPI'
 import SlotGrid from './components/SlotGrid'
 import BookingForm from './components/BookingForm'
@@ -159,6 +164,7 @@ const SlotBookingPage: React.FC = () => {
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [slotsError, setSlotsError] = useState<string | null>(null)
   const [booked, setBooked] = useState(false)
+  const [missesRemaining, setMissesRemaining] = useState<number | null>(null)
 
   // Check eligibility first — rescheduling bypasses the check
   // since the student already has a confirmed booking.
@@ -171,13 +177,36 @@ const SlotBookingPage: React.FC = () => {
       .finally(() => setEligibilityLoading(false))
   }, [studentId, isReschedule])
 
+  // How many free changes she has left, so the warning appears at the moment she commits
+  // rather than only when she later tries to cancel.
+  //
+  // The count is per entitlement, not per appointment, so any prior session of hers gives
+  // the right answer — we just need one id to ask about. A student with no history at all
+  // has a full allowance and nothing worth warning about, so the banner stays hidden.
+  useEffect(() => {
+    if (isReschedule || !studentId) return
+    let cancelled = false
+    getStudentAppointments(studentId)
+      .then((res) => {
+        const rows: any[] = Array.isArray(res.data) ? res.data : []
+        const anyId = rows.length ? (rows[0].id ?? rows[0].appointmentId) : null
+        if (!anyId) return null
+        return getStudentCancellationInfo(anyId)
+      })
+      .then((info) => {
+        if (!cancelled && info) setMissesRemaining(info.data?.missesRemaining ?? null)
+      })
+      .catch(() => { /* the picker works fine without the count */ })
+    return () => { cancelled = true }
+  }, [studentId, isReschedule])
+
   const fetchSlots = useCallback((opts?: { silent?: boolean }) => {
     if (!opts?.silent) {
       setSlotsLoading(true)
       setSlotsError(null)
       setSelectedSlot(null)
     }
-    getAvailableSlots(weekStart, instituteCode || undefined)
+    getAvailableSlots(weekStart, instituteCode || undefined, studentId || undefined)
       .then((res) => {
         const raw = Array.isArray(res.data) ? res.data : []
         const data: Slot[] = raw
@@ -429,6 +458,26 @@ const SlotBookingPage: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* The allowance, at the moment she commits to a time. It is also on the session
+            card, but this is the point where knowing it can actually change what she does. */}
+        {!isReschedule && missesRemaining !== null && (
+          <div
+            className='cl-card'
+            style={{
+              marginBottom: 16, padding: '12px 14px', fontSize: 12.5, lineHeight: 1.5,
+              background: missesRemaining > 1 ? '#F0FDF4' : '#FEF3C7',
+              border: `1px solid ${missesRemaining > 1 ? '#BBF7D0' : '#FCD34D'}`,
+              color: missesRemaining > 1 ? '#166534' : '#78350F',
+            }}
+          >
+            {missesRemaining > 1
+              ? `You can cancel or reschedule up to ${missesRemaining} times free of charge, until 2 hours before the session starts.`
+              : missesRemaining === 1
+                ? 'This is your last free change. If you cancel or miss this session, a new one will need to be paid for.'
+                : 'You have no free changes left — if you cancel or miss this session, a new one will need to be paid for.'}
+          </div>
+        )}
 
         {/* Week navigation */}
         <div className='cl-card' style={{ marginBottom: 20 }}>

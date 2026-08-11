@@ -68,6 +68,9 @@
   "dashboard.school.read": [
     "/school-dashboard"
   ],
+  "dashboard.school.release": [
+    "/school-dashboard/releases"
+  ],
   "email_account.read": [
     "/admin/email-accounts"
   ],

@@ -66,6 +66,68 @@ function colorFor(name: string): string {
 
 const ACTIVE_STATUSES = ['PENDING', 'ASSIGNED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'MISSED']
 
+type StageKey =
+  | 'scheduled' | 'waiting' | 'in_progress' | 'completed'
+  | 'student_absent' | 'counsellor_no_show' | 'cancelled' | 'under_review'
+
+interface Stage { key: StageKey; label: string; note?: string }
+
+function sessionStage(a: any, now: Date): Stage {
+  const status = (a?.status || '').toUpperCase()
+  const missedBy = (a?.missedByRole || '').toUpperCase()
+
+  if (status === 'COMPLETED') {
+    return { key: 'completed', label: 'Counselling happened' }
+  }
+  if (status === 'IN_PROGRESS') {
+    return { key: 'in_progress', label: 'In progress', note: 'code verified' }
+  }
+  if (status === 'CANCELLED') {
+    const by = (a?.cancelledByRole || '').toUpperCase()
+    return {
+      key: 'cancelled',
+      label: by === 'STUDENT' ? 'Cancelled by student'
+        : by === 'COUNSELLOR' ? 'Cancelled by counsellor'
+          : by === 'ADMIN' ? 'Cancelled by admin' : 'Cancelled',
+    }
+  }
+  if (status === 'UNDER_REVIEW') {
+    return { key: 'under_review', label: 'Under review', note: 'attendance disputed' }
+  }
+  if (status === 'MISSED' || missedBy === 'STUDENT') {
+    return { key: 'student_absent', label: 'Student absent' }
+  }
+  if (status === 'AWAITING_RESCHEDULE') {
+    return missedBy === 'COUNSELLOR'
+      ? { key: 'counsellor_no_show', label: 'Counsellor no-show' }
+      : { key: 'counsellor_no_show', label: 'Awaiting new time' }
+  }
+
+  // Still open: has its start time passed without anyone checking in?
+  const start = slotStartAt(a)
+  if (start != null && start < now) {
+    return { key: 'waiting', label: 'Waiting to start', note: 'no code entered yet' }
+  }
+  return { key: 'scheduled', label: 'Scheduled' }
+}
+
+/**
+ * One colour per stage, matching the counsellor portal's badge palette so a given status
+ * reads the same wherever it appears. Distinct hues throughout — "scheduled" and "in
+ * progress" in particular must not look alike, since only the second means the student was
+ * verified present.
+ */
+const STAGE_STYLE: Record<StageKey, React.CSSProperties> = {
+  scheduled:          { background: '#DBEAFE', color: '#1E40AF' },
+  waiting:            { background: '#FEF3C7', color: '#92400E' },
+  in_progress:        { background: '#DCFCE7', color: '#15803D' },
+  completed:          { background: '#CCFBF1', color: '#0F766E' },
+  student_absent:     { background: '#FEE2E2', color: '#991B1B' },
+  counsellor_no_show: { background: '#FFE4E6', color: '#9F1239' },
+  cancelled:          { background: '#E5E7EB', color: '#4B5563' },
+  under_review:       { background: '#EDE9FE', color: '#5B21B6' },
+}
+
 // ── Count-up: animates 0 -> value once when the card first mounts (after data load),
 //    then snaps on later refreshes so the numbers don't re-animate every 20s. ──
 function useCountUp(value: number, duration = 750): number {
@@ -214,6 +276,32 @@ const CounsellingDashboardPage: React.FC = () => {
       .sort((a, b) => (slotDate(a) + slotStartTime(a)).localeCompare(slotDate(b) + slotStartTime(b)))
     return { runningLate, happeningNow, nextUp, unassigned }
   }, [appts, today, now])
+
+  // ── Today's roster: every student with counselling today, and where each one has got to ──
+  //
+  // The point of this is the live progression. A session sits at "Scheduled", becomes
+  // "Waiting to start" once its time passes with nobody checked in, and flips to "In progress"
+  // the moment the counsellor enters the student's code — which is what proves the student
+  // actually turned up. The page already re-fetches on a timer, so the admin watches that
+  // happen without doing anything.
+  const todayRoster = useMemo(() => {
+    return appts
+      .filter((a) => slotDate(a) === today)
+      .filter((a) => (a.status || '').toUpperCase() !== 'RESCHEDULED') // superseded by its replacement
+      .map((a) => ({ a, stage: sessionStage(a, now) }))
+      .sort((x, y) => slotStartTime(x.a).localeCompare(slotStartTime(y.a)))
+  }, [appts, today, now])
+
+  const todayCounts = useMemo(() => {
+    const c = { total: todayRoster.length, happened: 0, live: 0, waiting: 0, notHappened: 0 }
+    for (const { stage } of todayRoster) {
+      if (stage.key === 'completed') c.happened++
+      else if (stage.key === 'in_progress') c.live++
+      else if (stage.key === 'waiting' || stage.key === 'scheduled') c.waiting++
+      else c.notHappened++
+    }
+    return c
+  }, [todayRoster])
 
   // ── Per-counsellor breakdown for the selected day ──
   const perCounsellor = useMemo(() => {
@@ -377,17 +465,115 @@ const CounsellingDashboardPage: React.FC = () => {
               <div className="cdash-grid-2x2">
                 <LivePanel icon="bi-exclamation-triangle" title="Running late" pill="danger" count={live.runningLate.length}
                   empty="Nothing overdue — every confirmed session is on track."
-                  rows={live.runningLate.map((a) => ({ a, meta: `${fmtTime(slotStartTime(a))} · ${counsellorName(a)}`, tone: 'danger' as const, tag: 'not checked in' }))} />
+                  rows={live.runningLate.map((a) => ({ a, meta: `${fmtTime(slotStartTime(a))} · ${counsellorName(a)}` as const, tag: 'not checked in' }))} />
                 <LivePanel icon="bi-broadcast" title="Happening now" pill="ok" count={live.happeningNow.length}
                   empty="No sessions in progress right now."
-                  rows={live.happeningNow.map((a) => ({ a, meta: `${fmtTime(slotStartTime(a))} · ${counsellorName(a)}`, tone: 'ok' as const, tag: 'in progress' }))} />
+                  rows={live.happeningNow.map((a) => ({ a, meta: `${fmtTime(slotStartTime(a))} · ${counsellorName(a)}` as const, tag: 'in progress' }))} />
                 <LivePanel icon="bi-arrow-right-circle" title="Next up today" pill="neutral" count={live.nextUp.length}
                   empty="No more confirmed sessions later today."
-                  rows={live.nextUp.map((a) => ({ a, meta: `${fmtTime(slotStartTime(a))} · ${counsellorName(a)}`, tone: 'neutral' as const }))} />
+                  rows={live.nextUp.map((a) => ({ a, meta: `${fmtTime(slotStartTime(a))} · ${counsellorName(a)}` as const }))} />
                 <LivePanel icon="bi-inbox" title="Unassigned queue" pill="warn" count={live.unassigned.length}
                   empty="Every booking has a counsellor assigned."
-                  rows={live.unassigned.slice(0, 6).map((a) => ({ a, meta: `${slotDate(a)} · ${fmtTime(slotStartTime(a))}`, tone: 'warn' as const, tag: 'awaiting assignment' }))}
+                  rows={live.unassigned.slice(0, 6).map((a) => ({ a, meta: `${slotDate(a)} · ${fmtTime(slotStartTime(a))}` as const, tag: 'awaiting assignment' }))}
                   footer={live.unassigned.length > 6 ? `+${live.unassigned.length - 6} more in the queue` : undefined} />
+              </div>
+            </>
+          )}
+
+          {/* ── Today's roster: who has counselling today, and whether it happened ── */}
+          {isToday && (
+            <>
+              <Eyebrow label="Counselling today" accent />
+              <div className="cl-card cdash-block">
+                <SectionTitle
+                  icon="bi-clipboard-check"
+                  title="Students with counselling today"
+                  right={
+                    <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span className="cdash-count-pill">{todayCounts.total} booked</span>
+                      <span style={{ ...STAGE_STYLE.completed, padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                        {todayCounts.happened} happened
+                      </span>
+                      {todayCounts.live > 0 && (
+                        <span style={{ ...STAGE_STYLE.completed, padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                          {todayCounts.live} live
+                        </span>
+                      )}
+                      {todayCounts.waiting > 0 && (
+                        <span style={{ ...STAGE_STYLE.waiting, padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                          {todayCounts.waiting} to go
+                        </span>
+                      )}
+                      {todayCounts.notHappened > 0 && (
+                        <span style={{ ...STAGE_STYLE.student_absent, padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                          {todayCounts.notHappened} didn&apos;t happen
+                        </span>
+                      )}
+                    </span>
+                  }
+                />
+                {todayRoster.length === 0 ? (
+                  <div className="cdash-empty">No counselling sessions booked for today.</div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="cdash-table">
+                      <thead>
+                        <tr>
+                          <th>Time</th><th>Student</th><th>Counsellor</th><th>Mode</th>
+                          <th>Status</th><th>Checked in</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {todayRoster.map(({ a, stage }) => (
+                          <tr key={a.id}>
+                            <td style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtTime(slotStartTime(a))}</td>
+                            <td>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                <span
+                                  style={{
+                                    width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                                    background: colorFor(studentName(a)), color: '#fff',
+                                    fontSize: 10, fontWeight: 700,
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  }}
+                                >
+                                  {initials(studentName(a))}
+                                </span>
+                                {studentName(a)}
+                              </span>
+                            </td>
+                            <td>{counsellorName(a)}</td>
+                            <td style={{ whiteSpace: 'nowrap' }}>
+                              {a.mode === 'OFFLINE' ? 'In-person' : 'Online'}
+                            </td>
+                            <td>
+                              <span
+                                style={{
+                                  ...STAGE_STYLE[stage.key],
+                                  padding: '3px 10px', borderRadius: 12,
+                                  fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {stage.label}
+                              </span>
+                              {stage.note && (
+                                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 3 }}>{stage.note}</div>
+                              )}
+                            </td>
+                            {/* The moment the counsellor entered the student's code — the point at
+                                which the session is proven to have started. */}
+                            <td style={{ whiteSpace: 'nowrap', color: a.checkinVerifiedAt ? '#166534' : '#94A3B8' }}>
+                              {a.checkinVerifiedAt
+                                ? new Date(a.checkinVerifiedAt).toLocaleTimeString(undefined,
+                                    { hour: 'numeric', minute: '2-digit' })
+                                : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </>
           )}

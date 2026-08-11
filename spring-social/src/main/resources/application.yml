@@ -196,7 +196,52 @@ app:
     same-site: Strict
     access-max-age-seconds: 864000
   openai:
+    # Supplied via the OPENAI_API_KEY environment variable. Never commit a key here.
     api-key: ${OPENAI_API_KEY:}
+  # Principal dashboard release. Both thresholds are stamped onto every row at
+  # generation time, so changing them here never retroactively reinterprets
+  # dashboards that were already produced.
+  principal-dashboard:
+    # Below this many scored students a scope gets its computed aggregates but no AI
+    # narrative: a narrative over a handful of students is statistically meaningless,
+    # and in a section that small it can identify a child by elimination.
+    min-cohort-size: ${PRINCIPAL_DASHBOARD_MIN_COHORT:10}
+    # New scored students required before a scope is flagged stale. Staleness is only
+    # ever a flag — regeneration is an explicit admin action, never automatic, because
+    # it costs money and rewrites wording that may already have been circulated.
+    stale-after-new-students: ${PRINCIPAL_DASHBOARD_STALE_AFTER:25}
+    model: ${PRINCIPAL_DASHBOARD_MODEL:gpt-4o}
+    request-timeout-seconds: 180
+  # Counselling cancellation / no-show rules. Shared across profiles.
+  #
+  # timezone: slot dates+times are stored as bare wall-clock values entered by counsellors
+  # in IST, while the JVM has no TZ configured and so runs UTC in a container. Every
+  # counselling "is it too late?" check goes through CounsellingClock, which reads this —
+  # NOT LocalDateTime.now(). See docs/COUNSELLING_CANCELLATION.md §9.3.
+  #
+  # The two windows differ deliberately: between 4h and 2h before a session a student can
+  # still cancel but a counsellor cannot. Sessions run in business hours, so a longer
+  # counsellor window would be unreachable for most of the day and would produce no-shows
+  # instead of cancellations.
+  counselling:
+    timezone: ${APP_COUNSELLING_TIMEZONE:Asia/Kolkata}
+    student-cancellation-window-hours: ${APP_COUNSELLING_STUDENT_WINDOW_HOURS:2}
+    counsellor-cancellation-window-hours: ${APP_COUNSELLING_COUNSELLOR_WINDOW_HOURS:4}
+    # Minutes after session start with no check-in before both parties are prompted, and the
+    # earliest point at which a counsellor may mark the student absent.
+    checkin-alarm-minutes: ${APP_COUNSELLING_CHECKIN_ALARM_MINUTES:10}
+    # Misses (cancellations + no-shows, student-caused only) allowed before the next
+    # session must be paid for.
+    miss-allowance: ${APP_COUNSELLING_MISS_ALLOWANCE:2}
+    # Wrong check-in codes allowed before the counsellor must restart check-in.
+    checkin-max-attempts: ${APP_COUNSELLING_CHECKIN_MAX_ATTEMPTS:3}
+    # How early the counsellor's time-based actions open, relative to the session start:
+    # check-in and the Join link both unlock here. Check-in closes when the slot ends.
+    checkin-opens-before-minutes: ${APP_COUNSELLING_CHECKIN_OPENS_BEFORE_MINUTES:15}
+    # Operational alerts (a session nobody could cover, a counsellor no-show, a disputed
+    # attendance mark) are written to the counselling ACTIVITY FEED, which the admin
+    # Counselling Notifications page reads. They are deliberately not emailed — no recipient
+    # list to configure, and no fan-out to every super admin.
   # Google Analytics (GA4) server-side conversion tracking via the Measurement
   # Protocol. The measurement-id is public (it also ships in the frontend
   # index.html). The api-secret IS sensitive — supply it per-profile via the
@@ -245,7 +290,13 @@ app:
   # The PDF is rendered synchronously during report generation, so no poller/queue
   # tuning is needed — just the renderer endpoint.
   gotenberg:
-    url: ${GOTENBERG_URL:http://localhost:3000}
+    # Headless-Chromium PDF renderer. 3001, NOT 3000 — the React dev server owns 3000, so the
+    # old default sent every render request to the frontend, which answered with its own HTML
+    # and the report was saved with pdf_status=failed and a puzzling "404 Not Found: <!DOCTYPE
+    # html>" in the log. Start it locally with:
+    #   docker run -d --name c9-gotenberg -p 3001:3000 gotenberg/gotenberg:8     #     gotenberg --chromium-disable-javascript=false --api-timeout=120s
+    # (compose publishes no host port, so a backend run outside Docker needs this container.)
+    url: ${GOTENBERG_URL:http://localhost:3001}
     # seconds Chromium waits after load for client-side charts to settle
     wait-delay: ${GOTENBERG_WAIT_DELAY:2}
   rate-limit:
@@ -286,6 +337,13 @@ spring:
       # - optional:file:../.env.dev[.properties]
       - optional:file:./.env.staging[.properties]
       - optional:file:../.env.staging[.properties]
+  flyway:
+    # Dev only. Feature branches apply their own migrations before merging main,
+    # so a dev DB routinely sits at a higher version than migrations arriving
+    # from main — which Flyway would otherwise skip silently, leaving the branch
+    # running against a schema that is missing main's tables. Staging and
+    # production apply strictly in order and must keep the default.
+    out-of-order: true
   datasource:
     url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
     username: root

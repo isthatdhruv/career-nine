@@ -34,6 +34,7 @@ import com.kccitm.api.service.b2c.pager.Navigator360EngineService;
 import com.kccitm.api.service.b2c.pager.Navigator360Models.Navigator360Result;
 import com.kccitm.api.service.b2c.pager.PagerScoreSource;
 import com.kccitm.api.service.b2c.report.SanityCheckService.SanityResult;
+import com.kccitm.api.service.counselling.CounsellingOtpService;
 
 /**
  * Unified report-generation orchestrator. One entry point for every report
@@ -154,6 +155,10 @@ public class ReportService {
         }
 
         Map<String, Object> placeholders = deserialize(calcRow.getCalculatedJson());
+        // Counselling OTP — derived from the student's DOB, not from the engine
+        // output, so it applies to every engine and is recomputed at render time
+        // (never frozen into the cached calculated_json).
+        placeholders.put("counselling_otp", counsellingOtp(userStudentId));
         // Expose the whole placeholder set as a JSON blob so templates can draw
         // dynamic, per-student charts client-side. Embed in the template inside
         // <script type="application/json">{{chartDataJson}}</script>. Computed at
@@ -213,6 +218,25 @@ public class ReportService {
     }
 
     // ───────────────────────────────────────────────────────── helpers ──
+
+    /**
+     * 4-digit counselling OTP for the student's DOB. Every path where the DOB is
+     * unavailable — no student row, no studentInfo, null DOB, or a lookup blow-up
+     * — yields {@link CounsellingOtpService#DEFAULT_OTP} rather than a blank, so
+     * the report never prints an empty OTP box. JOIN-FETCHes studentInfo because
+     * this runs on the report-worker thread with no open session.
+     */
+    private String counsellingOtp(Long userStudentId) {
+        try {
+            return userStudentRepository.findByIdWithStudentInfo(userStudentId)
+                    .map(us -> us.getStudentInfo())
+                    .map(si -> CounsellingOtpService.counsellingOtpFor(si.getStudentDob()))
+                    .orElse(CounsellingOtpService.DEFAULT_OTP);
+        } catch (Exception e) {
+            logger.warn("Counselling OTP fell back to default for student {}: {}", userStudentId, e.getMessage());
+            return CounsellingOtpService.DEFAULT_OTP;
+        }
+    }
 
     /**
      * Resolves the template to render. Explicit id wins (validated to belong to

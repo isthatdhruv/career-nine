@@ -55,14 +55,14 @@ public class AvailabilityTemplateController {
 
         java.util.Map<String, Object> body = new java.util.HashMap<>();
         if (result.created == 0) {
-            // Every slot clashed with one that already exists (or the range yields none),
-            // so this template produced no bookable time. Keeping it would leave a phantom
-            // row in "Weekly Schedule" promising availability that isn't in Upcoming Slots.
-            // Nothing references it yet — no slots were created — so drop it again.
+            // Every slot clashed with one that already exists, had already passed today, or
+            // the range yields none — so this template produced no bookable time. Keeping it
+            // would leave a phantom row in "Weekly Schedule" promising availability that isn't
+            // in Upcoming Slots. Nothing references it yet, so drop it again.
             templateRepository.delete(saved);
-            logger.info("Discarded availability template for counsellor {} on {}: 0 slots created, {} skipped",
+            logger.info("Discarded availability template for counsellor {} on {}: 0 slots created, {} skipped, {} already past",
                     saved.getCounsellor() != null ? saved.getCounsellor().getId() : null,
-                    saved.getDayOfWeek(), result.skipped);
+                    saved.getDayOfWeek(), result.skipped, result.past);
             body.put("template", null);
             body.put("discarded", true);
         } else {
@@ -71,6 +71,9 @@ public class AvailabilityTemplateController {
         }
         body.put("slotsCreated", result.created);
         body.put("slotsSkipped", result.skipped);
+        // Distinct from slotsSkipped: these were dropped for being in the part of today that
+        // has already gone by, not for clashing. The UI says something different for each.
+        body.put("slotsPast", result.past);
         return ResponseEntity.ok(body);
     }
 

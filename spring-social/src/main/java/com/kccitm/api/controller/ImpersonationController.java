@@ -33,15 +33,18 @@ import java.util.Optional;
 public class ImpersonationController {
 
     private final UserStudentRepository userStudentRepository;
+    private final com.kccitm.api.repository.Career9.counselling.CounsellorRepository counsellorRepository;
     private final CustomUserDetailsService customUserDetailsService;
     private final TokenProvider tokenProvider;
     private final UserActivityLogService userActivityLogService;
 
     public ImpersonationController(UserStudentRepository userStudentRepository,
+                                   com.kccitm.api.repository.Career9.counselling.CounsellorRepository counsellorRepository,
                                    CustomUserDetailsService customUserDetailsService,
                                    TokenProvider tokenProvider,
                                    UserActivityLogService userActivityLogService) {
         this.userStudentRepository = userStudentRepository;
+        this.counsellorRepository = counsellorRepository;
         this.customUserDetailsService = customUserDetailsService;
         this.tokenProvider = tokenProvider;
         this.userActivityLogService = userActivityLogService;
@@ -88,6 +91,58 @@ public class ImpersonationController {
         userActivityLogService.logLogin(
                 principal.getId(), principal.getUsername(), principal.getEmail(),
                 "IMPERSONATED_BY:" + adminId + ":" + adminEmail,
+                UserActivityLogService.getClientIp(request),
+                request.getHeader("User-Agent"));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("token", jwt);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * The counsellor equivalent of the student impersonation above: mints a short-lived JWT
+     * for the User behind a counsellor profile so an admin can open the counsellor portal as
+     * them, in a new tab, without disturbing their own session.
+     */
+    @PreAuthorize("@auth.allows('counsellor.update')")
+    @PostMapping("/admin/impersonate/counsellor/{counsellorId}")
+    public ResponseEntity<?> impersonateCounsellor(@PathVariable Long counsellorId,
+                                                   HttpServletRequest request) {
+        // Same hard check as the student path, and for the same reason: @auth.allows(...) is
+        // a NO-OP while auth.enforce-mode=log-only, so relying on the annotation alone would
+        // let ANY authenticated caller mint a counsellor token and read other people's
+        // students, notes and sessions.
+        Authentication authn = SecurityContextHolder.getContext().getAuthentication();
+        if (authn == null || !(authn.getPrincipal() instanceof UserPrincipal)) {
+            return ResponseEntity.status(403).body("Not authorized to impersonate counsellors");
+        }
+        UserPrincipal caller = (UserPrincipal) authn.getPrincipal();
+        boolean permitted = caller.isSuperAdmin()
+                || (caller.getPermissions() != null && caller.getPermissions().contains("counsellor.update"));
+        if (!permitted) {
+            return ResponseEntity.status(403).body("Not authorized to impersonate counsellors");
+        }
+
+        var counsellorOpt = counsellorRepository.findById(counsellorId);
+        if (counsellorOpt.isEmpty() || counsellorOpt.get().getUser() == null) {
+            // A counsellor with no linked login cannot be opened as — they have no account.
+            return ResponseEntity.status(404)
+                    .body("This counsellor has no login account to open.");
+        }
+
+        UserPrincipal principal;
+        try {
+            principal = (UserPrincipal) customUserDetailsService
+                    .loadUserById(counsellorOpt.get().getUser().getId());
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(404).body("Counsellor user not found");
+        }
+
+        String jwt = tokenProvider.createImpersonationToken(principal);
+
+        userActivityLogService.logLogin(
+                principal.getId(), principal.getUsername(), principal.getEmail(),
+                "IMPERSONATED_BY:" + caller.getId() + ":" + caller.getEmail(),
                 UserActivityLogService.getClientIp(request),
                 request.getHeader("User-Agent"));
 

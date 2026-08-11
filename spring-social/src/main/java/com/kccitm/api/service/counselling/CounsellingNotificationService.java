@@ -43,6 +43,23 @@ public class CounsellingNotificationService {
     @Autowired
     private EmailDispatchService emailDispatchService;
 
+    /**
+     * Base URL of the student-facing app, used to build absolute links in emails. Resolves
+     * per profile (localhost in dev, the staging/production dashboards elsewhere), so no
+     * host is ever hardcoded into a template.
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:3000}")
+    private String frontendUrl;
+
+    /**
+     * Operational counselling alerts — an unplaced session, a counsellor no-show, a disputed
+     * attendance mark — go to the counselling activity feed, which is what the admin
+     * Counselling Notifications page reads. No email: those alerts are for whoever is
+     * watching the queue, not for a named person's inbox.
+     */
+    @Autowired
+    private CounsellingActivityLogService activityLogService;
+
     // ─── In-app Notifications ────────────────────────────────────────────────────
 
     public void createInAppNotification(User user, String type, String title, String message,
@@ -186,7 +203,22 @@ public class CounsellingNotificationService {
     @Async
     public void sendCancellationEmail(CounsellingAppointment appointment, String cancelledByName,
             String recipientEmail, String recipientName) {
+        sendCancellationEmail(appointment, cancelledByName, recipientEmail, recipientName, null);
+    }
+
+    /**
+     * Cancellation notice to the other party.
+     *
+     * <p>The {@code reason} overload exists because the reason was previously accepted by
+     * {@code cancel()} and then dropped on the floor — the counsellor was told only that
+     * "the session was cancelled", which tells them nothing. "Schedule clash" and "no longer
+     * need the session" mean quite different things to whoever had the hour blocked out.
+     */
+    @Async
+    public void sendCancellationEmail(CounsellingAppointment appointment, String cancelledByName,
+            String recipientEmail, String recipientName, String reason) {
         try {
+            if (recipientEmail == null || recipientEmail.isEmpty()) return;
             String date = appointment.getSlot().getDate().format(DATE_FMT);
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
 
@@ -194,6 +226,7 @@ public class CounsellingNotificationService {
             String body = "Dear " + recipientName + ",\n\n"
                     + "Your counselling session scheduled on " + date + " at " + time
                     + " has been cancelled by " + cancelledByName + ".\n\n"
+                    + (reason != null && !reason.isEmpty() ? "Reason given: " + reason + "\n\n" : "")
                     + "If you have any questions, please contact us.\n\n"
                     + "Regards,\nCareer-Nine Team";
 
@@ -583,25 +616,6 @@ public class CounsellingNotificationService {
                 : "Join online: the meeting link will be shared before the session";
     }
 
-    /** Sends the check-in OTP to the student via WhatsApp; email fallback. */
-    @Async
-    public void sendCheckinOtpToStudent(CounsellingAppointment appointment, String code) {
-        boolean sent = whatsAppService.sendTemplate(
-                studentPhone(appointment), whatsAppService.otpCampaign(),
-                Arrays.asList(studentName(appointment), code));
-        if (!sent) {
-            String email = studentEmail(appointment);
-            if (email != null && !email.isEmpty()) {
-                String subject = "Your counselling check-in code";
-                String body = "Dear " + studentName(appointment) + ",\n\n"
-                        + "Share this code with your counsellor to start your session: " + code + "\n\n"
-                        + "This code expires in 15 minutes.\n\n"
-                        + "Regards,\nCareer-Nine Team";
-                sendEmail(email, subject, body);
-            }
-        }
-    }
-
     /**
      * 8pm day-before digest to a counsellor listing the next day's sessions.
      * Emails the full list and sends a short WhatsApp summary.
@@ -712,6 +726,424 @@ public class CounsellingNotificationService {
     }
 
     // ─── Recipient accessors ───────────────────────────────────────────────────────
+
+    // ═══ Cancellation and no-show (docs/COUNSELLING_CANCELLATION.md §10) ═════════
+    //
+    // Recipients are the student AND the parent/guardian where one was given at booking.
+    // The confirmation email already does this; cancellation notices did not, so a parent
+    // who was told about the session never heard it was called off — despite quite possibly
+    // having paid for it.
+
+    /** Public accessors so callers can address the student without duplicating the fallbacks. */
+    public String recipientStudentEmail(CounsellingAppointment a) {
+        return studentEmail(a);
+    }
+
+    public String recipientStudentName(CounsellingAppointment a) {
+        return studentName(a);
+    }
+
+    /**
+     * The student's own confirmation that her cancellation went through.
+     *
+     * <p>{@code cancel()} deliberately skips notifying whoever performed the cancellation —
+     * right for the counsellor-cancels case, wrong here: without this she has no evidence it
+     * worked. Carries the misses she has left, so the point at which the next session becomes
+     * chargeable is never a surprise.
+     */
+    @Async
+    public void sendStudentCancellationConfirmation(CounsellingAppointment appointment,
+                                                    int missesRemaining, boolean creditedBack) {
+        try {
+            String name = studentName(appointment);
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+
+            String consequence = creditedBack
+                    ? "Your session has been returned to your account, so you can book a new time at no extra cost."
+                    : "This was your last free change, so a new session will need to be paid for.";
+            String allowance = missesRemaining > 0
+                    ? "You have " + missesRemaining + " free change" + (missesRemaining == 1 ? "" : "s") + " remaining."
+                    : "You have no free changes remaining.";
+
+            String subject = "Your counselling session has been cancelled";
+            String body = "Dear " + name + ",\n\n"
+                    + "Your counselling session on " + date + " at " + time + " has been cancelled "
+                    + "as you requested.\n\n"
+                    + consequence + "\n"
+                    + allowance + "\n\n"
+                    + "Book a new session here:\n" + portalCounsellingUrl() + "\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            sendWithCancelledInvite(appointment, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send student cancellation confirmation for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * Admin cancelled the session — so <b>both</b> sides are told, because neither of them
+     * chose it. Deliberately carries no self-reschedule link: the follow-up is human.
+     */
+    @Async
+    public void sendAdminCancellationEmail(CounsellingAppointment appointment) {
+        try {
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+
+            String subject = "Your counselling session has been cancelled";
+            String studentBody = "Dear " + studentName(appointment) + ",\n\n"
+                    + "Your counselling session scheduled on " + date + " at " + time
+                    + " has been cancelled by the Career-9 team.\n\n"
+                    + "This does not affect your counselling entitlement in any way — our team will "
+                    + "be in touch shortly to arrange a new time.\n\n"
+                    + "We apologise for the inconvenience.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            sendWithCancelledInvite(appointment, subject, studentBody);
+
+            Counsellor counsellor = appointment.getCounsellor();
+            if (counsellor != null && counsellor.getEmail() != null && !counsellor.getEmail().isEmpty()) {
+                String counsellorBody = "Dear " + counsellor.getName() + ",\n\n"
+                        + "The counselling session with " + studentName(appointment) + " on "
+                        + date + " at " + time + " has been cancelled by the Career-9 team.\n\n"
+                        + "Nothing is recorded against you and your slot has been reopened. "
+                        + "The team will be in touch with the student to arrange a new time.\n\n"
+                        + "Regards,\nCareer-Nine Team";
+                sendEmail(counsellor.getEmail(), subject, counsellorBody);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to send admin cancellation emails for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * Rung 1 — a different counsellor picked the session up at the same time. Her plans are
+     * unchanged; what actually changed is the joining detail, which is the reason to write
+     * at all.
+     */
+    @Async
+    public void sendCounsellorSwappedEmail(CounsellingAppointment appointment) {
+        try {
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+            boolean offline = "OFFLINE".equals(appointment.getMode());
+
+            String subject = "Your counselling session is confirmed — updated details";
+            String body = "Dear " + studentName(appointment) + ",\n\n"
+                    + "Your counselling session on " + date + " at " + time
+                    + " is going ahead exactly as planned — the time has not changed.\n\n"
+                    + "A different counsellor will now be taking it, so please use the updated "
+                    + (offline ? "venue" : "joining link") + " below:\n"
+                    + "  " + attendanceLine(appointment) + "\n\n"
+                    + (offline
+                        ? "Please note the venue has changed — do check it before you set out.\n\n"
+                        : "")
+                    + "Regards,\nCareer-Nine Team";
+
+            sendToStudentAndParent(appointment, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send counsellor-swap email for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * Rung 2 — no one was free at her time, so the session moved later the same day. This
+     * changes her day, unlike rung 1, which is why it is a separate template.
+     */
+    @Async
+    public void sendSessionShiftedEmail(CounsellingAppointment appointment,
+                                        String originalTimeLabel, String rescheduleUrl) {
+        try {
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+
+            String subject = "Your counselling session has moved to " + time;
+            String body = "Dear " + studentName(appointment) + ",\n\n"
+                    + "Your counsellor is no longer available at " + originalTimeLabel
+                    + ", so we have moved your session to " + time + " on " + date + ".\n\n"
+                    + "  " + attendanceLine(appointment) + "\n\n"
+                    + "If that new time does not suit you, you can pick another one here — "
+                    + "choosing your own time uses one of your free changes:\n" + rescheduleUrl + "\n\n"
+                    + "We are sorry for the disruption.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            sendToStudentAndParent(appointment, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send session-shifted email for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * Admin alert — a counsellor cancellation that nobody could cover. Needs a human.
+     *
+     * <p>Written to the counselling <b>activity log</b>, which is what the admin Counselling
+     * Notifications page reads. Deliberately not emailed: resolving recipients by "every super
+     * admin" fans each alert out to the whole admin team, and the operational feed is where an
+     * admin is already looking for exactly this kind of thing.
+     */
+    @Async
+    public void notifyAdminNoReplacement(CounsellingAppointment appointment, String cause) {
+        try {
+            String date = appointment.getSlot() != null ? appointment.getSlot().getDate().format(DATE_FMT) : "?";
+            String time = appointment.getSlot() != null ? appointment.getSlot().getStartTime().format(TIME_FMT) : "?";
+            Counsellor counsellor = appointment.getCounsellor();
+            String counsellorName = counsellor != null ? counsellor.getName() : "A counsellor";
+
+            activityLogService.log(
+                    "COUNSELLING_NEEDS_ATTENTION",
+                    "Session needs attention",
+                    counsellorName + " " + cause + " the session with " + studentName(appointment)
+                            + " on " + date + " at " + time
+                            + ", and no replacement counsellor was available. The student has been "
+                            + "sent a self-reschedule link.",
+                    counsellor, counsellorName);
+        } catch (Exception e) {
+            logger.warn("Failed to log unplaced appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * Ten minutes in with no check-in — prompt the student to hand over her code.
+     * She is otherwise sitting in a call with no idea what is happening.
+     */
+    @Async
+    public void sendCheckinPromptToStudent(CounsellingAppointment appointment) {
+        try {
+            String email = studentEmail(appointment);
+            if (email == null || email.isEmpty()) return;
+            String subject = "Your counselling session is waiting to start";
+            String body = "Dear " + studentName(appointment) + ",\n\n"
+                    + "Your session has not been started yet. Please read out the 4-digit check-in "
+                    + "code from your Career-9 report so your counsellor can begin.\n\n"
+                    + "If nobody has joined, you do not need to do anything else — your session will "
+                    + "be preserved and we will send you a link to pick a new time.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+            sendEmail(email, subject, body);
+        } catch (Exception e) {
+            logger.warn("Check-in prompt to student failed for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * The matching prompt to the counsellor — and the one that keeps the rule fair.
+     *
+     * <p>Doing nothing is what records the session as <i>their</i> no-show, so a counsellor
+     * who is present but distracted would otherwise be marked absent for a session they
+     * actually ran. This is the warning that stops that happening.
+     */
+    @Async
+    public void sendCheckinPromptToCounsellor(CounsellingAppointment appointment) {
+        try {
+            Counsellor counsellor = appointment.getCounsellor();
+            if (counsellor == null) return;
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+
+            String subject = "Action needed: session with " + studentName(appointment) + " not started";
+            String body = "Dear " + counsellor.getName() + ",\n\n"
+                    + "Your " + time + " session with " + studentName(appointment)
+                    + " has not been checked in.\n\n"
+                    + "Please either enter the student's check-in code, or mark the student absent "
+                    + "if they have not appeared.\n\n"
+                    + "If neither is recorded before the session ends, it will be logged as YOUR "
+                    + "no-show rather than the student's.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            if (counsellor.getEmail() != null && !counsellor.getEmail().isEmpty()) {
+                sendEmail(counsellor.getEmail(), subject, body);
+            }
+            if (counsellor.getUser() != null) {
+                createInAppNotification(counsellor.getUser(), "CHECKIN_REQUIRED",
+                        "Session not checked in",
+                        "Enter the check-in code or mark the student absent — otherwise this is "
+                                + "recorded as your no-show.",
+                        appointment.getId(), "APPOINTMENT");
+            }
+        } catch (Exception e) {
+            logger.warn("Check-in prompt to counsellor failed for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * The counsellor marked her absent. Sent <b>immediately</b>, not at slot end, because it
+     * costs her one of her two free changes and she is entitled to know at once — and to
+     * contest it while she still remembers the session.
+     */
+    @Async
+    public void sendMarkedAbsentEmail(CounsellingAppointment appointment, int missesRemaining) {
+        try {
+            String name = studentName(appointment);
+            String email = studentEmail(appointment);
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+
+            String consequence = missesRemaining > 0
+                    ? "You have " + missesRemaining + " free change" + (missesRemaining == 1 ? "" : "s")
+                      + " remaining, so you can book a new session at no extra cost here:\n"
+                      + portalCounsellingUrl()
+                    : "This was your last free change, so a new session will need to be paid for. "
+                      + "You can arrange one here:\n" + portalCounsellingUrl();
+
+            String subject = "You were marked absent from your counselling session";
+            String body = "Dear " + name + ",\n\n"
+                    + "Your counsellor has recorded that you did not attend your session on "
+                    + date + " at " + time + ".\n\n"
+                    + consequence + "\n\n"
+                    + "If you were present and believe this is a mistake, reply to this email or "
+                    + "raise it from your Career-9 dashboard — the session will be reviewed and "
+                    + "nothing will count against you until it is settled.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            if (email != null && !email.isEmpty()) sendEmail(email, subject, body);
+
+            Long userId = appointment.getStudent() != null ? appointment.getStudent().getUserId() : null;
+            if (userId != null) {
+                User u = new User();
+                u.setId(userId);
+                createInAppNotification(u, "COUNSELLING_NO_SHOW", "Marked absent",
+                        "You were marked absent from your session on " + date
+                                + ". If that is wrong, you can dispute it.",
+                        appointment.getId(), "APPOINTMENT");
+            }
+        } catch (Exception e) {
+            logger.error("Failed to send marked-absent email for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * Admin alert — a counsellor did not appear. A management signal, not a student matter,
+     * so it lands in the counselling activity feed rather than anyone's inbox.
+     */
+    @Async
+    public void notifyAdminCounsellorNoShow(CounsellingAppointment appointment) {
+        try {
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+            Counsellor counsellor = appointment.getCounsellor();
+            String counsellorName = counsellor != null ? counsellor.getName() : "Unassigned";
+
+            activityLogService.log(
+                    "COUNSELLOR_NO_SHOW",
+                    "Counsellor no-show",
+                    counsellorName + " did not check in for the session with "
+                            + studentName(appointment) + " on " + date + " at " + time
+                            + ". The student has been sent a link to rebook and has not been penalised.",
+                    counsellor, counsellorName);
+        } catch (Exception e) {
+            logger.warn("Failed to log counsellor no-show on appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * Admin alert — a student has contested an absent mark, so her strike is suspended until
+     * someone decides. Surfaced in the counselling activity feed alongside the other
+     * operational items.
+     */
+    @Async
+    public void notifyAdminDisputeRaised(CounsellingAppointment appointment) {
+        try {
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            Counsellor counsellor = appointment.getCounsellor();
+            activityLogService.log(
+                    "ATTENDANCE_DISPUTE",
+                    "Attendance disputed",
+                    studentName(appointment) + " disputes being marked absent on " + date
+                            + ". Nothing counts against her until this is upheld or overturned.",
+                    counsellor, studentName(appointment));
+        } catch (Exception e) {
+            logger.warn("Failed to log dispute on appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /** Tells the student how her dispute went. */
+    @Async
+    public void sendDisputeOutcomeEmail(CounsellingAppointment appointment, boolean upheld, String note) {
+        try {
+            String email = studentEmail(appointment);
+            if (email == null || email.isEmpty()) return;
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+
+            String subject = upheld
+                    ? "Your counselling attendance review — outcome"
+                    : "Good news — your counselling session has been corrected";
+            String body = "Dear " + studentName(appointment) + ",\n\n"
+                    + (upheld
+                        ? "We have reviewed your session on " + date + " and the record that you did "
+                          + "not attend stands. It counts as one of your changes."
+                        : "We have reviewed your session on " + date + " and corrected it — it is now "
+                          + "recorded as attended, and nothing has been counted against you.")
+                    + (note != null && !note.isEmpty() ? "\n\nNote from our team: " + note : "")
+                    + "\n\nRegards,\nCareer-Nine Team";
+            sendEmail(email, subject, body);
+        } catch (Exception e) {
+            logger.warn("Failed to send dispute outcome for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    // ─── Cancellation/no-show helpers ────────────────────────────────────────────
+
+    /** The student's counselling page — where every "book a new time" link should land. */
+    private String portalCounsellingUrl() {
+        String base = frontendUrl == null ? "" : frontendUrl.replaceAll("/+$", "");
+        return base + "/student/dashboard/counselling";
+    }
+
+    /** Student plus parent/guardian, matching the confirmation email's recipient list. */
+    private void sendToStudentAndParent(CounsellingAppointment appointment, String subject, String body) {
+        for (String addr : studentAndParentEmails(appointment)) {
+            sendEmail(addr, subject, body);
+        }
+    }
+
+    private List<String> studentAndParentEmails(CounsellingAppointment appointment) {
+        List<String> to = new java.util.ArrayList<>();
+        String student = studentEmail(appointment);
+        String parent = appointment.getParentEmail();
+        if (student != null && !student.isEmpty()) to.add(student);
+        if (parent != null && !parent.isEmpty()) to.add(parent);
+        return to;
+    }
+
+    /**
+     * Sends to student + parent with a {@code METHOD:CANCEL} invite attached, so the original
+     * event disappears from their calendars instead of sitting there with a live meeting link.
+     * Falls back to plain text if the attachment cannot be built or sent.
+     */
+    private void sendWithCancelledInvite(CounsellingAppointment appointment, String subject, String body) {
+        List<String> to = studentAndParentEmails(appointment);
+        if (to.isEmpty()) return;
+
+        byte[] ics = icsService.buildCancellation(appointment);
+        if (ics != null) {
+            try {
+                SmtpEmailRequest req = new SmtpEmailRequest();
+                req.setTo(to);
+                req.setSubject(subject);
+                req.setHtmlContent("<pre style=\"font-family:inherit\">" + body + "</pre>");
+                req.setFromName("Career-9");
+                req.setFromEmail("notifications@career-9.net");
+                req.setAttachments(Arrays.asList(new SmtpEmailRequest.EmailAttachment(
+                        icsService.cancellationFileName(appointment), ics, "text/calendar")));
+                emailDispatchService.send(EmailType.COUNSELLING_NOTIFICATION, req, null);
+                return;
+            } catch (Exception e) {
+                logger.warn("Cancellation invite email failed for appointment {}, falling back to text: {}",
+                        appointment.getId(), e.getMessage());
+            }
+        }
+        for (String addr : to) sendEmail(addr, subject, body);
+    }
 
     private String studentName(CounsellingAppointment a) {
         if (a.getStudentContactName() != null && !a.getStudentContactName().isEmpty()) {

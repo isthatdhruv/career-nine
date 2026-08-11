@@ -7,6 +7,56 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 /** "09:00:00" → "09:00", so times compare as plain strings. */
 const hm = (t: string) => String(t || '').slice(0, 5)
 
+/** "2026-08-17T00:00:00" → "2026-08-17", so dates compare as plain strings. */
+const ymd = (d?: string | null) => (d ? String(d).slice(0, 10) : '')
+
+/**
+ * yyyy-MM-dd in the *local* calendar. `toISOString()` converts to UTC first, which
+ * in IST reports yesterday for any time before 05:30 — the wrong day to schedule on.
+ */
+const isoOf = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+const todayISO = () => isoOf(new Date())
+
+/** How far ahead the backend materializes a schedule with no end date (its `days` default). */
+const MATERIALIZE_DAYS = 30
+
+const prettyDate = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00`)
+  return isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/**
+ * Do two schedules' effective date ranges overlap? A missing bound is open-ended —
+ * no start date means "from whenever it was made", no end date means "forever".
+ * Two closed ranges overlap iff each begins on or before the other ends.
+ */
+const rangesOverlap = (
+  aFrom: string, aTo: string,
+  bFrom: string, bTo: string,
+) => (!aTo || !bFrom || bFrom <= aTo) && (!bTo || !aFrom || aFrom <= bTo)
+
+/**
+ * The dates this schedule would actually land on: every selected weekday between its
+ * start and end date — or to the end of the backend's materialization window when it
+ * is left open-ended.
+ */
+const coveredDates = (days: string[], startDate: string, endDate: string): string[] => {
+  const first = new Date(`${startDate}T00:00:00`)
+  if (isNaN(first.getTime())) return []
+  const lastIso = endDate || isoOf(new Date(first.getTime() + MATERIALIZE_DAYS * 86400000))
+  const last = new Date(`${lastIso}T00:00:00`)
+  const out: string[] = []
+  for (const d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
+    // JS weeks start on Sunday; DAYS starts on Monday.
+    if (days.includes(DAYS[(d.getDay() + 6) % 7])) out.push(isoOf(d))
+  }
+  return out
+}
+
 /** Sessions run on Microsoft Teams only — no other provider's link is accepted. */
 export const isTeamsLink = (link?: string) =>
   /^https:\/\/teams\.(microsoft|live)\.com\//i.test((link || '').trim())
@@ -42,8 +92,24 @@ interface WeeklyScheduleFormProps {
    * that clashes with an existing one — the schedule saves but yields no slots.
    */
   existingTemplates?: ExistingTemplate[]
+  /**
+   * The counsellor's actual slots. When supplied these are checked instead of
+   * `existingTemplates`, because a schedule row says which weekday a rule covers but
+   * not which dates it has really produced slots for — and only a real slot can be
+   * clashed with. Omitted on the bulk (several counsellors) path, where no one
+   * counsellor's slots are loaded.
+   */
+  existingSlots?: ExistingSlot[]
   /** The template being replaced by an edit — it is deleted first, so it can't clash. */
   ignoreTemplateId?: number
+}
+
+export interface ExistingSlot {
+  date: string
+  startTime: string
+  endTime: string
+  status?: string
+  isBlocked?: boolean
 }
 
 export interface ExistingTemplate {
@@ -52,6 +118,9 @@ export interface ExistingTemplate {
   startTime: string
   endTime: string
   defaultSlotDuration?: number
+  /** Effective range. Absent means open-ended at that end — see `rangesOverlap`. */
+  startDate?: string
+  endDate?: string
 }
 
 interface FormState {
@@ -127,6 +196,7 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
   onCancel,
   beforeCreate,
   existingTemplates,
+  existingSlots,
   ignoreTemplateId,
 }) => {
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, ...initial })
@@ -136,6 +206,67 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
   // mode is only offerable when a single counsellor is being scheduled.
   const multiple = counsellorIds.length > 1
   const mode: 'ONLINE' | 'OFFLINE' = multiple ? 'ONLINE' : form.mode
+
+  /**
+   * Warn — naming the dates — if this schedule would land on times the counsellor is
+   * already covered for, and report whether to carry on.
+   *
+   * Only real slots count. Two schedule rows can overlap on paper and still both
+   * produce slots, because a row is a rule and slots are only ever generated for the
+   * dates that rule has actually been run over. Where the caller has the slots
+   * (one counsellor at a time) they decide it; the bulk path has no slot list, so it
+   * falls back to comparing the rules, which is coarse but never silently wrong.
+   */
+  const confirmNoClash = (from: string): boolean => {
+    if (existingSlots) {
+      const busy = coveredDates(form.days, from, form.endDate)
+        .map((date) => ({
+          date,
+          count: existingSlots.filter((s) =>
+            ymd(s.date) === date &&
+            !s.isBlocked &&
+            String(s.status || '').toUpperCase() !== 'CANCELLED' &&
+            hm(s.startTime) < form.endTime && form.startTime < hm(s.endTime),
+          ).length,
+        }))
+        .filter((d) => d.count > 0)
+
+      if (!busy.length) return true
+
+      const shown = busy.slice(0, 6)
+        .map((d) => `• ${prettyDate(d.date)} — ${d.count} slot${d.count === 1 ? '' : 's'} already there`)
+        .join('\n')
+      const more = busy.length > shown.length ? `\n…and ${busy.length - shown.length} more date(s)` : ''
+      return window.confirm(
+        `You already have slots at this time on:\n\n${shown}${more}\n\n` +
+        'Nothing new is added on those dates — every other date in your range is unaffected. ' +
+        'To change the timing or slot length there, use Edit on the existing schedule instead.' +
+        '\n\nAdd it anyway?',
+      )
+    }
+
+    // No slot list (several counsellors at once): fall back to the schedule rows,
+    // matched on weekday, time and effective date range.
+    const clashes = (existingTemplates || []).filter((t) =>
+      t.id !== ignoreTemplateId &&
+      form.days.includes(t.dayOfWeek) &&
+      hm(t.startTime) < form.endTime && form.startTime < hm(t.endTime) &&
+      rangesOverlap(from, form.endDate, ymd(t.startDate), ymd(t.endDate)),
+    )
+    if (!clashes.length) return true
+
+    const list = clashes
+      .map((t) => {
+        const until = ymd(t.endDate) ? `, until ${ymd(t.endDate)}` : ''
+        return `• ${t.dayOfWeek} ${hm(t.startTime)}–${hm(t.endTime)} (${t.defaultSlotDuration || 30}-min slots${until})`
+      })
+      .join('\n')
+    return window.confirm(
+      `This time is already covered by an existing schedule:\n\n${list}\n\n` +
+      'Slots are only created for times that are still free — where they clash, nothing new is added. ' +
+      'To change the timing or slot length, use Edit on the existing schedule instead.\n\nAdd it anyway?',
+    )
+  }
 
   const handleSave = async () => {
     if (!counsellorIds.length) {
@@ -191,22 +322,15 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
     // A slot is never created on top of one that already exists (a counsellor can't
     // run two sessions at once), so a schedule covering an already-covered time
     // saves but produces nothing. Say so before it happens.
-    const clashes = (existingTemplates || []).filter((t) =>
-      t.id !== ignoreTemplateId &&
-      form.days.includes(t.dayOfWeek) &&
-      hm(t.startTime) < form.endTime && form.startTime < hm(t.endTime),
-    )
-    if (clashes.length > 0) {
-      const list = clashes
-        .map((t) => `• ${t.dayOfWeek} ${hm(t.startTime)}–${hm(t.endTime)} (${t.defaultSlotDuration || 30}-min slots)`)
-        .join('\n')
-      const ok = window.confirm(
-        `This time is already covered by an existing schedule:\n\n${list}\n\n` +
-        'Slots are only created for times that are still free — where they clash, nothing new is added. ' +
-        'To change the timing or slot length, use Edit on the existing schedule instead.\n\nAdd it anyway?',
-      )
-      if (!ok) return
-    }
+    //
+    // Check the real slots, date by date, not the schedule rows. A row only says
+    // "Mondays 09:00–18:00"; it does not say which Mondays it actually produced slots
+    // for. Matching on weekday alone flagged a single afternoon against a recurring
+    // Monday rule that had never materialized that particular date — a clash that
+    // could not happen, and one the person was powerless to act on because no other
+    // Monday was involved.
+    const from = form.startDate || todayISO()
+    if (!confirmNoClash(from)) return
 
     setSaving(true)
     try {
@@ -257,21 +381,41 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
       // Stretches whose slots all clashed: the backend keeps no schedule for those, so
       // the list never shows a schedule that produced nothing.
       const discarded = results.filter((r) => r?.data?.discarded).length
+      // Today's slots whose start time had already gone by. Counted apart from `skipped`
+      // because "that time has passed" and "that time is taken" are different problems and
+      // reporting both as a clash sent people looking for a conflicting schedule that
+      // didn't exist.
+      const past = results.reduce((sum, r) => sum + (Number(r?.data?.slotsPast) || 0), 0)
       const who = multiple ? ` for ${counsellorIds.length} counsellors` : ''
+      const s = (n: number) => (n === 1 ? '' : 's')
 
       if (created === 0) {
-        onError(
-          `Nothing was added — all ${skipped} slot${skipped === 1 ? '' : 's'} clashed with times that are already covered. ` +
-          'Edit or remove the existing schedule to change its timings or slot length.',
-        )
+        if (skipped === 0 && past === 0) {
+          onError(
+            'Nothing was added — the dates you chose contain none of the selected days. ' +
+            'Check the start and end date.',
+          )
+        } else if (skipped === 0) {
+          onError(
+            `Nothing was added — all ${past} slot${s(past)} had already started. ` +
+            'Pick a later start time, or a date after today.',
+          )
+        } else {
+          onError(
+            `Nothing was added — all ${skipped} slot${s(skipped)} clashed with times that are already covered` +
+            (past > 0 ? `, and ${past} more had already started today` : '') + '. ' +
+            'Edit or remove the existing schedule to change its timings or slot length.',
+          )
+        }
       } else {
         onSaved(
-          `Schedule saved${who} — ${created} slot${created === 1 ? '' : 's'} generated.` +
+          `Schedule saved${who} — ${created} slot${s(created)} generated.` +
             (discarded > 0
               ? ` ${discarded} of them added nothing (already covered) and ${discarded === 1 ? 'was' : 'were'} not kept.`
               : skipped > 0
-              ? ` ${skipped} slot${skipped === 1 ? '' : 's'} skipped because they overlapped existing slots.`
-              : ''),
+              ? ` ${skipped} slot${s(skipped)} skipped because they overlapped existing slots.`
+              : '') +
+            (past > 0 ? ` ${past} slot${s(past)} on today had already started and ${past === 1 ? 'was' : 'were'} not created.` : ''),
         )
       }
       setForm(EMPTY_FORM)

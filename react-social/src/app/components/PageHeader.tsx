@@ -311,12 +311,17 @@ const PageHeaderStyles: FC = () => (
       .ph-btn { flex: 1 1 auto; justify-content: center; }
     }
 
-    /* Page wrapper helper — apply to the page root to match dashboard look */
+    /* Page wrapper helper — apply to the page root to match dashboard look.
+       Top margin is 0, not negative: the -30px here used to climb past the
+       padding Metronic reserved for its (empty) 55px toolbar. That toolbar is
+       now off globally via DefaultLayoutConfig, so a negative top margin drags
+       the header up underneath the fixed top bar and clips it. The side and
+       bottom bleed still apply — only the vertical pull had to go. */
     .ph-page {
       background: #fafafa;
       min-height: 100vh;
-      margin: -30px -40px -60px;
-      padding: 4px 32px 56px;
+      margin: 0 -40px -60px;
+      padding: 24px 32px 56px;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: #0f172a;
     }

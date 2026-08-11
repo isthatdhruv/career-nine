@@ -124,6 +124,59 @@ public class CounsellingAppointment implements Serializable {
     @Column(name = "entitlement_id")
     private Long entitlementId;
 
+    // ─── Cancellation attribution ────────────────────────────────────────────────
+    // Who cancelled decides everything downstream: whether it costs the student one of her
+    // misses, and whether the vacated slot reopens (student/admin) or is blocked because
+    // the counsellor is not there. See docs/COUNSELLING_CANCELLATION.md §2.
+    @Column(name = "cancelled_by_role", length = 20)
+    private String cancelledByRole;
+
+    @Column(name = "cancelled_by_user_id")
+    private Long cancelledByUserId;
+
+    @Column(name = "cancellation_reason", length = 50)
+    private String cancellationReason;
+
+    @Column(name = "cancellation_note", columnDefinition = "TEXT")
+    private String cancellationNote;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    // ─── No-show attribution ─────────────────────────────────────────────────────
+    // STUDENT when the counsellor marked her absent; COUNSELLOR when neither the OTP nor an
+    // absent mark was recorded. Silence means the party holding both tools was not there.
+    @Column(name = "missed_by_role", length = 20)
+    private String missedByRole;
+
+    @Column(name = "marked_absent_at")
+    private LocalDateTime markedAbsentAt;
+
+    @Column(name = "marked_absent_by")
+    private Long markedAbsentBy;
+
+    // ─── Dispute ─────────────────────────────────────────────────────────────────
+    // A raised-but-unresolved dispute suspends the strike. An open dispute is not evidence
+    // against the student, so it must never be counted.
+    @Column(name = "dispute_raised_at")
+    private LocalDateTime disputeRaisedAt;
+
+    @Column(name = "dispute_resolved_at")
+    private LocalDateTime disputeResolvedAt;
+
+    @Column(name = "dispute_resolved_by")
+    private Long disputeResolvedBy;
+
+    // ─── Counsellor-caused reschedule ────────────────────────────────────────────
+    // True when the system moved this session because the counsellor cancelled or failed to
+    // appear. The student never chose this time, so it is exempt from her 2-hour window and
+    // a cancellation on it does not count as a miss.
+    @Column(name = "force_shifted")
+    private Boolean forceShifted = false;
+
+    @Column(name = "shifted_from_start")
+    private LocalDateTime shiftedFromStart;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -140,6 +193,7 @@ public class CounsellingAppointment implements Serializable {
         if (this.reminder24hSent == null) this.reminder24hSent = false;
         if (this.reminder1hSent == null) this.reminder1hSent = false;
         if (this.studentRescheduleCount == null) this.studentRescheduleCount = 0;
+        if (this.forceShifted == null) this.forceShifted = false;
     }
 
     @PreUpdate
@@ -350,6 +404,110 @@ public class CounsellingAppointment implements Serializable {
 
     public void setEntitlementId(Long entitlementId) {
         this.entitlementId = entitlementId;
+    }
+
+    public String getCancelledByRole() {
+        return cancelledByRole;
+    }
+
+    public void setCancelledByRole(String cancelledByRole) {
+        this.cancelledByRole = cancelledByRole;
+    }
+
+    public Long getCancelledByUserId() {
+        return cancelledByUserId;
+    }
+
+    public void setCancelledByUserId(Long cancelledByUserId) {
+        this.cancelledByUserId = cancelledByUserId;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
+    }
+
+    public String getCancellationNote() {
+        return cancellationNote;
+    }
+
+    public void setCancellationNote(String cancellationNote) {
+        this.cancellationNote = cancellationNote;
+    }
+
+    public LocalDateTime getCancelledAt() {
+        return cancelledAt;
+    }
+
+    public void setCancelledAt(LocalDateTime cancelledAt) {
+        this.cancelledAt = cancelledAt;
+    }
+
+    public String getMissedByRole() {
+        return missedByRole;
+    }
+
+    public void setMissedByRole(String missedByRole) {
+        this.missedByRole = missedByRole;
+    }
+
+    public LocalDateTime getMarkedAbsentAt() {
+        return markedAbsentAt;
+    }
+
+    public void setMarkedAbsentAt(LocalDateTime markedAbsentAt) {
+        this.markedAbsentAt = markedAbsentAt;
+    }
+
+    public Long getMarkedAbsentBy() {
+        return markedAbsentBy;
+    }
+
+    public void setMarkedAbsentBy(Long markedAbsentBy) {
+        this.markedAbsentBy = markedAbsentBy;
+    }
+
+    public LocalDateTime getDisputeRaisedAt() {
+        return disputeRaisedAt;
+    }
+
+    public void setDisputeRaisedAt(LocalDateTime disputeRaisedAt) {
+        this.disputeRaisedAt = disputeRaisedAt;
+    }
+
+    public LocalDateTime getDisputeResolvedAt() {
+        return disputeResolvedAt;
+    }
+
+    public void setDisputeResolvedAt(LocalDateTime disputeResolvedAt) {
+        this.disputeResolvedAt = disputeResolvedAt;
+    }
+
+    public Long getDisputeResolvedBy() {
+        return disputeResolvedBy;
+    }
+
+    public void setDisputeResolvedBy(Long disputeResolvedBy) {
+        this.disputeResolvedBy = disputeResolvedBy;
+    }
+
+    public Boolean getForceShifted() {
+        return forceShifted != null && forceShifted;
+    }
+
+    public void setForceShifted(Boolean forceShifted) {
+        this.forceShifted = forceShifted;
+    }
+
+    public LocalDateTime getShiftedFromStart() {
+        return shiftedFromStart;
+    }
+
+    public void setShiftedFromStart(LocalDateTime shiftedFromStart) {
+        this.shiftedFromStart = shiftedFromStart;
     }
 
     public LocalDateTime getCreatedAt() {

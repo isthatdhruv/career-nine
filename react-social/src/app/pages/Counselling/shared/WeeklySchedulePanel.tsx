@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { getTemplatesByCounsellor, deleteTemplate } from '../API/AvailabilityTemplateAPI'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
-import WeeklyScheduleForm from './WeeklyScheduleForm'
+import WeeklyScheduleForm, { ExistingSlot } from './WeeklyScheduleForm'
 
 interface Template {
   id: number
@@ -20,6 +20,12 @@ interface Props {
   onOfficeAddressChange: (value: string) => void
   meetingLink?: string
   onMeetingLinkChange?: (value: string) => void
+  /**
+   * The counsellor's slots, when the parent already has them. Passed straight to the
+   * form so its "already covered" warning can name the dates that really collide
+   * instead of guessing from the weekly rules. Absent on the several-counsellors path.
+   */
+  existingSlots?: ExistingSlot[]
   /** Lets the parent page refresh its own lists after a change. */
   onChanged?: () => void
 }
@@ -50,6 +56,7 @@ const CounsellorWeeklySchedulePanel: React.FC<Props> = ({
   onOfficeAddressChange,
   meetingLink,
   onMeetingLinkChange,
+  existingSlots,
   onChanged,
 }) => {
   const single = counsellorIds.length === 1 ? counsellorIds[0] : null
@@ -213,6 +220,7 @@ const CounsellorWeeklySchedulePanel: React.FC<Props> = ({
         onSaved={(text) => afterChange(editing ? 'Schedule updated.' : text)}
         onError={handleSaveError}
         existingTemplates={templates}
+        existingSlots={existingSlots}
         ignoreTemplateId={editing?.id}
         initial={editing ? {
           days: [editing.dayOfWeek],

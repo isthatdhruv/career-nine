@@ -30,7 +30,7 @@ const CounsellorDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Per-appointment check-in UI state: whether a code was sent + the typed code.
+  // Per-appointment check-in UI state: whether check-in is open + the typed code.
   const [otpSent, setOtpSent] = useState<Record<number, boolean>>({})
   const [otpCode, setOtpCode] = useState<Record<number, string>>({})
   const [checkinMsg, setCheckinMsg] = useState<Record<number, string>>({})
@@ -93,7 +93,7 @@ const CounsellorDashboardPage: React.FC = () => {
     try {
       await startSession(appointmentId)
       setOtpSent((p) => ({ ...p, [appointmentId]: true }))
-      setCheckinMsg((p) => ({ ...p, [appointmentId]: 'Code sent to the student. Ask them for it.' }))
+      setCheckinMsg((p) => ({ ...p, [appointmentId]: 'Ask the student for the 4-digit code on their report.' }))
     } catch (e: any) {
       const body = e?.response?.data
       showErrorToast(typeof body === 'string' ? body : 'Could not start the session.')
@@ -290,18 +290,18 @@ const CounsellorDashboardPage: React.FC = () => {
                           style={{ fontSize: 13, padding: '6px 14px' }}
                           onClick={() => handleStartSession(appt.id)}
                         >
-                          Start session (send check-in code)
+                          Start session
                         </button>
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                           <input
                             type='text'
                             inputMode='numeric'
-                            maxLength={6}
-                            placeholder='6-digit code'
+                            maxLength={4}
+                            placeholder='4-digit code'
                             value={otpCode[appt.id] || ''}
                             onChange={(e) =>
-                              setOtpCode((p) => ({ ...p, [appt.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))
+                              setOtpCode((p) => ({ ...p, [appt.id]: e.target.value.replace(/\D/g, '').slice(0, 4) }))
                             }
                             style={{ padding: '7px 10px', border: '1.5px solid var(--sp-border, #D1E5DF)', borderRadius: 8, fontSize: 14, width: 130 }}
                           />
@@ -311,13 +311,6 @@ const CounsellorDashboardPage: React.FC = () => {
                             onClick={() => handleVerifyCheckin(appt.id)}
                           >
                             Verify &amp; start
-                          </button>
-                          <button
-                            className='cl-btn-secondary'
-                            style={{ fontSize: 12, padding: '6px 12px' }}
-                            onClick={() => handleStartSession(appt.id)}
-                          >
-                            Resend code
                           </button>
                         </div>
                       )}

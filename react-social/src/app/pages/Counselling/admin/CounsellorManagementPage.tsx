@@ -349,6 +349,8 @@ const CounsellorManagementPage: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), 3500)
   }
 
+  const [impersonatingId, setImpersonatingId] = useState<number | null>(null)
+
   const handleAddClick = () => {
     setEditingCounsellor(null)
     setShowForm(true)
@@ -426,6 +428,39 @@ const CounsellorManagementPage: React.FC = () => {
     return instituteMappings.find(
       (m) => m.isActive && m.counsellor.id === counsellorId
     ) || null
+  }
+
+  /**
+   * Open the counsellor portal AS this counsellor, in a new tab.
+   *
+   * <p>Mirrors "Open as Student": the server mints a short-lived JWT, the new tab moves it
+   * into its own sessionStorage, and the admin's session here is never touched. Closing that
+   * tab ends the impersonation.
+   *
+   * <p>window.open is called BEFORE the await so the browser attributes it to the click and
+   * does not block it as a popup.
+   */
+  const handleOpenAsCounsellor = async (counsellor: Counsellor) => {
+    const id = getCounsellorId(counsellor)
+    if (!id) return
+    const tab = window.open('', '_blank')
+    setImpersonatingId(id)
+    try {
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/admin/impersonate/counsellor/${id}`)
+      const token = res?.data?.token
+      if (!token) throw new Error('no token')
+      const url = `${window.location.origin}/counsellor/impersonate?t=${encodeURIComponent(token)}`
+      if (tab) tab.location.href = url
+      else window.open(url, '_blank')
+    } catch (err: any) {
+      if (tab) tab.close()
+      const msg = err?.response?.data
+      alert(typeof msg === 'string' && msg
+        ? msg
+        : "Could not open this counsellor's portal. They may not have a login account.")
+    } finally {
+      setImpersonatingId(null)
+    }
   }
 
   const handleDeallocate = async (counsellor: Counsellor) => {
@@ -899,6 +934,15 @@ const CounsellorManagementPage: React.FC = () => {
                         )}
                       >
                         Slots
+                      </button>
+                      <button
+                        className='cl-btn-outline'
+                        style={{ fontSize: 12, padding: '5px 12px', color: '#6D28D9', borderColor: '#DDD6FE' }}
+                        onClick={() => handleOpenAsCounsellor(c)}
+                        disabled={impersonatingId === getCounsellorId(c)}
+                        title='Open the counsellor portal as this counsellor, in a new tab'
+                      >
+                        {impersonatingId === getCounsellorId(c) ? 'Opening…' : 'Open as Counsellor'}
                       </button>
                     </div>
                   </td>

@@ -32,6 +32,7 @@ function formatDate(dateStr: string): string {
   if (!dateStr) return '—'
   try {
     const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return '—'
     return d.toLocaleString('en-IN', {
       day: 'numeric',
       month: 'short',
@@ -228,7 +229,13 @@ const CounsellorNotesPage: React.FC = () => {
             const isFormOpen = !!expandedForms[appt.id]
             const form = formStates[appt.id] || defaultNotesForm()
             const isSaving = !!savingMap[appt.id]
-            const slotDate = appt.slot?.startTime || appt.scheduledAt || ''
+            // slot.date and slot.startTime are stored separately ("2026-08-10" + "14:15:00").
+            // Passing startTime on its own produced "Invalid Date" on every row — it is a time
+            // of day, not a timestamp, so it has to be joined to the date first.
+            const slotDate =
+              appt.slot?.date && appt.slot?.startTime
+                ? `${appt.slot.date}T${String(appt.slot.startTime).slice(0, 8)}`
+                : appt.scheduledAt || ''
             const studentName = getStudentName(appt)
 
             return (
@@ -236,8 +243,8 @@ const CounsellorNotesPage: React.FC = () => {
                 {/* Session header */}
                 <div className='cp-note-item' style={{ marginBottom: existingNotes || isFormOpen ? 12 : 0 }}>
                   <div className='cp-note-meta'>
-                    <span>{studentName}</span>
-                    <span>{formatDate(slotDate)}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#1A1F2E' }}>{studentName}</span>
+                    <span style={{ fontWeight: 600 }}>{formatDate(slotDate)}</span>
                   </div>
                   {appt.reason && (
                     <div className='cp-note-text' style={{ marginBottom: 8, color: '#6B7A8D', fontSize: 11 }}>
@@ -250,7 +257,7 @@ const CounsellorNotesPage: React.FC = () => {
                     <div style={{ marginTop: 6 }}>
                       {existingNotes.keyDiscussionPoints && (
                         <div style={{ marginBottom: 4 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#6B7A8D', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                             Key Points
                           </span>
                           <div className='cp-note-text' style={{ marginTop: 2 }}>
@@ -260,7 +267,7 @@ const CounsellorNotesPage: React.FC = () => {
                       )}
                       {existingNotes.publicRemarks && (
                         <div style={{ marginBottom: 4 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: '#6B7A8D', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                             Remarks
                           </span>
                           <div className='cp-note-text' style={{ marginTop: 2 }}>

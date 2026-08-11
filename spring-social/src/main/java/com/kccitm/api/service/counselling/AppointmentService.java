@@ -11,6 +11,7 @@ import javax.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.exception.BadRequestException;
@@ -22,13 +23,33 @@ import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
+import com.kccitm.api.service.b2c.EntitlementService;
 
 @Service
 public class AppointmentService {
 
     private static final Logger logger = LoggerFactory.getLogger(AppointmentService.class);
 
-    private static final int CANCELLATION_WINDOW_HOURS = 4;
+    /** Who caused a cancellation. Drives the miss allowance, the slot outcome and the emails. */
+    public static final String ROLE_STUDENT = "STUDENT";
+    public static final String ROLE_COUNSELLOR = "COUNSELLOR";
+    public static final String ROLE_ADMIN = "ADMIN";
+
+    /**
+     * Students get 2 hours, counsellors 4. Deliberately different: between 4 and 2 hours
+     * before a session the student can still cancel but the counsellor cannot. Sessions run
+     * in business hours, so a longer counsellor window would be unreachable for most of the
+     * day and would produce silent no-shows instead of cancellations.
+     */
+    @Value("${app.counselling.student-cancellation-window-hours:2}")
+    private int studentWindowHours;
+
+    @Value("${app.counselling.counsellor-cancellation-window-hours:4}")
+    private int counsellorWindowHours;
+
+    /** Cancellations + no-shows she caused, before the next session must be paid for. */
+    @Value("${app.counselling.miss-allowance:2}")
+    private int missAllowance;
 
     @Autowired
     private CounsellingAppointmentRepository appointmentRepository;
@@ -47,6 +68,12 @@ public class AppointmentService {
 
     @Autowired
     private MeetingLinkService meetingLinkService;
+
+    @Autowired
+    private CounsellingClock clock;
+
+    @Autowired
+    private EntitlementService entitlementService;
 
     // ─── Queries ─────────────────────────────────────────────────────────────────
 
@@ -210,109 +237,314 @@ public class AppointmentService {
         return appointment;
     }
 
+    // ─── Miss allowance ──────────────────────────────────────────────────────────
+
     /**
-     * Cancels an appointment.
-     * Enforces the {@value #CANCELLATION_WINDOW_HOURS}-hour cancellation window:
-     * cancellation is not permitted if fewer than CANCELLATION_WINDOW_HOURS hours
-     * remain before the session start.
+     * Cancellations and no-shows the student caused on this entitlement, counted together.
+     * One shared counter rather than two ladders: separate counters would give four free
+     * misses and invite cancelling twice then no-showing twice.
+     */
+    public int countStudentMisses(Long entitlementId) {
+        if (entitlementId == null) return 0;
+        Long n = appointmentRepository.countStudentMissesForEntitlement(entitlementId);
+        return n == null ? 0 : n.intValue();
+    }
+
+    /**
+     * Her misses that came before {@code appointmentId} — the count the credit-back decision
+     * needs, since it is asking "is this her first?" and must not see itself or anything
+     * later. See {@code countStudentMissesBefore} for why plain counting is not safe here.
+     */
+    public int countStudentMissesBefore(Long entitlementId, Long appointmentId) {
+        if (entitlementId == null || appointmentId == null) return 0;
+        Long n = appointmentRepository.countStudentMissesBefore(entitlementId, appointmentId);
+        return n == null ? 0 : n.intValue();
+    }
+
+    /** Misses she has left before the next session has to be paid for. Never negative. */
+    public int remainingMisses(Long entitlementId) {
+        return Math.max(0, missAllowance - countStudentMisses(entitlementId));
+    }
+
+    /** True when the next booking on this entitlement is free rather than chargeable. */
+    public boolean hasMissAllowanceRemaining(Long entitlementId) {
+        return remainingMisses(entitlementId) > 0;
+    }
+
+    public int getMissAllowance() {
+        return missAllowance;
+    }
+
+    public int getStudentWindowHours() {
+        return studentWindowHours;
+    }
+
+    public int getCounsellorWindowHours() {
+        return counsellorWindowHours;
+    }
+
+    // ─── Cancellation ────────────────────────────────────────────────────────────
+
+    /**
+     * Legacy 3-arg entry point, kept for the existing {@code PUT /cancel/{id}} route.
+     *
+     * <p>Attribution is inferred rather than guessed at random: if the caller is the
+     * appointment's own counsellor it is a counsellor cancellation, otherwise an admin one.
+     * Critically it can never resolve to {@code STUDENT}, so this path cannot consume a
+     * student's miss allowance — a student cancellation must come through the dedicated
+     * student endpoint, which proves ownership first.
      */
     @Transactional
     public CounsellingAppointment cancel(Long appointmentId, User cancelledBy, String reason) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
-        CounsellingSlot slot = appointment.getSlot();
+        Long callerId = cancelledBy != null ? cancelledBy.getId() : null;
+        Counsellor own = appointment.getCounsellor();
+        boolean callerIsTheCounsellor = own != null && own.getUser() != null && callerId != null
+                && callerId.equals(own.getUser().getId());
 
-        // Enforce 4-hour cancellation window
-        LocalDateTime sessionTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
-        if (LocalDateTime.now().plusHours(CANCELLATION_WINDOW_HOURS).isAfter(sessionTime)) {
-            throw new BadRequestException(
-                    "Cannot cancel: session starts within " + CANCELLATION_WINDOW_HOURS
-                            + " hours. Please contact support directly.");
-        }
+        return cancel(appointmentId, cancelledBy,
+                callerIsTheCounsellor ? ROLE_COUNSELLOR : ROLE_ADMIN, null, reason);
+    }
+
+    /**
+     * Cancels an appointment, with the consequences that follow from <b>who</b> cancelled.
+     *
+     * <p>Three things branch on the role, and getting any of them wrong penalises the wrong
+     * person (see docs/COUNSELLING_CANCELLATION.md §2):
+     *
+     * <ul>
+     *   <li><b>The window.</b> Students are held to 2 hours, counsellors to 4, and admins to
+     *       none — an admin cancellation is an operational decision, not a request.</li>
+     *   <li><b>The slot.</b> A student or admin cancellation returns the hour to
+     *       {@code AVAILABLE} so someone else can take it. A counsellor cancellation blocks
+     *       it: the counsellor is not there, so it must not be resold. The old behaviour set
+     *       every cancelled slot to {@code CANCELLED}, which
+     *       {@code SlotMaterializationService} then skips forever — quietly destroying an
+     *       hour of capacity on every cancellation.</li>
+     *   <li><b>The allowance.</b> Only a student cancellation counts against her two misses,
+     *       and only the first one credits the session back. Skipping the credit on the
+     *       second is precisely what makes her next booking chargeable.</li>
+     * </ul>
+     *
+     * @param cancellerRole one of {@link #ROLE_STUDENT}, {@link #ROLE_COUNSELLOR}, {@link #ROLE_ADMIN}
+     * @param reasonCode    dropdown value, stored for reporting
+     * @param note          free text; required by the caller when the reason is {@code OTHER}
+     */
+    @Transactional
+    public CounsellingAppointment cancel(Long appointmentId, User cancelledBy, String cancellerRole,
+                                         String reasonCode, String note) {
+        CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
+
+        String role = cancellerRole == null ? ROLE_ADMIN : cancellerRole.toUpperCase();
+        CounsellingSlot slot = appointment.getSlot();
+        String reason = buildReasonText(reasonCode, note);
+
+        guardCancellableStatus(appointment);
+        enforceCancellationWindow(appointment, slot, role);
 
         String oldStatus = appointment.getStatus();
         Counsellor assignedCounsellor = appointment.getCounsellor();
 
+        // Only a student's own cancellation costs her an allowance, and only when the system
+        // actually had a session to give her. A parked session is the one exception: the
+        // counsellor dropped out and nothing was offered in return, so walking away from it
+        // is not a choice she made. Being moved to another counsellor IS a session — declining
+        // that time is her choice and spends an allowance.
+        boolean parked = "AWAITING_RESCHEDULE".equals(oldStatus);
+        boolean countsAsMiss = ROLE_STUDENT.equals(role) && !parked;
+        // Misses already used BEFORE this one. Zero means this is her first, which is still free.
+        int priorMisses = countsAsMiss ? countStudentMisses(appointment.getEntitlementId()) : 0;
+        boolean creditBack = !countsAsMiss || priorMisses < (missAllowance - 1);
+
         appointment.setStatus("CANCELLED");
-        slot.setStatus("CANCELLED");
-        slotRepository.save(slot);
+        appointment.setCancelledByRole(role);
+        appointment.setCancelledByUserId(cancelledBy != null ? cancelledBy.getId() : null);
+        appointment.setCancellationReason(reasonCode);
+        appointment.setCancellationNote(note);
+        appointment.setCancelledAt(clock.now());
+
+        releaseSlot(slot, role);
         appointment = appointmentRepository.save(appointment);
 
-        logger.info("Appointment {} cancelled by user {}, reason: {}",
-                appointmentId, cancelledBy != null ? cancelledBy.getId() : "unknown", reason);
-
-        // Determine canceller identity to decide who to notify
-        Long cancellerUserId = cancelledBy != null ? cancelledBy.getId() : null;
-
-        // Notify student if the canceller is not the student
-        Long studentUserId = appointment.getStudent().getUserId();
-        if (!studentUserId.equals(cancellerUserId)) {
-            String cancellerName = cancelledBy != null
-                    ? (cancelledBy.getName() != null ? cancelledBy.getName() : "Admin")
-                    : "Admin";
-            String studentEmail = appointment.getStudent().getStudentInfo().getEmail();
-            String studentName = appointment.getStudent().getStudentInfo().getName();
-            notificationService.sendCancellationEmail(appointment, cancellerName, studentEmail, studentName);
-
+        if (creditBack && appointment.getEntitlementId() != null) {
             try {
-                User studentUser = new User();
-                studentUser.setId(studentUserId);
-                notificationService.createInAppNotification(
-                        studentUser,
-                        "APPOINTMENT_CANCELLED",
-                        "Counselling Session Cancelled",
-                        "Your counselling session has been cancelled. Reason: " + (reason != null ? reason : "N/A"),
-                        appointment.getId(),
-                        "APPOINTMENT");
+                entitlementService.creditBackCounsellingSession(appointment.getEntitlementId());
             } catch (Exception e) {
-                logger.warn("Failed to create in-app cancellation notification for student: {}", e.getMessage());
+                logger.warn("Session credit-back failed for appointment {} (entitlement {}): {}",
+                        appointmentId, appointment.getEntitlementId(), e.getMessage());
             }
         }
 
-        // Notify counsellor if assigned and the canceller is not the counsellor
-        if (assignedCounsellor != null) {
-            Long counsellorUserId = assignedCounsellor.getUser() != null
-                    ? assignedCounsellor.getUser().getId()
-                    : null;
-            if (counsellorUserId == null || !counsellorUserId.equals(cancellerUserId)) {
-                String cancellerName = cancelledBy != null
-                        ? (cancelledBy.getName() != null ? cancelledBy.getName() : "Admin")
-                        : "Admin";
-                notificationService.sendCancellationEmail(
-                        appointment, cancellerName,
-                        assignedCounsellor.getEmail(), assignedCounsellor.getName());
+        logger.info("Appointment {} cancelled by {} (user {}), reason: {}, slot -> {}, creditBack={}",
+                appointmentId, role, cancelledBy != null ? cancelledBy.getId() : "unknown",
+                reasonCode, slot != null ? slot.getStatus() : "n/a", creditBack);
 
-                if (assignedCounsellor.getUser() != null) {
-                    notificationService.createInAppNotification(
-                            assignedCounsellor.getUser(),
-                            "APPOINTMENT_CANCELLED",
-                            "Counselling Session Cancelled",
-                            "A session assigned to you has been cancelled. Reason: "
-                                    + (reason != null ? reason : "N/A"),
-                            appointment.getId(),
-                            "APPOINTMENT");
-                }
-            }
-        }
+        notifyOnCancellation(appointment, assignedCounsellor, cancelledBy, role, reason, creditBack);
 
-        // Audit log with old/new values
         Map<String, Object> oldValues = new HashMap<>();
         oldValues.put("status", oldStatus);
 
         Map<String, Object> newValues = new HashMap<>();
         newValues.put("status", "CANCELLED");
+        newValues.put("cancelledByRole", role);
+        newValues.put("cancellationReason", reasonCode);
+        newValues.put("creditedBack", creditBack);
 
         auditLogService.log(appointment, "CANCELLED", cancelledBy, reason, oldValues, newValues);
 
         return appointment;
     }
 
+    // ─── Cancellation helpers ────────────────────────────────────────────────────
+
+    /**
+     * A session that has started or finished cannot be cancelled. The window check catches
+     * most of this incidentally (a past start time is always inside any window), but an
+     * admin bypasses the window entirely, so the status guard has to stand on its own.
+     */
+    private void guardCancellableStatus(CounsellingAppointment appointment) {
+        String status = appointment.getStatus() == null ? "" : appointment.getStatus().toUpperCase();
+        if ("IN_PROGRESS".equals(status) || "COMPLETED".equals(status)
+                || "CANCELLED".equals(status) || "MISSED".equals(status)
+                || "RESCHEDULED".equals(status)) {
+            throw new BadRequestException("This session is " + status + " and can no longer be cancelled.");
+        }
+    }
+
+    /**
+     * The cutoff, by role. Admins have none — an admin cancellation is an operational
+     * decision that costs nobody anything, so there is nothing to protect against.
+     *
+     * <p>A force-shifted session is exempt for the student too: the counsellor moved her to
+     * this time, and the window exists to protect the counsellor's diary from late student
+     * changes, not to trap her in an hour she never chose.
+     *
+     * <p>Uses {@link CounsellingClock}, not {@code LocalDateTime.now()} — slot times are IST
+     * wall-clock while the JVM runs UTC, so the raw clock under-restricts by 5h30m and would
+     * happily permit a cancellation hours after the session had ended.
+     */
+    private void enforceCancellationWindow(CounsellingAppointment appointment,
+                                           CounsellingSlot slot, String role) {
+        if (ROLE_ADMIN.equals(role)) return;
+        if (slot == null || slot.getDate() == null || slot.getStartTime() == null) return;
+        // The counsellor put her at this time, so the notice period cannot be held against
+        // her. It still costs an allowance — the window and the allowance are separate rules.
+        if (ROLE_STUDENT.equals(role) && appointment.getForceShifted()) return;
+
+        int hours = ROLE_COUNSELLOR.equals(role) ? counsellorWindowHours : studentWindowHours;
+        LocalDateTime sessionTime = clock.sessionStart(slot.getDate(), slot.getStartTime());
+        if (clock.isWithinHoursOfNow(sessionTime, hours)) {
+            throw new BadRequestException(
+                    "Cannot cancel: the session starts within " + hours
+                            + " hours. Please contact support directly.");
+        }
+    }
+
+    /**
+     * What happens to the vacated hour, which depends entirely on who walked away.
+     *
+     * <p>A student or admin cancellation frees the slot — the counsellor is still there and
+     * someone else can take the time. A counsellor cancellation blocks it, because they are
+     * not. The previous behaviour marked every cancelled slot {@code CANCELLED}, a status
+     * {@code SlotMaterializationService} skips permanently, so each cancellation silently
+     * destroyed an hour of capacity that nothing ever restored.
+     */
+    private void releaseSlot(CounsellingSlot slot, String role) {
+        if (slot == null) return;
+        if (ROLE_COUNSELLOR.equals(role)) {
+            slot.setStatus("CANCELLED");
+            slot.setIsBlocked(true);
+        } else {
+            slot.setStatus("AVAILABLE");
+            slot.setIsBlocked(false);
+        }
+        slotRepository.save(slot);
+    }
+
+    private String buildReasonText(String reasonCode, String note) {
+        if (reasonCode == null || reasonCode.isEmpty()) return note;
+        if (note == null || note.isEmpty()) return reasonCode;
+        return reasonCode + ": " + note;
+    }
+
+    /**
+     * Who hears about it, which again turns on the role.
+     *
+     * <ul>
+     *   <li><b>Student cancelled</b> — she gets her own confirmation with the misses she has
+     *       left; the counsellor is told, with the reason (previously passed in and then
+     *       discarded).</li>
+     *   <li><b>Counsellor cancelled</b> — the student is told. The counsellor is not: they
+     *       initiated it and already know.</li>
+     *   <li><b>Admin cancelled</b> — <i>both</i> are told, because neither of them did it.</li>
+     * </ul>
+     */
+    private void notifyOnCancellation(CounsellingAppointment appointment, Counsellor counsellor,
+                                      User cancelledBy, String role, String reason, boolean creditBack) {
+        String cancellerName = cancelledBy != null && cancelledBy.getName() != null
+                ? cancelledBy.getName() : "Career-9";
+        Long studentUserId = appointment.getStudent() != null ? appointment.getStudent().getUserId() : null;
+
+        try {
+            if (ROLE_STUDENT.equals(role)) {
+                notificationService.sendStudentCancellationConfirmation(
+                        appointment, remainingMisses(appointment.getEntitlementId()), creditBack);
+                if (counsellor != null) {
+                    notificationService.sendCancellationEmail(appointment, cancellerName,
+                            counsellor.getEmail(), counsellor.getName(), reason);
+                    notifyCounsellorInApp(counsellor, appointment, reason);
+                }
+            } else if (ROLE_COUNSELLOR.equals(role)) {
+                notificationService.sendCancellationEmail(appointment, cancellerName,
+                        notificationService.recipientStudentEmail(appointment),
+                        notificationService.recipientStudentName(appointment), reason);
+                notifyStudentInApp(studentUserId, appointment, reason);
+            } else {
+                // Admin: nobody involved chose this, so tell both sides and promise a follow-up.
+                notificationService.sendAdminCancellationEmail(appointment);
+                notifyStudentInApp(studentUserId, appointment, reason);
+                if (counsellor != null) notifyCounsellorInApp(counsellor, appointment, reason);
+            }
+        } catch (Exception e) {
+            logger.warn("Cancellation notifications failed for appointment {}: {}",
+                    appointment.getId(), e.getMessage());
+        }
+    }
+
+    private void notifyStudentInApp(Long studentUserId, CounsellingAppointment appointment, String reason) {
+        if (studentUserId == null) return;
+        try {
+            User studentUser = new User();
+            studentUser.setId(studentUserId);
+            notificationService.createInAppNotification(studentUser, "APPOINTMENT_CANCELLED",
+                    "Counselling Session Cancelled",
+                    "Your counselling session has been cancelled. Reason: " + (reason != null ? reason : "N/A"),
+                    appointment.getId(), "APPOINTMENT");
+        } catch (Exception e) {
+            logger.warn("Failed to create in-app cancellation notification for student: {}", e.getMessage());
+        }
+    }
+
+    private void notifyCounsellorInApp(Counsellor counsellor, CounsellingAppointment appointment, String reason) {
+        if (counsellor == null || counsellor.getUser() == null) return;
+        try {
+            notificationService.createInAppNotification(counsellor.getUser(), "APPOINTMENT_CANCELLED",
+                    "Counselling Session Cancelled",
+                    "A session assigned to you has been cancelled. Reason: " + (reason != null ? reason : "N/A"),
+                    appointment.getId(), "APPOINTMENT");
+        } catch (Exception e) {
+            logger.warn("Failed to create in-app cancellation notification for counsellor: {}", e.getMessage());
+        }
+    }
+
     /**
      * Reschedules an appointment to a new slot.
-     * Enforces the {@value #CANCELLATION_WINDOW_HOURS}-hour window on the old slot,
-     * verifies the new slot is AVAILABLE, marks the old appointment RESCHEDULED,
-     * and creates a new CONFIRMED appointment on the new slot.
+     * Enforces the student cancellation window on the old slot, verifies the new slot is
+     * AVAILABLE, marks the old appointment RESCHEDULED, and creates a new CONFIRMED
+     * appointment on the new slot.
      *
      * Backwards-compatible overload that defaults to student behaviour
      * (counts toward the student cap of 1).
@@ -334,10 +566,10 @@ public class AppointmentService {
     }
 
     /**
-     * As {@link #reschedule(Long, Long, User, boolean)} but can bypass the
-     * {@value #CANCELLATION_WINDOW_HOURS}-hour window. The admin "change counsellor & rebook" of a
-     * session whose time has already passed sets this true — the window check would otherwise
-     * reject every past session outright (now + window is always after a past start time).
+     * As {@link #reschedule(Long, Long, User, boolean)} but can bypass the cancellation
+     * window. The admin "change counsellor &amp; rebook" of a session whose time has already
+     * passed sets this true — the window check would otherwise reject every past session
+     * outright (now + window is always after a past start time).
      */
     @Transactional
     public CounsellingAppointment reschedule(Long appointmentId, Long newSlotId, User counsellorUser,
@@ -347,22 +579,33 @@ public class AppointmentService {
 
         CounsellingSlot oldSlot = oldAppointment.getSlot();
 
-        // Enforce 4-hour window on old slot (skipped for an admin rebook of an already-passed session).
-        if (!bypassCancellationWindow) {
-            LocalDateTime oldSessionTime = LocalDateTime.of(oldSlot.getDate(), oldSlot.getStartTime());
-            if (LocalDateTime.now().plusHours(CANCELLATION_WINDOW_HOURS).isAfter(oldSessionTime)) {
+        // A PARKED session is exempt from every timing and quota rule below. Its old slot time
+        // is meaningless — the counsellor dropped out, and picking a new time is the only
+        // action left to the student. Enforcing the window against the slot she lost would
+        // lock her out of replacing it, and counting it against her reschedule quota would
+        // charge her for someone else's cancellation.
+        boolean parked = "AWAITING_RESCHEDULE".equals(oldAppointment.getStatus());
+
+        // Student window on the old slot. Skipped for an admin rebook of an already-passed
+        // session, and for a session the counsellor force-shifted her into — she did not
+        // choose that time, so the window has no business holding her to it.
+        if (!bypassCancellationWindow && !parked && !oldAppointment.getForceShifted()) {
+            LocalDateTime oldSessionTime = clock.sessionStart(oldSlot.getDate(), oldSlot.getStartTime());
+            if (clock.isWithinHoursOfNow(oldSessionTime, studentWindowHours)) {
                 throw new BadRequestException(
-                        "Cannot reschedule: session starts within " + CANCELLATION_WINDOW_HOURS
+                        "Cannot reschedule: the session starts within " + studentWindowHours
                                 + " hours. Please contact support directly.");
             }
         }
 
-        // Item 5: students may reschedule a session at most once.
-        // Admins bypass via the isAdmin flag (item 7).
+        // Allowances, not a separate reschedule cap, govern how often she can change a session:
+        // moving a session to a time that suits her spends one, exactly as cancelling does.
+        // Admins bypass via the isAdmin flag; a parked session is not her doing and is free.
         int existingStudentReschedules = oldAppointment.getStudentRescheduleCount();
-        if (!isAdmin && existingStudentReschedules >= 1) {
+        if (!isAdmin && !parked && remainingMisses(oldAppointment.getEntitlementId()) <= 0) {
             throw new BadRequestException(
-                    "You have already rescheduled this session once. Please contact your administrator for further changes.");
+                    "You have no free changes left, so this session cannot be moved. "
+                            + "Please attend it or contact your administrator.");
         }
 
         CounsellingSlot newSlot = slotRepository.findById(newSlotId)
@@ -377,6 +620,13 @@ public class AppointmentService {
         // other students can book it again. Blocked/manual slots stay bookable
         // exactly as they were; only the status flips back to AVAILABLE.
         oldAppointment.setStatus("RESCHEDULED");
+        // Attribute the abandoned row to her when she chose the move, so it spends an
+        // allowance exactly as a cancellation does — the allowance query counts attribution,
+        // not status. Admin rebooks and parked sessions stay unattributed and therefore free.
+        if (!isAdmin && !parked) {
+            oldAppointment.setCancelledByRole(ROLE_STUDENT);
+            oldAppointment.setCancelledAt(clock.now());
+        }
         oldSlot.setStatus("AVAILABLE");
         oldSlot.setIsBlocked(false);
         slotRepository.save(oldSlot);
@@ -401,6 +651,29 @@ public class AppointmentService {
         // reschedules increment it; admin reschedules preserve the existing value.
         newAppointment.setStudentRescheduleCount(
                 isAdmin ? existingStudentReschedules : existingStudentReschedules + 1);
+
+        // The entitlement the session was drawn from. Previously dropped, which orphaned
+        // every rescheduled appointment from the thing that paid for it: the miss allowance
+        // counts per entitlement and so silently read zero, credit-back became a no-op on
+        // its null guard, and a parked session lost the very link that parking exists to
+        // protect. Must survive the whole reschedule chain.
+        newAppointment.setEntitlementId(oldAppointment.getEntitlementId());
+
+        // Delivery details and the contacts given at booking. Also previously dropped, so a
+        // rescheduled session lost the parent/guardian address and the preferred channel —
+        // the parent would be told about the booking and then never hear about anything
+        // again. Mode/location follow the new slot where it has them, else carry over.
+        newAppointment.setMode(newSlot.getMode() != null ? newSlot.getMode() : oldAppointment.getMode());
+        newAppointment.setLocation(
+                "OFFLINE".equals(newAppointment.getMode()) && newSlot.getCounsellor() != null
+                        ? newSlot.getCounsellor().getOfficeAddress()
+                        : oldAppointment.getLocation());
+        newAppointment.setStudentContactName(oldAppointment.getStudentContactName());
+        newAppointment.setStudentContactEmail(oldAppointment.getStudentContactEmail());
+        newAppointment.setStudentContactPhone(oldAppointment.getStudentContactPhone());
+        newAppointment.setParentEmail(oldAppointment.getParentEmail());
+        newAppointment.setParentPhone(oldAppointment.getParentPhone());
+        newAppointment.setPreferredContactMethod(oldAppointment.getPreferredContactMethod());
 
         // Transition new slot to CONFIRMED
         newSlot.setStatus("CONFIRMED");

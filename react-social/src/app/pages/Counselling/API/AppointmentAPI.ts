@@ -24,3 +24,57 @@ export function verifyCheckin(appointmentId: number, code: string) { return axio
 
 // Counsellor dashboard headline summary (today's sessions + booked/free/upcoming counts).
 export function getDashboardSummary(counsellorId: number) { return axios.get(`${API_URL}/api/counsellor/${counsellorId}/dashboard-summary`) }
+
+// ── Cancellation and no-show (docs/COUNSELLING_CANCELLATION.md) ──────────────────
+//
+// Note these are separate routes rather than variants of `cancelAppointment` above.
+// That legacy PUT takes a body-supplied userId and never checks whose appointment it is;
+// the student route below proves ownership server-side before doing anything.
+
+export interface StudentCancellationInfo {
+  missesRemaining: number
+  missAllowance: number
+  cutoffHours: number
+  forceShifted: boolean
+  shiftedFromStart: string | null
+}
+
+/** Deadline + remaining-allowance figures for one session's card. */
+export function getStudentCancellationInfo(appointmentId: number) {
+  return axios.get<StudentCancellationInfo>(`${BASE}/student/cancellation-info/${appointmentId}`)
+}
+
+/** The student cancels her own session. `note` is required when reason is OTHER. */
+export function studentCancelAppointment(appointmentId: number, reason: string, note?: string) {
+  return axios.post(`${BASE}/student/cancel/${appointmentId}`, { reason, note })
+}
+
+/** The student contests an absent mark — suspends the strike until admin decides. */
+export function disputeAttendance(appointmentId: number, note?: string) {
+  return axios.post(`${BASE}/student/dispute/${appointmentId}`, { note })
+}
+
+/** Counsellor drops one session; the server re-places the student and reports the outcome. */
+export function counsellorCancelAppointment(
+  appointmentId: number, userId: number, reason: string, note?: string
+) {
+  return axios.post(`${BASE}/counsellor/cancel/${appointmentId}`, { userId, reason, note })
+}
+
+/** Counsellor records that the student did not appear. Session window only. */
+export function markStudentAbsent(appointmentId: number, userId: number) {
+  return axios.post(`${BASE}/mark-student-absent/${appointmentId}`, { userId })
+}
+
+/** Admin cancels a session — costs nobody anything, both parties emailed. */
+export function adminCancelAppointment(appointmentId: number, userId: number, note?: string) {
+  return axios.post(`${BASE}/admin/cancel/${appointmentId}`, { userId, note })
+}
+
+export function getAttendanceDisputes() { return axios.get(`${BASE}/disputes`) }
+
+export function resolveAttendanceDispute(
+  appointmentId: number, userId: number, upheld: boolean, note?: string
+) {
+  return axios.post(`${BASE}/disputes/resolve/${appointmentId}`, { userId, upheld, note })
+}
