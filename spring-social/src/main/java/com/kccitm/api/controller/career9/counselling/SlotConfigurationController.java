@@ -1,7 +1,5 @@
 package com.kccitm.api.controller.career9.counselling;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
@@ -21,12 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.counselling.Counsellor;
-import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.model.career9.counselling.SlotConfiguration;
 import com.kccitm.api.repository.Career9.counselling.AvailabilityTemplateRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.repository.Career9.counselling.SlotConfigurationRepository;
+import com.kccitm.api.service.counselling.SlotMaterializationService;
 
 @RestController
 @RequestMapping("/api/slot-configuration")
@@ -45,6 +43,9 @@ public class SlotConfigurationController {
 
     @Autowired
     private AvailabilityTemplateRepository templateRepository;
+
+    @Autowired
+    private SlotMaterializationService materializationService;
 
     /** Save a new slot configuration */
     // no scope arg: body is SlotConfiguration entity; admin-only
@@ -127,6 +128,7 @@ public class SlotConfigurationController {
                 .orElseThrow(() -> new ResourceNotFoundException("SlotConfiguration", "id", configId));
 
         int totalSlots = 0;
+        int totalSkipped = 0;
         int counsellorsProcessed = 0;
 
         for (Number idNum : idList) {
@@ -134,73 +136,21 @@ public class SlotConfigurationController {
             Counsellor counsellor = counsellorRepository.findById(counsellorId).orElse(null);
             if (counsellor == null) continue;
 
-            // Generate slots for each day in the date range
-            LocalDate date = config.getStartDate();
-            while (!date.isAfter(config.getEndDate())) {
-                totalSlots += generateSlotsForDay(counsellor, config, date);
-                date = date.plusDays(1);
-            }
+            // Slot rows are built by SlotMaterializationService, the same class the
+            // availability-template path uses, so both routes into the calendar create
+            // slots identically and share one definition of "this time is already taken".
+            SlotMaterializationService.MaterializationResult result =
+                    materializationService.materializeForConfiguration(counsellor, config);
+            totalSlots += result.created;
+            totalSkipped += result.skipped;
             counsellorsProcessed++;
         }
 
-        logger.info("Applied config {} to {} counsellors, created {} slots",
-                configId, counsellorsProcessed, totalSlots);
+        logger.info("Applied config {} to {} counsellors, created {} slots, skipped {} for conflicts",
+                configId, counsellorsProcessed, totalSlots, totalSkipped);
 
         return ResponseEntity.ok(Map.of(
                 "counsellorsProcessed", counsellorsProcessed,
                 "totalSlots", totalSlots));
-    }
-
-    /** Generate slot rows for a single counsellor on a single day using the config */
-    private int generateSlotsForDay(Counsellor counsellor, SlotConfiguration config, LocalDate date) {
-        int created = 0;
-
-        // Pre-fetch existing slots for this counsellor on this date
-        List<CounsellingSlot> existing = slotRepository.findByCounsellorIdAndDateBetween(
-                counsellor.getId(), date, date);
-
-        LocalTime cursor = config.getStartTime();
-
-        while (true) {
-            LocalTime slotEnd = cursor.plusMinutes(config.getSlotDuration());
-            if (slotEnd.isAfter(config.getEndTime())) break;
-
-            // Skip if cursor falls within break time
-            if (Boolean.TRUE.equals(config.getHasBreak())
-                    && config.getBreakStart() != null && config.getBreakEnd() != null) {
-                if (!cursor.isBefore(config.getBreakStart()) && cursor.isBefore(config.getBreakEnd())) {
-                    cursor = config.getBreakEnd();
-                    continue;
-                }
-                if (cursor.isBefore(config.getBreakStart()) && slotEnd.isAfter(config.getBreakStart())) {
-                    cursor = config.getBreakEnd();
-                    continue;
-                }
-            }
-
-            // Check for duplicate
-            final LocalTime checkStart = cursor;
-            final LocalTime checkEnd = slotEnd;
-            boolean duplicate = existing.stream().anyMatch(s ->
-                    s.getStartTime().equals(checkStart) && s.getEndTime().equals(checkEnd));
-
-            if (!duplicate) {
-                CounsellingSlot slot = new CounsellingSlot();
-                slot.setCounsellor(counsellor);
-                slot.setDate(date);
-                slot.setStartTime(cursor);
-                slot.setEndTime(slotEnd);
-                slot.setDurationMinutes(config.getSlotDuration());
-                slot.setStatus("AVAILABLE");
-                slot.setIsManuallyCreated(false);
-                slot.setIsBlocked(false);
-                slotRepository.save(slot);
-                created++;
-            }
-
-            cursor = slotEnd;
-        }
-
-        return created;
     }
 }

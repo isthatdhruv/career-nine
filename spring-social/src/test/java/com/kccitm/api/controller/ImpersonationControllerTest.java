@@ -2,6 +2,7 @@ package com.kccitm.api.controller;
 
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.security.UserPrincipal;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.when;
 class ImpersonationControllerTest {
 
     private UserStudentRepository userStudentRepository;
+    private CounsellorRepository counsellorRepository;
     private CustomUserDetailsService customUserDetailsService;
     private TokenProvider tokenProvider;
     private UserActivityLogService userActivityLogService;
@@ -34,11 +36,12 @@ class ImpersonationControllerTest {
     @BeforeEach
     void setup() {
         userStudentRepository = Mockito.mock(UserStudentRepository.class);
+        counsellorRepository = Mockito.mock(CounsellorRepository.class);
         customUserDetailsService = Mockito.mock(CustomUserDetailsService.class);
         tokenProvider = Mockito.mock(TokenProvider.class);
         userActivityLogService = Mockito.mock(UserActivityLogService.class);
         controller = new ImpersonationController(
-                userStudentRepository, customUserDetailsService,
+                userStudentRepository, counsellorRepository, customUserDetailsService,
                 tokenProvider, userActivityLogService);
     }
 

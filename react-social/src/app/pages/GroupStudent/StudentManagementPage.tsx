@@ -25,6 +25,11 @@ import {
   getGeneratedReportsForStudent,
 } from "../StudentInformation/StudentInfo_APIs";
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
+import { useAuth } from "../../modules/auth";
+import {
+  getStudentAppointments,
+  adminCancelAppointment,
+} from "../Counselling/API/AppointmentAPI";
 // XLSX retained ONLY for the Student List export (admin convenience for the
 // roster view). Per-student answer dumps + bulk answer dumps + proctoring
 // downloads are intentionally absent from this page.
@@ -117,6 +122,8 @@ export default function StudentManagementPage() {
   // Credentials-email send-in-flight tracking. Set of userStudentIds currently
   // being processed. Lets us disable the button + show a spinner per-row.
   const [sendingCredentialsFor, setSendingCredentialsFor] = useState<Set<number>>(new Set());
+  const [cancellingCounsellingFor, setCancellingCounsellingFor] = useState<Set<number>>(new Set());
+  const { currentUser } = useAuth();
   // Separate flag for the bulk-send button so a bulk run doesn't have to
   // populate the per-row set (and visa-versa).
   const [bulkSendingCredentials, setBulkSendingCredentials] = useState(false);
@@ -793,6 +800,62 @@ export default function StudentManagementPage() {
    * "queued failed" (no email / no DOB / no username) — actual SMTP success
    * shows up only in backend logs.
    */
+  /**
+   * Cancel a student's upcoming counselling session on the team's behalf.
+   *
+   * <p>An admin cancellation is an operational decision, not anyone's fault, so it costs
+   * nobody anything: her miss allowance is untouched, the paid session is credited back,
+   * nothing is recorded against the counsellor, and the slot reopens. Both of them are
+   * emailed that the team will be in touch — unlike a counsellor's own cancellation, where
+   * the counsellor is deliberately told nothing, because here neither party chose it.
+   */
+  const openCounsellingCancel = async (student: Student) => {
+    if (cancellingCounsellingFor.has(student.userStudentId)) return;
+    const adminUserId = Number(currentUser?.id ?? (currentUser as any)?.userId ?? 0);
+    if (!adminUserId) {
+      showErrorToast("Could not identify the signed-in admin.");
+      return;
+    }
+
+    setCancellingCounsellingFor((prev) => new Set(prev).add(student.userStudentId));
+    try {
+      const res = await getStudentAppointments(student.userStudentId);
+      const rows: any[] = Array.isArray(res.data) ? res.data : [];
+      const active = rows.find((a) =>
+        ["CONFIRMED", "ASSIGNED", "PENDING", "AWAITING_RESCHEDULE"].includes(
+          String(a.status || "").toUpperCase()));
+
+      if (!active) {
+        showErrorToast(`${student.name} has no upcoming counselling session.`);
+        return;
+      }
+      const when = active.slot?.date
+        ? `${active.slot.date} at ${String(active.slot.startTime || "").slice(0, 5)}`
+        : "the scheduled time";
+      // eslint-disable-next-line no-restricted-globals
+      if (!window.confirm(
+        `Cancel ${student.name}'s counselling session on ${when}?\n\n`
+        + `Nothing will be counted against the student, the counsellor's record is unaffected, `
+        + `and the slot is reopened. Both will be emailed that the team will be in touch.`
+      )) {
+        return;
+      }
+
+      await adminCancelAppointment(active.id ?? active.appointmentId, adminUserId);
+      showSuccessToast(`Counselling session cancelled for ${student.name}. Both parties have been emailed.`);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.response?.data?.message
+        || err?.message || "Request failed";
+      showErrorToast(`Could not cancel counselling for ${student.name}: ${msg}`);
+    } finally {
+      setCancellingCounsellingFor((prev) => {
+        const next = new Set(prev);
+        next.delete(student.userStudentId);
+        return next;
+      });
+    }
+  };
+
   const handleSendCredentials = async (student: Student) => {
     if (sendingCredentialsFor.has(student.userStudentId)) return;
     setSendingCredentialsFor((prev) => {
@@ -2203,6 +2266,33 @@ export default function StudentManagementPage() {
                                       Send Credentials
                                     </>
                                   )}
+                                </button>
+                                {/* Cancel this student's upcoming counselling session.
+                                    An admin cancellation costs nobody anything: the slot
+                                    reopens, the session is credited back, and both the
+                                    student and the counsellor are emailed that the team
+                                    will be in touch. */}
+                                <button
+                                  className="btn btn-sm d-flex align-items-center gap-1"
+                                  onClick={() => openCounsellingCancel(student)}
+                                  disabled={cancellingCounsellingFor.has(student.userStudentId)}
+                                  title="Cancel this student's upcoming counselling session"
+                                  style={{
+                                    background: "#fff7ed",
+                                    color: "#c2410c",
+                                    border: "1px solid #fed7aa",
+                                    padding: "5px 10px",
+                                    borderRadius: "6px",
+                                    fontWeight: 400,
+                                    fontSize: "0.78rem",
+                                    transition: "all 0.2s",
+                                    whiteSpace: "nowrap",
+                                    cursor: cancellingCounsellingFor.has(student.userStudentId)
+                                      ? "not-allowed" : "pointer",
+                                  }}
+                                >
+                                  <i className="bi bi-calendar-x"></i>
+                                  Cancel Counselling
                                 </button>
                               </div>
                             </td>

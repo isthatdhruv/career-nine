@@ -16,6 +16,10 @@ interface Appointment {
   reason?: string
   slot: Slot
   counsellorName?: string
+  cancelledByRole?: string | null
+  cancellationReason?: string | null
+  cancellationNote?: string | null
+  missedByRole?: string | null
 }
 
 interface SessionNotes {
@@ -27,6 +31,9 @@ interface SessionNotes {
 
 interface PastSessionCardProps {
   appointment: Appointment
+  /** She still has a free change left, so a replacement session can be booked. */
+  canBookAgain?: boolean
+  onBookAgain?: () => void
 }
 
 function formatDate(dateStr: string): string {
@@ -49,8 +56,79 @@ function formatTime(timeStr: string): string {
   }
 }
 
-const PastSessionCard: React.FC<PastSessionCardProps> = ({ appointment }) => {
+type Outcome = { text: string; bg: string; border: string; color: string }
+
+/**
+ * What actually happened to this session, in her words.
+ *
+ * <p>Without this the history is a list of dates with a coloured badge — "Cancelled" does not
+ * say whether she cancelled or it was cancelled on her, and those are entirely different
+ * facts: one costs her a free change, the other costs her nothing. The card has the
+ * attribution, so it should say it.
+ */
+function resolveOutcome(a: Appointment): Outcome | null {
+  const status = (a.status || '').toUpperCase()
+  const cancelledBy = (a.cancelledByRole || '').toUpperCase()
+  const missedBy = (a.missedByRole || '').toUpperCase()
+
+  if (status === 'CANCELLED') {
+    if (cancelledBy === 'STUDENT') {
+      return {
+        text: 'You cancelled this session. It counted as one of your free changes.',
+        bg: '#FFFBEB', border: '#FDE68A', color: '#92400E',
+      }
+    }
+    if (cancelledBy === 'COUNSELLOR') {
+      return {
+        text: 'Your counsellor cancelled this session. It did not count against you.',
+        bg: '#F1F5F9', border: '#CBD5E1', color: '#334155',
+      }
+    }
+    return {
+      text: 'This session was cancelled by the Career-9 team. It did not count against you.',
+      bg: '#F1F5F9', border: '#CBD5E1', color: '#334155',
+    }
+  }
+
+  if (status === 'MISSED') {
+    if (missedBy === 'COUNSELLOR') {
+      return {
+        text: 'Nobody was able to start this session. It did not count against you.',
+        bg: '#F1F5F9', border: '#CBD5E1', color: '#334155',
+      }
+    }
+    return {
+      text: 'You did not attend this session. It counted as one of your free changes.',
+      bg: '#FEF2F2', border: '#FECACA', color: '#991B1B',
+    }
+  }
+
+  if (status === 'RESCHEDULED') {
+    return missedBy === 'COUNSELLOR'
+      ? {
+          text: 'Your counsellor was unavailable, so this session was moved to a new time. It did not count against you.',
+          bg: '#EFF6FF', border: '#BFDBFE', color: '#1E3A8A',
+        }
+      : {
+          text: 'This session was moved to a new time.',
+          bg: '#EFF6FF', border: '#BFDBFE', color: '#1E3A8A',
+        }
+  }
+
+  return null
+}
+
+const PastSessionCard: React.FC<PastSessionCardProps> = ({ appointment, canBookAgain, onBookAgain }) => {
   const { appointmentId, slot, counsellorName, reason, status } = appointment
+  const outcome = resolveOutcome(appointment)
+  // Notes only exist for a sitting that actually happened; offering "View Remarks" on a
+  // cancelled one just leads to an empty box.
+  const sessionHappened = ['COMPLETED', 'ENDED'].includes((status || '').toUpperCase())
+  // Her own no-show — not one the counsellor caused, which costs her nothing and is handled
+  // by the parked-session flow instead.
+  const missedByStudent =
+    (status || '').toUpperCase() === 'MISSED' &&
+    (appointment.missedByRole || '').toUpperCase() !== 'COUNSELLOR'
   const [showRemarks, setShowRemarks] = useState(false)
   const [sessionNotes, setSessionNotes] = useState<SessionNotes | null>(null)
   const [notesLoading, setNotesLoading] = useState(false)
@@ -130,7 +208,45 @@ const PastSessionCard: React.FC<PastSessionCardProps> = ({ appointment }) => {
         </div>
       )}
 
+      {/* What happened, and whether it cost her anything. */}
+      {outcome && (
+        <div
+          style={{
+            marginBottom: 12, padding: '10px 12px', borderRadius: 8,
+            background: outcome.bg, border: `1px solid ${outcome.border}`,
+            fontSize: 12.5, lineHeight: 1.5, color: outcome.color,
+          }}
+        >
+          {outcome.text}
+          {appointment.cancellationReason && (
+            <div style={{ marginTop: 6 }}>
+              <strong>Reason:</strong> {appointment.cancellationReason}
+              {appointment.cancellationNote ? ` — ${appointment.cancellationNote}` : ''}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* A session she missed is closed and cannot be moved — but her seat comes back while
+          a free change remains, so offer the one route forward rather than leaving the card
+          as a dead end. Hidden once the allowance is used up: booking then is chargeable and
+          that is a conversation for an administrator. */}
+      {missedByStudent && canBookAgain && onBookAgain && (
+        <div style={{ paddingTop: 10, borderTop: '1px solid var(--sp-border, #D1E5DF)' }}>
+          <button className='cl-btn-primary' onClick={onBookAgain} style={{ fontSize: 13 }}>
+            <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+              <rect x='3' y='4' width='18' height='18' rx='2' ry='2' />
+              <line x1='16' y1='2' x2='16' y2='6' />
+              <line x1='8' y1='2' x2='8' y2='6' />
+              <line x1='3' y1='10' x2='21' y2='10' />
+            </svg>
+            Book another session
+          </button>
+        </div>
+      )}
+
       {/* Toggle Remarks */}
+      {sessionHappened && (
       <div style={{ paddingTop: 10, borderTop: '1px solid var(--sp-border, #D1E5DF)' }}>
         <button
           className='cl-btn-outline'
@@ -201,6 +317,7 @@ const PastSessionCard: React.FC<PastSessionCardProps> = ({ appointment }) => {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

@@ -30,6 +30,28 @@ const AUTH_SCOPE_VALUE = "session";
 // instead of the admin's cn_at cookie (see setupAxios request interceptor).
 export const IMPERSONATION_STORAGE_KEY = "cn_impersonation_jwt";
 
+/**
+ * Which portal an impersonation tab is standing in — "counsellor" today.
+ *
+ * <p>Per-tab, alongside the JWT. Needed because the impersonated account may itself hold
+ * admin roles: counsellor logins are ordinary users and several are admins too, so role
+ * alone cannot tell "this person happens to be a counsellor" from "an admin asked to see
+ * the counsellor portal". Without it the tab renders the full admin sidebar, which is not
+ * what the admin asked to look at.
+ */
+export const IMPERSONATION_MODE_KEY = "cn_impersonation_mode";
+
+/** The portal this tab is impersonating into, or null when it is a normal session. */
+export function getImpersonationMode(): string | null {
+  try {
+    return typeof sessionStorage !== "undefined"
+      ? sessionStorage.getItem(IMPERSONATION_MODE_KEY)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function readImpersonationJwt(): string | null {
   try {
     return typeof sessionStorage !== "undefined"
@@ -127,14 +149,23 @@ export function setupAxios(axios: any) {
     (config: any) => {
       const impJwt = readImpersonationJwt();
       const ownApi = isOwnApiUrl(config.url);
-      // The impersonation JWT must only authenticate requests originating
-      // from the student portal; on any other route (e.g. an admin tab that
-      // happens to still have a stale sessionStorage entry) the tab falls
-      // back to the admin's normal cookie session, so the impersonation tab
-      // can never run admin actions as the student.
-      const onStudentRoute =
-        typeof window !== "undefined" && window.location.pathname.startsWith("/student/");
-      const impersonating = !!impJwt && ownApi && onStudentRoute;
+      // The impersonation JWT must only authenticate requests originating from the
+      // portal the tab was opened into; on any other route (e.g. an admin tab that
+      // happens to still have a stale sessionStorage entry) the tab falls back to the
+      // admin's normal cookie session, so the impersonation tab can never run admin
+      // actions as the impersonated user.
+      //
+      // The mode marker names that portal. Without consulting it, a counsellor
+      // impersonation tab sends no Bearer at all and every call authenticates as the
+      // ADMIN via their cn_at cookie — the portal then renders the admin's own data
+      // instead of the counsellor's. A tab with no mode is a student tab (the original
+      // Data Download flow, which predates the marker).
+      const impPortalPrefix =
+        getImpersonationMode() === "counsellor" ? "/counsellor/" : "/student/";
+      const onImpersonationRoute =
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith(impPortalPrefix);
+      const impersonating = !!impJwt && ownApi && onImpersonationRoute;
       const method = (config.method || "get").toUpperCase();
 
       if (impersonating) {
@@ -197,10 +228,16 @@ export function setupAxios(axios: any) {
         if (
           readImpersonationJwt() &&
           typeof window !== "undefined" &&
-          window.location.pathname.startsWith("/student/")
+          window.location.pathname.startsWith(
+            getImpersonationMode() === "counsellor" ? "/counsellor/" : "/student/"
+          )
         ) {
           const { showErrorToast } = require("../../../utils/toast");
-          showErrorToast("Impersonation session expired. Reopen from Data Download.");
+          showErrorToast(
+            getImpersonationMode() === "counsellor"
+              ? "Impersonation session expired. Reopen from Manage Counsellors."
+              : "Impersonation session expired. Reopen from Data Download."
+          );
           return Promise.reject(error);
         }
 

@@ -33,7 +33,10 @@ public class CounsellingCheckinOtp implements Serializable {
     @Column(name = "appointment_id", nullable = false)
     private Long appointmentId;
 
-    @Column(name = "code_hash", nullable = false, length = 255)
+    // Vestigial. Nothing is generated or sent any more — the check-in code is the student's
+    // DOB-derived OTP, recomputed at verification time and never stored. Kept nullable so
+    // historical rows survive; new rows leave it null.
+    @Column(name = "code_hash", length = 255)
     private String codeHash;
 
     @Column(name = "expires_at", nullable = false)

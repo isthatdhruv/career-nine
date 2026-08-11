@@ -53,6 +53,9 @@ public class CounsellingRescheduleService {
     private CounsellingSlotRepository slotRepository;
 
     @Autowired
+    private CounsellingClock clock;
+
+    @Autowired
     private UserStudentRepository userStudentRepository;
 
     @Autowired
@@ -136,9 +139,11 @@ public class CounsellingRescheduleService {
 
     /** AVAILABLE, non-blocked, future slots across all counsellors, earliest first. */
     private List<CounsellingSlot> availableSlots() {
-        LocalDate today = LocalDate.now();
+        // Counselling timezone, not the JVM's: slot times mean IST, and a UTC "now" would
+        // keep offering times that passed up to 5h30m ago.
+        LocalDate today = clock.today();
         List<CounsellingSlot> slots = slotRepository.findAvailableSlots(today, today.plusDays(SLOT_HORIZON_DAYS));
-        LocalTime now = LocalTime.now();
+        LocalTime now = clock.timeNow();
         List<CounsellingSlot> out = new ArrayList<>(slots.size());
         for (CounsellingSlot s : slots) {
             if (s.getDate().equals(today) && !s.getStartTime().isAfter(now)) continue;

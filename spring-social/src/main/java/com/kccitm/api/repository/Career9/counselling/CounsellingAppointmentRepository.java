@@ -127,4 +127,96 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
     @Query("SELECT a FROM CounsellingAppointment a WHERE a.status IN ('CONFIRMED', 'IN_PROGRESS') " +
            "AND a.slot.date <= :today")
     List<CounsellingAppointment> findActiveUpToDate(@Param("today") LocalDate today);
+
+    // ─── Cancellation / no-show (docs/COUNSELLING_CANCELLATION.md) ───────────────
+
+    /**
+     * The student's used misses on one entitlement — cancellations she made plus no-shows
+     * confirmed against her, in a single query.
+     *
+     * <p>Two exclusions matter. Only {@code STUDENT}-attributed rows count, so a counsellor
+     * or admin cancellation never eats her allowance. A no-show with a dispute raised but not
+     * yet resolved is skipped: an open dispute is not evidence, so the strike stays suspended
+     * until someone decides (a dispute resolved against her keeps
+     * {@code missedByRole = STUDENT} plus a resolution timestamp, and does count).
+     *
+     * <p>Attribution, not status, decides: a session she rescheduled carries
+     * {@code cancelledByRole = STUDENT} on the abandoned row exactly like one she cancelled,
+     * so both spend an allowance. Whatever the system imposed on her does not — a parked
+     * session (counsellor dropped out, nothing offered in return) is never attributed to her.
+     *
+     * <p>Note the force-shift exemption applies to cancellations only. Failing to attend a
+     * shifted session is still recorded against her, subject to admin discretion.
+     *
+     * <p>Counted per entitlement rather than per appointment because cancelling abandons the
+     * row — any counter stored on the appointment resets the moment she rebooks.
+     */
+    @Query("SELECT COUNT(a) FROM CounsellingAppointment a "
+         + "WHERE a.entitlementId = :entitlementId AND ("
+         + "  (a.cancelledByRole = 'STUDENT') "
+         + "  OR (a.missedByRole = 'STUDENT' "
+         + "      AND (a.disputeRaisedAt IS NULL OR a.disputeResolvedAt IS NOT NULL))"
+         + ")")
+    Long countStudentMissesForEntitlement(@Param("entitlementId") Long entitlementId);
+
+    /**
+     * Her misses on this entitlement that came <b>before</b> a given appointment.
+     *
+     * <p>Used by the credit-back decision, which needs to know "is this her first?" and so
+     * must not see itself or anything later. Counting all attributed rows instead breaks when
+     * two sessions settle in the same sweep: each sees the other, both conclude they are the
+     * second, and she loses both credits when she was owed one back.
+     *
+     * <p>Ordering by id makes the outcome deterministic regardless of how the sweep batches.
+     */
+    @Query("SELECT COUNT(a) FROM CounsellingAppointment a "
+         + "WHERE a.entitlementId = :entitlementId AND a.id < :appointmentId AND ("
+         + "  (a.cancelledByRole = 'STUDENT') "
+         + "  OR (a.missedByRole = 'STUDENT' "
+         + "      AND (a.disputeRaisedAt IS NULL OR a.disputeResolvedAt IS NOT NULL))"
+         + ")")
+    Long countStudentMissesBefore(
+            @Param("entitlementId") Long entitlementId, @Param("appointmentId") Long appointmentId);
+
+    /**
+     * Check-in alarm sweep: confirmed sessions on {@code date} that have not been checked in,
+     * not already marked absent, and not already prompted. The scheduler works out which have
+     * passed the alarm threshold in Java, using {@link
+     * com.kccitm.api.service.counselling.CounsellingClock} rather than the JVM clock.
+     */
+    @Query("SELECT a FROM CounsellingAppointment a WHERE a.status = 'CONFIRMED' "
+         + "AND a.slot.date = :date AND a.checkinVerifiedAt IS NULL AND a.markedAbsentAt IS NULL")
+    List<CounsellingAppointment> findAwaitingCheckinOnDate(@Param("date") LocalDate date);
+
+    /** Admin dispute queue: raised, not yet decided. Should stay small. */
+    @Query("SELECT a FROM CounsellingAppointment a WHERE a.disputeRaisedAt IS NOT NULL "
+         + "AND a.disputeResolvedAt IS NULL ORDER BY a.disputeRaisedAt ASC")
+    List<CounsellingAppointment> findOpenDisputes();
+
+    /**
+     * How many sessions a counsellor already holds on a date — used to hand a re-placement to
+     * the lightest-loaded eligible counsellor. Without an explicit rule the query order
+     * decides, which in practice means the same person absorbs every reassignment.
+     */
+    @Query("SELECT COUNT(a) FROM CounsellingAppointment a WHERE a.counsellor.id = :counsellorId "
+         + "AND a.slot.date = :date AND a.status IN ('PENDING', 'ASSIGNED', 'CONFIRMED', 'IN_PROGRESS')")
+    Long countActiveForCounsellorOnDate(
+            @Param("counsellorId") Long counsellorId, @Param("date") LocalDate date);
+
+    /**
+     * Outcome tallies for one counsellor, split by who caused each one. A single merged
+     * "no-shows" number is useless for management: a counsellor with many student no-shows
+     * would look identical to one who keeps not turning up.
+     */
+    @Query("SELECT COUNT(a) FROM CounsellingAppointment a WHERE a.counsellor.id = :counsellorId "
+         + "AND a.slot.date BETWEEN :start AND :end AND a.missedByRole = :role")
+    Long countMissedByRoleForCounsellor(
+            @Param("counsellorId") Long counsellorId, @Param("role") String role,
+            @Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    @Query("SELECT COUNT(a) FROM CounsellingAppointment a WHERE a.counsellor.id = :counsellorId "
+         + "AND a.slot.date BETWEEN :start AND :end AND a.cancelledByRole = :role")
+    Long countCancelledByRoleForCounsellor(
+            @Param("counsellorId") Long counsellorId, @Param("role") String role,
+            @Param("start") LocalDate start, @Param("end") LocalDate end);
 }

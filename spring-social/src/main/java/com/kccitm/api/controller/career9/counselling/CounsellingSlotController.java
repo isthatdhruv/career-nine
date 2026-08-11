@@ -41,11 +41,19 @@ public class CounsellingSlotController {
     @GetMapping("/available")
     public ResponseEntity<List<CounsellingSlot>> getAvailable(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week,
-            @RequestParam(required = false) Integer instituteCode) {
+            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) Long studentId) {
         LocalDate weekStart = (week != null) ? week : LocalDate.now();
 
         List<CounsellingSlot> slots;
-        if (instituteCode != null) {
+        if (studentId != null) {
+            // Resolve exactly as the post-assessment picker does — assessment-assigned
+            // counsellors first, institute only as a fallback. Filtering by institute alone
+            // hides a counsellor attached to the student's assessment rather than her school,
+            // which shows her "No slots" while that counsellor has a full diary.
+            logger.info("Fetching available slots for week {} for student {}", weekStart, studentId);
+            slots = bookingService.getAvailableSlotsForStudent(weekStart, studentId);
+        } else if (instituteCode != null) {
             logger.info("Fetching available slots for week {} filtered by institute {}", weekStart, instituteCode);
             slots = bookingService.getAvailableSlotsForInstitute(weekStart, instituteCode);
         } else {

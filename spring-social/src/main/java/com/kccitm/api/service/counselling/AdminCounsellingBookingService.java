@@ -53,6 +53,9 @@ public class AdminCounsellingBookingService {
     private CounsellingAppointmentRepository appointmentRepository;
 
     @Autowired
+    private CounsellingClock clock;
+
+    @Autowired
     private CounsellingSlotRepository slotRepository;
 
     @Autowired
@@ -307,9 +310,10 @@ public class AdminCounsellingBookingService {
 
     /** Earliest AVAILABLE, future slot for one counsellor (same horizon/past-cutoff as bulk allotment). */
     private CounsellingSlot earliestAvailableSlotForCounsellor(Long counsellorId) {
-        LocalDate today = LocalDate.now();
+        // Counselling timezone, not the JVM's — see CounsellingClock.
+        LocalDate today = clock.today();
         LocalDate end = today.plusDays(SLOT_HORIZON_DAYS);
-        LocalTime now = LocalTime.now();
+        LocalTime now = clock.timeNow();
         // The query is ordered by date, startTime — the first slot that isn't already-past is the earliest.
         for (CounsellingSlot s : slotRepository.findAvailableSlotsForCounsellors(List.of(counsellorId), today, end)) {
             if (s.getDate().equals(today) && !s.getStartTime().isAfter(now)) continue;
@@ -336,10 +340,11 @@ public class AdminCounsellingBookingService {
 
     /** AVAILABLE, non-blocked, future slots across all counsellors, earliest first. */
     private List<CounsellingSlot> availableSlots() {
-        LocalDate today = LocalDate.now();
+        // Counselling timezone, not the JVM's — see CounsellingClock.
+        LocalDate today = clock.today();
         LocalDate end = today.plusDays(SLOT_HORIZON_DAYS);
         List<CounsellingSlot> slots = slotRepository.findAvailableSlots(today, end);
-        LocalTime now = LocalTime.now();
+        LocalTime now = clock.timeNow();
         List<CounsellingSlot> out = new ArrayList<>(slots.size());
         for (CounsellingSlot s : slots) {
             // Skip today's slots whose start time has already passed.

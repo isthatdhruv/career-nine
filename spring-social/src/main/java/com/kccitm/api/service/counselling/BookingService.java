@@ -45,6 +45,9 @@ public class BookingService {
     private MeetingLinkService meetingLinkService;
 
     @Autowired
+    private CounsellingClock clock;
+
+    @Autowired
     private AuditLogService auditLogService;
 
     @Autowired
@@ -56,13 +59,19 @@ public class BookingService {
     @Autowired
     private CounsellingActivityLogService activityLogService;
 
+    @Autowired
+    private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository entitlementRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.UserStudentRepository userStudentRepository;
+
     /**
      * Returns all available slots for the week starting at weekStart (inclusive)
      * through weekStart + 6 days (inclusive). Past dates are excluded.
      */
     public List<CounsellingSlot> getAvailableSlots(LocalDate weekStart) {
         LocalDate weekEnd = weekStart.plusDays(6);
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();
         LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
         logger.info("Fetching available slots from {} to {}", effectiveStart, weekEnd);
         if (effectiveStart.isAfter(weekEnd)) return List.of();
@@ -73,9 +82,46 @@ public class BookingService {
      * Returns available slots filtered to only counsellors allocated to the given institute.
      * Students see only slots from counsellors assigned to their school. Past dates are excluded.
      */
+    /**
+     * Bookable slots for one student, resolved the same way the post-assessment picker does:
+     * counsellors assigned to her assessment first, her institute's allocation only as a
+     * fallback.
+     *
+     * <p>The student portal previously went through the institute-only overload below, which
+     * silently showed a narrower set than the public booking flow — a student whose counsellor
+     * is attached to her <em>assessment</em> rather than her institute saw "No slots" while
+     * that counsellor sat there with a full diary. Same student, same counsellor, different
+     * answer depending on which page she happened to be on.
+     */
+    public List<CounsellingSlot> getAvailableSlotsForStudent(LocalDate weekStart, Long userStudentId) {
+        if (userStudentId == null) return List.of();
+
+        Integer instituteCode = null;
+        Long assessmentId = null;
+        try {
+            UserStudent student = userStudentRepository.findById(userStudentId).orElse(null);
+            if (student != null && student.getInstitute() != null) {
+                instituteCode = student.getInstitute().getInstituteCode();
+            }
+        } catch (Exception e) {
+            logger.debug("Could not resolve institute for student {}: {}", userStudentId, e.getMessage());
+        }
+        // Her live counselling entitlement decides which assessment's counsellor pool applies.
+        try {
+            assessmentId = entitlementRepository.findByUserStudentIdOrderByCreatedAtDesc(userStudentId).stream()
+                    .filter(e -> e.getAssessmentId() != null)
+                    .map(com.kccitm.api.model.career9.b2c.StudentEntitlement::getAssessmentId)
+                    .findFirst().orElse(null);
+        } catch (Exception e) {
+            logger.debug("Could not resolve assessment for student {}: {}", userStudentId, e.getMessage());
+        }
+
+        return getAvailableSlotsForInstitute(weekStart, instituteCode, assessmentId);
+    }
+
     public List<CounsellingSlot> getAvailableSlotsForInstitute(LocalDate weekStart, Integer instituteCode) {
         LocalDate weekEnd = weekStart.plusDays(6);
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();
         LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
 
         if (effectiveStart.isAfter(weekEnd)) return List.of();
@@ -106,7 +152,7 @@ public class BookingService {
         // student's picker shows slots starting from the FIRST available date instead of
         // landing on an empty current week. The picker groups by date and omits empty days.
         LocalDate weekEnd = weekStart.plusDays(83);
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();
         LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
         if (effectiveStart.isAfter(weekEnd)) return List.of();
 
@@ -137,7 +183,7 @@ public class BookingService {
     public List<CounsellingSlot> getBookableSlotsForInstitute(LocalDate weekStart, Integer instituteCode,
                                                               Long assessmentId) {
         LocalDate weekEnd = weekStart.plusDays(83);
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();
         LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
         if (effectiveStart.isAfter(weekEnd)) return List.of();
 
@@ -180,12 +226,72 @@ public class BookingService {
         return null;
     }
 
+    /**
+     * The counsellors permitted to take a given appointment — the same resolution the student
+     * picker uses, exposed so re-placement after a counsellor cancellation draws from exactly
+     * the same pool.
+     *
+     * <p>Counsellors are not interchangeable. Assignment is per assessment, falling back to
+     * the institute's allocation only when the assessment has none. Handing a session to
+     * whoever happens to be free would put a student in front of a counsellor who does not
+     * handle their assessment type.
+     *
+     * <p>Returns an empty list when nothing can be resolved, which the caller should treat as
+     * "no replacement available" rather than "anyone will do".
+     */
+    public List<Long> eligibleCounsellorIdsFor(CounsellingAppointment appointment) {
+        if (appointment == null) return List.of();
+
+        Long assessmentId = resolveAssessmentId(appointment);
+        List<Long> byAssessment = assessmentId != null
+                ? assessmentAssignmentRepository.findActiveCounsellorIdsForAssessment(assessmentId)
+                : List.of();
+        if (!byAssessment.isEmpty()) return byAssessment;
+
+        Integer instituteCode = null;
+        try {
+            UserStudent student = appointment.getStudent();
+            if (student != null && student.getInstitute() != null) {
+                instituteCode = student.getInstitute().getInstituteCode();
+            }
+        } catch (Exception e) {
+            logger.debug("Could not resolve institute for appointment {}: {}",
+                    appointment.getId(), e.getMessage());
+        }
+        if (instituteCode == null) return List.of();
+        return counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
+    }
+
+    /** The assessment behind this booking, via the entitlement it was drawn from. */
+    private Long resolveAssessmentId(CounsellingAppointment appointment) {
+        if (appointment.getEntitlementId() == null) return null;
+        try {
+            return entitlementRepository.findById(appointment.getEntitlementId())
+                    .map(com.kccitm.api.model.career9.b2c.StudentEntitlement::getAssessmentId)
+                    .orElse(null);
+        } catch (Exception e) {
+            logger.debug("Could not resolve assessment for appointment {}: {}",
+                    appointment.getId(), e.getMessage());
+            return null;
+        }
+    }
+
     private List<CounsellingSlot> filterOutPastSlots(List<CounsellingSlot> slots) {
-        LocalDate today = LocalDate.now();
-        LocalTime now = LocalTime.now();
+        // Slot times are IST wall-clock; the JVM has no timezone configured and runs UTC in a
+        // container. Asking the raw clock for "now" therefore reads 5h30m early and leaves
+        // this morning's slots on the picker all afternoon. CounsellingClock answers in the
+        // counselling timezone, so both sides of the comparison mean the same thing.
+        LocalDate today = clock.today();
+        LocalTime now = clock.timeNow();
         return slots.stream()
                 .filter(s -> !s.getDate().equals(today) || s.getStartTime().isAfter(now))
                 .collect(Collectors.toList());
+    }
+
+    /** True once a slot's start time has passed — nothing may be booked into it. */
+    private boolean hasStarted(CounsellingSlot slot) {
+        if (slot == null || slot.getDate() == null || slot.getStartTime() == null) return false;
+        return !clock.sessionStart(slot.getDate(), slot.getStartTime()).isAfter(clock.now());
     }
 
     /**
@@ -247,9 +353,10 @@ public class BookingService {
                     "Slot " + slotId + " is not available for booking. Current status: " + slot.getStatus());
         }
 
-        LocalDate today = LocalDate.now();
-        if (slot.getDate().isBefore(today)
-                || (slot.getDate().equals(today) && !slot.getStartTime().isAfter(LocalTime.now()))) {
+        // Counselling-timezone comparison: the raw JVM clock runs UTC in a container and would
+        // wave through anything that started in the last 5h30m — including from a picker left
+        // open while the slot expired.
+        if (hasStarted(slot)) {
             throw new BadRequestException("Slot " + slotId + " is in the past and cannot be booked.");
         }
 
@@ -283,9 +390,7 @@ public class BookingService {
             throw new BadRequestException(
                     "Slot " + slotId + " is not available. Current status: " + slot.getStatus());
         }
-        LocalDate today = LocalDate.now();
-        if (slot.getDate().isBefore(today)
-                || (slot.getDate().equals(today) && !slot.getStartTime().isAfter(LocalTime.now()))) {
+        if (hasStarted(slot)) {
             throw new BadRequestException("Slot " + slotId + " is in the past and cannot be held.");
         }
         slot.setStatus("REQUESTED");

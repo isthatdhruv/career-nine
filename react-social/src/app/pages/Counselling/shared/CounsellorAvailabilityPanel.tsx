@@ -365,6 +365,10 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                 onOfficeAddressChange={setOfficeAddress}
                 meetingLink={meetingLink}
                 onMeetingLinkChange={setMeetingLink}
+                // Lets the form warn about the dates that genuinely collide rather
+                // than about every schedule sharing the weekday. Already excludes
+                // blocked slots (they live in blockedDates).
+                existingSlots={manualSlots}
                 onChanged={handleScheduleChanged}
               />
             </div>
