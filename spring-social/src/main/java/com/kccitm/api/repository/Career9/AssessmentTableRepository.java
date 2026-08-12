@@ -52,4 +52,16 @@ public interface AssessmentTableRepository extends JpaRepository<AssessmentTable
            "WHERE m.instituteCode = :instituteCode AND m.isActive = true AND (a.isDeleted = false OR a.isDeleted IS NULL)")
     List<AssessmentSummary> findAssessmentSummariesByInstitute(@Param("instituteCode") Integer instituteCode);
 
+    /**
+     * The institute's catalog ("which assessments this institute offers", set in the
+     * wizard's Map-Assessments step), named. Distinct from
+     * {@link #findAssessmentSummariesByInstitute} above, which lists whatever has a
+     * registration link — a superset that can include assessments the institute was
+     * never enabled for.
+     */
+    @Query("SELECT DISTINCT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive, q.type AS questionnaireType " +
+           "FROM AssessmentTable a LEFT JOIN a.questionnaire q JOIN InstituteAssessment ia ON a.id = ia.assessmentId " +
+           "WHERE ia.instituteCode = :instituteCode AND ia.isActive = true AND (a.isDeleted = false OR a.isDeleted IS NULL)")
+    List<AssessmentSummary> findCatalogAssessmentSummariesByInstitute(@Param("instituteCode") Integer instituteCode);
+
 }

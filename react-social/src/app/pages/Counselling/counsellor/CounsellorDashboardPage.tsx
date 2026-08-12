@@ -12,7 +12,9 @@ import {
   startSession,
   verifyCheckin,
   getDashboardSummary,
+  getCounsellorSessions,
 } from '../API/AppointmentAPI'
+import SessionReportLink from '../shared/SessionReportLink'
 import { getCounsellorByUserId } from '../API/CounsellorAPI'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import '../Counselling.css'
@@ -30,6 +32,17 @@ const CounsellorDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  /**
+   * Report link per appointment id.
+   *
+   * <p>Kept beside the appointments rather than on them: the appointment row does not carry a
+   * report — the link sits behind the entitlement that names the assessment — so it comes from
+   * the session-summary endpoint, the same one the admin's Manage Sessions dialog reads. Its
+   * failure is not the dashboard's failure; a report lookup that does not answer leaves every
+   * card saying "being prepared", which is exactly what it would say anyway.
+   */
+  const [reportLinks, setReportLinks] = useState<Record<number, string | null>>({})
+
   // Per-appointment check-in UI state: whether check-in is open + the typed code.
   const [otpSent, setOtpSent] = useState<Record<number, boolean>>({})
   const [otpCode, setOtpCode] = useState<Record<number, string>>({})
@@ -38,6 +51,17 @@ const CounsellorDashboardPage: React.FC = () => {
   // Phase 19: userId resolves from useAuth().currentUser only — the legacy
   // localStorage JSON-blob fallback is gone.
   const userId: number | undefined = currentUser?.id
+
+  /** Best-effort: a missing report is a normal state, not an error to surface. */
+  const loadReportLinks = (counsellorId: number) => {
+    getCounsellorSessions(counsellorId)
+      .then((res) => {
+        const map: Record<number, string | null> = {}
+        for (const s of res.data || []) map[s.appointmentId] = s.reportLink ?? null
+        setReportLinks(map)
+      })
+      .catch(() => {})
+  }
 
   useEffect(() => {
     if (!userId) {
@@ -53,6 +77,8 @@ const CounsellorDashboardPage: React.FC = () => {
 
         const apptRes = await getCounsellorAppointments(counsellorData.id)
         setAppointments(apptRes.data || [])
+
+        loadReportLinks(counsellorData.id)
 
         try {
           const sumRes = await getDashboardSummary(counsellorData.id)
@@ -75,6 +101,9 @@ const CounsellorDashboardPage: React.FC = () => {
     getCounsellorAppointments(counsellor.id)
       .then((res) => setAppointments(res.data || []))
       .catch(() => {})
+    // Re-read on every refresh so a report that finishes generating mid-session appears
+    // without the counsellor reloading the page.
+    loadReportLinks(counsellor.id)
   }, { skip: !counsellor?.id })
 
   const refreshAppointments = async () => {
@@ -82,6 +111,7 @@ const CounsellorDashboardPage: React.FC = () => {
     try {
       const res = await getCounsellorAppointments(counsellor.id)
       setAppointments(res.data || [])
+      loadReportLinks(counsellor.id)
       getDashboardSummary(counsellor.id).then((r) => setSummary(r.data)).catch(() => {})
     } catch {
       // silent refresh failure
@@ -277,6 +307,7 @@ const CounsellorDashboardPage: React.FC = () => {
                 <div key={appt.id} style={{ marginBottom: 12 }}>
                   <ScheduleCard
                     appointment={appt}
+                    reportLink={reportLinks[appt.id]}
                     onConfirm={handleConfirm}
                     onDecline={handleDecline}
                     onCancel={handleCancel}
@@ -362,15 +393,20 @@ const CounsellorDashboardPage: React.FC = () => {
                       {appt.reason}
                     </div>
                   )}
-                  {appt.status === 'COMPLETED' && !appt.sessionNotes && (
-                    <button
-                      className='cl-btn-warning'
-                      style={{ fontSize: 12, padding: '5px 12px' }}
-                      onClick={() => navigate(`/counsellor/session-notes/${appt.id}`)}
-                    >
-                      Add Notes
-                    </button>
-                  )}
+                  {/* The report stays reachable after the session — a counsellor writing up
+                      notes is reading it, not the schedule. */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <SessionReportLink link={reportLinks[appt.id]} />
+                    {appt.status === 'COMPLETED' && !appt.sessionNotes && (
+                      <button
+                        className='cl-btn-warning'
+                        style={{ fontSize: 12, padding: '5px 12px' }}
+                        onClick={() => navigate(`/counsellor/session-notes/${appt.id}`)}
+                      >
+                        Add Notes
+                      </button>
+                    )}
+                  </div>
                   {appt.sessionNotes && (
                     <div className='cl-remarks-box' style={{ marginTop: 8 }}>
                       {appt.sessionNotes.publicRemarks || appt.sessionNotes.keyDiscussionPoints}
@@ -400,6 +436,7 @@ const CounsellorDashboardPage: React.FC = () => {
                 <ScheduleCard
                   key={appt.id}
                   appointment={appt}
+                  reportLink={reportLinks[appt.id]}
                   onConfirm={handleConfirm}
                   onDecline={handleDecline}
                   onCancel={handleCancel}
