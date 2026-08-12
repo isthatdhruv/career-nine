@@ -4,6 +4,8 @@ import { KTSVG } from '../../../../_metronic/helpers'
 import { getRecentActivities, markAllAsRead, ActivityLog } from '../API/CounsellingActivityAPI'
 import { getPendingBlockRequests, approveBlockRequest, rejectBlockRequest, BlockDateRequest } from '../API/BlockDateRequestAPI'
 import { getAllCounsellors, toggleCounsellorActive } from '../API/CounsellorAPI'
+import { getPendingCounsellingRequests, PendingCounsellingRequest } from '../API/CounsellorAssessmentAPI'
+import { useNavigate } from 'react-router-dom'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import PageHeader from '../../../components/PageHeader'
 
@@ -38,11 +40,16 @@ function timeAgo(dateStr: string): string {
 }
 
 const CounsellingNotificationsPage: React.FC = () => {
+  const navigate = useNavigate()
   const [activities, setActivities] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
   const [pendingBlocks, setPendingBlocks] = useState<BlockDateRequest[]>([])
   const [pendingCounsellors, setPendingCounsellors] = useState<any[]>([])
+  // Students who asked for counselling on an assessment nobody is appointed to yet. They
+  // cannot book until someone is, and nothing else in the app surfaces them — so this list
+  // is the only thing standing between them and an indefinite wait.
+  const [pendingRequests, setPendingRequests] = useState<PendingCounsellingRequest[]>([])
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -52,10 +59,12 @@ const CounsellingNotificationsPage: React.FC = () => {
       getRecentActivities(100),
       getPendingBlockRequests().catch(() => ({ data: [] })),
       getAllCounsellors().catch(() => ({ data: [] })),
+      getPendingCounsellingRequests().catch(() => ({ data: [] as PendingCounsellingRequest[] })),
     ])
-      .then(([actRes, brRes, cRes]) => {
+      .then(([actRes, brRes, cRes, prRes]) => {
         setActivities(Array.isArray(actRes.data) ? actRes.data : [])
         setPendingBlocks(Array.isArray(brRes.data) ? brRes.data : [])
+        setPendingRequests(Array.isArray(prRes.data) ? prRes.data : [])
         const allCounsellors = Array.isArray(cRes.data) ? cRes.data : []
         setPendingCounsellors(allCounsellors.filter((c: any) =>
           c.onboardingStatus === 'PENDING' && c.isActive === false
@@ -142,6 +151,79 @@ const CounsellingNotificationsPage: React.FC = () => {
           marginBottom: 16, padding: '12px 16px', background: '#D1FAE5',
           border: '1px solid #A7F3D0', borderRadius: 8, color: '#065F46', fontSize: 14,
         }}>{success}</div>
+      )}
+
+      {/* Students waiting for a counsellor. First on the page because it is the only item
+          here with a student stuck behind it — the others are staff admin. Grouped by
+          assessment, since one appointment unblocks everyone under it at once. */}
+      {pendingRequests.length > 0 && (
+        <div style={{
+          marginBottom: 20, background: '#fff', borderRadius: 12,
+          border: '2px solid #FCD34D', overflow: 'hidden',
+        }}>
+          <div style={{
+            padding: '14px 20px', background: '#FFFBEB', borderBottom: '1px solid #FDE68A',
+            fontWeight: 700, fontSize: 15, color: '#92400E',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}>
+            <span>Students Waiting for a Counsellor ({pendingRequests.length})</span>
+            <button
+              className='cl-btn-primary'
+              style={{ fontSize: 12, padding: '5px 14px', flexShrink: 0 }}
+              onClick={() => navigate('/admin/counsellors')}
+              title='Open Manage Counsellors to appoint someone to these assessments'
+            >
+              Appoint a Counsellor
+            </button>
+          </div>
+          <div style={{ padding: 12 }}>
+            <div style={{ fontSize: 12, color: '#92400E', padding: '0 4px 10px' }}>
+              These students asked for counselling on an assessment that has no counsellor
+              appointed. Use <strong>Appoint</strong> on Manage Counsellors — they can book as
+              soon as one is, and these entries clear themselves.
+            </div>
+            {(() => {
+              const byAssessment = new Map<number, PendingCounsellingRequest[]>()
+              for (const r of pendingRequests) {
+                const key = r.assessmentId
+                byAssessment.set(key, [...(byAssessment.get(key) || []), r])
+              }
+              return Array.from(byAssessment.entries()).map(([assessmentId, rows]) => (
+                <div key={assessmentId} style={{
+                  background: '#FFFBEB', border: '1px solid #FDE68A',
+                  borderRadius: 8, marginBottom: 8, padding: '10px 14px',
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#92400E', marginBottom: 6 }}>
+                    {rows[0].assessmentName || `Assessment ${assessmentId}`}
+                    <span style={{ fontWeight: 500, color: '#B45309', marginLeft: 8 }}>
+                      · {rows.length} student{rows.length === 1 ? '' : 's'} waiting
+                    </span>
+                  </div>
+                  {rows.map((r) => (
+                    <div key={r.id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      gap: 12, padding: '5px 0', fontSize: 12.5, color: '#1E293B',
+                      borderTop: '1px solid #FEF3C7',
+                    }}>
+                      <div>
+                        <span style={{ fontWeight: 600 }}>{r.studentName || `Student ${r.userStudentId}`}</span>
+                        {r.instituteName && (
+                          <span style={{ color: '#78716C' }}> · {r.instituteName}</span>
+                        )}
+                        <div style={{ fontSize: 11.5, color: '#78716C', marginTop: 1 }}>
+                          {[r.studentEmail, r.studentPhone].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 11.5, color: '#A8A29E', whiteSpace: 'nowrap' }}>
+                        {timeAgo(r.createdAt || '')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
       )}
 
       {/* Pending Registrations */}
@@ -311,7 +393,11 @@ const CounsellingNotificationsPage: React.FC = () => {
                       }} />
                     )}
                   </div>
-                  <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.5 }}>{a.description}</div>
+                  {/* pre-line so the labelled "Student: … / Institute: … / Time: …" lines the
+                      server writes survive. Older entries are single-line and are unaffected. */}
+                  <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.55, whiteSpace: 'pre-line' }}>
+                    {a.description}
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, fontSize: 11, color: '#94A3B8' }}>
                     <span>{timeAgo(a.createdAt)}</span>
                     {a.counsellor && <span>{a.counsellor.name}</span>}

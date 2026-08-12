@@ -67,7 +67,7 @@ const RecordSummary: React.FC<{ record: CounsellingRecord; missesUsed: number }>
     { label: 'Booked', value: record.booked, color: '#0C6B5A' },
     { label: 'Attended', value: record.completed, color: '#047857' },
     { label: 'Cancelled by you', value: record.cancelledByStudent, color: '#B45309' },
-    { label: 'You did not attend', value: record.missedByStudent, color: '#B91C1C' },
+    { label: 'Missed', value: record.missedByStudent, color: '#B91C1C' },
     { label: 'Cancelled for you', value: record.cancelledByOthers, color: '#5C7A72' },
     { label: 'Counsellor unavailable', value: record.missedByCounsellor, color: '#5C7A72' },
     { label: 'Moved to a new time', value: record.moved, color: '#5C7A72' },
@@ -77,50 +77,69 @@ const RecordSummary: React.FC<{ record: CounsellingRecord; missesUsed: number }>
   const allowanceUsedUp = missesUsed >= 2
 
   return (
-    <div className='cl-card' style={{ marginBottom: 16, padding: '16px 18px' }}>
+    <div className='cl-card' style={{ marginBottom: 16, padding: '14px 18px' }}>
+      {/* Title and standing on one line: "where do I stand" is the question the card exists
+          to answer, so it belongs at the top next to the heading rather than as a paragraph
+          underneath the numbers. */}
       <div
         style={{
-          fontSize: 12,
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          color: 'var(--sp-muted, #5C7A72)',
-          marginBottom: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, flexWrap: 'wrap', marginBottom: 12,
         }}
       >
-        Your counselling record
+        <div
+          style={{
+            fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
+            textTransform: 'uppercase', color: 'var(--sp-muted, #5C7A72)',
+          }}
+        >
+          Your counselling record
+        </div>
+        {missesUsed > 0 && (
+          <span
+            style={{
+              fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+              whiteSpace: 'nowrap',
+              background: allowanceUsedUp ? '#FEF2F2' : '#FFFBEB',
+              border: `1px solid ${allowanceUsedUp ? '#FECACA' : '#FDE68A'}`,
+              color: allowanceUsedUp ? '#991B1B' : '#92400E',
+            }}
+          >
+            {missesUsed}/2 free changes used
+          </span>
+        )}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px 28px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px 26px' }}>
         {rows.map((r) => (
-          <div key={r.label} style={{ minWidth: 96 }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: r.color, lineHeight: 1.1 }}>
+          <div key={r.label} style={{ minWidth: 88 }}>
+            <div style={{ fontSize: 21, fontWeight: 700, color: r.color, lineHeight: 1.1 }}>
               {r.value}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
+            <div style={{ fontSize: 11.5, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
               {r.label}
             </div>
           </div>
         ))}
       </div>
 
+      {/* One consequence line, and the exemption in small print — it matters, but it is a
+          footnote, not the headline it was being rendered as. */}
       {missesUsed > 0 && (
         <div
           style={{
-            marginTop: 14,
-            paddingTop: 12,
+            marginTop: 12, paddingTop: 10,
             borderTop: '1px solid var(--sp-border, #D1E5DF)',
-            fontSize: 12.5,
-            lineHeight: 1.5,
-            color: allowanceUsedUp ? '#991B1B' : '#92400E',
           }}
         >
-          <strong>
-            {missesUsed} of 2 free changes used.
-          </strong>{' '}
-          {allowanceUsedUp
-            ? 'Your next session will need to be paid for. Sessions cancelled by your counsellor or by the team are not counted here.'
-            : 'One free change is left. Sessions cancelled by your counsellor or by the team are not counted here.'}
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: allowanceUsedUp ? '#991B1B' : '#92400E' }}>
+            {allowanceUsedUp
+              ? 'Sessions can no longer be moved. New bookings are chargeable.'
+              : 'One free change left.'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)', marginTop: 3 }}>
+            Counsellor and team cancellations are not counted.
+          </div>
         </div>
       )}
     </div>
@@ -276,25 +295,33 @@ const StudentCounsellingPage: React.FC = () => {
     moved: 0,
     stillOpen: 0,
   }
+  // Attribution decides the bucket, and it is checked BEFORE status — the same rule the
+  // server's allowance query uses (`countStudentMissesForEntitlement` matches on
+  // cancelledByRole / missedByRole and ignores status altogether).
+  //
+  // Rescheduling used to overwrite the record: a session she failed to attend became
+  // RESCHEDULED, fell through to "moved to a new time", and her miss stopped being counted.
+  // The page then offered a free change the server had already spent — she could miss twice
+  // and still be told one was left. What happened to a session does not stop having happened
+  // because a later session was booked.
   appointments.forEach((a) => {
     const s = (a.status || '').toUpperCase()
-    if (s === 'COMPLETED') record.completed += 1
-    else if (s === 'CANCELLED') {
-      if (isStudentRole(a.cancelledByRole)) record.cancelledByStudent += 1
-      else record.cancelledByOthers += 1
-    } else if (s === 'MISSED') {
-      if (isCounsellorRole(a.missedByRole)) record.missedByCounsellor += 1
-      else record.missedByStudent += 1
-    } else if (isCounsellorRole(a.missedByRole)) {
-      // Parked or already re-picked after the counsellor failed to show.
-      record.missedByCounsellor += 1
-    } else if (s === 'RESCHEDULED') record.moved += 1
+    if (isStudentRole(a.missedByRole)) record.missedByStudent += 1
+    else if (isStudentRole(a.cancelledByRole)) record.cancelledByStudent += 1
+    else if (isCounsellorRole(a.missedByRole)) record.missedByCounsellor += 1
+    else if (isCounsellorRole(a.cancelledByRole)) record.cancelledByOthers += 1
+    else if (s === 'COMPLETED') record.completed += 1
+    // Ended that way with nobody recorded against it — the team, or the sweep.
+    else if (s === 'CANCELLED') record.cancelledByOthers += 1
+    else if (s === 'MISSED') record.missedByStudent += 1
+    else if (s === 'RESCHEDULED') record.moved += 1
     else record.stillOpen += 1
   })
 
   // Only student-caused endings count against the 2-miss allowance — the whole point of
   // recording who did what is that a counsellor's cancellation must never cost her one.
   const missesUsed = record.cancelledByStudent + record.missedByStudent
+  const changesLeft = Math.max(0, 2 - missesUsed)
 
   const handleReschedule = (appointmentId: number) => {
     navigate('/student/dashboard/counselling/book', { state: { rescheduleAppointmentId: appointmentId } })
@@ -399,10 +426,12 @@ const StudentCounsellingPage: React.FC = () => {
             <PastSessionCard
               key={appt.appointmentId}
               appointment={appt}
-              // A missed session is closed and cannot be moved — but the seat comes back
-              // while she still has free changes, so the way forward is a fresh booking.
-              canBookAgain={missesUsed < 2}
-              onBookAgain={handleBookSession}
+              // A missed session can be rescheduled while she still has a free change left;
+              // this opens the same picker the Upcoming tab's Reschedule uses. With none left
+              // the card points her at a fresh booking instead of ending in nothing.
+              canReschedule={changesLeft > 0}
+              onReschedule={handleReschedule}
+              onBookSession={handleBookSession}
             />
           ))}
         </div>

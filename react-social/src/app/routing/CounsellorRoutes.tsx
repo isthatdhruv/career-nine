@@ -28,6 +28,10 @@ const PermissionDeniedPage = lazy(
   () => import('../components/PermissionDeniedPage')
 )
 
+/**
+ * Full-screen splash. Correct before the shell exists — signing in, landing from an
+ * impersonation link — because at that point there is genuinely nothing on screen yet.
+ */
 const CounsellorFallback: FC = () => (
   <div
     style={{
@@ -43,6 +47,41 @@ const CounsellorFallback: FC = () => (
       <div style={{ color: '#6B7A8D', fontSize: 14 }}>Loading ...</div>
     </div>
   </div>
+)
+
+/** Fills the content column only — never the width of the sidebar. */
+const ContentFallback: FC = () => (
+  <div
+    style={{
+      width: '100%',
+      minHeight: 320,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#6B7A8D',
+      fontSize: 14,
+    }}
+  >
+    Loading ...
+  </div>
+)
+
+/**
+ * Suspense boundary for a page that renders inside the shell.
+ *
+ * <p>Every counsellor page is code-split, so the first visit to one has to fetch its
+ * chunk. React then shows the NEAREST Suspense fallback — and the only boundary used to be
+ * the one wrapping the whole {@code <Routes>}, layout included. So that first click
+ * replaced the entire screen, sidebar and all, with the full-screen splash: the page
+ * appeared to reload. Second and later visits were fine because the chunk was cached and
+ * nothing suspended.
+ *
+ * <p>Putting a boundary here — inside the {@code MasterLayout} route, so it renders into
+ * the layout's Outlet — keeps the fallback in the content column. The sidebar is mounted
+ * above it and never unmounts, first visit or hundredth.
+ */
+const PageSuspense: FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Suspense fallback={<ContentFallback />}>{children}</Suspense>
 )
 
 /**
@@ -140,11 +179,11 @@ const CounsellorRoutes: FC = () => {
             sidebar (AsideMenuMain) shows the counsellor-only menu for COUNSELLOR users. */}
         <Route element={<CounsellorAuthGuard />}>
           <Route element={<MasterLayout />}>
-            <Route path='dashboard' element={<CounsellorPortalDashboard />} />
-            <Route path='appointments' element={<CounsellorAppointmentsPage />} />
-            <Route path='notes' element={<CounsellorNotesPage />} />
-            <Route path='availability' element={<CounsellorAvailabilityPage />} />
-            <Route path='profile' element={<CounsellorProfilePage />} />
+            <Route path='dashboard' element={<PageSuspense><CounsellorPortalDashboard /></PageSuspense>} />
+            <Route path='appointments' element={<PageSuspense><CounsellorAppointmentsPage /></PageSuspense>} />
+            <Route path='notes' element={<PageSuspense><CounsellorNotesPage /></PageSuspense>} />
+            <Route path='availability' element={<PageSuspense><CounsellorAvailabilityPage /></PageSuspense>} />
+            <Route path='profile' element={<PageSuspense><CounsellorProfilePage /></PageSuspense>} />
           </Route>
         </Route>
 

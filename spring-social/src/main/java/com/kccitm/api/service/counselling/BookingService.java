@@ -517,11 +517,69 @@ public class BookingService {
         newValues.put("studentId", student.getUserStudentId());
         auditLogService.log(appointment, "BOOKING_CREATED", null, reason, null, newValues);
 
+        // Labelled lines rather than a sentence. The feed is scanned, not read: an admin is
+        // looking down it for a school or a time, and a prose line buries both mid-sentence
+        // in a different position on every row. "Student 2217" was worse still — an id the
+        // reader had to go and look up before the entry told them anything at all.
         activityLogService.log("SLOT_BOOKED", "Session Booked",
-                "Student " + student.getUserStudentId() + " booked a session with " + slot.getCounsellor().getName()
-                + " on " + slot.getDate() + " at " + slot.getStartTime(),
+                bookingSummary(student, slot, mode),
                 slot.getCounsellor(), "Student");
 
         return appointment;
+    }
+
+    private static final java.time.format.DateTimeFormatter FEED_DATE =
+            java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy");
+    private static final java.time.format.DateTimeFormatter FEED_TIME =
+            java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
+
+    /**
+     * One booking, as labelled lines for the activity feed.
+     *
+     * <pre>
+     * Student:    Riya Sharma
+     * Institute:  Greenwood School
+     * Counsellor: hiba
+     * Date:       11 Aug 2026
+     * Time:       01:15 PM (15 min, Online)
+     * </pre>
+     *
+     * <p>Each fact sits at a fixed place on every row, so the feed can be scanned down a
+     * column instead of read sentence by sentence. Any line that cannot be resolved is left
+     * out rather than printed empty — a student with an incomplete profile still produces a
+     * usable entry, falling back to the id only when there is genuinely no name.
+     */
+    private String bookingSummary(UserStudent student, CounsellingSlot slot, String mode) {
+        StringBuilder sb = new StringBuilder();
+        String name = null;
+        String school = null;
+        try {
+            if (student != null && student.getStudentInfo() != null) {
+                name = student.getStudentInfo().getName();
+            }
+            if (student != null && student.getInstitute() != null) {
+                school = student.getInstitute().getInstituteName();
+            }
+        } catch (Exception ignored) {
+            // A lazy association we cannot read is not worth failing a log line over.
+        }
+        if (name == null || name.isBlank()) {
+            name = student != null ? "Student " + student.getUserStudentId() : "Unknown student";
+        }
+
+        sb.append("Student: ").append(name).append("\n");
+        if (school != null && !school.isBlank()) sb.append("Institute: ").append(school).append("\n");
+        if (slot != null && slot.getCounsellor() != null && slot.getCounsellor().getName() != null) {
+            sb.append("Counsellor: ").append(slot.getCounsellor().getName()).append("\n");
+        }
+        if (slot != null && slot.getDate() != null) {
+            sb.append("Date: ").append(slot.getDate().format(FEED_DATE)).append("\n");
+        }
+        if (slot != null && slot.getStartTime() != null) {
+            sb.append("Time: ").append(slot.getStartTime().format(FEED_TIME))
+              .append(" (").append(slot.getDurationMinutes()).append(" min, ")
+              .append("OFFLINE".equals(mode) ? "In-person" : "Online").append(")");
+        }
+        return sb.toString().trim();
     }
 }

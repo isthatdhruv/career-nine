@@ -22,6 +22,11 @@ public class ReportAutoGenerationService {
 
     @Autowired private ReportService reportService;
 
+    /** Optional so this still starts in a context where counselling is not wired. */
+    @Autowired(required = false)
+    private com.kccitm.api.service.counselling.CounsellorReportNotificationService
+            counsellorReportNotificationService;
+
     /**
      * Generate the questionnaire's default-template report for this student.
      * {@code reportTemplateId=null} → ReportService resolves the default.
@@ -33,6 +38,13 @@ public class ReportAutoGenerationService {
                 ReportResult r = reportService.generate(userStudentId, assessmentId, null, false);
                 logger.info("Auto-generated default report: student={} assessment={} template={} url={}",
                         userStudentId, assessmentId, r.subtypeCode, r.reportUrl);
+                // Same notification as the Kafka path takes — this is the fallback route used
+                // when the pipeline is disabled, and a counsellor should not be told about a
+                // student's results only when a particular deployment happens to run Kafka.
+                if (counsellorReportNotificationService != null) {
+                    counsellorReportNotificationService.notifyCounsellorsReportReady(
+                            userStudentId, assessmentId, r.reportUrl, r.pdfUrl);
+                }
                 return;
             } catch (ScoresNotReadyException ex) {
                 // Async persistence still in flight — wait and retry.

@@ -38,6 +38,21 @@ export function getCounsellingEnabledAssessments() {
   return axios.get<number[]>(`${BASE}/counselling-enabled-assessments`)
 }
 
+/**
+ * The assessments a given institute runs — what the Appoint wizard offers under each
+ * institute the admin ticked. Lightweight projection (no questionnaire/questions).
+ */
+export interface InstituteAssessment {
+  id: number
+  assessmentName: string
+  isActive?: boolean
+}
+export function getAssessmentsByInstitute(instituteCode: number) {
+  return axios.get<InstituteAssessment[]>(
+    `${API_URL}/assessment-mapping/getByInstitute/${instituteCode}/assessments`,
+  )
+}
+
 // Students who requested counselling on the thank-you page for an assessment that
 // has no counsellor mapped yet. Assigning a counsellor auto-closes these.
 export interface PendingCounsellingRequest {

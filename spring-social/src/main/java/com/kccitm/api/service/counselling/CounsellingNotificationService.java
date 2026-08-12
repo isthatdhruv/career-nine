@@ -41,6 +41,15 @@ public class CounsellingNotificationService {
     private IcsService icsService;
 
     @Autowired
+    private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
+
+    @Autowired
+    private CounsellorReportNotificationService counsellorReportNotificationService;
+
+    @Autowired
     private EmailDispatchService emailDispatchService;
 
     /**
@@ -128,22 +137,15 @@ public class CounsellingNotificationService {
         try {
             String counsellorEmail = appointment.getCounsellor().getEmail();
             String counsellorName = appointment.getCounsellor().getName();
-            String studentName = appointment.getStudent().getStudentInfo().getName();
             String reason = appointment.getStudentReason();
-            String date = appointment.getSlot().getDate().format(DATE_FMT);
-            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
-            int duration = appointment.getSlot().getDurationMinutes();
 
             String subject = "New Counselling Session Assigned to You";
             String body = "Dear " + counsellorName + ",\n\n"
                     + "A new counselling session has been assigned to you.\n\n"
                     + "Session Details:\n"
-                    + "  Student: " + studentName + "\n"
                     + (reason != null && !reason.isEmpty() ? "  Reason: " + reason + "\n" : "")
-                    + "  Date: " + date + "\n"
-                    + "  Time: " + time + "\n"
-                    + "  Duration: " + duration + " minutes\n\n"
-                    + "Please review and confirm the appointment.\n\n"
+                    + sessionDetailsBlock(appointment, true)
+                    + "\nPlease review and confirm the appointment.\n\n"
                     + "Regards,\nCareer-Nine Team";
 
             sendEmail(counsellorEmail, subject, body);
@@ -258,8 +260,12 @@ public class CounsellingNotificationService {
                     + "Unfortunately, " + counsellorName + " is on leave on "
                     + date + ", and no other counsellor was available at "
                     + time + ".\n\n"
-                    + "Your session has been cancelled. Please log in to the student portal "
-                    + "and book a new session at a time that works for you.\n\n"
+                    + "Your session has been cancelled.\n\n"
+                    // Nothing here is the student's doing, so this never touches her free
+                    // changes and rescheduling is always open to her — no allowance check.
+                    + "Pick a new time at no cost — open Counselling, go to Past Sessions and "
+                    + "press Reschedule:\n" + portalCounsellingUrl() + "\n\n"
+                    + "This cancellation does not count against your free changes.\n\n"
                     + "We apologise for the inconvenience.\n\n"
                     + "Regards,\nCareer-Nine Team";
 
@@ -319,24 +325,39 @@ public class CounsellingNotificationService {
 
             String oldDate = oldAppointment.getSlot().getDate().format(DATE_FMT);
             String oldTime = oldAppointment.getSlot().getStartTime().format(TIME_FMT);
-            String newDate = newAppointment.getSlot().getDate().format(DATE_FMT);
-            String newTime = newAppointment.getSlot().getStartTime().format(TIME_FMT);
-            int newDuration = newAppointment.getSlot().getDurationMinutes();
 
             String subject = "Counselling Session Rescheduled";
+            // The new session is described in full — school, assessment, venue/link and the
+            // report — because a reschedule replaces the confirmation the student was working
+            // from. Telling them only the new date and time would leave the report link
+            // stranded in a mail about a session that no longer happens.
             String body = "Dear " + studentName + ",\n\n"
                     + "Your counselling session has been rescheduled.\n\n"
                     + "Previous Schedule:\n"
                     + "  Date: " + oldDate + "\n"
                     + "  Time: " + oldTime + "\n\n"
                     + "New Schedule:\n"
-                    + "  Date: " + newDate + "\n"
-                    + "  Time: " + newTime + "\n"
-                    + "  Duration: " + newDuration + " minutes\n\n"
-                    + "Please update your calendar accordingly.\n\n"
+                    + sessionDetailsBlock(newAppointment, false)
+                    + "\nPlease update your calendar accordingly.\n\n"
                     + "Regards,\nCareer-Nine Team";
 
             sendEmail(studentEmail, subject, body);
+            // The counsellor is on the new session too — they were told about the original
+            // and would otherwise be left holding a time that has moved.
+            if (newAppointment.getCounsellor() != null) {
+                String counsellorEmail = newAppointment.getCounsellor().getEmail();
+                if (counsellorEmail != null && !counsellorEmail.isBlank()) {
+                    sendEmail(counsellorEmail, subject,
+                            "Dear " + newAppointment.getCounsellor().getName() + ",\n\n"
+                            + "A counselling session has been rescheduled.\n\n"
+                            + "Previous Schedule:\n"
+                            + "  Date: " + oldDate + "\n"
+                            + "  Time: " + oldTime + "\n\n"
+                            + "New Schedule:\n"
+                            + sessionDetailsBlock(newAppointment, true)
+                            + "\nRegards,\nCareer-Nine Team");
+                }
+            }
         } catch (Exception e) {
             logger.error("Failed to send reschedule email for appointment ID: {}. Error: {}",
                     newAppointment != null ? newAppointment.getId() : "null", e.getMessage());
@@ -346,23 +367,19 @@ public class CounsellingNotificationService {
     @Async
     public void sendReminderEmail(CounsellingAppointment appointment, String period) {
         try {
-            String date = appointment.getSlot().getDate().format(DATE_FMT);
-            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
-            int duration = appointment.getSlot().getDurationMinutes();
-            // Phase 5: mode-aware — online shows the meeting link, offline shows the venue.
-            String attend = attendanceLine(appointment);
+            // Date, time, duration and the mode-aware venue/meeting line all come from
+            // sessionDetailsBlock, which both copies below share.
 
             // Send to student
             String studentEmail = appointment.getStudent().getStudentInfo().getEmail();
             String studentName = appointment.getStudent().getStudentInfo().getName();
             String studentSubject = "Reminder: Counselling Session in " + period;
+            // The reminder is the last email before the session, so it is the one that most
+            // needs the report link — this is the moment either side would actually open it.
             String studentBody = "Dear " + studentName + ",\n\n"
                     + "This is a reminder that your counselling session is scheduled in " + period + ".\n\n"
                     + "Session Details:\n"
-                    + "  Date: " + date + "\n"
-                    + "  Time: " + time + "\n"
-                    + "  Duration: " + duration + " minutes\n"
-                    + "  " + attend + "\n"
+                    + sessionDetailsBlock(appointment, false)
                     + "\nPlease be prepared for your session.\n\n"
                     + "Regards,\nCareer-Nine Team";
             sendEmail(studentEmail, studentSubject, studentBody);
@@ -380,12 +397,8 @@ public class CounsellingNotificationService {
                 String counsellorBody = "Dear " + counsellorName + ",\n\n"
                         + "This is a reminder that you have a counselling session in " + period + ".\n\n"
                         + "Session Details:\n"
-                        + "  Student: " + studentName + "\n"
-                        + "  Date: " + date + "\n"
-                        + "  Time: " + time + "\n"
-                        + "  Duration: " + duration + " minutes\n"
-                        + "  " + attend + "\n\n"
-                        + "Regards,\nCareer-Nine Team";
+                        + sessionDetailsBlock(appointment, true)
+                        + "\nRegards,\nCareer-Nine Team";
                 sendEmail(counsellorEmail, counsellorSubject, counsellorBody);
             }
         } catch (Exception e) {
@@ -439,6 +452,171 @@ public class CounsellingNotificationService {
         logger.info("Block date request email sent to admin for counsellor {} on date {}", counsellor.getName(), date);
     }
 
+    /**
+     * The school this student belongs to, or null when we cannot read it.
+     *
+     * <p>Worth stating in a session email: a counsellor covering several schools needs it to
+     * place the student, and a student receiving mail from a platform they used once needs it
+     * to recognise what the mail is even about.
+     */
+    private String instituteNameFor(CounsellingAppointment appointment) {
+        try {
+            if (appointment.getStudent() == null || appointment.getStudent().getInstitute() == null) {
+                return null;
+            }
+            String name = appointment.getStudent().getInstitute().getInstituteName();
+            return (name != null && !name.isBlank()) ? name : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** The assessment this session was booked against, resolved through the entitlement. */
+    private Long assessmentIdFor(CounsellingAppointment appointment) {
+        try {
+            if (appointment.getEntitlementId() == null) return null;
+            return studentEntitlementRepository.findById(appointment.getEntitlementId())
+                    .map(e -> e.getAssessmentId())
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String assessmentNameFor(CounsellingAppointment appointment) {
+        try {
+            Long assessmentId = assessmentIdFor(appointment);
+            if (assessmentId == null) return null;
+            return assessmentTableRepository.findById(assessmentId)
+                    .map(a -> a.getAssessmentName())
+                    .filter(n -> n != null && !n.isBlank())
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * The full picture of one session, as indented "  Label: value" lines.
+     *
+     * <p>Every counselling email used to carry its own hand-built subset — one had the date
+     * and time, another added the venue, none named the school or the assessment — so what a
+     * recipient was told depended on which email happened to reach them. This is the single
+     * description they all draw from, so a reminder says as much as a confirmation does.
+     *
+     * <p>Lines whose value cannot be resolved are left out rather than printed empty: an
+     * appointment created by an admin may have no entitlement, and therefore no assessment.
+     *
+     * @param includeStudent true for the counsellor's copy, which needs to know who is coming;
+     *                       false for the student's own, where naming them back at themselves
+     *                       adds nothing
+     */
+    private String sessionDetailsBlock(CounsellingAppointment appointment, boolean includeStudent) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            if (includeStudent && appointment.getStudent() != null
+                    && appointment.getStudent().getStudentInfo() != null) {
+                String name = appointment.getStudent().getStudentInfo().getName();
+                if (name != null && !name.isBlank()) sb.append("  Student: ").append(name).append("\n");
+            }
+            String school = instituteNameFor(appointment);
+            if (school != null) sb.append("  School: ").append(school).append("\n");
+
+            String assessment = assessmentNameFor(appointment);
+            if (assessment != null) sb.append("  Assessment: ").append(assessment).append("\n");
+
+            if (appointment.getSlot() != null) {
+                if (appointment.getSlot().getDate() != null) {
+                    sb.append("  Date: ").append(appointment.getSlot().getDate().format(DATE_FMT)).append("\n");
+                }
+                if (appointment.getSlot().getStartTime() != null) {
+                    sb.append("  Time: ").append(appointment.getSlot().getStartTime().format(TIME_FMT)).append("\n");
+                }
+                if (appointment.getSlot().getDurationMinutes() > 0) {
+                    sb.append("  Duration: ").append(appointment.getSlot().getDurationMinutes())
+                      .append(" minutes\n");
+                }
+            }
+            if (!includeStudent && appointment.getCounsellor() != null
+                    && appointment.getCounsellor().getName() != null) {
+                sb.append("  Counsellor: ").append(appointment.getCounsellor().getName()).append("\n");
+            }
+            sb.append("  Mode: ").append("OFFLINE".equals(appointment.getMode()) ? "In-person" : "Online").append("\n");
+            sb.append("  ").append(attendanceLine(appointment)).append("\n");
+
+            String report = bookingReportLink(appointment);
+            if (report != null) sb.append("  Assessment report: ").append(report).append("\n");
+        } catch (Exception e) {
+            logger.warn("Could not build session details for appointment {}: {}",
+                    appointment != null ? appointment.getId() : null, e.getMessage());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * One activity-feed entry, as labelled lines: who and when first, then whatever the
+     * event itself needs to add.
+     *
+     * <p>The feed is scanned rather than read. Prose put the student in a different position
+     * on every row and buried the date mid-sentence, so finding "the Greenwood booking on
+     * Tuesday" meant reading every entry in full. Fixed labels let the eye run down one
+     * column. Lines that cannot be resolved are dropped rather than printed empty.
+     */
+    private String feedLines(CounsellingAppointment appointment, String... extra) {
+        StringBuilder sb = new StringBuilder();
+        try {
+            String student = studentName(appointment);
+            if (student != null && !student.isBlank()) sb.append("Student: ").append(student).append("\n");
+
+            String school = instituteNameFor(appointment);
+            if (school != null) sb.append("Institute: ").append(school).append("\n");
+
+            if (appointment != null && appointment.getSlot() != null) {
+                if (appointment.getSlot().getDate() != null) {
+                    sb.append("Date: ").append(appointment.getSlot().getDate().format(DATE_FMT)).append("\n");
+                }
+                if (appointment.getSlot().getStartTime() != null) {
+                    sb.append("Time: ").append(appointment.getSlot().getStartTime().format(TIME_FMT)).append("\n");
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Could not build feed lines for appointment {}: {}",
+                    appointment != null ? appointment.getId() : null, e.getMessage());
+        }
+        if (extra != null) {
+            for (String line : extra) {
+                if (line != null && !line.isBlank()) sb.append(line).append("\n");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    /**
+     * The student's report for the assessment this session was booked against, or null.
+     *
+     * <p>The appointment does not carry an assessment id — it carries the entitlement the
+     * booking was paid for, and the entitlement is what names the assessment. Anything
+     * missing along that chain (no entitlement on a manually created appointment, report not
+     * generated yet) simply means no link, and the invite goes out without that line rather
+     * than not at all.
+     */
+    private String bookingReportLink(CounsellingAppointment appointment) {
+        try {
+            if (appointment.getStudent() == null || appointment.getEntitlementId() == null) return null;
+            Long assessmentId = studentEntitlementRepository.findById(appointment.getEntitlementId())
+                    .map(e -> e.getAssessmentId())
+                    .orElse(null);
+            if (assessmentId == null) return null;
+            return counsellorReportNotificationService
+                    .reportLink(appointment.getStudent().getUserStudentId(), assessmentId)
+                    .orElse(null);
+        } catch (Exception e) {
+            logger.warn("Could not resolve report link for appointment {}: {}",
+                    appointment.getId(), e.getMessage());
+            return null;
+        }
+    }
+
     // ─── Channel-aware dispatch (WhatsApp primary, email fallback) ─────────────────
 
     /**
@@ -451,36 +629,39 @@ public class CounsellingNotificationService {
         try {
             String studentName = studentName(appointment);
             String studentEmail = studentEmail(appointment);
-            String date = appointment.getSlot().getDate().format(DATE_FMT);
-            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
-            boolean offline = "OFFLINE".equals(appointment.getMode());
-            String channelLabel = offline
-                    ? (appointment.getLocation() != null && !appointment.getLocation().isEmpty()
-                            ? "Venue: " + appointment.getLocation()
-                            : "Venue: your counsellor will share the address shortly")
-                    : (appointment.getMeetingLink() != null && !appointment.getMeetingLink().isEmpty()
-                            ? "Meeting link: " + appointment.getMeetingLink()
-                            : "Meeting link: to be shared");
 
+            // Date, time, venue/meeting link and the report link all come from
+            // sessionDetailsBlock now, so this method no longer formats its own.
             String subject = "Counselling Session Confirmed";
             // Phase 6: one-click "Add to Google Calendar" link (no API/OAuth needed) in
             // addition to the attached .ics invite.
             String gcal = googleCalendarLink(appointment);
+            // One email reaches the student, the parent and the counsellor, so it names the
+            // student — the counsellor's copy is useless without it, and the other two are
+            // not confused by seeing it.
             String body = "Dear " + studentName + ",\n\n"
                     + "Your counselling session has been confirmed.\n\n"
-                    + "  Date: " + date + "\n"
-                    + "  Time: " + time + "\n"
-                    + "  Mode: " + (offline ? "In-person" : "Online") + "\n"
-                    + "  " + channelLabel + "\n\n"
+                    + "Session Details:\n"
+                    + sessionDetailsBlock(appointment, true)
+                    + "\n"
                     + (gcal != null ? "Add to Google Calendar: " + gcal + "\n\n" : "")
                     + "A calendar invite is also attached so you can add this to any calendar.\n\n"
                     + "Regards,\nCareer-Nine Team";
 
-            // Recipients: the student, plus the parent/guardian email if one was given.
+            // Recipients: the student, the parent/guardian if one was given, and the
+            // counsellor taking the session — they need the same calendar entry on their own
+            // calendar, and the report link above.
             String parentEmail = appointment.getParentEmail();
             java.util.List<String> emailTo = new java.util.ArrayList<>();
             if (studentEmail != null && !studentEmail.isEmpty()) emailTo.add(studentEmail);
             if (parentEmail != null && !parentEmail.isEmpty()) emailTo.add(parentEmail);
+            if (appointment.getCounsellor() != null) {
+                String counsellorEmail = appointment.getCounsellor().getEmail();
+                if (counsellorEmail != null && !counsellorEmail.isBlank()
+                        && !emailTo.contains(counsellorEmail.trim())) {
+                    emailTo.add(counsellorEmail.trim());
+                }
+            }
 
             // Email with .ics attachment (falls back to plain text if
             // the Gmail sender or the invite isn't available).
@@ -509,8 +690,12 @@ public class CounsellingNotificationService {
 
             // Best-effort WhatsApp confirmation in addition to the email — to the
             // student and, if provided, the parent/guardian number.
-            java.util.List<String> waParams =
-                    Arrays.asList(studentName, date + " " + time, offline ? "In-person" : "Online");
+            // WhatsApp templates take positional parameters, so these stay formatted here
+            // rather than coming from the email block.
+            String waWhen = appointment.getSlot().getDate().format(DATE_FMT)
+                    + " " + appointment.getSlot().getStartTime().format(TIME_FMT);
+            java.util.List<String> waParams = Arrays.asList(studentName, waWhen,
+                    "OFFLINE".equals(appointment.getMode()) ? "In-person" : "Online");
             whatsAppService.sendTemplate(studentPhone(appointment), whatsAppService.confirmationCampaign(), waParams);
             String parentPhone = appointment.getParentPhone();
             if (parentPhone != null && !parentPhone.isEmpty()) {
@@ -760,8 +945,8 @@ public class CounsellingNotificationService {
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
 
             String consequence = creditedBack
-                    ? "Your session has been returned to your account, so you can book a new time at no extra cost."
-                    : "This was your last free change, so a new session will need to be paid for.";
+                    ? "Your session has been returned to your account, so it costs you nothing."
+                    : "This was your last free change.";
             String allowance = missesRemaining > 0
                     ? "You have " + missesRemaining + " free change" + (missesRemaining == 1 ? "" : "s") + " remaining."
                     : "You have no free changes remaining.";
@@ -772,7 +957,7 @@ public class CounsellingNotificationService {
                     + "as you requested.\n\n"
                     + consequence + "\n"
                     + allowance + "\n\n"
-                    + "Book a new session here:\n" + portalCounsellingUrl() + "\n\n"
+                    + nextStepLine(missesRemaining) + "\n\n"
                     + "Regards,\nCareer-Nine Team";
 
             sendWithCancelledInvite(appointment, subject, body);
@@ -889,18 +1074,19 @@ public class CounsellingNotificationService {
     @Async
     public void notifyAdminNoReplacement(CounsellingAppointment appointment, String cause) {
         try {
-            String date = appointment.getSlot() != null ? appointment.getSlot().getDate().format(DATE_FMT) : "?";
-            String time = appointment.getSlot() != null ? appointment.getSlot().getStartTime().format(TIME_FMT) : "?";
+            // Date and time now come from feedLines, which formats them the same way for
+            // every entry in the feed.
             Counsellor counsellor = appointment.getCounsellor();
             String counsellorName = counsellor != null ? counsellor.getName() : "A counsellor";
 
             activityLogService.log(
                     "COUNSELLING_NEEDS_ATTENTION",
                     "Session needs attention",
-                    counsellorName + " " + cause + " the session with " + studentName(appointment)
-                            + " on " + date + " at " + time
-                            + ", and no replacement counsellor was available. The student has been "
-                            + "sent a self-reschedule link.",
+                    feedLines(appointment,
+                            "Counsellor: " + counsellorName,
+                            "Cause: " + cause,
+                            "Outcome: no replacement counsellor was available",
+                            "Action: student sent a self-reschedule link"),
                     counsellor, counsellorName);
         } catch (Exception e) {
             logger.warn("Failed to log unplaced appointment {}: {}",
@@ -984,12 +1170,11 @@ public class CounsellingNotificationService {
             String date = appointment.getSlot().getDate().format(DATE_FMT);
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
 
-            String consequence = missesRemaining > 0
-                    ? "You have " + missesRemaining + " free change" + (missesRemaining == 1 ? "" : "s")
-                      + " remaining, so you can book a new session at no extra cost here:\n"
-                      + portalCounsellingUrl()
-                    : "This was your last free change, so a new session will need to be paid for. "
-                      + "You can arrange one here:\n" + portalCounsellingUrl();
+            String consequence = (missesRemaining > 0
+                        ? "You have " + missesRemaining + " free change" + (missesRemaining == 1 ? "" : "s")
+                          + " remaining.\n\n"
+                        : "")
+                    + nextStepLine(missesRemaining);
 
             String subject = "You were marked absent from your counselling session";
             String body = "Dear " + name + ",\n\n"
@@ -1025,17 +1210,16 @@ public class CounsellingNotificationService {
     @Async
     public void notifyAdminCounsellorNoShow(CounsellingAppointment appointment) {
         try {
-            String date = appointment.getSlot().getDate().format(DATE_FMT);
-            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
             Counsellor counsellor = appointment.getCounsellor();
             String counsellorName = counsellor != null ? counsellor.getName() : "Unassigned";
 
             activityLogService.log(
                     "COUNSELLOR_NO_SHOW",
                     "Counsellor no-show",
-                    counsellorName + " did not check in for the session with "
-                            + studentName(appointment) + " on " + date + " at " + time
-                            + ". The student has been sent a link to rebook and has not been penalised.",
+                    feedLines(appointment,
+                            "Counsellor: " + counsellorName,
+                            "Outcome: counsellor did not check in",
+                            "Action: student sent a rebooking link; not penalised"),
                     counsellor, counsellorName);
         } catch (Exception e) {
             logger.warn("Failed to log counsellor no-show on appointment {}: {}",
@@ -1051,13 +1235,14 @@ public class CounsellingNotificationService {
     @Async
     public void notifyAdminDisputeRaised(CounsellingAppointment appointment) {
         try {
-            String date = appointment.getSlot().getDate().format(DATE_FMT);
             Counsellor counsellor = appointment.getCounsellor();
             activityLogService.log(
                     "ATTENDANCE_DISPUTE",
                     "Attendance disputed",
-                    studentName(appointment) + " disputes being marked absent on " + date
-                            + ". Nothing counts against her until this is upheld or overturned.",
+                    feedLines(appointment,
+                            "Counsellor: " + (counsellor != null ? counsellor.getName() : "Unassigned"),
+                            "Raised: student disputes being marked absent",
+                            "Status: nothing counts against the student until this is decided"),
                     counsellor, studentName(appointment));
         } catch (Exception e) {
             logger.warn("Failed to log dispute on appointment {}: {}",
@@ -1097,6 +1282,26 @@ public class CounsellingNotificationService {
     private String portalCounsellingUrl() {
         String base = frontendUrl == null ? "" : frontendUrl.replaceAll("/+$", "");
         return base + "/student/dashboard/counselling";
+    }
+
+    /**
+     * What the student can do next, given how many free changes she has left.
+     *
+     * <p>The two outcomes are genuinely different actions, and calling both "book a new
+     * session" — as every one of these emails used to — misled in both directions. With a
+     * change left she does not book anything: she reschedules the session she already paid
+     * for, from Past Sessions, and it costs her nothing. With none left rescheduling is not
+     * offered to her at all, and a fresh booking is chargeable. The wording now matches the
+     * button she will actually find when she gets there.
+     */
+    private String nextStepLine(int missesRemaining) {
+        if (missesRemaining > 0) {
+            return "Reschedule it yourself at no extra cost — open Counselling, go to "
+                    + "Past Sessions and press Reschedule to pick a new slot:\n"
+                    + portalCounsellingUrl();
+        }
+        return "You have no free changes left, so this session can no longer be moved. "
+                + "You can book a new session here:\n" + portalCounsellingUrl();
     }
 
     /** Student plus parent/guardian, matching the confirmation email's recipient list. */

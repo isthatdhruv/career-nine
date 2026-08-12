@@ -83,9 +83,13 @@ public class BlockDateRequestController {
         BlockDateRequest saved = requestRepository.save(request);
         logger.info("Block date request submitted: counsellor={} date={}", counsellor.getName(), dateStr);
 
+        // Labelled lines, matching the rest of the counselling feed — see feedLines() in
+        // CounsellingNotificationService for why the feed reads this way.
         activityLogService.log("BLOCK_DATE_REQUESTED", "Block Date Request",
-                counsellor.getName() + " requested to block " + dateStr
-                + (reason != null && !reason.isEmpty() ? " — Reason: " + reason : ""), counsellor);
+                "Counsellor: " + counsellor.getName() + "\n"
+                + "Date requested off: " + dateStr + "\n"
+                + "Reason: " + (reason != null && !reason.isEmpty() ? reason : "not given") + "\n"
+                + "Status: awaiting approval", counsellor);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
@@ -202,9 +206,10 @@ public class BlockDateRequestController {
                 id, request.getCounsellor().getName(), blockDate, cancelledCount, rescheduleEmailsSent);
 
         activityLogService.log("BLOCK_DATE_APPROVED", "Block Date Approved",
-                request.getCounsellor().getName() + "'s request to block " + blockDate
-                + " was approved. " + cancelledCount + " slot(s) cancelled, "
-                + rescheduleEmailsSent + " student(s) emailed a self-reschedule link.",
+                "Counsellor: " + request.getCounsellor().getName() + "\n"
+                + "Date blocked: " + blockDate + "\n"
+                + "Slots cancelled: " + cancelledCount + "\n"
+                + "Students emailed a self-reschedule link: " + rescheduleEmailsSent,
                 request.getCounsellor(), "Admin");
 
         return ResponseEntity.ok(request);
@@ -232,7 +237,9 @@ public class BlockDateRequestController {
                 id, request.getCounsellor().getName(), request.getBlockDate());
 
         activityLogService.log("BLOCK_DATE_REJECTED", "Block Date Rejected",
-                request.getCounsellor().getName() + "'s request to block " + request.getBlockDate() + " was rejected.",
+                "Counsellor: " + request.getCounsellor().getName() + "\n"
+                + "Date requested off: " + request.getBlockDate() + "\n"
+                + "Status: rejected — the counsellor remains available that day",
                 request.getCounsellor(), "Admin");
 
         return ResponseEntity.ok(request);

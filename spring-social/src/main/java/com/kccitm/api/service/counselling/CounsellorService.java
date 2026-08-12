@@ -29,9 +29,6 @@ public class CounsellorService {
     private UserRepository userRepository;
 
     @Autowired
-    private CounsellorProvisioningService provisioningService;
-
-    @Autowired
     private com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository appointmentRepository;
 
     public Counsellor create(Counsellor counsellor) {
@@ -158,16 +155,51 @@ public class CounsellorService {
     public Counsellor toggleActive(Long id) {
         Counsellor counsellor = counsellorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Counsellor not found with id: " + id));
+        return setActive(counsellor, !counsellor.getIsActive());
+    }
 
-        boolean newActive = !counsellor.getIsActive();
+    /**
+     * Activate or suspend the counsellor attached to this login user, if there is one.
+     *
+     * <p>Counsellor approval is one decision with two front doors: Manage Counsellors and
+     * User Management. They used to write different flags — the counsellor screen set
+     * {@code Counsellor.isActive} and pushed it down onto the User, while the user screen set
+     * {@code User.isActive} alone. Activating from User Management therefore let the person
+     * log in while leaving the counsellor record suspended: no portal permissions, and
+     * invisible to students booking a session. Both doors now run this same code.
+     *
+     * <p>A user with no counsellor record is left alone — the caller has already updated
+     * {@code User.isActive}, which is all an ordinary user has.
+     *
+     * @return true when a counsellor record was found and updated
+     */
+    public boolean setActiveForUser(Long userId, boolean active) {
+        if (userId == null) return false;
+        Optional<Counsellor> found = counsellorRepository.findByUserId(userId);
+        if (found.isEmpty()) return false;
+        Counsellor counsellor = found.get();
+        if (Boolean.valueOf(active).equals(counsellor.getIsActive())) return true; // already there
+        setActive(counsellor, active);
+        return true;
+    }
+
+    /** The single place a counsellor's approval state changes, whichever screen asked for it. */
+    private Counsellor setActive(Counsellor counsellor, boolean newActive) {
+        Long id = counsellor.getId();
         counsellor.setIsActive(newActive);
         counsellor.setOnboardingStatus(newActive ? "ACTIVE" : "SUSPENDED");
         logger.debug("Toggled counsellor id: {} → isActive={}, onboardingStatus={}", id, newActive, counsellor.getOnboardingStatus());
 
-        // Counselling Phase 1: keep the linked login User in lock-step with approval, and
-        // provision the counsellor role group/scope on activation so the portal's
-        // counsellor.* / counselling.* permission checks resolve. Best-effort — never block
+        // Keep the linked login User in lock-step with approval. Best-effort — never block
         // the admin's toggle on an auth-wiring hiccup.
+        //
+        // Activation deliberately grants NO role. Approval and authorization are separate
+        // decisions with separate owners: this button says "this person is a real counsellor
+        // and may sign in", and Roles & Permissions says what they may then do. Attaching the
+        // `counsellor` role group here meant activation quietly handed out permissions from a
+        // screen that shows none of them, so what a counsellor could do was set in a place
+        // nobody thought to look. An activated counsellor with no role group signs in to an
+        // empty portal until someone assigns one.
         try {
             User user = counsellor.getUser();
             if (user == null && newActive) {
@@ -196,12 +228,9 @@ public class CounsellorService {
             if (user != null) {
                 user.setIsActive(newActive);
                 userRepository.save(user);
-                if (newActive) {
-                    provisioningService.provision(user.getId(), null); // wildcard institute scope
-                }
             }
         } catch (Exception e) {
-            logger.warn("Counsellor {} login-user sync/provisioning failed on toggle: {}", id, e.getMessage());
+            logger.warn("Counsellor {} login-user sync failed on toggle: {}", id, e.getMessage());
         }
 
         Counsellor saved = counsellorRepository.save(counsellor);
@@ -209,7 +238,10 @@ public class CounsellorService {
         activityLogService.log(
                 newActive ? "COUNSELLOR_ACTIVATED" : "COUNSELLOR_SUSPENDED",
                 newActive ? "Counsellor Activated" : "Counsellor Suspended",
-                counsellor.getName() + " (" + counsellor.getEmail() + ") has been " + (newActive ? "activated" : "suspended") + ".",
+                "Counsellor: " + counsellor.getName() + "\n"
+                + "Email: " + counsellor.getEmail() + "\n"
+                + "Status: " + (newActive ? "active — can sign in and take sessions"
+                                          : "suspended — cannot sign in or be booked"),
                 counsellor, "Admin");
 
         return saved;

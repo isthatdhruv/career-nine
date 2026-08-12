@@ -177,7 +177,6 @@
     "/old-student-email"
   ],
   "user.write": [
-    "/admin/counselling-assignments",
     "/admin/counselling-dashboard",
     "/admin/counselling-notifications",
     "/admin/counselling-slots",

@@ -586,10 +586,16 @@ public class AppointmentService {
         // charge her for someone else's cancellation.
         boolean parked = "AWAITING_RESCHEDULE".equals(oldAppointment.getStatus());
 
+        // A session she failed to attend is rescheduled from her history, so its start time is
+        // necessarily in the past. The window exists to protect the counsellor's diary from a
+        // late change to an IMMINENT session; applied to one that has already been and gone it
+        // rejects every attempt, since a past time is always "within 2 hours of now".
+        boolean missed = "MISSED".equals(oldAppointment.getStatus());
+
         // Student window on the old slot. Skipped for an admin rebook of an already-passed
         // session, and for a session the counsellor force-shifted her into — she did not
         // choose that time, so the window has no business holding her to it.
-        if (!bypassCancellationWindow && !parked && !oldAppointment.getForceShifted()) {
+        if (!bypassCancellationWindow && !parked && !missed && !oldAppointment.getForceShifted()) {
             LocalDateTime oldSessionTime = clock.sessionStart(oldSlot.getDate(), oldSlot.getStartTime());
             if (clock.isWithinHoursOfNow(oldSessionTime, studentWindowHours)) {
                 throw new BadRequestException(
