@@ -28,7 +28,6 @@ import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
-import com.kccitm.api.service.counselling.CounsellorProvisioningService;
 import com.kccitm.api.service.counselling.CounsellorService;
 
 /**
@@ -57,9 +56,6 @@ public class CounsellorController {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private CounsellorProvisioningService provisioningService;
 
     @Autowired
     private com.kccitm.api.service.counselling.CounsellingActivityLogService activityLogService;
@@ -166,7 +162,13 @@ public class CounsellorController {
         logger.info("Counsellor self-registered: {} ({})", saved.getName(), saved.getEmail());
 
         activityLogService.log("COUNSELLOR_REGISTERED", "New Counsellor Registration",
-                saved.getName() + " (" + saved.getEmail() + ") has registered and is awaiting approval.", saved);
+                "Counsellor: " + saved.getName() + "\n"
+                + "Email: " + saved.getEmail() + "\n"
+                + (saved.getPhone() != null && !saved.getPhone().isBlank()
+                        ? "Phone: " + saved.getPhone() + "\n" : "")
+                + (saved.getSpecializations() != null && !saved.getSpecializations().isBlank()
+                        ? "Specializations: " + saved.getSpecializations() + "\n" : "")
+                + "Status: awaiting approval", saved);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "message", "Registration submitted successfully. You will be able to login once an administrator approves your account.",
@@ -391,21 +393,15 @@ public class CounsellorController {
     @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/api/counsellor/get/by-user/{userId}")
     public ResponseEntity<Counsellor> getByUserId(@PathVariable Long userId) {
-        Optional<Counsellor> counsellorOpt = counsellorService.getByUserId(userId);
-        // Counselling Phase 1: lazy self-heal. Counsellors created/linked before
-        // V20260610001 (and back-filled by it) have no role-group/scope yet. The first
-        // portal load idempotently provisions an active counsellor's User so future
-        // enforce-mode requests resolve the counsellor permission bundle.
-        counsellorOpt.ifPresent(c -> {
-            if (Boolean.TRUE.equals(c.getIsActive()) && c.getUser() != null) {
-                try {
-                    provisioningService.provision(c.getUser().getId(), null);
-                } catch (Exception e) {
-                    logger.warn("Lazy counsellor provisioning failed for user {}: {}", userId, e.getMessage());
-                }
-            }
-        });
-        return counsellorOpt
+        // Loading the portal no longer grants the `counsellor` role group.
+        //
+        // This was a lazy self-heal for counsellors back-filled before V20260610001, but it
+        // meant simply opening the portal handed out permissions — so removing a counsellor's
+        // role group in Roles & Permissions was undone by their next page load, and the
+        // decision to strip a role could not be made to stick. Role assignment now happens in
+        // Roles & Permissions and nowhere else; a counsellor without the role group sees an
+        // empty portal, which is the honest result of not having been given one.
+        return counsellorService.getByUserId(userId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

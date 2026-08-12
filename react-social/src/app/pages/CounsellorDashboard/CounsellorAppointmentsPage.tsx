@@ -157,6 +157,7 @@ const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
   UNDER_REVIEW:        { label: 'Under review',               bg: '#EDE9FE', fg: '#5B21B6' },
   CANCELLED:           { label: 'Cancelled',                  bg: '#E5E7EB', fg: '#4B5563' },
   DECLINED:            { label: 'Declined',                   bg: '#FFE4E6', fg: '#9F1239' },
+  RESCHEDULED:         { label: 'Moved to a new time',        bg: '#E0E7FF', fg: '#3730A3' },
 }
 
 /**
@@ -181,6 +182,17 @@ function resolveMeta(appt: any): { label: string; bg: string; fg: string } {
   // so the badge follows what the counsellor did, not what the sweep has yet to do.
   if (appt?.markedAbsentAt && (status === 'CONFIRMED' || status === 'ASSIGNED')) {
     return STATUS_META.MISSED
+  }
+  // A superseded row is still the record of how the first attempt went — who was absent,
+  // who dropped it. A bare "Moved to a new time" would erase exactly the part worth
+  // keeping, so the badge names the cause and the replacement is shown beneath it.
+  if (status === 'RESCHEDULED') {
+    const missedBy = (appt?.missedByRole || '').toUpperCase()
+    const cancelledBy = (appt?.cancelledByRole || '').toUpperCase()
+    if (missedBy === 'STUDENT') return { label: 'Student absent · moved', bg: '#FEE2E2', fg: '#991B1B' }
+    if (missedBy === 'COUNSELLOR') return { label: 'You missed this · moved', bg: '#FFE4E6', fg: '#9F1239' }
+    if (cancelledBy === 'COUNSELLOR') return { label: 'You cancelled · moved', bg: '#E5E7EB', fg: '#4B5563' }
+    if (cancelledBy === 'STUDENT') return { label: 'Student cancelled · moved', bg: '#E5E7EB', fg: '#4B5563' }
   }
   return STATUS_META[status] || { label: status, bg: '#F3F4F6', fg: '#374151' }
 }
@@ -267,6 +279,9 @@ function isToday(appt: any): boolean {
 function isUpcoming(appt: any): boolean {
   const status = (appt.status || '').toUpperCase()
   if (status === 'COMPLETED' || status === 'CANCELLED' || status === 'DECLINED') return false
+  // Superseded rows are kept for the record but are not going to happen — its replacement
+  // is the one the counsellor has to turn up to.
+  if (status === 'RESCHEDULED') return false
   if (isEndedConfirmed(appt)) return false
   const d = buildSlotDate(appt)
   if (!d) return false
@@ -539,10 +554,15 @@ const CounsellorAppointmentsPage: React.FC = () => {
   // Outcomes split by whose fault. Merged into one "no-shows" figure these are useless for
   // management: a counsellor with many student no-shows would look identical to one who
   // keeps not turning up.
-  const studentNoShows = activeAppointments.filter(
+  //
+  // Counted over EVERY appointment, not just the active ones. An absence is a thing that
+  // happened; booking a replacement does not unhappen it. Counting these off
+  // `activeAppointments` meant a no-show silently left the tally the moment the session
+  // was moved, which is the one case where the number most needs to hold.
+  const studentNoShows = appointments.filter(
     (a) => (a.missedByRole || '').toUpperCase() === 'STUDENT'
   )
-  const myNoShows = activeAppointments.filter(
+  const myNoShows = appointments.filter(
     (a) => (a.missedByRole || '').toUpperCase() === 'COUNSELLOR'
   )
 
@@ -550,11 +570,23 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const appointmentsById = new Map<number, any>()
   appointments.forEach((a) => { if (a.id != null) appointmentsById.set(a.id, a) })
 
-  // Filter out RESCHEDULED rows — they're represented by their replacement,
-  // which carries `rescheduledFromAppointmentId`.
-  const visible = appointments.filter(
-    (a) => (a.status || '').toUpperCase() !== 'RESCHEDULED' || wasCancelledByCounsellor(a)
-  )
+  // The reverse: original id -> whatever replaced it, so a superseded row can point
+  // forward to where the session actually ended up.
+  const replacementByOriginalId = new Map<number, any>()
+  appointments.forEach((a) => {
+    if (a.rescheduledFromAppointmentId != null) {
+      replacementByOriginalId.set(a.rescheduledFromAppointmentId, a)
+    }
+  })
+
+  // Every session stays on the list, superseded ones included.
+  //
+  // RESCHEDULED rows used to be hidden as "represented by their replacement", but they are
+  // not: the replacement records the new time, while the original records what went wrong —
+  // that the student did not turn up, that the counsellor dropped it, the reason given. The
+  // moment a new time was booked that history vanished from the page. Both rows are kept and
+  // linked to each other instead; the badge and the "Moved to …" line say which is which.
+  const visible = appointments
 
   const filtered = visible
     .filter((a) => {
@@ -569,7 +601,10 @@ const CounsellorAppointmentsPage: React.FC = () => {
         case 'pending':
           return status === 'ASSIGNED' || status === 'PENDING'
         case 'cancelled':
-          return status === 'CANCELLED' || status === 'DECLINED'
+          // Same test as the tab's own count, `wasCancelledByCounsellor` included: a session
+          // this counsellor dropped that was later covered sits at RESCHEDULED, so leaving it
+          // out here made the tab read "Cancelled (1)" over an empty list.
+          return status === 'CANCELLED' || status === 'DECLINED' || wasCancelledByCounsellor(a)
         default:
           return true
       }
@@ -734,6 +769,9 @@ const CounsellorAppointmentsPage: React.FC = () => {
               ? appointmentsById.get(appt.rescheduledFromAppointmentId)
               : null
             const rescheduledFromLabel = rescheduledFrom ? formatDateTime(rescheduledFrom) : null
+            // The other direction, for the row that was superseded: where the session went.
+            const movedTo = appt.id != null ? replacementByOriginalId.get(appt.id) : null
+            const movedToLabel = movedTo ? formatDateTime(movedTo) : null
 
             return (
               <div
@@ -771,6 +809,15 @@ const CounsellorAppointmentsPage: React.FC = () => {
                           <path d='M20.49 15a9 9 0 1 1-2.12-9.36L23 10' />
                         </svg>
                         Rescheduled from {rescheduledFromLabel}
+                      </div>
+                    )}
+                    {movedToLabel && (
+                      <div style={{ fontSize: 12, color: '#3730A3', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                          <polyline points='23 4 23 10 17 10' />
+                          <path d='M20.49 15a9 9 0 1 1-2.12-9.36L23 10' />
+                        </svg>
+                        Moved to {movedToLabel}
                       </div>
                     )}
                   </div>

@@ -13,10 +13,16 @@ interface CounsellorData {
   isExternal?: boolean
 }
 
+/**
+ * The id the dialog's Save button points at via its `form` attribute, so the button can
+ * sit in the modal footer — outside this element — and still submit it.
+ */
+export const COUNSELLOR_FORM_ID = 'counsellor-form'
+const FORM_ID = COUNSELLOR_FORM_ID
+
 interface CounsellorFormProps {
   counsellor: CounsellorData | null
   onSave: (data: CounsellorData) => void
-  onCancel: () => void
 }
 
 const EMPTY_FORM: CounsellorData = {
@@ -30,7 +36,7 @@ const EMPTY_FORM: CounsellorData = {
   isExternal: false,
 }
 
-const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave, onCancel }) => {
+const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave }) => {
   const [form, setForm] = useState<CounsellorData>(counsellor ?? EMPTY_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof CounsellorData, string>>>({})
 
@@ -103,20 +109,11 @@ const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave, onC
 
   const fieldStyle: React.CSSProperties = { marginBottom: 16 }
 
+  // Fields only: the dialog around this supplies the card, the title and the buttons.
+  // The submit control lives in the modal footer and reaches this form by id, which is
+  // why the <form> is addressable and carries no footer of its own.
   return (
-    <div
-      className='cl-card'
-      style={{
-        maxWidth: 560,
-        margin: '0 auto',
-        borderTop: '4px solid var(--sp-primary, #0C6B5A)',
-      }}
-    >
-      <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 700, color: 'var(--sp-text, #1A2B28)' }}>
-        {counsellor?.counsellorId ? 'Edit Counsellor' : 'Add Counsellor'}
-      </h3>
-
-      <form onSubmit={handleSubmit} noValidate>
+    <form id={FORM_ID} onSubmit={handleSubmit} noValidate>
         {/* Name */}
         <div style={fieldStyle}>
           <label style={labelStyle} htmlFor='cf-name'>
@@ -251,17 +248,7 @@ const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave, onC
           </label>
         </div>
 
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8 }}>
-          <button type='button' className='cl-btn-outline' onClick={onCancel}>
-            Cancel
-          </button>
-          <button type='submit' className='cl-btn-primary'>
-            {counsellor?.counsellorId ? 'Save Changes' : 'Add Counsellor'}
-          </button>
-        </div>
-      </form>
-    </div>
+    </form>
   )
 }
 
