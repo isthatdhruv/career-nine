@@ -20,6 +20,7 @@ import com.kccitm.api.model.career9.counselling.Notification;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.Career9.counselling.NotificationRepository;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
 
@@ -428,6 +429,120 @@ public class CounsellingNotificationService {
         }
     }
 
+    // ─── Admin-triggered session emails (Manage Sessions) ────────────────────────
+    //
+    // Every other email in this class fires off the back of an event. These two are sent
+    // because an admin pressed a button — a student who lost the confirmation, a counsellor
+    // who wants the report in front of them again. They are therefore SYNCHRONOUS and they
+    // throw: the admin is watching the result, and "sent" printed over a silent failure is
+    // worse than an error. Both draw on the same session description as the automatic mail,
+    // so a resend says exactly what the original did, report link included.
+    //
+    // What they can promise is acceptance, not delivery: COUNSELLING_NOTIFICATION is an ASYNC
+    // type, so the dispatcher queues the message and the terminal status lands in
+    // email_send_log. A rejected send — no configured account, no recipient — comes back
+    // unsuccessful here and is raised; the dialog says "queued" rather than "delivered".
+
+    /**
+     * Send one session's details, with the student's assessment report, to the student and
+     * their parent/guardian.
+     *
+     * @return the addresses written to
+     * @throws IllegalStateException when no address is on record
+     */
+    public List<String> sendSessionSummaryToStudent(CounsellingAppointment appointment) {
+        List<String> recipients = studentAndParentEmails(appointment);
+        if (recipients.isEmpty()) {
+            throw new IllegalStateException("No email address is on record for this student.");
+        }
+
+        String counsellorName = appointment.getCounsellor() != null
+                ? appointment.getCounsellor().getName() : null;
+        String subject = "Your counselling session — details and assessment report";
+        String body = "Dear " + studentName(appointment) + ",\n\n"
+                + "Please find below the details of your counselling session"
+                + (counsellorName != null && !counsellorName.isBlank() ? " with " + counsellorName : "")
+                + ".\n\n"
+                + sessionDetailsBlock(appointment, false)
+                + "\n"
+                + reportGuidance(appointment, false)
+                + "If any of the above is incorrect, please write to us before the session so we can "
+                + "put it right.\n\n"
+                + "Regards,\nCareer-Nine Team";
+
+        List<String> accepted = new java.util.ArrayList<>();
+        String failure = null;
+        for (String addr : recipients) {
+            EmailSendResult result = emailDispatchService.sendText(
+                    EmailType.COUNSELLING_NOTIFICATION, addr, subject, body);
+            if (result != null && result.isSuccess()) accepted.add(addr);
+            else if (failure == null && result != null) failure = result.getError();
+        }
+        if (accepted.isEmpty()) {
+            throw new IllegalStateException("The email could not be sent: "
+                    + (failure != null && !failure.isBlank() ? failure : "no email account is configured."));
+        }
+        logger.info("Manage Sessions: session summary queued to student for appointment {}", appointment.getId());
+        return accepted;
+    }
+
+    /**
+     * Send one session's details, with the student's assessment report, to the counsellor
+     * taking it.
+     *
+     * @return the address written to
+     * @throws IllegalStateException when the session has no counsellor, or none with an address
+     */
+    public String sendSessionSummaryToCounsellor(CounsellingAppointment appointment) {
+        Counsellor counsellor = appointment.getCounsellor();
+        if (counsellor == null) {
+            throw new IllegalStateException("No counsellor is assigned to this session.");
+        }
+        String to = counsellor.getEmail();
+        if (to == null || to.isBlank()) {
+            throw new IllegalStateException("No email address is on record for this counsellor.");
+        }
+
+        String subject = "Counselling session — " + studentName(appointment);
+        String body = "Dear " + counsellor.getName() + ",\n\n"
+                + "Please find below the details of your counselling session with "
+                + studentName(appointment) + ".\n\n"
+                + sessionDetailsBlock(appointment, true)
+                + "\n"
+                + reportGuidance(appointment, true)
+                + "Regards,\nCareer-Nine Team";
+
+        EmailSendResult result = emailDispatchService.sendText(
+                EmailType.COUNSELLING_NOTIFICATION, to, subject, body);
+        if (result == null || !result.isSuccess()) {
+            String failure = result != null ? result.getError() : null;
+            throw new IllegalStateException("The email could not be sent: "
+                    + (failure != null && !failure.isBlank() ? failure : "no email account is configured."));
+        }
+        logger.info("Manage Sessions: session summary queued to counsellor for appointment {}", appointment.getId());
+        return to;
+    }
+
+    /**
+     * The paragraph that follows the details block, which depends on whether there is a report
+     * to point at. Saying "the report is attached above" when the line is absent — because the
+     * student has not finished the assessment, or generation has not completed — would send the
+     * reader looking for something that is not there.
+     */
+    private String reportGuidance(CounsellingAppointment appointment, boolean forCounsellor) {
+        boolean hasReport = bookingReportLink(appointment) != null;
+        if (!hasReport) {
+            return forCounsellor
+                    ? "The assessment report is not available yet. It will be sent to you as soon as it is ready.\n\n"
+                    : "Your assessment report is not available yet. We will send it to you as soon as it is ready.\n\n";
+        }
+        return forCounsellor
+                ? "The assessment report is linked above. Please read it before the session so the "
+                  + "time can be spent on what matters most to the student.\n\n"
+                : "Your assessment report is linked above. Please read it before the session so you "
+                  + "can bring any questions with you.\n\n";
+    }
+
     // ─── Block Date Request Email ────────────────────────────────────────────────
 
     @Async
@@ -459,7 +574,7 @@ public class CounsellingNotificationService {
      * place the student, and a student receiving mail from a platform they used once needs it
      * to recognise what the mail is even about.
      */
-    private String instituteNameFor(CounsellingAppointment appointment) {
+    public String instituteNameFor(CounsellingAppointment appointment) {
         try {
             if (appointment.getStudent() == null || appointment.getStudent().getInstitute() == null) {
                 return null;
@@ -483,7 +598,7 @@ public class CounsellingNotificationService {
         }
     }
 
-    private String assessmentNameFor(CounsellingAppointment appointment) {
+    public String assessmentNameFor(CounsellingAppointment appointment) {
         try {
             Long assessmentId = assessmentIdFor(appointment);
             if (assessmentId == null) return null;
@@ -544,8 +659,13 @@ public class CounsellingNotificationService {
             sb.append("  Mode: ").append("OFFLINE".equals(appointment.getMode()) ? "In-person" : "Online").append("\n");
             sb.append("  ").append(attendanceLine(appointment)).append("\n");
 
+            // Always stated, never dropped. A silently missing report line reads as "there is
+            // no report to see" to a student and as "nobody sent me one" to a counsellor, and
+            // both then go looking. Saying it is still being prepared answers the question.
             String report = bookingReportLink(appointment);
-            if (report != null) sb.append("  Assessment report: ").append(report).append("\n");
+            sb.append("  Assessment report: ")
+              .append(report != null ? report : "being prepared — we will email it as soon as it is ready")
+              .append("\n");
         } catch (Exception e) {
             logger.warn("Could not build session details for appointment {}: {}",
                     appointment != null ? appointment.getId() : null, e.getMessage());
@@ -599,17 +719,29 @@ public class CounsellingNotificationService {
      * missing along that chain (no entitlement on a manually created appointment, report not
      * generated yet) simply means no link, and the invite goes out without that line rather
      * than not at all.
+     *
+     * <p>Public so the Manage Sessions list can tell the admin, per session, whether there is a
+     * report to send before they press the button — resolved the one way, here, rather than by
+     * a second implementation that could drift from what the emails actually carry.
      */
-    private String bookingReportLink(CounsellingAppointment appointment) {
+    public String bookingReportLink(CounsellingAppointment appointment) {
         try {
-            if (appointment.getStudent() == null || appointment.getEntitlementId() == null) return null;
-            Long assessmentId = studentEntitlementRepository.findById(appointment.getEntitlementId())
-                    .map(e -> e.getAssessmentId())
-                    .orElse(null);
-            if (assessmentId == null) return null;
-            return counsellorReportNotificationService
-                    .reportLink(appointment.getStudent().getUserStudentId(), assessmentId)
-                    .orElse(null);
+            if (appointment.getStudent() == null) return null;
+            Long studentId = appointment.getStudent().getUserStudentId();
+
+            Long assessmentId = assessmentIdFor(appointment);
+            if (assessmentId != null) {
+                // The assessment is known, so its report is the only correct one. If it has not
+                // generated yet the answer is "not yet" — substituting another assessment's
+                // report would put the wrong results in front of the counsellor.
+                return counsellorReportNotificationService.reportLink(studentId, assessmentId)
+                        .orElse(null);
+            }
+
+            // No entitlement, so nothing names the assessment — an admin-created booking never
+            // has one, and would otherwise never carry a link at all. Fall back to whatever
+            // report this student does have.
+            return counsellorReportNotificationService.latestReportLink(studentId).orElse(null);
         } catch (Exception e) {
             logger.warn("Could not resolve report link for appointment {}: {}",
                     appointment.getId(), e.getMessage());
@@ -655,12 +787,17 @@ public class CounsellingNotificationService {
             java.util.List<String> emailTo = new java.util.ArrayList<>();
             if (studentEmail != null && !studentEmail.isEmpty()) emailTo.add(studentEmail);
             if (parentEmail != null && !parentEmail.isEmpty()) emailTo.add(parentEmail);
-            if (appointment.getCounsellor() != null) {
-                String counsellorEmail = appointment.getCounsellor().getEmail();
-                if (counsellorEmail != null && !counsellorEmail.isBlank()
-                        && !emailTo.contains(counsellorEmail.trim())) {
-                    emailTo.add(counsellorEmail.trim());
-                }
+            String counsellorEmail = appointment.getCounsellor() != null
+                    ? appointment.getCounsellor().getEmail() : null;
+            if (counsellorEmail != null && !counsellorEmail.isBlank()) {
+                if (!emailTo.contains(counsellorEmail.trim())) emailTo.add(counsellorEmail.trim());
+            } else {
+                // The counsellor is a required recipient of this email, so failing to reach one
+                // is worth a line in the log rather than a silent short list. Nothing else can
+                // be done here: an appointment with no counsellor, or a counsellor with no
+                // address, is a data problem for an admin to fix.
+                logger.warn("Booking confirmation for appointment {} has no counsellor address to send to",
+                        appointment.getId());
             }
 
             // Email with .ics attachment (falls back to plain text if
@@ -1350,14 +1487,14 @@ public class CounsellingNotificationService {
         for (String addr : to) sendEmail(addr, subject, body);
     }
 
-    private String studentName(CounsellingAppointment a) {
+    public String studentName(CounsellingAppointment a) {
         if (a.getStudentContactName() != null && !a.getStudentContactName().isEmpty()) {
             return a.getStudentContactName();
         }
         try { return a.getStudent().getStudentInfo().getName(); } catch (Exception e) { return "Student"; }
     }
 
-    private String studentEmail(CounsellingAppointment a) {
+    public String studentEmail(CounsellingAppointment a) {
         if (a.getStudentContactEmail() != null && !a.getStudentContactEmail().isEmpty()) {
             return a.getStudentContactEmail();
         }

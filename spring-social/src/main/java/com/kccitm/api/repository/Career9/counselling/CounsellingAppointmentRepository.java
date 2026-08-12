@@ -48,6 +48,18 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
            "ORDER BY a.slot.date DESC, a.slot.startTime DESC")
     List<CounsellingAppointment> findByStudentIdOrdered(@Param("studentId") Long studentId);
 
+    /**
+     * One student's sessions that are still going to happen — the ones a newly generated report
+     * needs to reach. Same "still active" filter as the admin booking queries, and no date bound
+     * on purpose: a session earlier today has not necessarily been held yet, and a report that
+     * arrives for it is still worth having.
+     */
+    @Query("SELECT a FROM CounsellingAppointment a " +
+           "WHERE a.student.userStudentId = :studentId " +
+           "AND a.status NOT IN ('CANCELLED', 'MISSED', 'RESCHEDULED', 'DECLINED', 'COMPLETED') " +
+           "ORDER BY a.slot.date ASC, a.slot.startTime ASC")
+    List<CounsellingAppointment> findActiveByStudent(@Param("studentId") Long studentId);
+
     // Admin booking: the actual upcoming, still-active appointments (slot + counsellor eager) for
     // these students, earliest first. The bulk-allotment preview maps each student to their
     // earliest upcoming session so the "already booked" list can show with whom and when, and

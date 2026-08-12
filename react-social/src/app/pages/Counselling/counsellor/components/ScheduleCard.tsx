@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StatusBadge from '../../shared/StatusBadge'
+import SessionReportLink from '../../shared/SessionReportLink'
 import '../../Counselling.css'
 
 /**
@@ -31,6 +32,8 @@ function formatWait(ms: number): string {
 
 interface ScheduleCardProps {
   appointment: any
+  /** The student's assessment report; null while it is still being generated. */
+  reportLink?: string | null
   onConfirm?: (id: number) => void
   onDecline?: (id: number) => void
   onCancel?: (id: number) => void
@@ -39,6 +42,7 @@ interface ScheduleCardProps {
 
 const ScheduleCard: React.FC<ScheduleCardProps> = ({
   appointment,
+  reportLink,
   onConfirm,
   onDecline,
   onCancel,
@@ -109,8 +113,10 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
         )}
       </div>
 
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {/* Action buttons. The report sits first: it is what the session is about, and the
+          counsellor wants it before deciding to join, reschedule or anything else. */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <SessionReportLink link={reportLink} />
         {isConfirmed && (
           <>
             {meetingLink && (

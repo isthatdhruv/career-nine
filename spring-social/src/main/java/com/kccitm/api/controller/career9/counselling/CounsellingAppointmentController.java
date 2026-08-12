@@ -31,6 +31,7 @@ import com.kccitm.api.service.counselling.AppointmentService;
 import com.kccitm.api.service.counselling.BookingService;
 import com.kccitm.api.service.counselling.CheckinReviewService;
 import com.kccitm.api.service.counselling.CounsellorCancellationService;
+import com.kccitm.api.service.counselling.CounsellorSessionAdminService;
 import com.kccitm.api.service.counselling.MeetingLinkService;
 
 @RestController
@@ -65,6 +66,9 @@ public class CounsellingAppointmentController {
 
     @Autowired
     private CounsellorCancellationService counsellorCancellationService;
+
+    @Autowired
+    private CounsellorSessionAdminService counsellorSessionAdminService;
 
     // no scope arg: body is raw Map; student books appointment slot
     @PreAuthorize("@auth.allows('counselling.appointment.create')")
@@ -441,6 +445,73 @@ public class CounsellingAppointmentController {
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<List<CounsellingAppointment>> getByCounsellor(@PathVariable Long counsellorId) {
         return ResponseEntity.ok(appointmentService.getByCounsellor(counsellorId));
+    }
+
+    // ─── Manage Sessions (admin, Manage Counsellors page) ────────────────────────
+    //
+    // The list above returns appointment entities, which name neither the assessment nor the
+    // report — both sit behind further lookups. These three back the dialog that lets an admin
+    // see one counsellor's sessions and re-send either side's copy of the details.
+
+    // no scope arg: identifies by counsellorId
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
+    @GetMapping("/by-counsellor/{counsellorId}/sessions")
+    public ResponseEntity<List<CounsellorSessionAdminService.SessionSummary>> getCounsellorSessions(
+            @PathVariable Long counsellorId) {
+        return ResponseEntity.ok(counsellorSessionAdminService.sessionsFor(counsellorId));
+    }
+
+    /**
+     * The assessment report for one session. Read by the counsellor's session-notes page, which
+     * shows a single session and so cannot use the list above.
+     */
+    // no scope arg: identifies by appointment
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
+    @GetMapping("/{id}/report-link")
+    public ResponseEntity<Map<String, String>> getReportLink(@PathVariable Long id) {
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("reportLink", counsellorSessionAdminService.reportLinkFor(id));
+        return ResponseEntity.ok(body);
+    }
+
+    /** Re-send the session details, report link included, to the student and parent/guardian. */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/{id}/email/student")
+    public ResponseEntity<?> emailStudent(@PathVariable Long id) {
+        return sendAndReport(() -> counsellorSessionAdminService.mailStudent(id), id, "student");
+    }
+
+    /** Re-send the session details, report link included, to the counsellor taking it. */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/{id}/email/counsellor")
+    public ResponseEntity<?> emailCounsellor(@PathVariable Long id) {
+        return sendAndReport(() -> counsellorSessionAdminService.mailCounsellor(id), id, "counsellor");
+    }
+
+    /**
+     * Run one of the two sends and answer in the shape the dialog expects.
+     *
+     * <p>The two failure modes are told apart deliberately. A missing address or a deleted
+     * session is the admin's answer — say which, as a 400, so they can fix it. Anything else is
+     * ours, and a 500 with a generic line is honest: the admin cannot act on an SMTP fault.
+     */
+    private ResponseEntity<?> sendAndReport(
+            java.util.function.Supplier<CounsellorSessionAdminService.MailOutcome> send,
+            Long appointmentId, String audience) {
+        try {
+            CounsellorSessionAdminService.MailOutcome outcome = send.get();
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("recipients", outcome.getRecipients());
+            body.put("reportIncluded", outcome.isReportIncluded());
+            return ResponseEntity.ok(body);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Manage Sessions: {} email failed for appointment {}: {}",
+                    audience, appointmentId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "The email could not be sent. Please try again."));
+        }
     }
 
     // no scope arg: admin stats query

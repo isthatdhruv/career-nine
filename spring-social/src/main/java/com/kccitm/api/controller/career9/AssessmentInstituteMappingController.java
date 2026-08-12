@@ -342,6 +342,19 @@ public class AssessmentInstituteMappingController {
         return instituteAssessmentService.listByInstitute(instituteCode);
     }
 
+    /**
+     * The same catalog, named — for screens that show it to an admin rather than edit it
+     * (Appoint Counsellor). {@code /getByInstitute/{code}/assessments} is not the same
+     * list: it answers "has a registration link", which can include assessments this
+     * institute was never enabled for.
+     */
+    @GetMapping("/institute/{instituteCode}/catalog/assessments")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
+    public List<AssessmentTableRepository.AssessmentSummary> getCatalogAssessments(
+            @PathVariable Integer instituteCode) {
+        return assessmentTableRepository.findCatalogAssessmentSummariesByInstitute(instituteCode);
+    }
+
     @PostMapping("/institute/{instituteCode}/catalog")
     @PreAuthorize("@auth.allows('assessment_institute_mapping.create')")
     public ResponseEntity<?> enableCatalog(@PathVariable Integer instituteCode,

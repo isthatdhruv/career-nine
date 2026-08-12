@@ -7,6 +7,7 @@ import { getSlotsByCounsellor } from '../API/SlotAPI'
 import { Modal } from 'react-bootstrap-v5'
 import CounsellorForm, { COUNSELLOR_FORM_ID } from './components/CounsellorForm'
 import AppointCounsellorModal from './components/AppointCounsellorModal'
+import ManageSessionsModal from './components/ManageSessionsModal'
 import CounsellorAvailabilityPanel from '../shared/CounsellorAvailabilityPanel'
 import WeeklySchedulePanel from '../shared/WeeklySchedulePanel'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
@@ -165,6 +166,8 @@ const CounsellorManagementPage: React.FC = () => {
   const [viewingSlotsCounsellor, setViewingSlotsCounsellor] = useState<Counsellor | null>(null)
   // The counsellor whose institutes + assessments are being set, if the Appoint wizard is open.
   const [appointingCounsellor, setAppointingCounsellor] = useState<Counsellor | null>(null)
+  // The counsellor whose booked sessions are open for review and resending.
+  const [managingSessionsCounsellor, setManagingSessionsCounsellor] = useState<Counsellor | null>(null)
 
   // Filters
   const [instituteMappings, setInstituteMappings] = useState<CounsellorInstituteMapping[]>([])
@@ -794,6 +797,17 @@ const CounsellorManagementPage: React.FC = () => {
                       >
                         Appoint
                       </button>
+                      {/* Every session booked with this counsellor, and the two resends —
+                          the only place an admin can put a session's details, and the
+                          student's report, back in front of either party. */}
+                      <button
+                        className='cl-btn-outline'
+                        style={{ fontSize: 12, padding: '5px 12px', color: '#0F766E', borderColor: '#99F6E4' }}
+                        onClick={() => setManagingSessionsCounsellor(c)}
+                        title="Review this counsellor's sessions and resend the details to the student or counsellor"
+                      >
+                        Manage Sessions
+                      </button>
                       <button
                         className='cl-btn-outline'
                         style={{ fontSize: 12, padding: '5px 12px', color: '#6D28D9', borderColor: '#DDD6FE' }}
@@ -827,6 +841,16 @@ const CounsellorManagementPage: React.FC = () => {
             showSuccess(message)
             loadCounsellors()
           }}
+        />
+      )}
+
+      {/* Sessions booked with this counsellor, with the student/counsellor resends. */}
+      {managingSessionsCounsellor && (
+        <ManageSessionsModal
+          show
+          counsellorId={getCounsellorId(managingSessionsCounsellor)}
+          counsellorName={managingSessionsCounsellor.name}
+          onHide={() => setManagingSessionsCounsellor(null)}
         />
       )}
 

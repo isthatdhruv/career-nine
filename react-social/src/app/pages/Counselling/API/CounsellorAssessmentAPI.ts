@@ -39,8 +39,11 @@ export function getCounsellingEnabledAssessments() {
 }
 
 /**
- * The assessments a given institute runs — what the Appoint wizard offers under each
- * institute the admin ticked. Lightweight projection (no questionnaire/questions).
+ * The assessments a given institute offers — its catalog, the same list the institute
+ * wizard's "Map Assessments" step edits — so the Appoint wizard cannot offer a
+ * counsellor an assessment the school was never enabled for. Deliberately not
+ * /getByInstitute/{code}/assessments, which lists anything with a registration link.
+ * Lightweight projection (no questionnaire/questions).
  */
 export interface InstituteAssessment {
   id: number
@@ -49,7 +52,7 @@ export interface InstituteAssessment {
 }
 export function getAssessmentsByInstitute(instituteCode: number) {
   return axios.get<InstituteAssessment[]>(
-    `${API_URL}/assessment-mapping/getByInstitute/${instituteCode}/assessments`,
+    `${API_URL}/assessment-mapping/institute/${instituteCode}/catalog/assessments`,
   )
 }
 

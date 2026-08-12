@@ -391,9 +391,10 @@ const AppointCounsellorModal: React.FC<Props> = ({
             <div className='fv-row mb-2'>
               <label className='fs-6 fw-bold mb-2'>Assessments :</label>
               <div className='text-muted small mb-3'>
-                Pick the assessments this counsellor handles at each school. A student is only
-                offered their slots when both the school and the assessment match. Assessments
-                sold without counselling are shown greyed out and cannot be picked.
+                Pick the assessments this counsellor handles at each school. Only assessments the
+                school is enabled for are listed. A student is only offered their slots when both
+                the school and the assessment match. Assessments sold without counselling are
+                shown greyed out and cannot be picked.
               </div>
             </div>
 
@@ -429,7 +430,8 @@ const AppointCounsellorModal: React.FC<Props> = ({
                         <div style={{ maxHeight: 240, overflowY: 'auto' }}>
                           {list.length === 0 ? (
                             <div className='text-muted fs-7 px-4 py-3'>
-                              This institute has no assessments mapped yet.
+                              This institute has no assessments enabled yet — add them in
+                              Manage Institute → Map Assessments.
                             </div>
                           ) : list.map((a) => {
                             const selectable = isSelectable(a.id)
