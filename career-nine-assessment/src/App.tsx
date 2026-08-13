@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Suspense, lazy } from 'react'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { DataProvider } from './contexts/DataContext'
 import { AssessmentProvider } from './contexts/AssessmentContext'
+import AppErrorBoundary from './components/AppErrorBoundary'
 
 import StudentLoginPage from './pages/StudentLoginPage'
 import DemographicDetailsPage from './pages/DemographicDetailsPage'
@@ -21,17 +21,35 @@ import PayForReportPage from './pages/PayForReportPage'
 import AssessmentStartPage from './pages/AssessmentStartPage'
 import PermissionDeniedPage from './components/PermissionDeniedPage'
 
-const SelectSectionPage = lazy(() => import('./pages/SelectSectionPage'))
-const SectionInstructionPage = lazy(() => import('./pages/SectionInstructionPage'))
-const SectionQuestionPage = lazy(() => import('./pages/SectionQuestionPage'))
+/*
+  DELIBERATELY STATIC — do not convert these back to React.lazy().
 
-const LoadingSpinner = () => (
-  <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div className="spinner-border text-primary" role="status">
-      <span className="visually-hidden">Loading...</span>
-    </div>
-  </div>
-)
+  These three pages used to be the only code-split routes in the app, and they
+  were the direct cause of the long-standing "/studentAssessment forces every
+  student to reload" bug:
+
+    - Each build emits one hash per chunk and wipes dist/, and the static host
+      is configured with `catchall_document: index.html` (.do/app.yaml). So a
+      chunk URL from a previous build does not 404 — it returns 200 with
+      Content-Type: text/html, and the browser refuses it with "Failed to load
+      module script". Retrying is futile; the response is deterministic.
+    - The service worker (before vite.config.ts was fixed) swapped builds under
+      already-open tabs, which made exactly that happen on every deploy.
+    - <Suspense> had no error boundary, so the rejected lazy() promise unmounted
+      the React root: dead page, no message, manual reload the only way out.
+
+  Splitting them was never worth it anyway. Together they are ~56 KB gzip that
+  100% of students need within a minute of logging in, while ResourcePreloader
+  already blocks app boot behind multi-MB of precached assets. Deferring
+  non-conditional code just moves those bytes to a worse moment — the start of
+  the exam, on venue WiFi — and buys a hard network dependency there.
+
+  Genuinely conditional code (the game bundles, firebase, webgazer) is still
+  lazy; see games/GameRenderer.tsx.
+*/
+import SelectSectionPage from './pages/SelectSectionPage'
+import SectionInstructionPage from './pages/SectionInstructionPage'
+import SectionQuestionPage from './pages/SectionQuestionPage'
 
 export default function App() {
   return (
@@ -39,7 +57,7 @@ export default function App() {
       <ToastContainer />
       <DataProvider>
         <AssessmentProvider>
-          <Suspense fallback={<LoadingSpinner />}>
+          <AppErrorBoundary>
             <Routes>
               <Route path="/" element={<Navigate to="/student-login" replace />} />
               <Route path="/student-login" element={<StudentLoginPage />} />
@@ -72,7 +90,7 @@ export default function App() {
               <Route path="/permission-denied" element={<PermissionDeniedPage />} />
               <Route path="*" element={<Navigate to="/student-login" replace />} />
             </Routes>
-          </Suspense>
+          </AppErrorBoundary>
         </AssessmentProvider>
       </DataProvider>
     </BrowserRouter>

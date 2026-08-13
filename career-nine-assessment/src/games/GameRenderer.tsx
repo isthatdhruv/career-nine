@@ -1,8 +1,16 @@
-import React, { lazy, Suspense } from "react";
+import React, { Suspense } from "react";
+import { lazyWithRetry } from "../utils/lazyWithRetry";
+import { showErrorToast } from "../utils/toast";
 
-const JungleSpotGame = lazy(() => import('./JungleSpotGame').then(m => ({ default: m.JungleSpotGame })));
-const RabbitPathGame = lazy(() => import('./RabbitPathGame').then(m => ({ default: m.RabbitPathGame })));
-const HydroTubeGame = lazy(() => import('./HydroTubeGame').then(m => ({ default: m.HydroTubeGame })));
+/**
+ * The game bundles are the app's last genuinely conditional code-split: most
+ * questionnaires contain no game at all, and each bundle is only reachable from
+ * a game option inside a question. Everything on the core assessment path is a
+ * static import (see App.tsx).
+ */
+const JungleSpotGame = lazyWithRetry(() => import('./JungleSpotGame').then(m => ({ default: m.JungleSpotGame })), 'JungleSpotGame');
+const RabbitPathGame = lazyWithRetry(() => import('./RabbitPathGame').then(m => ({ default: m.RabbitPathGame })), 'RabbitPathGame');
+const HydroTubeGame = lazyWithRetry(() => import('./HydroTubeGame').then(m => ({ default: m.HydroTubeGame })), 'HydroTubeGame');
 
 interface GameRendererProps {
   gameCode: number;
@@ -19,6 +27,42 @@ const GameLoading = () => (
     </div>
   </div>
 );
+
+/**
+ * Local boundary so a game bundle that will not load cannot take the assessment
+ * down with it.
+ *
+ * This is reached mid-assessment: answers for the current section live only in
+ * React state between Redis snapshots, so bubbling up to AppErrorBoundary (and
+ * its refresh CTA) could cost the student real work. Instead we toast and hand
+ * control back to SectionQuestionPage via the existing onExit prop, which closes
+ * the game overlay and returns the student to the question. The game option
+ * stays unanswered and the launch button stays enabled, so it remains
+ * replayable — the same contract as a game whose result failed to save.
+ */
+class GameLoadBoundary extends React.Component<
+  { onFail: () => void; children: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('[GameLoadBoundary] game bundle failed to load', error);
+    showErrorToast(
+      'The game could not be loaded. Please try launching it again — if it keeps failing, tell your invigilator.',
+    );
+    this.props.onFail();
+  }
+
+  render() {
+    // Render nothing on failure: onFail has already unmounted this overlay.
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 export function GameRenderer({ gameCode, userStudentId, playerName, onComplete, onExit }: GameRendererProps) {
   const renderGame = () => {
@@ -42,5 +86,9 @@ export function GameRenderer({ gameCode, userStudentId, playerName, onComplete, 
     }
   };
 
-  return <Suspense fallback={<GameLoading />}>{renderGame()}</Suspense>;
+  return (
+    <GameLoadBoundary onFail={onExit}>
+      <Suspense fallback={<GameLoading />}>{renderGame()}</Suspense>
+    </GameLoadBoundary>
+  );
 }
