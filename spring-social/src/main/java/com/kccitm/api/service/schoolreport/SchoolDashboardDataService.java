@@ -272,6 +272,153 @@ public class SchoolDashboardDataService {
         return rows;
     }
 
+    // ═════════════════════ SCORED ROSTER (release path) ═════════════════════
+
+    /** One student: where they sit, how far they got, and their scored row. */
+    public static final class ScoredStudent {
+        public Long userStudentId;
+        public Long sessionId;
+        /** The class number, not a foreign key — {@code StudentInfo.studentClass}. */
+        public Long classId;
+        public Long sectionId;
+        public String sectionName;
+        /** {@code completed} | {@code ongoing} | {@code notStarted}. */
+        public String status;
+        /** Null unless the student completed <em>and</em> scoring succeeded. */
+        public PasteDataRow row;
+
+        public boolean isScored() {
+            return row != null;
+        }
+    }
+
+    /**
+     * Every student of one institute+assessment, scored once.
+     *
+     * <p>This exists so a release can score the institute a single time and then
+     * derive each scope by filtering, instead of re-scoring the same students once
+     * per scope. {@code buildScoringContext} reads the whole cohort's answers, so
+     * building it per scope is the expensive mistake — here it is built once.
+     *
+     * <p>Non-completed students are kept. They contribute no scores, but they are the
+     * only source of a <em>scoped</em> participation count: "18 of 42 in 10-B have not
+     * started" is unrecoverable once they have been filtered out at query time.
+     */
+    public static final class ScoredRoster {
+        public Integer instituteCode;
+        public String instituteName;
+        public Long assessmentId;
+        public String assessmentName;
+        public final List<ScoredStudent> students = new ArrayList<>();
+        /** Completed sittings whose scoring threw — feeds the release's data audit. */
+        public int scoringFailures;
+    }
+
+    /**
+     * Build the scored roster for one institute+assessment.
+     *
+     * <p>Navigator assessments only: the scoring context is Navigator's, and a BET
+     * sitting produces no RIASEC/aptitude/MI scores to aggregate.
+     */
+    @Transactional(readOnly = true)
+    public ScoredRoster buildScoredRoster(Integer instituteCode, Long assessmentId) {
+        ScoredRoster roster = new ScoredRoster();
+        roster.instituteCode = instituteCode;
+        roster.assessmentId = assessmentId;
+
+        List<StudentAssessmentMapping> mappings = mappingRepository.findAllByInstituteCode(instituteCode);
+        List<UserStudent> completed = new ArrayList<>();
+        List<ScoredStudent> completedEntries = new ArrayList<>();
+        Map<Integer, String> sectionNameCache = new HashMap<>();
+
+        for (StudentAssessmentMapping mapping : mappings) {
+            if (!assessmentId.equals(mapping.getAssessmentId())) {
+                continue;
+            }
+            UserStudent student = mapping.getUserStudent();
+            if (student == null) {
+                continue;
+            }
+            if (roster.instituteName == null && student.getInstitute() != null) {
+                roster.instituteName = student.getInstitute().getInstituteName();
+            }
+
+            StudentInfo info = student.getStudentInfo();
+            ScoredStudent entry = new ScoredStudent();
+            entry.userStudentId = student.getUserStudentId();
+            entry.sessionId = info == null ? null : longOf(info.getSessionId());
+            entry.classId = info == null ? null : longOf(info.getStudentClass());
+            entry.sectionId = info == null ? null : longOf(info.getSchoolSectionId());
+            entry.sectionName = sectionName(info, sectionNameCache);
+            entry.status = normalizeStatus(mapping.getStatus());
+            roster.students.add(entry);
+
+            if ("completed".equals(entry.status)) {
+                completed.add(student);
+                completedEntries.add(entry);
+            }
+        }
+
+        if (completed.isEmpty()) {
+            return roster;
+        }
+
+        // One context for the whole institute — the reason this method exists.
+        NavigatorReportGenerationService.AssessmentScoringContext scoringContext;
+        try {
+            scoringContext = navigatorReportGenerationService.buildScoringContext(assessmentId);
+        } catch (Exception e) {
+            logger.warn("Scored roster: cannot build scoring context for assessment {}: {}",
+                    assessmentId, e.getMessage());
+            roster.scoringFailures = completed.size();
+            return roster;
+        }
+
+        for (int i = 0; i < completed.size(); i++) {
+            UserStudent student = completed.get(i);
+            try {
+                NavigatorReportGenerationService.IntermediaryScores scores =
+                        navigatorReportGenerationService.computeIntermediaryScores(
+                                student.getUserStudentId(), assessmentId, scoringContext);
+                if (scores == null) {
+                    roster.scoringFailures++;
+                    continue;
+                }
+                completedEntries.get(i).row = toPasteDataRow(student, scores, sectionNameCache);
+            } catch (Exception e) {
+                roster.scoringFailures++;
+                logger.warn("Scored roster: scoring failed for student {} on assessment {}: {}",
+                        student.getUserStudentId(), assessmentId, e.getMessage());
+            }
+        }
+
+        Map<Long, String> names = assessmentNames(Collections.singleton(assessmentId));
+        roster.assessmentName = names.getOrDefault(assessmentId, "Assessment " + assessmentId);
+
+        logger.info("Scored roster: institute {} assessment {} — {} students, {} completed, {} scored",
+                instituteCode, assessmentId, roster.students.size(), completed.size(),
+                completed.size() - roster.scoringFailures);
+        return roster;
+    }
+
+    /** "inprogress" is the older spelling of "ongoing"; both mean the same state. */
+    private static String normalizeStatus(String raw) {
+        String status = raw == null ? "" : raw.trim().toLowerCase();
+        switch (status) {
+            case "completed":
+                return "completed";
+            case "ongoing":
+            case "inprogress":
+                return "ongoing";
+            default:
+                return "notStarted";
+        }
+    }
+
+    private static Long longOf(Number n) {
+        return n == null ? null : n.longValue();
+    }
+
     private Map<Long, String> assessmentNames(Set<Long> assessmentIds) {
         Map<Long, String> names = new HashMap<>();
         if (assessmentIds.isEmpty()) {

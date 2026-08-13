@@ -7,7 +7,7 @@ import { Toolbar } from "./components/toolbar/Toolbar";
 import { RightToolbar } from "../partials/layout/RightToolbar";
 import { ScrollTop } from "./components/ScrollTop";
 import { Content } from "./components/Content";
-import { PageDataProvider } from "./core";
+import { PageDataProvider, useLayout } from "./core";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../app/modules/auth";
 import {
@@ -22,6 +22,7 @@ import { MenuComponent } from "../assets/ts/components";
 const MasterLayout = () => {
   const location = useLocation();
   const { currentUser } = useAuth();
+  const { config } = useLayout();
   // A pure counsellor gets a focused shell: no top header bar (search/avatar) and
   // content flush to the top. The sidebar lives outside <Outlet/>, so it stays
   // mounted while only the content area swaps on navigation. Scoped to counsellors
@@ -101,7 +102,10 @@ const MasterLayout = () => {
               className="content d-flex flex-column flex-column-fluid"
               style={hideShell ? { paddingTop: 0 } : undefined}
             >
-              {!hideShell && <Toolbar />}
+              {/* The base `.toolbar` rule styles the bar regardless of the
+                  toolbar-enabled body class, so honouring config.toolbar.display
+                  here is what actually removes it. */}
+              {!hideShell && config.toolbar.display && <Toolbar />}
               <div
                 className="post d-flex flex-column-fluid"
                 id="kt_post"
