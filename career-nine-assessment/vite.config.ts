@@ -45,7 +45,31 @@ export default defineConfig({
     },
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      /*
+       * MUST NOT be 'autoUpdate'.
+       *
+       * 'autoUpdate' makes vite-plugin-pwa emit `self.skipWaiting()` +
+       * `clientsClaim()` into sw.js. A newly deployed service worker then
+       * activates INSIDE ALREADY-OPEN TABS and Workbox's cleanupOutdatedCaches
+       * purges the previous precache. Because each build emits exactly one hash
+       * per chunk (dist/assets is rewritten on every build), the old
+       * `/assets/SelectSectionPage-<hash>.js` the running document still points
+       * at is now gone from BOTH the cache and the server.
+       *
+       * The three routes under /studentAssessment are the only code-split pages
+       * in this app, so the next navigation there hit a 404 on its chunk, the
+       * React.lazy promise rejected, and the student was stranded on the
+       * <Suspense> spinner until they manually reloaded. That was the
+       * long-standing "/studentAssessment forces every student to reload" bug.
+       *
+       * With 'prompt' the new SW installs and stays in `waiting`; it only takes
+       * over once every tab on the origin has closed. A student mid-assessment
+       * therefore keeps the exact build they started on — which is the correct
+       * contract for an exam app — and picks up the new one on their next visit.
+       * index.html is served no-cache (see public/_headers + nginx), so nothing
+       * gets pinned to a stale build across sessions.
+       */
+      registerType: 'prompt',
       workbox: {
         maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,webp,png}'],
