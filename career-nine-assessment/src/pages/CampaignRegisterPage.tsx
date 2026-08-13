@@ -488,7 +488,7 @@ const CampaignRegisterPage = () => {
           {/* Locked-in tier summary (Pay-First only) */}
           {showLockedTier && selectedTier && (
             <section style={{ marginBottom: 24 }}>
-              <h3 style={s.sectionTitle}>Your selection</h3>
+              <h3 style={s.sectionTitle}>Limited Time Early Bird Offer</h3>
               <TierCard tier={selectedTier} selected={true} onSelect={() => {}} compact />
             </section>
           )}
