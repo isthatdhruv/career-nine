@@ -28,6 +28,7 @@ import com.kccitm.api.model.career9.Lead;
 import com.kccitm.api.model.career9.LeadType;
 import com.kccitm.api.model.career9.OdooSyncStatus;
 import com.kccitm.api.repository.Career9.LeadRepository;
+import com.kccitm.api.service.LeadNotificationService;
 import com.kccitm.api.service.LeadStudentService;
 import com.kccitm.api.service.OdooLeadService;
 import com.kccitm.api.service.RecaptchaService;
@@ -48,6 +49,9 @@ public class LeadController {
 
     @Autowired
     private LeadStudentService leadStudentService;
+
+    @Autowired
+    private LeadNotificationService leadNotificationService;
 
     @Autowired
     private RecaptchaService recaptchaService;
@@ -150,6 +154,11 @@ public class LeadController {
         Lead savedLead = leadRepository.save(lead);
 
         odooLeadService.syncLeadToOdoo(savedLead);
+
+        // Tell the team, and acknowledge to the person who enquired. Async/fire-and-forget
+        // for the same reason as the Odoo sync: the visitor's submission is already saved,
+        // and no mail problem may turn that into a failed submission for them.
+        leadNotificationService.notifyNewLead(savedLead);
 
         // Student leads also get a real, loginable student account (username + DOB),
         // ABAC authorization, and a credentials email. Async/fire-and-forget so a

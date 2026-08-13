@@ -43,6 +43,8 @@ import {
   StoredScope,
 } from "./StoredDashboard";
 import SchoolDashboardInsights from "./SchoolDashboardInsights";
+import SchoolDashboardSummary from "./SchoolDashboardSummary";
+import ComplianceReport from "./ComplianceReport";
 import "./SchoolDashboard.css";
 
 // recharts' polar typings fight TS in this version — the same escape hatch
@@ -120,12 +122,25 @@ const FALLBACK = {
   warning: "#fab219",
   muted: "#8a8a96",
   grid: "#eceef4",
-  ink: "#16161d",
-  inkMuted: "#8a8a96",
+  ink: "#0b1420",
+  inkMuted: "#4f6070",
   surface: "#ffffff",
 };
 
 type Palette = typeof FALLBACK;
+
+/*
+ * Chart type sizes.
+ *
+ * SVG text inside recharts cannot inherit the page's --sd-scale, so axis ticks
+ * and direct labels are lifted here by the same proportion. Without this the
+ * charts would keep their old 10-12px lettering while every word around them
+ * grew, which is exactly the text a principal has to squint at to read a value
+ * off a bar.
+ */
+const AXIS_FS = 14;
+const LABEL_FS = 13;
+const TICK_FS_SM = 12;
 
 function useVizPalette(ref: React.RefObject<HTMLElement>): Palette {
   const [palette, setPalette] = useState<Palette>(FALLBACK);
@@ -166,11 +181,14 @@ function useVizPalette(ref: React.RefObject<HTMLElement>): Palette {
 /**
  * The page's tabs, in reading order.
  *
- * "Analysis" leads and is the landing tab: it is what a release actually produces and
- * what a principal opens the page for. "Act" holds the three things to do about it and
- * the students behind each one. Everything after those is the evidence.
+ * "Summary" leads and is the landing tab: it is the whole release on one screen, outcome
+ * by outcome and then class by class, which is what a principal with ten minutes before
+ * a staff meeting actually needs. "Analysis" is the written report behind it and "Act"
+ * holds the work it implies, split by who has to do it. Everything after those is the
+ * evidence the first three are drawn from.
  */
 const TABS = [
+  "Summary",
   "Analysis",
   "Act",
   "Overview",
@@ -476,7 +494,9 @@ const SchoolDashboardPage: React.FC = () => {
   const [classFilter, setClassFilter] = useState("All");
   const [view, setView] = useState<SchoolDashboardView | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<Tab>("Analysis");
+  const [tab, setTab] = useState<Tab>("Summary");
+  /** The printable compliance sheet, over the page rather than a tab of it. */
+  const [printOpen, setPrintOpen] = useState(false);
 
   /**
    * The rail's other three dimensions.
@@ -702,11 +722,14 @@ const SchoolDashboardPage: React.FC = () => {
 
   // ── Hero ────────────────────────────────────────────────────────────────
   // Lead with the school's own name; the page title is the eyebrow's job.
+  const instituteRow = useMemo(
+    () =>
+      institutes.find((i: any) => Number(i.instituteCode) === selectedInstitute) as any,
+    [institutes, selectedInstitute]
+  );
+
   const schoolName =
-    view?.instituteName ||
-    (institutes.find((i: any) => Number(i.instituteCode) === selectedInstitute) as any)
-      ?.instituteName ||
-    "School Dashboard";
+    view?.instituteName || instituteRow?.instituteName || "School Dashboard";
 
   // Which rail dimensions the user's ABAC grant pins to a single value.
   const allowedSessions = useMemo(
@@ -867,25 +890,39 @@ const SchoolDashboardPage: React.FC = () => {
               and which sections need a teacher to step in this week.
             </p>
           </div>
-          <div className="sd-institute-picker">
-            <label htmlFor="sd-institute">School</label>
-            <select
-              id="sd-institute"
-              value={selectedInstitute}
-              onChange={(e) =>
-                setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value))
-              }
-              disabled={institutesLoading || institutes.length === 1}
-            >
-              <option value="">
-                {institutesLoading ? "Loading schools…" : "Select a school"}
-              </option>
-              {institutes.map((i: any) => (
-                <option key={i.instituteCode} value={i.instituteCode}>
-                  {i.instituteName}
+          <div className="sd-header-side">
+            <div className="sd-institute-picker">
+              <label htmlFor="sd-institute">School</label>
+              <select
+                id="sd-institute"
+                value={selectedInstitute}
+                onChange={(e) =>
+                  setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                disabled={institutesLoading || institutes.length === 1}
+              >
+                <option value="">
+                  {institutesLoading ? "Loading schools…" : "Select a school"}
                 </option>
-              ))}
-            </select>
+                {institutes.map((i: any) => (
+                  <option key={i.instituteCode} value={i.instituteCode}>
+                    {i.instituteName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Offered only once there is a release to certify — a compliance sheet over
+                an ungenerated scope would be a signed page of blanks. */}
+            {release?.released && view && (
+              <button
+                type="button"
+                className="sd-print-open"
+                onClick={() => setPrintOpen(true)}
+              >
+                Compliance report
+              </button>
+            )}
           </div>
         </div>
 
@@ -1085,7 +1122,20 @@ const SchoolDashboardPage: React.FC = () => {
             </div>
           )}
 
-          {tab === "Analysis" || tab === "Act" ? (
+          {tab === "Summary" ? (
+            /* The one tab that stands on the figures alone — it needs no narrative, so a
+               release whose model call failed still opens on something useful. */
+            d ? (
+              <SchoolDashboardSummary
+                view={view}
+                narrative={narrative}
+                scopeLabel={release?.scopeLabel || "Whole school"}
+                isSchoolWide={isSchoolWide}
+              />
+            ) : (
+              noScoredYet
+            )
+          ) : tab === "Analysis" || tab === "Act" ? (
             release && release.released ? (
               <SchoolDashboardInsights
                 section={tab === "Analysis" ? "analysis" : "act"}
@@ -1143,6 +1193,19 @@ const SchoolDashboardPage: React.FC = () => {
             </>
           )}
         </div>
+      )}
+
+      {view && (
+        <ComplianceReport
+          open={printOpen}
+          onClose={() => setPrintOpen(false)}
+          view={view}
+          release={release}
+          flags={flags}
+          storedScope={storedScope}
+          schoolName={schoolName}
+          schoolLogoUrl={instituteRow?.logoUrl}
+        />
       )}
     </div>
   );
@@ -1462,12 +1525,12 @@ const OverviewTab: React.FC<{
               <CartesianGrid stroke={palette.grid} vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={{ stroke: palette.grid }}
               />
               <YAxis
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={false}
                 allowDecimals={false}
@@ -1491,7 +1554,7 @@ const OverviewTab: React.FC<{
                   dataKey="students"
                   position="top"
                   fill={palette.inkMuted}
-                  fontSize={12}
+                  fontSize={AXIS_FS}
                 />
               </Bar>
             </BarChart>
@@ -1538,12 +1601,12 @@ const OverviewTab: React.FC<{
               <CartesianGrid stroke={palette.grid} vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={{ stroke: palette.grid }}
               />
               <YAxis
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={false}
                 unit="%"
@@ -1567,10 +1630,10 @@ const OverviewTab: React.FC<{
                 }
               />
               <Bar dataKey="suitedPct" fill={palette.s1} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                <LabelList dataKey="suitedPct" position="top" fill={palette.inkMuted} fontSize={11} formatter={(v: any) => `${v}%`} />
+                <LabelList dataKey="suitedPct" position="top" fill={palette.inkMuted} fontSize={LABEL_FS} formatter={(v: any) => `${v}%`} />
               </Bar>
               <Bar dataKey="aspiringPct" fill={palette.s2} radius={[4, 4, 0, 0]} maxBarSize={40}>
-                <LabelList dataKey="aspiringPct" position="top" fill={palette.inkMuted} fontSize={11} formatter={(v: any) => `${v}%`} />
+                <LabelList dataKey="aspiringPct" position="top" fill={palette.inkMuted} fontSize={LABEL_FS} formatter={(v: any) => `${v}%`} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -1677,10 +1740,10 @@ const PersonalityTab: React.FC<{
               <PolarGrid stroke={palette.grid} />
               <PolarAngleAxisFixed
                 dataKey="short"
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
               />
               <PolarRadiusAxisFixed
-                tick={{ fill: palette.inkMuted, fontSize: 10 }}
+                tick={{ fill: palette.inkMuted, fontSize: TICK_FS_SM }}
                 axisLine={false}
               />
               <Tooltip
@@ -1751,7 +1814,7 @@ const PersonalityTab: React.FC<{
               <XAxis
                 type="number"
                 unit="%"
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={{ stroke: palette.grid }}
               />
@@ -1759,7 +1822,7 @@ const PersonalityTab: React.FC<{
                 type="category"
                 dataKey="short"
                 width={86}
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={false}
               />
@@ -1778,7 +1841,7 @@ const PersonalityTab: React.FC<{
                 }
               />
               <Bar dataKey="pctAsTopTrait" fill={palette.s1} radius={[0, 4, 4, 0]} maxBarSize={16}>
-                <LabelList dataKey="pctAsTopTrait" position="right" fill={palette.inkMuted} fontSize={11} formatter={(v: any) => `${v}%`} />
+                <LabelList dataKey="pctAsTopTrait" position="right" fill={palette.inkMuted} fontSize={LABEL_FS} formatter={(v: any) => `${v}%`} />
               </Bar>
               <Bar dataKey="pctInTopThree" fill={palette.s2} radius={[0, 4, 4, 0]} maxBarSize={16} />
             </BarChart>
@@ -1845,7 +1908,7 @@ const PersonalityTab: React.FC<{
               <XAxis
                 type="number"
                 unit="%"
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={{ stroke: palette.grid }}
               />
@@ -1853,7 +1916,7 @@ const PersonalityTab: React.FC<{
                 type="category"
                 dataKey="short"
                 width={102}
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={false}
               />
@@ -1873,10 +1936,10 @@ const PersonalityTab: React.FC<{
                 }
               />
               <Bar dataKey="pctStrong" fill={palette.s1} radius={[0, 4, 4, 0]} maxBarSize={14}>
-                <LabelList dataKey="pctStrong" position="right" fill={palette.inkMuted} fontSize={11} formatter={(v: any) => `${v}%`} />
+                <LabelList dataKey="pctStrong" position="right" fill={palette.inkMuted} fontSize={LABEL_FS} formatter={(v: any) => `${v}%`} />
               </Bar>
               <Bar dataKey="pctLow" fill={palette.s2} radius={[0, 4, 4, 0]} maxBarSize={14}>
-                <LabelList dataKey="pctLow" position="right" fill={palette.inkMuted} fontSize={11} formatter={(v: any) => `${v}%`} />
+                <LabelList dataKey="pctLow" position="right" fill={palette.inkMuted} fontSize={LABEL_FS} formatter={(v: any) => `${v}%`} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -2005,7 +2068,7 @@ const AbilitiesTab: React.FC<{
               <CartesianGrid stroke={palette.grid} horizontal={false} />
               <XAxis
                 type="number"
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={{ stroke: palette.grid }}
               />
@@ -2013,7 +2076,7 @@ const AbilitiesTab: React.FC<{
                 type="category"
                 dataKey="label"
                 width={188}
-                tick={{ fill: palette.inkMuted, fontSize: 11 }}
+                tick={{ fill: palette.inkMuted, fontSize: LABEL_FS }}
                 tickLine={false}
                 axisLine={false}
               />
@@ -2045,7 +2108,7 @@ const AbilitiesTab: React.FC<{
                   dataKey="gap"
                   position="right"
                   fill={palette.inkMuted}
-                  fontSize={11}
+                  fontSize={LABEL_FS}
                   formatter={(v: any) => (v > 0 ? `+${v}` : String(v))}
                 />
               </Bar>
@@ -2125,7 +2188,7 @@ const CareersTab: React.FC<{
               <XAxis
                 type="number"
                 unit="%"
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={{ stroke: palette.grid }}
               />
@@ -2133,7 +2196,7 @@ const CareersTab: React.FC<{
                 type="category"
                 dataKey="label"
                 width={150}
-                tick={{ fill: palette.inkMuted, fontSize: 11 }}
+                tick={{ fill: palette.inkMuted, fontSize: LABEL_FS }}
                 tickLine={false}
                 axisLine={false}
               />
@@ -2153,7 +2216,7 @@ const CareersTab: React.FC<{
                 }
               />
               <Bar dataKey="pctInTopFive" fill={palette.s1} radius={[0, 4, 4, 0]} maxBarSize={16}>
-                <LabelList dataKey="pctInTopFive" position="right" fill={palette.inkMuted} fontSize={11} formatter={(v: any) => `${v}%`} />
+                <LabelList dataKey="pctInTopFive" position="right" fill={palette.inkMuted} fontSize={LABEL_FS} formatter={(v: any) => `${v}%`} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -2347,14 +2410,14 @@ const ByClassTab: React.FC<{
               <CartesianGrid stroke={palette.grid} vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={{ stroke: palette.grid }}
               />
               <YAxis
                 unit="%"
                 domain={[0, 100]}
-                tick={{ fill: palette.inkMuted, fontSize: 12 }}
+                tick={{ fill: palette.inkMuted, fontSize: AXIS_FS }}
                 tickLine={false}
                 axisLine={false}
               />
@@ -2374,7 +2437,7 @@ const ByClassTab: React.FC<{
                 }
               />
               <Bar dataKey="clarity" fill={palette.s1} radius={[4, 4, 0, 0]} maxBarSize={54}>
-                <LabelList dataKey="clarity" position="top" fill={palette.inkMuted} fontSize={12} formatter={(v: any) => `${v}%`} />
+                <LabelList dataKey="clarity" position="top" fill={palette.inkMuted} fontSize={AXIS_FS} formatter={(v: any) => `${v}%`} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

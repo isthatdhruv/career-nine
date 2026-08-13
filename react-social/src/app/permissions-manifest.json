@@ -77,6 +77,9 @@
   "email_log.read": [
     "/admin/email-log"
   ],
+  "email_recipient.read": [
+    "/admin/email-recipients"
+  ],
   "email_template.read": [
     "/admin/email-templates"
   ],

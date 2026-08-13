@@ -582,7 +582,11 @@ public enum PermissionCode {
 
     // ── Email templates (V20260629003 seed) ─────────────────────────────
     EMAIL_TEMPLATE_READ ("email_template.read", "View email templates"),
-    EMAIL_TEMPLATE_EDIT ("email_template.edit", "Create, edit and delete email templates");
+    EMAIL_TEMPLATE_EDIT ("email_template.edit", "Create, edit and delete email templates"),
+
+    // ── Notification recipients (V20260813001 seed) ─────────────────────
+    EMAIL_RECIPIENT_READ ("email_recipient.read", "View automatic-notification recipient lists"),
+    EMAIL_RECIPIENT_EDIT ("email_recipient.edit", "Add, edit and remove automatic-notification recipients");
 
     private final String code;
     private final String description;

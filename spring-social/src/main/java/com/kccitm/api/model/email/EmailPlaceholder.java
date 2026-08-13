@@ -44,7 +44,24 @@ public enum EmailPlaceholder {
     PAYMENT_DATE("payment_date", "Payment date", "Payment"),
 
     // — One-time codes —
-    OTP_CODE("otp_code", "One-time verification code", "Verification");
+    OTP_CODE("otp_code", "One-time verification code", "Verification"),
+
+    // — Lead (public capture form on career-9.com) —
+    // Named apart from the student placeholders on purpose: a lead is not a student yet,
+    // and a template that said {{student_name}} above a form submission would be wrong
+    // for the two thirds of leads (SCHOOL, PARENT) that never become one.
+    LEAD_NAME("lead_name", "Name on the enquiry form", "Lead"),
+    LEAD_EMAIL("lead_email", "Email on the enquiry form", "Lead"),
+    LEAD_PHONE("lead_phone", "Phone on the enquiry form", "Lead"),
+    LEAD_TYPE("lead_type", "SCHOOL / PARENT / STUDENT", "Lead"),
+    LEAD_SOURCE("lead_source", "Where the enquiry came from", "Lead"),
+    LEAD_SCHOOL("lead_school", "School named on the enquiry", "Lead"),
+    LEAD_CITY("lead_city", "City on the enquiry", "Lead"),
+    LEAD_DESIGNATION("lead_designation", "Designation on the enquiry", "Lead"),
+    LEAD_DETAILS("lead_details", "Every submitted field, as an HTML table", "Lead"),
+    LEAD_RECEIVED_AT("lead_received_at", "When the enquiry arrived", "Lead"),
+    LEAD_ID("lead_id", "Career-9 lead id", "Lead"),
+    LEAD_CRM_LINK("lead_crm_link", "Link to the lead in Odoo CRM (blank until synced)", "Lead");
 
     private final String key;
     private final String label;

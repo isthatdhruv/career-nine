@@ -260,6 +260,17 @@ app:
     # the primary property/secret above, so nothing breaks before it's set.
     b2c-measurement-id: ${GA_B2C_MEASUREMENT_ID:G-BNS71Q704M}
     b2c-api-secret: ${GA_B2C_API_SECRET:}
+  # Public lead capture (POST /leads/capture from the career-9.com forms).
+  leads:
+    # Acknowledgement email back to the person who filled the form (EmailType
+    # LEAD_WELCOME). The INTERNAL new-lead alert is not controlled here — it is
+    # driven entirely by the recipient list under Email > Notification Recipients
+    # and sends nothing while that list is empty.
+    #
+    # Note for STUDENT leads that include a date of birth: those already receive a
+    # separate login-credentials email from LeadStudentService, so they get two
+    # messages. Set this false if that is not wanted.
+    send-acknowledgement: ${APP_LEADS_SEND_ACKNOWLEDGEMENT:true}
   odoo:
     url: ${ODOO_URL:}
     database: ${ODOO_DATABASE:}
@@ -345,7 +356,7 @@ spring:
     # production apply strictly in order and must keep the default.
     out-of-order: true
   datasource:
-    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+    url: jdbc:mysql://localhost:3307/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
     username: root
     password: Career-qCsfeuECc3MW
     hikari:
