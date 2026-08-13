@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
@@ -17,56 +17,134 @@ type SectionWithQuestions = {
   questions: { questionnaireQuestionId: number }[];
 };
 
+/**
+ * How long to wait for the questionnaire before showing a recovery screen.
+ * fetchAssessmentData can legitimately take a while (axios 60s timeout + up to
+ * 3 backed-off retries on 5xx), so this does NOT abort the request — if the data
+ * lands later the page recovers on its own and the error screen disappears.
+ */
+const LOAD_WATCHDOG_MS = 20_000;
+
 const SelectSectionPage: React.FC = () => {
-  const [sections, setSections] = useState<Section[]>([]);
-  const [sectionsReady, setSectionsReady] = useState(false);
   const navigate = useNavigate();
-  const { assessmentData, loading } = useAssessment();
+  const { assessmentData, fetchAssessmentData } = useAssessment();
   usePreventReload();
 
+  /**
+   * Explicit load state for THIS page.
+   *
+   * Deliberately not derived from the context's shared `loading` flag, and no
+   * one-way `sectionsReady` latch: the previous version rendered its spinner on
+   * `loading || !sectionsReady`, where `sectionsReady` only ever flipped inside
+   * `if (assessmentData && assessmentData[0])`. That made the page a purely
+   * passive consumer — if the questionnaire was absent for ANY reason the
+   * spinner ran forever with no fetch, no timeout, no error and no retry, and a
+   * manual browser reload (which re-hydrates the provider from sessionStorage)
+   * was the only escape. That is the state students kept hitting.
+   */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
+
+  const assessmentId = localStorage.getItem('assessmentId');
+  const userStudentId = localStorage.getItem('userStudentId');
+
   useHeartbeat({
-    userStudentId: Number(localStorage.getItem('userStudentId')) || null,
-    assessmentId: Number(localStorage.getItem('assessmentId')) || null,
+    userStudentId: Number(userStudentId) || null,
+    assessmentId: Number(assessmentId) || null,
     page: 'section-select',
   });
 
-  // Extract sections immediately when assessmentData is available (no API dependency)
-  useEffect(() => {
-    if (assessmentData && assessmentData[0]) {
-      try {
-        const questionnaire = assessmentData[0];
-        const sectionsData = questionnaire.sections.map((item: any) => ({
-          sectionId: item.section.sectionId,
-          sectionName: item.section.sectionName,
-          sectionDescription: item.section.sectionDescription || "",
-        }));
-        setSections(sectionsData || []);
-      } catch (error) {
-        console.error("Failed to process sections:", error);
-      }
-      setSectionsReady(true);
+  const questionnaire = assessmentData?.[0] ?? null;
+
+  // Sections are DERIVED, never latched. The moment the questionnaire exists the
+  // list renders; there is no intermediate flag that can get stuck behind it.
+  const sections: Section[] = useMemo(() => {
+    if (!questionnaire?.sections) return [];
+    try {
+      return questionnaire.sections.map((item: any) => ({
+        sectionId: item.section.sectionId,
+        sectionName: item.section.sectionName,
+        sectionDescription: item.section.sectionDescription || "",
+      }));
+    } catch (error) {
+      console.error("Failed to process sections:", error);
+      return [];
     }
-  }, [assessmentData]);
+  }, [questionnaire]);
 
-  // Status check runs independently — doesn't block section rendering. For
-  // an "ongoing" status with partial answers we additionally auto-route the
-  // student to the next-unanswered question so they don't have to remember
-  // which section they paused in.
+  /**
+   * Self-sufficient load. If the shared context has no questionnaire — cold tab,
+   * restored tab, a sessionStorage write that hit quota in cacheToSession, a
+   * failed earlier fetch — this page loads it itself from the assessmentId in
+   * localStorage instead of waiting for a caller that may never come.
+   */
+  const loadAttemptRef = useRef<string | null>(null);
   useEffect(() => {
-    const checkStudentStatus = async () => {
-      const assessmentId = localStorage.getItem('assessmentId');
-      const userStudentId = localStorage.getItem('userStudentId');
+    if (!assessmentId || !userStudentId) {
+      navigate('/student-login', { replace: true });
+      return;
+    }
+    if (questionnaire) {
+      // Data arrived (possibly late, after the watchdog fired) — clear any
+      // recovery screen so the student proceeds without touching anything.
+      setLoadError(null);
+      return;
+    }
 
-      if (!assessmentId || !userStudentId) {
-        navigate('/student-login', { replace: true });
-        return;
-      }
+    const attemptKey = `${assessmentId}:${retryTick}`;
+    if (loadAttemptRef.current === attemptKey) return;
+    loadAttemptRef.current = attemptKey;
 
-      try {
-        const response = await http.get(
-          `/assessments/${assessmentId}/student/${userStudentId}`
-        );
-        const { isActive, studentStatus } = response.data;
+    let cancelled = false;
+    fetchAssessmentData(assessmentId)
+      .then((ok) => {
+        if (cancelled) return;
+        if (!ok) {
+          setLoadError('We could not load your assessment questions.');
+          return;
+        }
+        // Loaded successfully but the payload carries no questionnaire (empty
+        // list from /assessments/getby, or a locked snapshot without one). The
+        // effect above won't re-run for this attempt, so say so explicitly
+        // rather than letting the watchdog claim it is "taking longer".
+        const loaded = JSON.parse(sessionStorage.getItem('assessmentData') || 'null');
+        if (!loaded?.[0]) {
+          setLoadError('This assessment has no questions configured yet.');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError('We could not load your assessment questions.');
+      });
+
+    return () => { cancelled = true; };
+  }, [assessmentId, userStudentId, questionnaire, retryTick, fetchAssessmentData, navigate]);
+
+  // Watchdog: never leave the student on an indefinite spinner.
+  useEffect(() => {
+    if (questionnaire || loadError) return;
+    const timer = window.setTimeout(() => {
+      setLoadError('Loading your assessment is taking longer than expected.');
+    }, LOAD_WATCHDOG_MS);
+    return () => window.clearTimeout(timer);
+  }, [questionnaire, loadError, retryTick]);
+
+  /**
+   * Status check — runs ONCE per mount. The previous version listed
+   * `assessmentData` in its deps, so it re-fired the request every time the
+   * questionnaire landed, doubling the call with no cancellation.
+   */
+  const [studentStatus, setStudentStatus] = useState<string | null>(null);
+  const statusCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!assessmentId || !userStudentId) return;
+    if (statusCheckedRef.current) return;
+    statusCheckedRef.current = true;
+
+    let cancelled = false;
+    http.get(`/assessments/${assessmentId}/student/${userStudentId}`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const { isActive, studentStatus: status } = data;
 
         if (!isActive) {
           alert("This assessment is not active.");
@@ -74,48 +152,60 @@ const SelectSectionPage: React.FC = () => {
           return;
         }
 
-        if (studentStatus === 'completed') {
-          // Student already submitted — send them straight to the
-          // thank-you / report page, NOT back to login. The thank-you page
-          // resolves entitlement + report state from localStorage; it
-          // gracefully no-ops if those keys are absent.
+        if (status === 'completed') {
+          // Already submitted — straight to the thank-you / report page, NOT
+          // back to login. ThankYouPage resolves entitlement + report state from
+          // localStorage and no-ops gracefully if those keys are absent.
           navigate('/studentAssessment/completed', { replace: true });
           return;
         }
 
-        if (studentStatus === 'ongoing' && assessmentData && assessmentData[0]) {
-          // Resume path — pick the first section that still has an
-          // unanswered question and jump straight to it. SectionQuestionPage
-          // will restore the partial answers on mount and land the student
-          // on the within-section next-unanswered.
-          try {
-            const partial = await restorePartialAnswers(
-              Number(userStudentId), Number(assessmentId),
-            );
-            const answeredIds = collectAnsweredQuestionIds(partial);
-            const target = findNextUnansweredSection(assessmentData[0], answeredIds);
-            if (target) {
-              navigate(
-                `/studentAssessment/sections/${target.sectionId}/questions/0`,
-                { replace: true },
-              );
-              return;
-            }
-            // No unanswered question found — fall through to the section
-            // picker (student can re-enter manually if they want).
-          } catch (restoreErr) {
-            console.warn('Partial restore failed on resume; showing picker:', restoreErr);
-          }
-        }
-      } catch (error) {
+        setStudentStatus(status ?? null);
+      })
+      .catch((error) => {
+        // Non-fatal: the student can still pick a section manually. Re-arm so a
+        // Retry from the recovery screen re-checks.
         console.error("Error checking student status:", error);
-      }
-    };
+        statusCheckedRef.current = false;
+      });
 
-    checkStudentStatus();
-    // assessmentData participates in the effect because the resume path needs
-    // it to compute the next-unanswered section.
-  }, [navigate, assessmentData]);
+    return () => { cancelled = true; };
+  }, [assessmentId, userStudentId, navigate, retryTick]);
+
+  /**
+   * Resume path — only once both the status and the questionnaire are known.
+   * Jumps to the first section that still has an unanswered question so the
+   * student doesn't have to remember where they paused. SectionQuestionPage
+   * restores the partial answers on mount and lands them on the exact
+   * next-unanswered question within that section.
+   */
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (resumedRef.current) return;
+    if (studentStatus !== 'ongoing' || !questionnaire) return;
+    if (!assessmentId || !userStudentId) return;
+    resumedRef.current = true;
+
+    let cancelled = false;
+    restorePartialAnswers(Number(userStudentId), Number(assessmentId))
+      .then((partial) => {
+        if (cancelled) return;
+        const answeredIds = collectAnsweredQuestionIds(partial);
+        const target = findNextUnansweredSection(questionnaire, answeredIds);
+        if (target) {
+          navigate(
+            `/studentAssessment/sections/${target.sectionId}/questions/0`,
+            { replace: true },
+          );
+        }
+        // No unanswered question found — fall through to the section picker.
+      })
+      .catch((restoreErr) => {
+        console.warn('Partial restore failed on resume; showing picker:', restoreErr);
+      });
+
+    return () => { cancelled = true; };
+  }, [studentStatus, questionnaire, assessmentId, userStudentId, navigate]);
 
   // Pulls the set of answered questionnaireQuestionIds out of the
   // /partial-restore response shape ({ answers: [{ questionnaireQuestionId, ... }] }).
@@ -134,15 +224,15 @@ const SelectSectionPage: React.FC = () => {
   // Walks sections in order; returns the first one that still has any
   // unanswered question. Section shape mirrors what AssessmentContext loads.
   function findNextUnansweredSection(
-    questionnaire: any,
+    q: any,
     answeredIds: Set<number>,
   ): { sectionId: string | number } | null {
-    const sectionsList: SectionWithQuestions[] = questionnaire?.sections || [];
+    const sectionsList: SectionWithQuestions[] = q?.sections || [];
     for (const s of sectionsList) {
       const qs = Array.isArray(s.questions) ? s.questions : [];
-      const hasUnanswered = qs.some((q) =>
-        typeof q?.questionnaireQuestionId === 'number'
-          ? !answeredIds.has(q.questionnaireQuestionId)
+      const hasUnanswered = qs.some((qq) =>
+        typeof qq?.questionnaireQuestionId === 'number'
+          ? !answeredIds.has(qq.questionnaireQuestionId)
           : false,
       );
       if (hasUnanswered) return { sectionId: s.section.sectionId };
@@ -153,6 +243,17 @@ const SelectSectionPage: React.FC = () => {
   const handleSectionClick = (section: Section) => {
     navigate(`/studentAssessment/sections/${section.sectionId}`);
   };
+
+  const handleRetry = () => {
+    setLoadError(null);
+    loadAttemptRef.current = null;
+    resumedRef.current = false;
+    setRetryTick((t) => t + 1);
+  };
+
+  // Three mutually exclusive states — no combination can produce a silent hang.
+  const showError = !questionnaire && !!loadError;
+  const showSpinner = !questionnaire && !loadError;
 
   return (
     <div className="assessment-bg">
@@ -167,7 +268,7 @@ const SelectSectionPage: React.FC = () => {
                 </p>
 
                 {/* Loading State */}
-                {(loading || !sectionsReady) && (
+                {showSpinner && (
                   <div className="text-center py-5">
                     <div className="spinner-border" role="status" style={{ width: "3rem", height: "3rem", color: "#5DD68D" }}>
                       <span className="visually-hidden">Loading...</span>
@@ -176,8 +277,49 @@ const SelectSectionPage: React.FC = () => {
                   </div>
                 )}
 
+                {/* Recovery State — replaces the old indefinite spinner */}
+                {showError && (
+                  <div className="text-center py-4 py-md-5">
+                    <div
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        background: "linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.12) 100%)",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        margin: "0 auto 1.25rem",
+                      }}
+                    >
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
+                        <path d="M23 4v6h-6" />
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                      </svg>
+                    </div>
+                    <h4 style={{ color: "#4a5568", fontSize: "1.15rem", fontWeight: "600", marginBottom: "0.5rem" }}>
+                      {loadError}
+                    </h4>
+                    <p style={{ color: "#9ca3af", fontSize: "0.9rem", marginBottom: "1.25rem" }}>
+                      Check your internet connection and try again. Nothing you have already answered is lost.
+                    </p>
+                    <div className="d-flex gap-2 justify-content-center flex-wrap">
+                      <button className="btn btn-assessment-primary px-4" onClick={handleRetry}>
+                        Try again
+                      </button>
+                      <button
+                        className="btn px-4"
+                        onClick={() => navigate('/allotted-assessment')}
+                        style={{ border: '1px solid #e2e8f0', color: '#4a5568', background: '#fff', borderRadius: '10px' }}
+                      >
+                        Back to my assessments
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Empty State */}
-                {!loading && sectionsReady && sections.length === 0 && (
+                {!!questionnaire && sections.length === 0 && (
                   <div className="text-center py-4 py-md-5">
                     <div
                       style={{
@@ -207,7 +349,7 @@ const SelectSectionPage: React.FC = () => {
                 )}
 
                 {/* Sections List */}
-                {!loading && sectionsReady && sections.length > 0 && (
+                {sections.length > 0 && (
                   <div className="d-flex flex-column gap-3">
                     {sections.map((section, index) => (
                       <div
@@ -273,7 +415,7 @@ const SelectSectionPage: React.FC = () => {
                 )}
 
                 {/* Footer Note */}
-                {!loading && sectionsReady && sections.length > 0 && (
+                {sections.length > 0 && (
                   <div className="text-center mt-3 mt-md-4 p-2 p-md-3" style={{ background: "#f7fafc", borderRadius: "10px" }}>
                     <p style={{ margin: 0, color: "#718096", fontSize: "0.85rem" }}>Click on any section to begin</p>
                   </div>
