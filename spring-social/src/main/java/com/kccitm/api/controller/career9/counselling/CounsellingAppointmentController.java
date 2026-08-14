@@ -462,15 +462,24 @@ public class CounsellingAppointmentController {
     }
 
     /**
-     * The assessment report for one session. Read by the counsellor's session-notes page, which
-     * shows a single session and so cannot use the list above.
+     * The assessment report for one session, plus why there isn't one when there isn't. Read by
+     * the counsellor's session-notes page and the Report button on their appointments list, both
+     * of which show a single session and so cannot use the list above.
+     *
+     * <p>Resolving it here rather than from the student's report rows directly means the
+     * counsellor is shown the same report the emails carry — the one for the assessment this
+     * session was booked against, PDF preferred — and needs only the permission they already
+     * have to see the session at all.
      */
     // no scope arg: identifies by appointment
     @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/{id}/report-link")
     public ResponseEntity<Map<String, String>> getReportLink(@PathVariable Long id) {
+        CounsellorSessionAdminService.ReportLinkResult result =
+                counsellorSessionAdminService.resolveReportFor(id);
         Map<String, String> body = new java.util.HashMap<>();
-        body.put("reportLink", counsellorSessionAdminService.reportLinkFor(id));
+        body.put("reportLink", result.getReportLink());
+        body.put("status", result.getStatus());
         return ResponseEntity.ok(body);
     }
 

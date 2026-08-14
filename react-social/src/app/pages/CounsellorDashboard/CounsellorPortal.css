@@ -295,6 +295,167 @@
 .cp-appt-student { color: #1A1F2E; margin-top: 2px; }
 .cp-appt-type { font-size: 10px; color: #6B7A8D; }
 
+/* ── Appointments feed (the counsellor's Appointments page) ──
+   Read as an activity feed rather than a table of rows: a status-coloured rail
+   and icon on the left, then what happened, who it concerns, and the small
+   print underneath.
+
+   Each row sets three tones of its status hue inline, and one rule set covers
+   every status:
+
+     --appt-accent  deep ink    rail, icon glyph, live dot
+     --appt-tint    mid tint    the ground the glyph sits on
+     --appt-wash    near-white  the ground of the whole row
+
+   Two grounds rather than one is the whole trick. The mid tint is strong enough
+   to hold a deep glyph legibly but far too strong spread across a whole row, so
+   the row gets the wash and only the medallion gets the tint. */
+.cp-appt-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cp-appt-row {
+  --appt-accent: #334155;
+  --appt-tint: #E2E8F0;
+  --appt-wash: #F8FAFC;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 18px;
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-left: 4px solid var(--appt-accent);
+  border-radius: 10px;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.cp-appt-row:hover { box-shadow: 0 2px 10px rgba(38, 59, 106, 0.10); }
+
+/* A session that still wants something from the counsellor — or is happening
+   right now — reads as "unread": washed ground, full-strength rail, live dot.
+   Settled rows keep the white ground so the eye lands on the live ones, but they
+   keep their coloured rail and medallion: unlike a notification, "Completed" and
+   "Cancelled" are the content, not just a read receipt. */
+.cp-appt-row--live {
+  background: var(--appt-wash);
+  border-color: rgba(0, 0, 0, 0.07);
+  border-left-color: var(--appt-accent);
+}
+
+.cp-appt-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  line-height: 1;
+  background: var(--appt-tint);
+  color: var(--appt-accent);
+}
+
+.cp-appt-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-appt-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cp-appt-body {
+  flex: 1;
+  min-width: 220px;
+}
+
+.cp-appt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cp-appt-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.cp-appt-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--appt-accent);
+  flex-shrink: 0;
+}
+
+.cp-appt-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.55;
+  margin: 2px 0 0;
+}
+
+.cp-appt-desc strong { font-weight: 600; color: #1E293B; }
+
+.cp-appt-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.cp-appt-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cp-appt-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748B;
+  line-height: 1.5;
+}
+
+/* Where the session came from, and where it went. */
+.cp-appt-trail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.cp-appt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* Narrow: the buttons drop below the text but stay aligned to it, not to the
+   medallion, so the row still reads as one block. */
+@media (max-width: 768px) {
+  .cp-appt-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 /* ── Notes ── */
 .cp-note-item {
   background: #F8F9FC;
