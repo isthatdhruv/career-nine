@@ -881,20 +881,12 @@
         return response.json();
       })
       .then(function (data) {
-        // Optional welcome email (no-op if the endpoint isn't enabled server-side).
-        var dashboardLink = 'https://dashboard.career-9.com/';
-        fetch(API_BASE_URL + '/email/send-welcome', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: userEmail,
-            name: userName,
-            senderName: 'Career-9',
-            subject: 'Welcome to Career-9 — Registration Successful!',
-            dashboardLink: dashboardLink,
-            message: 'Hi ' + userName + ',\n\nCongratulations! Your registration with Career-9 is successful.\n\nHere are your details:\nName: ' + userName + '\nEmail: ' + userEmail + '\nPhone: ' + payload.phone + '\nSchool: ' + payload.schoolName + '\n\nClick the link below to access your student dashboard and start your career journey:\n' + dashboardLink + '\n\nWe are excited to help you discover your ideal career path!\n\nWarm regards,\nTeam Career-9'
-          })
-        }).catch(function () {});
+        // The acknowledgement email is sent by the server, from /leads/capture itself
+        // (EmailType LEAD_WELCOME, editable under Email > Email Templates), together with
+        // the internal new-lead alert. This page used to POST /email/send-welcome here —
+        // an endpoint that never existed, so the call 404'd on every registration and the
+        // error was swallowed by the empty .catch(). Nothing replaces it: a public page
+        // asking the API to send mail on its own say-so is not something to reinstate.
         return data;
       })
       .then(function () {

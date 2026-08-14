@@ -23,6 +23,15 @@ public interface GeneratedReportRepository extends JpaRepository<GeneratedReport
     Optional<GeneratedReport> findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
             Long userStudentId, Long assessmentId, Long reportTemplateId);
 
+    /**
+     * Every report row for one student on one assessment, whatever template produced it.
+     * The typed finders above all need the caller to know the template or report type up
+     * front; a counselling email only knows "this student, this assessment" and wants
+     * whichever report is actually ready.
+     */
+    List<GeneratedReport> findByUserStudentUserStudentIdAndAssessmentId(
+            Long userStudentId, Long assessmentId);
+
     List<GeneratedReport> findByUserStudentUserStudentId(Long userStudentId);
 
     List<GeneratedReport> findByUserStudentUserStudentIdAndTypeOfReport(Long userStudentId, String typeOfReport);

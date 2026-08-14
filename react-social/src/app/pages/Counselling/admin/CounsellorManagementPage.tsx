@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import '../Counselling.css'
 import { getAllCounsellors, createCounsellor, updateCounsellor, toggleCounsellorActive } from '../API/CounsellorAPI'
-import { getCounsellorAppointments } from '../API/AppointmentAPI'
-import { getAllMappings, allocateCounsellor, deallocateCounsellor, CounsellorInstituteMapping } from '../API/CounsellorInstituteAPI'
+import { getAllMappings, allocateCounsellor, CounsellorInstituteMapping } from '../API/CounsellorInstituteAPI'
 import { getSlotsByCounsellor } from '../API/SlotAPI'
-import CounsellorForm from './components/CounsellorForm'
+import { Modal } from 'react-bootstrap-v5'
+import CounsellorForm, { COUNSELLOR_FORM_ID } from './components/CounsellorForm'
+import AppointCounsellorModal from './components/AppointCounsellorModal'
+import ManageSessionsModal from './components/ManageSessionsModal'
 import CounsellorAvailabilityPanel from '../shared/CounsellorAvailabilityPanel'
 import WeeklySchedulePanel from '../shared/WeeklySchedulePanel'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
@@ -34,132 +36,6 @@ interface Counsellor {
 /** Safely get the counsellor's ID (backend may return `id` or frontend may map `counsellorId`) */
 function getCounsellorId(c: Counsellor): number {
   return c.counsellorId || c.id || 0
-}
-
-interface Appointment {
-  id: number
-  status: string
-  studentReason?: string
-  meetingLink?: string
-  createdAt?: string
-  student?: {
-    userStudentId?: number
-    studentInfo?: { name?: string }
-  }
-  slot?: {
-    date?: string
-    startTime?: string
-    endTime?: string
-  }
-}
-
-const AppointmentsSection: React.FC<{ counsellor: Counsellor; onClose: () => void }> = ({
-  counsellor,
-  onClose,
-}) => {
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [loadingAppts, setLoadingAppts] = useState(true)
-  const [apptError, setApptError] = useState<string | null>(null)
-  const cId = getCounsellorId(counsellor)
-
-  useEffect(() => {
-    setLoadingAppts(true)
-    getCounsellorAppointments(cId)
-      .then((res) => setAppointments(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setApptError('Failed to load appointments.'))
-      .finally(() => setLoadingAppts(false))
-  }, [cId])
-
-  useRefreshInterval(() => {
-    if (!cId) return
-    getCounsellorAppointments(cId)
-      .then((res) => setAppointments(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {})
-  }, { skip: !cId })
-
-  const statusColors: Record<string, { bg: string; color: string }> = {
-    CONFIRMED: { bg: '#D1FAE5', color: '#065F46' },
-    PENDING: { bg: '#FEF3C7', color: '#92400E' },
-    COMPLETED: { bg: '#DBEAFE', color: '#1E40AF' },
-    CANCELLED: { bg: '#FEE2E2', color: '#991B1B' },
-    DECLINED: { bg: '#F3F4F6', color: '#6B7280' },
-  }
-
-  return (
-    <div
-      className='cl-card'
-      style={{ marginTop: 28, padding: 0, border: '2px solid var(--sp-border, #D1E5DF)', borderRadius: 10 }}
-    >
-      <div
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', borderBottom: '1px solid var(--sp-border, #D1E5DF)',
-          background: 'var(--sp-bg, #F2F7F5)', borderRadius: '10px 10px 0 0',
-        }}
-      >
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--sp-text, #1A2B28)' }}>
-            Appointments — {counsellor.name}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
-            Students with counselling sessions booked
-          </div>
-        </div>
-        <button onClick={onClose} style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: 'var(--sp-muted, #5C7A72)', fontSize: 20, lineHeight: 1, padding: '0 4px',
-        }} title='Close'>&times;</button>
-      </div>
-
-      <div style={{ padding: 20 }}>
-        {apptError && (
-          <div style={{
-            padding: '10px 14px', background: '#FEE2E2', border: '1px solid #FECACA',
-            borderRadius: 6, color: '#991B1B', fontSize: 13, marginBottom: 12,
-          }}>{apptError}</div>
-        )}
-
-        {loadingAppts ? (
-          <div style={{ fontSize: 13, color: 'var(--sp-muted, #5C7A72)', padding: '10px 0' }}>Loading...</div>
-        ) : appointments.length === 0 ? (
-          <div style={{ fontSize: 13, color: 'var(--sp-muted, #5C7A72)', padding: '10px 0' }}>
-            No appointments found for this counsellor.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
-            {appointments.map((a) => {
-              const studentName = a.student?.studentInfo?.name || 'Unknown Student'
-              const date = a.slot?.date || '-'
-              const time = a.slot?.startTime ? `${a.slot.startTime} - ${a.slot.endTime || ''}` : '-'
-              const sc = statusColors[a.status] || { bg: '#F3F4F6', color: '#6B7280' }
-              return (
-                <div key={a.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 14px', background: '#fff',
-                  border: '1px solid var(--sp-border, #D1E5DF)', borderRadius: 8, fontSize: 13,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'var(--sp-text, #1A2B28)' }}>{studentName}</div>
-                      <div style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
-                        {date} &middot; {time}
-                      </div>
-                    </div>
-                  </div>
-                  <span style={{
-                    display: 'inline-block', padding: '3px 10px', borderRadius: 999,
-                    fontSize: 11, fontWeight: 600, background: sc.bg, color: sc.color,
-                  }}>
-                    {a.status}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  )
 }
 
 interface SlotData {
@@ -287,8 +163,11 @@ const CounsellorManagementPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<number | null>(null)
-  const [assigningCounsellor, setAssigningCounsellor] = useState<Counsellor | null>(null)
   const [viewingSlotsCounsellor, setViewingSlotsCounsellor] = useState<Counsellor | null>(null)
+  // The counsellor whose institutes + assessments are being set, if the Appoint wizard is open.
+  const [appointingCounsellor, setAppointingCounsellor] = useState<Counsellor | null>(null)
+  // The counsellor whose booked sessions are open for review and resending.
+  const [managingSessionsCounsellor, setManagingSessionsCounsellor] = useState<Counsellor | null>(null)
 
   // Filters
   const [instituteMappings, setInstituteMappings] = useState<CounsellorInstituteMapping[]>([])
@@ -349,6 +228,8 @@ const CounsellorManagementPage: React.FC = () => {
     setTimeout(() => setSuccessMessage(null), 3500)
   }
 
+  const [impersonatingId, setImpersonatingId] = useState<number | null>(null)
+
   const handleAddClick = () => {
     setEditingCounsellor(null)
     setShowForm(true)
@@ -396,12 +277,6 @@ const CounsellorManagementPage: React.FC = () => {
     }
   }
 
-  const handleManageStudents = (counsellor: Counsellor) => {
-    setAssigningCounsellor((prev) =>
-      prev && getCounsellorId(prev) === getCounsellorId(counsellor) ? null : counsellor
-    )
-  }
-
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -421,26 +296,36 @@ const CounsellorManagementPage: React.FC = () => {
     }
   }
 
-  /** Find the active institute mapping for a counsellor (null if not allocated) */
-  const getActiveMapping = (counsellorId: number): CounsellorInstituteMapping | null => {
-    return instituteMappings.find(
-      (m) => m.isActive && m.counsellor.id === counsellorId
-    ) || null
-  }
-
-  const handleDeallocate = async (counsellor: Counsellor) => {
-    const mapping = getActiveMapping(getCounsellorId(counsellor))
-    if (!mapping) {
-      setError('This counsellor is not allocated to any institute.')
-      return
-    }
-    setError(null)
+  /**
+   * Open the counsellor portal AS this counsellor, in a new tab.
+   *
+   * <p>Mirrors "Open as Student": the server mints a short-lived JWT, the new tab moves it
+   * into its own sessionStorage, and the admin's session here is never touched. Closing that
+   * tab ends the impersonation.
+   *
+   * <p>window.open is called BEFORE the await so the browser attributes it to the click and
+   * does not block it as a popup.
+   */
+  const handleOpenAsCounsellor = async (counsellor: Counsellor) => {
+    const id = getCounsellorId(counsellor)
+    if (!id) return
+    const tab = window.open('', '_blank')
+    setImpersonatingId(id)
     try {
-      await deallocateCounsellor(mapping.id)
-      showSuccess(`${counsellor.name} deallocated from ${mapping.institute.instituteName}.`)
-      await loadCounsellors()
-    } catch {
-      setError('Failed to deallocate counsellor.')
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/admin/impersonate/counsellor/${id}`)
+      const token = res?.data?.token
+      if (!token) throw new Error('no token')
+      const url = `${window.location.origin}/counsellor/impersonate?t=${encodeURIComponent(token)}`
+      if (tab) tab.location.href = url
+      else window.open(url, '_blank')
+    } catch (err: any) {
+      if (tab) tab.close()
+      const msg = err?.response?.data
+      alert(typeof msg === 'string' && msg
+        ? msg
+        : "Could not open this counsellor's portal. They may not have a login account.")
+    } finally {
+      setImpersonatingId(null)
     }
   }
 
@@ -691,16 +576,38 @@ const CounsellorManagementPage: React.FC = () => {
         )}
       </div>
 
-      {/* Form Panel */}
-      {showForm && (
-        <div style={{ marginBottom: 28 }}>
-          <CounsellorForm
-            counsellor={editingCounsellor}
-            onSave={handleSave}
-            onCancel={handleCancel}
-          />
-        </div>
-      )}
+      {/* Add / Edit counsellor.
+          A dialog rather than a panel above the table: rendered inline it pushed the whole
+          list down the page, so clicking Edit on a row scrolled that row out of sight and
+          left no visual tie between the form and the counsellor being edited. */}
+      <Modal show={showForm} onHide={handleCancel} size='lg' centered backdrop='static'>
+        <Modal.Header>
+          <Modal.Title>
+            <h2 className='mb-0'>
+              {editingCounsellor ? 'Edit Counsellor' : 'Add Counsellor'}
+            </h2>
+            {editingCounsellor && <small className='text-muted'>{editingCounsellor.name}</small>}
+          </Modal.Title>
+          <div
+            className='btn btn-sm btn-icon btn-active-color-primary'
+            onClick={handleCancel}
+            style={{ cursor: 'pointer', fontSize: 22, lineHeight: 1 }}
+          >
+            &times;
+          </div>
+        </Modal.Header>
+        <Modal.Body>
+          <CounsellorForm counsellor={editingCounsellor} onSave={handleSave} />
+        </Modal.Body>
+        <Modal.Footer>
+          <button type='button' className='btn btn-light' onClick={handleCancel}>
+            Cancel
+          </button>
+          <button type='submit' form={COUNSELLOR_FORM_ID} className='btn btn-primary'>
+            {editingCounsellor ? 'Save Changes' : 'Add Counsellor'}
+          </button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Table */}
       {(() => {
@@ -869,26 +776,6 @@ const CounsellorManagementPage: React.FC = () => {
                       </button>
                       <button
                         className={
-                          assigningCounsellor && getCounsellorId(assigningCounsellor) === getCounsellorId(c)
-                            ? 'cl-btn-warning'
-                            : 'cl-btn-outline'
-                        }
-                        style={{ fontSize: 12, padding: '5px 12px' }}
-                        onClick={() => handleManageStudents(c)}
-                      >
-                        Appointments
-                      </button>
-                      {getActiveMapping(getCounsellorId(c)) && (
-                        <button
-                          className='cl-btn-danger'
-                          style={{ fontSize: 12, padding: '5px 12px' }}
-                          onClick={() => handleDeallocate(c)}
-                        >
-                          Deallocate ({getActiveMapping(getCounsellorId(c))?.institute.instituteName})
-                        </button>
-                      )}
-                      <button
-                        className={
                           viewingSlotsCounsellor && getCounsellorId(viewingSlotsCounsellor) === getCounsellorId(c)
                             ? 'cl-btn-warning'
                             : 'cl-btn-outline'
@@ -900,6 +787,36 @@ const CounsellorManagementPage: React.FC = () => {
                       >
                         Slots
                       </button>
+                      {/* Institutes + assessments in one pass — the pair the booking flow
+                          requires before a student is offered this counsellor at all. */}
+                      <button
+                        className='cl-btn-outline'
+                        style={{ fontSize: 12, padding: '5px 12px', color: '#1D4ED8', borderColor: '#BFDBFE' }}
+                        onClick={() => setAppointingCounsellor(c)}
+                        title='Choose the institutes and assessments this counsellor covers'
+                      >
+                        Appoint
+                      </button>
+                      {/* Every session booked with this counsellor, and the two resends —
+                          the only place an admin can put a session's details, and the
+                          student's report, back in front of either party. */}
+                      <button
+                        className='cl-btn-outline'
+                        style={{ fontSize: 12, padding: '5px 12px', color: '#0F766E', borderColor: '#99F6E4' }}
+                        onClick={() => setManagingSessionsCounsellor(c)}
+                        title="Review this counsellor's sessions and resend the details to the student or counsellor"
+                      >
+                        Manage Sessions
+                      </button>
+                      <button
+                        className='cl-btn-outline'
+                        style={{ fontSize: 12, padding: '5px 12px', color: '#6D28D9', borderColor: '#DDD6FE' }}
+                        onClick={() => handleOpenAsCounsellor(c)}
+                        disabled={impersonatingId === getCounsellorId(c)}
+                        title='Open the counsellor portal as this counsellor, in a new tab'
+                      >
+                        {impersonatingId === getCounsellorId(c) ? 'Opening…' : 'Open as Counsellor'}
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -910,11 +827,30 @@ const CounsellorManagementPage: React.FC = () => {
       )
       })()}
 
-      {/* Appointments Section */}
-      {assigningCounsellor && (
-        <AppointmentsSection
-          counsellor={assigningCounsellor}
-          onClose={() => setAssigningCounsellor(null)}
+      {/* Appoint wizard: institutes, then their assessments. */}
+      {appointingCounsellor && (
+        <AppointCounsellorModal
+          show
+          counsellorId={getCounsellorId(appointingCounsellor)}
+          counsellorName={appointingCounsellor.name}
+          institutes={institutes}
+          assignedBy={adminUserId || undefined}
+          onHide={() => setAppointingCounsellor(null)}
+          onSaved={(message) => {
+            setAppointingCounsellor(null)
+            showSuccess(message)
+            loadCounsellors()
+          }}
+        />
+      )}
+
+      {/* Sessions booked with this counsellor, with the student/counsellor resends. */}
+      {managingSessionsCounsellor && (
+        <ManageSessionsModal
+          show
+          counsellorId={getCounsellorId(managingSessionsCounsellor)}
+          counsellorName={managingSessionsCounsellor.name}
+          onHide={() => setManagingSessionsCounsellor(null)}
         />
       )}
 

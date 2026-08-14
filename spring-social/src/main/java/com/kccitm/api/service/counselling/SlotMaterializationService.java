@@ -3,6 +3,7 @@ package com.kccitm.api.service.counselling;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.career9.counselling.AvailabilityTemplate;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
+import com.kccitm.api.model.career9.counselling.Counsellor;
+import com.kccitm.api.model.career9.counselling.SlotConfiguration;
 import com.kccitm.api.repository.Career9.counselling.AvailabilityTemplateRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 
@@ -37,9 +40,19 @@ public class SlotMaterializationService {
     public static class MaterializationResult {
         public final int created;
         public final int skipped;
+        /**
+         * Slots that fell in the part of today that has already gone by. Counted apart from
+         * {@link #skipped} because "you asked for a time that has passed" and "that time is
+         * already covered" need different answers in the UI.
+         */
+        public final int past;
         public MaterializationResult(int created, int skipped) {
+            this(created, skipped, 0);
+        }
+        public MaterializationResult(int created, int skipped, int past) {
             this.created = created;
             this.skipped = skipped;
+            this.past = past;
         }
     }
 
@@ -85,19 +98,30 @@ public class SlotMaterializationService {
 
     private MaterializationResult materializeSlotsForTemplate(AvailabilityTemplate template, int days) {
         DayOfWeek templateDayOfWeek = DayOfWeek.valueOf(template.getDayOfWeek().toUpperCase());
-        LocalDate tomorrow = LocalDate.now().plusDays(1);
-        // Honour the template's effective start date: materialize from max(startDate, tomorrow).
-        LocalDate start = (template.getStartDate() != null && template.getStartDate().isAfter(tomorrow))
+        LocalDate today = LocalDate.now();
+        // Honour the template's effective start date: materialize from max(startDate, today).
+        //
+        // Today counts. Generation used to begin at tomorrow, which silently made same-day
+        // availability impossible: a schedule dated for today alone produced an empty window
+        // (start = tomorrow, end = today), created nothing, and was discarded — so setting up
+        // "today 13:00–18:00" at noon appeared to do nothing at all. Today's hours that have
+        // already gone by are dropped slot by slot below, which is the part that actually
+        // needs excluding; the rest of today is bookable.
+        LocalDate start = (template.getStartDate() != null && template.getStartDate().isAfter(today))
                 ? template.getStartDate()
-                : tomorrow;
+                : today;
         LocalDate endDate = start.plusDays(days);
         // Honour the template's last effective date: never generate past it. A window
         // that ends before it begins yields nothing, which the caller reports.
         if (template.getEndDate() != null && template.getEndDate().isBefore(endDate)) {
             endDate = template.getEndDate();
         }
+        // Read the clock once: a run that straddles a minute boundary would otherwise apply
+        // two different cut-offs to the same day's slots.
+        LocalTime now = LocalTime.now();
         int created = 0;
         int skipped = 0;
+        int past = 0;
 
         for (LocalDate date = start; !date.isAfter(endDate); date = date.plusDays(1)) {
             if (date.getDayOfWeek() != templateDayOfWeek) {
@@ -126,11 +150,16 @@ public class SlotMaterializationService {
                     .findByCounsellorIdAndDateBetween(template.getCounsellor().getId(), date, date);
 
             // Generate slots for this date
+            boolean isToday = date.equals(today);
             LocalTime slotStart = template.getStartTime();
             LocalTime slotEnd = slotStart.plusMinutes(template.getDefaultSlotDuration());
 
             while (!slotEnd.isAfter(template.getEndTime())) {
-                if (overlapsExisting(sameDay, slotStart, slotEnd)) {
+                if (isToday && !slotStart.isAfter(now)) {
+                    // Already started (or starting this instant) — nobody can book it, so it is
+                    // not worth a row. Only today can hit this; every other date is in the future.
+                    past++;
+                } else if (overlapsExisting(sameDay, slotStart, slotEnd)) {
                     // Conflicts with an existing slot — skip this one, keep generating the rest.
                     skipped++;
                 } else {
@@ -154,6 +183,91 @@ public class SlotMaterializationService {
                 slotStart = slotEnd;
                 slotEnd = slotStart.plusMinutes(template.getDefaultSlotDuration());
             }
+        }
+
+        return new MaterializationResult(created, skipped, past);
+    }
+
+    /**
+     * Materialize a saved {@link SlotConfiguration} onto one counsellor, covering every date in
+     * the config's range. This is the admin "apply a configuration to these counsellors" path;
+     * {@link #materializeForTemplate} is the counsellor's own recurring-availability path. They
+     * describe availability differently — a config is a flat date range with an optional lunch
+     * break, a template is a weekday rule — but they produce the same {@code CounsellingSlot}
+     * rows, so slot creation and conflict detection live here for both.
+     *
+     * <p>A config has no weekday and no mode of its own, so — exactly as the controller loop did
+     * before — config slots are left untemplated and keep {@code CounsellingSlot}'s own default
+     * mode, rather than being given one here.
+     */
+    public MaterializationResult materializeForConfiguration(Counsellor counsellor, SlotConfiguration config) {
+        int created = 0;
+        int skipped = 0;
+        for (LocalDate date = config.getStartDate(); !date.isAfter(config.getEndDate()); date = date.plusDays(1)) {
+            MaterializationResult day = materializeConfigForDay(counsellor, config, date);
+            created += day.created;
+            skipped += day.skipped;
+        }
+        return new MaterializationResult(created, skipped);
+    }
+
+    /** One counsellor, one date: walk the config's window in slot-sized steps, skipping the break. */
+    private MaterializationResult materializeConfigForDay(Counsellor counsellor, SlotConfiguration config,
+            LocalDate date) {
+        // Every slot the counsellor already has that day, so a generated slot that would land on
+        // top of one is skipped rather than created. Newly created slots are appended as we go,
+        // so later steps in this same run see them too.
+        List<CounsellingSlot> sameDay = new ArrayList<>(
+                slotRepository.findByCounsellorIdAndDateBetween(counsellor.getId(), date, date));
+
+        int created = 0;
+        int skipped = 0;
+        LocalTime cursor = config.getStartTime();
+
+        while (true) {
+            LocalTime slotEnd = cursor.plusMinutes(config.getSlotDuration());
+            if (slotEnd.isAfter(config.getEndTime())) break;
+
+            // Jump the cursor past the break rather than generating a slot inside or across it.
+            if (Boolean.TRUE.equals(config.getHasBreak())
+                    && config.getBreakStart() != null && config.getBreakEnd() != null) {
+                boolean startsInBreak = !cursor.isBefore(config.getBreakStart())
+                        && cursor.isBefore(config.getBreakEnd());
+                boolean runsIntoBreak = cursor.isBefore(config.getBreakStart())
+                        && slotEnd.isAfter(config.getBreakStart());
+                if (startsInBreak || runsIntoBreak) {
+                    // A break that ends at or before the cursor (breakEnd < breakStart, say)
+                    // would leave the cursor where it is and spin forever. Stop the day instead.
+                    if (!config.getBreakEnd().isAfter(cursor)) {
+                        logger.warn("Slot configuration {} has a break ending at or before {} — "
+                                + "stopping generation for counsellor {} on {}",
+                                config.getId(), cursor, counsellor.getId(), date);
+                        break;
+                    }
+                    cursor = config.getBreakEnd();
+                    continue;
+                }
+            }
+
+            if (overlapsExisting(sameDay, cursor, slotEnd)) {
+                skipped++;
+            } else {
+                CounsellingSlot slot = new CounsellingSlot();
+                slot.setCounsellor(counsellor);
+                slot.setDate(date);
+                slot.setStartTime(cursor);
+                slot.setEndTime(slotEnd);
+                slot.setDurationMinutes(config.getSlotDuration());
+                slot.setStatus("AVAILABLE");
+                slot.setIsManuallyCreated(false);
+                slot.setIsBlocked(false);
+
+                slotRepository.save(slot);
+                sameDay.add(slot);
+                created++;
+            }
+
+            cursor = slotEnd;
         }
 
         return new MaterializationResult(created, skipped);

@@ -363,6 +363,23 @@ export interface Kpi {
 
 export type CardType = "strength" | "gap" | "risk" | "opportunity";
 
+/**
+ * Who an action item is addressed to.
+ *
+ * The Act tab is split by this. Nothing generated so far carries it — the field is read
+ * when present and inferred from the wording when it is not (see `audienceOf` in
+ * SchoolDashboardInsights), so a later prompt change that starts writing a real tag
+ * takes over from the inference without a second frontend change.
+ */
+export type Audience = "teacher" | "counsellor" | "parent";
+
+const AUDIENCES: Audience[] = ["teacher", "counsellor", "parent"];
+
+/** The stored tag, or null when the release predates it / wrote something unknown. */
+function audienceField(value: any): Audience | null {
+  return AUDIENCES.includes(value) ? value : null;
+}
+
 export interface InsightCard {
   id: string;
   title: string;
@@ -374,6 +391,8 @@ export interface InsightCard {
   type: CardType;
   /** The report section that expands this card. */
   section_ref: string;
+  /** Set only when the release stored one; otherwise inferred at render time. */
+  audience: Audience | null;
 }
 
 export interface Alert {
@@ -381,6 +400,7 @@ export interface Alert {
   label: string;
   count: number;
   action: string;
+  audience: Audience | null;
 }
 
 export interface NarrativeChart {
@@ -527,6 +547,7 @@ export function parseNarrative(aiResponse?: string | null): Narrative | null {
           })),
           type: cardType(c?.type),
           section_ref: text(c?.section_ref),
+          audience: audienceField(c?.audience),
         }))
         .filter((c) => c.insight.length > 0),
       alerts: list(insights.alerts).map((a: any) => ({
@@ -534,6 +555,7 @@ export function parseNarrative(aiResponse?: string | null): Narrative | null {
         label: text(a?.label),
         count: num(a?.count),
         action: text(a?.action),
+        audience: audienceField(a?.audience),
       })),
     },
     report: {

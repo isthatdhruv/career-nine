@@ -82,8 +82,59 @@ public class IcsService {
         return ics.getBytes(StandardCharsets.UTF_8);
     }
 
+    /**
+     * A withdrawal for a session that is no longer happening — cancelled, or moved to a new
+     * time. Returns null if the appointment lacks slot timing.
+     *
+     * <p>Without this the original event simply stays in the student's calendar (and the
+     * counsellor's) with a live meeting link, and both get an alarm for a session nobody is
+     * attending. On a reschedule she would end up holding two entries and may well go to the
+     * first one.
+     *
+     * <p>The mechanics that make it work: the {@code UID} must match the invite this is
+     * withdrawing, {@code METHOD:CANCEL} and {@code STATUS:CANCELLED} tell the client to
+     * remove it, and {@code SEQUENCE} must be higher than the original (which emits none, so
+     * defaults to 0) or the update is ignored as stale.
+     */
+    public byte[] buildCancellation(CounsellingAppointment appt) {
+        if (appt == null || appt.getSlot() == null
+                || appt.getSlot().getDate() == null || appt.getSlot().getStartTime() == null) {
+            return null;
+        }
+
+        LocalDateTime startLocal = LocalDateTime.of(appt.getSlot().getDate(), appt.getSlot().getStartTime());
+        LocalDateTime endLocal = appt.getSlot().getEndTime() != null
+                ? LocalDateTime.of(appt.getSlot().getDate(), appt.getSlot().getEndTime())
+                : startLocal.plusMinutes(appt.getSlot().getDurationMinutes() != null
+                        ? appt.getSlot().getDurationMinutes() : 60);
+
+        String uid = "counselling-appt-" + appt.getId() + "@career-9.net";
+
+        String ics = "BEGIN:VCALENDAR\r\n"
+                + "VERSION:2.0\r\n"
+                + "PRODID:-//Career-9//Counselling//EN\r\n"
+                + "CALSCALE:GREGORIAN\r\n"
+                + "METHOD:CANCEL\r\n"
+                + "BEGIN:VEVENT\r\n"
+                + "UID:" + uid + "\r\n"
+                + "SEQUENCE:1\r\n"
+                + "DTSTAMP:" + toUtc(LocalDateTime.now()) + "\r\n"
+                + "DTSTART:" + toUtc(startLocal) + "\r\n"
+                + "DTEND:" + toUtc(endLocal) + "\r\n"
+                + "SUMMARY:Career-9 Counselling Session (Cancelled)\r\n"
+                + "STATUS:CANCELLED\r\n"
+                + "END:VEVENT\r\n"
+                + "END:VCALENDAR\r\n";
+
+        return ics.getBytes(StandardCharsets.UTF_8);
+    }
+
     public String fileName(CounsellingAppointment appt) {
         return "counselling-session.ics";
+    }
+
+    public String cancellationFileName(CounsellingAppointment appt) {
+        return "counselling-session-cancelled.ics";
     }
 
     private String toUtc(LocalDateTime istLocal) {

@@ -24,6 +24,126 @@ interface Appointment {
   slot: Slot
   counsellorName?: string
   studentRescheduleCount?: number
+  /** Set when a counsellor cancellation/no-show moved her — exempts the session from her
+   *  cutoff, and from the miss count if the new time does not suit. */
+  forceShifted?: boolean
+  /** The time it was moved from, so the card can explain the change. */
+  shiftedFromStart?: string | null
+  /** Who ended it, and why — the history is only meaningful with attribution. */
+  cancelledByRole?: string | null
+  cancellationReason?: string | null
+  cancellationNote?: string | null
+  cancelledAt?: string | null
+  /** STUDENT when she did not show, COUNSELLOR when nobody checked her in. */
+  missedByRole?: string | null
+}
+
+interface CounsellingRecord {
+  booked: number
+  completed: number
+  cancelledByStudent: number
+  cancelledByOthers: number
+  missedByStudent: number
+  missedByCounsellor: number
+  moved: number
+  /** Booked but not yet resolved — upcoming, live, or waiting on her to pick a new time. */
+  stillOpen: number
+}
+
+/**
+ * Her counselling record at a glance, above the history.
+ *
+ * <p>The list of cards alone answers "what happened to each session" but not "where do I
+ * stand" — and the number that actually costs her something is how many endings were her
+ * own, since only those count against the 2-miss allowance. Rows that are zero are left
+ * out: a student who has never missed anything should not be shown a row of noughts telling
+ * her about missing things.
+ */
+const RecordSummary: React.FC<{ record: CounsellingRecord; missesUsed: number }> = ({
+  record,
+  missesUsed,
+}) => {
+  const rows: { label: string; value: number; color: string }[] = [
+    { label: 'Booked', value: record.booked, color: '#0C6B5A' },
+    { label: 'Attended', value: record.completed, color: '#047857' },
+    { label: 'Cancelled by you', value: record.cancelledByStudent, color: '#B45309' },
+    { label: 'Missed', value: record.missedByStudent, color: '#B91C1C' },
+    { label: 'Cancelled for you', value: record.cancelledByOthers, color: '#5C7A72' },
+    { label: 'Counsellor unavailable', value: record.missedByCounsellor, color: '#5C7A72' },
+    { label: 'Moved to a new time', value: record.moved, color: '#5C7A72' },
+    { label: 'Still to happen', value: record.stillOpen, color: '#5C7A72' },
+  ].filter((r) => r.value > 0 || r.label === 'Booked' || r.label === 'Attended')
+
+  const allowanceUsedUp = missesUsed >= 2
+
+  return (
+    <div className='cl-card' style={{ marginBottom: 16, padding: '14px 18px' }}>
+      {/* Title and standing on one line: "where do I stand" is the question the card exists
+          to answer, so it belongs at the top next to the heading rather than as a paragraph
+          underneath the numbers. */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, flexWrap: 'wrap', marginBottom: 12,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
+            textTransform: 'uppercase', color: 'var(--sp-muted, #5C7A72)',
+          }}
+        >
+          Your counselling record
+        </div>
+        {missesUsed > 0 && (
+          <span
+            style={{
+              fontSize: 11.5, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+              whiteSpace: 'nowrap',
+              background: allowanceUsedUp ? '#FEF2F2' : '#FFFBEB',
+              border: `1px solid ${allowanceUsedUp ? '#FECACA' : '#FDE68A'}`,
+              color: allowanceUsedUp ? '#991B1B' : '#92400E',
+            }}
+          >
+            {missesUsed}/2 free changes used
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px 26px' }}>
+        {rows.map((r) => (
+          <div key={r.label} style={{ minWidth: 88 }}>
+            <div style={{ fontSize: 21, fontWeight: 700, color: r.color, lineHeight: 1.1 }}>
+              {r.value}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
+              {r.label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* One consequence line, and the exemption in small print — it matters, but it is a
+          footnote, not the headline it was being rendered as. */}
+      {missesUsed > 0 && (
+        <div
+          style={{
+            marginTop: 12, paddingTop: 10,
+            borderTop: '1px solid var(--sp-border, #D1E5DF)',
+          }}
+        >
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: allowanceUsedUp ? '#991B1B' : '#92400E' }}>
+            {allowanceUsedUp
+              ? 'Sessions can no longer be moved. New bookings are chargeable.'
+              : 'One free change left.'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)', marginTop: 3 }}>
+            Counsellor and team cancellations are not counted.
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 type TabKey = 'upcoming' | 'past'
@@ -88,6 +208,13 @@ const StudentCounsellingPage: React.FC = () => {
           meetingLink: a.meetingLink,
           counsellorName: a.counsellor?.name ?? a.counsellorName,
           studentRescheduleCount: a.studentRescheduleCount ?? 0,
+          forceShifted: a.forceShifted ?? false,
+          shiftedFromStart: a.shiftedFromStart ?? null,
+          cancelledByRole: a.cancelledByRole ?? null,
+          cancellationReason: a.cancellationReason ?? null,
+          cancellationNote: a.cancellationNote ?? null,
+          cancelledAt: a.cancelledAt ?? null,
+          missedByRole: a.missedByRole ?? null,
           slot: a.slot
             ? {
                 date: a.slot.date,
@@ -113,22 +240,96 @@ const StudentCounsellingPage: React.FC = () => {
   // A live session (IN_PROGRESS, after the counsellor verifies check-in) stays under
   // "Upcoming" alongside CONFIRMED ones until its slot ends.
   const isActiveStatus = (s: string) => s === 'CONFIRMED' || s === 'IN_PROGRESS'
+
+  // Sessions that still need something FROM HER, even though their original slot has gone.
+  // Neither matched a tab before, so both simply vanished from this page: AWAITING_RESCHEDULE
+  // left her looking at "No upcoming sessions - book a session to get started" while she in
+  // fact had one parked waiting for her to choose a time.
+  const isActionNeededStatus = (s: string) => s === 'AWAITING_RESCHEDULE' || s === 'UNDER_REVIEW'
+
   const upcomingAppointments = appointments.filter(
-    (a) => isActiveStatus(a.status) && a.slot?.date >= today && !hasSlotEnded(a.slot)
+    (a) =>
+      isActionNeededStatus(a.status) ||
+      (isActiveStatus(a.status) && a.slot?.date >= today && !hasSlotEnded(a.slot))
   )
+  // Everything that has finished, whatever the ending. RESCHEDULED belongs here: it is the
+  // original booking that was moved (usually because the counsellor dropped it), and leaving
+  // it out of both tabs deleted that session from her history entirely — she could see the
+  // replacement but no trace of the sitting that was cancelled on her.
   const pastAppointments = appointments
     .filter(
       (a) =>
         a.status === 'COMPLETED' ||
+        a.status === 'CANCELLED' ||
+        a.status === 'MISSED' ||
+        a.status === 'RESCHEDULED' ||
         (isActiveStatus(a.status) && hasSlotEnded(a.slot))
     )
     .map((a) =>
       isActiveStatus(a.status) && hasSlotEnded(a.slot) ? { ...a, status: 'ENDED' } : a
     )
+    // Newest first: the most recent ending is the one she is looking for.
+    .sort((a, b) => {
+      const av = `${a.slot?.date || ''}T${a.slot?.startTime || ''}`
+      const bv = `${b.slot?.date || ''}T${b.slot?.startTime || ''}`
+      if (av === bv) return b.appointmentId - a.appointmentId
+      return av < bv ? 1 : -1
+    })
+
+  // Her counselling record, counted off the same list the cards are drawn from.
+  //
+  // Each session lands in exactly ONE bucket, so the buckets sum to "Booked". A session the
+  // counsellor dropped is both "counsellor unavailable" and "moved to a new time", and
+  // counting it under both would make the totals contradict each other on screen — the
+  // reason it ended is the more useful of the two, so that wins.
+  const isStudentRole = (r?: string | null) => (r || '').toUpperCase() === 'STUDENT'
+  const isCounsellorRole = (r?: string | null) => (r || '').toUpperCase() === 'COUNSELLOR'
+
+  const record = {
+    booked: appointments.length,
+    completed: 0,
+    cancelledByStudent: 0,
+    cancelledByOthers: 0,
+    missedByStudent: 0,
+    missedByCounsellor: 0,
+    moved: 0,
+    stillOpen: 0,
+  }
+  // Attribution decides the bucket, and it is checked BEFORE status — the same rule the
+  // server's allowance query uses (`countStudentMissesForEntitlement` matches on
+  // cancelledByRole / missedByRole and ignores status altogether).
+  //
+  // Rescheduling used to overwrite the record: a session she failed to attend became
+  // RESCHEDULED, fell through to "moved to a new time", and her miss stopped being counted.
+  // The page then offered a free change the server had already spent — she could miss twice
+  // and still be told one was left. What happened to a session does not stop having happened
+  // because a later session was booked.
+  appointments.forEach((a) => {
+    const s = (a.status || '').toUpperCase()
+    if (isStudentRole(a.missedByRole)) record.missedByStudent += 1
+    else if (isStudentRole(a.cancelledByRole)) record.cancelledByStudent += 1
+    else if (isCounsellorRole(a.missedByRole)) record.missedByCounsellor += 1
+    else if (isCounsellorRole(a.cancelledByRole)) record.cancelledByOthers += 1
+    else if (s === 'COMPLETED') record.completed += 1
+    // Ended that way with nobody recorded against it — the team, or the sweep.
+    else if (s === 'CANCELLED') record.cancelledByOthers += 1
+    else if (s === 'MISSED') record.missedByStudent += 1
+    else if (s === 'RESCHEDULED') record.moved += 1
+    else record.stillOpen += 1
+  })
+
+  // Only student-caused endings count against the 2-miss allowance — the whole point of
+  // recording who did what is that a counsellor's cancellation must never cost her one.
+  const missesUsed = record.cancelledByStudent + record.missedByStudent
+  const changesLeft = Math.max(0, 2 - missesUsed)
 
   const handleReschedule = (appointmentId: number) => {
     navigate('/student/dashboard/counselling/book', { state: { rescheduleAppointmentId: appointmentId } })
   }
+
+  // Cancel and dispute both refresh silently — the card's own state is derived from the
+  // list, so re-fetching is what moves it to the Past tab / into "Under review".
+  const handleChanged = () => fetchAppointments({ silent: true })
 
   const handleBookSession = () => {
     navigate('/student/dashboard/counselling/book')
@@ -194,6 +395,7 @@ const StudentCounsellingPage: React.FC = () => {
               key={appt.appointmentId}
               appointment={appt}
               onReschedule={handleReschedule}
+              onChanged={handleChanged}
             />
           ))}
         </div>
@@ -208,17 +410,29 @@ const StudentCounsellingPage: React.FC = () => {
               <circle cx='12' cy='12' r='10' />
               <polyline points='12 6 12 12 16 14' />
             </svg>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#455A64' }}>No past sessions</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#455A64' }}>No past sessions yet</div>
             <div style={{ fontSize: 13, color: '#78909C', marginTop: 4 }}>
-              Completed sessions will appear here
+              {record.booked > 0
+                ? 'Your booked session will be recorded here once it has taken place.'
+                : 'Sessions appear here once they have taken place, been cancelled or been missed.'}
             </div>
           </div>
         )
       }
       return (
         <div>
+          <RecordSummary record={record} missesUsed={missesUsed} />
           {pastAppointments.map((appt) => (
-            <PastSessionCard key={appt.appointmentId} appointment={appt} />
+            <PastSessionCard
+              key={appt.appointmentId}
+              appointment={appt}
+              // A missed session can be rescheduled while she still has a free change left;
+              // this opens the same picker the Upcoming tab's Reschedule uses. With none left
+              // the card points her at a fresh booking instead of ending in nothing.
+              canReschedule={changesLeft > 0}
+              onReschedule={handleReschedule}
+              onBookSession={handleBookSession}
+            />
           ))}
         </div>
       )

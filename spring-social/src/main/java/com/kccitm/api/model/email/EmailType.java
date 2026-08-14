@@ -38,9 +38,30 @@ public enum EmailType {
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.USERNAME,
             EmailPlaceholder.PASSWORD, EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.SCHOOL_NAME,
             EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
-    LEAD_WELCOME("Lead welcome / nurture", "Credentials", EmailDeliveryMode.ASYNC,
+    /**
+     * Acknowledgement to the person who filled the enquiry form on career-9.com. Sent from
+     * {@code LeadNotificationService} on every capture, whatever the lead type — a school
+     * or a parent gets an acknowledgement too, they simply never get credentials.
+     */
+    LEAD_WELCOME("Lead welcome / acknowledgement", "Lead", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.ACTION_LINK,
-            EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.DASHBOARD_LINK,
+            EmailPlaceholder.LEAD_NAME, EmailPlaceholder.LEAD_EMAIL, EmailPlaceholder.LEAD_PHONE,
+            EmailPlaceholder.LEAD_TYPE, EmailPlaceholder.LEAD_SCHOOL, EmailPlaceholder.LEAD_CITY,
+            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+
+    /**
+     * Internal alert: a new enquiry has arrived. Recipients are not passed by the caller —
+     * they come from {@code email_notification_recipient}, which is what makes this the one
+     * scenario an admin can re-address without a deploy.
+     */
+    LEAD_NOTIFICATION("New lead alert (internal)", "Lead", EmailDeliveryMode.ASYNC,
+            EmailPlaceholder.LEAD_NAME, EmailPlaceholder.LEAD_EMAIL, EmailPlaceholder.LEAD_PHONE,
+            EmailPlaceholder.LEAD_TYPE, EmailPlaceholder.LEAD_SOURCE, EmailPlaceholder.LEAD_SCHOOL,
+            EmailPlaceholder.LEAD_CITY, EmailPlaceholder.LEAD_DESIGNATION,
+            EmailPlaceholder.LEAD_DETAILS, EmailPlaceholder.LEAD_RECEIVED_AT,
+            EmailPlaceholder.LEAD_ID, EmailPlaceholder.LEAD_CRM_LINK,
+            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
     STUDENT_ID_EMAIL("Student ID / details", "Credentials", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.USERNAME,
             EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),

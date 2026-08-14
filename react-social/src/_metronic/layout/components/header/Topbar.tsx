@@ -1,6 +1,9 @@
 import clsx from "clsx";
 import { FC, useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../app/modules/auth";
+import { urlAllowed } from "../../../../app/modules/auth/core/permissions";
+import { getUnreadCount } from "../../../../app/pages/Counselling/API/CounsellingActivityAPI";
 import { KTSVG, toAbsoluteUrl } from "../../../helpers";
 import {
   GlobalStudentSearchModal,
@@ -68,7 +71,51 @@ const UserAvatar: FC<{ imageUrl?: string; name?: string }> = ({
 const Topbar: FC = () => {
   const { currentUser } = useAuth();
   const { config } = useLayout();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const NOTIFICATIONS_PATH = "/admin/counselling-notifications";
+  const onNotificationsPage = pathname.startsWith(NOTIFICATIONS_PATH);
+
+  // Same gate the sidebar uses: super-admins see everything, everyone else needs the page
+  // in their role's allowed-URL list.
+  const notificationsAllowed =
+    currentUser?.superAdmin === true ||
+    urlAllowed(currentUser?.urls, "/admin/counselling-notifications");
+
+  // Poll the unread badge while the shell is mounted. Kept deliberately cheap — a single
+  // count endpoint, not the feed itself — and skipped entirely for users who cannot open
+  // the page, so it costs nothing for counsellors and students.
+  useEffect(() => {
+    if (!notificationsAllowed) return;
+    // While the feed is on screen the badge is meaningless — the notifications are right
+    // there being read — so it is hidden and not polled. Re-polled on the way out, which
+    // picks up "Mark all as read" without the page having to tell the topbar anything.
+    if (onNotificationsPage) {
+      setUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      getUnreadCount()
+        .then((res) => {
+          if (cancelled) return;
+          const n = typeof res.data === "number" ? res.data : res.data?.count ?? 0;
+          setUnreadCount(n);
+        })
+        .catch(() => {
+          // A failed count is not worth surfacing — the bell still works as a link.
+        });
+    };
+    load();
+    const id = window.setInterval(load, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [notificationsAllowed, onNotificationsPage]);
 
   const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
@@ -135,7 +182,55 @@ const Topbar: FC = () => {
         {/* end::Drawer toggle */}
       </div>
 
-      {/* NOTIFICATIONS */}
+      {/* NOTIFICATIONS — counselling activity feed.
+          Shown only to users whose role actually grants the page: the bell is a link, and a
+          bell that lands on "request access" is worse than no bell. Counsellors have their
+          own in-page NotificationBell for their personal notifications; this one is the
+          admin's operational feed. */}
+      {notificationsAllowed && (
+        <div
+          className={clsx("d-flex align-items-center", toolbarButtonMarginClass)}
+        >
+          <div
+            className={clsx(
+              "btn btn-icon btn-active-light-primary btn-custom position-relative",
+              toolbarButtonHeightClass
+            )}
+            onClick={() => navigate(NOTIFICATIONS_PATH)}
+            title={
+              unreadCount > 0
+                ? `${unreadCount} unread counselling notification${unreadCount === 1 ? "" : "s"}`
+                : "Counselling notifications"
+            }
+            role="button"
+            aria-label="Open counselling notifications"
+          >
+            {/* Bootstrap Icons rather than the duotune SVG: gen022 is an abstract glyph that
+                does not read as a bell at toolbar size, and bi-bell is what the sidebar and
+                the notifications page header already use for this feature. */}
+            <i className="bi bi-bell fs-2" />
+            {unreadCount > 0 && (
+              <span
+                className="position-absolute badge badge-circle badge-danger"
+                style={{
+                  top: -2,
+                  right: -2,
+                  minWidth: 18,
+                  height: 18,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "0 4px",
+                  border: "2px solid #fff",
+                }}
+              >
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Legacy demo notifications menu retained as reference */}
       <div
         className={clsx("d-flex align-items-center", toolbarButtonMarginClass)}
       >

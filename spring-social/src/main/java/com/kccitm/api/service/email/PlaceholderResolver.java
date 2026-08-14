@@ -72,9 +72,18 @@ public class PlaceholderResolver {
         return ctx;
     }
 
-    /** Placeholders whose values are intentional HTML and must NOT be escaped. */
+    /**
+     * Placeholders whose values are intentional HTML and must NOT be escaped.
+     *
+     * <p>{@code lead_details} is on this list because it is a table, but its cells hold
+     * text somebody typed into a public form. That content is escaped where the block is
+     * BUILT ({@code LeadNotificationService.detailsTable}) rather than here — anything
+     * added to this set must do the same, or a form field becomes a script tag in an
+     * internal inbox.
+     */
     private static final Set<String> RAW_HTML_KEYS = new HashSet<>(Arrays.asList(
-            EmailPlaceholder.EMAIL_HEADER.key(), EmailPlaceholder.EMAIL_FOOTER.key()));
+            EmailPlaceholder.EMAIL_HEADER.key(), EmailPlaceholder.EMAIL_FOOTER.key(),
+            EmailPlaceholder.LEAD_DETAILS.key()));
 
     private static String escapeHtml(String input) {
         if (input == null) {

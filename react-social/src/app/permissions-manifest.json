@@ -77,6 +77,9 @@
   "email_log.read": [
     "/admin/email-log"
   ],
+  "email_recipient.read": [
+    "/admin/email-recipients"
+  ],
   "email_template.read": [
     "/admin/email-templates"
   ],
@@ -177,7 +180,6 @@
     "/old-student-email"
   ],
   "user.write": [
-    "/admin/counselling-assignments",
     "/admin/counselling-dashboard",
     "/admin/counselling-notifications",
     "/admin/counselling-slots",

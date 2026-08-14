@@ -38,6 +38,24 @@ export function getCounsellingEnabledAssessments() {
   return axios.get<number[]>(`${BASE}/counselling-enabled-assessments`)
 }
 
+/**
+ * The assessments a given institute offers — its catalog, the same list the institute
+ * wizard's "Map Assessments" step edits — so the Appoint wizard cannot offer a
+ * counsellor an assessment the school was never enabled for. Deliberately not
+ * /getByInstitute/{code}/assessments, which lists anything with a registration link.
+ * Lightweight projection (no questionnaire/questions).
+ */
+export interface InstituteAssessment {
+  id: number
+  assessmentName: string
+  isActive?: boolean
+}
+export function getAssessmentsByInstitute(instituteCode: number) {
+  return axios.get<InstituteAssessment[]>(
+    `${API_URL}/assessment-mapping/institute/${instituteCode}/catalog/assessments`,
+  )
+}
+
 // Students who requested counselling on the thank-you page for an assessment that
 // has no counsellor mapped yet. Assigning a counsellor auto-closes these.
 export interface PendingCounsellingRequest {

@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,8 +26,12 @@ import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.counselling.AppointmentService;
 import com.kccitm.api.service.counselling.BookingService;
+import com.kccitm.api.service.counselling.CheckinReviewService;
+import com.kccitm.api.service.counselling.CounsellorCancellationService;
+import com.kccitm.api.service.counselling.CounsellorSessionAdminService;
 import com.kccitm.api.service.counselling.MeetingLinkService;
 
 @RestController
@@ -55,6 +60,15 @@ public class CounsellingAppointmentController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private CheckinReviewService checkinReviewService;
+
+    @Autowired
+    private CounsellorCancellationService counsellorCancellationService;
+
+    @Autowired
+    private CounsellorSessionAdminService counsellorSessionAdminService;
 
     // no scope arg: body is raw Map; student books appointment slot
     @PreAuthorize("@auth.allows('counselling.appointment.create')")
@@ -200,11 +214,11 @@ public class CounsellingAppointmentController {
     @PostMapping("/start/{id}")
     public ResponseEntity<?> startSession(@PathVariable Long id) {
         try {
-            CounsellingAppointment appointment = checkinOtpService.generateAndSend(id);
+            CounsellingAppointment appointment = checkinOtpService.beginCheckin(id);
             Map<String, Object> out = new java.util.HashMap<>();
             out.put("appointmentId", appointment.getId());
             out.put("status", appointment.getStatus());
-            out.put("message", "A check-in code has been sent to the student. Ask them for it to start the session.");
+            out.put("message", "Ask the student for the 4-digit code on their report to start the session.");
             return ResponseEntity.ok(out);
         } catch (RuntimeException e) {
             logger.warn("Start session failed for appointment {}: {}", id, e.getMessage());
@@ -226,6 +240,199 @@ public class CounsellingAppointmentController {
         }
     }
 
+    // ═══ Cancellation and no-show (docs/COUNSELLING_CANCELLATION.md) ═════════════
+
+    /**
+     * The student cancels her own session.
+     *
+     * <p>A separate route from {@code PUT /cancel/{id}} on purpose. That one is annotated for
+     * {@code counselling.appointment.update} — a counsellor/admin permission — and takes
+     * {@code userId} from the request body without ever checking whose appointment it is.
+     *
+     * <p><b>Ownership is verified in code here, not by an annotation.</b>
+     * {@code auth.enforce-mode} is {@code log-only} on every profile including production, so
+     * {@code @PreAuthorize("@auth.allows(...)")} records the decision and then returns true
+     * regardless. An annotation would look correct in review and enforce nothing at runtime;
+     * without the explicit check below, any signed-in student could cancel any appointment by
+     * incrementing the id.
+     */
+    @PostMapping("/student/cancel/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> studentCancel(@PathVariable Long id,
+                                           @AuthenticationPrincipal UserPrincipal principal,
+                                           @RequestBody(required = false) Map<String, Object> request) {
+        if (principal == null || principal.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No authenticated user."));
+        }
+        UserStudent self = userStudentRepository.getByUserId(principal.getId()).orElse(null);
+        if (self == null || self.getUserStudentId() == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "This account is not a student."));
+        }
+
+        CounsellingAppointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CounsellingAppointment", "id", id));
+
+        // The check that actually protects this endpoint.
+        Long ownerId = appointment.getStudent() != null ? appointment.getStudent().getUserStudentId() : null;
+        if (ownerId == null || !ownerId.equals(self.getUserStudentId())) {
+            logger.warn("Student {} attempted to cancel appointment {} belonging to student {}",
+                    self.getUserStudentId(), id, ownerId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "This session does not belong to you."));
+        }
+
+        Map<String, Object> body = request == null ? Map.of() : request;
+        String reasonCode = body.get("reason") != null ? body.get("reason").toString() : null;
+        String note = body.get("note") != null ? body.get("note").toString() : null;
+        if ("OTHER".equalsIgnoreCase(reasonCode) && (note == null || note.trim().isEmpty())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please tell us briefly why you are cancelling."));
+        }
+
+        User user = userRepository.findById(principal.getId()).orElse(null);
+        try {
+            CounsellingAppointment cancelled = appointmentService.cancel(
+                    id, user, AppointmentService.ROLE_STUDENT, reasonCode, note);
+            Map<String, Object> out = new java.util.HashMap<>();
+            out.put("appointmentId", cancelled.getId());
+            out.put("status", cancelled.getStatus());
+            out.put("missesRemaining", appointmentService.remainingMisses(cancelled.getEntitlementId()));
+            return ResponseEntity.ok(out);
+        } catch (RuntimeException e) {
+            // Includes the window rejection the UI must surface rather than swallow: she can
+            // open the page at 2h05m and confirm at 1h58m, and the server is right to refuse.
+            logger.warn("Student cancel failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** What the student's card needs to render: her deadline, and how many misses are left. */
+    @GetMapping("/student/cancellation-info/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> studentCancellationInfo(@PathVariable Long id,
+                                                     @AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null || principal.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No authenticated user."));
+        }
+        UserStudent self = userStudentRepository.getByUserId(principal.getId()).orElse(null);
+        CounsellingAppointment appointment = appointmentRepository.findById(id).orElse(null);
+        if (self == null || appointment == null || appointment.getStudent() == null
+                || !self.getUserStudentId().equals(appointment.getStudent().getUserStudentId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not your session."));
+        }
+        Map<String, Object> out = new java.util.HashMap<>();
+        out.put("missesRemaining", appointmentService.remainingMisses(appointment.getEntitlementId()));
+        out.put("missAllowance", appointmentService.getMissAllowance());
+        out.put("cutoffHours", appointmentService.getStudentWindowHours());
+        out.put("forceShifted", appointment.getForceShifted());
+        out.put("shiftedFromStart", appointment.getShiftedFromStart());
+        return ResponseEntity.ok(out);
+    }
+
+    /** The student contests an absent mark. Raising it suspends the strike immediately. */
+    @PostMapping("/student/dispute/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> studentDispute(@PathVariable Long id,
+                                            @AuthenticationPrincipal UserPrincipal principal,
+                                            @RequestBody(required = false) Map<String, Object> request) {
+        if (principal == null || principal.getId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "No authenticated user."));
+        }
+        UserStudent self = userStudentRepository.getByUserId(principal.getId()).orElse(null);
+        CounsellingAppointment appointment = appointmentRepository.findById(id).orElse(null);
+        if (self == null || appointment == null || appointment.getStudent() == null
+                || !self.getUserStudentId().equals(appointment.getStudent().getUserStudentId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Not your session."));
+        }
+        String note = request != null && request.get("note") != null ? request.get("note").toString() : null;
+        User user = userRepository.findById(principal.getId()).orElse(null);
+        try {
+            return ResponseEntity.ok(checkinReviewService.raiseDispute(id, user, note));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * The counsellor drops one session; the system re-places the student.
+     * Distinct from the block-date flow, which still covers a whole day and needs approval.
+     */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/counsellor/cancel/{id}")
+    public ResponseEntity<?> counsellorCancel(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        Long userId = request.get("userId") != null ? Long.valueOf(request.get("userId").toString()) : null;
+        String reasonCode = request.get("reason") != null ? request.get("reason").toString() : null;
+        String note = request.get("note") != null ? request.get("note").toString() : null;
+        if ("OTHER".equalsIgnoreCase(reasonCode) && (note == null || note.trim().isEmpty())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please give a brief reason."));
+        }
+        User actor = userId != null ? userRepository.findById(userId).orElse(null) : null;
+        try {
+            return ResponseEntity.ok(counsellorCancellationService.cancelAndReplace(id, actor, reasonCode, note));
+        } catch (RuntimeException e) {
+            logger.warn("Counsellor cancel failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** The counsellor records that the student did not appear. Session window only. */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/mark-student-absent/{id}")
+    public ResponseEntity<?> markStudentAbsent(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> request) {
+        Long userId = request != null && request.get("userId") != null
+                ? Long.valueOf(request.get("userId").toString()) : null;
+        User actor = userId != null ? userRepository.findById(userId).orElse(null) : null;
+        try {
+            return ResponseEntity.ok(checkinReviewService.markStudentAbsent(id, actor));
+        } catch (RuntimeException e) {
+            logger.warn("Mark-absent failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Admin cancels a session. Costs nobody anything: the slot reopens, the session is
+     * credited back, and both the student and the counsellor are told the team will be in
+     * touch. Neither of them chose this, so unlike counsellor self-cancellation the counsellor
+     * is notified too.
+     */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/admin/cancel/{id}")
+    public ResponseEntity<?> adminCancel(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        Long userId = request.get("userId") != null ? Long.valueOf(request.get("userId").toString()) : null;
+        String note = request.get("note") != null ? request.get("note").toString() : null;
+        User admin = userId != null ? userRepository.findById(userId).orElse(null) : null;
+        try {
+            CounsellingAppointment cancelled = appointmentService.cancel(
+                    id, admin, AppointmentService.ROLE_ADMIN, "ADMIN_CANCELLED", note);
+            return ResponseEntity.ok(cancelled);
+        } catch (RuntimeException e) {
+            logger.warn("Admin cancel failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /** Admin dispute queue — the only no-show cases needing a human decision. */
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
+    @GetMapping("/disputes")
+    public ResponseEntity<List<CounsellingAppointment>> getDisputes() {
+        return ResponseEntity.ok(checkinReviewService.getOpenDisputes());
+    }
+
+    /** Admin upholds or overturns a disputed absent mark. */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/disputes/resolve/{id}")
+    public ResponseEntity<?> resolveDispute(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        Long userId = request.get("userId") != null ? Long.valueOf(request.get("userId").toString()) : null;
+        boolean upheld = Boolean.TRUE.equals(request.get("upheld"));
+        String note = request.get("note") != null ? request.get("note").toString() : null;
+        User admin = userId != null ? userRepository.findById(userId).orElse(null) : null;
+        try {
+            return ResponseEntity.ok(checkinReviewService.resolveDispute(id, admin, upheld, note));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // no scope arg: identifies by studentId
     @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/by-student/{studentId}")
@@ -238,6 +445,73 @@ public class CounsellingAppointmentController {
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<List<CounsellingAppointment>> getByCounsellor(@PathVariable Long counsellorId) {
         return ResponseEntity.ok(appointmentService.getByCounsellor(counsellorId));
+    }
+
+    // ─── Manage Sessions (admin, Manage Counsellors page) ────────────────────────
+    //
+    // The list above returns appointment entities, which name neither the assessment nor the
+    // report — both sit behind further lookups. These three back the dialog that lets an admin
+    // see one counsellor's sessions and re-send either side's copy of the details.
+
+    // no scope arg: identifies by counsellorId
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
+    @GetMapping("/by-counsellor/{counsellorId}/sessions")
+    public ResponseEntity<List<CounsellorSessionAdminService.SessionSummary>> getCounsellorSessions(
+            @PathVariable Long counsellorId) {
+        return ResponseEntity.ok(counsellorSessionAdminService.sessionsFor(counsellorId));
+    }
+
+    /**
+     * The assessment report for one session. Read by the counsellor's session-notes page, which
+     * shows a single session and so cannot use the list above.
+     */
+    // no scope arg: identifies by appointment
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
+    @GetMapping("/{id}/report-link")
+    public ResponseEntity<Map<String, String>> getReportLink(@PathVariable Long id) {
+        Map<String, String> body = new java.util.HashMap<>();
+        body.put("reportLink", counsellorSessionAdminService.reportLinkFor(id));
+        return ResponseEntity.ok(body);
+    }
+
+    /** Re-send the session details, report link included, to the student and parent/guardian. */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/{id}/email/student")
+    public ResponseEntity<?> emailStudent(@PathVariable Long id) {
+        return sendAndReport(() -> counsellorSessionAdminService.mailStudent(id), id, "student");
+    }
+
+    /** Re-send the session details, report link included, to the counsellor taking it. */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/{id}/email/counsellor")
+    public ResponseEntity<?> emailCounsellor(@PathVariable Long id) {
+        return sendAndReport(() -> counsellorSessionAdminService.mailCounsellor(id), id, "counsellor");
+    }
+
+    /**
+     * Run one of the two sends and answer in the shape the dialog expects.
+     *
+     * <p>The two failure modes are told apart deliberately. A missing address or a deleted
+     * session is the admin's answer — say which, as a 400, so they can fix it. Anything else is
+     * ours, and a 500 with a generic line is honest: the admin cannot act on an SMTP fault.
+     */
+    private ResponseEntity<?> sendAndReport(
+            java.util.function.Supplier<CounsellorSessionAdminService.MailOutcome> send,
+            Long appointmentId, String audience) {
+        try {
+            CounsellorSessionAdminService.MailOutcome outcome = send.get();
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("recipients", outcome.getRecipients());
+            body.put("reportIncluded", outcome.isReportIncluded());
+            return ResponseEntity.ok(body);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Manage Sessions: {} email failed for appointment {}: {}",
+                    audience, appointmentId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "The email could not be sent. Please try again."));
+        }
     }
 
     // no scope arg: admin stats query

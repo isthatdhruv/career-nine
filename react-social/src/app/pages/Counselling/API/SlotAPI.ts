@@ -2,10 +2,19 @@ import axios from 'axios'
 const API_URL = process.env.REACT_APP_API_URL
 const BASE = `${API_URL}/api/counselling-slot`
 
-export function getAvailableSlots(week?: string, instituteCode?: number) {
+/**
+ * Bookable slots for the student's picker.
+ *
+ * Pass `studentId` wherever it is known: the server then resolves counsellors the same way
+ * the post-assessment flow does (assessment-assigned first, institute as fallback).
+ * `instituteCode` alone is the narrower legacy path and misses counsellors attached to the
+ * student's assessment rather than her school.
+ */
+export function getAvailableSlots(week?: string, instituteCode?: number, studentId?: number) {
   const params = new URLSearchParams()
   if (week) params.append('week', week)
   if (instituteCode) params.append('instituteCode', String(instituteCode))
+  if (studentId) params.append('studentId', String(studentId))
   const qs = params.toString()
   return axios.get(`${BASE}/available${qs ? '?' + qs : ''}`)
 }

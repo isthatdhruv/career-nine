@@ -3,8 +3,46 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../../modules/auth/core/Auth'
 import { getCurrentUser } from '../../modules/auth/core/_requests'
+import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { getSlotsByCounsellor } from '../Counselling/API/SlotAPI'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
+
+const DASHBOARD = '/counsellor/dashboard'
+const AVAILABILITY = '/counsellor/availability'
+
+/**
+ * Where to drop a counsellor after signing in.
+ *
+ * <p>Availability when they have nothing bookable, the dashboard otherwise. Setting hours is
+ * the one task that blocks everything else — an admin cannot appoint a counsellor with no
+ * upcoming slots, because the server refuses it — so a counsellor who has not done it would
+ * otherwise sit on an empty dashboard with no hint as to why no students ever arrive. Once
+ * they have availability that reason is gone, and sending them to their calendar every
+ * morning instead of their dashboard would just be friction.
+ *
+ * <p>Anything unexpected (no counsellor record, request fails) falls back to the dashboard:
+ * it is the established home, and the availability page carries the same prompt for whenever
+ * they get there under their own steam.
+ */
+async function landingRoute(userId?: number): Promise<string> {
+  if (!userId) return DASHBOARD
+  try {
+    const counsellorId = (await getCounsellorByUserId(userId)).data?.id
+    if (!counsellorId) return DASHBOARD
+    const slots: any[] = (await getSlotsByCounsellor(counsellorId)).data || []
+    const now = Date.now()
+    const hasUpcoming = slots.some((s) => {
+      if (s?.isBlocked) return false
+      if (!s?.date || !s?.endTime) return true
+      const end = new Date(`${s.date}T${s.endTime}`)
+      return isNaN(end.getTime()) || end.getTime() > now
+    })
+    return hasUpcoming ? DASHBOARD : AVAILABILITY
+  } catch {
+    return DASHBOARD
+  }
+}
 
 interface CounsellorLoginPanelProps {
   onSwitchToRegister: () => void
@@ -47,7 +85,7 @@ const CounsellorLoginPanel: React.FC<CounsellorLoginPanelProps> = ({ onSwitchToR
       // sees currentUser=undefined and bounces straight back to this page.
       const { data } = await getCurrentUser()
       setCurrentUser(data)
-      navigate('/counsellor/dashboard', { replace: true })
+      navigate(await landingRoute(data?.id), { replace: true })
     } catch (err: any) {
       if (err.response?.status === 401) setError('Invalid email or password.')
       else if (err.response?.status === 403) setError(err.response?.data?.error || 'Your account is not active.')

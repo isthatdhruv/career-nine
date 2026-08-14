@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../modules/auth'
 import { getCounsellorByUserId } from '../API/CounsellorAPI'
 import { getSessionNotes } from '../API/SessionNotesAPI'
+import { getSessionReportLink } from '../API/AppointmentAPI'
 import StatusBadge from '../shared/StatusBadge'
+import SessionReportLink from '../shared/SessionReportLink'
 import SessionNotesForm from './components/SessionNotesForm'
 import '../Counselling.css'
 import axios from 'axios'
@@ -18,6 +20,8 @@ const SessionNotesPage: React.FC = () => {
   const [appointment, setAppointment] = useState<any>(null)
   const [existingNotes, setExistingNotes] = useState<any>(null)
   const [counsellorUserId, setCounsellorUserId] = useState<number | null>(null)
+  /** The student's assessment report; null until one has generated. */
+  const [reportLink, setReportLink] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -43,6 +47,11 @@ const SessionNotesPage: React.FC = () => {
           `${API_URL}/api/counselling-appointment/get/${appointmentId}`
         )
         setAppointment(apptRes.data)
+
+        // Best-effort: no report yet is a normal state, and the card says so itself.
+        getSessionReportLink(appointmentId)
+          .then((r) => setReportLink(r.data?.reportLink ?? null))
+          .catch(() => {})
 
         // Check for existing notes (don't fail if not found)
         try {
@@ -144,6 +153,10 @@ const SessionNotesPage: React.FC = () => {
               Reason: {appointment.reason}
             </div>
           )}
+          {/* Notes are written against the results, so the report belongs on this page. */}
+          <div style={{ marginTop: 10 }}>
+            <SessionReportLink link={reportLink} />
+          </div>
         </div>
       )}
 

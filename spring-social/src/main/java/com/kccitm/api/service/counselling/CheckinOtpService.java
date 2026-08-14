@@ -1,12 +1,11 @@
 package com.kccitm.api.service.counselling;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,16 +13,32 @@ import com.kccitm.api.exception.BadRequestException;
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingCheckinOtp;
+import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingCheckinOtpRepository;
 
 /**
- * Session check-in OTP. When the student arrives the counsellor triggers
- * {@link #generateAndSend}; the student receives the code (WhatsApp/email),
- * reads it to the counsellor, who enters it via {@link #verify}. A successful
- * verification marks the appointment IN_PROGRESS and records attendance.
+ * Session check-in. The counsellor triggers {@link #beginCheckin}, the student reads their
+ * code out, and the counsellor enters it via {@link #verify}. A successful verification marks
+ * the appointment IN_PROGRESS and records attendance.
  *
- * The raw code is never stored — only a BCrypt hash — and attempts are capped.
+ * <p><b>The code is the student's DOB-derived counselling OTP</b>
+ * ({@link CounsellingOtpService}) — the same four digits printed on their report — rather
+ * than a freshly generated random one. It is recomputed from the DOB at verification time and
+ * never stored, so it cannot go stale if the DOB is corrected.
+ *
+ * <p>Two consequences of that choice, both deliberate and worth knowing:
+ * <ul>
+ *   <li>The code is <b>permanent</b>, not single-use, so a session can be checked in with it
+ *       at any time. It is no longer proof that the student was present at that moment — it
+ *       proves only that whoever entered it knew the code.</li>
+ *   <li>Four digits is a small space, so the attempt cap below is doing real work. It is the
+ *       only thing standing between a wrong guess and a brute force.</li>
+ * </ul>
+ *
+ * <p><b>Nothing is sent.</b> The student already has the code — it is printed on their
+ * report — so there is no delivery step and no message to miss. Starting a session just opens
+ * the attempt window.
  */
 @Service
 public class CheckinOtpService {
@@ -31,8 +46,21 @@ public class CheckinOtpService {
     private static final Logger logger = LoggerFactory.getLogger(CheckinOtpService.class);
 
     private static final int OTP_TTL_MINUTES = 15;
-    private static final int MAX_ATTEMPTS = 5;
-    private static final SecureRandom RANDOM = new SecureRandom();
+
+    /**
+     * Wrong guesses allowed before the counsellor has to restart check-in. Four digits is
+     * only 10,000 possibilities and the code never changes, so this is what stops a code
+     * being found by trying.
+     */
+    @Value("${app.counselling.checkin-max-attempts:3}")
+    private int maxAttempts;
+
+    /**
+     * How early check-in opens, matching the lead time on the student's Join button so both
+     * sides can be in the meeting and check in the moment the session starts.
+     */
+    @Value("${app.counselling.checkin-opens-before-minutes:15}")
+    private int opensBeforeMinutes;
 
     @Autowired
     private CounsellingCheckinOtpRepository otpRepository;
@@ -40,71 +68,143 @@ public class CheckinOtpService {
     @Autowired
     private CounsellingAppointmentRepository appointmentRepository;
 
+    /**
+     * Slot times are IST wall-clock while the JVM runs UTC, so the window checks below must
+     * go through this rather than {@code LocalDateTime.now()} — on the raw clock they land
+     * 5h30m adrift of the session they are meant to be gating.
+     */
     @Autowired
-    private CounsellingNotificationService notificationService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private CounsellingClock clock;
 
     /**
-     * Generates (or regenerates) the check-in OTP for an appointment and sends
-     * it to the student. Returns the appointment so the caller can echo status.
+     * Opens the check-in window for a session.
+     *
+     * <p>Nothing is generated and nothing is sent — the student already has their code, on
+     * their report. All this does is reset the attempt counter and start the clock, which is
+     * what bounds guessing on the four-digit space.
      */
     @Transactional
-    public CounsellingAppointment generateAndSend(Long appointmentId) {
+    public CounsellingAppointment beginCheckin(Long appointmentId) {
         CounsellingAppointment appt = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("CounsellingAppointment", "id", appointmentId));
 
         if ("CANCELLED".equals(appt.getStatus()) || "RESCHEDULED".equals(appt.getStatus())
-                || "COMPLETED".equals(appt.getStatus())) {
+                || "COMPLETED".equals(appt.getStatus()) || "MISSED".equals(appt.getStatus())) {
             throw new BadRequestException("Cannot start a session that is " + appt.getStatus() + ".");
         }
         if (appt.getCheckinVerifiedAt() != null) {
             throw new BadRequestException("This session has already been checked in.");
         }
+        guardCheckinWindow(appt);
 
-        String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-
+        // The row is purely an attempt counter, an expiry window and an "already checked in"
+        // marker. No code is stored: it is recomputed from the DOB at verification time.
         CounsellingCheckinOtp otp = otpRepository.findByAppointmentId(appointmentId)
                 .orElseGet(CounsellingCheckinOtp::new);
         otp.setAppointmentId(appointmentId);
-        otp.setCodeHash(passwordEncoder.encode(code));
+        otp.setCodeHash(null);
         otp.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_TTL_MINUTES));
         otp.setAttempts(0);
         otp.setVerifiedAt(null);
         otpRepository.save(otp);
 
-        notificationService.sendCheckinOtpToStudent(appt, code);
-        logger.info("Check-in OTP issued for appointment {}", appointmentId);
+        logger.info("Check-in window opened for appointment {}", appointmentId);
         return appt;
     }
 
     /**
-     * Verifies the code the counsellor entered. On success the appointment is
-     * marked IN_PROGRESS with attendance recorded.
+     * Check-in is only open around the session itself: from {@code opensBeforeMinutes} before
+     * the start until the slot ends.
+     *
+     * <p>Without this a counsellor could open the code box and start guessing hours — or
+     * days — ahead of a session, and mark a student present for something that had not
+     * happened yet. Attendance is meant to be evidence that the two of them were together at
+     * the appointed time; a check-in accepted at any hour is evidence of nothing.
+     */
+    private void guardCheckinWindow(CounsellingAppointment appt) {
+        CounsellingSlot slot = appt.getSlot();
+        if (slot == null || slot.getDate() == null || slot.getStartTime() == null) return;
+
+        LocalDateTime start = clock.sessionStart(slot.getDate(), slot.getStartTime());
+        LocalDateTime opensAt = start.minusMinutes(opensBeforeMinutes);
+        LocalDateTime endsAt = slot.getEndTime() != null
+                ? clock.sessionStart(slot.getDate(), slot.getEndTime())
+                : start.plusHours(1);
+        LocalDateTime now = clock.now();
+
+        if (now.isBefore(opensAt)) {
+            throw new BadRequestException(
+                    "This session has not started yet. Check-in opens " + opensBeforeMinutes
+                            + " minutes before the scheduled time.");
+        }
+        if (now.isAfter(endsAt)) {
+            throw new BadRequestException(
+                    "This session has ended and can no longer be checked in.");
+        }
+    }
+
+    /**
+     * The code this student should be reading out — their DOB-derived counselling OTP.
+     *
+     * <p>Falls back to {@link CounsellingOtpService#DEFAULT_OTP} when no DOB is on record,
+     * which is the same fallback the report uses. Note that means every student without a DOB
+     * shares one code, so a missing DOB is worth chasing rather than shrugging at.
+     */
+    private String expectedCodeFor(CounsellingAppointment appt) {
+        try {
+            return CounsellingOtpService.counsellingOtpFor(
+                    appt.getStudent().getStudentInfo().getStudentDob());
+        } catch (Exception e) {
+            logger.warn("No DOB available for appointment {} — falling back to the default code: {}",
+                    appt.getId(), e.getMessage());
+            return CounsellingOtpService.DEFAULT_OTP;
+        }
+    }
+
+    /**
+     * Verifies the code the counsellor entered against the student's DOB-derived OTP,
+     * recomputed here rather than read from storage. On success the appointment is marked
+     * IN_PROGRESS with attendance recorded.
+     *
+     * <p>The comparison happens <b>server-side only</b>. The expected code is never returned
+     * to the caller — sending it to the browser to be checked there would hand the answer to
+     * anyone who opened the network tab.
      */
     @Transactional
     public CounsellingAppointment verify(Long appointmentId, String code) {
         if (code == null || code.trim().isEmpty()) {
-            throw new BadRequestException("Enter the code shared with the student.");
+            throw new BadRequestException("Enter the code the student read out to you.");
         }
         CounsellingAppointment appt = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("CounsellingAppointment", "id", appointmentId));
 
+        if (appt.getCheckinVerifiedAt() != null) {
+            throw new BadRequestException("This session has already been checked in.");
+        }
+        if (appt.getMarkedAbsentAt() != null) {
+            throw new BadRequestException(
+                    "This student is marked absent for this session. Ask an administrator to correct it.");
+        }
+
+        guardCheckinWindow(appt);
+
         CounsellingCheckinOtp otp = otpRepository.findByAppointmentId(appointmentId)
-                .orElseThrow(() -> new BadRequestException("No check-in code has been generated yet. Start the session first."));
+                .orElseThrow(() -> new BadRequestException(
+                        "No check-in has been started yet. Press Start Session first."));
 
         if (otp.getVerifiedAt() != null) {
             throw new BadRequestException("This session has already been checked in.");
         }
         if (LocalDateTime.now().isAfter(otp.getExpiresAt())) {
-            throw new BadRequestException("The code has expired. Please resend a new code.");
+            throw new BadRequestException("The check-in window has expired. Press Start Session again.");
         }
-        if (otp.getAttempts() >= MAX_ATTEMPTS) {
-            throw new BadRequestException("Too many incorrect attempts. Please resend a new code.");
+        // Four digits is only 10,000 possibilities and the code never changes, so this cap is
+        // the whole defence against simply trying them.
+        if (otp.getAttempts() >= maxAttempts) {
+            throw new BadRequestException("Too many incorrect attempts. Press Start Session again.");
         }
 
-        if (!passwordEncoder.matches(code.trim(), otp.getCodeHash())) {
+        if (!expectedCodeFor(appt).equals(code.trim())) {
             otp.setAttempts(otp.getAttempts() + 1);
             otpRepository.save(otp);
             throw new BadRequestException("Incorrect code. Please try again.");
@@ -119,7 +219,7 @@ public class CheckinOtpService {
         appt.setCheckinVerifiedAt(now);
         appt.setAttended(true);
         CounsellingAppointment saved = appointmentRepository.save(appt);
-        logger.info("Check-in verified for appointment {} — session started", appointmentId);
+        logger.info("Check-in verified for appointment {} — session started, student present", appointmentId);
         return saved;
     }
 }

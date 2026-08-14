@@ -86,9 +86,19 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
   const validateStep2 = (): string | null => {
     if (!form.specializations.trim()) return 'Please enter your specializations'
     if (!form.languagesSpoken.trim()) return 'Please enter languages you speak'
-    // Optional at signup, but if given it has to be Teams — nothing else is accepted.
+    if (!form.yearsOfExperience.trim()) return 'Please enter your years of experience'
+    if (Number.isNaN(Number(form.yearsOfExperience)) || Number(form.yearsOfExperience) < 0) {
+      return 'Years of experience must be a number'
+    }
+    if (!form.qualifications.trim()) return 'Please enter your qualifications'
+    // Company Name and About Me stay optional: a counsellor working independently has no
+    // company to name, and a bio is presentation rather than something the booking flow needs.
+
+    // Required, and Teams only — nothing else is accepted. Every online session a student
+    // books reuses this one link, so a counsellor without it cannot be given any work.
     const link = form.meetingLink.trim()
-    if (link && !/^https:\/\/teams\.(microsoft|live)\.com\//i.test(link)) {
+    if (!link) return 'Please add your Microsoft Teams meeting link'
+    if (!/^https:\/\/teams\.(microsoft|live)\.com\//i.test(link)) {
       return 'The meeting link must be a Microsoft Teams link (teams.microsoft.com or teams.live.com)'
     }
     return null
@@ -299,7 +309,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <label style={labelStyle}>Counselling Mode</label>
+              <label style={labelStyle}>Counselling Mode *</label>
               <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.modeCapability}
                 autoComplete='off' name='c9-mode'
                 onChange={(e) => update('modeCapability', e.target.value)}>
@@ -309,15 +319,15 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Years of Experience</label>
-              <input style={inputStyle} type='number' placeholder='e.g. 5' value={form.yearsOfExperience}
+              <label style={labelStyle}>Years of Experience *</label>
+              <input style={inputStyle} type='number' min='0' placeholder='e.g. 5' value={form.yearsOfExperience}
                 autoComplete='off' name='c9-experience' data-lpignore='true'
                 onChange={(e) => update('yearsOfExperience', e.target.value)} />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <label style={labelStyle}>Work-time</label>
+              <label style={labelStyle}>Work-time *</label>
               <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.workTime}
                 autoComplete='off' name='c9-worktime'
                 onChange={(e) => update('workTime', e.target.value)}>
@@ -326,7 +336,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Counsellor Type</label>
+              <label style={labelStyle}>Counsellor Type *</label>
               <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.counsellorType}
                 autoComplete='off' name='c9-type'
                 onChange={(e) => update('counsellorType', e.target.value)}>
@@ -336,13 +346,28 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Microsoft Teams meeting link</label>
+            <label style={labelStyle}>Microsoft Teams meeting link *</label>
             <input style={inputStyle} placeholder='https://teams.microsoft.com/l/meetup-join/...'
               autoComplete='off' name='c9-teams-link' data-lpignore='true'
               value={form.meetingLink} onChange={(e) => update('meetingLink', e.target.value)} />
-            <div style={{ fontSize: 11, color: '#5C7A72', marginTop: 4 }}>
-              Used for all your online sessions. Teams → Calendar → New meeting → repeat with no
-              end date → copy the join link. You can add it later from your profile.
+            {/* Every online session this counsellor ever takes reuses this one link. A link
+                from a single dated meeting stops working once that meeting passes, and the
+                student is the one who finds out — so the recipe below is for a recurring
+                meeting with no end date, and it is spelled out rather than assumed. */}
+            <div style={{
+              marginTop: 6, padding: '9px 11px', background: '#FFFBEB',
+              border: '1px solid #FDE68A', borderRadius: 7,
+              fontSize: 11.5, lineHeight: 1.55, color: '#92400E',
+            }}>
+              <strong>This link must never expire.</strong> It is reused for every session you
+              take, so create a repeating meeting with no end date:
+              <ol style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                <li>Teams → <strong>Calendar</strong> → <strong>New meeting</strong></li>
+                <li>Title it e.g. “Career-9 Counselling”</li>
+                <li><strong>Repeat</strong> → <strong>Custom</strong> → set End date to <strong>Never</strong></li>
+                <li><strong>Save</strong>, then open the meeting</li>
+                <li>Copy <strong>“Join the meeting now”</strong> and paste it above</li>
+              </ol>
             </div>
           </div>
           <div>
@@ -355,7 +380,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Qualifications</label>
+            <label style={labelStyle}>Qualifications *</label>
             <textarea
               style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }}
               placeholder='e.g. M.Ed in Counselling Psychology, Certified Career Coach'
@@ -505,7 +530,20 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             By submitting, your registration will be reviewed by an administrator. You will be notified once your account is approved.
           </p>
           <button
-            onClick={onSwitchToLogin}
+            onClick={() => {
+              // Clear the submitted registration on the way out. This panel stays mounted
+              // behind the login form, so without a reset anyone opening Register again —
+              // the same person on a shared machine, or the next counsellor — would be met
+              // by the previous person's "Registration Submitted!" screen and their details
+              // still sitting in the fields.
+              setForm(initialForm)
+              setPhotoPreview(null)
+              setPhotoUrl(null)
+              setStep(1)
+              setError('')
+              setShowConfirmation(false)
+              onSwitchToLogin()
+            }}
             style={{
               padding: '10px 32px', fontSize: 14, fontWeight: 600,
               border: 'none', borderRadius: 8,

@@ -45,6 +45,11 @@ public class ReportGenerateConsumer {
     @Autowired private PdfRenderService pdfRenderService;
     @Autowired private KafkaTemplate<String, String> kafkaTemplate;
     @Autowired private GeneratedReportRepository generatedReportRepository;
+
+    /** Optional so the pipeline still starts in a context where counselling is not wired. */
+    @Autowired(required = false)
+    private com.kccitm.api.service.counselling.CounsellorReportNotificationService
+            counsellorReportNotificationService;
     @Autowired private ReportBatchLifecycle batchLifecycle;
     @Autowired private ObjectMapper objectMapper;
 
@@ -80,6 +85,17 @@ public class ReportGenerateConsumer {
         try {
             ReportResult r = reportService.generate(
                     ev.userStudentId, ev.assessmentId, ev.reportTemplateId, ev.force);
+
+            // The counsellor is told as soon as the report exists, before and regardless of
+            // the student-email decision below. That decision is about white-labelling and a
+            // school's per-assessment preference for what reaches the STUDENT; none of it
+            // says anything about the counsellor, who needs the results to run the session
+            // whatever the school has chosen to send. Best-effort inside — a failed email
+            // must not fail generation or push the event to the DLT.
+            if (counsellorReportNotificationService != null) {
+                counsellorReportNotificationService.notifyCounsellorsReportReady(
+                        ev.userStudentId, ev.assessmentId, r.reportUrl, r.pdfUrl);
+            }
 
             // Email decision — emailMode and force are fully orthogonal.
             //   "all"  → email anyone with an address (whitelabel ignored; admin toggle ON)

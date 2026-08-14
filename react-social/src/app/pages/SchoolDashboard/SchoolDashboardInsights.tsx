@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FlaggedStudent,
   FlagTier,
@@ -9,6 +9,8 @@ import {
 } from "./PrincipalDashboardRelease_APIs";
 import { Emphasis } from "./ChartCommentary";
 import {
+  Alert,
+  Audience,
   CardType,
   InsightCard,
   Narrative,
@@ -97,10 +99,6 @@ const SchoolDashboardInsights: React.FC<Props> = ({
   const ranked = [...cards].sort(
     (a, b) => CARD_ORDER.indexOf(a.type) - CARD_ORDER.indexOf(b.type)
   );
-  const headlineCards = ranked.slice(0, 3);
-
-  /** Section 9 is the flagged-student section; the tiles hang off it. */
-  const flagsSection = sections.some((s) => s.number === 9) ? 9 : null;
 
   // ── Figures: the page's own, above the tabs ──
   if (section === "stats") {
@@ -120,45 +118,20 @@ const SchoolDashboardInsights: React.FC<Props> = ({
     );
   }
 
-  // ── Act: the three things to do, and who they are about ──
+  // ── Act: who does what, split by the person who has to do it ──
   if (section === "act") {
     return (
       <div className="sd-brief">
         <StaleBanner release={release} />
 
-        {headlineCards.length > 0 ? (
-          <div className="sd-actions">
-            {headlineCards.map((card) => (
-              <ActionCard key={card.id || card.title} card={card} />
-            ))}
-          </div>
-        ) : (
-          <div className="sd-note">
-            <h2>Nothing flagged to act on</h2>
-            <p>The analysis found no gaps or risks worth singling out for {scopeLabel}.</p>
-          </div>
-        )}
-
-        {alerts.length > 0 && (
-          <div className="sd-alerts">
-            {alerts.map((alert) => (
-              <div key={alert.id || alert.label} className="sd-alert">
-                <span className="sd-alert-count">{alert.count}</span>
-                <div>
-                  <div className="sd-alert-label"><Emphasis text={alert.label} /></div>
-                  <div className="sd-alert-action"><Emphasis text={alert.action} /></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
+        {/* Students first. Everything else on this tab is a programme decision that can
+            wait a week; this is the list of children someone should be looking at now,
+            so it leads rather than sitting under three columns of prose. */}
         {flags && flags.base > 0 && (
-          <>
-            <h2 className="sd-rule">Students to look at</h2>
-            <FlagTiles flags={flags} scopeParams={scopeParams} />
-          </>
+          <HighlightedCases flags={flags} scopeParams={scopeParams} />
         )}
+
+        <ActionDesk cards={ranked} alerts={alerts} scopeLabel={scopeLabel} />
       </div>
     );
   }
@@ -168,16 +141,10 @@ const SchoolDashboardInsights: React.FC<Props> = ({
     <div className="sd-brief">
       <StaleBanner release={release} />
 
-      {/* The verdict. A principal who reads nothing else should still leave knowing
-          this, which is why it is a sentence at display size rather than a number. */}
-      <section className="sd-verdict">
-        <p className="sd-verdict-kicker">
-          What this cohort is telling you · {scopeLabel}
-        </p>
-        <p className="sd-verdict-line">
-          <Emphasis text={narrative.headline || fallbackHeadline(ranked)} />
-        </p>
-      </section>
+      {/* The verdict, and the sharpest lines the report carries, one after another.
+          A principal who reads nothing else should still leave knowing these, which is
+          why they are sentences at display size rather than numbers. */}
+      <Spotlight narrative={narrative} scopeLabel={scopeLabel} />
 
       {sections.length > 0 && (
         <div className="sd-doc">
@@ -246,6 +213,352 @@ function scrollToSection(domId: string) {
   if (!el) return;
   el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+
+// ────────────────────────────── the spotlight ──────────────────────────────
+
+/**
+ * The lines worth putting on a screen in a staff meeting.
+ *
+ * "48% of students aspire to Arts, but only 31% have the profile for it" is the sentence
+ * that makes a room go quiet; a report that buries it in paragraph four wastes it. The
+ * pool is drawn in confidence order — the model's own verdict, then the callouts it
+ * chose to pull out, then the findings that carry a number — because the first is always
+ * the one the analysis was built around.
+ */
+function spotlightQuotes(narrative: Narrative): string[] {
+  const ranked = [...narrative.dashboard_insights.cards].sort(
+    (a, b) => CARD_ORDER.indexOf(a.type) - CARD_ORDER.indexOf(b.type)
+  );
+  const pool: string[] = [];
+  const push = (text: string) => {
+    const line = text.trim();
+    if (line.length < 20) return;
+    // Compared without markers or case: the same finding often appears as a callout and
+    // again as a card insight, and showing it twice in one rotation reads as a fault.
+    const key = line.replace(/\*\*/g, "").toLowerCase();
+    if (pool.some((p) => p.replace(/\*\*/g, "").toLowerCase() === key)) return;
+    pool.push(line);
+  };
+
+  push(narrative.headline || fallbackHeadline(ranked));
+  narrative.report.sections.forEach((s) => s.callouts.forEach((c) => push(c.text)));
+  // Only findings that quantify something. A sentence without a number is a statement of
+  // opinion at this size, and this is the one place on the page that cannot be argued with.
+  ranked.filter((c) => /\d/.test(c.insight)).forEach((c) => push(c.insight));
+
+  return pool.filter(Boolean).slice(0, 6);
+}
+
+/** How long each line holds before the next slides in. */
+const SPOTLIGHT_MS = 9000;
+
+/**
+ * One finding at a time, at display size, sliding to the next.
+ *
+ * Auto-advance stops on hover and on keyboard focus — a reader who has reached for the
+ * controls is reading, and moving the text under them is the one thing a carousel must
+ * not do. It also stops for `prefers-reduced-motion`, where the dots become the only way
+ * through rather than an override.
+ */
+const Spotlight: React.FC<{ narrative: Narrative; scopeLabel: string }> = ({
+  narrative,
+  scopeLabel,
+}) => {
+  // Derived here, not by the caller: an array rebuilt on every render would make the
+  // reset effect below fire on every render and the rotation would never leave the
+  // first line. `narrative` is set once per scope load, so this is stable between them.
+  const quotes = useMemo(() => spotlightQuotes(narrative), [narrative]);
+
+  const [i, setI] = useState(0);
+  const [held, setHeld] = useState(false);
+
+  const many = quotes.length > 1;
+
+  useEffect(() => {
+    setI(0);
+  }, [quotes]);
+
+  useEffect(() => {
+    if (!many || held) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const t = window.setInterval(() => setI((n) => (n + 1) % quotes.length), SPOTLIGHT_MS);
+    return () => window.clearInterval(t);
+  }, [many, held, quotes.length]);
+
+  if (quotes.length === 0) return null;
+
+  const step = (by: number) => setI((n) => (n + by + quotes.length) % quotes.length);
+
+  return (
+    <section
+      className="sd-spot"
+      aria-roledescription="carousel"
+      aria-label="Key findings"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocusCapture={() => setHeld(true)}
+      onBlurCapture={() => setHeld(false)}
+    >
+      <p className="sd-spot-kicker">
+        What this cohort is telling you · {scopeLabel}
+        {many && (
+          <span className="sd-spot-count">
+            {i + 1} / {quotes.length}
+          </span>
+        )}
+      </p>
+
+      <div className="sd-spot-stage">
+        {/* Keyed on the index so the browser treats each line as a new element and
+            replays the entry animation, rather than re-flowing text in place. */}
+        <p key={i} className="sd-spot-line" aria-live="polite">
+          <Emphasis text={quotes[i]} />
+        </p>
+      </div>
+
+      {many && (
+        <div className="sd-spot-controls">
+          <button
+            type="button"
+            className="sd-spot-arrow"
+            onClick={() => step(-1)}
+            aria-label="Previous finding"
+          >
+            ‹
+          </button>
+          <div className="sd-spot-dots">
+            {quotes.map((_, n) => (
+              <button
+                key={n}
+                type="button"
+                className={`sd-spot-dot${n === i ? " is-on" : ""}`}
+                aria-label={`Finding ${n + 1} of ${quotes.length}`}
+                aria-current={n === i}
+                onClick={() => setI(n)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="sd-spot-arrow"
+            onClick={() => step(1)}
+            aria-label="Next finding"
+          >
+            ›
+          </button>
+        </div>
+      )}
+    </section>
+  );
+};
+
+// ────────────────────────────── action desk ──────────────────────────────
+
+/**
+ * Who each action item belongs to.
+ *
+ * A principal does not act on this page — they hand it out. Splitting by the person who
+ * has to do the work is what turns a list of findings into three briefs that can be
+ * forwarded as they are.
+ */
+const DESKS: { audience: Audience; label: string; blurb: string }[] = [
+  {
+    audience: "teacher",
+    label: "For Teachers",
+    blurb:
+      "Academic. What changes in lessons, classwork and practice — the abilities and learning styles this cohort is weak on.",
+  },
+  {
+    audience: "counsellor",
+    label: "For Counsellors",
+    blurb:
+      "Workshops and sessions to run — for students, parents and teachers — where career clarity, stream fit or wellbeing is the problem.",
+  },
+  {
+    audience: "parent",
+    label: "For Parents",
+    blurb:
+      "What families need told at a parents' meeting: where expectation and evidence have come apart, and what helps at home.",
+  },
+];
+
+/**
+ * Words that place a finding on a desk.
+ *
+ * Deliberately a visible table rather than a clever classifier: every dashboard released
+ * so far predates the `audience` field, so this is what routes them, and someone
+ * disagreeing with where a card landed needs to be able to see why and edit one line.
+ * Order inside a list does not matter; a longer match does not outweigh a shorter one.
+ */
+const DESK_WORDS: Record<Audience, string[]> = {
+  teacher: [
+    "abilit", "learning style", "intelligence", "classroom", "class time", "teach",
+    "lesson", "curricul", "subject", "practice", "drill", "remedial", "numeracy",
+    "literacy", "reading", "writing", "verbal", "comprehension", "speed", "accuracy",
+    "computation", "reasoning", "memory", "attention", "spatial", "homework",
+    "completion", "not started", "participation", "attendance", "project work",
+  ],
+  counsellor: [
+    "counsel", "workshop", "session", "guidance", "career clarity", "clarity",
+    "aspiration", "aspire", "suitab", "stream fit", "stream choice", "mismatch",
+    "exposure", "career talk", "flagged", "at risk", "at-risk", "support", "screening",
+    "wellbeing", "confidence", "motivation", "self-aware", "one-to-one", "referral",
+  ],
+  parent: [
+    "parent", "family", "home", "father", "mother", "expectation", "pressure",
+    "awareness", "orientation", "conversation at home", "screen time", "value",
+    "interest", "peer", "socio", "afford", "encourag",
+  ],
+};
+
+/**
+ * Where a card goes.
+ *
+ * A stored tag wins outright. Failing that the wording is scored against each desk's
+ * lexicon and the highest count takes it; a tie or a blank goes by the kind of finding,
+ * because a risk is a conversation and a gap is a lesson plan.
+ */
+export function audienceOf(item: {
+  audience: Audience | null;
+  title?: string;
+  insight?: string;
+  action?: string;
+  label?: string;
+  section_ref?: string;
+  type?: CardType;
+}): Audience {
+  if (item.audience) return item.audience;
+
+  const haystack = [item.title, item.insight, item.action, item.label, item.section_ref]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  let best: Audience = item.type === "risk" ? "counsellor" : "teacher";
+  let bestScore = 0;
+  for (const desk of DESKS) {
+    const score = DESK_WORDS[desk.audience].reduce(
+      (n, word) => (haystack.includes(word) ? n + 1 : n),
+      0
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      best = desk.audience;
+    }
+  }
+  return best;
+}
+
+/**
+ * The action items, on three tabs.
+ *
+ * Every card lands on exactly one desk — a finding that appeared under all three would
+ * make each tab a copy of the others, and the point of the split is that a teacher can
+ * be handed their tab and nothing else.
+ */
+const ActionDesk: React.FC<{
+  cards: InsightCard[];
+  alerts: Alert[];
+  scopeLabel: string;
+}> = ({ cards, alerts, scopeLabel }) => {
+  const [desk, setDesk] = useState<Audience>("teacher");
+
+  const byDesk = useMemo(() => {
+    const empty: Record<Audience, { cards: InsightCard[]; alerts: Alert[] }> = {
+      teacher: { cards: [], alerts: [] },
+      counsellor: { cards: [], alerts: [] },
+      parent: { cards: [], alerts: [] },
+    };
+    cards.forEach((c) => empty[audienceOf(c)].cards.push(c));
+    alerts.forEach((a) => empty[audienceOf(a)].alerts.push(a));
+    return empty;
+  }, [cards, alerts]);
+
+  const total = cards.length + alerts.length;
+
+  // Land on a desk that has something on it, so the tab that opens is never the empty one.
+  useEffect(() => {
+    const has = (a: Audience) => byDesk[a].cards.length + byDesk[a].alerts.length > 0;
+    if (!has(desk)) {
+      const first = DESKS.find((d) => has(d.audience));
+      if (first) setDesk(first.audience);
+    }
+    // Only when the split itself changes — re-running on `desk` would fight the reader.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byDesk]);
+
+  if (total === 0) {
+    return (
+      <div className="sd-note">
+        <h2>Nothing flagged to act on</h2>
+        <p>The analysis found no gaps or risks worth singling out for {scopeLabel}.</p>
+      </div>
+    );
+  }
+
+  const active = DESKS.find((d) => d.audience === desk)!;
+  const shown = byDesk[desk];
+
+  return (
+    <section className="sd-desk">
+      <h2 className="sd-rule">Action items</h2>
+
+      <nav className="sd-desk-tabs" aria-label="Action items by who does them">
+        {DESKS.map((d) => {
+          const n = byDesk[d.audience].cards.length + byDesk[d.audience].alerts.length;
+          return (
+            <button
+              key={d.audience}
+              type="button"
+              className={`sd-desk-tab${d.audience === desk ? " is-active" : ""}`}
+              onClick={() => setDesk(d.audience)}
+              aria-pressed={d.audience === desk}
+            >
+              {d.label}
+              <span className="sd-desk-n">{n}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <p className="sd-desk-blurb">{active.blurb}</p>
+
+      {shown.cards.length === 0 && shown.alerts.length === 0 ? (
+        <div className="sd-note">
+          <h2>Nothing for this group</h2>
+          <p>
+            This cohort's findings all fall to the other desks. The counts on the tabs
+            above show where they went.
+          </p>
+        </div>
+      ) : (
+        <>
+          {shown.cards.length > 0 && (
+            <div className="sd-actions">
+              {shown.cards.map((card) => (
+                <ActionCard key={card.id || card.title} card={card} />
+              ))}
+            </div>
+          )}
+
+          {shown.alerts.length > 0 && (
+            <div className="sd-alerts">
+              {shown.alerts.map((alert) => (
+                <div key={alert.id || alert.label} className="sd-alert">
+                  <span className="sd-alert-count">{alert.count}</span>
+                  <div>
+                    <div className="sd-alert-label"><Emphasis text={alert.label} /></div>
+                    <div className="sd-alert-action"><Emphasis text={alert.action} /></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+};
 
 /** Risk first, strength last — the order someone scanning for problems needs. */
 const CARD_ORDER: CardType[] = ["risk", "gap", "opportunity", "strength"];
@@ -442,6 +755,65 @@ const ChartBlock = ({ chart }: { chart: NarrativeChart }) => {
  * Shown beside the section that discusses them so the count and the prose are visibly one
  * fact. Deliberately anonymous — a tier is a queue for a conversation, not a label.
  */
+/**
+ * The students someone should be looking at, made impossible to scroll past.
+ *
+ * These counts used to sit at the bottom of the tab under a plain rule, which is where a
+ * reader stops. They are the only thing on the page about identifiable children, so they
+ * open the tab and carry the page's one piece of alarm colour — earned here and nowhere
+ * else, which is what keeps it meaning something.
+ */
+const HighlightedCases: React.FC<{ flags: StoredFlags; scopeParams: ScopeParams }> = ({
+  flags,
+  scopeParams,
+}) => {
+  const urgent = flags.acute;
+  const watch = flags.abilitySupport + flags.guidanceMismatch;
+
+  return (
+    <section className={`sd-cases${urgent > 0 ? " is-urgent" : " is-clear"}`}>
+      <header className="sd-cases-head">
+        <span className="sd-cases-mark" aria-hidden="true">
+          {urgent > 0 ? <span className="sd-cases-pulse" /> : "✓"}
+        </span>
+        <div className="sd-cases-say">
+          <h2>
+            {urgent > 0
+              ? "Highlighted cases — immediate attention"
+              : "No student needs immediate attention"}
+          </h2>
+          <p>
+            {urgent > 0 ? (
+              <>
+                <b>
+                  {urgent} student{urgent === 1 ? "" : "s"}
+                </b>{" "}
+                came back with no ability at strength level and eight or more weak. Open
+                the tier below for the names and put each one in front of a counsellor
+                this week.
+              </>
+            ) : (
+              <>
+                No one in {flags.base} scored profile
+                {flags.base === 1 ? "" : "s"} hit the top screening tier.
+                {watch > 0 && ` ${watch} still warrant a look — the tiers below.`}
+              </>
+            )}
+          </p>
+        </div>
+        {urgent > 0 && (
+          <div className="sd-cases-n">
+            <b>{urgent}</b>
+            <span>of {flags.base} scored</span>
+          </div>
+        )}
+      </header>
+
+      <FlagTiles flags={flags} scopeParams={scopeParams} />
+    </section>
+  );
+};
+
 /** The three tiers, with the key the endpoint resolves names by. */
 const TIERS: { tier: FlagTier; label: string; tone: string }[] = [
   { tier: "acute", label: "No ability at strength level and eight or more weak", tone: "crit" },

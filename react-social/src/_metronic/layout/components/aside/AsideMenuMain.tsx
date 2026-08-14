@@ -3,6 +3,7 @@ import { useIntl } from "react-intl";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../app/modules/auth";
 import { urlAllowed } from "../../../../app/modules/auth/core/permissions";
+import { getImpersonationMode } from "../../../../app/modules/auth/core/AuthHelpers";
 import { AsideMenuItem } from "./AsideMenuItem";
 import { AsideMenuItemWithSub } from "./AsideMenuItemWithSub";
 
@@ -111,7 +112,9 @@ export function AsideMenuMain() {
   const showEmailAccounts = allowed("/admin/email-accounts");
   const showEmailLog = allowed("/admin/email-log");
   const showEmailTemplates = allowed("/admin/email-templates");
-  const showEmail = showEmailAccounts || showEmailLog || showEmailTemplates;
+  const showEmailRecipients = allowed("/admin/email-recipients");
+  const showEmail =
+    showEmailAccounts || showEmailLog || showEmailTemplates || showEmailRecipients;
   const showLeads = allowed("/leads");
   const showOldDataMapping = allowed("/old-data-mapping");
   const showScoreDebug = allowed("/score-debug");
@@ -143,15 +146,24 @@ export function AsideMenuMain() {
       return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
     });
 
+  // "Open as Counsellor" opens a new tab that impersonates a counsellor. That tab must show
+  // the counsellor's own navigation and nothing else — an admin opened it precisely to see
+  // what the counsellor sees. Role alone can't decide it: counsellor logins are ordinary
+  // user accounts and several also carry Admin roles, so without this per-tab marker those
+  // tabs would render the full admin sidebar. The marker is sessionStorage, so it never
+  // leaks into the admin's other tabs.
+  const impersonatingCounsellor = getImpersonationMode() === "counsellor";
+
   // A pure COUNSELLOR (not also a super-admin) sees ONLY the counsellor portal menu —
   // none of the admin sections. The pages render inside this same admin shell, so the
   // counsellor gets the unified UI but a focused, counsellor-only navigation.
   const isCounsellorOnly =
-    !isSuperAdmin &&
-    userRoles.some((r) => {
-      const u = typeof r === "string" ? r.toUpperCase() : "";
-      return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
-    });
+    impersonatingCounsellor ||
+    (!isSuperAdmin &&
+      userRoles.some((r) => {
+        const u = typeof r === "string" ? r.toUpperCase() : "";
+        return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
+      }));
 
   if (isCounsellorOnly) {
     return (
@@ -710,6 +722,14 @@ export function AsideMenuMain() {
                   fontIcon="bi-envelope-paper-heart"
                 />
               )}
+              {showEmailRecipients && (
+                <AsideMenuItem
+                  to="/admin/email-recipients"
+                  icon="/media/icons/duotune/general/gen007.svg"
+                  title="Notification Recipients"
+                  fontIcon="bi-bell"
+                />
+              )}
               {showEmailLog && (
                 <AsideMenuItem
                   to="/admin/email-log"
@@ -826,9 +846,6 @@ export function AsideMenuMain() {
             )}
             {allowed("/admin/counselling-slots") && (
               <AsideMenuItem to="/admin/counselling-slots" title="Bookings" hasBullet={true} />
-            )}
-            {allowed("/admin/counselling-assignments") && (
-              <AsideMenuItem to="/admin/counselling-assignments" title="Assessment Assignments" hasBullet={true} />
             )}
             {allowed("/admin/counselling-notifications") && (
               <AsideMenuItem to="/admin/counselling-notifications" title="Notifications" hasBullet={true} />

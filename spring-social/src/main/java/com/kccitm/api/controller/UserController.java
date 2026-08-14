@@ -46,8 +46,14 @@ import com.kccitm.api.model.userDefinedModel.StudentPortalComputedData;
 @RestController
 public class UserController {
 
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserController.class);
+
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    /** Activating a counsellor's login is the same decision as activating the counsellor. */
+    @Autowired
+    private com.kccitm.api.service.counselling.CounsellorService counsellorService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -531,6 +537,15 @@ public class UserController {
         return ResponseEntity.ok(resp);
     }
 
+    /**
+     * Activate or deactivate a login account.
+     *
+     * <p>For a counsellor this is the same decision as the Activate button on Manage
+     * Counsellors, so it does the same thing. It used to set {@code User.isActive} alone,
+     * which let the counsellor log in while their counsellor record stayed suspended —
+     * no portal permissions and invisible to students booking — until an admin happened to
+     * press the other button too. One approval, two front doors, one flag.
+     */
     @PreAuthorize("@auth.allows('user.toggle_active')")
     @PostMapping(value = "user/toggle-active/{id}")
     public ResponseEntity<?> toggleUserActive(@PathVariable("id") Long userId) {
@@ -548,7 +563,19 @@ public class UserController {
                     "Your Dashboard account has been activated.\nYou can login at https://dashboard.career-9.com using your registered email and password.\n\nBest regards,\nCareer-9 Team");
         } catch (Exception e) {
         }
-        return ResponseEntity.ok(new ApiResponse(true, newStatus ? "User activated" : "User deactivated"));
+
+        // Carry the same decision onto the counsellor record when this user is one. Nothing
+        // happens for an ordinary user. Best-effort: the account change above already stands,
+        // so a counsellor-side hiccup must not turn it into an error the admin has to retry.
+        boolean counsellorSynced = false;
+        try {
+            counsellorSynced = counsellorService.setActiveForUser(userId, newStatus);
+        } catch (Exception e) {
+            logger.warn("Could not sync counsellor record for user {} on toggle-active: {}", userId, e.getMessage());
+        }
+
+        String who = counsellorSynced ? "Counsellor" : "User";
+        return ResponseEntity.ok(new ApiResponse(true, who + (newStatus ? " activated" : " deactivated")));
     }
 
     /**

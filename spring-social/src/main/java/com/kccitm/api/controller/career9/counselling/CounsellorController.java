@@ -1,6 +1,7 @@
 package com.kccitm.api.controller.career9.counselling;
 
 import java.security.MessageDigest;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -12,12 +13,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.AuthProvider;
@@ -26,11 +28,19 @@ import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
-import com.kccitm.api.service.counselling.CounsellorProvisioningService;
 import com.kccitm.api.service.counselling.CounsellorService;
 
+/**
+ * Everything a counsellor record is made of: self-registration, login, profile CRUD, the
+ * dashboard summary, and profile media.
+ *
+ * <p>There is deliberately no class-level {@code @RequestMapping}. Most routes live under
+ * {@code /api/counsellor}, but the two media routes are served at {@code /counsellor-media/*} —
+ * the URLs the registration screens have always called. Spring always prepends a class-level
+ * prefix to method paths, so a shared prefix would have silently moved them. Each method
+ * therefore carries its full path.
+ */
 @RestController
-@RequestMapping("/api/counsellor")
 public class CounsellorController {
 
     private static final Logger logger = LoggerFactory.getLogger(CounsellorController.class);
@@ -46,9 +56,6 @@ public class CounsellorController {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private CounsellorProvisioningService provisioningService;
 
     @Autowired
     private com.kccitm.api.service.counselling.CounsellingActivityLogService activityLogService;
@@ -71,7 +78,7 @@ public class CounsellorController {
      */
     // Phase 2 (Task 2.2 / HIGH-A): anonymous pre-auth self-registration. @PreAuthorize removed so
     // the enforce flip won't 403 prospective counsellors; permitAll via PUBLIC_PATHS. Coverage-excluded.
-    @PostMapping("/self-register")
+    @PostMapping("/api/counsellor/self-register")
     public ResponseEntity<?> selfRegister(@RequestBody Map<String, Object> body) {
         String name = (String) body.get("name");
         String email = (String) body.get("email");
@@ -155,7 +162,13 @@ public class CounsellorController {
         logger.info("Counsellor self-registered: {} ({})", saved.getName(), saved.getEmail());
 
         activityLogService.log("COUNSELLOR_REGISTERED", "New Counsellor Registration",
-                saved.getName() + " (" + saved.getEmail() + ") has registered and is awaiting approval.", saved);
+                "Counsellor: " + saved.getName() + "\n"
+                + "Email: " + saved.getEmail() + "\n"
+                + (saved.getPhone() != null && !saved.getPhone().isBlank()
+                        ? "Phone: " + saved.getPhone() + "\n" : "")
+                + (saved.getSpecializations() != null && !saved.getSpecializations().isBlank()
+                        ? "Specializations: " + saved.getSpecializations() + "\n" : "")
+                + "Status: awaiting approval", saved);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "message", "Registration submitted successfully. You will be able to login once an administrator approves your account.",
@@ -173,7 +186,7 @@ public class CounsellorController {
     // NOTE (deferred): this still returns the counsellor record without issuing a scoped session
     // token/cookie — the counsellor portal currently trusts the client. Issuing a real cn_at-style
     // session is FE-coupled and tracked as a follow-up (Phase 2 residual).
-    @PostMapping("/login")
+    @PostMapping("/api/counsellor/login")
     public ResponseEntity<?> counsellorLogin(@RequestBody Map<String, Object> body) {
         String email = (String) body.get("email");
         String password = (String) body.get("password");
@@ -273,7 +286,7 @@ public class CounsellorController {
      */
     // no scope arg: update by id; counsellor self-update photo
     @PreAuthorize("@auth.allows('counsellor.update')")
-    @PostMapping("/upload-photo/{id}")
+    @PostMapping("/api/counsellor/upload-photo/{id}")
     public ResponseEntity<?> uploadPhoto(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         String photo = (String) body.get("photo");
         if (photo == null || !photo.startsWith("data:image")) {
@@ -298,9 +311,56 @@ public class CounsellorController {
         }
     }
 
+    /**
+     * POST /counsellor-media/upload
+     * Upload counsellor profile media (image) to DigitalOcean Spaces.
+     * Expects JSON body: { "base64Data": "data:image/webp;base64,...", "mediaType": "profile" }
+     * Returns: { "url": "https://storage-c9.sgp1.digitaloceanspaces.com/counsellor-media/..." }
+     *
+     * <p>Distinct from {@code /upload-photo/{id}} above, which needs an existing counsellor row
+     * to write {@code profileImageUrl} onto. This one runs during self-registration, before that
+     * row exists, so it only returns the URL for the caller to submit with the form.
+     */
+    // no scope arg: body is base64 payload; counsellor uploads own media
+    @PreAuthorize("@auth.allows('counsellor_media.create')")
+    @PostMapping("/counsellor-media/upload")
+    public ResponseEntity<Map<String, String>> uploadMedia(@RequestBody Map<String, String> request) {
+        String base64Data = request.get("base64Data");
+        String mediaType = request.getOrDefault("mediaType", "profile");
+
+        if (base64Data == null || base64Data.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "base64Data is required"));
+        }
+
+        try {
+            String folder = "counsellor-media/" + mediaType + "s";
+            String url = spacesService.uploadBase64File(base64Data, folder, null);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("url", url);
+            return ResponseEntity.ok(response);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * DELETE /counsellor-media/delete
+     * Delete counsellor media from DigitalOcean Spaces.
+     * Expects query param: ?url=https://storage-c9.sgp1.digitaloceanspaces.com/...
+     */
+    // no scope arg: delete by URL query param
+    @PreAuthorize("@auth.allows('counsellor_media.delete')")
+    @DeleteMapping("/counsellor-media/delete")
+    public ResponseEntity<Map<String, String>> deleteMedia(@RequestParam String url) {
+        spacesService.deleteFileByUrl(url);
+        return ResponseEntity.ok(Map.of("status", "deleted"));
+    }
+
     // no scope arg: body is Counsellor entity; admin-only create
     @PreAuthorize("@auth.allows('counsellor.create')")
-    @PostMapping("/create")
+    @PostMapping("/api/counsellor/create")
     public ResponseEntity<Counsellor> create(@RequestBody Counsellor counsellor) {
         logger.info("Creating new counsellor: {}", counsellor.getName());
         return ResponseEntity.ok(counsellorService.create(counsellor));
@@ -308,21 +368,21 @@ public class CounsellorController {
 
     // no scope arg: catalog list — counsellor entries are global
     @PreAuthorize("@auth.allows('counsellor.read')")
-    @GetMapping("/getAll")
+    @GetMapping("/api/counsellor/getAll")
     public ResponseEntity<List<Counsellor>> getAll() {
         return ResponseEntity.ok(counsellorService.getAll());
     }
 
     // no scope arg: catalog list — active counsellors
     @PreAuthorize("@auth.allows('counsellor.read')")
-    @GetMapping("/getActive")
+    @GetMapping("/api/counsellor/getActive")
     public ResponseEntity<List<Counsellor>> getActive() {
         return ResponseEntity.ok(counsellorService.getAllActive());
     }
 
     // no scope arg: fetch by id
     @PreAuthorize("@auth.allows('counsellor.read')")
-    @GetMapping("/get/{id}")
+    @GetMapping("/api/counsellor/get/{id}")
     public ResponseEntity<Counsellor> getById(@PathVariable Long id) {
         return counsellorService.getById(id)
                 .map(ResponseEntity::ok)
@@ -331,23 +391,17 @@ public class CounsellorController {
 
     // no scope arg: fetch by user id
     @PreAuthorize("@auth.allows('counsellor.read')")
-    @GetMapping("/get/by-user/{userId}")
+    @GetMapping("/api/counsellor/get/by-user/{userId}")
     public ResponseEntity<Counsellor> getByUserId(@PathVariable Long userId) {
-        Optional<Counsellor> counsellorOpt = counsellorService.getByUserId(userId);
-        // Counselling Phase 1: lazy self-heal. Counsellors created/linked before
-        // V20260610001 (and back-filled by it) have no role-group/scope yet. The first
-        // portal load idempotently provisions an active counsellor's User so future
-        // enforce-mode requests resolve the counsellor permission bundle.
-        counsellorOpt.ifPresent(c -> {
-            if (Boolean.TRUE.equals(c.getIsActive()) && c.getUser() != null) {
-                try {
-                    provisioningService.provision(c.getUser().getId(), null);
-                } catch (Exception e) {
-                    logger.warn("Lazy counsellor provisioning failed for user {}: {}", userId, e.getMessage());
-                }
-            }
-        });
-        return counsellorOpt
+        // Loading the portal no longer grants the `counsellor` role group.
+        //
+        // This was a lazy self-heal for counsellors back-filled before V20260610001, but it
+        // meant simply opening the portal handed out permissions — so removing a counsellor's
+        // role group in Roles & Permissions was undone by their next page load, and the
+        // decision to strip a role could not be made to stick. Role assignment now happens in
+        // Roles & Permissions and nowhere else; a counsellor without the role group sees an
+        // empty portal, which is the honest result of not having been given one.
+        return counsellorService.getByUserId(userId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -358,7 +412,7 @@ public class CounsellorController {
      */
     // no scope arg: identifies by counsellorId; scope-filter narrows access
     @PreAuthorize("@auth.allows('counsellor.read')")
-    @GetMapping("/{id}/dashboard-summary")
+    @GetMapping("/api/counsellor/{id}/dashboard-summary")
     public ResponseEntity<?> dashboardSummary(@PathVariable Long id) {
         java.time.LocalDate today = java.time.LocalDate.now();
         java.time.LocalDate weekEnd = today.plusDays(6);
@@ -405,7 +459,7 @@ public class CounsellorController {
 
     // no scope arg: update by id; admin-only
     @PreAuthorize("@auth.allows('counsellor.update')")
-    @PutMapping("/update/{id}")
+    @PutMapping("/api/counsellor/update/{id}")
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Counsellor counsellor) {
         // Sessions run on Microsoft Teams only — refuse any other provider's link rather
         // than storing one that would be emailed to students and not work as expected.
@@ -422,7 +476,7 @@ public class CounsellorController {
 
     // no scope arg: toggle by id; admin-only approval action
     @PreAuthorize("@auth.allows('counsellor.update')")
-    @PutMapping("/toggle-active/{id}")
+    @PutMapping("/api/counsellor/toggle-active/{id}")
     public ResponseEntity<Counsellor> toggleActive(@PathVariable Long id) {
         logger.info("Toggling active status for counsellor with id: {}", id);
         return ResponseEntity.ok(counsellorService.toggleActive(id));

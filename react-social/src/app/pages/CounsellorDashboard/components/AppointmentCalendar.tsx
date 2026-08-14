@@ -66,6 +66,22 @@ function getTodayString(): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
+/**
+ * The meeting link only opens 15 minutes before the session — matching the rest of the
+ * counsellor portal and the server's check-in window. An always-live Join let a counsellor
+ * open the room days early.
+ */
+const JOIN_OPENS_BEFORE_MS = 15 * 60 * 1000
+
+function joinIsOpen(appt: any): boolean {
+  const date = appt?.slot?.date || appt?.date
+  const time = appt?.slot?.startTime || appt?.startTime
+  if (!date || !time) return true
+  const start = new Date(`${date}T${String(time).slice(0, 8)}`)
+  if (isNaN(start.getTime())) return true
+  return start.getTime() - Date.now() <= JOIN_OPENS_BEFORE_MS
+}
+
 const AppointmentCalendar: React.FC<Props> = ({ counsellorId }) => {
   const navigate = useNavigate()
   const { currentUser } = useAuth()
@@ -210,17 +226,27 @@ const AppointmentCalendar: React.FC<Props> = ({ counsellorId }) => {
               <div className='cp-appt-type'>{appt.studentReason}</div>
             )}
 
-            {appt.status === 'CONFIRMED' && appt.meetingLink && (
-              <a
-                href={appt.meetingLink}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='cp-action-btn'
-                style={{ display: 'inline-block', marginTop: 6, fontSize: 12 }}
-              >
-                Join Meet
-              </a>
-            )}
+            {appt.status === 'CONFIRMED' && appt.meetingLink && (() => {
+              const open = joinIsOpen(appt)
+              return (
+                <a
+                  href={open ? appt.meetingLink : undefined}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='cp-action-btn'
+                  aria-disabled={!open}
+                  title={open ? undefined : 'Opens 15 minutes before the session starts.'}
+                  onClick={(e) => { if (!open) e.preventDefault() }}
+                  style={{
+                    display: 'inline-block', marginTop: 6, fontSize: 12,
+                    opacity: open ? 1 : 0.45,
+                    cursor: open ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Join Meet
+                </a>
+              )
+            })()}
 
             {appt.status === 'ASSIGNED' && (
               <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>

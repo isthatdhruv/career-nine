@@ -349,7 +349,6 @@ const PrivateRoutes = () => {
   const SlotManagementPage = lazy(() => import("../pages/Counselling/admin/SlotManagementPage"));
   const ManageStudentsPage = lazy(() => import("../pages/Counselling/admin/ManageStudentsPage"));
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
-  const CounsellorAssessmentAssignmentPage = lazy(() => import("../pages/Counselling/admin/CounsellorAssessmentAssignmentPage"));
   const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
@@ -362,6 +361,7 @@ const PrivateRoutes = () => {
   const EmailAccountsPage = lazy(() => import("../pages/EmailAccounts/EmailAccountsPage"));
   const EmailLogPage = lazy(() => import("../pages/EmailLog/EmailLogPage"));
   const EmailTemplatesPage = lazy(() => import("../pages/EmailTemplates/EmailTemplatesPage"));
+  const EmailRecipientsPage = lazy(() => import("../pages/EmailRecipients/EmailRecipientsPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -1710,16 +1710,6 @@ const PrivateRoutes = () => {
           }
         />
         <Route
-          path="/admin/counselling-assignments"
-          element={
-            <RequirePermission perm="user.write">
-              <SuspensedView>
-                <CounsellorAssessmentAssignmentPage />
-              </SuspensedView>
-            </RequirePermission>
-          }
-        />
-        <Route
           path="/admin/report-templates"
           element={
             <RequirePermission perm="report_template.read">
@@ -1756,6 +1746,16 @@ const PrivateRoutes = () => {
             <RequirePermission perm="email_template.read">
               <SuspensedView>
                 <EmailTemplatesPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/email-recipients"
+          element={
+            <RequirePermission perm="email_recipient.read">
+              <SuspensedView>
+                <EmailRecipientsPage />
               </SuspensedView>
             </RequirePermission>
           }
