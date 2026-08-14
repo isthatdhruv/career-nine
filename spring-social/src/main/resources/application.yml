@@ -24,7 +24,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: dev
+    active: production , report-worker
   servlet:
     multipart:
       max-file-size: 1GB
