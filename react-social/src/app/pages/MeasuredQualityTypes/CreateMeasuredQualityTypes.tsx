@@ -9,8 +9,10 @@ import MeasuredQualityTypesRecycleBinModal from "./components/MeasuredQualityTyp
 import PageHeader from "../../components/PageHeader";
 
 const MeasuredQualityTypesPage = () => {
-  const { data: measuredQualityTypesData = [], isLoading: loading } = useMeasuredQualityTypes<any>();
+  const { data: measuredQualityTypesData = [], isLoading } = useMeasuredQualityTypes<any>();
   const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const loading = isLoading || busy;
   const [measuredQualities, setMeasuredQualities] = useState<any[]>([]);
   const [selectedQualityFilter, setSelectedQualityFilter] = useState<string>("");
   const [pageLoading, setPageLoading] = useState(["false"]);
@@ -110,7 +112,7 @@ const MeasuredQualityTypesPage = () => {
           <div className="card-body pt-5">
             <MeasuredQualityTypesTable
               data={filteredData}
-              setLoading={setLoading}
+              setLoading={setBusy}
               setPageLoading={setPageLoading}
             />
           </div>
