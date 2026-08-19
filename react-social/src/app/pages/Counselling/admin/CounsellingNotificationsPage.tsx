@@ -361,26 +361,31 @@ const CounsellingNotificationsPage: React.FC = () => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map((a) => {
+            // Colour is the event type speaking, not the read state: a suspension is red and a
+            // booking is violet whether or not anyone has looked at it yet, and the type is what
+            // the eye scans this log for. Reading used to strip the row back to plain white,
+            // so "Mark all as read" flattened the whole page into an undifferentiated list.
+            // The unread dot beside the title carries the read state on its own.
             const cfg = TYPE_CONFIG[a.activityType] || DEFAULT_CONFIG
             return (
               <div
                 key={a.id}
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 14,
-                  padding: '14px 18px', background: a.isRead ? '#fff' : cfg.bg,
-                  border: `1px solid ${a.isRead ? '#E2E8F0' : 'rgba(0,0,0,0.06)'}`,
+                  padding: '14px 18px', background: cfg.bg,
+                  border: '1px solid rgba(0,0,0,0.06)',
                   borderRadius: 10, transition: 'all 0.15s',
-                  borderLeft: a.isRead ? undefined : `3px solid ${cfg.color}`,
+                  borderLeft: `3px solid ${cfg.color}`,
                 }}
               >
                 {/* Icon */}
                 <div style={{
                   width: 38, height: 38, borderRadius: '50%',
-                  background: a.isRead ? '#F1F5F9' : cfg.bg,
+                  background: cfg.bg,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0, color: cfg.color,
+                  flexShrink: 0,
                 }}>
-                  <KTSVG path={cfg.iconPath} className='svg-icon-2' />
+                  <KTSVG path={cfg.iconPath} className='svg-icon-2' style={{ color: cfg.color }} />
                 </div>
 
                 {/* Content */}
