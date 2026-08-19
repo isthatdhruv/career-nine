@@ -101,10 +101,20 @@ export function getCounsellorSessions(counsellorId: number) {
 
 /**
  * The report for a single session — for screens showing one session rather than a list
- * (the counsellor's session-notes page). `reportLink` is null until one has generated.
+ * (the counsellor's session-notes page, the Report button on their appointments list).
+ *
+ * `reportLink` is null until one has generated, and `status` says why:
+ *   ready        — the link is there
+ *   notGenerated — the student has finished, but no report has come through for them
+ *   notCompleted — the student has not finished the assessment yet
+ *   unavailable  — nothing names an assessment for this session, so there is no report to find
  */
+export type SessionReportStatus = 'ready' | 'notGenerated' | 'notCompleted' | 'unavailable'
+
 export function getSessionReportLink(appointmentId: number) {
-  return axios.get<{ reportLink: string | null }>(`${BASE}/${appointmentId}/report-link`)
+  return axios.get<{ reportLink: string | null; status: SessionReportStatus }>(
+    `${BASE}/${appointmentId}/report-link`
+  )
 }
 
 /** Who was written to, and whether the report link made it into the email. */

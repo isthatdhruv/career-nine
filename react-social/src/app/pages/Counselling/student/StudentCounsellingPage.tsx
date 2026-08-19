@@ -36,6 +36,29 @@ interface Appointment {
   cancelledAt?: string | null
   /** STUDENT when she did not show, COUNSELLOR when nobody checked her in. */
   missedByRole?: string | null
+  /** Set the moment a counsellor records her absent — before the sweep closes the session. */
+  markedAbsentAt?: string | null
+  /** Set once she contests an absent mark. The server allows only one. */
+  disputeRaisedAt?: string | null
+}
+
+/**
+ * What the session actually IS, rather than what its row still says.
+ *
+ * <p>Marking a student absent sets `markedAbsentAt` and the attribution but deliberately
+ * leaves `status` alone — the nightly sweep is what closes the session off. Until it runs the
+ * raw row still reads CONFIRMED, and this page took that at face value: her counsellor had
+ * already recorded her absent while she was still shown a live countdown, a Join button and a
+ * Cancel that could only fail. Once the slot passed it got worse, not better — the session
+ * fell through to "ENDED", which the history presents as one she attended.
+ *
+ * <p>A raised dispute is left alone: the server moves that row to UNDER_REVIEW itself, and of
+ * the two that is the more specific truth.
+ */
+function effectiveStatus(a: any): string {
+  const status = (a?.status || '').toUpperCase()
+  if (a?.markedAbsentAt && (status === 'CONFIRMED' || status === 'ASSIGNED')) return 'MISSED'
+  return a?.status
 }
 
 interface CounsellingRecord {
@@ -203,7 +226,7 @@ const StudentCounsellingPage: React.FC = () => {
         const raw = Array.isArray(res.data) ? res.data : []
         const data: Appointment[] = raw.map((a: any) => ({
           appointmentId: a.id ?? a.appointmentId,
-          status: a.status,
+          status: effectiveStatus(a),
           reason: a.studentReason ?? a.reason,
           meetingLink: a.meetingLink,
           counsellorName: a.counsellor?.name ?? a.counsellorName,
@@ -215,6 +238,8 @@ const StudentCounsellingPage: React.FC = () => {
           cancellationNote: a.cancellationNote ?? null,
           cancelledAt: a.cancelledAt ?? null,
           missedByRole: a.missedByRole ?? null,
+          markedAbsentAt: a.markedAbsentAt ?? null,
+          disputeRaisedAt: a.disputeRaisedAt ?? null,
           slot: a.slot
             ? {
                 date: a.slot.date,
@@ -432,6 +457,7 @@ const StudentCounsellingPage: React.FC = () => {
               canReschedule={changesLeft > 0}
               onReschedule={handleReschedule}
               onBookSession={handleBookSession}
+              onChanged={handleChanged}
             />
           ))}
         </div>

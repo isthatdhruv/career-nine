@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import StatusBadge from '../../shared/StatusBadge'
 import { getSessionNotes } from '../../API/SessionNotesAPI'
+import { disputeAttendance } from '../../API/AppointmentAPI'
 import '../../Counselling.css'
 
 interface Slot {
@@ -20,6 +21,8 @@ interface Appointment {
   cancellationReason?: string | null
   cancellationNote?: string | null
   missedByRole?: string | null
+  /** Set once she has already contested this absent mark; the server allows only one. */
+  disputeRaisedAt?: string | null
 }
 
 interface SessionNotes {
@@ -40,6 +43,8 @@ interface PastSessionCardProps {
    * so the card offers that rather than nothing at all.
    */
   onBookSession?: () => void
+  /** Refetch after a dispute, so the card moves into "Under review". */
+  onChanged?: () => void
 }
 
 function formatDate(dateStr: string): string {
@@ -113,6 +118,7 @@ const PastSessionCard: React.FC<PastSessionCardProps> = ({
   canReschedule,
   onReschedule,
   onBookSession,
+  onChanged,
 }) => {
   const { appointmentId, slot, counsellorName, reason, status } = appointment
   const outcome = resolveOutcome(appointment)
@@ -128,6 +134,26 @@ const PastSessionCard: React.FC<PastSessionCardProps> = ({
   const [sessionNotes, setSessionNotes] = useState<SessionNotes | null>(null)
   const [notesLoading, setNotesLoading] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
+
+  // Contesting an absent mark belongs wherever the missed session is — and that is here,
+  // since a session she was marked absent from is over and sits in her history. Without it
+  // the mark was final the moment the counsellor made it, with no way to say it was wrong.
+  const [disputing, setDisputing] = useState(false)
+  const [disputed, setDisputed] = useState(false)
+  const [disputeError, setDisputeError] = useState<string | null>(null)
+  const alreadyDisputed = !!appointment.disputeRaisedAt || disputed
+
+  const submitDispute = () => {
+    setDisputing(true)
+    setDisputeError(null)
+    disputeAttendance(appointmentId)
+      .then(() => { setDisputed(true); onChanged?.() })
+      .catch((err) => {
+        const msg = err?.response?.data?.error || err?.response?.data
+        setDisputeError(typeof msg === 'string' ? msg : 'Could not raise this. Please try again.')
+      })
+      .finally(() => setDisputing(false))
+  }
 
   const handleToggleRemarks = () => {
     if (!showRemarks && sessionNotes === null && !notesLoading) {
@@ -222,44 +248,80 @@ const PastSessionCard: React.FC<PastSessionCardProps> = ({
         </div>
       )}
 
-      {/* A missed session is rescheduled rather than left as a dead end: this opens the same
-          slot picker rescheduling uses, already limited to the counsellors mapped to her
-          assessment, so she lands on this counsellor's next free slots. Hidden once her free
-          changes are used up — booking then is chargeable, which is an administrator's call. */}
-      {missedByStudent && canReschedule && onReschedule && (
+      {/* What she can still do about a session she was marked absent from: move it, book a
+          fresh one, or say the mark was wrong. All three belong together — split across
+          separate bordered blocks they read as unrelated afterthoughts. */}
+      {missedByStudent && (
         <div style={{ paddingTop: 10, borderTop: '1px solid var(--sp-border, #D1E5DF)' }}>
-          <button
-            className='cl-btn-primary'
-            onClick={() => onReschedule(appointmentId)}
-            style={{ fontSize: 13 }}
-          >
-            <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-              <polyline points='23 4 23 10 17 10' />
-              <path d='M20.49 15a9 9 0 1 1-2.12-9.36L23 10' />
-            </svg>
-            Reschedule
-          </button>
-        </div>
-      )}
-
-      {/* Allowance spent. Rescheduling IS the free change, so it is gone — but leaving the
-          card with no route at all read as "this is over, and there is nothing you can do",
-          which is not true: she can still book. Say why the button went, then offer the
-          thing that is still open to her. */}
-      {missedByStudent && !canReschedule && (
-        <div style={{ paddingTop: 10, borderTop: '1px solid var(--sp-border, #D1E5DF)' }}>
-          <div style={{ fontSize: 12.5, lineHeight: 1.5, color: '#991B1B', marginBottom: onBookSession ? 10 : 0 }}>
-            No free changes left — this cannot be moved.
-          </div>
-          {onBookSession && (
-            <button className='cl-btn-primary' onClick={onBookSession} style={{ fontSize: 13 }}>
-              <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-                <line x1='12' y1='5' x2='12' y2='19' />
-                <line x1='5' y1='12' x2='19' y2='12' />
-              </svg>
-              Book a Session
-            </button>
+          {/* Allowance spent. Rescheduling IS the free change, so it is gone — but leaving the
+              card with no route at all read as "this is over, and there is nothing you can do",
+              which is not true: she can still book, and she can still contest it. */}
+          {!canReschedule && (
+            <div style={{ fontSize: 12.5, lineHeight: 1.5, color: '#991B1B', marginBottom: 10 }}>
+              No free changes left — this cannot be moved.
+            </div>
           )}
+
+          {alreadyDisputed && (
+            <div
+              style={{
+                marginBottom: 10, padding: '10px 12px', borderRadius: 8,
+                background: '#F1F5F9', border: '1px solid #CBD5E1',
+                fontSize: 12.5, lineHeight: 1.5, color: '#334155',
+              }}
+            >
+              <strong>We are looking into this.</strong> You have told us you attended, so
+              nothing counts against you until it is settled.
+            </div>
+          )}
+
+          {disputeError && (
+            <div role='alert' style={{ fontSize: 12.5, color: '#B91C1C', marginBottom: 10 }}>
+              {disputeError}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* Rescheduling opens the same slot picker the Upcoming tab uses, already limited
+                to the counsellors mapped to her assessment, so she lands on this counsellor's
+                next free slots. Gone once her free changes are used up — booking then is
+                chargeable, which is an administrator's call. */}
+            {canReschedule && onReschedule && (
+              <button
+                className='cl-btn-primary'
+                onClick={() => onReschedule(appointmentId)}
+                style={{ fontSize: 13 }}
+              >
+                <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                  <polyline points='23 4 23 10 17 10' />
+                  <path d='M20.49 15a9 9 0 1 1-2.12-9.36L23 10' />
+                </svg>
+                Reschedule
+              </button>
+            )}
+
+            {!canReschedule && onBookSession && (
+              <button className='cl-btn-primary' onClick={onBookSession} style={{ fontSize: 13 }}>
+                <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                  <line x1='12' y1='5' x2='12' y2='19' />
+                  <line x1='5' y1='12' x2='19' y2='12' />
+                </svg>
+                Book a Session
+              </button>
+            )}
+
+            {!alreadyDisputed && (
+              <button
+                className='cl-btn-outline'
+                onClick={submitDispute}
+                disabled={disputing}
+                style={{ fontSize: 13 }}
+                title='If you attended this session, tell us and we will review it.'
+              >
+                {disputing ? 'Sending…' : 'I was there'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

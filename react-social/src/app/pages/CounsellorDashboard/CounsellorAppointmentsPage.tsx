@@ -9,10 +9,10 @@ import {
   markStudentAbsent,
   startSession,
   verifyCheckin,
+  getSessionReportLink,
 } from '../Counselling/API/AppointmentAPI'
 import NotificationBell from '../Counselling/shared/NotificationBell'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
-import { getGeneratedReportsByStudent } from '../ReportGeneration/API/GeneratedReport_APIs'
 import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import { COUNSELLOR_MENU_ITEMS } from './counsellorMenu'
@@ -144,20 +144,34 @@ function wasCancelledByCounsellor(appt: any): boolean {
  * <p>The hues follow the session's life: grey/amber before it is settled, blue once it is
  * locked in, green while it is actually happening, teal when it is done, and warm colours
  * for the ways it can fail.
+ *
+ * <p>Each status carries THREE tones of its hue, which the feed rows lean on — the same
+ * arrangement the counselling activity feed uses:
+ *
+ * <pre>
+ *   fg   deep ink       the left rail, the icon glyph, the live dot, badge text
+ *   bg   mid tint       the ground behind the icon glyph, badge fill
+ *   wash near-white     the ground of a whole row
+ * </pre>
+ *
+ * <p>The split matters: `bg` is sized for a small pill, and spread across an entire row it
+ * shouts. `wash` is what a row can carry without drowning the text. Keeping `bg` under the
+ * glyph is what makes the icon legible — a deep glyph needs a tinted ground, and floating it
+ * on plain white is what washed the medallions out.
  */
-const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  PENDING:             { label: 'Awaiting assignment',        bg: '#F1F5F9', fg: '#475569' },
-  ASSIGNED:            { label: 'Awaiting your confirmation', bg: '#FEF3C7', fg: '#92400E' },
-  CONFIRMED:           { label: 'Scheduled',                  bg: '#DBEAFE', fg: '#1E40AF' },
-  IN_PROGRESS:         { label: 'Student present',            bg: '#DCFCE7', fg: '#15803D' },
-  COMPLETED:           { label: 'Completed',                  bg: '#CCFBF1', fg: '#0F766E' },
-  ENDED:               { label: 'Completed',                  bg: '#CCFBF1', fg: '#0F766E' },
-  MISSED:              { label: 'Student absent',             bg: '#FEE2E2', fg: '#991B1B' },
-  AWAITING_RESCHEDULE: { label: 'Awaiting new time',          bg: '#FFEDD5', fg: '#9A3412' },
-  UNDER_REVIEW:        { label: 'Under review',               bg: '#EDE9FE', fg: '#5B21B6' },
-  CANCELLED:           { label: 'Cancelled',                  bg: '#E5E7EB', fg: '#4B5563' },
-  DECLINED:            { label: 'Declined',                   bg: '#FFE4E6', fg: '#9F1239' },
-  RESCHEDULED:         { label: 'Moved to a new time',        bg: '#E0E7FF', fg: '#3730A3' },
+const STATUS_META: Record<string, { label: string; bg: string; fg: string; wash: string }> = {
+  PENDING:             { label: 'Awaiting assignment',        bg: '#E2E8F0', fg: '#334155', wash: '#F8FAFC' },
+  ASSIGNED:            { label: 'Awaiting your confirmation', bg: '#FDE68A', fg: '#92400E', wash: '#FFFBEB' },
+  CONFIRMED:           { label: 'Scheduled',                  bg: '#DBEAFE', fg: '#1D4ED8', wash: '#EFF6FF' },
+  IN_PROGRESS:         { label: 'Student present',            bg: '#BBF7D0', fg: '#15803D', wash: '#F0FDF4' },
+  COMPLETED:           { label: 'Completed',                  bg: '#CCFBF1', fg: '#0F766E', wash: '#F0FDFA' },
+  ENDED:               { label: 'Completed',                  bg: '#CCFBF1', fg: '#0F766E', wash: '#F0FDFA' },
+  MISSED:              { label: 'Student absent',             bg: '#FECACA', fg: '#B91C1C', wash: '#FEF2F2' },
+  AWAITING_RESCHEDULE: { label: 'Awaiting new time',          bg: '#FED7AA', fg: '#C2410C', wash: '#FFF7ED' },
+  UNDER_REVIEW:        { label: 'Under review',               bg: '#DDD6FE', fg: '#6D28D9', wash: '#F5F3FF' },
+  CANCELLED:           { label: 'Cancelled',                  bg: '#E5E7EB', fg: '#4B5563', wash: '#F9FAFB' },
+  DECLINED:            { label: 'Declined',                   bg: '#FECDD3', fg: '#BE123C', wash: '#FFF1F2' },
+  RESCHEDULED:         { label: 'Moved to a new time',        bg: '#C7D2FE', fg: '#4338CA', wash: '#EEF2FF' },
 }
 
 /**
@@ -171,11 +185,11 @@ const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
  *   otherwise                  ->  they cancelled it in advance and no cover was found; the
  *                                  student genuinely is picking a new time.
  */
-function resolveMeta(appt: any): { label: string; bg: string; fg: string } {
+function resolveMeta(appt: any): { label: string; bg: string; fg: string; wash: string } {
   const status = (appt?.status || '').toUpperCase()
   if (status === 'AWAITING_RESCHEDULE'
       && (appt?.missedByRole || '').toUpperCase() === 'COUNSELLOR') {
-    return { label: 'You missed this', bg: '#FFE4E6', fg: '#9F1239' }
+    return { label: 'You missed this', bg: '#FECDD3', fg: '#BE123C', wash: '#FFF1F2' }
   }
   // A recorded absence does not change the status — the nightly sweep closes the session
   // later. Until then the row would read "Scheduled" for a student already marked absent,
@@ -189,29 +203,68 @@ function resolveMeta(appt: any): { label: string; bg: string; fg: string } {
   if (status === 'RESCHEDULED') {
     const missedBy = (appt?.missedByRole || '').toUpperCase()
     const cancelledBy = (appt?.cancelledByRole || '').toUpperCase()
-    if (missedBy === 'STUDENT') return { label: 'Student absent · moved', bg: '#FEE2E2', fg: '#991B1B' }
-    if (missedBy === 'COUNSELLOR') return { label: 'You missed this · moved', bg: '#FFE4E6', fg: '#9F1239' }
-    if (cancelledBy === 'COUNSELLOR') return { label: 'You cancelled · moved', bg: '#E5E7EB', fg: '#4B5563' }
-    if (cancelledBy === 'STUDENT') return { label: 'Student cancelled · moved', bg: '#E5E7EB', fg: '#4B5563' }
+    if (missedBy === 'STUDENT') return { label: 'Student absent · moved', bg: '#FECACA', fg: '#B91C1C', wash: '#FEF2F2' }
+    if (missedBy === 'COUNSELLOR') return { label: 'You missed this · moved', bg: '#FECDD3', fg: '#BE123C', wash: '#FFF1F2' }
+    if (cancelledBy === 'COUNSELLOR') return { label: 'You cancelled · moved', bg: '#E5E7EB', fg: '#4B5563', wash: '#F9FAFB' }
+    if (cancelledBy === 'STUDENT') return { label: 'Student cancelled · moved', bg: '#E5E7EB', fg: '#4B5563', wash: '#F9FAFB' }
   }
-  return STATUS_META[status] || { label: status, bg: '#F3F4F6', fg: '#374151' }
+  return STATUS_META[status] || { label: status, bg: '#E5E7EB', fg: '#374151', wash: '#F9FAFB' }
 }
 
 function statusLabel(appt: any): string {
   return resolveMeta(appt).label
 }
 
-function getStatusBadgeStyle(appt: any): React.CSSProperties {
-  const meta = resolveMeta(appt)
-  return {
-    background: meta.bg,
-    color: meta.fg,
-    padding: '2px 10px',
-    borderRadius: 12,
-    fontSize: 11,
-    fontWeight: 600,
-    whiteSpace: 'nowrap',
-  }
+/**
+ * The medallion at the head of each feed row. One glyph per status, so the shape
+ * says what happened before the text is read — and the pairs that matter most are
+ * the ones drawn least alike: a session waiting on the counsellor (person-check)
+ * against one already locked in (calendar-check), and one running right now
+ * (broadcast) against one finished (check).
+ */
+const STATUS_ICON: Record<string, string> = {
+  PENDING:             'bi-hourglass-split',
+  ASSIGNED:            'bi-person-check',
+  CONFIRMED:           'bi-calendar-check',
+  IN_PROGRESS:         'bi-broadcast',
+  COMPLETED:           'bi-check2-circle',
+  ENDED:               'bi-check2-circle',
+  MISSED:              'bi-person-dash',
+  AWAITING_RESCHEDULE: 'bi-arrow-repeat',
+  UNDER_REVIEW:        'bi-eye',
+  CANCELLED:           'bi-x-circle',
+  DECLINED:            'bi-slash-circle',
+  RESCHEDULED:         'bi-arrow-right-circle',
+}
+
+/**
+ * Statuses where the session is still in play — the counsellor either owes it an
+ * action or is in it. These rows get the tinted ground, the coloured rail and the
+ * live dot; everything already settled stays plain white, so a long history tab
+ * never competes with the two sessions happening today.
+ */
+const LIVE_STATUSES = new Set(['PENDING', 'ASSIGNED', 'CONFIRMED', 'IN_PROGRESS'])
+
+/** Date only — "17 Jul 2026". Null when the booking has no usable slot. */
+function formatSlotDay(appt: any): string | null {
+  const d = buildSlotDate(appt)
+  if (!d) return null
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** Time only — "04:00 PM". Null when the booking has no usable slot. */
+function formatSlotTime(appt: any): string | null {
+  const d = buildSlotDate(appt)
+  if (!d) return null
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+}
+
+/** When the booking itself was made, for the small print. */
+function formatBookedOn(value: any): string | null {
+  if (!value) return null
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 /** Build a Date from slot's date ("YYYY-MM-DD") + startTime ("HH:mm:ss"). */
@@ -299,28 +352,34 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [reportLoading, setReportLoading] = useState<number | null>(null)
+  // Separate from `error`: a session whose student has not sat the assessment yet is a normal
+  // state of affairs, not a failure, and colouring it red sends the counsellor chasing an admin.
+  const [reportNotice, setReportNotice] = useState<{ text: string } | null>(null)
   const [declineModal, setDeclineModal] = useState<{ appointmentId: number } | null>(null)
   const [declineReason, setDeclineReason] = useState('')
 
-  // Open the booked student's assessment report in a new tab. We look up the
-  // student's generated reports and open the first one that's ready (has a URL).
+  // The report the emails carry — resolved per session, not per student, so it is the one for
+  // the assessment this booking was made against, and it prefers the PDF. When there is none,
+  // the reason is worth saying: a student who has not sat the assessment and a report that has
+  // not come through are different problems, and only the second is anyone's to chase.
   const handleViewReport = async (appt: any) => {
-    const usid = appt?.student?.userStudentId
-    if (!usid) {
-      setError('No student is linked to this appointment.')
-      return
-    }
     setReportLoading(appt.id)
+    setReportNotice(null)
     try {
-      const res = await getGeneratedReportsByStudent(usid)
-      const reports = (res.data || []) as any[]
-      const ready =
-        reports.find((r) => r.reportUrl && (r.reportStatus || '').toLowerCase() === 'generated') ||
-        reports.find((r) => r.reportUrl)
-      if (ready?.reportUrl) {
-        window.open(ready.reportUrl, '_blank', 'noopener,noreferrer')
+      const res = await getSessionReportLink(appt.id)
+      const { reportLink, status } = res.data || ({} as any)
+      if (reportLink) {
+        window.open(reportLink, '_blank', 'noopener,noreferrer')
+        return
+      }
+      if (status === 'notCompleted') {
+        setReportNotice({ text: 'This student has not finished the assessment yet, so there is no report to read.' })
+      } else if (status === 'unavailable') {
+        setReportNotice({ text: 'No assessment is linked to this session, so there is no report to open.' })
       } else {
-        setError("This student's report isn't ready yet.")
+        setReportNotice({
+          text: "This student's report has not been generated yet. Please ask an administrator to generate it.",
+        })
       }
     } catch {
       setError("Could not load the student's report.")
@@ -705,6 +764,27 @@ const CounsellorAppointmentsPage: React.FC = () => {
         </div>
       )}
 
+      {reportNotice && (
+        <div
+          style={{
+            background: '#EFF6FF',
+            color: '#1E3A8A',
+            padding: '10px 16px',
+            borderRadius: 8,
+            fontSize: 13,
+            marginBottom: 16,
+          }}
+        >
+          {reportNotice.text}
+          <button
+            onClick={() => setReportNotice(null)}
+            style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#1E3A8A', fontWeight: 700 }}
+          >
+            x
+          </button>
+        </div>
+      )}
+
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
         {[
@@ -756,7 +836,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
           No appointments found for this filter.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className='cp-appt-feed'>
           {filtered.map((appt) => {
             const rawStatus = (appt.status || '').toUpperCase()
             const ended = isEndedConfirmed(appt)
@@ -773,37 +853,68 @@ const CounsellorAppointmentsPage: React.FC = () => {
             const movedTo = appt.id != null ? replacementByOriginalId.get(appt.id) : null
             const movedToLabel = movedTo ? formatDateTime(movedTo) : null
 
+            const meta = resolveMeta(appt)
+            // A recorded absence is settled even while the status still says CONFIRMED —
+            // the sweep has simply not closed it yet, and the row wants nothing further.
+            const live = LIVE_STATUSES.has(status) && !appt.markedAbsentAt
+            const slotDay = formatSlotDay(appt)
+            const slotTime = formatSlotTime(appt)
+            const bookedOn = formatBookedOn(appt.createdAt)
+            const mode = (appt.mode || appt.slot?.mode || '').toUpperCase()
+
             return (
-              <div
+              <article
                 key={appt.id}
-                className='cp-card'
-                style={{ padding: '16px 20px' }}
+                className={`cp-appt-row${live ? ' cp-appt-row--live' : ''}`}
+                style={{
+                  '--appt-accent': meta.fg,
+                  '--appt-tint': meta.bg,
+                  '--appt-wash': meta.wash,
+                } as React.CSSProperties}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                <div className='cp-appt-icon'>
+                  <i className={`bi ${STATUS_ICON[status] || 'bi-calendar-event'}`} />
+                </div>
+
+                <div className='cp-appt-main'>
+                <div className='cp-appt-topline'>
                   {/* Left: Info */}
-                  <div style={{ flex: 1, minWidth: 200 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#263B6A' }}>
-                        {formatDateTime(appt)}
-                      </span>
-                      <span style={getStatusBadgeStyle(appt)}>{statusLabel(appt)}</span>
+                  <div className='cp-appt-body'>
+                    <div className='cp-appt-head'>
+                      <span className='cp-appt-title'>{statusLabel(appt)}</span>
+                      {live && <span className='cp-appt-dot' />}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1F2E', marginBottom: 4 }}>
-                      {studentName}
+                    <p className='cp-appt-desc'>
+                      <strong>{studentName}</strong>
+                      {slotDay
+                        ? <> — session on {slotDay} at {slotTime}</>
+                        : <> — no time scheduled yet</>}
+                    </p>
+                    <div className='cp-appt-meta'>
+                      {bookedOn && (
+                        <span title='When this session was booked'>
+                          <i className='bi bi-clock-history' />
+                          Booked {bookedOn}
+                        </span>
+                      )}
+                      {instituteName && (
+                        <span>
+                          <i className='bi bi-building' />
+                          {instituteName}
+                        </span>
+                      )}
+                      {mode && (
+                        <span>
+                          <i className={mode === 'ONLINE' ? 'bi bi-camera-video' : 'bi bi-geo-alt'} />
+                          {mode === 'ONLINE' ? 'Online' : 'In person'}
+                        </span>
+                      )}
                     </div>
-                    {instituteName && (
-                      <div style={{ fontSize: 12, color: '#6B7A8D', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <i className='bi bi-building' style={{ fontSize: 11 }} />
-                        {instituteName}
-                      </div>
-                    )}
                     {reason && (
-                      <div style={{ fontSize: 12, color: '#6B7A8D' }}>
-                        Reason: {reason}
-                      </div>
+                      <div className='cp-appt-note'>Reason: {reason}</div>
                     )}
                     {rescheduledFromLabel && (
-                      <div style={{ fontSize: 12, color: '#92400E', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div className='cp-appt-trail' style={{ color: '#92400E' }}>
                         <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
                           <polyline points='23 4 23 10 17 10' />
                           <path d='M20.49 15a9 9 0 1 1-2.12-9.36L23 10' />
@@ -812,7 +923,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                       </div>
                     )}
                     {movedToLabel && (
-                      <div style={{ fontSize: 12, color: '#3730A3', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div className='cp-appt-trail' style={{ color: '#3730A3' }}>
                         <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
                           <polyline points='23 4 23 10 17 10' />
                           <path d='M20.49 15a9 9 0 1 1-2.12-9.36L23 10' />
@@ -823,7 +934,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                   </div>
 
                   {/* Right: Actions */}
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className='cp-appt-actions'>
                     {/* Student's assessment report — always available so the counsellor
                         can prepare from the results that led to this booking. */}
                     <button
@@ -1060,7 +1171,8 @@ const CounsellorAppointmentsPage: React.FC = () => {
                     </div>
                   )
                 })()}
-              </div>
+                </div>
+              </article>
             )
           })}
         </div>

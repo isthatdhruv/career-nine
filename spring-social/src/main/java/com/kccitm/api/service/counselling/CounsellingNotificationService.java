@@ -587,7 +587,7 @@ public class CounsellingNotificationService {
     }
 
     /** The assessment this session was booked against, resolved through the entitlement. */
-    private Long assessmentIdFor(CounsellingAppointment appointment) {
+    public Long assessmentIdFor(CounsellingAppointment appointment) {
         try {
             if (appointment.getEntitlementId() == null) return null;
             return studentEntitlementRepository.findById(appointment.getEntitlementId())

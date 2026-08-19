@@ -24,21 +24,25 @@
 -- All additive; existing rows are unaffected. The legacy reminder24h_sent /
 -- reminder1h_sent flags on counselling_appointment are left in place (no longer
 -- written) so any in-flight rows keep their history.
+--
+-- Idempotent: CREATE TABLE IF NOT EXISTS plus information_schema guards, because
+-- in some environments Hibernate `ddl-auto` has already created these
+-- entity-mapped tables/columns before this migration runs (out-of-order after a
+-- merge). Hibernate creates the tables without the FK constraints, so those are
+-- guard-added separately.
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE counselling_reminder_sent (
+CREATE TABLE IF NOT EXISTS counselling_reminder_sent (
   id              BIGINT       NOT NULL AUTO_INCREMENT,
   appointment_id  BIGINT       NOT NULL,
   audience        VARCHAR(20)  NOT NULL,
   offset_code     VARCHAR(10)  NOT NULL,
   sent_at         DATETIME     NOT NULL,
   PRIMARY KEY (id),
-  CONSTRAINT uq_reminder_sent UNIQUE (appointment_id, audience, offset_code),
-  CONSTRAINT fk_reminder_sent_appt FOREIGN KEY (appointment_id)
-      REFERENCES counselling_appointment (id) ON DELETE CASCADE
+  CONSTRAINT uq_reminder_sent UNIQUE (appointment_id, audience, offset_code)
 );
 
-CREATE TABLE counselling_checkin_otp (
+CREATE TABLE IF NOT EXISTS counselling_checkin_otp (
   id              BIGINT       NOT NULL AUTO_INCREMENT,
   appointment_id  BIGINT       NOT NULL,
   code_hash       VARCHAR(255) NOT NULL,
@@ -47,12 +51,50 @@ CREATE TABLE counselling_checkin_otp (
   verified_at     DATETIME     NULL,
   created_at      DATETIME     NOT NULL,
   PRIMARY KEY (id),
-  CONSTRAINT uq_checkin_otp_appt UNIQUE (appointment_id),
-  CONSTRAINT fk_checkin_otp_appt FOREIGN KEY (appointment_id)
-      REFERENCES counselling_appointment (id) ON DELETE CASCADE
+  CONSTRAINT uq_checkin_otp_appt UNIQUE (appointment_id)
 );
 
-ALTER TABLE counselling_appointment
-  ADD COLUMN session_started_at  DATETIME NULL,
-  ADD COLUMN checkin_verified_at DATETIME NULL,
-  ADD COLUMN attended            BOOLEAN  NULL;
+SET @s := IF(
+  EXISTS(SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+         WHERE CONSTRAINT_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'counselling_reminder_sent'
+           AND CONSTRAINT_NAME = 'fk_reminder_sent_appt'),
+  'SELECT 1',
+  'ALTER TABLE counselling_reminder_sent ADD CONSTRAINT fk_reminder_sent_appt FOREIGN KEY (appointment_id) REFERENCES counselling_appointment (id) ON DELETE CASCADE');
+PREPARE s1 FROM @s; EXECUTE s1; DEALLOCATE PREPARE s1;
+
+SET @s := IF(
+  EXISTS(SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+         WHERE CONSTRAINT_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'counselling_checkin_otp'
+           AND CONSTRAINT_NAME = 'fk_checkin_otp_appt'),
+  'SELECT 1',
+  'ALTER TABLE counselling_checkin_otp ADD CONSTRAINT fk_checkin_otp_appt FOREIGN KEY (appointment_id) REFERENCES counselling_appointment (id) ON DELETE CASCADE');
+PREPARE s2 FROM @s; EXECUTE s2; DEALLOCATE PREPARE s2;
+
+SET @s := IF(
+  EXISTS(SELECT 1 FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'counselling_appointment'
+           AND COLUMN_NAME = 'session_started_at'),
+  'SELECT 1',
+  'ALTER TABLE counselling_appointment ADD COLUMN session_started_at DATETIME NULL');
+PREPARE s3 FROM @s; EXECUTE s3; DEALLOCATE PREPARE s3;
+
+SET @s := IF(
+  EXISTS(SELECT 1 FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'counselling_appointment'
+           AND COLUMN_NAME = 'checkin_verified_at'),
+  'SELECT 1',
+  'ALTER TABLE counselling_appointment ADD COLUMN checkin_verified_at DATETIME NULL');
+PREPARE s4 FROM @s; EXECUTE s4; DEALLOCATE PREPARE s4;
+
+SET @s := IF(
+  EXISTS(SELECT 1 FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'counselling_appointment'
+           AND COLUMN_NAME = 'attended'),
+  'SELECT 1',
+  'ALTER TABLE counselling_appointment ADD COLUMN attended BOOLEAN NULL');
+PREPARE s5 FROM @s; EXECUTE s5; DEALLOCATE PREPARE s5;
