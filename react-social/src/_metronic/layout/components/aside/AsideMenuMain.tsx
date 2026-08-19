@@ -85,11 +85,15 @@ export function AsideMenuMain() {
 
   const showAssessmentManagement = showQuestionnaire || showQualities || showAssessment;
 
-  const showDataUpload =
+  const showOfflineAssessmentData =
     allowed("/offline-assessment-upload") ||
-    allowed("/omr-data-upload") ||
+    allowed("/omr-data-upload");
+
+  const showUploadTracking =
     allowed("/live-tracking") ||
     allowed("/communication-logs");
+
+  const showDataUpload = showOfflineAssessmentData || showUploadTracking;
 
   const showB2C =
     allowed("/b2c/campaigns") ||
@@ -465,28 +469,39 @@ export function AsideMenuMain() {
             </div>
           </div>
 
+          {showOfflineAssessmentData && (
+            <AsideMenuItemWithSub
+              to=""
+              title="Offline Assessment Data"
+              fontIcon="bi-upc-scan"
+              icon="/media/icons/duotune/files/fil003.svg"
+            >
+              {allowed("/offline-assessment-upload") && (
+                <AsideMenuItem
+                  to="/offline-assessment-upload"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Offline Upload"
+                  fontIcon="bi-cloud-upload"
+                />
+              )}
+              {allowed("/omr-data-upload") && (
+                <AsideMenuItem
+                  to="/omr-data-upload"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="OMR Data Upload"
+                  fontIcon="bi-upc-scan"
+                />
+              )}
+            </AsideMenuItemWithSub>
+          )}
+
+          {showUploadTracking && (
           <AsideMenuItemWithSub
             to=""
             title="Upload & Tracking"
             fontIcon="bi-cloud-upload"
             icon="/media/icons/duotune/files/fil003.svg"
           >
-            {allowed("/offline-assessment-upload") && (
-              <AsideMenuItem
-                to="/offline-assessment-upload"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Offline Upload"
-                fontIcon="bi-cloud-upload"
-              />
-            )}
-            {allowed("/omr-data-upload") && (
-              <AsideMenuItem
-                to="/omr-data-upload"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="OMR Data Upload"
-                fontIcon="bi-upc-scan"
-              />
-            )}
             {allowed("/live-tracking") && (
               <AsideMenuItem
                 to="/live-tracking"
@@ -504,6 +519,7 @@ export function AsideMenuMain() {
               />
             )}
           </AsideMenuItemWithSub>
+          )}
         </>
       )}
 

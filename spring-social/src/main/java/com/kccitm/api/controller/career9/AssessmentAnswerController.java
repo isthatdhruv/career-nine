@@ -1114,18 +1114,39 @@ public class AssessmentAnswerController {
                         throw new BadRequestException("Roll number is required");
                     }
 
-                    // Find user by careerNineRollNumber
-                    Optional<User> userOpt = userRepository.findByCareerNineRollNumber(rollNumber);
-                    if (!userOpt.isPresent()) {
+                    // Find the student by roll number WITHIN the selected institute.
+                    // Roll numbers are issued per institute and section (see
+                    // CareerNineRollNumberService), so the same value legitimately exists at
+                    // other schools; a global lookup would silently write this sheet's answers
+                    // onto a student who belongs to a different institute.
+                    List<User> candidates = userRepository.findAllByCareerNineRollNumber(rollNumber);
+                    if (candidates.isEmpty()) {
                         throw new ResourceNotFoundException("User", "rollNumber", rollNumber);
                     }
 
-                    User user = userOpt.get();
+                    User user = null;
+                    StudentInfo studentInfo = null;
+                    int matchesInInstitute = 0;
+                    for (User candidate : candidates) {
+                        StudentInfo candidateInfo = studentInfoRepository.findByUser(candidate);
+                        if (candidateInfo == null) continue;
+                        if (!instituteId.equals(candidateInfo.getInstituteId())) continue;
+                        matchesInInstitute++;
+                        if (user == null) {
+                            user = candidate;
+                            studentInfo = candidateInfo;
+                        }
+                    }
 
-                    // Find StudentInfo for this user
-                    StudentInfo studentInfo = studentInfoRepository.findByUser(user);
-                    if (studentInfo == null) {
-                        throw new ResourceNotFoundException("StudentInfo", "rollNumber", rollNumber);
+                    if (matchesInInstitute == 0) {
+                        throw new BadRequestException("Roll number '" + rollNumber
+                                + "' does not belong to " + institute.getInstituteName()
+                                + " (found at " + candidates.size() + " other institute(s))");
+                    }
+                    if (matchesInInstitute > 1) {
+                        throw new BadRequestException("Roll number '" + rollNumber + "' is shared by "
+                                + matchesInInstitute + " students in " + institute.getInstituteName()
+                                + " — fix the duplicate before uploading");
                     }
 
                     // Find or create UserStudent

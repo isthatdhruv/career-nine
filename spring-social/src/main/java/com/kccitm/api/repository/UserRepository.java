@@ -57,6 +57,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByCareerNineRollNumber(String careerNineRollNumber);
 
+    /**
+     * Every user holding this roll number. Roll numbers are generated per institute and
+     * section (see CareerNineRollNumberService), so the same value legitimately exists at
+     * more than one school — callers must narrow by institute themselves.
+     */
+    List<User> findAllByCareerNineRollNumber(String careerNineRollNumber);
+
     long countByIsSuperAdminTrue();
 
     @Query(value = "SELECT u.career_nine_rollnumber FROM student_user u " +
