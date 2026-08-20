@@ -8,7 +8,12 @@ export function assignCounsellor(appointmentId: number, counsellorId: number, ad
 export function confirmAppointment(appointmentId: number, userId: number) { return axios.put(`${BASE}/confirm/${appointmentId}`, { userId }) }
 export function declineAppointment(appointmentId: number, userId: number, reason: string) { return axios.put(`${BASE}/decline/${appointmentId}`, { userId, reason }) }
 export function cancelAppointment(appointmentId: number, userId: number, reason: string) { return axios.put(`${BASE}/cancel/${appointmentId}`, { userId, reason }) }
-export function rescheduleAppointment(appointmentId: number, newSlotId: number, userId: number) { return axios.put(`${BASE}/reschedule/${appointmentId}`, { newSlotId, userId }) }
+/**
+ * Move a booking to another slot. `isAdmin` bypasses the student's one-reschedule
+ * cap without spending it — pass it only from admin screens, never from the
+ * student's own picker.
+ */
+export function rescheduleAppointment(appointmentId: number, newSlotId: number, userId: number, isAdmin = false) { return axios.put(`${BASE}/reschedule/${appointmentId}`, { newSlotId, userId, isAdmin }) }
 export function setMeetingLink(appointmentId: number, meetingLink: string) { return axios.put(`${BASE}/set-meeting-link/${appointmentId}`, { meetingLink }) }
 export function getStudentAppointments(studentId: number) { return axios.get(`${BASE}/by-student/${studentId}`) }
 export function getCounsellorAppointments(counsellorId: number) { return axios.get(`${BASE}/by-counsellor/${counsellorId}`) }

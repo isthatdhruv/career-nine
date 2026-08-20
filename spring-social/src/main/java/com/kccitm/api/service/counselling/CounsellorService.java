@@ -184,6 +184,17 @@ public class CounsellorService {
     }
 
     /** The single place a counsellor's approval state changes, whichever screen asked for it. */
+    /**
+     * Flip approval on a counsellor already in hand.
+     *
+     * <p>Exposed for the deactivation cascade, which has settled the diary first and must
+     * suspend that same instance — going back through {@link #toggleActive(Long)} would
+     * re-read the row and flip whatever it found, which is not the same statement.
+     */
+    public Counsellor setActiveForCounsellor(Counsellor counsellor, boolean active) {
+        return setActive(counsellor, active);
+    }
+
     private Counsellor setActive(Counsellor counsellor, boolean newActive) {
         Long id = counsellor.getId();
         counsellor.setIsActive(newActive);

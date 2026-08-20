@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { Spinner, Button, Form, Badge, Alert, Modal, Table } from "react-bootstrap";
+import { Spinner, Button, Form, Badge, Alert, Modal, Table, ProgressBar } from "react-bootstrap";
 import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
@@ -408,7 +408,10 @@ const OMRDataUploadPage = () => {
   const [loadingMapping, setLoadingMapping] = useState(false);
 
   // --- Upload mode ---
-  const [uploadMode, setUploadMode] = useState<"rollnumber" | "name">("rollnumber");
+  type UploadMode = "rollnumber" | "schoolrollnumber" | "name";
+  const [uploadMode, setUploadMode] = useState<UploadMode>("rollnumber");
+  /** Both roll-number modes use the same identity row; only the field matched differs. */
+  const matchesOnRollNumber = uploadMode === "rollnumber" || uploadMode === "schoolrollnumber";
 
   // --- Excel ---
   const [excelHeaders, setExcelHeaders] = useState<string[]>([]);
@@ -431,6 +434,7 @@ const OMRDataUploadPage = () => {
   const [autoMappedCount, setAutoMappedCount] = useState(0);
   const [showUnmappedFields, setShowUnmappedFields] = useState(false);
   const [showAllErrors, setShowAllErrors] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState<{ current: number; total: number } | null>(null);
   const savedMappingJsonRef = useRef<Record<string, string> | null>(null);
 
   // --- Parsed data ---
@@ -456,7 +460,12 @@ const OMRDataUploadPage = () => {
     const rows: MappingRow[] = [];
 
     // Identity fields
-    rows.push({ key: "id_rollNumber", label: "Roll Number", sectionLabel: "Student Identity", type: "identity" });
+    rows.push({
+      key: "id_rollNumber",
+      label: uploadMode === "schoolrollnumber" ? "School Roll Number" : "Career Nine Roll Number",
+      sectionLabel: "Student Identity",
+      type: "identity",
+    });
     rows.push({ key: "id_name", label: "Name", sectionLabel: "Student Identity", type: "identity" });
     rows.push({ key: "id_mobile", label: "Mobile Number", sectionLabel: "Student Identity", type: "identity" });
     rows.push({ key: "id_dob", label: "Date of Birth", sectionLabel: "Student Identity", type: "identity" });
@@ -504,7 +513,7 @@ const OMRDataUploadPage = () => {
     }
 
     return rows;
-  }, [mappingData]);
+  }, [mappingData, uploadMode]);
 
   // Group mapping rows by section for display
   const groupedMappingRows = useMemo(() => {
@@ -522,9 +531,9 @@ const OMRDataUploadPage = () => {
   // A field the upload cannot proceed without stays visible even with no column
   const isRequiredField = useCallback(
     (row: MappingRow) =>
-      (row.key === "id_rollNumber" && uploadMode === "rollnumber") ||
+      (row.key === "id_rollNumber" && matchesOnRollNumber) ||
       (row.key === "id_name" && uploadMode === "name"),
-    [uploadMode]
+    [uploadMode, matchesOnRollNumber]
   );
 
   /** Fields with no column in the uploaded sheet — hidden unless asked for. */
@@ -538,7 +547,7 @@ const OMRDataUploadPage = () => {
     const issues: string[] = [];
     const hasRollNumber = !!fieldToHeader["id_rollNumber"];
     const hasName = !!fieldToHeader["id_name"];
-    if (uploadMode === "rollnumber" && !hasRollNumber) issues.push("Map Roll Number (required)");
+    if (matchesOnRollNumber && !hasRollNumber) issues.push("Map Roll Number (required)");
     if (uploadMode === "name" && !hasName) issues.push("Map Name (required)");
 
     let mappedQuestionCount = 0;
@@ -549,7 +558,7 @@ const OMRDataUploadPage = () => {
     if (mappedQuestionCount === 0) issues.push("No question/option columns mapped");
 
     return { issues, canApply: issues.length === 0 && mappedQuestionCount > 0, mappedQuestionCount, totalMappable };
-  }, [fieldToHeader, mappingRows, uploadMode]);
+  }, [fieldToHeader, mappingRows, uploadMode, matchesOnRollNumber]);
 
   // ============ Data loading ============
 
@@ -1011,7 +1020,7 @@ const OMRDataUploadPage = () => {
   const handleSubmit = async () => {
     if (!mappingData || parsedStudents.length === 0) return;
 
-    if (uploadMode === "rollnumber") {
+    if (matchesOnRollNumber) {
       const noRoll = parsedStudents.filter((s) => !s.rollNumber.trim());
       if (noRoll.length > 0) {
         showErrorToast(`${noRoll.length} row(s) have no roll number.`);
@@ -1028,29 +1037,69 @@ const OMRDataUploadPage = () => {
     setSubmitting(true);
     setSubmitResult(null);
     setShowAllErrors(false);
+    setSubmitProgress({ current: 0, total: parsedStudents.length });
+
+    // Sent in batches so the upload can report real progress instead of sitting on one
+    // long request — a class of 55 with 110 answers each is a lot to push in one go.
+    const BATCH_SIZE = 10;
+
+    const combinedErrors: any[] = [];
+    let processed = 0;
+    let matched = 0;
+    let created = 0;
+    let sawCreated = false;
 
     try {
-      let res;
-      if (uploadMode === "rollnumber") {
-        res = await bulkSubmitByRollNumber({
-          assessmentId: mappingData.assessmentId,
-          instituteId: Number(selectedInstitute),
-          students: parsedStudents.map((s) => ({ rollNumber: s.rollNumber.trim(), answers: s.answers })),
-        });
-      } else {
-        res = await bulkSubmitWithStudents({
-          assessmentId: mappingData.assessmentId,
-          instituteId: Number(selectedInstitute),
-          students: parsedStudents.map((s) => ({
-            name: s.name.trim(), dob: s.dob || undefined, phone: s.mobile || undefined, answers: s.answers,
-          })),
-        });
+      for (let offset = 0; offset < parsedStudents.length; offset += BATCH_SIZE) {
+        const batch = parsedStudents.slice(offset, offset + BATCH_SIZE);
+
+        let res;
+        if (matchesOnRollNumber) {
+          res = await bulkSubmitByRollNumber({
+            assessmentId: mappingData.assessmentId,
+            instituteId: Number(selectedInstitute),
+            matchBy: uploadMode === "schoolrollnumber" ? "school" : "careerNine",
+            students: batch.map((s) => ({ rollNumber: s.rollNumber.trim(), answers: s.answers })),
+          });
+        } else {
+          res = await bulkSubmitWithStudents({
+            assessmentId: mappingData.assessmentId,
+            instituteId: Number(selectedInstitute),
+            students: batch.map((s) => ({
+              name: s.name.trim(), dob: s.dob || undefined, phone: s.mobile || undefined, answers: s.answers,
+            })),
+          });
+        }
+
+        const data = res.data || {};
+        processed += Number(data.studentsProcessed || 0);
+        matched += Number(data.matchSummary?.matched || 0);
+        if (data.matchSummary?.created != null) {
+          sawCreated = true;
+          created += Number(data.matchSummary.created);
+        }
+        // The row index comes back relative to the batch — restore the sheet's own numbering
+        for (const err of data.errors || []) {
+          combinedErrors.push({ ...err, rowIndex: (err.rowIndex ?? 0) + offset });
+        }
+
+        setSubmitProgress({ current: offset + batch.length, total: parsedStudents.length });
       }
-      setSubmitResult(res.data);
+
+      const matchSummary: Record<string, number> = { matched, failed: combinedErrors.length };
+      if (sawCreated) matchSummary.created = created;
+
+      setSubmitResult({
+        status: "success",
+        studentsProcessed: processed,
+        errors: combinedErrors,
+        matchSummary,
+      });
     } catch (error: any) {
       setSubmitResult({ status: "error", message: error.response?.data || error.message });
     } finally {
       setSubmitting(false);
+      setSubmitProgress(null);
     }
   };
 
@@ -1211,7 +1260,8 @@ const OMRDataUploadPage = () => {
               <div className="col-md-3">
                 <Form.Label>Upload Mode</Form.Label>
                 <Form.Select value={uploadMode} onChange={(e) => setUploadMode(e.target.value as any)}>
-                  <option value="rollnumber">Match by Roll Number</option>
+                  <option value="rollnumber">Match by Career Nine Roll Number</option>
+                  <option value="schoolrollnumber">Match by School Roll Number</option>
                   <option value="name">Match/Create by Name</option>
                 </Form.Select>
               </div>
@@ -1343,7 +1393,7 @@ const OMRDataUploadPage = () => {
                                 <tr key={row.key} className={isMapped ? "" : "text-muted"}>
                                   <td>
                                     {row.label}
-                                    {row.type === "identity" && row.key === "id_rollNumber" && uploadMode === "rollnumber" && (
+                                    {row.type === "identity" && row.key === "id_rollNumber" && matchesOnRollNumber && (
                                       <Badge bg="danger" className="ms-1" style={{ fontSize: "0.6rem" }}>Required</Badge>
                                     )}
                                     {row.type === "identity" && row.key === "id_name" && uploadMode === "name" && (
@@ -1418,7 +1468,7 @@ const OMRDataUploadPage = () => {
                   <tbody>
                     {parsedStudents.map((student, idx) => {
                       const hasWarnings = student.warnings.length > 0;
-                      const noIdentity = uploadMode === "rollnumber" ? !student.rollNumber.trim() : !student.name.trim();
+                      const noIdentity = matchesOnRollNumber ? !student.rollNumber.trim() : !student.name.trim();
                       return (
                         <tr key={idx} className={noIdentity ? "table-danger" : hasWarnings ? "table-warning" : ""}>
                           <td>{idx + 1}</td>
@@ -1465,8 +1515,21 @@ const OMRDataUploadPage = () => {
                     <>Submit All ({parsedStudents.length} students)</>
                   )}
                 </Button>
+                {submitting && submitProgress && (
+                  <div style={{ width: 250 }}>
+                    <ProgressBar
+                      now={Math.round((submitProgress.current / submitProgress.total) * 100)}
+                      label={`${submitProgress.current} / ${submitProgress.total}`}
+                      style={{ height: 22, borderRadius: 10 }}
+                    />
+                  </div>
+                )}
                 <small className="text-muted">
-                  Mode: <strong>{uploadMode === "rollnumber" ? "Match by Roll Number" : "Match/Create by Name"}</strong>
+                  Mode: <strong>{uploadMode === "rollnumber"
+                    ? "Match by Career Nine Roll Number"
+                    : uploadMode === "schoolrollnumber"
+                      ? "Match by School Roll Number"
+                      : "Match/Create by Name"}</strong>
                 </small>
 
                 {submitResult && submitResult.status === "success" && (

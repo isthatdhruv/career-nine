@@ -1099,6 +1099,12 @@ public class AssessmentAnswerController {
         InstituteDetail institute = instituteDetailRepository.findById(instituteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Institute", "id", instituteId));
 
+            // Which identifier the sheet carries: the Career Nine roll number (default) or the
+            // school's own roll number. Either way the search stays inside the chosen institute.
+            boolean matchBySchoolRoll = "school".equalsIgnoreCase(
+                    payload.get("matchBy") != null ? String.valueOf(payload.get("matchBy")) : "");
+            String rollLabel = matchBySchoolRoll ? "school roll number" : "roll number";
+
             List<Map<String, Object>> students = (List<Map<String, Object>>) payload.get("students");
             int successCount = 0;
             int matchedCount = 0;
@@ -1114,39 +1120,57 @@ public class AssessmentAnswerController {
                         throw new BadRequestException("Roll number is required");
                     }
 
-                    // Find the student by roll number WITHIN the selected institute.
-                    // Roll numbers are issued per institute and section (see
-                    // CareerNineRollNumberService), so the same value legitimately exists at
-                    // other schools; a global lookup would silently write this sheet's answers
-                    // onto a student who belongs to a different institute.
-                    List<User> candidates = userRepository.findAllByCareerNineRollNumber(rollNumber);
-                    if (candidates.isEmpty()) {
-                        throw new ResourceNotFoundException("User", "rollNumber", rollNumber);
-                    }
-
+                    // Find the student WITHIN the selected institute. Roll numbers are issued
+                    // per institute and section (see CareerNineRollNumberService) and school roll
+                    // numbers are the school's own, so neither is unique across institutes; a
+                    // global lookup would silently write this sheet's answers onto a student who
+                    // belongs to a different school.
                     User user = null;
                     StudentInfo studentInfo = null;
                     int matchesInInstitute = 0;
-                    for (User candidate : candidates) {
-                        StudentInfo candidateInfo = studentInfoRepository.findByUser(candidate);
-                        if (candidateInfo == null) continue;
-                        if (!instituteId.equals(candidateInfo.getInstituteId())) continue;
-                        matchesInInstitute++;
-                        if (user == null) {
-                            user = candidate;
-                            studentInfo = candidateInfo;
+                    int matchesElsewhere = 0;
+
+                    if (matchBySchoolRoll) {
+                        List<StudentInfo> infos = studentInfoRepository
+                                .findBySchoolRollNumberAndInstituteId(rollNumber, instituteId);
+                        for (StudentInfo info : infos) {
+                            if (info.getUser() == null) continue;
+                            matchesInInstitute++;
+                            if (user == null) {
+                                user = info.getUser();
+                                studentInfo = info;
+                            }
+                        }
+                    } else {
+                        List<User> candidates = userRepository.findAllByCareerNineRollNumber(rollNumber);
+                        for (User candidate : candidates) {
+                            StudentInfo candidateInfo = studentInfoRepository.findByUser(candidate);
+                            if (candidateInfo == null) continue;
+                            if (!instituteId.equals(candidateInfo.getInstituteId())) {
+                                matchesElsewhere++;
+                                continue;
+                            }
+                            matchesInInstitute++;
+                            if (user == null) {
+                                user = candidate;
+                                studentInfo = candidateInfo;
+                            }
                         }
                     }
 
                     if (matchesInInstitute == 0) {
-                        throw new BadRequestException("Roll number '" + rollNumber
-                                + "' does not belong to " + institute.getInstituteName()
-                                + " (found at " + candidates.size() + " other institute(s))");
+                        if (matchesElsewhere > 0) {
+                            throw new BadRequestException("Roll number '" + rollNumber
+                                    + "' does not belong to " + institute.getInstituteName()
+                                    + " (found at " + matchesElsewhere + " other institute(s))");
+                        }
+                        throw new BadRequestException("No student with " + rollLabel + " '"
+                                + rollNumber + "' in " + institute.getInstituteName());
                     }
                     if (matchesInInstitute > 1) {
-                        throw new BadRequestException("Roll number '" + rollNumber + "' is shared by "
-                                + matchesInInstitute + " students in " + institute.getInstituteName()
-                                + " — fix the duplicate before uploading");
+                        throw new BadRequestException("The " + rollLabel + " '" + rollNumber
+                                + "' is shared by " + matchesInInstitute + " students in "
+                                + institute.getInstituteName() + " — fix the duplicate before uploading");
                     }
 
                     // Find or create UserStudent

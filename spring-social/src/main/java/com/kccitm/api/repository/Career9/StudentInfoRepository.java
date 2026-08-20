@@ -16,6 +16,13 @@ public interface StudentInfoRepository extends JpaRepository<StudentInfo, Long> 
 
     StudentInfo findByUser(User user);
 
+    /**
+     * Students at one institute holding this school roll number. School roll numbers are the
+     * school's own identifiers, so they are only meaningful within an institute — and are not
+     * guaranteed unique, hence the list.
+     */
+    List<StudentInfo> findBySchoolRollNumberAndInstituteId(String schoolRollNumber, Integer instituteId);
+
     List<StudentInfo> findByInstituteId(Integer instituteId);
 
     List<StudentInfo> findByEmailAndInstituteId(String email, Integer instituteId);

@@ -5,6 +5,10 @@ import PageHeader from '../../../components/PageHeader'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import { getAllAppointments } from '../API/AppointmentAPI'
 import { getAvailableSlots } from '../API/SlotAPI'
+import {
+  usePeriodFilter, PeriodFilterControl,
+  localDateStr, shiftDate, daysBetween, fmtDateShort,
+} from '../shared/PeriodFilter'
 
 /**
  * Admin Counselling Dashboard.
@@ -21,13 +25,7 @@ import { getAvailableSlots } from '../API/SlotAPI'
  * excluded from every "real session" count.
  */
 
-// ── Date / time helpers (local time — IST-correct, unlike toISOString which is UTC) ──
-function localDateStr(d: Date = new Date()): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+// ── Appointment field readers (shape of GET /counselling-appointment/getAll) ──
 function slotDate(a: any): string { return (a?.slot?.date || a?.date || '').slice(0, 10) }
 function slotStartTime(a: any): string { return (a?.slot?.startTime || a?.startTime || '').slice(0, 5) }
 function slotOnlyDate(s: any): string { return (s?.date || '').slice(0, 10) }
@@ -64,7 +62,65 @@ function colorFor(name: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length]
 }
 
+/** Title of the issues tile — its drill-down is by reason, not by status. */
+const ISSUE_TILE = 'Students Facing Issues'
+
+/**
+ * Sessions that went wrong for the student, and why.
+ *
+ * These are the ones nobody would find by reading the funnel: the student did
+ * everything right and still lost her session, or is disputing being marked absent.
+ * They sit in statuses the eight overview tiles deliberately ignore, so without this
+ * they are invisible on the dashboard — which is how a parked session can sit for
+ * days with nobody chasing it.
+ *
+ * Returns null when the session is fine.
+ */
+function issueReason(a: any): string | null {
+  const status = String(a?.status || '').toUpperCase()
+  const reason = String(a?.cancellationReason || '').toUpperCase()
+  const missedBy = String(a?.missedByRole || '').toUpperCase()
+
+  // She says she was there; the absence mark is suspended until an admin decides.
+  if (status === 'UNDER_REVIEW') return 'Marked absent — student disputes it'
+
+  if (status === 'AWAITING_RESCHEDULE') {
+    if (reason === 'COUNSELLOR_DEACTIVATED') return 'Counsellor deactivated — rebooking link sent'
+    if (missedBy === 'COUNSELLOR') return 'Counsellor did not turn up'
+    return 'Session parked — awaiting a new time'
+  }
+
+  // Cancelled because the counsellor was suspended and nobody else covers her
+  // assessment: she was promised a call, so somebody has to make it.
+  if (status === 'CANCELLED' && reason === 'COUNSELLOR_DEACTIVATED') {
+    return 'Counsellor deactivated — needs follow-up'
+  }
+
+  return null
+}
+
 const ACTIVE_STATUSES = ['PENDING', 'ASSIGNED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'MISSED']
+
+/**
+ * The overview tiles, each defined once: its label, the statuses it counts, and
+ * how to read its number off the window buckets. Clicking a tile lists exactly
+ * the appointments matching `statuses`, so the number and the list can never
+ * disagree.
+ */
+const OVERVIEW_TILES: {
+  label: string; accent: string; icon: string; hint: string
+  statuses: string[]
+  count: (b: { pending: number; assigned: number; confirmed: number; inProgress: number; completed: number; missed: number; cancelled: number; booked: number }) => number
+}[] = [
+  { label: 'Booked', accent: '#0C6B5A', icon: 'bi-calendar-check', hint: 'Total sessions in this period', statuses: ACTIVE_STATUSES, count: (b) => b.booked },
+  { label: 'Awaiting Assignment', accent: '#F59E0B', icon: 'bi-hourglass-split', hint: 'Need a counsellor', statuses: ['PENDING'], count: (b) => b.pending },
+  { label: 'Awaiting Confirmation', accent: '#6366F1', icon: 'bi-person-check', hint: 'Counsellor not yet confirmed', statuses: ['ASSIGNED'], count: (b) => b.assigned },
+  { label: 'Upcoming', accent: '#3B82F6', icon: 'bi-clock-history', hint: 'Confirmed, not started', statuses: ['CONFIRMED'], count: (b) => b.confirmed },
+  { label: 'In Progress', accent: '#10B981', icon: 'bi-broadcast', hint: 'Happening now', statuses: ['IN_PROGRESS'], count: (b) => b.inProgress },
+  { label: 'Completed', accent: '#059669', icon: 'bi-check2-circle', hint: 'Finished & attended', statuses: ['COMPLETED'], count: (b) => b.completed },
+  { label: 'No-shows', accent: '#EF4444', icon: 'bi-person-x', hint: 'Booked but missed', statuses: ['MISSED'], count: (b) => b.missed },
+  { label: 'Cancelled', accent: '#94A3B8', icon: 'bi-x-circle', hint: 'Cancelled in this period', statuses: ['CANCELLED'], count: (b) => b.cancelled },
+]
 
 type StageKey =
   | 'scheduled' | 'waiting' | 'in_progress' | 'completed'
@@ -153,10 +209,24 @@ function useCountUp(value: number, duration = 750): number {
 // ── Building blocks ──
 const StatCard: React.FC<{
   label: string; value: number; accent: string; icon: string; hint?: string; pulse?: boolean
-}> = ({ label, value, accent, icon, hint, pulse }) => {
+  /** Opens the drill-down list for this bucket. Omitted / no rows ⇒ not clickable. */
+  onClick?: () => void
+}> = ({ label, value, accent, icon, hint, pulse, onClick }) => {
   const shown = useCountUp(value)
+  // Nothing to drill into when the bucket is empty, so it stays a plain tile.
+  const clickable = !!onClick && value > 0
   return (
-    <div className="cl-card cdash-stat" style={{ ['--accent' as any]: accent }}>
+    <div
+      className={`cl-card cdash-stat${clickable ? ' cdash-stat-clickable' : ''}`}
+      style={{ ['--accent' as any]: accent }}
+      onClick={clickable ? onClick : undefined}
+      onKeyDown={clickable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick!() }
+      } : undefined}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      title={clickable ? `View the ${value} session${value === 1 ? '' : 's'} in ${label}` : undefined}
+    >
       <div className="cdash-stat-bar" />
       <div className="cdash-stat-top">
         <span className="cdash-stat-label">{label}</span>
@@ -164,6 +234,132 @@ const StatCard: React.FC<{
       </div>
       <div className="cdash-stat-value">{shown}</div>
       {hint && <div className="cdash-stat-hint">{hint}</div>}
+      {clickable && (
+        <span className="cdash-stat-drill">
+          View students <i className="bi bi-arrow-right-short" />
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The students behind one stat card.
+ *
+ * Every tile in the overview is a filter over the same appointment list the page
+ * already holds, so clicking one needs no request — it just shows the rows that
+ * produced the number, with enough on each to act on it (who, with whom, when,
+ * how to reach them).
+ */
+const DrillModal: React.FC<{
+  title: string
+  accent: string
+  windowLabel: string
+  rows: any[]
+  now: Date
+  onClose: () => void
+  /** When given, the Mode column is replaced by what went wrong for that student. */
+  reasonOf?: (a: any) => string | null
+}> = ({ title, accent, windowLabel, rows, now, onClose, reasonOf }) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    // The list can be long; don't let the page scroll behind it.
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose])
+
+  return (
+    <div className="cdash-modal-backdrop" onClick={onClose}>
+      <div
+        className="cdash-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cdash-modal-head" style={{ ['--accent' as any]: accent }}>
+          <div>
+            <div className="cdash-modal-title">{title}</div>
+            <div className="cdash-modal-sub">
+              {rows.length} session{rows.length === 1 ? '' : 's'} · {windowLabel}
+            </div>
+          </div>
+          <button className="cdash-modal-close" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+
+        <div className="cdash-modal-body">
+          {rows.length === 0 ? (
+            <div className="cdash-empty">No sessions in this category.</div>
+          ) : (
+            <table className="cdash-table">
+              <thead>
+                <tr>
+                  <th>Student</th><th>When</th><th>Counsellor</th>
+                  <th>{reasonOf ? 'What went wrong' : 'Mode'}</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((a) => {
+                  const stage = sessionStage(a, now)
+                  const name = studentName(a)
+                  return (
+                    <tr key={a.id}>
+                      <td>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            style={{
+                              width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                              background: colorFor(name), color: '#fff',
+                              fontSize: 10, fontWeight: 700,
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                          >
+                            {initials(name)}
+                          </span>
+                          <span>
+                            {name}
+                            {(a.studentContactEmail || a.studentContactPhone) && (
+                              <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                                {[a.studentContactEmail, a.studentContactPhone].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                          </span>
+                        </span>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {slotDate(a) ? fmtDateShort(slotDate(a)) : '—'}
+                        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                          {fmtTime(slotStartTime(a)) || '—'}
+                        </div>
+                      </td>
+                      <td>{counsellorName(a)}</td>
+                      <td style={reasonOf ? undefined : { whiteSpace: 'nowrap' }}>
+                        {reasonOf ? (reasonOf(a) || '—') : (a.mode === 'OFFLINE' ? 'In-person' : 'Online')}
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            ...STAGE_STYLE[stage.key],
+                            padding: '3px 10px', borderRadius: 12,
+                            fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {stage.label}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -207,9 +403,11 @@ const CounsellingDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [day, setDay] = useState<string>(localDateStr())
   const [now, setNow] = useState<Date>(new Date())
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  // Which overview tile is drilled into, if any. Holds the tile's identity only —
+  // the rows are derived from the same window data the tile counted.
+  const [drill, setDrill] = useState<{ label: string; accent: string; statuses: string[] } | null>(null)
 
   const load = (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true)
@@ -235,28 +433,32 @@ const CounsellingDashboardPage: React.FC = () => {
     return () => clearInterval(t)
   }, [])
 
-  const today = localDateStr(now)
-  const isToday = day === today
+  // Period filter (All time / Today / Range) and the window every count below is
+  // read through — shared with Manage Sessions so both screens agree on what a
+  // period means.
+  const allDates = useMemo(() => appts.map(slotDate).filter(Boolean), [appts])
+  const filter = usePeriodFilter(allDates)
+  const { mode, win, winLabel, inWin, isToday, today } = filter
 
-  // ── Selected-day funnel buckets ──
-  const dayBuckets = useMemo(() => {
-    const onDay = appts.filter((a) => slotDate(a) === day)
+  // ── Window funnel buckets ──
+  const winBuckets = useMemo(() => {
+    const onDay = appts.filter((a) => inWin(slotDate(a)))
     const by = (s: string) => onDay.filter((a) => a.status === s).length
     const pending = by('PENDING'), assigned = by('ASSIGNED'), confirmed = by('CONFIRMED')
     const inProgress = by('IN_PROGRESS'), completed = by('COMPLETED'), missed = by('MISSED'), cancelled = by('CANCELLED')
     const booked = pending + assigned + confirmed + inProgress + completed + missed
     return { onDay, pending, assigned, confirmed, inProgress, completed, missed, cancelled, booked }
-  }, [appts, day])
+  }, [appts, win])
 
   // ── Slot availability (open / bookable) ──
   const slotStats = useMemo(() => {
     if (!openSlots) return null
     const openToday = openSlots.filter((s) => slotOnlyDate(s) === today).length
     const open7 = openSlots.length
-    const capacityToday = dayBuckets.booked + openToday // booked today + still-open today
-    const utilToday = capacityToday > 0 ? Math.round((dayBuckets.booked / capacityToday) * 100) : 0
+    const capacityToday = winBuckets.booked + openToday // booked today + still-open today
+    const utilToday = capacityToday > 0 ? Math.round((winBuckets.booked / capacityToday) * 100) : 0
     return { openToday, open7, capacityToday, utilToday }
-  }, [openSlots, today, dayBuckets.booked])
+  }, [openSlots, today, winBuckets.booked])
 
   // ── Live operational lists (real "today" only) ──
   const live = useMemo(() => {
@@ -303,10 +505,10 @@ const CounsellingDashboardPage: React.FC = () => {
     return c
   }, [todayRoster])
 
-  // ── Per-counsellor breakdown for the selected day ──
+  // ── Per-counsellor breakdown for the selected window ──
   const perCounsellor = useMemo(() => {
     const map = new Map<string, { name: string; booked: number; upcoming: number; inProgress: number; completed: number; missed: number }>()
-    for (const a of dayBuckets.onDay) {
+    for (const a of winBuckets.onDay) {
       if (!ACTIVE_STATUSES.includes(a.status)) continue
       const key = a?.counsellor?.id != null ? String(a.counsellor.id) : 'unassigned'
       const name = a?.counsellor?.name || 'Unassigned'
@@ -319,47 +521,105 @@ const CounsellingDashboardPage: React.FC = () => {
       map.set(key, row)
     }
     return Array.from(map.values()).sort((a, b) => b.booked - a.booked)
-  }, [dayBuckets])
+  }, [winBuckets])
 
-  // ── 7-day booking trend (ending on the selected day) ──
+  // Chart windows. In Today mode the charts keep their trailing windows — a single
+  // bar, or one day of outcomes, says nothing. In All-time / Range mode they follow
+  // the selected window, so the card titles below state which one is in use.
+  const trendWin = useMemo(
+    () => (mode === 'today' ? { from: shiftDate(today, -6), to: today } : win),
+    [mode, today, win],
+  )
+  const ratesWin = useMemo(
+    () => (mode === 'today' ? { from: shiftDate(today, -29), to: today } : win),
+    [mode, today, win],
+  )
+
+  // ── Booking trend over the trend window ──
+  // One bar per day, capped at 14 bars — longer windows are grouped into equal
+  // spans so an all-time view stays readable instead of drawing hundreds of bars.
   const trend = useMemo(() => {
-    const base = new Date(`${day}T00:00:00`)
-    const days: { label: string; date: string; count: number; isSel: boolean }[] = []
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(base); d.setDate(base.getDate() - i)
-      const ds = localDateStr(d)
-      const count = appts.filter((a) => slotDate(a) === ds && ACTIVE_STATUSES.includes(a.status)).length
-      days.push({ label: d.toLocaleDateString(undefined, { weekday: 'short' }), date: ds, count, isSel: ds === day })
+    const startMs = new Date(`${trendWin.from}T00:00:00`).getTime()
+    const totalDays = Math.max(1, daysBetween(trendWin.from, trendWin.to) + 1)
+    const MAX_BARS = 14
+    const span = Math.ceil(totalDays / MAX_BARS)
+    const days: { label: string; date: string; title: string; count: number; isSel: boolean }[] = []
+    for (let i = 0; i < totalDays; i += span) {
+      const s = localDateStr(new Date(startMs + i * 864e5))
+      const e = localDateStr(new Date(startMs + Math.min(i + span - 1, totalDays - 1) * 864e5))
+      const count = appts.filter((a) => {
+        const d = slotDate(a)
+        return d >= s && d <= e && ACTIVE_STATUSES.includes(a.status)
+      }).length
+      const d0 = new Date(`${s}T00:00:00`)
+      days.push({
+        date: s,
+        label: span === 1
+          ? (totalDays <= 7
+            ? d0.toLocaleDateString(undefined, { weekday: 'short' })
+            : d0.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))
+          : d0.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+        title: span === 1 ? `${s}: ${count}` : `${s} – ${e}: ${count}`,
+        count,
+        isSel: span === 1 && s === today,
+      })
     }
-    return { days, max: Math.max(1, ...days.map((d) => d.count)) }
-  }, [appts, day])
+    return { days, max: Math.max(1, ...days.map((d) => d.count)), grouped: span > 1, span }
+  }, [appts, trendWin, today])
 
-  // ── 30-day outcome rates (sessions on/before the selected day) ──
+  // ── Outcome rates over the rates window ──
   const rates = useMemo(() => {
-    const end = new Date(`${day}T23:59:59`); const start = new Date(end); start.setDate(end.getDate() - 29)
-    const startS = localDateStr(start), endS = day
-    const win = appts.filter((a) => { const d = slotDate(a); return d >= startS && d <= endS })
-    const completed = win.filter((a) => a.status === 'COMPLETED').length
-    const missed = win.filter((a) => a.status === 'MISSED').length
-    const cancelled = win.filter((a) => a.status === 'CANCELLED').length
+    const inRates = appts.filter((a) => {
+      const d = slotDate(a)
+      return d >= ratesWin.from && d <= ratesWin.to
+    })
+    const completed = inRates.filter((a) => a.status === 'COMPLETED').length
+    const missed = inRates.filter((a) => a.status === 'MISSED').length
+    const cancelled = inRates.filter((a) => a.status === 'CANCELLED').length
     const concluded = completed + missed
-    const booked = win.filter((a) => ACTIVE_STATUSES.includes(a.status)).length
+    const booked = inRates.filter((a) => ACTIVE_STATUSES.includes(a.status)).length
     const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0)
     return {
       completionRate: pct(completed, concluded), noShowRate: pct(missed, concluded),
       cancellationRate: pct(cancelled, booked + cancelled), completed, missed, cancelled, concluded,
     }
-  }, [appts, day])
+  }, [appts, ratesWin])
+
+  // Students who came off worse than the funnel suggests: session lost to a
+  // counsellor being deactivated or not turning up, or an absence they dispute.
+  // Counted by STUDENT, not by session — one student with two spoiled sessions is
+  // one person to apologise to, and the tile is about people, not rows.
+  const issues = useMemo(() => {
+    const rows = winBuckets.onDay.filter((a: any) => issueReason(a) !== null)
+    const students = new Set<string>(
+      rows.map((a: any) => String(a?.student?.userStudentId ?? a?.studentContactEmail ?? `appt-${a.id}`)),
+    )
+    return {
+      rows: rows.sort((a: any, b: any) =>
+        (slotDate(b) + slotStartTime(b)).localeCompare(slotDate(a) + slotStartTime(a))),
+      studentCount: students.size,
+    }
+  }, [winBuckets])
+
+  // Rows behind the drilled-into tile: the same window rows the tile counted,
+  // narrowed to its statuses and read in the order they happen.
+  const drillRows = useMemo(() => {
+    if (!drill) return []
+    return winBuckets.onDay
+      .filter((a: any) => drill.statuses.includes(String(a.status || '').toUpperCase()))
+      .sort((a: any, b: any) =>
+        (slotDate(a) + slotStartTime(a)).localeCompare(slotDate(b) + slotStartTime(b)))
+  }, [drill, winBuckets])
 
   const funnel = [
-    { label: 'Booked', value: dayBuckets.booked, color: '#0C6B5A' },
-    { label: 'Confirmed', value: dayBuckets.confirmed + dayBuckets.inProgress + dayBuckets.completed + dayBuckets.missed, color: '#3B82F6' },
-    { label: 'Started', value: dayBuckets.inProgress + dayBuckets.completed, color: '#8B5CF6' },
-    { label: 'Completed', value: dayBuckets.completed, color: '#10B981' },
+    { label: 'Booked', value: winBuckets.booked, color: '#0C6B5A' },
+    { label: 'Confirmed', value: winBuckets.confirmed + winBuckets.inProgress + winBuckets.completed + winBuckets.missed, color: '#3B82F6' },
+    { label: 'Started', value: winBuckets.inProgress + winBuckets.completed, color: '#8B5CF6' },
+    { label: 'Completed', value: winBuckets.completed, color: '#10B981' },
   ]
-  const funnelMax = Math.max(1, dayBuckets.booked)
-  const remaining = dayBuckets.pending + dayBuckets.assigned + dayBuckets.confirmed
-  const dayProgress = dayBuckets.booked > 0 ? Math.round((dayBuckets.completed / dayBuckets.booked) * 100) : 0
+  const funnelMax = Math.max(1, winBuckets.booked)
+  const remaining = winBuckets.pending + winBuckets.assigned + winBuckets.confirmed
+  const dayProgress = winBuckets.booked > 0 ? Math.round((winBuckets.completed / winBuckets.booked) * 100) : 0
 
   return (
     <div className="ph-page">
@@ -369,8 +629,19 @@ const CounsellingDashboardPage: React.FC = () => {
         title="Counselling Dashboard"
         subtitle={
           <span>
-            {isToday ? 'Today' : new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' })}
-            {' · '}<strong>{dayBuckets.booked}</strong> booked · <strong>{dayBuckets.completed}</strong> completed · <strong>{remaining}</strong> remaining
+            {winLabel}
+            {mode === 'all' && appts.length > 0 && (
+              <span className="cdash-sub-span"> ({fmtDateShort(win.from)} – {fmtDateShort(win.to)})</span>
+            )}
+            {' · '}<strong>{winBuckets.booked}</strong> booked · <strong>{winBuckets.completed}</strong> completed · <strong>{remaining}</strong> remaining
+            {issues.studentCount > 0 && (
+              <>
+                {' · '}
+                <span className="cdash-sub-alert">
+                  <strong>{issues.studentCount}</strong> need{issues.studentCount === 1 ? 's' : ''} attention
+                </span>
+              </>
+            )}
           </span>
         }
         actions={[
@@ -379,12 +650,7 @@ const CounsellingDashboardPage: React.FC = () => {
         ]}
       >
         <div className="cdash-toolbar">
-          <div className="cdash-daypick">
-            <button className="cdash-chip" onClick={() => setDay(localDateStr())} disabled={isToday}>Today</button>
-            <input type="date" value={day} className="cdash-date-input"
-              max={localDateStr(new Date(Date.now() + 365 * 864e5))}
-              onChange={(e) => setDay(e.target.value || localDateStr())} />
-          </div>
+          <PeriodFilterControl filter={filter} />
           <div className="cdash-updated">
             {lastUpdated && <span>Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
             <button className="cdash-refresh" onClick={() => load()} title="Refresh now" disabled={refreshing}>
@@ -408,17 +674,83 @@ const CounsellingDashboardPage: React.FC = () => {
       ) : (
         <div className="cdash-fade">
           {/* ── Day at a glance ── */}
-          <Eyebrow label={isToday ? "Today's overview" : `Overview · ${new Date(`${day}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`} />
+          <Eyebrow label={isToday ? "Today's overview" : `Overview · ${winLabel}`} />
           <div className="cdash-grid">
-            <StatCard label="Booked" value={dayBuckets.booked} accent="#0C6B5A" icon="bi-calendar-check" hint="Total sessions for the day" />
-            <StatCard label="Awaiting Assignment" value={dayBuckets.pending} accent="#F59E0B" icon="bi-hourglass-split" hint="Need a counsellor" />
-            <StatCard label="Awaiting Confirmation" value={dayBuckets.assigned} accent="#6366F1" icon="bi-person-check" hint="Counsellor not yet confirmed" />
-            <StatCard label="Upcoming" value={dayBuckets.confirmed} accent="#3B82F6" icon="bi-clock-history" hint="Confirmed, not started" />
-            <StatCard label="In Progress" value={dayBuckets.inProgress} accent="#10B981" icon="bi-broadcast" hint="Happening now" pulse={dayBuckets.inProgress > 0} />
-            <StatCard label="Completed" value={dayBuckets.completed} accent="#059669" icon="bi-check2-circle" hint="Finished & attended" />
-            <StatCard label="No-shows" value={dayBuckets.missed} accent="#EF4444" icon="bi-person-x" hint="Booked but missed" />
-            <StatCard label="Cancelled" value={dayBuckets.cancelled} accent="#94A3B8" icon="bi-x-circle" hint="Cancelled for the day" />
+            {OVERVIEW_TILES.map((t) => (
+              <StatCard
+                key={t.label}
+                label={t.label}
+                value={t.count(winBuckets)}
+                accent={t.accent}
+                icon={t.icon}
+                hint={t.hint}
+                pulse={t.label === 'In Progress' && winBuckets.inProgress > 0}
+                onClick={() => setDrill({ label: t.label, accent: t.accent, statuses: t.statuses })}
+              />
+            ))}
+            {/* Ninth tile, and the only one counting people rather than sessions. */}
+            <StatCard
+              label="Students Facing Issues"
+              value={issues.studentCount}
+              accent="#B45309"
+              icon="bi-exclamation-triangle"
+              hint="Lost a session or disputing an absence"
+              pulse={issues.studentCount > 0}
+              onClick={() => setDrill({ label: ISSUE_TILE, accent: '#B45309', statuses: [] })}
+            />
           </div>
+
+          {/* ── Needs attention ──
+              Sits above the pipeline on purpose: these students are the only thing on
+              this page that needs a person to do something today, and they are invisible
+              in every other figure because their statuses are excluded from the funnel. */}
+          {issues.studentCount > 0 && (
+            <>
+              <Eyebrow label="Needs attention" accent />
+              <div className="cl-card cdash-block cdash-attention">
+                <SectionTitle
+                  icon="bi-exclamation-triangle"
+                  title={`Students who lost a session or dispute an absence · ${winLabel}`}
+                  right={
+                    <button
+                      className="cdash-attention-all"
+                      onClick={() => setDrill({ label: ISSUE_TILE, accent: '#B45309', statuses: [] })}
+                    >
+                      View all {issues.rows.length}
+                    </button>
+                  }
+                />
+                <div className="cdash-attention-list">
+                  {issues.rows.slice(0, 5).map((a: any) => (
+                    <div key={a.id} className="cdash-attention-row">
+                      <span
+                        className="cdash-attention-avatar"
+                        style={{ background: colorFor(studentName(a)) }}
+                      >
+                        {initials(studentName(a))}
+                      </span>
+                      <div className="cdash-attention-who">
+                        <div className="cdash-attention-name">{studentName(a)}</div>
+                        <div className="cdash-attention-meta">
+                          {[a.studentContactEmail, a.studentContactPhone].filter(Boolean).join(' · ') || '—'}
+                        </div>
+                      </div>
+                      <div className="cdash-attention-when">
+                        {slotDate(a) ? fmtDateShort(slotDate(a)) : '—'}
+                        <div className="cdash-attention-meta">{counsellorName(a)}</div>
+                      </div>
+                      <span className="cdash-attention-reason">{issueReason(a)}</span>
+                    </div>
+                  ))}
+                </div>
+                {issues.rows.length > 5 && (
+                  <div className="cdash-attention-more">
+                    and {issues.rows.length - 5} more
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* ── Funnel + capacity ── */}
           <Eyebrow label="Pipeline & capacity" />
@@ -445,7 +777,7 @@ const CounsellingDashboardPage: React.FC = () => {
               {isToday && slotStats ? (
                 <>
                   <Ring value={slotStats.utilToday} label="booked" color="#0C6B5A"
-                    sub={`${dayBuckets.booked} booked · ${slotStats.openToday} open`} />
+                    sub={`${winBuckets.booked} booked · ${slotStats.openToday} open`} />
                   <div className="cdash-cap-stats">
                     <div className="cdash-cap-stat"><span>{slotStats.openToday}</span><label>Open today</label></div>
                     <div className="cdash-cap-stat"><span>{slotStats.open7}</span><label>Open · 7 days</label></div>
@@ -453,7 +785,7 @@ const CounsellingDashboardPage: React.FC = () => {
                 </>
               ) : (
                 <Ring value={dayProgress} label="done" color="#10B981"
-                  sub={`${dayBuckets.completed} of ${dayBuckets.booked} completed`} />
+                  sub={`${winBuckets.completed} of ${winBuckets.booked} completed`} />
               )}
             </div>
           </div>
@@ -581,10 +913,10 @@ const CounsellingDashboardPage: React.FC = () => {
           {/* ── Per-counsellor ── */}
           <Eyebrow label="Counsellor workload" />
           <div className="cl-card cdash-block">
-            <SectionTitle icon="bi-people" title={`By counsellor · ${isToday ? 'today' : day}`}
+            <SectionTitle icon="bi-people" title={`By counsellor · ${winLabel}`}
               right={<span className="cdash-count-pill">{perCounsellor.length}</span>} />
             {perCounsellor.length === 0 ? (
-              <div className="cdash-empty">No sessions for this day yet.</div>
+              <div className="cdash-empty">No sessions in this period yet.</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table className="cdash-table">
@@ -623,10 +955,11 @@ const CounsellingDashboardPage: React.FC = () => {
           <Eyebrow label="Trends & outcomes" />
           <div className="cdash-two-col">
             <div className="cl-card cdash-block">
-              <SectionTitle icon="bi-bar-chart" title="Bookings · last 7 days" />
+              <SectionTitle icon="bi-bar-chart" title={`Bookings · ${mode === 'today' ? 'last 7 days' : winLabel.toLowerCase()}`}
+                right={trend.grouped ? <span className="cdash-count-pill">{trend.span}-day bars</span> : undefined} />
               <div className="cdash-bars">
                 {trend.days.map((d) => (
-                  <div key={d.date} className={`cdash-bar-col${d.isSel ? ' sel' : ''}`} title={`${d.date}: ${d.count}`}>
+                  <div key={d.date} className={`cdash-bar-col${d.isSel ? ' sel' : ''}`} title={d.title}>
                     <span className="cdash-bar-num">{d.count}</span>
                     <div className="cdash-bar-track"><div className="cdash-bar-fill" style={{ height: `${(d.count / trend.max) * 100}%` }} /></div>
                     <span className="cdash-bar-label">{d.label}</span>
@@ -636,7 +969,7 @@ const CounsellingDashboardPage: React.FC = () => {
             </div>
 
             <div className="cl-card cdash-block">
-              <SectionTitle icon="bi-graph-up-arrow" title="Outcome rates · last 30 days" />
+              <SectionTitle icon="bi-graph-up-arrow" title={`Outcome rates · ${mode === 'today' ? 'last 30 days' : winLabel.toLowerCase()}`} />
               <div className="cdash-rates">
                 <RateRow label="Completion rate" value={rates.completionRate} color="#10B981" sub={`${rates.completed} of ${rates.concluded} concluded`} />
                 <RateRow label="No-show rate" value={rates.noShowRate} color="#EF4444" sub={`${rates.missed} of ${rates.concluded} concluded`} />
@@ -645,6 +978,18 @@ const CounsellingDashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {drill && (
+        <DrillModal
+          title={drill.label}
+          accent={drill.accent}
+          windowLabel={winLabel}
+          rows={drill.label === ISSUE_TILE ? issues.rows : drillRows}
+          now={now}
+          reasonOf={drill.label === ISSUE_TILE ? issueReason : undefined}
+          onClose={() => setDrill(null)}
+        />
       )}
     </div>
   )
@@ -701,7 +1046,26 @@ const DashboardStyles: React.FC = () => (
   <style>{`
     /* Toolbar in the dark hero */
     .cdash-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-    .cdash-daypick { display: flex; gap: 8px; align-items: center; }
+    .cdash-sub-span { opacity: 0.75; }
+    .cdash-sub-alert { color: #FCD34D; }
+
+    .cdash-attention { border-left: 3px solid #B45309; }
+    .cdash-attention-all { background: rgba(180,83,9,0.10); color: #B45309; border: 1px solid rgba(180,83,9,0.25); border-radius: 8px; padding: 4px 12px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .cdash-attention-all:hover { background: rgba(180,83,9,0.18); }
+    .cdash-attention-list { display: flex; flex-direction: column; }
+    .cdash-attention-row { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--sp-border, #D1E5DF); }
+    .cdash-attention-row:last-child { border-bottom: none; }
+    .cdash-attention-avatar { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+    .cdash-attention-who { flex: 1; min-width: 0; }
+    .cdash-attention-name { font-size: 13.5px; font-weight: 600; color: var(--sp-text, #1A2B28); }
+    .cdash-attention-meta { font-size: 11px; color: var(--sp-muted, #5C7A72); margin-top: 2px; }
+    .cdash-attention-when { font-size: 12.5px; font-weight: 600; color: var(--sp-text, #1A2B28); text-align: right; white-space: nowrap; }
+    .cdash-attention-reason { font-size: 11px; font-weight: 700; color: #92400E; background: #FEF3C7; border-radius: 999px; padding: 4px 11px; white-space: nowrap; flex-shrink: 0; }
+    .cdash-attention-more { padding-top: 10px; font-size: 12px; color: var(--sp-muted, #5C7A72); }
+    @media (max-width: 700px) {
+      .cdash-attention-row { flex-wrap: wrap; }
+      .cdash-attention-when { text-align: left; }
+    }
     .cdash-chip { padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.12); color: #fff; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; transition: background .15s; }
     .cdash-chip:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
     .cdash-chip:disabled { opacity: 0.45; cursor: default; }
@@ -723,7 +1087,25 @@ const DashboardStyles: React.FC = () => (
     .cdash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 18px 0; }
     .cdash-stat { position: relative; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; transition: transform .18s cubic-bezier(.16,1,.3,1), box-shadow .18s; }
     .cdash-stat:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(15,23,42,0.10); }
+    .cdash-stat-clickable { cursor: pointer; }
+    .cdash-stat-clickable:hover { box-shadow: 0 12px 28px rgba(15,23,42,0.14); border-color: var(--accent); }
+    .cdash-stat-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .cdash-stat-drill { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; color: var(--accent); opacity: 0; transform: translateY(-3px); transition: opacity .16s, transform .16s; }
+    .cdash-stat-clickable:hover .cdash-stat-drill, .cdash-stat-clickable:focus-visible .cdash-stat-drill { opacity: 1; transform: translateY(0); }
+    .cdash-stat-drill i { font-size: 15px; line-height: 1; }
     .cdash-stat-bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); }
+
+    /* Drill-down: the students behind one tile */
+    .cdash-modal-backdrop { position: fixed; inset: 0; z-index: 1050; background: rgba(15,23,42,0.55); display: flex; align-items: center; justify-content: center; padding: 24px; animation: cdash-fade .14s ease; }
+    .cdash-modal { background: #fff; border-radius: 14px; width: 100%; max-width: 860px; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 64px rgba(15,23,42,0.32); animation: cdash-rise .18s cubic-bezier(.16,1,.3,1); }
+    .cdash-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--sp-border, #D1E5DF); border-top: 3px solid var(--accent); }
+    .cdash-modal-title { font-size: 17px; font-weight: 700; color: var(--sp-text, #1A2B28); }
+    .cdash-modal-sub { font-size: 12.5px; color: var(--sp-muted, #5C7A72); margin-top: 3px; }
+    .cdash-modal-close { background: transparent; border: none; font-size: 26px; line-height: 1; color: #94A3B8; cursor: pointer; padding: 0 4px; }
+    .cdash-modal-close:hover { color: #475569; }
+    .cdash-modal-body { padding: 6px 22px 20px; overflow-y: auto; }
+    @keyframes cdash-fade { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes cdash-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .cdash-stat::after { content: ''; position: absolute; right: -30px; top: -30px; width: 90px; height: 90px; border-radius: 50%; background: var(--accent); opacity: 0.05; }
     .cdash-stat-top { display: flex; align-items: center; justify-content: space-between; }
     .cdash-stat-label { font-size: 11.5px; font-weight: 700; color: var(--sp-muted, #5C7A72); text-transform: uppercase; letter-spacing: 0.04em; }

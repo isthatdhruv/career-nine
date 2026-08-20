@@ -128,6 +128,7 @@ export function AsideMenuMain() {
 
   const showCounselling =
     allowed("/admin/counselling-dashboard") ||
+    allowed("/admin/counselling-sessions") ||
     allowed("/admin/counsellors") ||
     allowed("/admin/counselling-students") ||
     allowed("/admin/counselling-slots") ||
@@ -853,6 +854,9 @@ export function AsideMenuMain() {
           >
             {allowed("/admin/counselling-dashboard") && (
               <AsideMenuItem to="/admin/counselling-dashboard" title="Dashboard" hasBullet={true} />
+            )}
+            {allowed("/admin/counselling-sessions") && (
+              <AsideMenuItem to="/admin/counselling-sessions" title="Manage Sessions" hasBullet={true} />
             )}
             {allowed("/admin/counsellors") && (
               <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />

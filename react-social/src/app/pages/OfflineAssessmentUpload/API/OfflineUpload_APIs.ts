@@ -33,6 +33,8 @@ export function bulkSubmitWithStudents(data: {
 export function bulkSubmitByRollNumber(data: {
   assessmentId: number;
   instituteId: number;
+  /** "school" matches the school's own roll number; omitted/"careerNine" matches the Career Nine one. */
+  matchBy?: "careerNine" | "school";
   students: {
     rollNumber: string;
     answers: { questionnaireQuestionId: number; optionId: number }[];
