@@ -88,6 +88,21 @@ export default function GroupStudentPage() {
   // Narrow to assessments mapped to the selected institute (falls back to all when
   // nothing is picked or the institute has no mappings).
   const { assessments } = useAssessmentsForInstitute(selectedInstitute, allAssessments);
+  // Assessments offered in the FILTER panel: the institute-mapped list PLUS any active
+  // assessment actually assigned to a loaded student. Students receive assessments through
+  // channels that never write assessment_institute_mapping (bulk allot on this page,
+  // campaigns, legacy flows), so the mapping alone under-reports what's on the page.
+  // The per-row allot picker deliberately keeps using `assessments` (mapping-scoped).
+  const filterAssessments = useMemo(() => {
+    const assignedIds = new Set<number>();
+    for (const s of students) {
+      for (const a of s.assessments || []) assignedIds.add(Number(a.assessmentId));
+      for (const id of s.assignedAssessmentIds || []) assignedIds.add(Number(id));
+    }
+    const shown = new Set(assessments.map((a) => a.id));
+    const extras = allAssessments.filter((a) => !shown.has(a.id) && assignedIds.has(a.id));
+    return extras.length ? [...assessments, ...extras] : assessments;
+  }, [students, assessments, allAssessments]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(
@@ -382,7 +397,7 @@ export default function GroupStudentPage() {
   const activeFilterLabel = useMemo(() => {
     const parts: string[] = [];
     if (hasAssessmentFilter) {
-      const names = assessments
+      const names = filterAssessments
         .filter(a => appliedAssessmentIds.has(a.id))
         .map(a => a.assessmentName);
       parts.push(names.length === 1 ? names[0] : `${names.length} assessments`);
@@ -406,7 +421,7 @@ export default function GroupStudentPage() {
       parts.push(appliedGenders.size === 1 ? Array.from(appliedGenders)[0] : `${appliedGenders.size} genders`);
     }
     return parts.join(', ');
-  }, [hasAssessmentFilter, appliedAssessmentIds, appliedEnabled, appliedSessions, appliedGrades, appliedSections, hasStatusFilter, appliedStatuses, hasGenderFilter, appliedGenders, assessments]);
+  }, [hasAssessmentFilter, appliedAssessmentIds, appliedEnabled, appliedSessions, appliedGrades, appliedSections, hasStatusFilter, appliedStatuses, hasGenderFilter, appliedGenders, filterAssessments]);
 
   const isFiltered = activeFilterLabel.length > 0;
 
@@ -452,7 +467,7 @@ export default function GroupStudentPage() {
           const assessmentId = student.assessmentId
             ? String(student.assessmentId)
             : "";
-          const assessment = assessments.find(
+          const assessment = allAssessments.find(
             (a) => a.id === Number(assessmentId)
           );
           const assignedIds = Array.isArray(student.assignedAssessmentIds)
@@ -580,7 +595,7 @@ export default function GroupStudentPage() {
           const assessmentId = student.assessmentId
             ? String(student.assessmentId)
             : "";
-          const assessment = assessments.find(
+          const assessment = allAssessments.find(
             (a) => a.id === Number(assessmentId)
           );
           const assignedIds = Array.isArray(student.assignedAssessmentIds)
@@ -730,8 +745,9 @@ export default function GroupStudentPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [students]);
 
-  // Set of active assessment IDs — memoized
-  const activeAssessmentIds = useMemo(() => new Set(assessments.map((a) => a.id)), [assessments]);
+  // Set of active assessment IDs — memoized. Built from filterAssessments so that
+  // student-assigned assessments outside the institute mapping still count.
+  const activeAssessmentIds = useMemo(() => new Set(filterAssessments.map((a) => a.id)), [filterAssessments]);
 
   // Pre-compute per-student active assessment count
   const studentAssessmentCounts = useMemo(() => {
@@ -1836,7 +1852,7 @@ export default function GroupStudentPage() {
             {isFiltered && (
               <>
                 <div className="d-flex flex-wrap gap-2">
-                  {hasAssessmentFilter && assessments.filter(a => appliedAssessmentIds.has(a.id)).map(a => (
+                  {hasAssessmentFilter && filterAssessments.filter(a => appliedAssessmentIds.has(a.id)).map(a => (
                     <span key={a.id} style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", padding: "4px 12px", borderRadius: "16px", fontSize: "0.8rem", fontWeight: 600 }}>
                       {a.assessmentName}
                     </span>
@@ -2024,19 +2040,19 @@ export default function GroupStudentPage() {
                         <button
                           className="btn btn-sm"
                           onClick={() => {
-                            if (pendingAssessmentIds.size === assessments.length) {
+                            if (pendingAssessmentIds.size === filterAssessments.length) {
                               setPendingAssessmentIds(new Set());
                             } else {
-                              setPendingAssessmentIds(new Set(assessments.map(a => a.id)));
+                              setPendingAssessmentIds(new Set(filterAssessments.map(a => a.id)));
                             }
                           }}
                           style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "none", borderRadius: "8px", padding: "4px 12px", fontWeight: 600, fontSize: "0.8rem" }}
                         >
-                          {pendingAssessmentIds.size === assessments.length ? 'Deselect All' : 'Select All'}
+                          {pendingAssessmentIds.size === filterAssessments.length ? 'Deselect All' : 'Select All'}
                         </button>
                       </div>
                       <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
-                        {assessments.map((a) => (
+                        {filterAssessments.map((a) => (
                           <label key={a.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", background: pendingAssessmentIds.has(a.id) ? "rgba(67, 97, 238, 0.05)" : "transparent" }}>
                             <input
                               type="checkbox"
@@ -2052,7 +2068,7 @@ export default function GroupStudentPage() {
                             <span style={{ fontWeight: 500, color: "#333" }}>{a.assessmentName}</span>
                           </label>
                         ))}
-                        {assessments.length === 0 && (
+                        {filterAssessments.length === 0 && (
                           <div style={{ textAlign: "center", color: "#999", padding: "20px" }}>No assessments available</div>
                         )}
                       </div>
@@ -3469,7 +3485,7 @@ export default function GroupStudentPage() {
                                   if (!modalStudent) return;
                                   setReportGeneratingFor(assessment.assessmentId);
                                   try {
-                                    const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                    const fullAssessment = allAssessments.find((a: any) => a.id === assessment.assessmentId) as any;
                                     const isBet = fullAssessment?.questionnaire?.type === true
                                       || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
 
@@ -3510,7 +3526,7 @@ export default function GroupStudentPage() {
                                 if (!modalStudent) return;
                                 setReportGeneratingFor(assessment.assessmentId);
                                 try {
-                                  const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                  const fullAssessment = allAssessments.find((a: any) => a.id === assessment.assessmentId) as any;
                                   const isBet = fullAssessment?.questionnaire?.type === true
                                     || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
 
