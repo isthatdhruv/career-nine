@@ -1,6 +1,7 @@
 package com.kccitm.api.service.counselling;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,9 +37,10 @@ import com.kccitm.api.repository.Career9.counselling.CounsellingCheckinOtpReposi
  *       only thing standing between a wrong guess and a brute force.</li>
  * </ul>
  *
- * <p><b>Nothing is sent.</b> The student already has the code — it is printed on their
- * report — so there is no delivery step and no message to miss. Starting a session just opens
- * the attempt window.
+ * <p><b>Starting a session sends nothing.</b> The student already has the code — it is
+ * printed on their report — so {@link #beginCheckin} only opens the attempt window. Delivery
+ * is a separate, deliberate act: {@link #sendCodeToStudent} mails and WhatsApps the code when
+ * the counsellor asks for it, for the student who cannot lay hands on their report.
  */
 @Service
 public class CheckinOtpService {
@@ -67,6 +69,12 @@ public class CheckinOtpService {
 
     @Autowired
     private CounsellingAppointmentRepository appointmentRepository;
+
+    /**
+     * Only used by {@link #sendCodeToStudent} — check-in itself sends nothing.
+     */
+    @Autowired
+    private CounsellingNotificationService notificationService;
 
     /**
      * Slot times are IST wall-clock while the JVM runs UTC, so the window checks below must
@@ -159,6 +167,43 @@ public class CheckinOtpService {
                     appt.getId(), e.getMessage());
             return CounsellingOtpService.DEFAULT_OTP;
         }
+    }
+
+    /**
+     * Sends the student their check-in code by email and WhatsApp — the counsellor's
+     * "Send code to student" button.
+     *
+     * <p>This exists because the code lives on the report and nowhere else: a student who
+     * never downloaded it, or is on a phone with the PDF on a laptop at home, has no way to
+     * read it out and the session cannot be checked in at all. Sending it is the escape
+     * hatch, not the normal path.
+     *
+     * <p><b>Not gated by the check-in window</b>, unlike {@link #beginCheckin} and
+     * {@link #verify}. That window exists to stop attendance being recorded at an hour when
+     * the session was not happening; sending a code records nothing, and a counsellor who
+     * wants the student to have it a few minutes early should not be blocked. The code is
+     * permanent anyway — withholding it for ten more minutes protects nothing.
+     *
+     * @return the channels that accepted it ("WhatsApp", "email"), empty if the student has
+     *         neither on record or both sends failed.
+     */
+    public List<String> sendCodeToStudent(Long appointmentId) {
+        CounsellingAppointment appt = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("CounsellingAppointment", "id", appointmentId));
+
+        if ("CANCELLED".equals(appt.getStatus()) || "RESCHEDULED".equals(appt.getStatus())
+                || "COMPLETED".equals(appt.getStatus()) || "MISSED".equals(appt.getStatus())) {
+            throw new BadRequestException("Cannot send a code for a session that is " + appt.getStatus() + ".");
+        }
+        if (appt.getCheckinVerifiedAt() != null) {
+            throw new BadRequestException("This session has already been checked in.");
+        }
+        if (appt.getMarkedAbsentAt() != null) {
+            throw new BadRequestException(
+                    "This student is marked absent for this session. Ask an administrator to correct it.");
+        }
+
+        return notificationService.sendCheckinCodeToStudent(appt, expectedCodeFor(appt));
     }
 
     /**

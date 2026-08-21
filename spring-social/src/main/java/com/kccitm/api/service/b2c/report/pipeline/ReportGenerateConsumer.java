@@ -50,6 +50,9 @@ public class ReportGenerateConsumer {
     @Autowired(required = false)
     private com.kccitm.api.service.counselling.CounsellorReportNotificationService
             counsellorReportNotificationService;
+    /** Optional for the same reason as the notifier above — the worker may run without it. */
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.ReportReleaseGate reportReleaseGate;
     @Autowired private ReportBatchLifecycle batchLifecycle;
     @Autowired private ObjectMapper objectMapper;
 
@@ -108,6 +111,18 @@ public class ReportGenerateConsumer {
                     "all".equals(mode)  ? hasEmail
                   : "none".equals(mode) ? false
                   :                       ((ev.whitelabel || ev.emailReportEnabled) && hasEmail);
+            // A counsellor-release tier overrides both the whitelabel rule and the school's
+            // per-assessment toggle: those decide HOW the report reaches the student, this one
+            // decides WHETHER it may leave yet, and it may not until the counsellor releases it.
+            // An admin who deliberately picked "email everyone" from the Generate Queue is still
+            // obeyed — that is a person overriding the hold on purpose, not the pipeline
+            // wandering past it.
+            if (shouldEmail && !"all".equals(mode) && reportReleaseGate != null
+                    && reportReleaseGate.isHeldForCounsellorRelease(ev.userStudentId, ev.assessmentId)) {
+                logger.info("Report generated (not mailed — held for counsellor release) student={} assessment={}",
+                        ev.userStudentId, ev.assessmentId);
+                return;
+            }
             if (!shouldEmail) {
                 logger.info("Report generated (not mailed — mode={} whitelabel={} toggle={} hasEmail={}) student={} assessment={}",
                         mode, ev.whitelabel, ev.emailReportEnabled, hasEmail, ev.userStudentId, ev.assessmentId);

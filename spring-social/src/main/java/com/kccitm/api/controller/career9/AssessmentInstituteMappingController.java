@@ -1967,6 +1967,7 @@ public class AssessmentInstituteMappingController {
         tier.setCounsellingSessionCount(pt.getCounsellingSessionCount());
         tier.setIncludesLms(Boolean.TRUE.equals(pt.getIncludesLms()));
         tier.setLmsValidityDays(pt.getLmsValidityDays());
+        tier.setCounsellorReleaseReport(Boolean.TRUE.equals(pt.getCounsellorReleaseReport()));
         return tierRepository.save(tier);
     }
 

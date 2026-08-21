@@ -119,6 +119,15 @@ public class StudentEntitlement implements Serializable {
     @Column(name = "final_report_active")
     private Boolean finalReportActive = false;
 
+    /**
+     * Snapshot of the tier's counsellor-release setting, taken when this entitlement was
+     * granted. Held here rather than read live off the tier so that editing a tier later
+     * cannot retrospectively release a report that was meant to be held, nor re-hold one
+     * that has already gone out.
+     */
+    @Column(name = "counsellor_release_report")
+    private Boolean counsellorReleaseReport = false;
+
     @Column(name = "access_token", length = 64, unique = true)
     private String accessToken;
 
@@ -161,6 +170,7 @@ public class StudentEntitlement implements Serializable {
         if (counsellingActive == null) counsellingActive = false;
         if (lmsActive == null) lmsActive = false;
         if (finalReportActive == null) finalReportActive = false;
+        if (counsellorReleaseReport == null) counsellorReleaseReport = false;
     }
 
     @PreUpdate
@@ -212,6 +222,8 @@ public class StudentEntitlement implements Serializable {
     public void setLmsActive(Boolean v) { this.lmsActive = v; }
     public Date getLmsExpiresAt() { return lmsExpiresAt; }
     public void setLmsExpiresAt(Date v) { this.lmsExpiresAt = v; }
+    public Boolean getCounsellorReleaseReport() { return counsellorReleaseReport; }
+    public void setCounsellorReleaseReport(Boolean v) { this.counsellorReleaseReport = v; }
     public Boolean getFinalReportActive() { return finalReportActive; }
     public void setFinalReportActive(Boolean v) { this.finalReportActive = v; }
     public String getAccessToken() { return accessToken; }

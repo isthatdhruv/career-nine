@@ -615,6 +615,7 @@ public class CampaignPublicController {
                     activeTier.put("includesDashboard", pt.getIncludesDashboard());
                     activeTier.put("includesCounselling", pt.getIncludesCounselling());
                     activeTier.put("includesLms", pt.getIncludesLms());
+                    activeTier.put("counsellorReleaseReport", pt.getCounsellorReleaseReport());
                     if (Boolean.TRUE.equals(pt.getIncludesDashboard())
                             && e.getAccessToken() != null && linkBuilder != null) {
                         dashboardUrl = linkBuilder.dashboard(e.getAccessToken(), e.getEntitlementId());
@@ -641,6 +642,10 @@ public class CampaignPublicController {
         response.put("finalReportUrl", finalReportUrl);
         response.put("accessToken", e.getAccessToken());
         response.put("finalReportActive", e.getFinalReportActive());
+        // Held for counsellor release: the Thank-You page uses this to withhold the download
+        // tile, the "we've emailed it" line and the Add-Report upsell, none of which are true
+        // on a tier where the report only leaves when a counsellor sends it.
+        response.put("counsellorReleaseReport", e.getCounsellorReleaseReport());
         // Entitlement-level service flags consumed by the assessment Thank-You
         // page to drive (a) conditional outcome CTAs and (b) per-feature
         // "Add <feature>" upsell cards. Sourced from StudentEntitlement (the
@@ -841,6 +846,7 @@ public class CampaignPublicController {
             tDto.put("includesCounselling", pt.getIncludesCounselling());
             tDto.put("counsellingSessionCount", pt.getCounsellingSessionCount());
             tDto.put("includesLms", pt.getIncludesLms());
+            tDto.put("counsellorReleaseReport", pt.getCounsellorReleaseReport());
             tDto.put("lmsValidityDays", pt.getLmsValidityDays());
             tDto.put("dashboardValidityDays", pt.getDashboardValidityDays());
             out.add(tDto);

@@ -99,6 +99,12 @@ public class AssessmentMappingTier implements Serializable {
     @Column(name = "includes_lms", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean includesLms = false;
 
+    // Hold the finished report until a counsellor releases it — copied from the B2C
+    // pricing tier this level was built from, so an invite issued against a
+    // counsellor-released tier behaves the same way a campaign purchase does.
+    @Column(name = "counsellor_release_report", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean counsellorReleaseReport = false;
+
     @Column(name = "lms_validity_days")
     private Integer lmsValidityDays;
 
@@ -184,6 +190,9 @@ public class AssessmentMappingTier implements Serializable {
 
     public Boolean getIncludesLms() { return includesLms; }
     public void setIncludesLms(Boolean includesLms) { this.includesLms = includesLms; }
+
+    public Boolean getCounsellorReleaseReport() { return counsellorReleaseReport; }
+    public void setCounsellorReleaseReport(Boolean v) { this.counsellorReleaseReport = v; }
 
     public Integer getLmsValidityDays() { return lmsValidityDays; }
     public void setLmsValidityDays(Integer lmsValidityDays) { this.lmsValidityDays = lmsValidityDays; }

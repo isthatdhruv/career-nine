@@ -58,6 +58,9 @@ public class AppointmentService {
     private CounsellingSlotRepository slotRepository;
 
     @Autowired
+    private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
+
+    @Autowired
     private CounsellorRepository counsellorRepository;
 
     @Autowired
@@ -85,8 +88,40 @@ public class AppointmentService {
         return appointmentRepository.findByStudentIdOrdered(studentId);
     }
 
+    /**
+     * One counsellor's sessions, each stamped with whether its tier makes the report theirs to
+     * release — which is what decides whether the row offers a "Send report" button.
+     *
+     * <p>Resolved here rather than in the view because it lives two hops away (appointment →
+     * entitlement → the flag snapshotted at grant time), and a list that omitted it would have
+     * the counsellor's own screen unable to tell a held report from a sent one.
+     */
     public List<CounsellingAppointment> getByCounsellor(Long counsellorId) {
-        return appointmentRepository.findByCounsellorId(counsellorId);
+        List<CounsellingAppointment> appointments = appointmentRepository.findByCounsellorId(counsellorId);
+        for (CounsellingAppointment a : appointments) {
+            a.setCounsellorReleaseReport(isCounsellorReleased(a));
+        }
+        return appointments;
+    }
+
+    /**
+     * Whether this booking's entitlement holds the report for counsellor release.
+     *
+     * <p>False for anything that cannot be resolved — an admin-created booking carries no
+     * entitlement, and a session with no tier behind it has never held a report back. Failing
+     * to false hides a button rather than offering one that would only error.
+     */
+    private boolean isCounsellorReleased(CounsellingAppointment a) {
+        try {
+            if (a.getEntitlementId() == null) return false;
+            return studentEntitlementRepository.findById(a.getEntitlementId())
+                    .map(e -> Boolean.TRUE.equals(e.getCounsellorReleaseReport()))
+                    .orElse(false);
+        } catch (Exception e) {
+            logger.warn("Could not resolve report-release setting for appointment {}: {}",
+                    a.getId(), e.getMessage());
+            return false;
+        }
     }
 
     public List<CounsellingAppointment> getByCounsellorAndDate(Long counsellorId, LocalDate date) {

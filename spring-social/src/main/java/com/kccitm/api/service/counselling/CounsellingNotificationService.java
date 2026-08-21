@@ -51,6 +51,10 @@ public class CounsellingNotificationService {
     @Autowired
     private CounsellorReportNotificationService counsellorReportNotificationService;
 
+    /** Optional so this still starts where the B2C entitlement stack is not wired. */
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.ReportReleaseGate reportReleaseGate;
+
     @Autowired
     private EmailDispatchService emailDispatchService;
 
@@ -535,6 +539,10 @@ public class CounsellingNotificationService {
      * reader looking for something that is not there.
      */
     private String reportGuidance(CounsellingAppointment appointment, boolean forCounsellor) {
+        if (!forCounsellor && isHeldForCounsellorRelease(appointment)) {
+            return "Your assessment report will be shared with you by your counsellor after "
+                 + "the session, so the results can be talked through rather than simply read.\n\n";
+        }
         boolean hasReport = bookingReportLink(appointment) != null;
         if (!hasReport) {
             return forCounsellor
@@ -632,6 +640,20 @@ public class CounsellingNotificationService {
      *                       adds nothing
      */
     private String sessionDetailsBlock(CounsellingAppointment appointment, boolean includeStudent) {
+        // `includeStudent` marks the counsellor's own copy -- they are the ones who need
+        // telling who is coming -- and a counsellor may always be shown the report.
+        return sessionDetailsBlock(appointment, includeStudent, includeStudent);
+    }
+
+    /**
+     * @param mayShowReport false to print the held wording in place of the link. Set for every
+     *                      copy a student can read, including the booking confirmation, which
+     *                      is one body sent to student, parent and counsellor together -- on a
+     *                      counsellor-release tier the link cannot ride along in an email a
+     *                      student will open, whatever else is in it.
+     */
+    private String sessionDetailsBlock(CounsellingAppointment appointment, boolean includeStudent,
+                                       boolean mayShowReport) {
         StringBuilder sb = new StringBuilder();
         try {
             if (includeStudent && appointment.getStudent() != null
@@ -667,9 +689,12 @@ public class CounsellingNotificationService {
             // Always stated, never dropped. A silently missing report line reads as "there is
             // no report to see" to a student and as "nobody sent me one" to a counsellor, and
             // both then go looking. Saying it is still being prepared answers the question.
-            String report = bookingReportLink(appointment);
+            boolean held = !mayShowReport && isHeldForCounsellorRelease(appointment);
+            String report = held ? null : bookingReportLink(appointment);
             sb.append("  Assessment report: ")
-              .append(report != null ? report : "being prepared — we will email it as soon as it is ready")
+              .append(report != null ? report
+                      : held ? "will be shared by your counsellor after the session"
+                             : "being prepared — we will email it as soon as it is ready")
               .append("\n");
         } catch (Exception e) {
             logger.warn("Could not build session details for appointment {}: {}",
@@ -729,6 +754,18 @@ public class CounsellingNotificationService {
      * report to send before they press the button — resolved the one way, here, rather than by
      * a second implementation that could drift from what the emails actually carry.
      */
+    /**
+     * Whether this booking's tier keeps the report back for the counsellor to release.
+     *
+     * <p>Asked of the entitlement the session was booked against rather than of the student's
+     * reports, because that is where the setting was snapshotted at purchase. A booking with
+     * no entitlement -- an admin-created one -- was never on a tier at all, and is not held.
+     */
+    private boolean isHeldForCounsellorRelease(CounsellingAppointment appointment) {
+        if (reportReleaseGate == null || appointment == null) return false;
+        return reportReleaseGate.isHeldForEntitlement(appointment.getEntitlementId());
+    }
+
     public String bookingReportLink(CounsellingAppointment appointment) {
         try {
             if (appointment.getStudent() == null) return null;
@@ -779,7 +816,7 @@ public class CounsellingNotificationService {
             String body = "Dear " + studentName + ",\n\n"
                     + "Your counselling session has been confirmed.\n\n"
                     + "Session Details:\n"
-                    + sessionDetailsBlock(appointment, true)
+                    + sessionDetailsBlock(appointment, true, false)
                     + "\n"
                     + (gcal != null ? "Add to Google Calendar: " + gcal + "\n\n" : "")
                     + "A calendar invite is also attached so you can add this to any calendar.\n\n"
@@ -1247,6 +1284,64 @@ public class CounsellingNotificationService {
             logger.warn("Failed to log unplaced appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
         }
+    }
+
+    /**
+     * Sends the student their four-digit check-in code on demand — the counsellor's
+     * "Send code to student" button on the session row.
+     *
+     * <p>The code is not generated here and nothing new is stored: it is the same
+     * DOB-derived {@link CounsellingOtpService} value printed on the student's report and
+     * recomputed by {@link CheckinOtpService#verify}. This method only carries it to the
+     * student who has mislaid the report or never opened it.
+     *
+     * <p>Both channels are attempted independently — a student with a number but no address
+     * still gets it, and vice versa. Returns the channels that actually accepted the message
+     * so the counsellor is told what happened rather than a blanket "sent": WhatsApp is a
+     * no-op until {@code AISENSY_API_KEY} and the {@code counselling_otp} campaign exist, and
+     * silently reporting success there would leave the counsellor waiting on a message that
+     * was never sent.
+     *
+     * <p>Deliberately not {@code @Async} — the counsellor is standing at the button waiting
+     * to be told whether the student has the code.
+     */
+    public List<String> sendCheckinCodeToStudent(CounsellingAppointment appointment, String code) {
+        List<String> delivered = new java.util.ArrayList<>();
+        String name = studentName(appointment);
+
+        // WhatsApp first: it is where the student is likeliest to be looking mid-session.
+        String phone = studentPhone(appointment);
+        if (phone != null && !phone.trim().isEmpty()) {
+            // Positional template params for the AiSensy `counselling_otp` campaign.
+            if (whatsAppService.sendTemplate(phone, whatsAppService.otpCampaign(),
+                    Arrays.asList(name, code))) {
+                delivered.add("WhatsApp");
+            }
+        }
+
+        String email = studentEmail(appointment);
+        if (email != null && !email.trim().isEmpty()) {
+            try {
+                String subject = "Your counselling check-in code";
+                String body = "Dear " + name + ",\n\n"
+                        + "Your check-in code for the counselling session is:\n\n"
+                        + "    " + code + "\n\n"
+                        + "Read this out to your counsellor to start the session. It is the same "
+                        + "4-digit code printed on your Career-9 report.\n\n"
+                        + "Please do not share it with anyone else — it is what records you as "
+                        + "present for your sessions.\n\n"
+                        + "Regards,\nCareer-Nine Team";
+                sendEmail(email, subject, body);
+                delivered.add("email");
+            } catch (Exception e) {
+                logger.warn("Check-in code email failed for appointment {}: {}",
+                        appointment.getId(), e.getMessage());
+            }
+        }
+
+        logger.info("Check-in code for appointment {} delivered via {}", appointment.getId(),
+                delivered.isEmpty() ? "nothing" : String.join(" + ", delivered));
+        return delivered;
     }
 
     /**

@@ -81,6 +81,7 @@ public class PricingTierController {
         if (req.containsKey("includesCounselling")) t.setIncludesCounselling((Boolean) req.get("includesCounselling"));
         if (req.containsKey("counsellingSessionCount")) t.setCounsellingSessionCount(toInt(req.get("counsellingSessionCount")));
         if (req.containsKey("includesLms")) t.setIncludesLms((Boolean) req.get("includesLms"));
+        if (req.containsKey("counsellorReleaseReport")) t.setCounsellorReleaseReport((Boolean) req.get("counsellorReleaseReport"));
         if (req.containsKey("lmsValidityDays")) t.setLmsValidityDays(toInt(req.get("lmsValidityDays")));
         if (req.containsKey("dashboardValidityDays")) t.setDashboardValidityDays(toInt(req.get("dashboardValidityDays")));
         if (req.containsKey("sortOrder")) t.setSortOrder(toInt(req.get("sortOrder")));

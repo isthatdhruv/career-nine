@@ -9,7 +9,9 @@ import {
   markStudentAbsent,
   startSession,
   verifyCheckin,
+  sendCheckinCode,
   getSessionReportLink,
+  releaseReportToStudent,
 } from '../Counselling/API/AppointmentAPI'
 import NotificationBell from '../Counselling/shared/NotificationBell'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
@@ -352,6 +354,10 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [reportLoading, setReportLoading] = useState<number | null>(null)
+  const [releaseLoading, setReleaseLoading] = useState<number | null>(null)
+  // Locally remembered releases, so a row says "Sent" the moment it is sent rather than only
+  // after the next poll brings a fresh reportReleasedAt back from the server.
+  const [releasedAt, setReleasedAt] = useState<Record<number, string>>({})
   // Separate from `error`: a session whose student has not sat the assessment yet is a normal
   // state of affairs, not a failure, and colouring it red sends the counsellor chasing an admin.
   const [reportNotice, setReportNotice] = useState<{ text: string } | null>(null)
@@ -402,6 +408,9 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const [otpSent, setOtpSent] = useState<Record<number, boolean>>({})
   const [otpCode, setOtpCode] = useState<Record<number, string>>({})
   const [checkinMsg, setCheckinMsg] = useState<Record<number, string>>({})
+  // Separate from actionLoading so sending the code doesn't grey out Verify & start —
+  // the counsellor may well be typing the code in as it goes out.
+  const [codeSending, setCodeSending] = useState<Record<number, boolean>>({})
 
   const refreshAppointments = useCallback(() => {
     if (!counsellorId) return
@@ -526,6 +535,38 @@ const CounsellorAppointmentsPage: React.FC = () => {
     }
   }
 
+  /**
+   * Send this student their report — the only way it reaches them on a tier where the report
+   * is the counsellor's to release, since nothing was mailed when the assessment finished.
+   *
+   * Re-sendable on purpose. A student who lost the mail, or asks again after the session,
+   * should not need an administrator, so the button stays live once it has been used and only
+   * changes what it says.
+   */
+  const handleReleaseReport = async (appt: any) => {
+    setReleaseLoading(appt.id)
+    setReportNotice(null)
+    try {
+      const res = await releaseReportToStudent(appt.id)
+      const to = res.data?.recipients?.join(', ')
+      setReleasedAt((p) => ({ ...p, [appt.id]: res.data?.releasedAt || new Date().toISOString() }))
+      setCheckinMsg((p) => ({
+        ...p,
+        [appt.id]: `✓ Report sent to ${to || 'the student'}.`,
+      }))
+      reload()
+    } catch (e: any) {
+      // The three refusals — no report yet, no address, session gone — are the counsellor's to
+      // act on, so they are shown as written rather than flattened into a generic failure.
+      setCheckinMsg((p) => ({
+        ...p,
+        [appt.id]: e?.response?.data?.error || 'Could not send the report. Please try again.',
+      }))
+    } finally {
+      setReleaseLoading(null)
+    }
+  }
+
   // Session check-in: counsellor sends the OTP to the student, then enters the code
   // the student shares back. Verifying it is what actually starts the session
   // (status -> IN_PROGRESS) and unlocks the Teams meeting link.
@@ -554,6 +595,31 @@ const CounsellorAppointmentsPage: React.FC = () => {
       }))
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  // "Send code to student" — for the student who never downloaded their report, or has it
+  // on a laptop at home. Sends the same 4-digit code that is printed on it (nothing new is
+  // generated) to their email and WhatsApp. The message names the channels that actually
+  // accepted it: WhatsApp is a no-op until AiSensy is configured, and saying "sent" when
+  // nothing was would leave the counsellor waiting on a message that never comes.
+  const handleSendCode = async (appointmentId: number) => {
+    setCodeSending((p) => ({ ...p, [appointmentId]: true }))
+    setCheckinMsg((p) => ({ ...p, [appointmentId]: '' }))
+    try {
+      const res = await sendCheckinCode(appointmentId)
+      const sent = (res.data?.channels || []).length > 0
+      setCheckinMsg((p) => ({
+        ...p,
+        [appointmentId]: (sent ? '✓ ' : '') + (res.data?.message || 'Code sent to the student.'),
+      }))
+    } catch (e: any) {
+      setCheckinMsg((p) => ({
+        ...p,
+        [appointmentId]: typeof e?.response?.data === 'string' ? e.response.data : 'Could not send the code.',
+      }))
+    } finally {
+      setCodeSending((p) => ({ ...p, [appointmentId]: false }))
     }
   }
 
@@ -945,6 +1011,26 @@ const CounsellorAppointmentsPage: React.FC = () => {
                     >
                       {reportLoading === appt.id ? 'Opening…' : '📄 Report'}
                     </button>
+                    {/* Only on tiers that hold the report back. Everywhere else the student was
+                        mailed it the moment it generated, and a button implying otherwise would
+                        invite a duplicate. */}
+                    {appt.counsellorReleaseReport && (() => {
+                      const sentAt = releasedAt[appt.id] || appt.reportReleasedAt
+                      return (
+                        <button
+                          className={`cp-action-btn${sentAt ? '' : ' cp-action-btn-primary'}`}
+                          onClick={() => handleReleaseReport(appt)}
+                          disabled={releaseLoading === appt.id}
+                          title={sentAt
+                            ? 'Already sent. Press again to send the student the same link once more.'
+                            : "Email this student their assessment report. Nothing has been sent to them yet."}
+                        >
+                          {releaseLoading === appt.id
+                            ? 'Sending…'
+                            : sentAt ? '✓ Report sent — send again' : 'Send report'}
+                        </button>
+                      )
+                    })()}
                     {status === 'ASSIGNED' && (
                       <>
                         <button
@@ -1024,6 +1110,18 @@ const CounsellorAppointmentsPage: React.FC = () => {
                             </button>
                           </>
                         )}
+                        {/* The code is on the student's report and nowhere else, so a student who
+                            can't open it cannot check in at all. This mails and WhatsApps it to
+                            them. Always available on a confirmed session — before Start session as
+                            well as after — because that is when a student says they can't find it. */}
+                        <button
+                          className='cp-action-btn'
+                          onClick={() => handleSendCode(appt.id)}
+                          disabled={!!codeSending[appt.id]}
+                          title="Email and WhatsApp the student the 4-digit code from their report."
+                        >
+                          {codeSending[appt.id] ? 'Sending…' : 'Send code to student'}
+                        </button>
                         {(() => {
                           const until = msUntilStart(appt, nowMs)
                           const tooLate = until < CANCEL_CUTOFF_MS

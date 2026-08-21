@@ -20,6 +20,7 @@ const emptyTier: PricingTier = {
   counsellingSessionCount: undefined,
   includesLms: false,
   lmsValidityDays: undefined,
+  counsellorReleaseReport: false,
   dashboardValidityDays: undefined,
   sortOrder: 0,
   isActive: true,
@@ -131,6 +132,7 @@ const PricingTierPage = () => {
                     {t.includesDashboard && <span className="badge bg-success me-1">Dashboard</span>}
                     {t.includesCounselling && <span className="badge bg-success me-1">Counselling</span>}
                     {t.includesLms && <span className="badge bg-success me-1">LMS</span>}
+                    {t.counsellorReleaseReport && <span className="badge bg-warning text-dark me-1">Counsellor releases report</span>}
                   </td>
                   <td>{t.includesCounselling ? (t.counsellingSessionCount ?? "—") : "—"}</td>
                   <td>
@@ -209,6 +211,14 @@ const PricingTierPage = () => {
                 )}
               </div>
             </div>
+            <Form.Check
+              className="mb-2"
+              type="switch"
+              id="incCRR"
+              label="Counsellor release report"
+              checked={!!editing.counsellorReleaseReport}
+              onChange={e => upd("counsellorReleaseReport", e.target.checked)}
+            />
             <Form.Check type="switch" id="actv" label="Active (visible in campaigns)" checked={!!editing.isActive} onChange={e => upd("isActive", e.target.checked)} />
           </Form>
         </Modal.Body>

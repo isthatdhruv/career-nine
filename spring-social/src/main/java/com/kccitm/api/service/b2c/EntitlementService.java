@@ -461,12 +461,13 @@ public class EntitlementService {
      * project into this so a single snapshot routine serves both flows.
      */
     private static final class ServiceInclusions {
-        final boolean finalReport, dashboard, counselling, lms;
+        final boolean finalReport, dashboard, counselling, lms, counsellorReleaseReport;
         final Integer dashboardValidityDays, counsellingSessionCount, lmsValidityDays;
 
         private ServiceInclusions(boolean finalReport, boolean dashboard, Integer dashboardValidityDays,
                                   boolean counselling, Integer counsellingSessionCount,
-                                  boolean lms, Integer lmsValidityDays) {
+                                  boolean lms, Integer lmsValidityDays,
+                                  boolean counsellorReleaseReport) {
             this.finalReport = finalReport;
             this.dashboard = dashboard;
             this.dashboardValidityDays = dashboardValidityDays;
@@ -474,6 +475,7 @@ public class EntitlementService {
             this.counsellingSessionCount = counsellingSessionCount;
             this.lms = lms;
             this.lmsValidityDays = lmsValidityDays;
+            this.counsellorReleaseReport = counsellorReleaseReport;
         }
 
         static ServiceInclusions fromMappingTier(AssessmentMappingTier t) {
@@ -481,21 +483,28 @@ public class EntitlementService {
                     Boolean.TRUE.equals(t.getIncludesFinalReport()),
                     Boolean.TRUE.equals(t.getIncludesDashboard()), t.getDashboardValidityDays(),
                     Boolean.TRUE.equals(t.getIncludesCounselling()), t.getCounsellingSessionCount(),
-                    Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays());
+                    Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays(),
+                    Boolean.TRUE.equals(t.getCounsellorReleaseReport()));
         }
 
+        /**
+         * The legacy school tier has no counsellor-release setting of its own, so a school
+         * entitlement never holds the report — which is the behaviour those schools have
+         * always had, and changing it silently would stop reports they expect.
+         */
         static ServiceInclusions fromSchoolTier(SchoolAssessmentTier t) {
             return new ServiceInclusions(
                     Boolean.TRUE.equals(t.getIncludesFinalReport()),
                     Boolean.TRUE.equals(t.getIncludesDashboard()), t.getDashboardValidityDays(),
                     Boolean.TRUE.equals(t.getIncludesCounselling()), t.getCounsellingSessionCount(),
-                    Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays());
+                    Boolean.TRUE.equals(t.getIncludesLms()), t.getLmsValidityDays(),
+                    false);
         }
 
         /** Copy with counselling stripped — used to defer counselling to PAY_LATER per-slot booking. */
         ServiceInclusions withoutCounselling() {
             return new ServiceInclusions(finalReport, dashboard, dashboardValidityDays,
-                    false, 0, lms, lmsValidityDays);
+                    false, 0, lms, lmsValidityDays, counsellorReleaseReport);
         }
     }
 
@@ -505,6 +514,11 @@ public class EntitlementService {
         e.setDashboardActive(Boolean.TRUE.equals(e.getDashboardActive()) || inc.dashboard);
         e.setCounsellingActive(Boolean.TRUE.equals(e.getCounsellingActive()) || inc.counselling);
         e.setLmsActive(Boolean.TRUE.equals(e.getLmsActive()) || inc.lms);
+        // Additive like the flags above: once any tier the student holds says the report is
+        // the counsellor's to release, an upgrade bought on a plainer tier must not quietly
+        // start posting it out.
+        e.setCounsellorReleaseReport(
+                Boolean.TRUE.equals(e.getCounsellorReleaseReport()) || inc.counsellorReleaseReport);
 
         // A tier with the counselling toggle ON must always grant at least one
         // bookable session, even if the admin left the session-count field blank.
@@ -544,12 +558,23 @@ public class EntitlementService {
     /**
      * Called from AssessmentAnswerController.submit at end of submission, fire-and-forget.
      * If the active entitlement includes a final report, mark it ready and email the link.
+     *
+     * <p>Unless the tier hands that decision to the counsellor. On those tiers the results are
+     * meant to be explained rather than delivered, so nothing is sent here — the link goes out
+     * when the counsellor presses "Send report" on the session. Nothing else about the
+     * entitlement changes — the report is generated and stored exactly as before, and the
+     * release is a send and nothing more.
      */
     @Transactional
     public void onAssessmentCompleted(Long userStudentId, Long assessmentId, String studentEmail) {
         for (StudentEntitlement e : entitlementRepository
                 .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
             if (!"active".equals(e.getStatus()) && !"pending".equals(e.getStatus())) continue;
+            if (Boolean.TRUE.equals(e.getCounsellorReleaseReport())) {
+                logger.info("Report held for counsellor release: student={} assessment={} entitlement={}",
+                        userStudentId, assessmentId, e.getEntitlementId());
+                return;
+            }
             String token = e.getAccessToken();
             if (token == null) {
                 token = generateToken();
@@ -774,6 +799,7 @@ public class EntitlementService {
         entitlement.setDashboardActive(Boolean.TRUE.equals(tier.getIncludesDashboard()));
         entitlement.setCounsellingActive(Boolean.TRUE.equals(tier.getIncludesCounselling()));
         entitlement.setLmsActive(Boolean.TRUE.equals(tier.getIncludesLms()));
+        entitlement.setCounsellorReleaseReport(Boolean.TRUE.equals(tier.getCounsellorReleaseReport()));
         entitlement.setCounsellingSessionsTotal(
                 tier.getCounsellingSessionCount() != null ? tier.getCounsellingSessionCount() : 0);
 
