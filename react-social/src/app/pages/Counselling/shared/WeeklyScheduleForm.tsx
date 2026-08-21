@@ -110,6 +110,8 @@ export interface ExistingSlot {
   endTime: string
   status?: string
   isBlocked?: boolean
+  /** The weekly schedule that generated this slot, when it came from one. */
+  template?: { id: number } | null
 }
 
 export interface ExistingTemplate {

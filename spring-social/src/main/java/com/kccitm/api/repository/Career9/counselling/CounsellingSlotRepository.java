@@ -87,6 +87,15 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
     /** Slots generated from one template — cleanup when that template is deleted. */
     List<CounsellingSlot> findByTemplateId(Long templateId);
 
+    /**
+     * Slots a template still has ahead of it that are worth keeping the template for:
+     * today or later, not blocked, not cancelled. Zero means the weekly rule has nothing
+     * left to offer and can go with it.
+     */
+    @Query("SELECT COUNT(s) FROM CounsellingSlot s WHERE s.template.id = :templateId "
+         + "AND s.date >= :today AND s.isBlocked = false AND s.status <> 'CANCELLED'")
+    long countActiveFutureByTemplate(@Param("templateId") Long templateId, @Param("today") LocalDate today);
+
     /** Nullify template_id on every slot — needed before deleting templates */
     @Modifying
     @Transactional

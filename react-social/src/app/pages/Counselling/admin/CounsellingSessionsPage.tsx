@@ -7,7 +7,7 @@ import PageHeader from '../../../components/PageHeader'
 import { useAuth } from '../../../modules/auth'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import {
-  getAllAppointments, adminCancelAppointment, rescheduleAppointment,
+  getAllAppointments, adminCancelAppointment, rescheduleAppointment, sendSelfRescheduleLink,
   assignCounsellor, confirmAppointment, emailSessionToStudent, emailSessionToCounsellor,
 } from '../API/AppointmentAPI'
 import { getActiveCounsellors } from '../API/CounsellorAPI'
@@ -442,6 +442,28 @@ const ActionDialog: React.FC<{
     }
   }, [action])
 
+  /**
+   * Hand the choice back to the student instead of picking a time for them. Lives inside the
+   * reschedule dialog because it is the same decision — move this session — taken the other
+   * way round, and an admin who cannot see a slot that suits the student needs it right there.
+   */
+  const emailRescheduleLink = async () => {
+    if (!window.confirm(
+      `Email ${name} a link to pick a new time?\n\nThe session is held open for them and its current slot reopens for other students. They keep it until they choose a new time.`,
+    )) return
+    setErr('')
+    setBusy(true)
+    try {
+      const res = await sendSelfRescheduleLink(appt.id, note.trim() || undefined)
+      const to = res.data?.recipient || 'the student'
+      onDone(`Reschedule link sent to ${to}. ${name}'s session is held until they pick a new time.`)
+    } catch (e: any) {
+      const body = e?.response?.data
+      setErr(typeof body === 'string' ? body : body?.error || 'The link could not be sent. Please try again.')
+      setBusy(false)
+    }
+  }
+
   const run = async () => {
     setErr('')
     setBusy(true)
@@ -573,8 +595,38 @@ const ActionDialog: React.FC<{
               <p style={noteStyle}>
                 Pick a new time from the open slots. The old slot reopens, the counsellor is carried
                 over from the new slot, and the student and the counsellor are both emailed the new
-                details. An admin move does not use up the student's own reschedule.
+                details. An admin move does not use up the student's own reschedule, and can be
+                repeated as often as needed — including for a session that has already started or
+                passed.
               </p>
+
+              {/* The other way to move a session: let the student choose. */}
+              <div style={{
+                marginBottom: 14, padding: '12px 14px', borderRadius: 10,
+                background: '#F0F7FF', border: '1px solid #C7DDF7',
+              }}>
+                <div style={{ fontSize: 12.5, color: '#1E3A5F', lineHeight: 1.6, marginBottom: 10 }}>
+                  Don't know what time suits them? Email the student a link to pick a new slot
+                  themselves — no login needed. Their session is held until they choose, and this
+                  slot reopens for other students. Anything typed below is included as the reason.
+                </div>
+                <button
+                  type='button'
+                  className='cl-btn-outline'
+                  onClick={emailRescheduleLink}
+                  disabled={busy}
+                  style={{ width: '100%' }}
+                >
+                  {busy ? 'Working…' : '✉ Email student a reschedule link'}
+                </button>
+              </div>
+
+              <label style={labelStyle}>Reason (optional — included in the link email)</label>
+              <textarea
+                style={{ ...inputStyle, resize: 'vertical', marginBottom: 14 }} rows={2} value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder='e.g. you asked to move this session'
+              />
               {loadingOptions ? (
                 <div style={emptyStyle}>Loading open slots...</div>
               ) : slots.length === 0 ? (

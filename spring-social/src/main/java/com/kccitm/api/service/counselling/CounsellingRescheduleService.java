@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.exception.BadRequestException;
 import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
@@ -24,6 +25,7 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.security.TokenProvider;
+import com.kccitm.api.service.b2c.LinkBuilder;
 
 /**
  * Public, token-gated self-service rescheduling. When a counsellor is marked absent, each affected
@@ -60,6 +62,81 @@ public class CounsellingRescheduleService {
 
     @Autowired
     private BookingService bookingService;
+
+    @Autowired
+    private LinkBuilder linkBuilder;
+
+    @Autowired
+    private CounsellingNotificationService notificationService;
+
+    /** Statuses an admin can still hand back to the student to re-pick. */
+    private static final List<String> INVITABLE = List.of(
+            "PENDING", "ASSIGNED", "CONFIRMED", "IN_PROGRESS", "MISSED", AWAITING);
+
+    /**
+     * Admin hands the choice of time back to the student: the session is parked as
+     * {@code AWAITING_RESCHEDULE} and the student is emailed the same tokenized, no-login link
+     * used for counsellor absences, so they pick a new slot themselves rather than the admin
+     * guessing a time that suits them.
+     *
+     * <p>The old slot is released back to AVAILABLE — the counsellor is not away, so holding
+     * their diary open for a session that now has no time would take that slot off every other
+     * student for nothing. Sending the link again on an already-parked session just re-sends
+     * the mail, which is what an admin chasing a student needs.
+     *
+     * @return the address the link went to, for the admin's confirmation message
+     */
+    @Transactional
+    public String sendSelfRescheduleInvite(Long appointmentId, String reason) {
+        CounsellingAppointment appt = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
+
+        if (!INVITABLE.contains(String.valueOf(appt.getStatus()))) {
+            throw new BadRequestException(
+                    "This session is " + String.valueOf(appt.getStatus()).toLowerCase()
+                            + " — there is nothing for the student to reschedule.");
+        }
+
+        String recipient = firstNonBlank(appt.getStudentContactEmail(), infoEmail(appt.getStudent()));
+        if (recipient == null || recipient.isBlank()) {
+            throw new BadRequestException(
+                    "No email address on file for this student, so the reschedule link cannot be sent.");
+        }
+
+        CounsellingSlot oldSlot = appt.getSlot();
+        // Leave a blocked slot blocked: that means the counsellor really is away, and reopening
+        // it would put a time nobody can staff back on the board.
+        if (oldSlot != null && !Boolean.TRUE.equals(oldSlot.getIsBlocked())
+                && !AWAITING.equals(appt.getStatus())) {
+            oldSlot.setStatus("AVAILABLE");
+            slotRepository.save(oldSlot);
+        }
+
+        appt.setStatus(AWAITING);
+        appointmentRepository.save(appt);
+
+        String url = linkBuilder.counsellingReschedule(
+                tokenProvider.createCounsellingRescheduleToken(appt.getId()));
+        notificationService.sendSelfRescheduleInviteEmail(appt, url, reason);
+
+        try {
+            User studentUser = new User();
+            studentUser.setId(appt.getStudent().getUserId());
+            notificationService.createInAppNotification(
+                    studentUser,
+                    "APPOINTMENT_RESCHEDULE_NEEDED",
+                    "Reschedule Your Counselling Session",
+                    "Please pick a new time for your counselling session using the link we emailed you.",
+                    appt.getId(),
+                    "APPOINTMENT");
+        } catch (Exception e) {
+            // The email is the delivery that matters; the in-app nudge is a bonus.
+            logger.warn("In-app reschedule nudge failed for appointment {}: {}", appt.getId(), e.getMessage());
+        }
+
+        logger.info("Admin sent self-reschedule link for appointment {} to {}", appt.getId(), recipient);
+        return recipient;
+    }
 
     /** Context for the public reschedule page: the old session details + currently-available slots. */
     @Transactional

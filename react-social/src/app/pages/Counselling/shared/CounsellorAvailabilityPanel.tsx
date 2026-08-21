@@ -130,6 +130,13 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
   const [slotSaving, setSlotSaving] = useState(false)
   const [blockSaving, setBlockSaving] = useState(false)
   const [deletingSlot, setDeletingSlot] = useState<number | null>(null)
+  const [clearingDate, setClearingDate] = useState<string | null>(null)
+  /**
+   * Bumped whenever slots change, to make the Weekly Schedule card re-read its list:
+   * deleting a schedule's last remaining slot deletes the schedule itself server-side,
+   * and the day must disappear from above at the same moment, not one poll later.
+   */
+  const [scheduleReloadToken, setScheduleReloadToken] = useState(0)
 
   const refreshAvailability = useCallback(() => {
     if (!counsellorId) return
@@ -172,12 +179,23 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
       .catch(() => {})
   }
 
+  /**
+   * One place for "slots just changed": the slot list, the Weekly Schedule card above it
+   * (a schedule can disappear as a result), and whatever the parent page shows.
+   */
+  const afterSlotsChanged = () => {
+    reloadSlots()
+    setScheduleReloadToken((n) => n + 1)
+    onChanged?.()
+  }
+
   const handleScheduleChanged = () => {
     // The backend materializes slots from a new template immediately,
     // so the Upcoming Slots list must refresh too.
     reloadSlots()
     onChanged?.()
   }
+
 
   // Online extra slot needs the permanent Teams link on file, exactly as the weekly
   // schedule does — the Add Slot button stays disabled until it is a valid one.
@@ -230,8 +248,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
         mode: manualSlotForm.mode,
       })
       setSuccess('Extra slot added.')
-      reloadSlots()
-      onChanged?.()
+      afterSlotsChanged()
       setManualSlotForm({ date: '', startTime: '', endTime: '', durationMinutes: 30, mode: 'ONLINE' })
     } catch (e: any) {
       // Surface the backend's conflict message (e.g. "You already have an Online
@@ -269,7 +286,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
       }
       setBlockDateForm({ date: '', reason: '' })
       reloadBlockRequests()
-      if (asAdmin) { reloadSlots(); onChanged?.() }
+      if (asAdmin) { afterSlotsChanged() }
     } catch {
       setError(asAdmin ? 'Failed to block the date.' : 'Failed to submit block date request.')
     } finally {
@@ -279,16 +296,56 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
 
   const handleDeleteSlot = async (slotId: number) => {
     setDeletingSlot(slotId)
+    setError('')
     try {
-      await deleteSlot(slotId)
-      setSuccess('Deleted successfully.')
-      reloadSlots()
-      onChanged?.()
-    } catch {
-      setError('Failed to delete.')
+      const res = await deleteSlot(slotId)
+      // The server drops the weekly schedule too once its last live slot goes, so say so —
+      // the row vanishing from Weekly Schedule above should not look like a glitch.
+      setSuccess(res?.data?.templateRemoved
+        ? 'Slot removed. That was the last slot from its weekly schedule, so the schedule was removed too.'
+        : 'Deleted successfully.')
+      afterSlotsChanged()
+    } catch (e: any) {
+      // e.g. a rescheduled session still linked to the slot — the backend explains why.
+      const msg = e?.response?.data
+      setError(typeof msg === 'string' && msg ? msg : 'Failed to delete.')
     } finally {
       setDeletingSlot(null)
     }
+  }
+
+  /**
+   * Clear a whole day's free slots at once — the counterpart to removing a whole weekly
+   * schedule. Booked slots are left alone (the server refuses them anyway), so a day with
+   * a session in it keeps that session and loses only the free time around it.
+   */
+  const handleClearDate = async (date: string, daySlots: any[]) => {
+    const removable = daySlots.filter((s: any) => (s.status || '').toUpperCase() === 'AVAILABLE')
+    if (removable.length === 0) return
+    if (!window.confirm(
+      `Remove all ${removable.length} free slot${removable.length === 1 ? '' : 's'} on ${formatDateShort(date)}? Booked sessions that day are kept.`,
+    )) return
+    setClearingDate(date)
+    setError('')
+    let removedTemplate = false
+    const failed: string[] = []
+    for (const slot of removable) {
+      try {
+        const res = await deleteSlot(slot.id)
+        if (res?.data?.templateRemoved) removedTemplate = true
+      } catch {
+        failed.push(`${formatTime(slot.startTime)}–${formatTime(slot.endTime)}`)
+      }
+    }
+    if (failed.length > 0) {
+      setError(`Could not remove ${failed.length} slot(s) on ${formatDateShort(date)}: ${failed.join(', ')}. A past or rescheduled session is still linked to them.`)
+    } else {
+      setSuccess(removedTemplate
+        ? `${formatDateShort(date)} cleared. A weekly schedule ran out of slots and was removed too.`
+        : `${formatDateShort(date)} cleared.`)
+    }
+    afterSlotsChanged()
+    setClearingDate(null)
   }
 
   const dismissMessages = () => {
@@ -375,6 +432,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                 // blocked slots (they live in blockedDates).
                 existingSlots={manualSlots}
                 onChanged={handleScheduleChanged}
+                reloadToken={scheduleReloadToken}
               />
             </div>
 
@@ -403,8 +461,23 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                       <div style={{
                         padding: '10px 18px', background: '#F8FAFC',
                         fontSize: 13, fontWeight: 700, color: '#334155',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
                       }}>
-                        {formatDateShort(date)}
+                        <span>{formatDateShort(date)}</span>
+                        {daySlots.some((s: any) => (s.status || '').toUpperCase() === 'AVAILABLE') && (
+                          <button
+                            onClick={() => handleClearDate(date, daySlots)}
+                            disabled={clearingDate === date}
+                            title='Remove every free slot on this day'
+                            style={{
+                              background: 'none', border: '1px solid #FECACA', color: '#DC2626',
+                              borderRadius: 6, padding: '2px 9px', fontSize: 10.5, fontWeight: 700,
+                              cursor: clearingDate === date ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            {clearingDate === date ? 'Removing…' : 'Remove All'}
+                          </button>
+                        )}
                       </div>
                       <div style={{ padding: '10px 18px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                         {daySlots
