@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- V20260821003__expand_page_permission_grants.sql
+-- V20260821005__expand_page_permission_grants.sql
 --
 -- The admin SPA's page gates move from 33 coarse permission codes to the
 -- resource-grained codes the Phase-15 catalog already defines (each page now

@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- V20260821002__seed_missing_permission_codes.sql
+-- V20260821004__seed_missing_permission_codes.sql
 --
 -- Seeds 12 PermissionCode entries that never made it into a seed migration
 -- (found by PermissionCatalogSeedCoverageTest). Their enum comments name
