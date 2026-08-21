@@ -435,6 +435,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           ? questionData.options.map((option: any, idx: number) => ({
             optionText: option.optionText || "",
             optionDescription: option.optionDescription || "",
+            optionGroup: option.optionGroup || "",
             correct: option.correct ?? false,
             sequence: option.sequence || idx + 1,
             ...(option.optionId ? { optionId: option.optionId } : {}),
@@ -443,6 +444,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
             {
               optionText: "",
               optionDescription: "",
+              optionGroup: "",
               correct: false,
               sequence: 1,
             },
@@ -450,6 +452,15 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     },
     // validationSchema: validationSchema,
     onSubmit: async (values) => {
+      // Dropdown questions need every option tagged with a group
+      if (values.questionType === "dropdown" && !useGameAsOption) {
+        const missing = values.options.find((opt: any) => !(opt.optionGroup || "").trim());
+        if (missing) {
+          showErrorToast(`Option ${missing.sequence} has no group. Every option of a dropdown question needs a group name.`);
+          return;
+        }
+      }
+
       setLoading(true);
       try {
         // Sort options by sequence before processing
@@ -510,6 +521,9 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
               optionText: isImageMode ? null : option.optionText,
               optionImageUrl: isImageMode ? (optionImageUrls[originalIdx] || null) : null,
               optionDescription: option.optionDescription || "",
+              optionGroup: values.questionType === "dropdown"
+                ? (option.optionGroup || "").trim()
+                : null,
               optionScores,
               correct: option.correct ?? false,
               sequence: option.sequence,
@@ -613,6 +627,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       const newOption = {
         optionText: "",
         optionDescription: "",
+        optionGroup: "",
         correct: false,
         sequence: currentOptions.length + 1, // Auto-increment sequence
       };
@@ -669,6 +684,16 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     if (optionIndex !== -1) {
 
       currentOptions[optionIndex].optionDescription = value;
+      formik.setFieldValue("options", currentOptions);
+    }
+  };
+
+  // Group tag for dropdown questions
+  const updateOptionGroup = (sequence: number, value: string) => {
+    const currentOptions = [...formik.values.options];
+    const optionIndex = currentOptions.findIndex(opt => opt.sequence === sequence);
+    if (optionIndex !== -1) {
+      currentOptions[optionIndex] = { ...currentOptions[optionIndex], optionGroup: value };
       formik.setFieldValue("options", currentOptions);
     }
   };
@@ -884,6 +909,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 <option value="single-choice">Single Choice</option>
                 <option value="ranking">Ranking</option>
                 <option value="text">Text Input</option>
+                <option value="dropdown">Dropdown (Grouped Options)</option>
               </select>
               {formik.touched.questionType && formik.errors.questionType && (
                 <div className="fv-plugins-message-container">
@@ -983,6 +1009,31 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 </div>
               ) : (
                 <>
+                  {formik.values.questionType === "dropdown" && (
+                    <>
+                      <div className="alert alert-info py-2 mb-3">
+                        <strong>Dropdown Mode:</strong> Tag every option with a group. Students first pick a group
+                        from a dropdown below the question, then see only that group's options.
+                        {(() => {
+                          const groups = Array.from(new Set(
+                            formik.values.options
+                              .map((opt: any) => (opt.optionGroup || "").trim())
+                              .filter(Boolean)
+                          ));
+                          return groups.length > 0
+                            ? <span> Dropdown will show: <strong>{groups.join(", ")}</strong></span>
+                            : null;
+                        })()}
+                      </div>
+                      <datalist id="edit-option-group-suggestions">
+                        {Array.from(new Set(
+                          formik.values.options.map((opt: any) => (opt.optionGroup || "").trim()).filter(Boolean)
+                        )).map((g: any) => (
+                          <option key={g} value={g} />
+                        ))}
+                      </datalist>
+                    </>
+                  )}
                   {[...formik.values.options]
                     .sort((a, b) => a.sequence - b.sequence)
                     .map((option, index) => (
@@ -1088,6 +1139,24 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                                   style={{ resize: "vertical" }}
                                 />
                               </>
+                            )}
+
+                            {/* Group tag — required for dropdown questions */}
+                            {formik.values.questionType === "dropdown" && (
+                              <div className="mt-2">
+                                <label className="form-label small fw-bold mb-1">Group</label>
+                                <input
+                                  type="text"
+                                  list="edit-option-group-suggestions"
+                                  placeholder="Group name (e.g. Science, Commerce)"
+                                  value={option.optionGroup || ""}
+                                  onChange={e => updateOptionGroup(option.sequence, e.target.value)}
+                                  className={clsx("form-control form-control-sm", {
+                                    "is-invalid": !(option.optionGroup || "").trim(),
+                                    "is-valid": !!(option.optionGroup || "").trim(),
+                                  })}
+                                />
+                              </div>
                             )}
                           </div>
 

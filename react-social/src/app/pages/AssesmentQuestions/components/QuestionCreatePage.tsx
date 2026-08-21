@@ -32,6 +32,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [optionTypes, setOptionTypes] = useState<{ [key: number]: 'text' | 'image' }>({});
   // NEW: State for storing Base64 image data per option index
   const [optionImages, setOptionImages] = useState<{ [key: number]: string }>({});
+  // Group name per option index — only used when questionType is "dropdown"
+  const [optionGroups, setOptionGroups] = useState<{ [key: number]: string }>({});
   // State for tracking which option images are being processed
   const [optionImageProcessing, setOptionImageProcessing] = useState<{ [key: number]: boolean }>({});
   // State for pending image confirmation popup (custom overlay portal)
@@ -146,6 +148,17 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
           else if (k > index) newImages[k - 1] = prevImages[k];
         });
         return newImages;
+      });
+
+      // Shift keys for optionGroups
+      setOptionGroups((prevGroups: any) => {
+        const newGroups: any = {};
+        Object.keys(prevGroups).forEach(key => {
+          const k = Number(key);
+          if (k < index) newGroups[k] = prevGroups[k];
+          else if (k > index) newGroups[k - 1] = prevGroups[k];
+        });
+        return newGroups;
       });
 
       return { ...prev, questionOptions: newOptions };
@@ -310,6 +323,18 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
           className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework"
           onSubmit={async (e) => {
             e.preventDefault();
+
+            // Dropdown questions need every option tagged with a group
+            if (formikValues.questionType === "dropdown" && !useGameAsOption) {
+              const missing = formikValues.questionOptions.findIndex(
+                (_: any, i: number) => !(optionGroups[i] || "").trim()
+              );
+              if (missing !== -1) {
+                showErrorToast(`Option ${missing + 1} has no group. Every option of a dropdown question needs a group name.`);
+                return;
+              }
+            }
+
             setLoading(true);
             try {
               // Build options array with optionScores
@@ -371,7 +396,10 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                     correct: isCorrect,
                     isGame: false,
                     game: null,
-                    optionDescription
+                    optionDescription,
+                    optionGroup: formikValues.questionType === "dropdown"
+                      ? (optionGroups[index] || "").trim()
+                      : null
                   };
                 });
               }
@@ -416,6 +444,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               setOptionMeasuredQualities({});
               setOptionTypes({});
               setOptionImages({});
+              setOptionGroups({});
               setSelectedGameId("");
               setUseGameAsOption(false);
               setQuestionMediaType('text');
@@ -585,6 +614,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 <option value="single-choice">Single Choice</option>
                 <option value="ranking">Ranking</option>
                 <option value="text">Text Input</option>
+                <option value="dropdown">Dropdown (Grouped Options)</option>
               </select>
             </div>
             <div className="fv-row mb-7">
@@ -611,7 +641,31 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
             </div>
             <div className="fv-row mb-7">
               <label className="required fs-6 fw-bold mb-2">Options:</label>
-              
+
+              {formikValues.questionType === "dropdown" && !useGameAsOption && !useMQTAsOptions && (
+                <>
+                  <div className="alert alert-info py-2 mb-3">
+                    <strong>Dropdown Mode:</strong> Tag every option with a group. Students first pick a group
+                    from a dropdown below the question, then see only that group's options.
+                    {(() => {
+                      const groups = Array.from(new Set(
+                        formikValues.questionOptions
+                          .map((_: any, i: number) => (optionGroups[i] || "").trim())
+                          .filter(Boolean)
+                      ));
+                      return groups.length > 0
+                        ? <span> Dropdown will show: <strong>{groups.join(", ")}</strong></span>
+                        : null;
+                    })()}
+                  </div>
+                  <datalist id="option-group-suggestions">
+                    {Array.from(new Set(Object.values(optionGroups).map(g => g.trim()).filter(Boolean))).map(g => (
+                      <option key={g} value={g} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+
               {/* Game as Option Mode */}
               {useGameAsOption ? (
                 <div className="p-3 border rounded bg-light">
@@ -819,6 +873,24 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                         </button>
                       )}
                     </div>
+
+                    {/* Group tag — required for dropdown questions */}
+                    {formikValues.questionType === "dropdown" && (
+                      <div className="mt-2">
+                        <label className="fs-7 fw-semibold mb-1 text-muted required">Group:</label>
+                        <input
+                          type="text"
+                          list="option-group-suggestions"
+                          placeholder="Group name (e.g. Science, Commerce)"
+                          value={optionGroups[index] || ""}
+                          onChange={e => setOptionGroups(prev => ({ ...prev, [index]: e.target.value }))}
+                          className={clsx("form-control form-control-sm", {
+                            "is-invalid": !(optionGroups[index] || "").trim(),
+                            "is-valid": !!(optionGroups[index] || "").trim(),
+                          })}
+                        />
+                      </div>
+                    )}
 
                     {/* NEW: Option Description Field */}
                     <div className="mt-2">

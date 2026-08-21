@@ -172,8 +172,10 @@ develop-eggs/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Anchored to repo root: a bare "lib/" also ignored JS source dirs
+# like react-social/src/app/lib/, silently keeping them out of git.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
