@@ -85,11 +85,15 @@ export function AsideMenuMain() {
 
   const showAssessmentManagement = showQuestionnaire || showQualities || showAssessment;
 
-  const showDataUpload =
+  const showOfflineAssessmentData =
     allowed("/offline-assessment-upload") ||
-    allowed("/omr-data-upload") ||
+    allowed("/omr-data-upload");
+
+  const showUploadTracking =
     allowed("/live-tracking") ||
     allowed("/communication-logs");
+
+  const showDataUpload = showOfflineAssessmentData || showUploadTracking;
 
   const showB2C =
     allowed("/b2c/campaigns") ||
@@ -124,6 +128,7 @@ export function AsideMenuMain() {
 
   const showCounselling =
     allowed("/admin/counselling-dashboard") ||
+    allowed("/admin/counselling-sessions") ||
     allowed("/admin/counsellors") ||
     allowed("/admin/counselling-students") ||
     allowed("/admin/counselling-slots") ||
@@ -465,28 +470,39 @@ export function AsideMenuMain() {
             </div>
           </div>
 
+          {showOfflineAssessmentData && (
+            <AsideMenuItemWithSub
+              to=""
+              title="Offline Assessment Data"
+              fontIcon="bi-upc-scan"
+              icon="/media/icons/duotune/files/fil003.svg"
+            >
+              {allowed("/offline-assessment-upload") && (
+                <AsideMenuItem
+                  to="/offline-assessment-upload"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Offline Upload"
+                  fontIcon="bi-cloud-upload"
+                />
+              )}
+              {allowed("/omr-data-upload") && (
+                <AsideMenuItem
+                  to="/omr-data-upload"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="OMR Data Upload"
+                  fontIcon="bi-upc-scan"
+                />
+              )}
+            </AsideMenuItemWithSub>
+          )}
+
+          {showUploadTracking && (
           <AsideMenuItemWithSub
             to=""
             title="Upload & Tracking"
             fontIcon="bi-cloud-upload"
             icon="/media/icons/duotune/files/fil003.svg"
           >
-            {allowed("/offline-assessment-upload") && (
-              <AsideMenuItem
-                to="/offline-assessment-upload"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Offline Upload"
-                fontIcon="bi-cloud-upload"
-              />
-            )}
-            {allowed("/omr-data-upload") && (
-              <AsideMenuItem
-                to="/omr-data-upload"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="OMR Data Upload"
-                fontIcon="bi-upc-scan"
-              />
-            )}
             {allowed("/live-tracking") && (
               <AsideMenuItem
                 to="/live-tracking"
@@ -504,6 +520,7 @@ export function AsideMenuMain() {
               />
             )}
           </AsideMenuItemWithSub>
+          )}
         </>
       )}
 
@@ -837,6 +854,9 @@ export function AsideMenuMain() {
           >
             {allowed("/admin/counselling-dashboard") && (
               <AsideMenuItem to="/admin/counselling-dashboard" title="Dashboard" hasBullet={true} />
+            )}
+            {allowed("/admin/counselling-sessions") && (
+              <AsideMenuItem to="/admin/counselling-sessions" title="Manage Sessions" hasBullet={true} />
             )}
             {allowed("/admin/counsellors") && (
               <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />

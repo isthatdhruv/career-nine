@@ -140,6 +140,15 @@ public enum EmailType {
             EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.FIRST_NAME, EmailPlaceholder.ACTION_LINK,
             EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
 
+    /**
+     * Internal alert: a counsellor has been deactivated and these students lost a session.
+     * Like LEAD_NOTIFICATION, the recipients are not passed by the caller — they come from
+     * {@code email_notification_recipient}, so the ops list is changed without a deploy.
+     */
+    COUNSELLOR_DEACTIVATED_ALERT("Counsellor deactivated — affected students (internal)", "Counselling",
+            EmailDeliveryMode.ASYNC,
+            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+
     // ── Legacy KCCITM (Phase 5) ─────────────────────────────────────────────
     KCCITM_NOTIFICATION("Legacy KCCITM email", "KCCITM", EmailDeliveryMode.ASYNC),
 

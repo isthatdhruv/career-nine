@@ -349,6 +349,7 @@ const PrivateRoutes = () => {
   const SlotManagementPage = lazy(() => import("../pages/Counselling/admin/SlotManagementPage"));
   const ManageStudentsPage = lazy(() => import("../pages/Counselling/admin/ManageStudentsPage"));
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
+  const CounsellingSessionsPage = lazy(() => import("../pages/Counselling/admin/CounsellingSessionsPage"));
   const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
@@ -1665,6 +1666,16 @@ const PrivateRoutes = () => {
             <RequirePermission perm="user.write">
               <SuspensedView>
                 <CounsellingDashboardPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/admin/counselling-sessions"
+          element={
+            <RequirePermission perm="user.write">
+              <SuspensedView>
+                <CounsellingSessionsPage />
               </SuspensedView>
             </RequirePermission>
           }

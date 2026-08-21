@@ -182,6 +182,7 @@
   "user.write": [
     "/admin/counselling-dashboard",
     "/admin/counselling-notifications",
+    "/admin/counselling-sessions",
     "/admin/counselling-slots",
     "/admin/counselling-students",
     "/admin/counsellors",

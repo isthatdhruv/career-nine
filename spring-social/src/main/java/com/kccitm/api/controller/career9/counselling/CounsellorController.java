@@ -28,6 +28,7 @@ import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
+import com.kccitm.api.service.counselling.CounsellorDeactivationService;
 import com.kccitm.api.service.counselling.CounsellorService;
 
 /**
@@ -47,6 +48,9 @@ public class CounsellorController {
 
     @Autowired
     private CounsellorService counsellorService;
+
+    @Autowired
+    private CounsellorDeactivationService deactivationService;
 
     @Autowired
     private CounsellorRepository counsellorRepository;
@@ -480,5 +484,41 @@ public class CounsellorController {
     public ResponseEntity<Counsellor> toggleActive(@PathVariable Long id) {
         logger.info("Toggling active status for counsellor with id: {}", id);
         return ResponseEntity.ok(counsellorService.toggleActive(id));
+    }
+
+    /**
+     * What deactivating this counsellor would do — the students who would lose a session,
+     * and whether each can be handed a rebooking link. Read-only; drives the confirmation
+     * the admin sees before pressing Deactivate.
+     */
+    @PreAuthorize("@auth.allows('counsellor.read')")
+    @GetMapping("/api/counsellor/{id}/deactivation-preview")
+    public ResponseEntity<List<CounsellorDeactivationService.AffectedSession>> deactivationPreview(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(deactivationService.preview(id));
+    }
+
+    /**
+     * Deactivate a counsellor and settle their diary in the same breath: every session still
+     * ahead is either parked with a rebooking link to the student or cancelled with a
+     * follow-up promise, the counsellor gets one suspension notice, and the configured admins
+     * get the list of affected students.
+     *
+     * <p>Separate from {@code toggle-active} on purpose. That endpoint flips a flag; this one
+     * has consequences for other people, so it is asked for explicitly rather than reached by
+     * a toggle that used to be harmless.
+     */
+    @PreAuthorize("@auth.allows('counsellor.update')")
+    @PostMapping("/api/counsellor/{id}/deactivate")
+    public ResponseEntity<?> deactivate(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
+        Long adminUserId = body != null && body.get("userId") != null
+                ? Long.valueOf(body.get("userId").toString()) : null;
+        User admin = adminUserId != null ? userRepository.findById(adminUserId).orElse(null) : null;
+        try {
+            return ResponseEntity.ok(deactivationService.deactivate(id, admin));
+        } catch (RuntimeException e) {
+            logger.warn("Deactivation failed for counsellor {}: {}", id, e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

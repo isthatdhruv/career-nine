@@ -22,7 +22,20 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
 
     List<CounsellingSlot> findByCounsellorId(Long counsellorId);
 
-    @Query("SELECT s FROM CounsellingSlot s WHERE s.status = 'AVAILABLE' AND s.isBlocked = false AND s.date BETWEEN :start AND :end ORDER BY s.date, s.startTime")
+    /**
+     * Bookable slots in a date range.
+     *
+     * <p>Slots belonging to a suspended counsellor are excluded. Deactivation says the
+     * counsellor "cannot sign in or be booked", but only the institute- and
+     * assessment-scoped lookups enforced that; this unscoped query did not, so a suspended
+     * counsellor's diary stayed offerable to anyone reaching it through the unscoped path
+     * (the admin reschedule picker, for one). {@code isActive} is NULL-tolerant so rows
+     * predating the flag are still treated as bookable.
+     */
+    @Query("SELECT s FROM CounsellingSlot s WHERE s.status = 'AVAILABLE' AND s.isBlocked = false "
+            + "AND s.date BETWEEN :start AND :end "
+            + "AND (s.counsellor IS NULL OR s.counsellor.isActive IS NULL OR s.counsellor.isActive = true) "
+            + "ORDER BY s.date, s.startTime")
     List<CounsellingSlot> findAvailableSlots(@Param("start") LocalDate start, @Param("end") LocalDate end);
 
     @Query("SELECT s FROM CounsellingSlot s WHERE s.counsellor.id = :counsellorId AND s.date = :date AND s.template.id = :templateId")

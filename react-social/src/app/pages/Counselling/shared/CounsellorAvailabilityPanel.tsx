@@ -179,6 +179,11 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
     onChanged?.()
   }
 
+  // Online extra slot needs the permanent Teams link on file, exactly as the weekly
+  // schedule does — the Add Slot button stays disabled until it is a valid one.
+  const manualSlotLinkMissing =
+    manualSlotForm.mode === 'ONLINE' && !isTeamsLink(meetingLink)
+
   const handleSaveManualSlot = async () => {
     if (!manualSlotForm.date || !manualSlotForm.startTime || !manualSlotForm.endTime) {
       setError('Please fill in date, start time, and end time.')
@@ -513,14 +518,26 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                 </div>
                 {manualSlotForm.mode === 'ONLINE' && (
                   <div>
-                    <label style={labelStyle}>Microsoft Teams meeting link</label>
+                    <label style={labelStyle}>
+                      Microsoft Teams meeting link <span style={{ color: '#DC2626' }}>*</span>
+                    </label>
                     <input
-                      type='text'
+                      type='url'
+                      required
+                      aria-required='true'
                       value={meetingLink}
                       onChange={(e) => setMeetingLink(e.target.value)}
                       placeholder='https://teams.microsoft.com/l/meetup-join/...'
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        borderColor: meetingLink.trim() && !isTeamsLink(meetingLink)
+                          ? '#DC2626'
+                          : (inputStyle as any).borderColor,
+                      }}
                     />
+                    <div style={{ fontSize: 11, color: '#6B7A8D', marginTop: 4 }}>
+                      Saved to the profile when the slot is added.
+                    </div>
                   </div>
                 )}
                 {manualSlotForm.mode === 'OFFLINE' && (
@@ -535,14 +552,23 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                     />
                   </div>
                 )}
+                {/* Same rule as the weekly form: an online slot with no Teams link
+                    can be created but never joined, so block the save instead. */}
                 <button
                   onClick={handleSaveManualSlot}
-                  disabled={slotSaving}
+                  disabled={slotSaving || manualSlotLinkMissing}
+                  title={manualSlotLinkMissing
+                    ? meetingLink.trim()
+                      ? 'The meeting link must be a Microsoft Teams link'
+                      : 'Add the Microsoft Teams meeting link first'
+                    : undefined}
                   style={{
                     width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
                     border: 'none', borderRadius: 8, color: '#fff',
-                    cursor: slotSaving ? 'not-allowed' : 'pointer',
-                    background: slotSaving ? '#9CA3AF' : 'linear-gradient(135deg, #1C2D52, #263B6A)',
+                    cursor: slotSaving || manualSlotLinkMissing ? 'not-allowed' : 'pointer',
+                    background: slotSaving || manualSlotLinkMissing
+                      ? '#9CA3AF'
+                      : 'linear-gradient(135deg, #1C2D52, #263B6A)',
                   }}
                 >
                   {slotSaving ? 'Adding…' : 'Add Slot'}

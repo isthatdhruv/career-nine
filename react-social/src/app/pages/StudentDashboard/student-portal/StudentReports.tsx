@@ -7,6 +7,7 @@ import { useAutoRefresh } from '../../../utils/useAutoRefresh'
 import { useAuth } from '../../../modules/auth/core/Auth'
 import { useStudentData } from './StudentDataContext'
 import { showErrorToast } from '../../../utils/toast'
+import ReportsEmptyState from './components/ReportsEmptyState'
 import './StudentPortal.css'
 
 function getReportLabel(type: string): string {
@@ -108,20 +109,16 @@ const StudentReports: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className='sp-card' style={{ textAlign: 'center', padding: '48px 24px' }}>
-          <div style={{ fontSize: 14, color: '#78909C' }}>Loading reports...</div>
+        // Themed skeleton instead of a bare "Loading..." line, so the page keeps
+        // its shape while the visible-reports call is in flight.
+        <div aria-busy='true' aria-label='Loading reports'>
+          <div className='sp-rep-skel' />
+          <div className='sp-rep-skel' style={{ opacity: 0.65 }} />
         </div>
       ) : reports.length === 0 ? (
-        <div className='sp-card' style={{ textAlign: 'center', padding: '48px 24px' }}>
-          <svg width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='#B0BEC5' strokeWidth='1.5' style={{ marginBottom: 16 }}>
-            <path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/>
-            <polyline points='14 2 14 8 20 8'/>
-          </svg>
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#455A64' }}>No reports available yet</div>
-          <div style={{ fontSize: 13, color: '#78909C', marginTop: 4 }}>
-            Your reports will appear here once they have been generated and released
-          </div>
-        </div>
+        // Not just "nothing here": tells the student where they are in the
+        // assessment → generated → released pipeline.
+        <ReportsEmptyState />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {reports.map((r) => {

@@ -23,6 +23,7 @@ import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.EmailNotificationRecipientService;
 
 @Service
 public class CounsellingNotificationService {
@@ -52,6 +53,10 @@ public class CounsellingNotificationService {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    /** Standing recipient lists (email_notification_recipient) for the internal alerts. */
+    @Autowired
+    private EmailNotificationRecipientService recipientService;
 
     /**
      * Base URL of the student-facing app, used to build absolute links in emails. Resolves
@@ -1110,6 +1115,19 @@ public class CounsellingNotificationService {
      */
     @Async
     public void sendAdminCancellationEmail(CounsellingAppointment appointment) {
+        sendAdminCancellationEmail(appointment, true);
+    }
+
+    /**
+     * As above, but the counsellor's copy can be withheld.
+     *
+     * <p>Used when a whole diary is cancelled at once: deactivating a counsellor with
+     * sessions booked would otherwise send them one "your session was cancelled" mail per
+     * student on top of the single suspension notice, which reads as a series of faults
+     * rather than as the one thing that happened to their account.
+     */
+    @Async
+    public void sendAdminCancellationEmail(CounsellingAppointment appointment, boolean includeCounsellor) {
         try {
             String date = appointment.getSlot().getDate().format(DATE_FMT);
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
@@ -1125,7 +1143,7 @@ public class CounsellingNotificationService {
 
             sendWithCancelledInvite(appointment, subject, studentBody);
 
-            Counsellor counsellor = appointment.getCounsellor();
+            Counsellor counsellor = includeCounsellor ? appointment.getCounsellor() : null;
             if (counsellor != null && counsellor.getEmail() != null && !counsellor.getEmail().isEmpty()) {
                 String counsellorBody = "Dear " + counsellor.getName() + ",\n\n"
                         + "The counselling session with " + studentName(appointment) + " on "
@@ -1506,6 +1524,143 @@ public class CounsellingNotificationService {
             return a.getStudentContactPhone();
         }
         try { return a.getStudent().getStudentInfo().getPhoneNumber(); } catch (Exception e) { return null; }
+    }
+
+    // ─── Counsellor deactivation (Manage Counsellors → Deactivate) ────────────────
+
+    /**
+     * The counsellor's single suspension notice. Deliberately one message covering the whole
+     * diary: the per-session cancellation copies are withheld for this flow, because a stack
+     * of "your session was cancelled" mails reads as a series of faults rather than as the
+     * one thing that actually happened to them.
+     */
+    @Async
+    public void sendCounsellorDeactivatedEmail(Counsellor counsellor, int sessionsAffected) {
+        try {
+            if (counsellor == null || counsellor.getEmail() == null || counsellor.getEmail().isEmpty()) return;
+            String subject = "Your Career-9 counsellor account has been deactivated";
+            StringBuilder body = new StringBuilder();
+            body.append("Dear ").append(counsellor.getName()).append(",\n\n")
+                .append("Your Career-9 counsellor account has been deactivated by the team. ")
+                .append("You will not be able to sign in to the counsellor portal, and no new ")
+                .append("sessions can be booked with you.\n\n");
+            if (sessionsAffected > 0) {
+                body.append("Your ").append(sessionsAffected)
+                    .append(sessionsAffected == 1 ? " upcoming session has" : " upcoming sessions have")
+                    .append(" been taken off your calendar and the students have been contacted ")
+                    .append("directly. Nothing is recorded against you and no action is needed ")
+                    .append("from your side.\n\n");
+            } else {
+                body.append("You had no upcoming sessions booked, so no student has been affected.\n\n");
+            }
+            body.append("If you believe this is a mistake, please contact the Career-9 team.\n\n")
+                .append("Regards,\nCareer-Nine Team");
+            sendEmail(counsellor.getEmail(), subject, body.toString());
+        } catch (Exception e) {
+            logger.error("Failed to send deactivation notice to counsellor {}: {}",
+                    counsellor != null ? counsellor.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * The student, when somebody else can take her session: it is off, and here is the link
+     * to pick a new time. The counsellor is never named as deactivated — that is between the
+     * team and them.
+     */
+    @Async
+    public void sendCounsellorDeactivatedStudentEmail(CounsellingAppointment appointment, String rescheduleUrl) {
+        try {
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+            String subject = "Your counselling session has been cancelled — please pick a new time";
+            String body = "Dear " + studentName(appointment) + ",\n\n"
+                    + "Your counselling session scheduled on " + date + " at " + time
+                    + " has been cancelled by the Career-9 team, as your counsellor is no longer "
+                    + "available.\n\n"
+                    + "This does not affect your counselling entitlement in any way. Another "
+                    + "counsellor is available, so you can choose a new time right away:\n\n"
+                    + "  " + rescheduleUrl + "\n\n"
+                    + "No login is needed — the link opens your booking page directly. If you would "
+                    + "rather we arranged it for you, simply reply to this email.\n\n"
+                    + "We apologise for the inconvenience.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+            sendWithCancelledInvite(appointment, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send counsellor-deactivated student email for appointment {}: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * The internal summary: who was deactivated and every student left needing attention.
+     *
+     * <p>Recipients are configured, not passed — they come from
+     * {@code email_notification_recipient} keyed by {@code COUNSELLOR_DEACTIVATED_ALERT}, so
+     * the list is changed on the Notification Recipients screen rather than in a deploy.
+     * Nothing is sent when the list is empty, which is the honest outcome of nobody being
+     * configured to receive it.
+     */
+    @Async
+    public void sendCounsellorDeactivatedAdminAlert(
+            Counsellor counsellor,
+            java.util.List<CounsellorDeactivationService.AffectedSession> sessions,
+            User admin) {
+        try {
+            EmailNotificationRecipientService.Resolved who =
+                    recipientService.resolve(EmailType.COUNSELLOR_DEACTIVATED_ALERT, null, null);
+            if (who.isEmpty()) {
+                logger.warn("Counsellor {} deactivated but no COUNSELLOR_DEACTIVATED_ALERT recipients "
+                        + "are configured — no admin alert sent.",
+                        counsellor != null ? counsellor.getId() : "null");
+                return;
+            }
+
+            int affected = sessions == null ? 0 : sessions.size();
+            String subject = "Counsellor deactivated: "
+                    + (counsellor != null ? counsellor.getName() : "unknown")
+                    + " — " + affected + (affected == 1 ? " session affected" : " sessions affected");
+
+            StringBuilder body = new StringBuilder();
+            body.append("A counsellor has been deactivated.\n\n")
+                .append("Counsellor: ").append(counsellor != null ? counsellor.getName() : "unknown").append("\n")
+                .append("Email: ").append(counsellor != null ? counsellor.getEmail() : "-").append("\n")
+                .append("Deactivated by: ")
+                .append(admin != null && admin.getName() != null ? admin.getName() : "Career-9 admin").append("\n")
+                .append("Sessions affected: ").append(affected).append("\n\n");
+
+            if (affected == 0) {
+                body.append("No upcoming sessions were booked with this counsellor.\n\n");
+            } else {
+                body.append("The students below have had their session taken off the calendar.\n")
+                    .append("Those marked REBOOKING LINK SENT can pick a new time themselves; those\n")
+                    .append("marked NEEDS FOLLOW-UP have no other counsellor covering their assessment\n")
+                    .append("and were told the team would be in touch — they need contacting.\n\n");
+                for (CounsellorDeactivationService.AffectedSession row : sessions) {
+                    body.append("  • ").append(row.studentName == null ? "Student" : row.studentName).append("\n")
+                        .append("      When:    ").append(row.date).append(" ")
+                        .append(row.startTime == null ? "" : row.startTime).append("\n")
+                        .append("      Contact: ").append(row.studentEmail == null ? "-" : row.studentEmail);
+                    if (row.studentPhone != null && !row.studentPhone.isEmpty()) {
+                        body.append(" · ").append(row.studentPhone);
+                    }
+                    body.append("\n")
+                        .append("      Outcome: ")
+                        .append("PARKED".equals(row.outcome) ? "REBOOKING LINK SENT"
+                                : "CANCELLED".equals(row.outcome) ? "NEEDS FOLLOW-UP"
+                                : "COULD NOT BE SETTLED — CHECK MANUALLY")
+                        .append("\n\n");
+                }
+            }
+            body.append("Regards,\nCareer-Nine System");
+
+            String text = body.toString();
+            for (String to : who.to) sendEmail(to, subject, text);
+            for (String cc : who.cc) sendEmail(cc, subject, text);
+            for (String bcc : who.bcc) sendEmail(bcc, subject, text);
+        } catch (Exception e) {
+            logger.error("Failed to send counsellor-deactivated admin alert for counsellor {}: {}",
+                    counsellor != null ? counsellor.getId() : "null", e.getMessage());
+        }
     }
 
     // ─── Private Helper ───────────────────────────────────────────────────────────

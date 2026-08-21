@@ -310,6 +310,63 @@ public class StudentInfoController {
         return allRows;
     }
 
+    /**
+     * The student this payload refers to, if the institute already has them.
+     *
+     * <p>Matched on the Career Nine roll number when one was supplied, otherwise on the
+     * school's own roll number — both are only meaningful within an institute, so the search
+     * never leaves it. Returns null when there is nothing to match on, which keeps the
+     * ordinary "add a new student" path unchanged.
+     */
+    private StudentInfo findExistingStudent(StudentInfo incoming, Integer instituteId) {
+        if (instituteId == null) return null;
+
+        String careerNineRoll = incoming.getCareerNineRollNumber();
+        if (careerNineRoll != null && !careerNineRoll.trim().isEmpty()) {
+            for (User candidate : userRepository.findAllByCareerNineRollNumber(careerNineRoll.trim())) {
+                StudentInfo info = studentInfoRepository.findByUser(candidate);
+                if (info != null && instituteId.equals(info.getInstituteId())) {
+                    return info;
+                }
+            }
+        }
+
+        String schoolRoll = incoming.getSchoolRollNumber();
+        if (schoolRoll != null && !schoolRoll.trim().isEmpty()) {
+            List<StudentInfo> matches = studentInfoRepository
+                    .findBySchoolRollNumberAndInstituteId(schoolRoll.trim(), instituteId);
+            if (!matches.isEmpty()) {
+                return matches.get(0);
+            }
+        }
+
+        return null;
+    }
+
+    /** Copy the supplied details onto an existing student, leaving blanks alone. */
+    private void applyStudentUpdates(StudentInfo existing, StudentInfo incoming) {
+        if (incoming.getName() != null && !incoming.getName().trim().isEmpty()) {
+            existing.setName(incoming.getName());
+        }
+        if (incoming.getStudentDob() != null) existing.setStudentDob(incoming.getStudentDob());
+        if (incoming.getSchoolRollNumber() != null && !incoming.getSchoolRollNumber().trim().isEmpty()) {
+            existing.setSchoolRollNumber(incoming.getSchoolRollNumber());
+        }
+        if (incoming.getPhoneNumber() != null && !incoming.getPhoneNumber().trim().isEmpty()) {
+            existing.setPhoneNumber(incoming.getPhoneNumber());
+        }
+        if (incoming.getEmail() != null && !incoming.getEmail().trim().isEmpty()) {
+            existing.setEmail(incoming.getEmail());
+        }
+        if (incoming.getAddress() != null && !incoming.getAddress().trim().isEmpty()) {
+            existing.setAddress(incoming.getAddress());
+        }
+        if (incoming.getStudentClass() != null) existing.setStudentClass(incoming.getStudentClass());
+        if (incoming.getSchoolSectionId() != null) existing.setSchoolSectionId(incoming.getSchoolSectionId());
+        if (incoming.getControlNumber() != null) existing.setControlNumber(incoming.getControlNumber());
+        if (incoming.getSessionId() != null) existing.setSessionId(incoming.getSessionId());
+    }
+
     @PreAuthorize("@auth.allows('student_info.create', #studentInfo.instituteId, null, null, null)")
     @PostMapping("/add")
     public StudentAssessmentMapping addStudentInfo(@RequestBody StudentInfo studentInfo) {
@@ -319,27 +376,59 @@ public class StudentInfoController {
                 + ", assesment_id=" + studentInfo.getAssesment_id()
                 + ", instituteId=" + studentInfo.getInstituteId());
 
-            User user = userRepository.save(new User((int) (Math.random() * 1000),
-                    studentInfo.getStudentDob()));
+            Integer instituteId = studentInfo.getInstituteId();
 
-            // Set careerNineRollNumber: use manual value if provided, otherwise auto-generate
+            // Re-uploading the same class list must refresh the students it already created
+            // rather than adding a second copy of each, so look for one at this institute
+            // carrying the same roll number before creating anything.
+            StudentInfo existing = findExistingStudent(studentInfo, instituteId);
+
+            User user;
+            if (existing != null) {
+                user = existing.getUser();
+                if (user == null) {
+                    user = userRepository.save(new User((int) (Math.random() * 1000),
+                            studentInfo.getStudentDob()));
+                }
+                applyStudentUpdates(existing, studentInfo);
+                existing.setUser(user);
+
+                // Login is username + DOB, so a corrected date has to reach the User too
+                if (studentInfo.getStudentDob() != null) {
+                    user.setDobDate(studentInfo.getStudentDob());
+                }
+            } else {
+                user = userRepository.save(new User((int) (Math.random() * 1000),
+                        studentInfo.getStudentDob()));
+            }
+
+            // Set careerNineRollNumber: use manual value if provided, otherwise auto-generate.
+            // An existing student keeps the number they already have.
             String manualRollNumber = studentInfo.getCareerNineRollNumber();
             if (manualRollNumber != null && !manualRollNumber.trim().isEmpty()) {
                 user.setCareerNineRollNumber(manualRollNumber.trim());
-            } else {
+            } else if (user.getCareerNineRollNumber() == null
+                    || user.getCareerNineRollNumber().trim().isEmpty()) {
                 String rollNumber = rollNumberService.generateNextRollNumber(
-                        studentInfo.getInstituteId(), studentInfo.getSchoolSectionId());
+                        instituteId, studentInfo.getSchoolSectionId());
                 if (rollNumber != null) {
                     user.setCareerNineRollNumber(rollNumber);
                 }
             }
             user = userRepository.save(user);
 
-            studentInfo.setUser(user);
-            Integer instituteId = studentInfo.getInstituteId();
-            UserStudent userStudent = new UserStudent(user, studentInfoRepository.save(studentInfo),
-                    instituteDetailRepository.getById(instituteId));
-            UserStudent userStudentSAVED = userStudentRepository.save(userStudent);
+            StudentInfo persisted;
+            if (existing != null) {
+                existing.setUser(user);
+                persisted = studentInfoRepository.save(existing);
+            } else {
+                studentInfo.setUser(user);
+                persisted = studentInfoRepository.save(studentInfo);
+            }
+
+            UserStudent userStudentSAVED = userStudentRepository.findByStudentInfo(persisted)
+                    .orElseGet(() -> userStudentRepository.save(new UserStudent(
+                            persisted.getUser(), persisted, instituteDetailRepository.getById(instituteId))));
             studentProvisioningService.provision(userStudentSAVED);
 
             var assessmentId = Long.parseLong(studentInfo.getAssesment_id());
