@@ -1,6 +1,6 @@
 {
-  "version": "mt2hpgp0",
-  "generated": "2026-08-21T05:09:31.717Z",
+  "version": "mt2iig15",
+  "generated": "2026-08-21T05:32:03.881Z",
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -58,6 +58,11 @@
       "priority": "game"
     },
     {
+      "url": "/mediapipe/face_mesh/README.md",
+      "size": 389,
+      "priority": "deferred"
+    },
+    {
       "url": "/mediapipe/face_mesh/face_mesh.binarypb",
       "size": 939,
       "priority": "deferred"
@@ -113,28 +118,38 @@
       "priority": "deferred"
     },
     {
-      "url": "/mediapipe/face_mesh/README.md",
-      "size": 389,
-      "priority": "deferred"
-    },
-    {
-      "url": "/assets/firebase-BzjeF8i9.js",
-      "size": 218084,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/firebase-C1orBrdJ.js",
-      "size": 355,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/HydroTubeGame-Dtq_5EE8.js",
+      "url": "/assets/HydroTubeGame-KSrZLMzr.js",
       "size": 23331,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-C22iJ_mE.js",
+      "url": "/assets/JungleSpotGame-C6qSRgEW.js",
+      "size": 23397,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/RabbitPathGame-D1NtYUFB.js",
+      "size": 26981,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-BWr05Q1M.js",
+      "size": 419515,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-CO-cIJU6.js",
+      "size": 360,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-2fjnxqMQ.js",
       "size": 1274010,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-Bmz8G-9Z.js",
+      "size": 1311902,
       "priority": "critical"
     },
     {
@@ -143,28 +158,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-CXXdIT4s.js",
-      "size": 1304199,
+      "url": "/assets/index.es-B90zHhHw.js",
+      "size": 158942,
       "priority": "critical"
     },
     {
-      "url": "/assets/index.es-Bocno8fx.js",
-      "size": 158825,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/JungleSpotGame-5Wx4bGfK.js",
-      "size": 23397,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/purify.es-BZstNxVn.js",
-      "size": 25426,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/RabbitPathGame-BmYB2yfv.js",
-      "size": 26981,
+      "url": "/assets/purify.es-4eNOHKSq.js",
+      "size": 28741,
       "priority": "critical"
     },
     {
@@ -173,19 +173,24 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/router-iAnXovsC.js",
-      "size": 31101,
+      "url": "/assets/router-BjeQxyP1.js",
+      "size": 30873,
       "priority": "critical"
     },
     {
       "url": "/index.html",
-      "size": 23846,
+      "size": 23783,
       "priority": "critical"
     },
     {
       "url": "/workbox-2ff6bd68.js",
       "size": 21348,
       "priority": "critical"
+    },
+    {
+      "url": "/_headers",
+      "size": 189,
+      "priority": "other"
     },
     {
       "url": "/manifest.webmanifest",
@@ -201,16 +206,11 @@
       "url": "/media/logos/kcc.webp",
       "size": 274630,
       "priority": "other"
-    },
-    {
-      "url": "/_headers",
-      "size": 197,
-      "priority": "other"
     }
   ],
   "summary": {
     "total": 41,
-    "totalSize": 23822387,
+    "totalSize": 24034659,
     "byPriority": {
       "game": {
         "count": 11,
@@ -222,11 +222,11 @@
       },
       "critical": {
         "count": 14,
-        "size": 3391755
+        "size": 3604035
       },
       "other": {
         "count": 4,
-        "size": 927436
+        "size": 927428
       }
     }
   }
