@@ -10,9 +10,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
+import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 
 /**
  * Backs the admin's <em>Manage Sessions</em> dialog on the Manage Counsellors page.
@@ -36,6 +39,9 @@ public class CounsellorSessionAdminService {
 
     @Autowired
     private CounsellingNotificationService notificationService;
+
+    @Autowired
+    private StudentAssessmentMappingRepository mappingRepository;
 
     /** One row of the Manage Sessions table. */
     public static class SessionSummary {
@@ -144,15 +150,59 @@ public class CounsellorSessionAdminService {
         return s;
     }
 
+    /** What a screen asking for one session's report can be told. */
+    public static class ReportLinkResult {
+        private final String reportLink;
+        private final String status;
+
+        public ReportLinkResult(String reportLink, String status) {
+            this.reportLink = reportLink;
+            this.status = status;
+        }
+
+        /** The report itself, or null for every status other than {@code ready}. */
+        public String getReportLink() { return reportLink; }
+
+        /** ready | notGenerated | notCompleted | unavailable. */
+        public String getStatus() { return status; }
+    }
+
     /**
-     * The report link for one session, for screens that show a single session rather than a
-     * list — the counsellor's session-notes page, which is precisely where the results are
-     * being read. Null when nothing has generated yet.
+     * The session's report, and — when there isn't one — why not.
+     *
+     * <p>Resolved per session rather than from the student's report rows: the report a
+     * counsellor needs is the one for the assessment this booking was made against, which is
+     * also the one the counselling emails carry. Reading it here rather than from the report
+     * rows directly keeps those two answers the same, and asks nothing of the counsellor
+     * beyond the permission they already hold to see the session.
+     *
+     * <p>The reason matters as much as the link. "Not ready" covers two situations a
+     * counsellor would act on differently — a student who has not sat the assessment yet, and
+     * a finished assessment whose report has not come through — so they are named separately.
      */
     @Transactional(readOnly = true)
-    public String reportLinkFor(Long appointmentId) {
+    public ReportLinkResult resolveReportFor(Long appointmentId) {
         CounsellingAppointment a = appointmentRepository.findById(appointmentId).orElse(null);
-        return a == null ? null : notificationService.bookingReportLink(a);
+        if (a == null) return new ReportLinkResult(null, "unavailable");
+
+        String link = notificationService.bookingReportLink(a);
+        if (link != null) return new ReportLinkResult(link, "ready");
+
+        UserStudent student = a.getStudent();
+        Long assessmentId = notificationService.assessmentIdFor(a);
+        if (student == null || assessmentId == null) {
+            // An admin-created booking carries no entitlement, so nothing names the assessment.
+            // bookingReportLink already looked for any report this student has and found none.
+            return new ReportLinkResult(null, "unavailable");
+        }
+
+        String mappingStatus = mappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(student.getUserStudentId(), assessmentId)
+                .map(StudentAssessmentMapping::getStatus)
+                .orElse(null);
+        return "completed".equalsIgnoreCase(mappingStatus)
+                ? new ReportLinkResult(null, "notGenerated")
+                : new ReportLinkResult(null, "notCompleted");
     }
 
     /** What the admin is told after pressing one of the two send buttons. */

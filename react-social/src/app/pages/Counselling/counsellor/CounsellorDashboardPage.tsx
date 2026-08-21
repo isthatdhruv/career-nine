@@ -11,6 +11,7 @@ import {
   cancelAppointment,
   startSession,
   verifyCheckin,
+  sendCheckinCode,
   getDashboardSummary,
   getCounsellorSessions,
 } from '../API/AppointmentAPI'
@@ -47,6 +48,7 @@ const CounsellorDashboardPage: React.FC = () => {
   const [otpSent, setOtpSent] = useState<Record<number, boolean>>({})
   const [otpCode, setOtpCode] = useState<Record<number, string>>({})
   const [checkinMsg, setCheckinMsg] = useState<Record<number, string>>({})
+  const [codeSending, setCodeSending] = useState<Record<number, boolean>>({})
 
   // Phase 19: userId resolves from useAuth().currentUser only — the legacy
   // localStorage JSON-blob fallback is gone.
@@ -127,6 +129,26 @@ const CounsellorDashboardPage: React.FC = () => {
     } catch (e: any) {
       const body = e?.response?.data
       showErrorToast(typeof body === 'string' ? body : 'Could not start the session.')
+    }
+  }
+
+  // "Send code to student" — mails and WhatsApps the student the same 4-digit code that is
+  // printed on their report, for the one who cannot open it mid-session. Nothing new is
+  // generated. The reply names the channels that actually accepted it, so an unconfigured
+  // WhatsApp reads as "email" rather than a false "sent".
+  const handleSendCode = async (appointmentId: number) => {
+    setCodeSending((p) => ({ ...p, [appointmentId]: true }))
+    try {
+      const res = await sendCheckinCode(appointmentId)
+      setCheckinMsg((p) => ({ ...p, [appointmentId]: res.data?.message || 'Code sent to the student.' }))
+    } catch (e: any) {
+      const body = e?.response?.data
+      setCheckinMsg((p) => ({
+        ...p,
+        [appointmentId]: typeof body === 'string' ? body : 'Could not send the code.',
+      }))
+    } finally {
+      setCodeSending((p) => ({ ...p, [appointmentId]: false }))
     }
   }
 
@@ -316,13 +338,26 @@ const CounsellorDashboardPage: React.FC = () => {
                   {(appt.status === 'CONFIRMED') && !appt.attended && (
                     <div className='cl-card' style={{ marginTop: 6, padding: '12px 16px', background: 'var(--sp-bg, #F2F7F5)' }}>
                       {!otpSent[appt.id] ? (
-                        <button
-                          className='cl-btn-primary'
-                          style={{ fontSize: 13, padding: '6px 14px' }}
-                          onClick={() => handleStartSession(appt.id)}
-                        >
-                          Start session
-                        </button>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                          <button
+                            className='cl-btn-primary'
+                            style={{ fontSize: 13, padding: '6px 14px' }}
+                            onClick={() => handleStartSession(appt.id)}
+                          >
+                            Start session
+                          </button>
+                          {/* The code lives on the student's report and nowhere else, so a
+                              student who can't open it cannot check in at all. This sends it. */}
+                          <button
+                            className='cl-btn-outline'
+                            style={{ fontSize: 13, padding: '6px 14px' }}
+                            onClick={() => handleSendCode(appt.id)}
+                            disabled={!!codeSending[appt.id]}
+                            title="Email and WhatsApp the student the 4-digit code from their report."
+                          >
+                            {codeSending[appt.id] ? 'Sending…' : 'Send code to student'}
+                          </button>
+                        </div>
                       ) : (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                           <input
@@ -342,6 +377,15 @@ const CounsellorDashboardPage: React.FC = () => {
                             onClick={() => handleVerifyCheckin(appt.id)}
                           >
                             Verify &amp; start
+                          </button>
+                          <button
+                            className='cl-btn-outline'
+                            style={{ fontSize: 13, padding: '6px 14px' }}
+                            onClick={() => handleSendCode(appt.id)}
+                            disabled={!!codeSending[appt.id]}
+                            title="Email and WhatsApp the student the 4-digit code from their report."
+                          >
+                            {codeSending[appt.id] ? 'Sending…' : 'Send code to student'}
                           </button>
                         </div>
                       )}

@@ -166,6 +166,26 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
   const rescheduleBlocked = withinCutoff || outOfChanges
   const cancelBlocked = withinCutoff || outOfChanges
 
+  /**
+   * Whether cancelling or rescheduling is on the table at all.
+   *
+   * <p>On a missed or under-review session it is not: there is no longer a booking to call
+   * off, only a question of what happened. Everything that explains WHY a change is blocked
+   * hangs off this — those notices answer "why can't I move this?", and printing them on a
+   * session that was never hers to move answers a question she has not asked. The under-review
+   * card read as a session she was still expected to attend, warning her about a two-hour
+   * cutoff and telling her to contact support, directly under a notice saying it was already
+   * being looked into.
+   */
+  const changeable = !underReview && !isMissed
+
+  // The footer is drawn only when it has something in it. An empty flex row still paints its
+  // top border and padding, which left a stray rule across the bottom of the card.
+  const showDispute = isMissed && !underReview && !disputed
+  const showCancel = changeable && !awaitingReschedule
+  const showReschedule = changeable
+  const hasActions = showDispute || showCancel || showReschedule
+
   useEffect(() => {
     let cancelled = false
     getStudentCancellationInfo(appointmentId)
@@ -322,7 +342,10 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
         </div>
       )}
 
-      {/* Disputed absent mark: nothing counts against her while it is open. */}
+      {/* Disputed absent mark. Three facts and no more: what she said, what happens next, and
+          that it costs her nothing meanwhile. The badge above already says "Under review", the
+          missing buttons already say it cannot be changed, and the counsellor's side of it is
+          not news to her — spelling all of that out again buried the one line she needed. */}
       {underReview && (
         <div
           style={{
@@ -331,8 +354,8 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
             fontSize: 12.5, color: '#334155', lineHeight: 1.5,
           }}
         >
-          <strong>Under review.</strong> We are checking what happened with this session. Nothing
-          counts against you until it is settled.
+          <strong>Under review.</strong> You told us you attended. We'll email you once it's
+          settled — nothing counts against you until then.
         </div>
       )}
 
@@ -359,8 +382,9 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
       )}
 
       {/* Cutoff warning — the control stays visible and disabled, not hidden. A button that
-          disappears reads as a bug, and she calls anyway. */}
-      {withinCutoff && (
+          disappears reads as a bug, and she calls anyway. Only where a change was possible in
+          the first place: see `changeable`. */}
+      {changeable && withinCutoff && (
         <div
           role='alert'
           style={{
@@ -385,7 +409,7 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
 
       {/* No free changes left — cancelling and rescheduling both spend one, so neither is
           offered until an administrator steps in. */}
-      {!withinCutoff && outOfChanges && (
+      {changeable && !withinCutoff && outOfChanges && (
         <div
           role='alert'
           style={{
@@ -407,8 +431,9 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
       )}
 
       {/* Actions */}
+      {hasActions && (
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 10, borderTop: '1px solid var(--sp-border, #D1E5DF)' }}>
-        {isMissed && !underReview && !disputed && (
+        {showDispute && (
           <button
             className='cl-btn-outline'
             onClick={submitDispute}
@@ -423,7 +448,7 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
         {/* A parked session offers no Cancel: the counsellor dropped out and nothing was
             given in return, so there is no booking to call off — only a new time to pick.
             Her paid session stays attached to it until she does. */}
-        {!isMissed && !underReview && !awaitingReschedule && (
+        {showCancel && (
           <button
             className='cl-btn-outline'
             onClick={() => { setActionError(null); setCancelOpen(true) }}
@@ -450,7 +475,7 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
           </button>
         )}
 
-        {!isMissed && !underReview && (
+        {showReschedule && (
           <button
             className='cl-btn-outline'
             onClick={() => onReschedule(appointmentId)}
@@ -478,6 +503,7 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
           </button>
         )}
       </div>
+      )}
 
       {/* Confirm modal. Shows what is about to be cancelled and what it costs — the warning
           confirms something already on the card rather than springing it at the last moment. */}

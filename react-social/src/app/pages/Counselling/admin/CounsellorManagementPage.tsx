@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import '../Counselling.css'
-import { getAllCounsellors, createCounsellor, updateCounsellor, toggleCounsellorActive } from '../API/CounsellorAPI'
+import {
+  getAllCounsellors, createCounsellor, updateCounsellor, toggleCounsellorActive,
+  getDeactivationPreview, deactivateCounsellor, AffectedSession, DeactivationResult,
+} from '../API/CounsellorAPI'
 import { getAllMappings, allocateCounsellor, CounsellorInstituteMapping } from '../API/CounsellorInstituteAPI'
 import { getSlotsByCounsellor } from '../API/SlotAPI'
 import { Modal } from 'react-bootstrap-v5'
@@ -186,6 +189,13 @@ const CounsellorManagementPage: React.FC = () => {
   // Office address used when an admin schedules in-person slots for one counsellor.
   const [scheduleOfficeAddress, setScheduleOfficeAddress] = useState('')
 
+  // Deactivation confirmation: what suspending this counsellor would do to the
+  // students booked with them, shown before anything is sent.
+  const [deactivating, setDeactivating] = useState<Counsellor | null>(null)
+  const [deactivationRows, setDeactivationRows] = useState<AffectedSession[] | null>(null)
+  const [deactivationBusy, setDeactivationBusy] = useState(false)
+  const [deactivationResult, setDeactivationResult] = useState<DeactivationResult | null>(null)
+
 
   // Phase 19: admin identity comes from the unified cookie session, not from
   // legacy localStorage JSON blobs (counsellor-portal + authUser) — they were
@@ -264,16 +274,51 @@ const CounsellorManagementPage: React.FC = () => {
   }
 
   const handleToggleActive = async (counsellor: Counsellor) => {
+    // Activating is a harmless flag flip. Deactivating cancels other people's
+    // sessions and emails them, so it goes through a confirmation showing exactly
+    // who is affected before anything is sent.
+    if (counsellor.isActive) {
+      setDeactivating(counsellor)
+      setDeactivationRows(null)
+      setDeactivationResult(null)
+      setError(null)
+      try {
+        const res = await getDeactivationPreview(getCounsellorId(counsellor))
+        setDeactivationRows(Array.isArray(res.data) ? res.data : [])
+      } catch {
+        setDeactivationRows([])
+        setError('Could not load the affected sessions — deactivating now would still settle them.')
+      }
+      return
+    }
+
     setTogglingId(getCounsellorId(counsellor))
     setError(null)
     try {
       await toggleCounsellorActive(getCounsellorId(counsellor))
-      showSuccess(`Counsellor ${counsellor.isActive ? 'deactivated' : 'activated'}.`)
+      showSuccess('Counsellor activated.')
       await loadCounsellors()
     } catch {
       setError('Failed to update counsellor status.')
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  const confirmDeactivate = async () => {
+    if (!deactivating) return
+    setDeactivationBusy(true)
+    setError(null)
+    try {
+      const res = await deactivateCounsellor(getCounsellorId(deactivating), adminUserId)
+      setDeactivationResult(res.data)
+      await loadCounsellors()
+    } catch (e: any) {
+      const body = e?.response?.data
+      setError(typeof body === 'string' ? body : body?.error || 'Failed to deactivate the counsellor.')
+      setDeactivating(null)
+    } finally {
+      setDeactivationBusy(false)
     }
   }
 
@@ -873,6 +918,168 @@ const CounsellorManagementPage: React.FC = () => {
         </div>
       )}
     </div>
+
+      {/* Deactivation confirmation — what it will do, before it does it */}
+      {deactivating && (
+        <div
+          onClick={() => !deactivationBusy && setDeactivating(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+            zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 680, maxHeight: '85vh', overflow: 'hidden',
+              background: '#fff', borderRadius: 14, boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
+              display: 'flex', flexDirection: 'column',
+            }}
+          >
+            <div style={{
+              padding: '16px 20px', borderBottom: '1px solid var(--sp-border, #D1E5DF)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--sp-text, #1A2B28)' }}>
+                  {deactivationResult ? 'Counsellor deactivated' : 'Deactivate counsellor'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
+                  {deactivating.name} · {deactivating.email}
+                </div>
+              </div>
+              <button
+                onClick={() => setDeactivating(null)}
+                disabled={deactivationBusy}
+                style={{
+                  border: '1px solid var(--sp-border, #D1E5DF)', background: '#fff',
+                  borderRadius: 8, cursor: 'pointer', padding: '4px 10px',
+                  fontSize: 18, color: '#6B7280', lineHeight: 1,
+                }}
+                aria-label='Close'
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ padding: 20, overflowY: 'auto' }}>
+              {deactivationResult ? (
+                <>
+                  <div style={{
+                    padding: '10px 14px', background: '#D1FAE5', border: '1px solid #A7F3D0',
+                    borderRadius: 8, color: '#065F46', fontSize: 13, marginBottom: 14,
+                  }}>
+                    {deactivationResult.counsellorName} can no longer sign in or be booked.{' '}
+                    {deactivationResult.parked > 0 && (
+                      <>{deactivationResult.parked} student{deactivationResult.parked === 1 ? '' : 's'} sent a rebooking link. </>
+                    )}
+                    {deactivationResult.cancelled > 0 && (
+                      <>{deactivationResult.cancelled} session{deactivationResult.cancelled === 1 ? '' : 's'} cancelled — the team needs to follow up. </>
+                    )}
+                    {deactivationResult.failed > 0 && (
+                      <strong>{deactivationResult.failed} could not be settled — check them manually.</strong>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--sp-muted, #5C7A72)' }}>
+                    The counsellor has been emailed, and the configured admins have the full list
+                    of affected students.
+                  </div>
+                </>
+              ) : deactivationRows === null ? (
+                <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--sp-muted, #5C7A72)', fontSize: 13 }}>
+                  Checking their upcoming sessions...
+                </div>
+              ) : deactivationRows.length === 0 ? (
+                <p style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--sp-text, #1A2B28)', margin: 0 }}>
+                  This counsellor has no upcoming sessions, so no student is affected. They will
+                  lose access to the counsellor portal, their remaining slots stop being offered
+                  to students, and they will be emailed to say the account has been deactivated.
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--sp-text, #1A2B28)', margin: '0 0 14px' }}>
+                    <strong>{deactivationRows.length}</strong> upcoming session
+                    {deactivationRows.length === 1 ? '' : 's'} will be taken off the calendar.
+                    Students with another counsellor covering their assessment are emailed a link
+                    to pick a new time; the rest are told the team will be in touch, and appear in
+                    the admin alert as needing follow-up.
+                  </p>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid var(--sp-border, #D1E5DF)' }}>
+                        {['Student', 'When', 'What happens'].map((c) => (
+                          <th key={c} style={{
+                            padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 11,
+                            color: 'var(--sp-muted, #5C7A72)', textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                          }}>{c}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deactivationRows.map((r, i) => (
+                        <tr key={r.appointmentId} style={{
+                          borderBottom: '1px solid var(--sp-border, #D1E5DF)',
+                          background: i % 2 === 0 ? '#fff' : 'var(--sp-bg, #F2F7F5)',
+                        }}>
+                          <td style={{ padding: '9px 10px' }}>
+                            <div style={{ fontWeight: 600 }}>{r.studentName || 'Student'}</div>
+                            <div style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
+                              {r.studentEmail || '—'}
+                            </div>
+                          </td>
+                          <td style={{ padding: '9px 10px', whiteSpace: 'nowrap' }}>
+                            {r.date || '—'}
+                            <div style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
+                              {(r.startTime || '').slice(0, 5)}
+                            </div>
+                          </td>
+                          <td style={{ padding: '9px 10px' }}>
+                            <span className='cl-badge' style={r.hasAlternative
+                              ? { background: '#DBEAFE', color: '#1E40AF' }
+                              : { background: '#FEF3C7', color: '#92400E' }}>
+                              {r.hasAlternative ? 'Rebooking link' : 'Needs follow-up'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+            </div>
+
+            <div style={{
+              padding: '14px 20px', borderTop: '1px solid var(--sp-border, #D1E5DF)',
+              display: 'flex', justifyContent: 'flex-end', gap: 8,
+            }}>
+              {deactivationResult ? (
+                <button className='cl-btn-primary' style={{ fontSize: 13 }} onClick={() => setDeactivating(null)}>
+                  Done
+                </button>
+              ) : (
+                <>
+                  <button
+                    className='cl-btn-outline' style={{ fontSize: 13 }}
+                    onClick={() => setDeactivating(null)} disabled={deactivationBusy}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className='cl-btn-danger' style={{ fontSize: 13 }}
+                    onClick={confirmDeactivate}
+                    disabled={deactivationBusy || deactivationRows === null}
+                  >
+                    {deactivationBusy ? 'Deactivating...' : 'Deactivate & notify'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

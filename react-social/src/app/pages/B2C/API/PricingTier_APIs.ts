@@ -12,6 +12,12 @@ export interface PricingTier {
   includesCounselling?: boolean;
   counsellingSessionCount?: number | null;
   includesLms?: boolean;
+  /**
+   * Hold the finished report until a counsellor releases it. With this on, neither the
+   * student nor the counsellor is mailed the report when the assessment completes — the
+   * counsellor sends it from their appointments list, after the session.
+   */
+  counsellorReleaseReport?: boolean;
   lmsValidityDays?: number | null;
   dashboardValidityDays?: number | null;
   sortOrder?: number;

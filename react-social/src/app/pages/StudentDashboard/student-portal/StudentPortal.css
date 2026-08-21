@@ -1076,3 +1076,233 @@
     align-items: flex-start;
   }
 }
+
+/* ── My Reports: awaiting-report / empty state ─────────────────────────────
+   Deliberately quiet: one narrow centred card on the shell's green-glass
+   theme (.sp-shell tokens — #1a6b3c / #e8f5ee, 16px radius), no hero band.
+   Own --sr-* vars so it renders the same wherever it is mounted. */
+
+.sp-rep-empty {
+  --sr-green: #1a6b3c;
+  --sr-mint: #e8f5ee;
+  --sr-line: #e4eae6;
+  --sr-muted: #6b7a8d;
+
+  max-width: 620px;
+  margin: 8px auto 0;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(26, 107, 60, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 6px 26px rgba(26, 107, 60, 0.06);
+  padding: 30px 34px 26px;
+  text-align: center;
+}
+
+.sp-rep-icon {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 14px;
+  border-radius: 13px;
+  background: var(--sr-mint);
+  color: var(--sr-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-rep-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--sr-mint);
+  color: var(--sr-green);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.sp-rep-status-idle {
+  background: #f1f4f7;
+  color: var(--sr-muted);
+}
+
+.sp-rep-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.sp-rep-status:not(.sp-rep-status-idle) .sp-rep-status-dot {
+  animation: sp-rep-blip 2.4s ease-in-out infinite;
+}
+
+@keyframes sp-rep-blip {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+
+.sp-rep-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.01em;
+}
+
+.sp-rep-sub {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sr-muted);
+  margin: 0 auto;
+  max-width: 44ch;
+}
+
+.sp-rep-for {
+  font-size: 12px;
+  color: var(--sr-muted);
+  margin: 10px 0 0;
+}
+
+.sp-rep-for strong {
+  color: #1a1a2e;
+  font-weight: 600;
+}
+
+/* Compact 3-step rail */
+.sp-rep-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 24px;
+}
+
+.sp-rep-step {
+  position: relative;
+  padding: 0 6px;
+}
+
+.sp-rep-step::before {
+  content: '';
+  position: absolute;
+  top: 11px;
+  left: -50%;
+  right: 50%;
+  height: 1.5px;
+  background: var(--sr-line);
+}
+
+.sp-rep-step:first-child::before { display: none; }
+
+.sp-rep-step-done::before,
+.sp-rep-step-active::before { background: var(--sr-green); }
+
+.sp-rep-step-mark {
+  position: relative;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--sr-line);
+  background: #fff;
+  color: #a9b4bf;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sp-rep-step-done .sp-rep-step-mark {
+  background: var(--sr-green);
+  border-color: var(--sr-green);
+  color: #fff;
+}
+
+.sp-rep-step-active .sp-rep-step-mark {
+  border-color: var(--sr-green);
+  color: var(--sr-green);
+  box-shadow: 0 0 0 3px rgba(26, 107, 60, 0.1);
+}
+
+.sp-rep-step-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #3b4754;
+  line-height: 1.4;
+}
+
+.sp-rep-step-pending .sp-rep-step-name { color: #a9b4bf; }
+.sp-rep-step-active .sp-rep-step-name { font-weight: 600; color: var(--sr-green); }
+
+/* Footnote + action */
+.sp-rep-foot {
+  margin: 22px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--sr-line);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--sr-muted);
+}
+
+.sp-rep-actions {
+  margin-top: 14px;
+}
+
+.sp-rep-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 9px;
+  border: 1px solid rgba(26, 107, 60, 0.18);
+  background: var(--sr-mint);
+  color: var(--sr-green);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.sp-rep-btn:hover {
+  background: #dcefe4;
+  border-color: rgba(26, 107, 60, 0.3);
+}
+
+.sp-rep-btn-primary {
+  background: var(--sr-green);
+  border-color: var(--sr-green);
+  color: #fff;
+}
+
+.sp-rep-btn-primary:hover {
+  background: #14532c;
+  border-color: #14532c;
+}
+
+/* Loading skeleton */
+.sp-rep-skel {
+  height: 76px;
+  border-radius: 14px;
+  border: 1px solid rgba(26, 107, 60, 0.08);
+  background: linear-gradient(90deg, #f6faf7 25%, #eef5f0 37%, #f6faf7 63%);
+  background-size: 400% 100%;
+  animation: sp-rep-shimmer 1.4s ease infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes sp-rep-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (max-width: 560px) {
+  .sp-rep-empty { padding: 26px 20px 22px; }
+  .sp-rep-step { padding: 0 2px; }
+  .sp-rep-step-name { font-size: 10.5px; }
+}

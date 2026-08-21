@@ -15,6 +15,7 @@ import javax.persistence.OneToOne;
 import javax.persistence.PrePersist;
 import javax.persistence.PreUpdate;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.User;
@@ -177,6 +178,26 @@ public class CounsellingAppointment implements Serializable {
     @Column(name = "shifted_from_start")
     private LocalDateTime shiftedFromStart;
 
+    // ─── Counsellor-released report ──────────────────────────────────────────────
+    //
+    // Set when the counsellor pressed "Send report" and the student was mailed the link.
+    // Only ever set on tiers that hold the report back; NULL everywhere else, including on
+    // tiers where the report went out automatically the moment it was generated.
+    @Column(name = "report_released_at")
+    private LocalDateTime reportReleasedAt;
+
+    /**
+     * Whether this session's tier holds the report for the counsellor to release — and so
+     * whether the counsellor's list should offer the "Send report" button at all.
+     *
+     * <p>Not a column: it belongs to the entitlement the booking was made against, and is
+     * read across at list time rather than duplicated onto every appointment row, where it
+     * would go stale the moment an entitlement was re-granted. Populated only by the lists
+     * that need it; null elsewhere, which the UI reads as "no button".
+     */
+    @Transient
+    private Boolean counsellorReleaseReport;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -205,6 +226,22 @@ public class CounsellingAppointment implements Serializable {
     }
 
     // Getters and Setters
+
+    public LocalDateTime getReportReleasedAt() {
+        return reportReleasedAt;
+    }
+
+    public void setReportReleasedAt(LocalDateTime reportReleasedAt) {
+        this.reportReleasedAt = reportReleasedAt;
+    }
+
+    public Boolean getCounsellorReleaseReport() {
+        return counsellorReleaseReport;
+    }
+
+    public void setCounsellorReleaseReport(Boolean counsellorReleaseReport) {
+        this.counsellorReleaseReport = counsellorReleaseReport;
+    }
 
     public Long getId() {
         return id;

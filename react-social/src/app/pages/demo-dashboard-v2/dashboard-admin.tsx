@@ -814,17 +814,6 @@ const DashboardAdminContent: FC = () => {
       }));
   }, [institutes]);
 
-  const recentLogins = useMemo(() => {
-    return logins
-      .slice()
-      .sort((a, b) => {
-        const ta = new Date(pick(a, ["loginTime", "createdAt"]) || 0).getTime();
-        const tb = new Date(pick(b, ["loginTime", "createdAt"]) || 0).getTime();
-        return tb - ta;
-      })
-      .slice(0, 6);
-  }, [logins]);
-
   return (
     <>
       <PageTitle breadcrumbs={[]}>Admin</PageTitle>
@@ -1115,11 +1104,6 @@ const DashboardAdminContent: FC = () => {
             rangeLabelText={rangeLabel(rangeKey, range)}
             activity={institutesActivity}
           />
-        </div>
-
-        {/* RECENT LOGINS */}
-        <div style={{ marginTop: 24 }}>
-          <RecentLoginsCard t={t} logins={recentLogins} loading={loading} tone={tone} />
         </div>
       </div>
     </>
@@ -2132,80 +2116,6 @@ const InstitutesTable: FC<{
               ))}
             </tbody>
           </table>
-        )}
-      </div>
-    </Card>
-  );
-};
-
-/* ============================================================
-   RECENT LOGINS FEED
-   ============================================================ */
-const RecentLoginsCard: FC<{
-  t: Theme;
-  logins: any[];
-  loading: boolean;
-  tone: (k: Tone) => { solid: string; soft: string };
-}> = ({ t, logins, loading, tone }) => {
-  const rotation: Tone[] = ["primary", "info", "success", "warning", "purple", "danger"];
-  return (
-    <Card t={t}>
-      <CardHeader t={t} title="Recent logins" subtitle="Latest sign-ins across the network" />
-      <div style={{ padding: "0 20px 16px", minHeight: 240 }}>
-        {loading ? (
-          <Skeleton t={t} height={240} />
-        ) : logins.length === 0 ? (
-          <EmptyState t={t} label="No login activity in the last 30 days" />
-        ) : (
-          logins.map((a, i) => {
-            const tn = tone(rotation[i % rotation.length]);
-            const name =
-              pick(a, ["userName", "fullName", "name", "username", "email"]) || "User";
-            const who = String(name);
-            const when = pick(a, ["loginTime", "createdAt", "accessTime"]);
-            const email = pick(a, ["email"]);
-            const role = pick(a, ["role", "userRole"]);
-            return (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 12,
-                  padding: "12px 0",
-                  borderBottom: i < logins.length - 1 ? `1px dashed ${t.border}` : "none",
-                }}
-              >
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: tn.soft,
-                    color: tn.solid,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 700,
-                    fontSize: 12,
-                    flexShrink: 0,
-                  }}
-                >
-                  {initials(who)}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: t.text, fontWeight: 600 }}>{who}</div>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
-                    {role ? `${role} · ` : ""}
-                    {email || "signed in"}
-                  </div>
-                </div>
-                <span style={{ fontSize: 11, color: t.textSubtle, whiteSpace: "nowrap" }}>
-                  {relativeTime(when)}
-                </span>
-              </div>
-            );
-          })
         )}
       </div>
     </Card>

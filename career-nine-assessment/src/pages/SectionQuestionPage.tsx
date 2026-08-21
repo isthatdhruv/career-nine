@@ -40,6 +40,9 @@ type Option = {
   languageOptions?: LanguageOption[];
   isGame?: boolean;
   game?: GameTable;
+  // Group tag for "dropdown" questions; every option of such a question
+  // belongs to exactly one group. Absent/null on all other question types.
+  optionGroup?: string | null;
 };
 
 type LanguageOption = {
@@ -208,6 +211,13 @@ const SectionQuestionPage: React.FC = () => {
   // Same Redis-only contract as `answers` / `rankingAnswers` above.
   const [textAnswers, setTextAnswers] = useState<
     Record<string, Record<number, Record<number, string>>>
+  >({});
+  // For "dropdown" questions: sectionId -> questionId -> chosen group label.
+  // UI-only filter state — never submitted or saved to Redis. On resume it is
+  // re-derived from the restored optionIds (each option belongs to exactly
+  // one group), so no persistence is needed.
+  const [dropdownGroupChoice, setDropdownGroupChoice] = useState<
+    Record<string, Record<number, string>>
   >({});
   // Refs mirroring state for use in callbacks (avoids stale closures)
   const sectionIdRef = useRef(sectionId);
@@ -692,6 +702,28 @@ const SectionQuestionPage: React.FC = () => {
   const belowMin = currentSelectionCount < effectiveMin;
   const remainingToMin = Math.max(effectiveMin - currentSelectionCount, 0);
 
+  // --- "dropdown" question type: a select of option groups filters which
+  //     options are visible. The group choice is UI state only; on resume it
+  //     falls back to the group of the first restored selection. ---
+  const currentIsDropdown = question.question.questionType === "dropdown";
+  const groupOf = (opt: Option): string =>
+    (opt.optionGroup || "").trim() || "Other";
+  const dropdownGroups = currentIsDropdown
+    ? Array.from(new Set(question.question.options.map(groupOf)))
+    : [];
+  const effectiveDropdownGroup = (() => {
+    if (!currentIsDropdown) return "";
+    const explicit = dropdownGroupChoice[sectionId!]?.[qId];
+    if (explicit) return explicit;
+    if (selectedOptions.length > 0) {
+      const firstOpt = question.question.options.find(
+        (o) => o.optionId === selectedOptions[0],
+      );
+      if (firstOpt) return groupOf(firstOpt);
+    }
+    return "";
+  })();
+
   // Filter languages to only those that have actual translations for the current question
   // Prevents English text from being repeated side-by-side when translations are missing
   const availableLanguages = languages.filter((lang) => {
@@ -998,6 +1030,30 @@ const SectionQuestionPage: React.FC = () => {
         }
         // If all questions answered, stay on current question (user can submit)
       }, 400); // 400ms delay so user can see their selection
+    }
+  };
+
+  // Dropdown question: change the group filter. Selections always belong to
+  // the previously chosen group, so they are invalid under the new filter —
+  // clear them (the question then reads as unanswered everywhere, since all
+  // answered-state computations derive from `answers`).
+  const handleDropdownGroupChange = (group: string) => {
+    setDropdownGroupChoice((prev) => ({
+      ...prev,
+      [sectionId!]: { ...(prev[sectionId!] || {}), [qId]: group },
+    }));
+    if (selectedOptions.length > 0) {
+      const opts = question.question.options;
+      const keep = selectedOptions.filter((id) => {
+        const o = opts.find((op) => op.optionId === id);
+        return o && groupOf(o) === group;
+      });
+      if (keep.length !== selectedOptions.length) {
+        setAnswers((prev) => {
+          const sec = prev[sectionId!] || {};
+          return { ...prev, [sectionId!]: { ...sec, [qId]: keep } };
+        });
+      }
     }
   };
 
@@ -2455,7 +2511,15 @@ const SectionQuestionPage: React.FC = () => {
 
             <div className="mt-4">
               {(() => {
-                const options = question.question.options;
+                // Dropdown questions only show the options of the chosen
+                // group; nothing is shown until a group is picked.
+                const options = currentIsDropdown
+                  ? effectiveDropdownGroup
+                    ? question.question.options.filter(
+                        (o) => groupOf(o) === effectiveDropdownGroup,
+                      )
+                    : []
+                  : question.question.options;
                 const isRankingQuestion =
                   question.question.questionType === "ranking";
                 const isTextQuestion =
@@ -2998,30 +3062,75 @@ const SectionQuestionPage: React.FC = () => {
                   );
                 };
 
-                // If more than 5 options, use 2-column layout
-                if (options.length > 5) {
-                  const midpoint = Math.ceil(options.length / 2);
-                  const leftColumn = options.slice(0, midpoint);
-                  const rightColumn = options.slice(midpoint);
+                // Shared column layout: 2 columns above 5 options, else 1.
+                const optionsLayout =
+                  options.length > 5 ? (
+                    (() => {
+                      const midpoint = Math.ceil(options.length / 2);
+                      const leftColumn = options.slice(0, midpoint);
+                      const rightColumn = options.slice(midpoint);
+                      return (
+                        <div className="options-grid-2col">
+                          {/* Left Column */}
+                          <div>
+                            {leftColumn.map((opt, idx) => renderOption(opt, idx))}
+                          </div>
+                          {/* Right Column */}
+                          <div>
+                            {rightColumn.map((opt, idx) =>
+                              renderOption(opt, midpoint + idx),
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    options.map((opt, idx) => renderOption(opt, idx))
+                  );
 
+                // Dropdown question: group select above the (filtered) options
+                if (currentIsDropdown) {
                   return (
-                    <div className="options-grid-2col">
-                      {/* Left Column */}
-                      <div>
-                        {leftColumn.map((opt, idx) => renderOption(opt, idx))}
+                    <>
+                      <div className="mb-3">
+                        <select
+                          className="form-select"
+                          value={effectiveDropdownGroup}
+                          onChange={(e) =>
+                            handleDropdownGroupChange(e.target.value)
+                          }
+                          style={{
+                            maxWidth: "360px",
+                            fontSize: "1rem",
+                            fontWeight: 600,
+                            color: "#2d3748",
+                            background: "#fff",
+                            borderColor: "#dee2e6",
+                          }}
+                        >
+                          <option value="">Select a category…</option>
+                          {dropdownGroups.map((group) => (
+                            <option key={group} value={group}>
+                              {group}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                      {/* Right Column */}
-                      <div>
-                        {rightColumn.map((opt, idx) =>
-                          renderOption(opt, midpoint + idx),
-                        )}
-                      </div>
-                    </div>
+                      {effectiveDropdownGroup ? (
+                        optionsLayout
+                      ) : (
+                        <div
+                          className="text-muted"
+                          style={{ fontSize: "0.95rem" }}
+                        >
+                          Choose a category above to see its options.
+                        </div>
+                      )}
+                    </>
                   );
                 }
 
-                // 5 or fewer options - single column layout
-                return options.map((opt, idx) => renderOption(opt, idx));
+                return optionsLayout;
               })()}
             </div>
 

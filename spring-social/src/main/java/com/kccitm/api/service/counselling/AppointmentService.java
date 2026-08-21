@@ -58,6 +58,9 @@ public class AppointmentService {
     private CounsellingSlotRepository slotRepository;
 
     @Autowired
+    private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
+
+    @Autowired
     private CounsellorRepository counsellorRepository;
 
     @Autowired
@@ -85,8 +88,40 @@ public class AppointmentService {
         return appointmentRepository.findByStudentIdOrdered(studentId);
     }
 
+    /**
+     * One counsellor's sessions, each stamped with whether its tier makes the report theirs to
+     * release — which is what decides whether the row offers a "Send report" button.
+     *
+     * <p>Resolved here rather than in the view because it lives two hops away (appointment →
+     * entitlement → the flag snapshotted at grant time), and a list that omitted it would have
+     * the counsellor's own screen unable to tell a held report from a sent one.
+     */
     public List<CounsellingAppointment> getByCounsellor(Long counsellorId) {
-        return appointmentRepository.findByCounsellorId(counsellorId);
+        List<CounsellingAppointment> appointments = appointmentRepository.findByCounsellorId(counsellorId);
+        for (CounsellingAppointment a : appointments) {
+            a.setCounsellorReleaseReport(isCounsellorReleased(a));
+        }
+        return appointments;
+    }
+
+    /**
+     * Whether this booking's entitlement holds the report for counsellor release.
+     *
+     * <p>False for anything that cannot be resolved — an admin-created booking carries no
+     * entitlement, and a session with no tier behind it has never held a report back. Failing
+     * to false hides a button rather than offering one that would only error.
+     */
+    private boolean isCounsellorReleased(CounsellingAppointment a) {
+        try {
+            if (a.getEntitlementId() == null) return false;
+            return studentEntitlementRepository.findById(a.getEntitlementId())
+                    .map(e -> Boolean.TRUE.equals(e.getCounsellorReleaseReport()))
+                    .orElse(false);
+        } catch (Exception e) {
+            logger.warn("Could not resolve report-release setting for appointment {}: {}",
+                    a.getId(), e.getMessage());
+            return false;
+        }
     }
 
     public List<CounsellingAppointment> getByCounsellorAndDate(Long counsellorId, LocalDate date) {
@@ -335,6 +370,19 @@ public class AppointmentService {
     @Transactional
     public CounsellingAppointment cancel(Long appointmentId, User cancelledBy, String cancellerRole,
                                          String reasonCode, String note) {
+        return cancel(appointmentId, cancelledBy, cancellerRole, reasonCode, note, true);
+    }
+
+    /**
+     * As above, but the counsellor's own copy of an admin cancellation can be withheld.
+     *
+     * <p>For the one case where a whole diary is cancelled at once — a counsellor being
+     * deactivated — the per-session notices are replaced by a single message telling them
+     * their account has been suspended. Every other caller keeps both mails.
+     */
+    @Transactional
+    public CounsellingAppointment cancel(Long appointmentId, User cancelledBy, String cancellerRole,
+                                         String reasonCode, String note, boolean notifyCounsellor) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
@@ -382,7 +430,7 @@ public class AppointmentService {
                 appointmentId, role, cancelledBy != null ? cancelledBy.getId() : "unknown",
                 reasonCode, slot != null ? slot.getStatus() : "n/a", creditBack);
 
-        notifyOnCancellation(appointment, assignedCounsellor, cancelledBy, role, reason, creditBack);
+        notifyOnCancellation(appointment, assignedCounsellor, cancelledBy, role, reason, creditBack, notifyCounsellor);
 
         Map<String, Object> oldValues = new HashMap<>();
         oldValues.put("status", oldStatus);
@@ -483,7 +531,8 @@ public class AppointmentService {
      * </ul>
      */
     private void notifyOnCancellation(CounsellingAppointment appointment, Counsellor counsellor,
-                                      User cancelledBy, String role, String reason, boolean creditBack) {
+                                      User cancelledBy, String role, String reason, boolean creditBack,
+                                      boolean notifyCounsellor) {
         String cancellerName = cancelledBy != null && cancelledBy.getName() != null
                 ? cancelledBy.getName() : "Career-9";
         Long studentUserId = appointment.getStudent() != null ? appointment.getStudent().getUserId() : null;
@@ -504,9 +553,9 @@ public class AppointmentService {
                 notifyStudentInApp(studentUserId, appointment, reason);
             } else {
                 // Admin: nobody involved chose this, so tell both sides and promise a follow-up.
-                notificationService.sendAdminCancellationEmail(appointment);
+                notificationService.sendAdminCancellationEmail(appointment, notifyCounsellor);
                 notifyStudentInApp(studentUserId, appointment, reason);
-                if (counsellor != null) notifyCounsellorInApp(counsellor, appointment, reason);
+                if (counsellor != null && notifyCounsellor) notifyCounsellorInApp(counsellor, appointment, reason);
             }
         } catch (Exception e) {
             logger.warn("Cancellation notifications failed for appointment {}: {}",

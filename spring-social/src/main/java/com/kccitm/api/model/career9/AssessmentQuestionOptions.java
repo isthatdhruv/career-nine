@@ -53,6 +53,12 @@ public class AssessmentQuestionOptions implements Serializable {
     @Column(name = "option_image_url", length = 1024)
     private String optionImageUrl;
 
+    // Group tag for "dropdown" questions: the student portal lists the distinct
+    // groups in a dropdown and shows only the picked group's options. NULL on
+    // options of every other question type.
+    @Column(name = "option_group", length = 255)
+    private String optionGroup;
+
     @Column(name = "is_game", nullable = false)
     private Boolean isGame;
 
@@ -181,6 +187,14 @@ public class AssessmentQuestionOptions implements Serializable {
 
     public void setOptionDescription(String optionDescription) {
         this.optionDescription = optionDescription;
+    }
+
+    public String getOptionGroup() {
+        return optionGroup;
+    }
+
+    public void setOptionGroup(String optionGroup) {
+        this.optionGroup = optionGroup;
     }
 
     public String getOptionImageUrl() {

@@ -110,6 +110,7 @@
   },
   "scripts": {
     "gen:perms": "node scripts/extract-perm-routes.js",
+    "typecheck": "npx -y -p typescript@5.4.5 tsc -p tsconfig.typecheck.json --noEmit",
     "prestart": "npm run gen:perms",
     "prebuild": "npm run gen:perms",
     "start": "react-scripts start",

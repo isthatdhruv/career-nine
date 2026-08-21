@@ -70,6 +70,9 @@ public class CounsellingAppointmentController {
     @Autowired
     private CounsellorSessionAdminService counsellorSessionAdminService;
 
+    @Autowired
+    private com.kccitm.api.service.counselling.CounsellorReportReleaseService reportReleaseService;
+
     // no scope arg: body is raw Map; student books appointment slot
     @PreAuthorize("@auth.allows('counselling.appointment.create')")
     @PostMapping("/book")
@@ -222,6 +225,35 @@ public class CounsellingAppointmentController {
             return ResponseEntity.ok(out);
         } catch (RuntimeException e) {
             logger.warn("Start session failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    /**
+     * Counsellor's "Send code to student" button: mails and WhatsApps the student the
+     * 4-digit check-in code they should be reading out. Nothing is generated — it is the
+     * same DOB-derived code already on their report — so this is purely a delivery for a
+     * student who cannot find it.
+     *
+     * <p>200 with an empty {@code channels} list is a real outcome, not a failure: the
+     * student may have no email or phone on record, or WhatsApp may be unconfigured. The
+     * caller reports what did and did not go out rather than claiming a blanket "sent".
+     */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/send-checkin-code/{id}")
+    public ResponseEntity<?> sendCheckinCode(@PathVariable Long id) {
+        try {
+            java.util.List<String> channels = checkinOtpService.sendCodeToStudent(id);
+            Map<String, Object> out = new java.util.HashMap<>();
+            out.put("appointmentId", id);
+            out.put("channels", channels);
+            out.put("message", channels.isEmpty()
+                    ? "Could not send the code — no email or WhatsApp number on record for this student. "
+                            + "Ask them to read it from their report."
+                    : "Code sent to the student by " + String.join(" and ", channels) + ".");
+            return ResponseEntity.ok(out);
+        } catch (RuntimeException e) {
+            logger.warn("Send check-in code failed for appointment {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
@@ -462,15 +494,24 @@ public class CounsellingAppointmentController {
     }
 
     /**
-     * The assessment report for one session. Read by the counsellor's session-notes page, which
-     * shows a single session and so cannot use the list above.
+     * The assessment report for one session, plus why there isn't one when there isn't. Read by
+     * the counsellor's session-notes page and the Report button on their appointments list, both
+     * of which show a single session and so cannot use the list above.
+     *
+     * <p>Resolving it here rather than from the student's report rows directly means the
+     * counsellor is shown the same report the emails carry — the one for the assessment this
+     * session was booked against, PDF preferred — and needs only the permission they already
+     * have to see the session at all.
      */
     // no scope arg: identifies by appointment
     @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/{id}/report-link")
     public ResponseEntity<Map<String, String>> getReportLink(@PathVariable Long id) {
+        CounsellorSessionAdminService.ReportLinkResult result =
+                counsellorSessionAdminService.resolveReportFor(id);
         Map<String, String> body = new java.util.HashMap<>();
-        body.put("reportLink", counsellorSessionAdminService.reportLinkFor(id));
+        body.put("reportLink", result.getReportLink());
+        body.put("status", result.getStatus());
         return ResponseEntity.ok(body);
     }
 
@@ -486,6 +527,35 @@ public class CounsellingAppointmentController {
     @PostMapping("/{id}/email/counsellor")
     public ResponseEntity<?> emailCounsellor(@PathVariable Long id) {
         return sendAndReport(() -> counsellorSessionAdminService.mailCounsellor(id), id, "counsellor");
+    }
+
+    /**
+     * The counsellor releases this student's report — the only way it reaches them on a tier
+     * bought with counsellor release on, where nothing was sent when the report was generated.
+     *
+     * <p>Answers 400 with a readable sentence for the three things the counsellor can do
+     * something about — no report yet, no address on file, session gone — and 500 only for
+     * faults that are ours. Deliberately re-sendable: a student who lost the mail should not
+     * need an admin.
+     */
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/{id}/release-report")
+    public ResponseEntity<?> releaseReport(@PathVariable Long id) {
+        try {
+            com.kccitm.api.service.counselling.CounsellorReportReleaseService.ReleaseOutcome outcome =
+                    reportReleaseService.releaseToStudent(id);
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("recipients", outcome.getRecipients());
+            body.put("reportLink", outcome.getReportLink());
+            body.put("releasedAt", outcome.getReleasedAt());
+            return ResponseEntity.ok(body);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Report release failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "The report could not be sent. Please try again."));
+        }
     }
 
     /**

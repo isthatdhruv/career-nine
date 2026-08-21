@@ -145,6 +145,17 @@ const StudentAuthGuard: FC = () => {
 };
 
 /**
+ * Super-admin-only route guard (JWT token console). No permission code exists
+ * for this surface on purpose — the backend enforces `principal.superAdmin`
+ * directly, so the route gate mirrors that rather than inventing a grantable
+ * code that the server would ignore.
+ */
+const RequireSuperAdmin: FC<WithChildren> = ({ children }) => {
+  const { currentUser } = useAuth();
+  return currentUser?.superAdmin === true ? <>{children}</> : <Navigate to="/dashboard" replace />;
+};
+
+/**
  * Post-login gate: a student whose one-time profile step isn't done is routed to
  * /student/dashboard/student-info before any dashboard page. `infoCompleted` comes
  * from /auth/me (MeResponse). Non-students and super-admins pass through, and the
@@ -349,6 +360,7 @@ const PrivateRoutes = () => {
   const SlotManagementPage = lazy(() => import("../pages/Counselling/admin/SlotManagementPage"));
   const ManageStudentsPage = lazy(() => import("../pages/Counselling/admin/ManageStudentsPage"));
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
+  const CounsellingSessionsPage = lazy(() => import("../pages/Counselling/admin/CounsellingSessionsPage"));
   const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
@@ -426,21 +438,21 @@ const PrivateRoutes = () => {
           Dashboard 2" actions via window.open(..., "_blank"). Rendered WITHOUT the
           Metronic aside menu so only the dashboard surface shows in the new tab. */}
       <Route path="/dashboard/school/:id" element={
-        <RequirePermission perm="institute.read">
+        <RequirePermission perm="dashboard.principal.read">
           <SuspensedView>
             <SchoolDashboardPage />
           </SuspensedView>
         </RequirePermission>
       } />
       <Route path="/dashboard/school-navigator/:id" element={
-        <RequirePermission perm="institute.read">
+        <RequirePermission perm="dashboard.principal.read">
           <SuspensedView>
             <SchoolNavigatorDashboardPage />
           </SuspensedView>
         </RequirePermission>
       } />
       <Route path="/dashboard/school-combined/:id" element={
-        <RequirePermission perm="institute.read">
+        <RequirePermission perm="dashboard.principal.read">
           <SuspensedView>
             <SchoolCombinedDashboardPage />
           </SuspensedView>
@@ -537,7 +549,7 @@ const PrivateRoutes = () => {
         <Route path="dashboard" element={<DashboardAdminPage />} />
 
         <Route path="/school/principal/dashboard/:id" element={
-          <RequirePermission perm="institute.read">
+          <RequirePermission perm="dashboard.principal.read">
             <SuspensedView>
               <InstituteDashboard />
             </SuspensedView>
@@ -553,7 +565,7 @@ const PrivateRoutes = () => {
         <Route
           path="/student/university/result-list"
           element={
-            <RequirePermission perm="student.read">
+            <RequirePermission perm="university_mark.read">
               <SuspensedView>
                 <StudentsData />
               </SuspensedView>
@@ -561,12 +573,14 @@ const PrivateRoutes = () => {
           }
         />
         <Route path="/game-list" element={
-          <SuspensedView>
-            <GamePage />
-          </SuspensedView>
+          <RequirePermission perm="game_table.read">
+            <SuspensedView>
+              <GamePage />
+            </SuspensedView>
+          </RequirePermission>
         } />
         <Route path="/questionaire/List" element={
-          <RequirePermission perm="assessment.read">
+          <RequirePermission perm="questionnaire.read">
             <SuspensedView>
               <QuestionaireListPage />
             </SuspensedView>
@@ -610,14 +624,14 @@ const PrivateRoutes = () => {
           </RequirePermission>
         } />
         <Route path="/school/group/create" element={
-          <RequirePermission perm="group.write">
+          <RequirePermission perm="group.create">
             <SuspensedView>
               <GroupCreatePage />
             </SuspensedView>
           </RequirePermission>
         } />
         <Route path="/school/student/create" element={
-          <RequirePermission perm="student.write">
+          <RequirePermission perm="student.create">
             <SuspensedView>
               <StudentCreatePage />
             </SuspensedView>
@@ -625,7 +639,7 @@ const PrivateRoutes = () => {
         } />
 
         <Route path="/group-student" element={
-          <RequirePermission perm="student.read">
+          <RequirePermission perm="student_group.read">
             <SuspensedView>
               <GroupStudentPage />
             </SuspensedView>
@@ -672,7 +686,7 @@ const PrivateRoutes = () => {
         } />
 
         <Route path="/report-generation" element={
-          <RequirePermission perm="report.read">
+          <RequirePermission perm="report_generation.read">
             <SuspensedView>
               <ReportGenerationPage />
             </SuspensedView>
@@ -680,7 +694,7 @@ const PrivateRoutes = () => {
         } />
 
         <Route path="/career-suggestion" element={
-          <RequirePermission perm="career.read">
+          <RequirePermission perm="career_suggestion.read">
             <SuspensedView>
               {/* <CareerSuggestionPage /> */}
             </SuspensedView>
@@ -725,7 +739,7 @@ const PrivateRoutes = () => {
         <Route
           path="/student/university/result-dashboard"
           element={
-            <RequirePermission perm="student.read">
+            <RequirePermission perm="university_mark.read">
               <SuspensedView>
                 <UniversityResultDashboard />
               </SuspensedView>
@@ -745,7 +759,7 @@ const PrivateRoutes = () => {
         <Route
           path="/student/university/result"
           element={
-            <RequirePermission perm="student.read">
+            <RequirePermission perm="university_mark.read">
               <SuspensedView>
                 <ResultPage />
               </SuspensedView>
@@ -763,7 +777,7 @@ const PrivateRoutes = () => {
         <Route
           path="/student/registrar/page"
           element={
-            <RequirePermission perm="student.write">
+            <RequirePermission perm="student.create">
               <SuspensedView>
                 <CourseBranchBatchPageForm />
               </SuspensedView>
@@ -783,7 +797,7 @@ const PrivateRoutes = () => {
         <Route
           path="/faculty/registration-details"
           element={
-            <RequirePermission perm="user.read">
+            <RequirePermission perm="faculty.read">
               <SuspensedView>
                 <FacultyRegistrationDetails />
               </SuspensedView>
@@ -793,7 +807,7 @@ const PrivateRoutes = () => {
         <Route
           path="/faculty/registration-form"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="faculty.create">
               <SuspensedView>
                 <FacultyRegistrationForm />
               </SuspensedView>
@@ -803,7 +817,7 @@ const PrivateRoutes = () => {
         <Route
           path="/teacher/class-dashboard"
           element={
-            <RequirePermission perm="student.read">
+            <RequirePermission perm="dashboard.teacher.read">
               <SuspensedView>
                 <ClassTeacherDashboard />
               </SuspensedView>
@@ -814,7 +828,7 @@ const PrivateRoutes = () => {
         <Route
           path="/registrar/verification/faculty"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="faculty.update">
               <SuspensedView>
                 <FacultyRegistrationForm />
               </SuspensedView>
@@ -824,7 +838,7 @@ const PrivateRoutes = () => {
         <Route
           path="/registrar/verification"
           element={
-            <RequirePermission perm="student.write">
+            <RequirePermission perm="student.update">
               <SuspensedView>
                 <StudentRegistrationForm />
               </SuspensedView>
@@ -842,7 +856,7 @@ const PrivateRoutes = () => {
         <Route
           path="google-groups"
           element={
-            <RequirePermission perm="group.read">
+            <RequirePermission perm="google_groups.read">
               <SuspensedView>
                 <GoogleGroups />
               </SuspensedView>
@@ -892,7 +906,7 @@ const PrivateRoutes = () => {
         <Route
           path="/career/create"
           element={
-            <RequirePermission perm="career.write">
+            <RequirePermission perm="career.create">
               <SuspensedView>
                 <CareerCreatePage />
               </SuspensedView>
@@ -902,7 +916,7 @@ const PrivateRoutes = () => {
         <Route
           path="/career/edit/:id"
           element={
-            <RequirePermission perm="career.write">
+            <RequirePermission perm="career.update">
               <SuspensedView>
                 <CareerEditPage />
               </SuspensedView>
@@ -912,7 +926,7 @@ const PrivateRoutes = () => {
         <Route
           path="/contact-person"
           element={
-            <RequirePermission perm="institute.read">
+            <RequirePermission perm="contact_person.read">
               <SuspensedView>
                 <ContactPersonPage />
               </SuspensedView>
@@ -922,7 +936,7 @@ const PrivateRoutes = () => {
         <Route
           path="/contact-person/create"
           element={
-            <RequirePermission perm="institute.write">
+            <RequirePermission perm="contact_person.create">
               <SuspensedView>
                 <ContactPersonCreatePage />
               </SuspensedView>
@@ -942,7 +956,7 @@ const PrivateRoutes = () => {
         <Route
           path="/section"
           element={
-            <RequirePermission perm="institute.read">
+            <RequirePermission perm="section.read">
               <SuspensedView>
                 <Section />
               </SuspensedView>
@@ -987,7 +1001,7 @@ const PrivateRoutes = () => {
         <Route
           path="/assessment-mapping"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="assessment_institute_mapping.read">
               <SuspensedView>
                 <AssessmentMappingPage />
               </SuspensedView>
@@ -997,7 +1011,7 @@ const PrivateRoutes = () => {
         <Route
           path="/question-sections"
           element={
-            <RequirePermission perm="assessment.read">
+            <RequirePermission perm="question_section.read">
               <SuspensedView>
                 <QuestionSectionPage />
               </SuspensedView>
@@ -1007,7 +1021,7 @@ const PrivateRoutes = () => {
         <Route
           path="/question-sections/create"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="question_section.create">
               <SuspensedView>
                 <QuestionSectionCreatePage />
               </SuspensedView>
@@ -1017,7 +1031,7 @@ const PrivateRoutes = () => {
         <Route
           path="/question-sections/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="question_section.update">
               <SuspensedView>
                 <QuestionSectionEditPage />
               </SuspensedView>
@@ -1035,7 +1049,7 @@ const PrivateRoutes = () => {
         <Route
           path="/assessment-questions"
           element={
-            <RequirePermission perm="assessment.read">
+            <RequirePermission perm="assessment_question.read">
               <SuspensedView>
                 <AssessmentQuestions />
               </SuspensedView>
@@ -1045,7 +1059,7 @@ const PrivateRoutes = () => {
         <Route
           path="/assessment-questions/create"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="assessment_question.create">
               <SuspensedView>
                 <QuestionCreatePage />
               </SuspensedView>
@@ -1055,7 +1069,7 @@ const PrivateRoutes = () => {
         <Route
           path="/assessment-questions/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="assessment_question.update">
               <SuspensedView>
                 <QuestionEditPage />
               </SuspensedView>
@@ -1065,7 +1079,7 @@ const PrivateRoutes = () => {
         <Route
           path="/assessment-questions/duplicates"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="assessment_question.read">
               <SuspensedView>
                 <QuestionDuplicatesPage />
               </SuspensedView>
@@ -1075,7 +1089,7 @@ const PrivateRoutes = () => {
         <Route
           path="/offline-assessment-upload"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="assessment_answer.create">
               <SuspensedView>
                 <OfflineAssessmentUpload />
               </SuspensedView>
@@ -1085,7 +1099,7 @@ const PrivateRoutes = () => {
         <Route
           path="/omr-data-upload"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="omr_column_mapping.read">
               <SuspensedView>
                 <OMRDataUpload />
               </SuspensedView>
@@ -1095,7 +1109,7 @@ const PrivateRoutes = () => {
         <Route
           path="/text-response-mapping"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="assessment_answer.update">
               <SuspensedView>
                 <TextResponseMapping />
               </SuspensedView>
@@ -1105,7 +1119,7 @@ const PrivateRoutes = () => {
         <Route
           path="/tools"
           element={
-            <RequirePermission perm="assessment.read">
+            <RequirePermission perm="tool.read">
               <SuspensedView>
                 <Tools />
               </SuspensedView>
@@ -1115,7 +1129,7 @@ const PrivateRoutes = () => {
         <Route
           path="/tools/create"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="tool.create">
               <SuspensedView>
                 <ToolCreatePage />
               </SuspensedView>
@@ -1125,7 +1139,7 @@ const PrivateRoutes = () => {
         <Route
           path="/tools/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="tool.update">
               <SuspensedView>
                 <ToolEditPage />
               </SuspensedView>
@@ -1135,7 +1149,7 @@ const PrivateRoutes = () => {
         <Route
           path="/list"
           element={
-            <RequirePermission perm="assessment.read">
+            <RequirePermission perm="list.read">
               <SuspensedView>
                 <ListPage />
               </SuspensedView>
@@ -1145,7 +1159,7 @@ const PrivateRoutes = () => {
         <Route
           path="/list/create"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="list.read">
               <SuspensedView>
                 <ListCreatePage />
               </SuspensedView>
@@ -1155,7 +1169,7 @@ const PrivateRoutes = () => {
         <Route
           path="/list/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="list.read">
               <SuspensedView>
                 <ListEditPage />
               </SuspensedView>
@@ -1165,7 +1179,7 @@ const PrivateRoutes = () => {
         <Route
           path="/upload-excel"
           element={
-            <RequirePermission perm="student.write">
+            <RequirePermission perm="student.import_bulk">
               <SuspensedView>
                 <UploadExcelFile />
               </SuspensedView>
@@ -1175,7 +1189,7 @@ const PrivateRoutes = () => {
         <Route
           path="/demographic-fields"
           element={
-            <RequirePermission perm="assessment.read">
+            <RequirePermission perm="demographic_field.read">
               <SuspensedView>
                 <DemographicFieldsPage />
               </SuspensedView>
@@ -1185,7 +1199,7 @@ const PrivateRoutes = () => {
         <Route
           path="/demographic-fields/create"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="demographic_field.create">
               <SuspensedView>
                 <DemographicFieldCreatePage />
               </SuspensedView>
@@ -1195,7 +1209,7 @@ const PrivateRoutes = () => {
         <Route
           path="/demographic-fields/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="demographic_field.update">
               <SuspensedView>
                 <DemographicFieldEditPage />
               </SuspensedView>
@@ -1255,7 +1269,7 @@ const PrivateRoutes = () => {
         <Route
           path="/questionare/create"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="questionnaire.create">
               <SuspensedView>
                 <QuestionareCreateSinglePage />
               </SuspensedView>
@@ -1265,7 +1279,7 @@ const PrivateRoutes = () => {
         <Route
           path="/questionare/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="questionnaire.update">
               <SuspensedView>
                 <QuestionareEditSinglePage />
               </SuspensedView>
@@ -1286,7 +1300,7 @@ const PrivateRoutes = () => {
         <Route
           path="/assessments/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="assessment.update">
               <SuspensedView>
                 <AssessmentEditPage />
               </SuspensedView>
@@ -1296,7 +1310,7 @@ const PrivateRoutes = () => {
         <Route
           path="/measured-qualities"
           element={
-            <RequirePermission perm="assessment.read">
+            <RequirePermission perm="measured_quality.read">
               <SuspensedView>
                 <MeasuredQualities />
               </SuspensedView>
@@ -1306,7 +1320,7 @@ const PrivateRoutes = () => {
         <Route
           path="/measured-qualities/create"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="measured_quality.create">
               <SuspensedView>
                 <MeasuredQualitiesCreatePage />
               </SuspensedView>
@@ -1316,7 +1330,7 @@ const PrivateRoutes = () => {
         <Route
           path="/measured-qualities/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="measured_quality.update">
               <SuspensedView>
                 <MeasuredQualitiesEditPage />
               </SuspensedView>
@@ -1326,7 +1340,7 @@ const PrivateRoutes = () => {
         <Route
           path="/measured-quality-types"
           element={
-            <RequirePermission perm="assessment.read">
+            <RequirePermission perm="measured_quality_type.read">
               <SuspensedView>
                 <MeasuredQualityTypes />
               </SuspensedView>
@@ -1336,7 +1350,7 @@ const PrivateRoutes = () => {
         <Route
           path="/measured-quality-types/create"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="measured_quality_type.create">
               <SuspensedView>
                 <MeasuredQualityTypesCreatePage />
               </SuspensedView>
@@ -1346,7 +1360,7 @@ const PrivateRoutes = () => {
         <Route
           path="/measured-quality-types/edit/:id"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="measured_quality_type.update">
               <SuspensedView>
                 <MeasuredQualityTypesEditPage />
               </SuspensedView>
@@ -1356,7 +1370,7 @@ const PrivateRoutes = () => {
         <Route
           path="/course"
           element={
-            <RequirePermission perm="institute.read">
+            <RequirePermission perm="institute_course.read">
               <SuspensedView>
                 <Course />
               </SuspensedView>
@@ -1366,7 +1380,7 @@ const PrivateRoutes = () => {
         <Route
           path="/branch"
           element={
-            <RequirePermission perm="institute.read">
+            <RequirePermission perm="institute_branch.read">
               <SuspensedView>
                 <Branch />
               </SuspensedView>
@@ -1376,7 +1390,7 @@ const PrivateRoutes = () => {
         <Route
           path="/batch"
           element={
-            <RequirePermission perm="institute.read">
+            <RequirePermission perm="institute_batch.read">
               <SuspensedView>
                 <Batch />
               </SuspensedView>
@@ -1386,7 +1400,7 @@ const PrivateRoutes = () => {
         <Route
           path="/session"
           element={
-            <RequirePermission perm="institute.read">
+            <RequirePermission perm="institute_session.read">
               <SuspensedView>
                 <Session />
               </SuspensedView>
@@ -1396,7 +1410,7 @@ const PrivateRoutes = () => {
         <Route
           path="/batchgoogle"
           element={
-            <RequirePermission perm="group.write">
+            <RequirePermission perm="google_groups.update">
               <SuspensedView>
                 <BatchGoogle />
               </SuspensedView>
@@ -1427,7 +1441,7 @@ const PrivateRoutes = () => {
         <Route
           path="/user-management/roles/manage"
           element={
-            <RequirePermission perm="role.assign">
+            <RequirePermission perm="role.read">
               <SuspensedView>
                 <RolesAndPermissionsPage />
               </SuspensedView>
@@ -1437,7 +1451,7 @@ const PrivateRoutes = () => {
         <Route
           path="/user-management/users/manage"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="user.read.all">
               <SuspensedView>
                 <UserManagementPage />
               </SuspensedView>
@@ -1465,7 +1479,7 @@ const PrivateRoutes = () => {
         <Route
           path="/bet-report-generation"
           element={
-            <RequirePermission perm="report.read">
+            <RequirePermission perm="bet_report_data.read">
               <SuspensedView>
                 <BetReportGenerationPage />
               </SuspensedView>
@@ -1475,7 +1489,7 @@ const PrivateRoutes = () => {
         <Route
           path="/navigator-report-generation"
           element={
-            <RequirePermission perm="report.read">
+            <RequirePermission perm="navigator_report_data.read">
               <SuspensedView>
                 <NavigatorReportGenerationPage />
               </SuspensedView>
@@ -1485,7 +1499,7 @@ const PrivateRoutes = () => {
         <Route
           path="/unified-report-management"
           element={
-            <RequirePermission perm="report.read">
+            <RequirePermission perm="report_generation.read">
               <SuspensedView>
                 <UnifiedReportManagementPage />
               </SuspensedView>
@@ -1547,7 +1561,7 @@ const PrivateRoutes = () => {
         <Route
           path="/admin-assessment-edit/:assessmentId/:studentId"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="assessment_answer.update">
               <SuspensedView>
                 <AdminAssessmentEditPage />
               </SuspensedView>
@@ -1557,7 +1571,7 @@ const PrivateRoutes = () => {
         <Route
           path="/activity-log"
           element={
-            <RequirePermission perm="permission.grant">
+            <RequirePermission perm="user_activity_log.read">
               <SuspensedView>
                 <ActivityLogPage />
               </SuspensedView>
@@ -1568,16 +1582,18 @@ const PrivateRoutes = () => {
         <Route
           path="/admin/jwt-tokens"
           element={
-            <SuspensedView>
-              <JwtTokensPage />
-            </SuspensedView>
+            <RequireSuperAdmin>
+              <SuspensedView>
+                <JwtTokensPage />
+              </SuspensedView>
+            </RequireSuperAdmin>
           }
         />
 
         <Route
           path="/live-tracking"
           element={
-            <RequirePermission perm="student.read">
+            <RequirePermission perm="live_tracking.read">
               <SuspensedView>
                 <LiveTrackingPage />
               </SuspensedView>
@@ -1588,7 +1604,7 @@ const PrivateRoutes = () => {
         <Route
           path="/communication-logs"
           element={
-            <RequirePermission perm="permission.grant">
+            <RequirePermission perm="communication_log.read">
               <SuspensedView>
                 <CommunicationLogsPage />
               </SuspensedView>
@@ -1599,7 +1615,7 @@ const PrivateRoutes = () => {
         <Route
           path="/leads"
           element={
-            <RequirePermission perm="user.read">
+            <RequirePermission perm="lead.read">
               <SuspensedView>
                 <LeadsPage />
               </SuspensedView>
@@ -1610,7 +1626,7 @@ const PrivateRoutes = () => {
         <Route
           path="/old-data-mapping"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="firebase_data_mapping.read">
               <SuspensedView>
                 <OldDataMappingPage />
               </SuspensedView>
@@ -1621,7 +1637,7 @@ const PrivateRoutes = () => {
         <Route
           path="/score-debug"
           element={
-            <RequirePermission perm="assessment.create">
+            <RequirePermission perm="intermediary_scores.read">
               <SuspensedView>
                 <ScoreDebugPage />
               </SuspensedView>
@@ -1632,7 +1648,7 @@ const PrivateRoutes = () => {
         <Route
           path="/counsellor/dashboard"
           element={
-            <RequirePermission perm="counselling.read">
+            <RequirePermission perm="counselling.appointment.read">
               <SuspensedView>
                 <CounsellorDashboardPage />
               </SuspensedView>
@@ -1642,7 +1658,7 @@ const PrivateRoutes = () => {
         <Route
           path="/counsellor/availability"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="counselling.availability_template.update">
               <SuspensedView>
                 <AvailabilityManagerPage />
               </SuspensedView>
@@ -1652,7 +1668,7 @@ const PrivateRoutes = () => {
         <Route
           path="/counsellor/session-notes/:id"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="counselling.session_notes.update">
               <SuspensedView>
                 <SessionNotesPage />
               </SuspensedView>
@@ -1662,7 +1678,7 @@ const PrivateRoutes = () => {
         <Route
           path="/admin/counselling-dashboard"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="counselling.appointment.read">
               <SuspensedView>
                 <CounsellingDashboardPage />
               </SuspensedView>
@@ -1670,9 +1686,19 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path="/admin/counselling-sessions"
+          element={
+            <RequirePermission perm="counselling.appointment.read">
+              <SuspensedView>
+                <CounsellingSessionsPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        <Route
           path="/admin/counsellors"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="counsellor.read">
               <SuspensedView>
                 <CounsellorManagementPage />
               </SuspensedView>
@@ -1682,7 +1708,7 @@ const PrivateRoutes = () => {
         <Route
           path="/admin/counselling-students"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="counselling.student_management.read">
               <SuspensedView>
                 <ManageStudentsPage />
               </SuspensedView>
@@ -1692,7 +1718,7 @@ const PrivateRoutes = () => {
         <Route
           path="/admin/counselling-slots"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="counselling.slot.read">
               <SuspensedView>
                 <SlotManagementPage />
               </SuspensedView>
@@ -1702,7 +1728,7 @@ const PrivateRoutes = () => {
         <Route
           path="/admin/counselling-notifications"
           element={
-            <RequirePermission perm="user.write">
+            <RequirePermission perm="counselling.notification.read">
               <SuspensedView>
                 <CounsellingNotificationsPage />
               </SuspensedView>
@@ -1764,7 +1790,7 @@ const PrivateRoutes = () => {
         <Route
           path="/payment-tracking"
           element={
-            <RequirePermission perm="payment.refund">
+            <RequirePermission perm="payment.read">
               <SuspensedView>
                 <PaymentTrackingPage />
               </SuspensedView>
@@ -1774,7 +1800,7 @@ const PrivateRoutes = () => {
         <Route
           path="/promo-codes"
           element={
-            <RequirePermission perm="payment.refund">
+            <RequirePermission perm="promo_code.read">
               <SuspensedView>
                 <PromoCodePage />
               </SuspensedView>
@@ -1784,7 +1810,7 @@ const PrivateRoutes = () => {
         <Route
           path="/referral-codes"
           element={
-            <RequirePermission perm="referral_code.read.all">
+            <RequirePermission perm="referral_code.read">
               <SuspensedView>
                 <ReferralCodePage />
               </SuspensedView>
@@ -1794,7 +1820,7 @@ const PrivateRoutes = () => {
         <Route
           path="/b2c/pricing-tiers"
           element={
-            <RequirePermission perm="campaign.write">
+            <RequirePermission perm="pricing_tier.read">
               <SuspensedView>
                 <B2CPricingTierPage />
               </SuspensedView>
@@ -1814,7 +1840,7 @@ const PrivateRoutes = () => {
         <Route
           path="/b2c/campaigns/create"
           element={
-            <RequirePermission perm="campaign.write">
+            <RequirePermission perm="campaign.create">
               <SuspensedView>
                 <B2CCampaignEditPage />
               </SuspensedView>
@@ -1824,7 +1850,7 @@ const PrivateRoutes = () => {
         <Route
           path="/b2c/campaigns/edit/:id"
           element={
-            <RequirePermission perm="campaign.write">
+            <RequirePermission perm="campaign.update">
               <SuspensedView>
                 <B2CCampaignEditPage />
               </SuspensedView>
@@ -1834,7 +1860,7 @@ const PrivateRoutes = () => {
         <Route
           path="/b2c/tracker"
           element={
-            <RequirePermission perm="campaign.read">
+            <RequirePermission perm="tracker.read">
               <SuspensedView>
                 <B2CTrackerPage />
               </SuspensedView>

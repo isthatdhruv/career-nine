@@ -70,6 +70,10 @@ public class CounsellorReportNotificationService {
     @Autowired
     private EmailDispatchService emailDispatchService;
 
+    /** Optional so this still starts where the B2C entitlement stack is not wired. */
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.ReportReleaseGate reportReleaseGate;
+
     /**
      * The best link to this student's report for this assessment, or empty if none exists.
      *
@@ -142,12 +146,27 @@ public class CounsellorReportNotificationService {
      * school wants sent to the student. Neither says anything about what the counsellor
      * needs to do their job.
      *
+     * <p>The one setting that does silence this as well is the tier's counsellor-release flag,
+     * because that one is not about delivery preferences — it says the report is not to leave
+     * the platform until a counsellor sends it.
+     *
      * @param reportUrl the hosted report link (CDN/Spaces), used in preference to a lookup
      *                  because the caller has just produced it
      */
     public void notifyCounsellorsReportReady(Long userStudentId, Long assessmentId,
                                              String reportUrl, String pdfUrl) {
         if (userStudentId == null || assessmentId == null) return;
+        // On a counsellor-release tier nothing goes out on its own — not to the student, and
+        // not to the counsellor either. The counsellor reads the report from their own
+        // appointments list, where the Report button has always opened it, and decides when
+        // the student sees it. Mailing it here would put the report in an inbox the student
+        // may share, which is the whole thing the setting exists to prevent.
+        if (reportReleaseGate != null
+                && reportReleaseGate.isHeldForCounsellorRelease(userStudentId, assessmentId)) {
+            logger.info("Report ready but held for counsellor release — nothing mailed student={} assessment={}",
+                    userStudentId, assessmentId);
+            return;
+        }
         try {
             // The link is resolved first because both notifications below need it, and they are
             // independent of each other: a student can have a session booked with a counsellor

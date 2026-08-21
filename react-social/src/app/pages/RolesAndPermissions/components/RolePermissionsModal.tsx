@@ -4,6 +4,7 @@ import Select, { GroupBase } from "react-select";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 import { ActionIcon } from "../../../components/ActionIcon";
 import permissionRoutesManifest from "../../../permissions-manifest.json";
+import { nextUrlsAfterPermissionChange } from "../../../modules/auth/core/deriveUrls";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -165,6 +166,23 @@ const RolePermissionsModal = ({
     setSelectedCodes(next);
   };
 
+  // Save the role's permission set, then re-derive its URL whitelist from the
+  // perm→routes manifest so route access follows the permissions automatically.
+  // Custom paths (wildcards, one-off deep links — anything not in the manifest)
+  // stored on the role survive re-derivation; see deriveUrls.ts.
+  const savePermissionsAndSyncUrls = async (roleId: number, codes: string[]) => {
+    await axios.put(`${API_URL}/role/${roleId}/permissions`, { codes });
+    try {
+      const current = await axios.get<string[]>(`${API_URL}/role/${roleId}/urls`);
+      const urls = nextUrlsAfterPermissionChange(codes, current.data || [], routesMap);
+      await axios.put(`${API_URL}/role/${roleId}/urls`, { paths: urls });
+    } catch (e) {
+      // Permissions saved but URL sync failed — surface it rather than hiding
+      // it, or the role ends up holding perms for pages it cannot reach.
+      showErrorToast("Permissions saved, but URL auto-sync failed — check URL Access");
+    }
+  };
+
   const handleSave = async () => {
     if (targets.length === 0) return;
     setSaving(true);
@@ -172,9 +190,7 @@ const RolePermissionsModal = ({
 
     try {
       const results = await Promise.allSettled(
-        targets.map((t) =>
-          axios.put(`${API_URL}/role/${t.id}/permissions`, { codes })
-        )
+        targets.map((t) => savePermissionsAndSyncUrls(t.id, codes))
       );
       const failed = results.filter((r) => r.status === "rejected").length;
       if (failed === 0) {

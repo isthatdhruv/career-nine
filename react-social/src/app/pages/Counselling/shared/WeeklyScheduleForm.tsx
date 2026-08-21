@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createTemplate } from '../API/AvailabilityTemplateAPI'
 import { updateCounsellor } from '../API/CounsellorAPI'
 
@@ -201,11 +201,29 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
 }) => {
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, ...initial })
   const [saving, setSaving] = useState(false)
+  // Don't shout "invalid link" at a field the person hasn't reached yet.
+  const [linkTouched, setLinkTouched] = useState(false)
 
   // In-person sessions are delivered at *one* counsellor's office address, so the
   // mode is only offerable when a single counsellor is being scheduled.
   const multiple = counsellorIds.length > 1
   const mode: 'ONLINE' | 'OFFLINE' = multiple ? 'ONLINE' : form.mode
+
+  // The Teams link is mandatory for online slots: without one the slot is created
+  // but nobody can join it. A bulk selection is exempt — each counsellor carries
+  // their own link, so there is no single field to fill in here.
+  const needsMeetingLink = mode === 'ONLINE' && !multiple && !!onMeetingLinkChange
+  const meetingLinkValid = isTeamsLink(meetingLink)
+  const meetingLinkMissing = needsMeetingLink && !meetingLinkValid
+
+  // The link already on file, so the hint can tell a value prefilled from the
+  // profile apart from one being typed here. The parent loads the counsellor
+  // asynchronously, so this can't be read on first render — instead take whatever
+  // arrives while the field is still untouched, which is exactly the profile value.
+  const prefilledLink = useRef('')
+  useEffect(() => {
+    if (!linkTouched && meetingLink.trim()) prefilledLink.current = meetingLink.trim()
+  }, [meetingLink, linkTouched])
 
   /**
    * Warn — naming the dates — if this schedule would land on times the counsellor is
@@ -465,21 +483,40 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
         </div>
       </div>
 
-      {/* Teams link — every online session uses the counsellor's permanent room */}
-      {mode === 'ONLINE' && !multiple && onMeetingLinkChange && (
+      {/* Teams link — every online session uses the counsellor's permanent room.
+          Required: an online slot with no link is unbookable, so the field is
+          starred and the save button below stays disabled until it is valid. */}
+      {needsMeetingLink && (
         <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>Microsoft Teams meeting link</label>
+          <label style={labelStyle}>
+            Microsoft Teams meeting link <span style={{ color: '#DC2626' }}>*</span>
+          </label>
           <input
-            type='text'
+            type='url'
+            required
+            aria-required='true'
+            aria-invalid={linkTouched && !meetingLinkValid}
             value={meetingLink}
-            onChange={(e) => onMeetingLinkChange(e.target.value)}
+            onChange={(e) => { setLinkTouched(true); onMeetingLinkChange!(e.target.value) }}
+            onBlur={() => setLinkTouched(true)}
             placeholder='https://teams.microsoft.com/l/meetup-join/...'
-            style={inputStyle}
+            style={{
+              ...inputStyle,
+              borderColor: linkTouched && !meetingLinkValid ? '#DC2626' : (inputStyle as any).borderColor,
+            }}
           />
-          <div style={{ fontSize: 11, color: '#6B7A8D', marginTop: 4 }}>
-            In Teams: Calendar → New meeting → repeat with no end date → Save → copy the
-            "Join the meeting now" link.
-          </div>
+          {linkTouched && meetingLink.trim() && !meetingLinkValid ? (
+            <div style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>
+              That is not a Microsoft Teams link — it must start with
+              https://teams.microsoft.com/ or https://teams.live.com/.
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: '#6B7A8D', marginTop: 4 }}>
+              {prefilledLink.current && meetingLinkValid && meetingLink.trim() === prefilledLink.current
+                ? 'Filled in from your profile. Editing it here updates your profile when you save.'
+                : 'In Teams: Calendar → New meeting → repeat with no end date → Save → copy the "Join the meeting now" link. Saved to your profile when you save this schedule.'}
+            </div>
+          )}
         </div>
       )}
 
@@ -621,16 +658,30 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || meetingLinkMissing}
+          title={
+            meetingLinkMissing
+              ? meetingLink.trim()
+                ? 'The meeting link must be a Microsoft Teams link'
+                : 'Add the Microsoft Teams meeting link first — online slots are unbookable without it'
+              : undefined
+          }
           style={{
             padding: '9px 18px', fontSize: 13, fontWeight: 600,
             border: 'none', borderRadius: 8, color: '#fff',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            background: saving ? '#9CA3AF' : accentGradient,
+            cursor: saving || meetingLinkMissing ? 'not-allowed' : 'pointer',
+            background: saving || meetingLinkMissing ? '#9CA3AF' : accentGradient,
           }}
         >
           {saving ? 'Saving…' : submitLabel || 'Add Weekly Schedule'}
         </button>
+        {meetingLinkMissing && !saving && (
+          <span style={{ fontSize: 11.5, color: '#92400E' }}>
+            {meetingLink.trim()
+              ? 'Enter a valid Teams link to continue.'
+              : 'Add your Teams meeting link to continue.'}
+          </span>
+        )}
         {onCancel && (
           <button
             onClick={onCancel}

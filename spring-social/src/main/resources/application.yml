@@ -24,7 +24,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: production , report-worker
+    active: dev
   servlet:
     multipart:
       max-file-size: 1GB
@@ -356,7 +356,7 @@ spring:
     # production apply strictly in order and must keep the default.
     out-of-order: true
   datasource:
-    url: jdbc:mysql://localhost:3307/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
     username: root
     password: Career-qCsfeuECc3MW
     hikari:

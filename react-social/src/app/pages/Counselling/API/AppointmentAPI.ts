@@ -8,7 +8,12 @@ export function assignCounsellor(appointmentId: number, counsellorId: number, ad
 export function confirmAppointment(appointmentId: number, userId: number) { return axios.put(`${BASE}/confirm/${appointmentId}`, { userId }) }
 export function declineAppointment(appointmentId: number, userId: number, reason: string) { return axios.put(`${BASE}/decline/${appointmentId}`, { userId, reason }) }
 export function cancelAppointment(appointmentId: number, userId: number, reason: string) { return axios.put(`${BASE}/cancel/${appointmentId}`, { userId, reason }) }
-export function rescheduleAppointment(appointmentId: number, newSlotId: number, userId: number) { return axios.put(`${BASE}/reschedule/${appointmentId}`, { newSlotId, userId }) }
+/**
+ * Move a booking to another slot. `isAdmin` bypasses the student's one-reschedule
+ * cap without spending it — pass it only from admin screens, never from the
+ * student's own picker.
+ */
+export function rescheduleAppointment(appointmentId: number, newSlotId: number, userId: number, isAdmin = false) { return axios.put(`${BASE}/reschedule/${appointmentId}`, { newSlotId, userId, isAdmin }) }
 export function setMeetingLink(appointmentId: number, meetingLink: string) { return axios.put(`${BASE}/set-meeting-link/${appointmentId}`, { meetingLink }) }
 export function getStudentAppointments(studentId: number) { return axios.get(`${BASE}/by-student/${studentId}`) }
 export function getCounsellorAppointments(counsellorId: number) { return axios.get(`${BASE}/by-counsellor/${counsellorId}`) }
@@ -21,6 +26,10 @@ export function getAllAppointments() { return axios.get(`${BASE}/getAll`) }
 // Session check-in (counsellor enters the student's OTP at the start of the session).
 export function startSession(appointmentId: number) { return axios.post(`${BASE}/start/${appointmentId}`) }
 export function verifyCheckin(appointmentId: number, code: string) { return axios.post(`${BASE}/verify-checkin/${appointmentId}`, { code }) }
+// Sends the student their 4-digit check-in code by email + WhatsApp. Nothing is generated:
+// it is the same DOB-derived code already printed on their report, for the student who can't
+// find it. `channels` lists what actually accepted it — an empty array means nothing went out.
+export function sendCheckinCode(appointmentId: number) { return axios.post<{ channels: string[]; message: string }>(`${BASE}/send-checkin-code/${appointmentId}`) }
 
 // Counsellor dashboard headline summary (today's sessions + booked/free/upcoming counts).
 export function getDashboardSummary(counsellorId: number) { return axios.get(`${API_URL}/api/counsellor/${counsellorId}/dashboard-summary`) }
@@ -101,10 +110,20 @@ export function getCounsellorSessions(counsellorId: number) {
 
 /**
  * The report for a single session — for screens showing one session rather than a list
- * (the counsellor's session-notes page). `reportLink` is null until one has generated.
+ * (the counsellor's session-notes page, the Report button on their appointments list).
+ *
+ * `reportLink` is null until one has generated, and `status` says why:
+ *   ready        — the link is there
+ *   notGenerated — the student has finished, but no report has come through for them
+ *   notCompleted — the student has not finished the assessment yet
+ *   unavailable  — nothing names an assessment for this session, so there is no report to find
  */
+export type SessionReportStatus = 'ready' | 'notGenerated' | 'notCompleted' | 'unavailable'
+
 export function getSessionReportLink(appointmentId: number) {
-  return axios.get<{ reportLink: string | null }>(`${BASE}/${appointmentId}/report-link`)
+  return axios.get<{ reportLink: string | null; status: SessionReportStatus }>(
+    `${BASE}/${appointmentId}/report-link`
+  )
 }
 
 /** Who was written to, and whether the report link made it into the email. */
@@ -121,6 +140,24 @@ export function emailSessionToStudent(appointmentId: number) {
 /** Send the session details, with the report link, to the counsellor taking it. */
 export function emailSessionToCounsellor(appointmentId: number) {
   return axios.post<SessionMailResult>(`${BASE}/${appointmentId}/email/counsellor`)
+}
+
+/** Where the released report went, and when. */
+export interface ReportReleaseResult {
+  recipients: string[]
+  reportLink: string
+  releasedAt: string
+}
+
+/**
+ * The counsellor releases this student's report.
+ *
+ * On a tier with "counsellor release report" on, nothing was mailed when the assessment
+ * finished — this is what puts the report in the student's inbox. Re-sendable: pressing it
+ * again sends the same link again, for a student who lost the first mail.
+ */
+export function releaseReportToStudent(appointmentId: number) {
+  return axios.post<ReportReleaseResult>(`${BASE}/${appointmentId}/release-report`)
 }
 
 export function getAttendanceDisputes() { return axios.get(`${BASE}/disputes`) }

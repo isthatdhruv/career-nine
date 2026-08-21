@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { Spinner, Button, Form, Badge, Alert, Modal, Table } from "react-bootstrap";
+import { Spinner, Button, Form, Badge, Alert, Modal, Table, ProgressBar } from "react-bootstrap";
 import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
@@ -85,12 +85,26 @@ interface MappingRow {
 
 // ============ Answer resolvers ============
 
+/**
+ * A bubble the student did not fill.
+ *
+ * Scanned sheets write this as an empty cell, the literal "BLANK", or a zero —
+ * which can arrive as "0", "0.0" or "0.00" depending on how the cell is formatted.
+ */
+function isNotAttempted(value: string): boolean {
+  const val = String(value ?? "").trim();
+  if (val === "" || val === "-") return true;
+  if (val.toUpperCase() === "BLANK") return true;
+  const num = Number(val);
+  return !isNaN(num) && num === 0;
+}
+
 function resolveMultiQuestionAnswer(
   cellValue: string,
   options: OptionInfo[]
 ): { optionId: number | null; warning?: string } {
   const val = String(cellValue).trim();
-  if (val === "" || val === "BLANK" || val === "blank" || val === "0") return { optionId: null };
+  if (isNotAttempted(val)) return { optionId: null };
 
   if (val.startsWith("(") && val.includes(",")) {
     // Extract first answer from "(Yes,No)" or "(A,B)" format
@@ -128,6 +142,100 @@ function resolveMultiQuestionAnswer(
   }
 
   return { optionId: null, warning: `Unrecognized: "${val}"` };
+}
+
+/**
+ * Resolve a single cell holding SEVERAL selected options for one multi-select question.
+ *
+ * Accepts "A,C,E", "(A,C,E)", "1,3,5" and option texts ("Honesty, Respect"),
+ * separated by comma, semicolon, pipe, slash or newline.
+ */
+// ============ Display helpers ============
+
+/**
+ * Questionnaire sections are often already named "Section D: Personality:", which
+ * reads badly once the page adds its own section letter. Strip the redundant
+ * prefix and trailing punctuation so only the subject remains.
+ */
+function cleanSectionName(name: string | null | undefined): string {
+  return String(name || "")
+    .replace(/^\s*(insight\s+)?section\s*[A-Za-z0-9]*\s*[:\-–]\s*/i, "")
+    .replace(/[:\-–\s]+$/, "")
+    .trim() || "Untitled section";
+}
+
+/** Short, accurate description of the values a question column may hold. */
+function optionValueHint(options: OptionInfo[]): string {
+  if (!options || options.length === 0) return "";
+  const texts = options.map((o) => String(o.optionText || "").trim().toLowerCase());
+  if (options.length === 2 && texts.includes("yes") && texts.includes("no")) return "Yes / No";
+  if (options.length === 1) return "A";
+  return `A–${String.fromCharCode(64 + options.length)}`;
+}
+
+// ============ Sheet reading ============
+
+/**
+ * Turn a raw sheet (array of rows) into objects keyed by column name.
+ *
+ * Scanned OMR sheets often start with a title row (the school name) before the
+ * real header row, and end with hundreds of empty rows, so the header row is
+ * detected as the most-populated of the first few rows rather than assumed to be
+ * the first one. Blank rows are dropped and duplicate column names made unique.
+ */
+function buildRowsFromSheet(matrix: any[][]): { headers: string[]; rows: any[] } {
+  if (!matrix || matrix.length === 0) return { headers: [], rows: [] };
+
+  const filledCount = (row: any[]) =>
+    (row || []).filter((c) => String(c ?? "").trim() !== "").length;
+
+  /**
+   * Column names are distinct by nature, while an answer row repeats the same few
+   * values ("Yes", "No", "A", "BLANK") and a title row fills a single cell. Counting
+   * distinct values therefore separates the header row from both, and — unlike a
+   * plain "most cells filled" test — still finds it when a column is left unnamed.
+   */
+  const distinctValueCount = (row: any[]) => {
+    const seen = new Set<string>();
+    for (const cell of row || []) {
+      const val = String(cell ?? "").trim().toLowerCase();
+      if (val) seen.add(val);
+    }
+    return seen.size;
+  };
+
+  let headerIndex = 0;
+  let best = -1;
+  for (let i = 0; i < Math.min(matrix.length, 10); i++) {
+    const score = distinctValueCount(matrix[i]);
+    // Ties go to the earliest row, so a sheet that starts with its header keeps it
+    if (score > best) { best = score; headerIndex = i; }
+  }
+
+  const seen = new Map<string, number>();
+  const headerRow = matrix[headerIndex] || [];
+  const columnNames: string[] = [];
+  for (const cell of headerRow) {
+    const name = String(cell ?? "").trim();
+    if (!name) { columnNames.push(""); continue; }
+    const previous = seen.get(name) ?? 0;
+    seen.set(name, previous + 1);
+    columnNames.push(previous === 0 ? name : `${name}_${previous + 1}`);
+  }
+
+  const rows: any[] = [];
+  for (let r = headerIndex + 1; r < matrix.length; r++) {
+    const row = matrix[r];
+    if (!row || filledCount(row) === 0) continue;
+    const obj: Record<string, any> = {};
+    for (let c = 0; c < columnNames.length; c++) {
+      if (!columnNames[c]) continue;
+      obj[columnNames[c]] = row[c] ?? "";
+    }
+    rows.push(obj);
+  }
+
+  return { headers: columnNames.filter(Boolean), rows };
 }
 
 // ============ Header normalization for fuzzy matching ============
@@ -171,6 +279,121 @@ function matchMappingToHeaders(
   return result;
 }
 
+// ============ Auto-mapping from questionnaire headers ============
+
+/**
+ * Identity columns are not part of the questionnaire, so they are matched
+ * against a list of commonly used Excel header names instead.
+ */
+const IDENTITY_SYNONYMS: Record<string, string[]> = {
+  id_rollNumber: [
+    "rollnumber", "rollno", "roll", "careerninerollnumber", "careerninerollno",
+    "c9rollnumber", "studentrollnumber", "admissionnumber", "admissionno", "admno",
+    "enrollmentnumber", "enrollmentno",
+  ],
+  id_name: ["name", "studentname", "fullname", "studentfullname", "nameofstudent", "candidatename"],
+  id_mobile: ["mobile", "mobileno", "mobilenumber", "phone", "phoneno", "phonenumber", "contact", "contactno", "contactnumber"],
+  id_dob: ["dob", "dateofbirth", "birthdate", "birthday"],
+  id_class: ["class", "grade", "standard", "std", "classgrade", "classsection"],
+};
+
+/**
+ * Column names a scanned OMR sheet uses for a given section letter and position,
+ * e.g. section C question 7 → "SeC_C_7".
+ *
+ * Scanners in use write a literal "BLANK" in place of the digit 0, so question 10
+ * arrives as "SeC_C_1BLANK" — both spellings are offered. Matching itself ignores
+ * case, spaces, dashes and underscores, so "Sec C 7" and "SEC_C_7" match too.
+ */
+function omrHeaderCandidates(sectionLetter: string, position: number): string[] {
+  const candidates = [`SeC_${sectionLetter}_${position}`];
+  const withBlank = String(position).replace(/0/g, "BLANK");
+  if (withBlank !== String(position)) candidates.push(`SeC_${sectionLetter}_${withBlank}`);
+  return candidates;
+}
+
+/**
+ * Map Excel columns straight onto the questionnaire, without needing a saved mapping.
+ *
+ * Questions carry an `excelQuestionHeader` (set on the questionnaire) which is the
+ * column name the sheet is expected to use — that is the primary match. Merged-section
+ * options have no stored header, so they are matched on option text and on the
+ * conventional "<question header> <option>" / "<question header>_<sequence>" forms.
+ * Matching ignores case, spaces, dashes and underscores; a column is claimed once.
+ */
+function autoMapFromQuestionHeaders(
+  data: MappingData,
+  excelHeaders: string[]
+): { mapping: Record<string, string>; questionMatches: number } {
+  const normalizedMap = new Map<string, string>();
+  for (const h of excelHeaders) {
+    const n = normalizeHeader(h);
+    if (n && !normalizedMap.has(n)) normalizedMap.set(n, h);
+  }
+
+  const mapping: Record<string, string> = {};
+  const used = new Set<string>();
+
+  /** Claim the first candidate name that exists as an unused Excel column. */
+  const claim = (fieldKey: string, candidates: (string | null | undefined)[]): boolean => {
+    if (mapping[fieldKey]) return true;
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const actual = normalizedMap.get(normalizeHeader(candidate));
+      if (actual && !used.has(actual)) {
+        mapping[fieldKey] = actual;
+        used.add(actual);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const sortedSections = [...(data.sections || [])].sort(
+    (a, b) => parseInt(a.sectionOrder || "0") - parseInt(b.sectionOrder || "0")
+  );
+
+  // Questions and options first — the questionnaire is authoritative about its columns.
+  for (let si = 0; si < sortedSections.length; si++) {
+    const section = sortedSections[si];
+    // Sections are lettered in the same order the mapping table shows them
+    const sLetter = String.fromCharCode(65 + si);
+    const isMerged = section.questions.length === 1;
+
+    if (isMerged) {
+      const q = section.questions[0];
+      const qHeader = q.excelQuestionHeader;
+      for (const opt of q.options) {
+        claim(`opt_${q.questionnaireQuestionId}_${opt.optionId}`, [
+          ...omrHeaderCandidates(sLetter, opt.sequence),
+          opt.optionText,
+          qHeader && opt.optionText ? `${qHeader} ${opt.optionText}` : null,
+          qHeader ? `${qHeader}_${opt.sequence}` : null,
+          qHeader ? `${qHeader}${opt.sequence}` : null,
+        ]);
+      }
+    } else {
+      for (let qi = 0; qi < section.questions.length; qi++) {
+        const q = section.questions[qi];
+        claim(`q_${q.questionnaireQuestionId}`, [
+          ...omrHeaderCandidates(sLetter, qi + 1),
+          q.excelQuestionHeader,
+          q.questionText,
+        ]);
+      }
+    }
+  }
+
+  const questionMatches = Object.keys(mapping).length;
+
+  // Identity columns take whatever is left, so they can never steal a question column.
+  for (const [fieldKey, synonyms] of Object.entries(IDENTITY_SYNONYMS)) {
+    claim(fieldKey, synonyms);
+  }
+
+  return { mapping, questionMatches };
+}
+
 // ============ Component ============
 
 const OMRDataUploadPage = () => {
@@ -185,7 +408,10 @@ const OMRDataUploadPage = () => {
   const [loadingMapping, setLoadingMapping] = useState(false);
 
   // --- Upload mode ---
-  const [uploadMode, setUploadMode] = useState<"rollnumber" | "name">("rollnumber");
+  type UploadMode = "rollnumber" | "schoolrollnumber" | "name";
+  const [uploadMode, setUploadMode] = useState<UploadMode>("rollnumber");
+  /** Both roll-number modes use the same identity row; only the field matched differs. */
+  const matchesOnRollNumber = uploadMode === "rollnumber" || uploadMode === "schoolrollnumber";
 
   // --- Excel ---
   const [excelHeaders, setExcelHeaders] = useState<string[]>([]);
@@ -205,6 +431,10 @@ const OMRDataUploadPage = () => {
   const [savingMapping, setSavingMapping] = useState(false);
   const [loadingSavedMapping, setLoadingSavedMapping] = useState(false);
   const [autoLoadedMapping, setAutoLoadedMapping] = useState(false);
+  const [autoMappedCount, setAutoMappedCount] = useState(0);
+  const [showUnmappedFields, setShowUnmappedFields] = useState(false);
+  const [showAllErrors, setShowAllErrors] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState<{ current: number; total: number } | null>(null);
   const savedMappingJsonRef = useRef<Record<string, string> | null>(null);
 
   // --- Parsed data ---
@@ -230,7 +460,12 @@ const OMRDataUploadPage = () => {
     const rows: MappingRow[] = [];
 
     // Identity fields
-    rows.push({ key: "id_rollNumber", label: "Roll Number", sectionLabel: "Student Identity", type: "identity" });
+    rows.push({
+      key: "id_rollNumber",
+      label: uploadMode === "schoolrollnumber" ? "School Roll Number" : "Career Nine Roll Number",
+      sectionLabel: "Student Identity",
+      type: "identity",
+    });
     rows.push({ key: "id_name", label: "Name", sectionLabel: "Student Identity", type: "identity" });
     rows.push({ key: "id_mobile", label: "Mobile Number", sectionLabel: "Student Identity", type: "identity" });
     rows.push({ key: "id_dob", label: "Date of Birth", sectionLabel: "Student Identity", type: "identity" });
@@ -243,7 +478,7 @@ const OMRDataUploadPage = () => {
     for (let si = 0; si < sortedSections.length; si++) {
       const section = sortedSections[si];
       const sLetter = String.fromCharCode(65 + si);
-      const sectionLabel = `Section ${sLetter}: ${section.sectionName}`;
+      const sectionLabel = `Section ${sLetter} — ${cleanSectionName(section.sectionName)}`;
       const isMerged = section.questions.length === 1;
 
       if (isMerged) {
@@ -278,7 +513,7 @@ const OMRDataUploadPage = () => {
     }
 
     return rows;
-  }, [mappingData]);
+  }, [mappingData, uploadMode]);
 
   // Group mapping rows by section for display
   const groupedMappingRows = useMemo(() => {
@@ -293,12 +528,26 @@ const OMRDataUploadPage = () => {
   // Used headers (to prevent double-mapping)
   const usedHeaders = useMemo(() => new Set(Object.values(fieldToHeader)), [fieldToHeader]);
 
+  // A field the upload cannot proceed without stays visible even with no column
+  const isRequiredField = useCallback(
+    (row: MappingRow) =>
+      (row.key === "id_rollNumber" && matchesOnRollNumber) ||
+      (row.key === "id_name" && uploadMode === "name"),
+    [uploadMode, matchesOnRollNumber]
+  );
+
+  /** Fields with no column in the uploaded sheet — hidden unless asked for. */
+  const hiddenFieldCount = useMemo(
+    () => mappingRows.filter((r) => !fieldToHeader[r.key] && !isRequiredField(r)).length,
+    [mappingRows, fieldToHeader, isRequiredField]
+  );
+
   // Mapping validation
   const mappingValidation = useMemo(() => {
     const issues: string[] = [];
     const hasRollNumber = !!fieldToHeader["id_rollNumber"];
     const hasName = !!fieldToHeader["id_name"];
-    if (uploadMode === "rollnumber" && !hasRollNumber) issues.push("Map Roll Number (required)");
+    if (matchesOnRollNumber && !hasRollNumber) issues.push("Map Roll Number (required)");
     if (uploadMode === "name" && !hasName) issues.push("Map Name (required)");
 
     let mappedQuestionCount = 0;
@@ -309,7 +558,7 @@ const OMRDataUploadPage = () => {
     if (mappedQuestionCount === 0) issues.push("No question/option columns mapped");
 
     return { issues, canApply: issues.length === 0 && mappedQuestionCount > 0, mappedQuestionCount, totalMappable };
-  }, [fieldToHeader, mappingRows, uploadMode]);
+  }, [fieldToHeader, mappingRows, uploadMode, matchesOnRollNumber]);
 
   // ============ Data loading ============
 
@@ -454,7 +703,7 @@ const OMRDataUploadPage = () => {
     setExcelHeaders([]); setRawExcelData([]); setFieldToHeader({});
     setMappingApplied(false); setParsedStudents([]);
     setFileName(""); setSubmitResult(null); setExpandedSections(new Set());
-    setSavedMappingExists(false); setAutoLoadedMapping(false);
+    setSavedMappingExists(false); setAutoLoadedMapping(false); setAutoMappedCount(0); setShowUnmappedFields(false);
     savedMappingJsonRef.current = null;
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -462,6 +711,32 @@ const OMRDataUploadPage = () => {
   // ============ File Upload ============
 
   const [parsingFile, setParsingFile] = useState(false);
+
+  /**
+   * Map the uploaded sheet onto the questionnaire automatically.
+   * Anything the questionnaire headers could not resolve is filled in from a
+   * saved mapping, if one exists, so nothing that used to work is lost.
+   */
+  const applyAutoMapping = (headers: string[], data: MappingData) => {
+    const { mapping, questionMatches } = autoMapFromQuestionHeaders(data, headers);
+    const merged: Record<string, string> = { ...mapping };
+    const used = new Set(Object.values(merged));
+    let savedFilledGap = false;
+
+    if (savedMappingJsonRef.current) {
+      const matched = matchMappingToHeaders(savedMappingJsonRef.current, headers);
+      for (const [key, header] of Object.entries(matched)) {
+        if (merged[key] || used.has(header)) continue;
+        merged[key] = header;
+        used.add(header);
+        savedFilledGap = true;
+      }
+    }
+
+    setFieldToHeader(merged);
+    setAutoMappedCount(questionMatches);
+    setAutoLoadedMapping(savedFilledGap);
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -484,8 +759,8 @@ const OMRDataUploadPage = () => {
           var data = new Uint8Array(e.data);
           var workbook = XLSX.read(data, { type: "array", cellDates: true });
           var sheet = workbook.Sheets[workbook.SheetNames[0]];
-          var jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
-          self.postMessage(jsonData);
+          var matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false, blankrows: false });
+          self.postMessage(matrix);
         };
       `;
       const blob = new Blob([workerCode], { type: "application/javascript" });
@@ -493,28 +768,20 @@ const OMRDataUploadPage = () => {
       const worker = new Worker(workerUrl);
 
       worker.onmessage = (workerEvt) => {
-        const jsonData: any[] = workerEvt.data;
+        const matrix: any[][] = workerEvt.data;
         worker.terminate();
         URL.revokeObjectURL(workerUrl);
 
-        if (jsonData.length === 0) { showErrorToast("Excel file is empty."); setParsingFile(false); return; }
+        const { headers, rows } = buildRowsFromSheet(matrix);
+        if (rows.length === 0) { showErrorToast("Excel file has no data rows."); setParsingFile(false); return; }
 
-        const headers = Object.keys(jsonData[0]).filter(
-          (h) => h && !h.startsWith("__EMPTY")
-        );
         setExcelHeaders(headers);
-        setRawExcelData(jsonData);
+        setRawExcelData(rows);
         setAutoLoadedMapping(false);
         setParsingFile(false);
 
-        // Auto-apply saved mapping if available (normalized matching, skip identity fields)
-        if (savedMappingJsonRef.current) {
-          const matched = matchMappingToHeaders(savedMappingJsonRef.current, headers);
-          setFieldToHeader(matched);
-          setAutoLoadedMapping(Object.keys(matched).length > 0);
-        } else {
-          setFieldToHeader({});
-        }
+        // Map the sheet onto the questionnaire straight away
+        applyAutoMapping(headers, mappingData);
       };
 
       worker.onerror = () => {
@@ -523,25 +790,17 @@ const OMRDataUploadPage = () => {
         // Fallback: parse on main thread if worker fails
         const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array", cellDates: true });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+        const matrix: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false, blankrows: false });
 
-        if (jsonData.length === 0) { showErrorToast("Excel file is empty."); setParsingFile(false); return; }
+        const { headers, rows } = buildRowsFromSheet(matrix);
+        if (rows.length === 0) { showErrorToast("Excel file has no data rows."); setParsingFile(false); return; }
 
-        const headers = Object.keys(jsonData[0]).filter(
-          (h) => h && !h.startsWith("__EMPTY")
-        );
         setExcelHeaders(headers);
-        setRawExcelData(jsonData);
+        setRawExcelData(rows);
         setAutoLoadedMapping(false);
         setParsingFile(false);
 
-        if (savedMappingJsonRef.current) {
-          const matched = matchMappingToHeaders(savedMappingJsonRef.current, headers);
-          setFieldToHeader(matched);
-          setAutoLoadedMapping(Object.keys(matched).length > 0);
-        } else {
-          setFieldToHeader({});
-        }
+        applyAutoMapping(headers, mappingData);
       };
 
       worker.postMessage(arrayBuffer);
@@ -638,7 +897,8 @@ const OMRDataUploadPage = () => {
         if (meta.isMerged) {
           for (const om of meta.optMappings) {
             const val = String(row[om.header] ?? "").trim();
-            if (val === "1") {
+            // Selected bubble = 1 (or "1.0"); anything else, incl. BLANK, is unselected
+            if (!isNotAttempted(val) && Number(val) === 1) {
               answers.push({ questionnaireQuestionId: meta.questionnaireQuestionId, optionId: om.optionId });
             }
           }
@@ -744,12 +1004,23 @@ const OMRDataUploadPage = () => {
     [mappingData]
   );
 
+  /** Put the full error list on the clipboard — easier than reading it in the panel. */
+  const copyErrorsToClipboard = (errors: any[]) => {
+    const text = errors
+      .map((e) => `Row ${(e.rowIndex ?? 0) + 1} (${e.rollNumber || e.name}): ${e.error}`)
+      .join("\n");
+    navigator.clipboard?.writeText(text).then(
+      () => showSuccessToast(`${errors.length} errors copied`),
+      () => showErrorToast("Could not copy to clipboard")
+    );
+  };
+
   // ============ Submit ============
 
   const handleSubmit = async () => {
     if (!mappingData || parsedStudents.length === 0) return;
 
-    if (uploadMode === "rollnumber") {
+    if (matchesOnRollNumber) {
       const noRoll = parsedStudents.filter((s) => !s.rollNumber.trim());
       if (noRoll.length > 0) {
         showErrorToast(`${noRoll.length} row(s) have no roll number.`);
@@ -765,29 +1036,70 @@ const OMRDataUploadPage = () => {
 
     setSubmitting(true);
     setSubmitResult(null);
+    setShowAllErrors(false);
+    setSubmitProgress({ current: 0, total: parsedStudents.length });
+
+    // Sent in batches so the upload can report real progress instead of sitting on one
+    // long request — a class of 55 with 110 answers each is a lot to push in one go.
+    const BATCH_SIZE = 10;
+
+    const combinedErrors: any[] = [];
+    let processed = 0;
+    let matched = 0;
+    let created = 0;
+    let sawCreated = false;
 
     try {
-      let res;
-      if (uploadMode === "rollnumber") {
-        res = await bulkSubmitByRollNumber({
-          assessmentId: mappingData.assessmentId,
-          instituteId: Number(selectedInstitute),
-          students: parsedStudents.map((s) => ({ rollNumber: s.rollNumber.trim(), answers: s.answers })),
-        });
-      } else {
-        res = await bulkSubmitWithStudents({
-          assessmentId: mappingData.assessmentId,
-          instituteId: Number(selectedInstitute),
-          students: parsedStudents.map((s) => ({
-            name: s.name.trim(), dob: s.dob || undefined, phone: s.mobile || undefined, answers: s.answers,
-          })),
-        });
+      for (let offset = 0; offset < parsedStudents.length; offset += BATCH_SIZE) {
+        const batch = parsedStudents.slice(offset, offset + BATCH_SIZE);
+
+        let res;
+        if (matchesOnRollNumber) {
+          res = await bulkSubmitByRollNumber({
+            assessmentId: mappingData.assessmentId,
+            instituteId: Number(selectedInstitute),
+            matchBy: uploadMode === "schoolrollnumber" ? "school" : "careerNine",
+            students: batch.map((s) => ({ rollNumber: s.rollNumber.trim(), answers: s.answers })),
+          });
+        } else {
+          res = await bulkSubmitWithStudents({
+            assessmentId: mappingData.assessmentId,
+            instituteId: Number(selectedInstitute),
+            students: batch.map((s) => ({
+              name: s.name.trim(), dob: s.dob || undefined, phone: s.mobile || undefined, answers: s.answers,
+            })),
+          });
+        }
+
+        const data = res.data || {};
+        processed += Number(data.studentsProcessed || 0);
+        matched += Number(data.matchSummary?.matched || 0);
+        if (data.matchSummary?.created != null) {
+          sawCreated = true;
+          created += Number(data.matchSummary.created);
+        }
+        // The row index comes back relative to the batch — restore the sheet's own numbering
+        for (const err of data.errors || []) {
+          combinedErrors.push({ ...err, rowIndex: (err.rowIndex ?? 0) + offset });
+        }
+
+        setSubmitProgress({ current: offset + batch.length, total: parsedStudents.length });
       }
-      setSubmitResult(res.data);
+
+      const matchSummary: Record<string, number> = { matched, failed: combinedErrors.length };
+      if (sawCreated) matchSummary.created = created;
+
+      setSubmitResult({
+        status: "success",
+        studentsProcessed: processed,
+        errors: combinedErrors,
+        matchSummary,
+      });
     } catch (error: any) {
       setSubmitResult({ status: "error", message: error.response?.data || error.message });
     } finally {
       setSubmitting(false);
+      setSubmitProgress(null);
     }
   };
 
@@ -948,7 +1260,8 @@ const OMRDataUploadPage = () => {
               <div className="col-md-3">
                 <Form.Label>Upload Mode</Form.Label>
                 <Form.Select value={uploadMode} onChange={(e) => setUploadMode(e.target.value as any)}>
-                  <option value="rollnumber">Match by Roll Number</option>
+                  <option value="rollnumber">Match by Career Nine Roll Number</option>
+                  <option value="schoolrollnumber">Match by School Roll Number</option>
                   <option value="name">Match/Create by Name</option>
                 </Form.Select>
               </div>
@@ -979,8 +1292,13 @@ const OMRDataUploadPage = () => {
                 <Badge bg="info">
                   {mappingValidation.mappedQuestionCount}/{mappingValidation.totalMappable} mapped
                 </Badge>
+                {autoMappedCount > 0 && (
+                  <Badge bg="success" style={{ fontSize: "0.7rem" }}>
+                    {autoMappedCount} columns matched automatically
+                  </Badge>
+                )}
                 {autoLoadedMapping && (
-                  <Badge bg="success" style={{ fontSize: "0.7rem" }}>Saved mapping auto-applied</Badge>
+                  <Badge bg="secondary" style={{ fontSize: "0.7rem" }}>Saved mapping used for the rest</Badge>
                 )}
                 {savedMappingExists && (
                   <Button variant="outline-success" size="sm" onClick={handleLoadSavedMapping} disabled={loadingSavedMapping}>
@@ -994,6 +1312,11 @@ const OMRDataUploadPage = () => {
                 >
                   {savingMapping ? <><Spinner animation="border" size="sm" className="me-1" />Saving...</> : "Save Mapping"}
                 </Button>
+                {hiddenFieldCount > 0 && (
+                  <Button variant="outline-secondary" size="sm" onClick={() => setShowUnmappedFields((v) => !v)}>
+                    {showUnmappedFields ? "Hide unmatched fields" : `Show ${hiddenFieldCount} unmatched field${hiddenFieldCount === 1 ? "" : "s"}`}
+                  </Button>
+                )}
                 <Button variant="outline-secondary" size="sm" onClick={expandAllSections}>Expand All</Button>
                 <Button variant="outline-secondary" size="sm" onClick={collapseAllSections}>Collapse All</Button>
                 <Button variant="primary" size="sm" onClick={handleApplyMapping} disabled={!mappingValidation.canApply || parsing}>
@@ -1006,9 +1329,15 @@ const OMRDataUploadPage = () => {
             <div className="accordion" id="mappingAccordion">
               {Object.entries(groupedMappingRows).map(([sectionLabel, rows]) => {
                 const isExpanded = expandedSections.has(sectionLabel);
-                const mappedCount = rows.filter((r) => !!fieldToHeader[r.key]).length;
                 const isIdentity = rows[0]?.type === "identity";
                 const isMergedSection = rows[0]?.type === "option";
+
+                // Show only the fields the uploaded sheet actually has a column for
+                const visibleRows = showUnmappedFields
+                  ? rows
+                  : rows.filter((r) => !!fieldToHeader[r.key] || isRequiredField(r));
+                if (visibleRows.length === 0) return null;
+                const mappedCount = visibleRows.filter((r) => !!fieldToHeader[r.key]).length;
 
                 return (
                   <div className="accordion-item" key={sectionLabel}>
@@ -1022,19 +1351,25 @@ const OMRDataUploadPage = () => {
                         <div className="d-flex align-items-center gap-2 w-100 flex-wrap">
                           <strong>{sectionLabel}</strong>
                           <Badge bg="secondary" style={{ fontSize: "0.65rem" }}>
-                            {rows.length} fields
+                            {visibleRows.length} fields
                           </Badge>
-                          <Badge bg={mappedCount === rows.length ? "success" : mappedCount > 0 ? "warning" : "danger"} style={{ fontSize: "0.65rem" }}>
-                            {mappedCount}/{rows.length} mapped
+                          <Badge bg={mappedCount === visibleRows.length ? "success" : mappedCount > 0 ? "warning" : "danger"} style={{ fontSize: "0.65rem" }}>
+                            {mappedCount}/{visibleRows.length} mapped
                           </Badge>
                           {isMergedSection && (
-                            <Badge bg="warning" text="dark" style={{ fontSize: "0.6rem" }}>
-                              Merged: value 1 = selected, BLANK = not
+                            <Badge
+                              bg="warning" text="dark" style={{ fontSize: "0.6rem" }}
+                              title="One column per option. 1 = selected, blank = not selected."
+                            >
+                              1 = selected
                             </Badge>
                           )}
                           {!isIdentity && !isMergedSection && rows[0]?.type === "question" && (
-                            <Badge bg="info" style={{ fontSize: "0.6rem" }}>
-                              Cell value: A/B/C/D or Yes/No
+                            <Badge
+                              bg="info" style={{ fontSize: "0.6rem" }}
+                              title="One column per question. The cell holds the option chosen; 0 means not attempted."
+                            >
+                              {optionValueHint(rows[0]?.options || [])}
                             </Badge>
                           )}
                         </div>
@@ -1050,7 +1385,7 @@ const OMRDataUploadPage = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            {rows.map((row) => {
+                            {visibleRows.map((row) => {
                               const currentHeader = fieldToHeader[row.key] || "";
                               const isMapped = !!currentHeader;
 
@@ -1058,7 +1393,7 @@ const OMRDataUploadPage = () => {
                                 <tr key={row.key} className={isMapped ? "" : "text-muted"}>
                                   <td>
                                     {row.label}
-                                    {row.type === "identity" && row.key === "id_rollNumber" && uploadMode === "rollnumber" && (
+                                    {row.type === "identity" && row.key === "id_rollNumber" && matchesOnRollNumber && (
                                       <Badge bg="danger" className="ms-1" style={{ fontSize: "0.6rem" }}>Required</Badge>
                                     )}
                                     {row.type === "identity" && row.key === "id_name" && uploadMode === "name" && (
@@ -1133,7 +1468,7 @@ const OMRDataUploadPage = () => {
                   <tbody>
                     {parsedStudents.map((student, idx) => {
                       const hasWarnings = student.warnings.length > 0;
-                      const noIdentity = uploadMode === "rollnumber" ? !student.rollNumber.trim() : !student.name.trim();
+                      const noIdentity = matchesOnRollNumber ? !student.rollNumber.trim() : !student.name.trim();
                       return (
                         <tr key={idx} className={noIdentity ? "table-danger" : hasWarnings ? "table-warning" : ""}>
                           <td>{idx + 1}</td>
@@ -1180,8 +1515,21 @@ const OMRDataUploadPage = () => {
                     <>Submit All ({parsedStudents.length} students)</>
                   )}
                 </Button>
+                {submitting && submitProgress && (
+                  <div style={{ width: 250 }}>
+                    <ProgressBar
+                      now={Math.round((submitProgress.current / submitProgress.total) * 100)}
+                      label={`${submitProgress.current} / ${submitProgress.total}`}
+                      style={{ height: 22, borderRadius: 10 }}
+                    />
+                  </div>
+                )}
                 <small className="text-muted">
-                  Mode: <strong>{uploadMode === "rollnumber" ? "Match by Roll Number" : "Match/Create by Name"}</strong>
+                  Mode: <strong>{uploadMode === "rollnumber"
+                    ? "Match by Career Nine Roll Number"
+                    : uploadMode === "schoolrollnumber"
+                      ? "Match by School Roll Number"
+                      : "Match/Create by Name"}</strong>
                 </small>
 
                 {submitResult && submitResult.status === "success" && (
@@ -1201,14 +1549,29 @@ const OMRDataUploadPage = () => {
                     )}
                     {submitResult.errors?.length > 0 && (
                       <div className="mt-2">
-                        <strong>Errors:</strong>
-                        {submitResult.errors.slice(0, 10).map((err: any, i: number) => (
-                          <div key={i} className="text-danger">
-                            Row {(err.rowIndex ?? 0) + 1} ({err.rollNumber || err.name}): {err.error}
-                          </div>
-                        ))}
-                        {submitResult.errors.length > 10 && (
-                          <div className="text-muted">...and {submitResult.errors.length - 10} more</div>
+                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                          <strong>Errors ({submitResult.errors.length}):</strong>
+                          {submitResult.errors.length > 10 && (
+                            <Button variant="link" size="sm" className="p-0"
+                              onClick={() => setShowAllErrors((v) => !v)}>
+                              {showAllErrors ? "Show first 10" : `Show all ${submitResult.errors.length}`}
+                            </Button>
+                          )}
+                          <Button variant="link" size="sm" className="p-0"
+                            onClick={() => copyErrorsToClipboard(submitResult.errors)}>
+                            Copy
+                          </Button>
+                        </div>
+                        <div style={showAllErrors ? { maxHeight: 260, overflowY: "auto" } : undefined}>
+                          {(showAllErrors ? submitResult.errors : submitResult.errors.slice(0, 10))
+                            .map((err: any, i: number) => (
+                              <div key={i} className="text-danger">
+                                Row {(err.rowIndex ?? 0) + 1} ({err.rollNumber || err.name}): {err.error}
+                              </div>
+                            ))}
+                        </div>
+                        {!showAllErrors && submitResult.errors.length > 10 && (
+                          <div className="text-muted">…and {submitResult.errors.length - 10} more</div>
                         )}
                       </div>
                     )}
