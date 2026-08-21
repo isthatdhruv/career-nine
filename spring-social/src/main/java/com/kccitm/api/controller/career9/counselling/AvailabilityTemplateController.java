@@ -16,12 +16,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.model.career9.counselling.AvailabilityTemplate;
-import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.AvailabilityTemplateRepository;
-import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
+import com.kccitm.api.service.counselling.AvailabilityTemplateService;
 import com.kccitm.api.service.counselling.SlotMaterializationService;
 
 @RestController
@@ -37,7 +35,7 @@ public class AvailabilityTemplateController {
     private SlotMaterializationService materializationService;
 
     @Autowired
-    private CounsellingSlotRepository slotRepository;
+    private AvailabilityTemplateService templateService;
 
     // no scope arg: body is AvailabilityTemplate; counsellor-scoped admin
     @PreAuthorize("@auth.allows('counselling.availability_template.create')")
@@ -119,29 +117,60 @@ public class AvailabilityTemplateController {
     // no scope arg: delete by id; scope-filter narrows access
     @PreAuthorize("@auth.allows('counselling.availability_template.delete')")
     @DeleteMapping("/delete/{id}")
-    @Transactional
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        // Materialized slots hold an FK to the template, so the template row
-        // cannot be deleted while they exist. Unbooked future inventory goes
-        // with the template; anything booked/held stays and is just detached.
-        List<CounsellingSlot> slots = slotRepository.findByTemplateId(id);
-        int deleted = 0, detached = 0;
-        for (CounsellingSlot slot : slots) {
-            boolean unbooked = "AVAILABLE".equals(slot.getStatus())
-                    && !Boolean.TRUE.equals(slot.getIsBlocked());
-            if (unbooked) {
-                slotRepository.delete(slot);
-                deleted++;
-            } else {
-                slot.setTemplate(null);
-                slotRepository.save(slot);
-                detached++;
+    public ResponseEntity<?> delete(@PathVariable Long id) {
+        if (!templateRepository.existsById(id)) {
+            // Already gone — two people removing the same row, or a stale list. Nothing to
+            // do and nothing wrong, so don't fail the caller over it.
+            return ResponseEntity.ok().build();
+        }
+        AvailabilityTemplateService.DeletionResult result = templateService.deleteTemplate(id);
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("slotsDeleted", result.slotsDeleted);
+        body.put("slotsKept", result.slotsKept);
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Remove several weekly schedules in one go — what the "select all / remove selected"
+     * control on the availability screen calls. Each id is deleted in its own transaction
+     * so one bad row cannot take the rest of the batch down with it; the response says
+     * exactly which ones failed.
+     */
+    // no scope arg: delete by ids; scope-filter narrows access
+    @PreAuthorize("@auth.allows('counselling.availability_template.delete')")
+    @PostMapping("/delete-batch")
+    public ResponseEntity<?> deleteBatch(@RequestBody java.util.Map<String, List<Long>> payload) {
+        List<Long> ids = payload != null ? payload.get("ids") : null;
+        if (ids == null || ids.isEmpty()) {
+            return ResponseEntity.badRequest().body("No schedules selected.");
+        }
+        List<Long> deletedIds = new java.util.ArrayList<>();
+        List<Long> failedIds = new java.util.ArrayList<>();
+        int slotsDeleted = 0, slotsKept = 0;
+        for (Long id : ids) {
+            if (id == null) continue;
+            try {
+                if (!templateRepository.existsById(id)) {
+                    deletedIds.add(id);
+                    continue;
+                }
+                AvailabilityTemplateService.DeletionResult result = templateService.deleteTemplate(id);
+                slotsDeleted += result.slotsDeleted;
+                slotsKept += result.slotsKept;
+                deletedIds.add(id);
+            } catch (RuntimeException e) {
+                logger.error("Failed to delete availability template {} in batch", id, e);
+                failedIds.add(id);
             }
         }
-        logger.info("Deleting availability template {}: removed {} unbooked slots, detached {} booked/blocked slots",
-                id, deleted, detached);
-        templateRepository.deleteById(id);
-        return ResponseEntity.ok().build();
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("deletedIds", deletedIds);
+        body.put("failedIds", failedIds);
+        body.put("slotsDeleted", slotsDeleted);
+        body.put("slotsKept", slotsKept);
+        logger.info("Batch template delete: {} removed, {} failed, {} slots deleted, {} slots kept",
+                deletedIds.size(), failedIds.size(), slotsDeleted, slotsKept);
+        return ResponseEntity.ok(body);
     }
 
     // no scope arg: toggle by id; scope-filter narrows access

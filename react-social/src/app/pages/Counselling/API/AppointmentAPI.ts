@@ -14,6 +14,13 @@ export function cancelAppointment(appointmentId: number, userId: number, reason:
  * student's own picker.
  */
 export function rescheduleAppointment(appointmentId: number, newSlotId: number, userId: number, isAdmin = false) { return axios.put(`${BASE}/reschedule/${appointmentId}`, { newSlotId, userId, isAdmin }) }
+/**
+ * Park the session and email the student the no-login link to pick a new time themselves.
+ * Can be sent again on an already-parked session as a chaser.
+ */
+export function sendSelfRescheduleLink(appointmentId: number, reason?: string) {
+  return axios.post<{ recipient: string }>(`${BASE}/send-reschedule-link/${appointmentId}`, { reason })
+}
 export function setMeetingLink(appointmentId: number, meetingLink: string) { return axios.put(`${BASE}/set-meeting-link/${appointmentId}`, { meetingLink }) }
 export function getStudentAppointments(studentId: number) { return axios.get(`${BASE}/by-student/${studentId}`) }
 export function getCounsellorAppointments(counsellorId: number) { return axios.get(`${BASE}/by-counsellor/${counsellorId}`) }

@@ -531,6 +531,10 @@ const CounsellorManagementPage: React.FC = () => {
                 counsellorIds={Array.from(selectedIds)}
                 officeAddress={scheduleOfficeAddress}
                 onOfficeAddressChange={setScheduleOfficeAddress}
+                // So each group of existing schedules is headed by whose it is.
+                counsellorNames={Object.fromEntries(
+                  counsellors.map((c) => [getCounsellorId(c), c.name]),
+                )}
                 onChanged={() => loadCounsellors({ silent: true })}
               />
             )}

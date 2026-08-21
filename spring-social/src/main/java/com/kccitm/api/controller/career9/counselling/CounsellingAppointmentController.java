@@ -71,6 +71,9 @@ public class CounsellingAppointmentController {
     private CounsellorSessionAdminService counsellorSessionAdminService;
 
     @Autowired
+    private com.kccitm.api.service.counselling.CounsellingRescheduleService rescheduleService;
+
+    @Autowired
     private com.kccitm.api.service.counselling.CounsellorReportReleaseService reportReleaseService;
 
     // no scope arg: body is raw Map; student books appointment slot
@@ -193,6 +196,30 @@ public class CounsellingAppointmentController {
             return ResponseEntity.ok(appointment);
         } catch (RuntimeException e) {
             logger.warn("Reschedule failed for appointment {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    /**
+     * Hand the choice of time back to the student: parks the session and emails them the
+     * no-login reschedule link. The admin's alternative — picking a slot for the student — is
+     * a guess at what suits them; this lets them choose, and can be sent again as a chaser.
+     */
+    // no scope arg: appointment by id; admin action
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
+    @PostMapping("/send-reschedule-link/{id}")
+    public ResponseEntity<?> sendRescheduleLink(@PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> request) {
+        Object reason = request != null ? request.get("reason") : null;
+        try {
+            String recipient = rescheduleService.sendSelfRescheduleInvite(
+                    id, reason != null ? reason.toString() : null);
+            Map<String, Object> body = new java.util.HashMap<>();
+            body.put("recipient", recipient);
+            logger.info("Self-reschedule link sent for appointment {}", id);
+            return ResponseEntity.ok(body);
+        } catch (RuntimeException e) {
+            logger.warn("Sending self-reschedule link failed for appointment {}: {}", id, e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }

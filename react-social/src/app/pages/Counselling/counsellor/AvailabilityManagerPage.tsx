@@ -30,7 +30,9 @@ const AvailabilityManagerPage: React.FC = () => {
   const fetchAll = async (counsellorId: number) => {
     try {
       // Fetch recurring templates
-      const tmplRes = await axios.get(`${TEMPLATE_BASE}/by-counsellor/${counsellorId}`)
+      // The route is /get/by-counsellor — the short form 404s, which failed the whole
+      // fetch and left this page permanently on "Failed to load availability data".
+      const tmplRes = await axios.get(`${TEMPLATE_BASE}/get/by-counsellor/${counsellorId}`)
       const allTemplates = tmplRes.data || []
       setTemplates(allTemplates.filter((t: any) => !t.isManual && !t.isBlocked))
 
