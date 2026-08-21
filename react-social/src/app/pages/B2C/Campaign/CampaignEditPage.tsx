@@ -754,6 +754,7 @@ const TierConfigDrawer = ({ show, row, allTiers, onClose, onChanged }: TierConfi
                       {t.includesDashboard && <span className="badge bg-success me-1">Dash</span>}
                       {t.includesCounselling && <span className="badge bg-success me-1">Counsel</span>}
                       {t.includesLms && <span className="badge bg-success me-1">LMS</span>}
+                      {t.counsellorReleaseReport && <span className="badge bg-warning text-dark me-1">Counsellor releases report</span>}
                     </div>
                   </td>
                   <td>₹{(t.basePriceInr ?? 0).toLocaleString("en-IN")}</td>

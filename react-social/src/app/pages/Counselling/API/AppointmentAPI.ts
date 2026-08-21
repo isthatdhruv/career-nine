@@ -26,6 +26,10 @@ export function getAllAppointments() { return axios.get(`${BASE}/getAll`) }
 // Session check-in (counsellor enters the student's OTP at the start of the session).
 export function startSession(appointmentId: number) { return axios.post(`${BASE}/start/${appointmentId}`) }
 export function verifyCheckin(appointmentId: number, code: string) { return axios.post(`${BASE}/verify-checkin/${appointmentId}`, { code }) }
+// Sends the student their 4-digit check-in code by email + WhatsApp. Nothing is generated:
+// it is the same DOB-derived code already printed on their report, for the student who can't
+// find it. `channels` lists what actually accepted it — an empty array means nothing went out.
+export function sendCheckinCode(appointmentId: number) { return axios.post<{ channels: string[]; message: string }>(`${BASE}/send-checkin-code/${appointmentId}`) }
 
 // Counsellor dashboard headline summary (today's sessions + booked/free/upcoming counts).
 export function getDashboardSummary(counsellorId: number) { return axios.get(`${API_URL}/api/counsellor/${counsellorId}/dashboard-summary`) }
@@ -136,6 +140,24 @@ export function emailSessionToStudent(appointmentId: number) {
 /** Send the session details, with the report link, to the counsellor taking it. */
 export function emailSessionToCounsellor(appointmentId: number) {
   return axios.post<SessionMailResult>(`${BASE}/${appointmentId}/email/counsellor`)
+}
+
+/** Where the released report went, and when. */
+export interface ReportReleaseResult {
+  recipients: string[]
+  reportLink: string
+  releasedAt: string
+}
+
+/**
+ * The counsellor releases this student's report.
+ *
+ * On a tier with "counsellor release report" on, nothing was mailed when the assessment
+ * finished — this is what puts the report in the student's inbox. Re-sendable: pressing it
+ * again sends the same link again, for a student who lost the first mail.
+ */
+export function releaseReportToStudent(appointmentId: number) {
+  return axios.post<ReportReleaseResult>(`${BASE}/${appointmentId}/release-report`)
 }
 
 export function getAttendanceDisputes() { return axios.get(`${BASE}/disputes`) }

@@ -55,6 +55,17 @@ public class PricingTier implements Serializable {
     @Column(name = "includes_lms")
     private Boolean includesLms = false;
 
+    /**
+     * Hold the finished report until a counsellor releases it.
+     *
+     * <p>When on, neither the student's report link nor the counsellor's "report ready" notice
+     * goes out on completion. The report reaches the student only when the counsellor presses
+     * "Send report" on that session — the point being that the results are explained rather
+     * than simply delivered.
+     */
+    @Column(name = "counsellor_release_report")
+    private Boolean counsellorReleaseReport = false;
+
     @Column(name = "lms_validity_days")
     private Integer lmsValidityDays;
 
@@ -89,6 +100,7 @@ public class PricingTier implements Serializable {
         if (isActive == null) isActive = true;
         if (isDeleted == null) isDeleted = false;
         if (sortOrder == null) sortOrder = 0;
+        if (counsellorReleaseReport == null) counsellorReleaseReport = false;
     }
 
     @PreUpdate
@@ -116,6 +128,8 @@ public class PricingTier implements Serializable {
     public void setIncludesCounselling(Boolean v) { this.includesCounselling = v; }
     public Integer getCounsellingSessionCount() { return counsellingSessionCount; }
     public void setCounsellingSessionCount(Integer v) { this.counsellingSessionCount = v; }
+    public Boolean getCounsellorReleaseReport() { return counsellorReleaseReport; }
+    public void setCounsellorReleaseReport(Boolean v) { this.counsellorReleaseReport = v; }
     public Boolean getIncludesLms() { return includesLms; }
     public void setIncludesLms(Boolean v) { this.includesLms = v; }
     public Integer getLmsValidityDays() { return lmsValidityDays; }
