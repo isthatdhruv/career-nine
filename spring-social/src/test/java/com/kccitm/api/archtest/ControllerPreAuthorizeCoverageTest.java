@@ -98,6 +98,24 @@ public class ControllerPreAuthorizeCoverageTest {
             "com.kccitm.api.controller.AssessmentSessionController#issueAssessmentSession",
             // refresh — consumes the opaque cn_rt cookie; MUST work with an EXPIRED access token (Phase 18-02).
             "com.kccitm.api.controller.AuthController#refresh",
+            // --- anonymous /public/** funnels (all inside SecurityConfig.PUBLIC_PATHS permitAll) ---
+            // B2B student-invite + pay-later booking + counselling-options lookups: token/entitlement-id
+            // gated in-controller, consumed by students who have no session yet.
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getCounsellingOptions",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getCounsellingOptionsByStudent",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getInviteInfo",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getPayLaterSlots",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#payLaterBook",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#registerInvite",
+            // B2C campaign landing-page counselling funnel (/campaign/public/**).
+            "com.kccitm.api.controller.career9.b2c.CampaignPublicController#forwardCounsellingRequest",
+            "com.kccitm.api.controller.career9.b2c.CampaignPublicController#studentCounselling",
+            // Counsellor-absence self-reschedule (/counselling/public/reschedule/**) — gated by the
+            // 30-day counselling_reschedule JWT validated manually in-controller.
+            "com.kccitm.api.controller.career9.counselling.CounsellingPublicRescheduleController#confirm",
+            "com.kccitm.api.controller.career9.counselling.CounsellingPublicRescheduleController#context",
+            // Referral-code public validation (/referral-codes/public/validate) — mirrors promo-code.
+            "com.kccitm.api.controller.career9.ReferralCodeController#validate",
             // me — anonymous-friendly: returns 401 when no principal is bound rather than 403 via PreAuthorize.
             "com.kccitm.api.controller.AuthController#me",
             // Razorpay webhook receiver — authenticated via HMAC signature, not user JWT.

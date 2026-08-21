@@ -33,4 +33,11 @@ public interface UserRoleScopeRepository extends JpaRepository<UserRoleScope, Lo
     @Query("SELECT urs FROM UserRoleScope urs "
          + "WHERE urs.userRoleGroupMapping.user = :userId")
     List<UserRoleScope> findAllByUserId(@Param("userId") Long userId);
+
+    /**
+     * Replace-set support for the scope-assignment endpoint: wipe a mapping's
+     * scope rows before re-inserting the new set.
+     */
+    @javax.transaction.Transactional
+    void deleteAllByUserRoleGroupMapping_Id(Integer userRoleGroupMappingId);
 }

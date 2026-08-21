@@ -3,6 +3,7 @@ import axios from "axios";
 import PageHeader from "../../components/PageHeader";
 import RolesPanel from "./components/RolesPanel";
 import RoleGroupsPanel from "./components/RoleGroupsPanel";
+import GroupBuilderWizard from "./components/GroupBuilderWizard";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 
 export interface RoleItem {
@@ -41,6 +42,7 @@ const RolesAndPermissionsPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshReport, setRefreshReport] = useState<RefreshReport | null>(null);
   const [codeToEndpoints, setCodeToEndpoints] = useState<Record<string, string[]>>({});
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const fetchRoles = useCallback(async () => {
     setLoadingRoles(true);
@@ -120,6 +122,12 @@ const RolesAndPermissionsPage = () => {
         }
         actions={[
           {
+            label: "New Group (guided)",
+            iconClass: "bi-magic",
+            onClick: () => setWizardOpen(true),
+            variant: "primary",
+          },
+          {
             label: refreshing ? "Refreshing..." : "Refresh Permissions",
             iconClass: "bi-arrow-clockwise",
             onClick: handleRefresh,
@@ -127,6 +135,15 @@ const RolesAndPermissionsPage = () => {
             disabled: refreshing,
           },
         ]}
+      />
+
+      <GroupBuilderWizard
+        show={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        roles={roles}
+        roleGroups={roleGroups}
+        onDataChanged={() => { fetchRoles(); fetchRoleGroups(); }}
+        codeToEndpoints={codeToEndpoints}
       />
 
       {/* Roles Panel */}

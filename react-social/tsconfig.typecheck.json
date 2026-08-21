@@ -1,0 +1,12 @@
+{
+  // CLI type-checking config. The main tsconfig.json pins ignoreDeprecations
+  // to "6.0" for the IDE's TypeScript 6.x; that value is INVALID for the 5.x
+  // compiler used on the command line (error TS5103), which silently aborts
+  // before checking a single source file — `tsc --noEmit` then reports only
+  // the config error and looks deceptively green. Run checks with:
+  //   npm run typecheck
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "5.0"
+  }
+}

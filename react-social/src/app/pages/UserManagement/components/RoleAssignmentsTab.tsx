@@ -3,6 +3,8 @@ import axios from "axios";
 import Select from "react-select";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 import { ActionIcon } from "../../../components/ActionIcon";
+import ScopeRowsEditor from "../../RolesAndPermissions/components/ScopeRowsEditor";
+import type { Scope } from "../../../modules/auth/core/_models";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -13,6 +15,97 @@ interface UserMapping {
   isActive?: boolean | null;
   userRoleGroupMappings: { id: number; roleGroup: { id: number; name: string } }[];
 }
+
+interface AssignmentRow {
+  mappingId: number;
+  roleGroupId: number;
+  roleGroupName: string;
+  scopes: Scope[];
+}
+
+/**
+ * Expanded panel under a user row: each role-group assignment with its ABAC
+ * scope rows, editable in place. Loads from
+ * GET /userrolegroupmapping/user/{userId}; saves per assignment via
+ * PUT /userrolegroupmapping/{mappingId}/scopes.
+ */
+const UserAssignmentsPanel = ({ userId }: { userId: number }) => {
+  const [rows, setRows] = useState<AssignmentRow[] | null>(null);
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  const load = () => {
+    axios
+      .get(`${API_URL}/userrolegroupmapping/user/${userId}`)
+      .then((res) => setRows(res.data || []))
+      .catch(() => {
+        setRows([]);
+        showErrorToast("Failed to load scope assignments");
+      });
+  };
+  useEffect(load, [userId]);
+
+  const saveScopes = async (row: AssignmentRow) => {
+    setSavingId(row.mappingId);
+    try {
+      await axios.put(`${API_URL}/userrolegroupmapping/${row.mappingId}/scopes`, {
+        scopes: row.scopes,
+      });
+      showSuccessToast(`Scopes saved for ${row.roleGroupName}`);
+    } catch (e: any) {
+      showErrorToast(e?.response?.data?.message || "Failed to save scopes");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  if (rows === null) {
+    return (
+      <div className="py-2 text-muted" style={{ fontSize: "0.8rem" }}>
+        <span className="spinner-border spinner-border-sm me-2" />Loading scopes...
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="py-2 text-muted" style={{ fontSize: "0.8rem" }}>
+        No active role-group assignments.
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: "8px 0 4px 44px" }}>
+      {rows.map((row) => (
+        <div key={row.mappingId} style={{ marginBottom: 10 }}>
+          <div className="d-flex align-items-center gap-2 mb-1">
+            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#4361ee" }}>
+              {row.roleGroupName}
+            </span>
+            <button
+              className="btn btn-sm btn-light"
+              onClick={() => saveScopes(row)}
+              disabled={savingId === row.mappingId}
+              style={{ borderRadius: 6, fontSize: "0.72rem", padding: "2px 10px" }}
+            >
+              {savingId === row.mappingId ? (
+                <span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }} />
+              ) : (
+                "Save scopes"
+              )}
+            </button>
+          </div>
+          <ScopeRowsEditor
+            value={row.scopes}
+            onChange={(scopes) =>
+              setRows((prev) =>
+                (prev || []).map((r) => (r.mappingId === row.mappingId ? { ...r, scopes } : r))
+              )
+            }
+          />
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const RoleAssignmentsTab = () => {
   const [users, setUsers] = useState<UserMapping[]>([]);
@@ -26,6 +119,7 @@ const RoleAssignmentsTab = () => {
   const [newUser, setNewUser] = useState<any>(null);
   const [newGroups, setNewGroups] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -85,10 +179,17 @@ const RoleAssignmentsTab = () => {
     }
   };
 
-  const handleDeleteMapping = async (userId: number) => {
+  const handleDeleteMapping = async (user: UserMapping) => {
     if (!window.confirm("Remove all role group assignments for this user?")) return;
     try {
-      await axios.get(`${API_URL}/userrolegroupmapping/delete/${userId}`);
+      // The delete endpoint takes a MAPPING id. The previous code passed the
+      // USER id here, which soft-deleted whatever unrelated mapping happened
+      // to share that number.
+      await Promise.all(
+        (user.userRoleGroupMappings || []).map((m) =>
+          axios.get(`${API_URL}/userrolegroupmapping/delete/${m.id}`)
+        )
+      );
       fetchData();
     } catch (e) {
       showErrorToast("Failed to remove assignment");
@@ -137,11 +238,12 @@ const RoleAssignmentsTab = () => {
         <div className="d-flex flex-column gap-2 mb-3">
           {filtered.map((user) => {
             const active = user.isActive === true;
+            const expanded = expandedUserId === user.id;
             return (
+            <div key={user.id} style={{ borderRadius: "8px", background: "#fafbfc", border: "1px solid #f0f0f0" }}>
             <div
-              key={user.id}
               className="d-flex align-items-center gap-3"
-              style={{ padding: "10px 12px", borderRadius: "8px", background: "#fafbfc", border: "1px solid #f0f0f0" }}
+              style={{ padding: "10px 12px" }}
             >
               <div style={{
                 width: "32px", height: "32px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
@@ -191,10 +293,22 @@ const RoleAssignmentsTab = () => {
                   : <i className={`bi bi-${active ? "pause-fill" : "play-fill"}`} style={{ fontSize: "0.7rem" }}></i>
                 }
               </button>
+              {/* Scopes (expand) */}
+              <button
+                className="btn btn-sm"
+                onClick={() => setExpandedUserId(expanded ? null : user.id)}
+                title="Edit ABAC scopes per assignment"
+                style={{
+                  width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "rgba(67, 97, 238, 0.08)", color: "#4361ee", border: "1px solid rgba(67, 97, 238, 0.2)", borderRadius: "6px",
+                }}
+              >
+                <i className={`bi bi-${expanded ? "chevron-up" : "geo-alt"}`} style={{ fontSize: "0.7rem" }}></i>
+              </button>
               {/* Delete */}
               <button
                 className="btn btn-sm"
-                onClick={() => handleDeleteMapping(user.id)}
+                onClick={() => handleDeleteMapping(user)}
                 title="Remove assignments"
                 style={{
                   width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center",
@@ -203,6 +317,12 @@ const RoleAssignmentsTab = () => {
               >
                 <ActionIcon type="delete" size="sm" />
               </button>
+            </div>
+            {expanded && (
+              <div style={{ borderTop: "1px solid #f0f0f0", padding: "4px 12px 8px" }}>
+                <UserAssignmentsPanel userId={user.id} />
+              </div>
+            )}
             </div>
             );
           })}
