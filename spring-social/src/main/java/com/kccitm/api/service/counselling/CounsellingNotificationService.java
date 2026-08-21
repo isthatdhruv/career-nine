@@ -813,13 +813,19 @@ public class CounsellingNotificationService {
             // One email reaches the student, the parent and the counsellor, so it names the
             // student — the counsellor's copy is useless without it, and the other two are
             // not confused by seeing it.
+            // One mail carries everything the student gets at booking: the confirmation,
+            // the calendar invite, and the report guidance the Manage Sessions summary
+            // used to send separately — two near-identical mails taught students to skim.
             String body = "Dear " + studentName + ",\n\n"
                     + "Your counselling session has been confirmed.\n\n"
                     + "Session Details:\n"
                     + sessionDetailsBlock(appointment, true, false)
                     + "\n"
+                    + reportGuidance(appointment, false)
                     + (gcal != null ? "Add to Google Calendar: " + gcal + "\n\n" : "")
                     + "A calendar invite is also attached so you can add this to any calendar.\n\n"
+                    + "If any of the above is incorrect, please write to us before the session so we "
+                    + "can put it right.\n\n"
                     + "Regards,\nCareer-Nine Team";
 
             // Recipients: the student, the parent/guardian if one was given, and the
@@ -842,29 +848,73 @@ public class CounsellingNotificationService {
                         appointment.getId());
             }
 
-            // Email with .ics attachment (falls back to plain text if
-            // the Gmail sender or the invite isn't available).
+            // This is the only mail the student gets at booking, so it must actually go out.
+            // Up to three rounds with a pause between them: the full message (.ics attached)
+            // to everyone first, then a plain-text send per address that has not been accepted
+            // yet — and unlike before, "accepted" means the dispatcher REPORTED success, not
+            // merely that the call returned. The rounds stop once the student's address is
+            // accepted (or any address, when the student has none on record — the parent's
+            // copy is then the only copy there is). Per-address tracking means a retry never
+            // re-mails an address that already got its copy.
             byte[] ics = icsService.buildInvite(appointment);
-            boolean emailed = false;
-            if (!emailTo.isEmpty() && ics != null) {
-                try {
-                    SmtpEmailRequest req = new SmtpEmailRequest();
-                    req.setTo(emailTo);
-                    req.setSubject(subject);
-                    req.setHtmlContent("<pre style=\"font-family:inherit\">" + body + "</pre>");
-                    req.setFromName("Career-9");
-                    req.setFromEmail("notifications@career-9.net");
-                    req.setAttachments(Arrays.asList(
-                            new SmtpEmailRequest.EmailAttachment(
-                                    icsService.fileName(appointment), ics, "text/calendar")));
-                    emailDispatchService.send(EmailType.COUNSELLING_BOOKING, req, null);
-                    emailed = true;
-                } catch (Exception e) {
-                    logger.warn("ICS confirmation email failed for appointment {}: {}", appointment.getId(), e.getMessage());
-                }
+            String mustReach = (studentEmail != null && !studentEmail.isEmpty())
+                    ? studentEmail : (emailTo.isEmpty() ? null : emailTo.get(0));
+            java.util.Set<String> acceptedAddrs = new java.util.LinkedHashSet<>();
+            if (emailTo.isEmpty()) {
+                logger.error("Booking confirmation for appointment {} has no email recipients at all "
+                        + "— no student, parent or counsellor address on record", appointment.getId());
             }
-            if (!emailed) {
-                for (String addr : emailTo) sendEmail(addr, subject, body); // plain fallback, no attachment
+            boolean delivered = emailTo.isEmpty();
+            for (int round = 1; !delivered && round <= 3; round++) {
+                if (round > 1) {
+                    try {
+                        Thread.sleep(round == 2 ? 5_000 : 15_000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+                // Full message with the calendar invite — only while nobody has a copy yet,
+                // so a partial fallback success is never followed by a duplicate to everyone.
+                if (acceptedAddrs.isEmpty() && ics != null) {
+                    try {
+                        SmtpEmailRequest req = new SmtpEmailRequest();
+                        req.setTo(emailTo);
+                        req.setSubject(subject);
+                        req.setHtmlContent("<pre style=\"font-family:inherit\">" + body + "</pre>");
+                        req.setFromName("Career-9");
+                        req.setFromEmail("notifications@career-9.net");
+                        req.setAttachments(Arrays.asList(
+                                new SmtpEmailRequest.EmailAttachment(
+                                        icsService.fileName(appointment), ics, "text/calendar")));
+                        EmailSendResult full = emailDispatchService.send(
+                                EmailType.COUNSELLING_BOOKING, req, null);
+                        if (full != null && full.isSuccess()) acceptedAddrs.addAll(emailTo);
+                    } catch (Exception e) {
+                        logger.warn("ICS confirmation email failed for appointment {} (round {}): {}",
+                                appointment.getId(), round, e.getMessage());
+                    }
+                }
+                // Plain-text fallback, one send per address still without a copy. No calendar
+                // attachment here, but the Google Calendar link in the body survives.
+                for (String addr : emailTo) {
+                    if (acceptedAddrs.contains(addr)) continue;
+                    try {
+                        EmailSendResult r = emailDispatchService.sendText(
+                                EmailType.COUNSELLING_NOTIFICATION, addr, subject, body);
+                        if (r != null && r.isSuccess()) acceptedAddrs.add(addr);
+                    } catch (Exception e) {
+                        logger.warn("Plain confirmation email to {} failed for appointment {} (round {}): {}",
+                                addr, appointment.getId(), round, e.getMessage());
+                    }
+                }
+                delivered = mustReach == null ? !acceptedAddrs.isEmpty()
+                                              : acceptedAddrs.contains(mustReach);
+            }
+            if (!delivered && !emailTo.isEmpty()) {
+                logger.error("Booking confirmation could NOT be emailed to the student for appointment {} "
+                        + "after 3 rounds (accepted so far: {}) — re-send it from Manage Sessions",
+                        appointment.getId(), acceptedAddrs);
             }
 
             // Best-effort WhatsApp confirmation in addition to the email — to the
