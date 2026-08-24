@@ -92,7 +92,7 @@ const CounsellorDashboardLogin: React.FC = () => {
             }}
           >
             <img
-              src={toAbsoluteUrl('/media/logos/kcc.jpg')}
+              src={toAbsoluteUrl('/media/logos/kcc_logo.webp')}
               alt='Career-9'
               style={{ height: 48, display: 'block' }}
             />

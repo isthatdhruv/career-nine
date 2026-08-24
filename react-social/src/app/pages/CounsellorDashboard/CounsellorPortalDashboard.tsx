@@ -44,7 +44,7 @@ const CounsellorPortalDashboard: React.FC = () => {
   if (loading) {
     return (
       <div className='cp-loading'>
-        <img src={toAbsoluteUrl('/media/logos/kcc.jpg')} alt='Career-9' />
+        <img src={toAbsoluteUrl('/media/logos/kcc_logo.webp')} alt='Career-9' />
         <span className='cp-loading-text'>Loading ...</span>
       </div>
     )

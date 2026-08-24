@@ -105,7 +105,7 @@ const StudentSsoLanding: React.FC = () => {
     >
       <div style={{ textAlign: 'center' }}>
         <img
-          src={toAbsoluteUrl('/media/logos/kcc.jpg')}
+          src={toAbsoluteUrl('/media/logos/kcc_logo.webp')}
           alt='Career-9'
           style={{ height: 32, marginBottom: 16 }}
         />
