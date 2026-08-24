@@ -11,6 +11,8 @@ interface Template {
   startTime: string
   endTime: string
   defaultSlotDuration?: number
+  /** Gap between consecutive generated slots, minutes. Null/0 = back-to-back. */
+  breakMinutes?: number
   mode?: string
   startDate?: string
   endDate?: string
@@ -94,6 +96,13 @@ const CounsellorWeeklySchedulePanel: React.FC<Props> = ({
   // True once an edit has dropped the original template — so a failure after that
   // point can say the old schedule is gone instead of implying nothing changed.
   const oldRemovedRef = useRef(false)
+  // The edit form lives below the (possibly long) schedule list — without scrolling
+  // it into view, pressing Edit looks like it did nothing.
+  const formRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (editing) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [editing])
 
   /**
    * Load what every selected counsellor already has. The admin can have several picked at
@@ -228,15 +237,27 @@ const CounsellorWeeklySchedulePanel: React.FC<Props> = ({
   /**
    * Rows grouped by counsellor, in the order the parent selected them. One group for the
    * counsellor's own screen (rendered without a heading), one per counsellor for the admin
-   * managing several at once.
+   * managing several at once. Within a group the rows run Monday → Sunday, mornings
+   * first — the server returns them in creation order, which reads as random.
    */
   const groups = React.useMemo(() => {
+    const dayRank = (d?: string) => {
+      const i = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
+        .indexOf(String(d || '').toUpperCase())
+      return i === -1 ? 7 : i
+    }
     const byCounsellor = new Map<number, Template[]>()
     for (const id of counsellorIds) byCounsellor.set(id, [])
     for (const t of templates) {
       const arr = byCounsellor.get(t.counsellorId)
       if (arr) arr.push(t)
       else byCounsellor.set(t.counsellorId, [t])
+    }
+    for (const list of byCounsellor.values()) {
+      list.sort((a, b) =>
+        dayRank(a.dayOfWeek) - dayRank(b.dayOfWeek)
+        || String(a.startTime || '').localeCompare(String(b.startTime || ''))
+        || String(a.endTime || '').localeCompare(String(b.endTime || '')))
     }
     return Array.from(byCounsellor.entries()).filter(([, list]) => list.length > 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -392,7 +413,9 @@ const CounsellorWeeklySchedulePanel: React.FC<Props> = ({
                     <span style={{ fontSize: 13, fontWeight: 600, color: isDead ? '#64748B' : '#1E293B' }}>
                       {t.dayOfWeek} &middot; {hhmm(t.startTime)} – {hhmm(t.endTime)}
                       <span style={{ fontSize: 11, color: '#64748B', fontWeight: 500 }}>
-                        {' '}({t.defaultSlotDuration || 30}-min slots{t.endDate ? `, until ${shortDate(t.endDate)}` : ''})
+                        {' '}({t.defaultSlotDuration || 30}-min slots
+                        {t.breakMinutes ? `, ${t.breakMinutes}-min break between` : ''}
+                        {t.endDate ? `, until ${shortDate(t.endDate)}` : ''})
                       </span>
                       {canCountSlots && (
                         <span style={{
@@ -450,9 +473,11 @@ const CounsellorWeeklySchedulePanel: React.FC<Props> = ({
         </p>
       )}
 
+      <div ref={formRef}>
       {editing && (
         <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 10px' }}>
-          Editing the {editing.dayOfWeek} schedule — change the values below and save.
+          Editing the {editing.dayOfWeek} {hhmm(editing.startTime)}–{hhmm(editing.endTime)} schedule
+          — change the values below and save.
         </p>
       )}
 
@@ -474,6 +499,7 @@ const CounsellorWeeklySchedulePanel: React.FC<Props> = ({
           startTime: hhmm(editing.startTime),
           endTime: hhmm(editing.endTime),
           slotDurationMinutes: editing.defaultSlotDuration || 30,
+          slotGapMinutes: editing.breakMinutes || 0,
           mode: editing.mode === 'OFFLINE' ? 'OFFLINE' : 'ONLINE',
           startDate: editing.startDate ? String(editing.startDate).slice(0, 10) : '',
           endDate: editing.endDate ? String(editing.endDate).slice(0, 10) : '',
@@ -487,6 +513,7 @@ const CounsellorWeeklySchedulePanel: React.FC<Props> = ({
           oldRemovedRef.current = true
         } : undefined}
       />
+      </div>
     </div>
   )
 }

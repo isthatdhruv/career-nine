@@ -57,13 +57,6 @@ public class CheckinOtpService {
     @Value("${app.counselling.checkin-max-attempts:3}")
     private int maxAttempts;
 
-    /**
-     * How early check-in opens, matching the lead time on the student's Join button so both
-     * sides can be in the meeting and check in the moment the session starts.
-     */
-    @Value("${app.counselling.checkin-opens-before-minutes:15}")
-    private int opensBeforeMinutes;
-
     @Autowired
     private CounsellingCheckinOtpRepository otpRepository;
 
@@ -121,30 +114,23 @@ public class CheckinOtpService {
     }
 
     /**
-     * Check-in is only open around the session itself: from {@code opensBeforeMinutes} before
-     * the start until the slot ends.
-     *
-     * <p>Without this a counsellor could open the code box and start guessing hours — or
-     * days — ahead of a session, and mark a student present for something that had not
-     * happened yet. Attendance is meant to be evidence that the two of them were together at
-     * the appointed time; a check-in accepted at any hour is evidence of nothing.
+     * Check-in stays open until the slot ends; there is no lower bound (counsellors
+     * may start/join their meeting room as early as they like).
      */
     private void guardCheckinWindow(CounsellingAppointment appt) {
         CounsellingSlot slot = appt.getSlot();
         if (slot == null || slot.getDate() == null || slot.getStartTime() == null) return;
 
         LocalDateTime start = clock.sessionStart(slot.getDate(), slot.getStartTime());
-        LocalDateTime opensAt = start.minusMinutes(opensBeforeMinutes);
         LocalDateTime endsAt = slot.getEndTime() != null
                 ? clock.sessionStart(slot.getDate(), slot.getEndTime())
                 : start.plusHours(1);
         LocalDateTime now = clock.now();
 
-        if (now.isBefore(opensAt)) {
-            throw new BadRequestException(
-                    "This session has not started yet. Check-in opens " + opensBeforeMinutes
-                            + " minutes before the scheduled time.");
-        }
+        // No lower bound: counsellors may start/join ahead of the scheduled time
+        // (product decision 2026-08 — the old opens-N-minutes-before lock kept
+        // counsellors out of their own meeting room). The end-of-slot bound stays:
+        // a check-in after the slot proves nothing about attendance.
         if (now.isAfter(endsAt)) {
             throw new BadRequestException(
                     "This session has ended and can no longer be checked in.");
