@@ -75,7 +75,7 @@ const StudentImpersonationLanding: React.FC = () => {
     >
       <div style={{ textAlign: 'center' }}>
         <img
-          src={toAbsoluteUrl('/media/logos/kcc_logo.webp')}
+          src={toAbsoluteUrl('/media/logos/kcc.webp')}
           alt='Career-9'
           style={{ height: 32, marginBottom: 16 }}
         />

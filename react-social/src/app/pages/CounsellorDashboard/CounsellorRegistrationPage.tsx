@@ -208,7 +208,7 @@ const CounsellorRegistrationPage: React.FC = () => {
 
           {/* Header */}
           <div className='text-center mb-6'>
-            <img src={toAbsoluteUrl('/media/logos/kcc_logo.webp')} alt='Career-9' style={{ height: 36, marginBottom: 16 }} />
+            <img src={toAbsoluteUrl('/media/logos/kcc.webp')} alt='Career-9' style={{ height: 36, marginBottom: 16 }} />
             <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1A2B28', margin: '0 0 4px' }}>
               Counsellor Registration
             </h1>
