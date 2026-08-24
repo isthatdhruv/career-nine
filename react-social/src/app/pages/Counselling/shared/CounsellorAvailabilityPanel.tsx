@@ -95,6 +95,25 @@ const labelStyle: React.CSSProperties = {
 }
 
 /**
+ * The blocked rows worth showing under "Blocked Dates": deliberate date blocks that are
+ * still ahead of us. A slot that got blocked as the residue of a cancelled session (the
+ * server stamps those "Counsellor cancelled…" / "Counsellor unavailable…", legacy rows
+ * have no reason at all) stays hidden — the session's story lives on the appointment,
+ * and leaving these here made every cancelled booking linger in the panel forever.
+ */
+const visibleBlockedDates = (slots: any[]) => {
+  const d = new Date()
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return slots.filter((s: any) => {
+    if (!s?.isBlocked) return false
+    if (s.date && String(s.date).slice(0, 10) < today) return false
+    const reason = String(s.blockReason || s.reason || '')
+    if (!reason) return false
+    return !/^counsellor (cancelled|unavailable)/i.test(reason)
+  })
+}
+
+/**
  * The whole availability workspace for one counsellor: weekly schedule, upcoming
  * slots, extra slots, and date blocking.
  *
@@ -146,7 +165,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
     ]).then(([sRes, brRes]) => {
       const slots: any[] = sRes.data || []
       setManualSlots(slots.filter((s: any) => !s.isBlocked))
-      setBlockedDates(slots.filter((s: any) => s.isBlocked))
+      setBlockedDates(visibleBlockedDates(slots))
       setBlockRequests(Array.isArray(brRes.data) ? brRes.data : [])
     }).catch(() => {})
   }, [counsellorId])
@@ -168,7 +187,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
       .then((res) => {
         const slots: any[] = res.data || []
         setManualSlots(slots.filter((s) => !s.isBlocked))
-        setBlockedDates(slots.filter((s) => s.isBlocked))
+        setBlockedDates(visibleBlockedDates(slots))
       })
       .catch(() => setError('Failed to reload slots.'))
   }
@@ -745,8 +764,8 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                               <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>
                                 {formatTime(s.startTime)} – {formatTime(s.endTime)}
                               </div>
-                              {s.reason && (
-                                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{s.reason}</div>
+                              {(s.blockReason || s.reason) && (
+                                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{s.blockReason || s.reason}</div>
                               )}
                             </div>
                           ))}

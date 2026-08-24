@@ -505,6 +505,11 @@ public class AppointmentService {
         if (ROLE_COUNSELLOR.equals(role)) {
             slot.setStatus("CANCELLED");
             slot.setIsBlocked(true);
+            // Marks this as session-cancellation residue, not a deliberate date block —
+            // the availability panels hide these rows (the story lives on the appointment).
+            if (slot.getBlockReason() == null || slot.getBlockReason().isEmpty()) {
+                slot.setBlockReason("Counsellor cancelled");
+            }
         } else {
             slot.setStatus("AVAILABLE");
             slot.setIsBlocked(false);
