@@ -21,6 +21,7 @@ import com.kccitm.api.model.career9.AssessmentMappingTier;
 import com.kccitm.api.model.career9.SchoolAssessmentTier;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.SchoolAssessmentTier;
+import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.b2c.Campaign;
@@ -64,6 +65,17 @@ public class EntitlementService {
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private NotificationDispatcher notificationDispatcher;
     @Autowired private LinkBuilder linkBuilder;
+    @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
+
+    /**
+     * Mirrors {@code report.pipeline.enabled}. When the Kafka report pipeline is on,
+     * the final-report "report ready" email is sent by the report-worker AFTER the
+     * report is generated — with the Spaces CDN report link and the PDF — instead of
+     * the legacy immediate send in {@link #onAssessmentCompleted} (which could only
+     * offer the tokenized viewer link, since no PDF exists yet at completion time).
+     */
+    @org.springframework.beans.factory.annotation.Value("${report.pipeline.enabled:true}")
+    private boolean reportPipelineEnabled;
 
     /**
      * Path B step 1, OR Path A step 1 (pre-payment row). Returns existing pending row if one exists
@@ -585,10 +597,22 @@ public class EntitlementService {
             String onePagerLink = linkBuilder.onePager(token, e.getEntitlementId());
 
             if (Boolean.TRUE.equals(e.getFinalReportActive())) {
+                if (reportPipelineEnabled) {
+                    // The report pipeline (Kafka → report-worker) sends this email once
+                    // the report is generated and stored in Spaces, with the CDN report
+                    // link + PDF attached — the producer stamps this entitlement on the
+                    // generate event (see resolvePipelineReportEmail). Sending here too
+                    // would double-mail the student with a stale viewer-only link.
+                    logger.info("Final report email delegated to report pipeline: student={} assessment={} entitlement={}",
+                            userStudentId, assessmentId, e.getEntitlementId());
+                    return;
+                }
+                // Legacy fallback (pipeline disabled): immediate send with the tokenized
+                // viewer link — no PDF exists yet at completion time.
                 String finalLink = linkBuilder.finalReport(token, e.getEntitlementId());
-                String subject = "Your Career-9 final report is ready";
+                String subject = "Your Career-9 report is ready";
                 String body = simpleHtml("Your full Career-9 report is ready.",
-                        "View your detailed report:", finalLink, "Open final report");
+                        "View your detailed report:", finalLink, "Open report");
                 notificationDispatcher.sendEmail(e, studentEmail, "final_report", subject, body, finalLink);
             } else {
                 String subject = "Your Career-9 1-pager is ready";
@@ -598,6 +622,26 @@ public class EntitlementService {
             }
             return;
         }
+    }
+
+    /**
+     * Report-pipeline hook: the entitlement (if any) whose final-report email the
+     * pipeline should deliver for this completion. Mirrors {@link #onAssessmentCompleted}'s
+     * selection exactly: the first active/pending entitlement wins; a counsellor-release
+     * tier holds the report (the pipeline's ReportReleaseGate enforces the same hold);
+     * a tier without the final report gets the 1-pager email from onAssessmentCompleted
+     * instead — never a pipeline email.
+     */
+    @Transactional(readOnly = true)
+    public StudentEntitlement resolvePipelineReportEmail(Long userStudentId, Long assessmentId) {
+        if (userStudentId == null || assessmentId == null) return null;
+        for (StudentEntitlement e : entitlementRepository
+                .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId)) {
+            if (!"active".equals(e.getStatus()) && !"pending".equals(e.getStatus())) continue;
+            if (Boolean.TRUE.equals(e.getCounsellorReleaseReport())) return null;
+            return Boolean.TRUE.equals(e.getFinalReportActive()) ? e : null;
+        }
+        return null;
     }
 
     /**
@@ -721,12 +765,22 @@ public class EntitlementService {
                 subject = "Your Career-9 1-pager";
                 body = simpleHtml("Your 1-pager summary.", "View it:", link, "Open 1-pager");
                 break;
-            case "final_report":
+            case "final_report": {
                 if (!Boolean.TRUE.equals(e.getFinalReportActive())) return new ResendResult(false, "Final report not in this tier");
-                link = linkBuilder.finalReport(token, eid);
-                subject = "Your Career-9 final report";
-                body = simpleHtml("Your full report.", "View it:", link, "Open final report");
+                subject = "Your Career-9 report";
+                // Prefer the generated report's Spaces CDN links (same delivery as the
+                // report-pipeline email); fall back to the tokenized viewer link when
+                // no generated report exists yet.
+                GeneratedReport gr = latestGeneratedReport(e.getUserStudentId(), e.getAssessmentId());
+                if (gr != null) {
+                    link = gr.getReportUrl();
+                    body = reportReadyHtml(gr.getReportUrl(), gr.getPdfUrl());
+                } else {
+                    link = linkBuilder.finalReport(token, eid);
+                    body = simpleHtml("Your full report.", "View it:", link, "Open report");
+                }
                 break;
+            }
             case "dashboard_access":
                 if (!Boolean.TRUE.equals(e.getDashboardActive())) return new ResendResult(false, "Dashboard not in this tier");
                 link = linkBuilder.dashboard(token, eid);
@@ -980,6 +1034,45 @@ public class EntitlementService {
      * report, resend flows). The welcome email uses {@link #welcomeEmailHtml}
      * because it surfaces credentials and a manual-login fallback.
      */
+    /** Newest generated report with a stored Spaces URL for this student+assessment, or null. */
+    private GeneratedReport latestGeneratedReport(Long userStudentId, Long assessmentId) {
+        try {
+            GeneratedReport best = null;
+            for (GeneratedReport gr : generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)) {
+                if (gr.getReportUrl() == null || gr.getReportUrl().trim().isEmpty()) continue;
+                if (best == null || (gr.getUpdatedAt() != null && best.getUpdatedAt() != null
+                        && gr.getUpdatedAt().after(best.getUpdatedAt()))) {
+                    best = gr;
+                }
+            }
+            return best;
+        } catch (Exception ex) {
+            logger.warn("Could not resolve generated report for student={} assessment={}: {}",
+                    userStudentId, assessmentId, ex.getMessage());
+            return null;
+        }
+    }
+
+    /** Final-report email body: Spaces CDN report link as the CTA + a direct PDF link. */
+    private static String reportReadyHtml(String reportUrl, String pdfUrl) {
+        String pdfLine = (pdfUrl != null && !pdfUrl.trim().isEmpty())
+                ? "<p style='text-align:center;margin:0 0 8px;'><a href='" + pdfUrl
+                        + "' style='color:#059669;font-weight:bold;'>Download your report as a PDF</a></p>"
+                : "";
+        return "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;'>"
+                + "<div style='background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:24px;border-radius:12px 12px 0 0;color:white;'>"
+                + "<h2 style='margin:0;'>Your full Career-9 report is ready.</h2></div>"
+                + "<div style='padding:24px;background:#fff;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 12px 12px;'>"
+                + "<p>View your detailed report:</p>"
+                + "<div style='text-align:center;margin:24px 0 12px;'>"
+                + "<a href='" + reportUrl + "' style='display:inline-block;padding:14px 32px;background:#059669;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;'>Open report</a>"
+                + "</div>"
+                + pdfLine
+                + "<p style='color:#64748b;font-size:0.85em;margin-top:24px;'>If the button doesn't work, copy this link: " + reportUrl + "</p>"
+                + "</div></div>";
+    }
+
     private static String simpleHtml(String greeting, String preLink, String link, String cta) {
         return "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;'>"
                 + "<div style='background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:24px;border-radius:12px 12px 0 0;color:white;'>"

@@ -46,6 +46,7 @@ const PayForReportPage = () => {
   const [promoApplied, setPromoApplied] = useState<{ code: string; discountPercent: number } | null>(null)
   const [promoError, setPromoError] = useState("")
   const [promoValidating, setPromoValidating] = useState(false)
+  const [showPromo, setShowPromo] = useState(false)
 
   useEffect(() => {
     if (!eidParam) {
@@ -190,7 +191,16 @@ const PayForReportPage = () => {
 
         <div style={s.divider} />
 
-        <form onSubmit={handleSubmit} style={{ padding: "24px 32px 32px" }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ padding: "24px 32px 32px" }}
+          // Enter in a text field must never submit — only the explicit pay button
+          // does. Field-level handlers (promo apply) still run first, since the
+          // event bubbles from the input up to the form.
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault()
+          }}
+        >
           {formError && (
             <div style={s.errorBanner}>
               <div style={s.errorBannerIcon}>!</div>
@@ -222,6 +232,21 @@ const PayForReportPage = () => {
             ))}
           </div>
 
+          {/* Promo code — hidden behind a toggle until the student asks for it */}
+          {!showPromo && !promoApplied && (
+            <button
+              type="button"
+              onClick={() => setShowPromo(true)}
+              style={{
+                background: "none", border: "none", padding: 0, textAlign: "left", marginTop: 24,
+                color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+              }}
+            >
+              Do you have a promo code?
+            </button>
+          )}
+          {(showPromo || promoApplied) && (
+          <>
           <h3 style={{ ...s.sectionTitle, marginTop: 24 }}>Promo code</h3>
           {promoApplied ? (
             <div style={s.promoApplied}>
@@ -251,6 +276,8 @@ const PayForReportPage = () => {
             </div>
           )}
           {promoError && <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: 6 }}>{promoError}</div>}
+          </>
+          )}
 
           {selectedTier && (
             <div style={s.totalBar}>

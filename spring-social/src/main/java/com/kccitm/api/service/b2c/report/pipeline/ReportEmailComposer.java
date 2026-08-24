@@ -16,9 +16,10 @@ public class ReportEmailComposer {
     @Autowired private InstituteBrandingService brandingService;
 
     public String subject(ReportEmailEvent e) {
-        return (e.whitelabel && e.schoolName != null && !e.schoolName.isEmpty())
-                ? "Your " + e.schoolName + " report is ready"
-                : "Your Career-9 report is ready";
+        if (e.whitelabel && e.schoolName != null && !e.schoolName.isEmpty()) {
+            return "Your " + e.schoolName + " report is ready";
+        }
+        return "Your Career-9 report is ready";
     }
 
     public String html(ReportEmailEvent e) {
@@ -30,6 +31,13 @@ public class ReportEmailComposer {
         String attachLine = e.linkOnly
                 ? "<p style=\"margin:16px 0 0;color:#555;font-size:14px;\">Open your full report using the button above.</p>"
                 : "<p style=\"margin:16px 0 0;color:#555;font-size:14px;\">Your detailed report is also attached to this email as a PDF.</p>";
+        // Direct Spaces CDN link to the PDF, so the report is reachable even from
+        // clients that strip attachments (and after the attachment is lost).
+        String pdfLine = (e.pdfUrl != null && !e.pdfUrl.isEmpty())
+                ? "<p style=\"text-align:center;margin:0 0 8px;\">"
+                        + "<a href=\"" + e.pdfUrl + "\" style=\"color:#1f8a4c;font-weight:bold;\">Download your report as a PDF</a>"
+                        + "</p>"
+                : "";
 
         return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head>"
                 + "<body style=\"margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;\">"
@@ -39,10 +47,11 @@ public class ReportEmailComposer {
                 + "<h2 style=\"color:#2b2b6b;margin:0 0 12px;\">Your report is ready</h2>"
                 + "<p style=\"color:#444;margin:0 0 16px;font-size:15px;\">Your assessment report from "
                 + orgName + " has been generated.</p>"
-                + "<p style=\"text-align:center;margin:24px 0;\">"
+                + "<p style=\"text-align:center;margin:24px 0 12px;\">"
                 + "<a href=\"" + e.reportUrl + "\" style=\"background:#1f8a4c;color:#ffffff;text-decoration:none;"
                 + "padding:12px 28px;border-radius:6px;display:inline-block;font-weight:bold;\">View your report</a>"
                 + "</p>"
+                + pdfLine
                 + attachLine
                 + "</div>"
                 + footer

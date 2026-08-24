@@ -41,6 +41,13 @@ public class ReportGenerateEvent {
     /** Set per admin enqueue action; folded into the email idempotency key. */
     public String batchId = null;
 
+    // ── B2C entitlement extension (2026-08). When the completing student holds an
+    // active/pending entitlement whose tier includes the final report (PDF), the
+    // producer stamps its id here and the email stage mails the report (CDN link +
+    // PDF) to the student — the same delivery whitelabel schools get. Null (the
+    // backward-compat default for legacy events) = no entitlement email.
+    public Long entitlementId = null;
+
     public ReportGenerateEvent() {
     }
 

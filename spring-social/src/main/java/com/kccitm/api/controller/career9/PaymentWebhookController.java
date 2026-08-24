@@ -84,6 +84,7 @@ public class PaymentWebhookController {
     @Autowired private PromoCodeRepository promoCodeRepository;
     @Autowired private com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository schoolAssessmentTierRepository;
     @Autowired private StudentInstituteMembershipService membershipService;
+    @Autowired private com.kccitm.api.repository.Career9.b2c.CampaignRepository campaignRepository;
     @Autowired private StudentProvisioningService studentProvisioningService;
     @Autowired private com.kccitm.api.service.GoogleAnalyticsService googleAnalyticsService;
 
@@ -763,6 +764,17 @@ public class PaymentWebhookController {
                 userStudent = new UserStudent(user, studentInfo, null);
                 userStudent = userStudentRepository.save(userStudent);
                 studentProvisioningService.provision(userStudent);
+            }
+
+            // Set the campaign's institute as primary + record membership, same as
+            // the free/trial registration paths. No-op when the campaign has no
+            // institute mapped (legacy campaign pre-backfill).
+            if (txn.getCampaignId() != null) {
+                Optional<com.kccitm.api.model.career9.b2c.Campaign> campaignOpt =
+                        campaignRepository.findById(txn.getCampaignId());
+                if (campaignOpt.isPresent()) {
+                    membershipService.assignFromCampaign(userStudent, campaignOpt.get(), "campaign-payment");
+                }
             }
 
             // Ensure StudentAssessmentMapping exists so they can take the assessment.

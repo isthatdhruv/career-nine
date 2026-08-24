@@ -30,6 +30,7 @@ const SchoolAssessmentRegisterPage = () => {
   const [promoApplied, setPromoApplied] = useState<{ code: string; discountPercent: number } | null>(null);
   const [promoError, setPromoError] = useState("");
   const [promoValidating, setPromoValidating] = useState(false);
+  const [showPromo, setShowPromo] = useState(false);
 
   // Referral code
   const [hasReferral, setHasReferral] = useState(false);
@@ -390,7 +391,16 @@ const SchoolAssessmentRegisterPage = () => {
         <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #e2e8f0, transparent)", margin: "0 32px" }} />
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: "28px 32px 32px" }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ padding: "28px 32px 32px" }}
+          // Enter in a text field must never submit the registration — only the
+          // explicit submit button does. Field-level handlers (promo/referral apply)
+          // still run first, since the event bubbles from the input up to the form.
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
+          }}
+        >
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
 
             {/* Class + Section row */}
@@ -535,8 +545,20 @@ const SchoolAssessmentRegisterPage = () => {
               </div>
             )}
 
-            {/* Promo Code */}
-            {isPaid && selectedClassId && (
+            {/* Promo Code — hidden behind a toggle until the student asks for it */}
+            {isPaid && selectedClassId && !showPromo && !promoApplied && (
+              <button
+                type="button"
+                onClick={() => setShowPromo(true)}
+                style={{
+                  background: "none", border: "none", padding: 0, textAlign: "left",
+                  color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+                }}
+              >
+                Do you have a promo code?
+              </button>
+            )}
+            {isPaid && selectedClassId && (showPromo || promoApplied) && (
               <div>
                 <label style={s.label}>Promo Code</label>
                 {promoApplied ? (

@@ -85,6 +85,15 @@ export const getAllCampaigns = () => axios.get<Campaign[]>(`${API_URL}/campaign/
 export const getCampaign = (id: number) => axios.get<CampaignFullDto>(`${API_URL}/campaign/get/${id}`);
 export const getCampaignBySlug = (slug: string) => axios.get<CampaignFullDto>(`${API_URL}/campaign/get/by-slug/${slug}`);
 export const createCampaign = (body: Campaign) => axios.post<Campaign>(`${API_URL}/campaign/create`, body);
+
+// Brand logo (PNG/JPG only — may be reused in emails) → DigitalOcean Spaces.
+// Returns { url } (CDN URL) to store in the campaign's brandLogoUrl.
+export const uploadCampaignLogo = (base64Data: string, campaignId?: number, previousUrl?: string) =>
+  axios.post<{ url: string }>(`${API_URL}/campaign/upload-logo`, {
+    base64Data,
+    campaignId: campaignId ?? undefined,
+    previousUrl: previousUrl || undefined,
+  });
 export const updateCampaign = (id: number, body: Partial<Campaign>) =>
   axios.put<Campaign>(`${API_URL}/campaign/update/${id}`, body);
 export const deleteCampaign = (id: number) => axios.delete(`${API_URL}/campaign/delete/${id}`);

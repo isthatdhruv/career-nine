@@ -19,6 +19,7 @@ import {
   InstituteOption,
   updateAssessmentMapping,
   updateCampaign,
+  uploadCampaignLogo,
   upsertClassRoute,
 } from "../API/Campaign_APIs";
 import { useInstitutes } from "../../../lib/queries/lookups";
@@ -45,6 +46,18 @@ const emptyCampaign: Campaign = {
 // generated registration link would 404 until reload.
 const slugify = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
 
+// Brand logo constraints — mirror the institute logo upload (PNG/JPG only because
+// the asset may be reused in emails, and Outlook won't render WebP).
+const MAX_LOGO_SIZE = 1024 * 1024; // 1 MB
+
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 const CampaignEditPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -69,6 +82,12 @@ const CampaignEditPage = () => {
   const { data: allInstitutes = [] } = useInstitutes<InstituteOption>();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Brand logo: picked file is held locally and only uploaded to DO Spaces on save,
+  // so an abandoned form doesn't leave an orphaned object in the bucket.
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
   // Tier-config drawer state — track by mappingId so the row stays in sync with refreshed assessmentRows
   const [tierDrawerMappingId, setTierDrawerMappingId] = useState<number | null>(null);
@@ -159,22 +178,65 @@ const CampaignEditPage = () => {
 
   useEffect(() => { loadAssessments(campaign.instituteCode); /* eslint-disable-next-line */ }, [campaign.instituteCode]);
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setLogoError(null);
+    if (file && !["image/png", "image/jpeg"].includes(file.type)) {
+      setLogoError("Logo must be a PNG or JPG/JPEG image");
+      setLogoFile(null);
+      setLogoPreview(null);
+      e.target.value = "";
+      return;
+    }
+    if (file && file.size > MAX_LOGO_SIZE) {
+      setLogoError("Logo must be under 1 MB");
+      setLogoFile(null);
+      setLogoPreview(null);
+      e.target.value = "";
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(file ? URL.createObjectURL(file) : null);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setLogoError(null);
+    upd("brandLogoUrl", "");
+  };
+
   const handleSaveBasics = async () => {
     if (!campaign.name?.trim()) { showErrorToast("Name is required"); return; }
     if (!campaign.slug?.trim()) { showErrorToast("Slug is required"); return; }
     if (!campaign.instituteCode) { showErrorToast("Institute is required"); return; }
     setSaving(true);
     try {
+      // Brand logo → upload to DO Spaces first, then persist the returned CDN URL
+      // on brandLogoUrl. The old logo object (if any) is cleaned up server-side.
+      const payload = { ...campaign };
+      if (logoFile) {
+        const dataUrl = await fileToDataUrl(logoFile);
+        const up = await uploadCampaignLogo(
+          dataUrl,
+          isEdit ? Number(id) : undefined,
+          campaign.brandLogoUrl || undefined
+        );
+        payload.brandLogoUrl = up.data.url;
+      }
       if (isEdit) {
-        await updateCampaign(Number(id), campaign);
+        await updateCampaign(Number(id), payload);
+        setCampaign(payload);
+        setLogoFile(null);
+        setLogoPreview(null);
         showSuccessToast("Campaign updated");
       } else {
-        const res = await createCampaign(campaign);
+        const res = await createCampaign(payload);
         showSuccessToast("Campaign created");
         navigate(`/b2c/campaigns/edit/${res.data.campaignId}`);
       }
     } catch (e: any) {
-      showErrorToast(e?.response?.data || "Failed to save");
+      showErrorToast(e?.response?.data?.error || e?.response?.data || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -337,8 +399,25 @@ const CampaignEditPage = () => {
                 <Form.Control value={campaign.targetAudience ?? ""} onChange={e => upd("targetAudience", e.target.value)} placeholder="Class 11–12, Science stream" />
               </div>
               <div className="col-md-6 mb-3">
-                <Form.Label>Brand logo URL</Form.Label>
-                <Form.Control value={campaign.brandLogoUrl ?? ""} onChange={e => upd("brandLogoUrl", e.target.value)} />
+                <Form.Label>Brand logo</Form.Label>
+                <Form.Control type="file" accept="image/png,image/jpeg" onChange={handleLogoChange} />
+                <Form.Text className="text-muted">
+                  PNG or JPG/JPEG, under 1 MB. Shown on the registration, thank-you and payment pages.
+                  {logoFile && " Uploads when you save."}
+                </Form.Text>
+                {logoError && <div className="text-danger small mt-1">{logoError}</div>}
+                {(logoPreview || campaign.brandLogoUrl) && (
+                  <div className="d-flex align-items-center gap-3 mt-2">
+                    <img
+                      src={logoPreview || campaign.brandLogoUrl}
+                      alt="Brand logo preview"
+                      style={{ maxHeight: 50, maxWidth: 200, objectFit: "contain" }}
+                    />
+                    <Button size="sm" variant="outline-danger" onClick={handleRemoveLogo}>
+                      Remove logo
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="col-md-6 mb-3">
                 <Form.Label>

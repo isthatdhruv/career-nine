@@ -29,6 +29,8 @@ public class ReportEmailEvent {
     public Long emailAccountId;        // resolved sending account (institute → global); null = worker default
     public Long emailTemplateId;       // resolved REPORT_READY template; null = composer HTML
     public String studentName;         // for {{student_name}} in a REPORT_READY template
+    /** B2C entitlement whose tier includes the final report; null = not an entitlement email. */
+    public Long entitlementId;
 
     public ReportEmailEvent() {
     }
@@ -49,6 +51,7 @@ public class ReportEmailEvent {
         this.emailAccountId = src.emailAccountId;
         this.emailTemplateId = src.emailTemplateId;
         this.studentName = src.studentName;
+        this.entitlementId = src.entitlementId;
     }
 
     public String key() {

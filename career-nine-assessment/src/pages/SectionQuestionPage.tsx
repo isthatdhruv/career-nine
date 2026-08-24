@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
 import { usePreventReload } from "../hooks/usePreventReload";
-import { useStudentBranding, brandLogoSrc } from "../hooks/useStudentBranding";
+import { useStudentBranding, brandLogoSrc, CAREER9_LOGO } from "../hooks/useStudentBranding";
 import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
 import { useDebouncedLocalStorage } from "../hooks/useDebouncedLocalStorage";
 import QuestionNavigationGrid from "../components/QuestionNavigationGrid";
@@ -108,6 +108,12 @@ const SectionQuestionPage: React.FC = () => {
   const saveLater = assessmentConfig?.saveLater !== false;
   usePreventReload();
   const branding = useStudentBranding();
+  // B2C campaign students always see the Career-9 logo here — school whitelabel
+  // co-branding is a B2B feature, and the campaign's own brand logo belongs on
+  // the registration page, not inside the assessment. Every entry flow clear()s
+  // localStorage before seeding, so a present campaignId reliably marks this
+  // session as campaign-registered.
+  const isCampaignStudent = !!localStorage.getItem("campaignId");
   const { scheduleWrite, flush: flushLocalStorage } =
     useDebouncedLocalStorage(500);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -1783,15 +1789,15 @@ const SectionQuestionPage: React.FC = () => {
             }}
           >
             <img
-              src={brandLogoSrc(branding)}
-              alt={branding.whitelabel ? (branding.schoolName || "School") + " logo" : "Career-9 logo"}
+              src={isCampaignStudent ? CAREER9_LOGO : brandLogoSrc(branding)}
+              alt={!isCampaignStudent && branding.whitelabel ? (branding.schoolName || "School") + " logo" : "Career-9 logo"}
               style={{
                 height: "48px",
                 objectFit: "contain",
               }}
             />
           </div>
-          {branding.whitelabel && (
+          {!isCampaignStudent && branding.whitelabel && (
             <div style={{ textAlign: "center", fontSize: "0.62rem", color: "#94a3b8", marginTop: "-6px", marginBottom: "6px" }}>
               Powered by Career-9
             </div>
