@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { createPortal } from "react-dom"
 
 /**
  * DPDP (Digital Personal Data Protection Act, 2023) parental-consent block for the
@@ -26,11 +27,15 @@ const p = (text: string) => (
   </p>
 )
 
-const ConsentModal = ({ onClose }: { onClose: () => void }) => (
+// Rendered through a portal to document.body: the registration pages' centered
+// card ancestors have transforms/overflow that would otherwise trap the fixed
+// overlay inside the card instead of covering the viewport.
+const ConsentModal = ({ onClose }: { onClose: () => void }) => createPortal(
   <div
     onClick={onClose}
     style={{
       position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.55)",
+      backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
       display: "flex", alignItems: "center", justifyContent: "center",
       zIndex: 1000, padding: 16,
     }}
@@ -96,10 +101,6 @@ const ConsentModal = ({ onClose }: { onClose: () => void }) => (
           + "resolved, you have the right to file a complaint with the Data Protection Board "
           + "of India.")}
 
-        {h("Consent verification")}
-        {p("Your consent will be verified through a One-Time Password (OTP) sent to your "
-          + "mobile number. A secure record of your consent is maintained as required by law.")}
-
         <div style={{
           marginTop: 18, padding: "12px 16px", background: "#f8fafc",
           border: "1px solid #e2e8f0", borderRadius: 10,
@@ -125,7 +126,8 @@ const ConsentModal = ({ onClose }: { onClose: () => void }) => (
         </button>
       </div>
     </div>
-  </div>
+  </div>,
+  document.body,
 )
 
 interface Props {
