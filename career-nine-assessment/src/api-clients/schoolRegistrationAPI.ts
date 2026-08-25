@@ -34,6 +34,8 @@ export function registerSchoolStudent(
     schoolSectionId?: number
     promoCode?: string
     referralCode?: string
+    /** DPDP parental consent given on the form; the backend stamps dpdp_consent_at from it. */
+    dpdpConsent?: boolean
   }
 ) {
   return http.post(`/school-registration/public/register/${token}`, studentData)

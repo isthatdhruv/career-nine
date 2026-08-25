@@ -766,6 +766,10 @@ public class PaymentWebhookController {
                 studentProvisioningService.provision(userStudent);
             }
 
+            // DPDP: the consent given on the registration form travels on the txn
+            // (student rows for paid registrations only exist from here on).
+            stampDpdpConsentFromTxn(userStudent, txn);
+
             // Set the campaign's institute as primary + record membership, same as
             // the free/trial registration paths. No-op when the campaign has no
             // institute mapped (legacy campaign pre-backfill).
@@ -974,6 +978,9 @@ public class PaymentWebhookController {
             userStudent = userStudentRepository.save(userStudent);
             studentProvisioningService.provision(userStudent);
 
+            // DPDP: consent from the registration form travels on the txn.
+            stampDpdpConsentFromTxn(userStudent, txn);
+
             membershipService.setPrimaryInstitute(userStudent, instituteCode, null, "payment-provision");
 
             tryIncrementSchoolLink(txn);
@@ -1073,6 +1080,20 @@ public class PaymentWebhookController {
         if (!sam.isPresent()) {
             studentAssessmentMappingRepository.save(new StudentAssessmentMapping(userStudentId, assessmentId));
         }
+    }
+
+    /**
+     * DPDP: stamp the parental-consent timestamp on the student from the consent flag
+     * carried on the transaction (set at registration/order time — the form enforces
+     * the checkbox). First consent wins; an existing timestamp is never moved. Old
+     * transactions created before consent capture carry NULL and stamp nothing.
+     */
+    private void stampDpdpConsentFromTxn(UserStudent userStudent, PaymentTransaction txn) {
+        if (!Boolean.TRUE.equals(txn.getDpdpConsent()) || userStudent == null) return;
+        StudentInfo info = userStudent.getStudentInfo();
+        if (info == null || info.getDpdpConsentAt() != null) return;
+        info.setDpdpConsentAt(new Date());
+        studentInfoRepository.save(info);
     }
 
     private void tryIncrementSchoolLink(PaymentTransaction txn) {

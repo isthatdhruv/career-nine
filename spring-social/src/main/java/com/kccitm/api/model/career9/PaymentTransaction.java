@@ -150,6 +150,12 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "nudge_email_sent")
     private Boolean nudgeEmailSent = false;
 
+    // DPDP parental consent given on the registration form that created this
+    // transaction. Carried here because paid-path students are provisioned later,
+    // by the Razorpay webhook — which stamps StudentInfo.dpdpConsentAt from it.
+    @Column(name = "dpdp_consent")
+    private Boolean dpdpConsent;
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
@@ -232,6 +238,9 @@ public class PaymentTransaction implements Serializable {
 
     public String getPromoCode() { return promoCode; }
     public void setPromoCode(String promoCode) { this.promoCode = promoCode; }
+
+    public Boolean getDpdpConsent() { return dpdpConsent; }
+    public void setDpdpConsent(Boolean dpdpConsent) { this.dpdpConsent = dpdpConsent; }
 
     public String getReferralCode() { return referralCode; }
     public void setReferralCode(String referralCode) { this.referralCode = referralCode; }

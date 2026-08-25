@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import DuplicateEmailDialog, { DuplicateEmailPayload } from "../components/DuplicateEmailDialog"
+import ParentalConsentSection from "../components/ParentalConsent"
 import { useParams, useNavigate } from "react-router-dom"
 import { showErrorToast } from '../utils/toast'
 import {
@@ -21,6 +22,8 @@ const AssessmentRegisterPage = () => {
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [formError, setFormError] = useState("")
+  // DPDP parental consent — registration cannot proceed without it.
+  const [dpdpConsent, setDpdpConsent] = useState(false)
 
   // Form fields
   const [name, setName] = useState("")
@@ -168,6 +171,10 @@ const AssessmentRegisterPage = () => {
       showErrorToast("Date of Birth must be in dd-mm-yyyy format.")
       return
     }
+    if (!dpdpConsent) {
+      showErrorToast("Please confirm the parental consent to continue.")
+      return
+    }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
@@ -183,6 +190,8 @@ const AssessmentRegisterPage = () => {
         dob: dob,
         phone: phone.trim(),
         gender: gender,
+        // DPDP parental consent (submit is gated on the checkbox above).
+        dpdpConsent,
       }
 
       if (selectedClassId) {
@@ -598,7 +607,7 @@ const AssessmentRegisterPage = () => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div>
                 <label style={s.label}>
-                  Email <span style={{ color: "#f43f5e" }}>*</span>
+                  Parent's Email <span style={{ color: "#f43f5e" }}>*</span>
                 </label>
                 <input
                   ref={emailRef}
@@ -635,7 +644,7 @@ const AssessmentRegisterPage = () => {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div>
                 <label style={s.label}>
-                  Phone Number <span style={{ color: "#f43f5e" }}>*</span>
+                  Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
                 </label>
                 <input
                   type="tel"
@@ -1005,6 +1014,10 @@ const AssessmentRegisterPage = () => {
                 </>
               )}
             </div>
+          </div>
+
+          <div style={{ marginTop: 20 }}>
+            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
           </div>
 
           {/* Submit Button */}

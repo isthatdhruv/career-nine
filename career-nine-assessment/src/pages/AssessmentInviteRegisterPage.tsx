@@ -7,6 +7,7 @@ import {
   InviteInfo,
 } from "../api-clients/assessmentMappingAPI"
 import { TierCard, Tier } from "../components/TierCard"
+import ParentalConsentSection from "../components/ParentalConsent"
 
 /**
  * Student-locked invite registration. The link is bound to one already-known
@@ -23,6 +24,9 @@ const AssessmentInviteRegisterPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  // DPDP parental consent — a NEW registration cannot proceed without it (an
+  // already-enrolled student continuing to their assessment is not gated).
+  const [dpdpConsent, setDpdpConsent] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -65,9 +69,14 @@ const AssessmentInviteRegisterPage = () => {
 
   const handleSubmit = async () => {
     if (!token || !info) return
+    if (!info.alreadyRegistered && !dpdpConsent) {
+      showErrorToast("Please confirm the parental consent to continue.")
+      return
+    }
     setSubmitting(true)
     try {
-      const res = await registerInviteByToken(token)
+      // DPDP parental consent travels with the confirm (gated above for new registrations).
+      const res = await registerInviteByToken(token, { dpdpConsent })
 
       if (res.data.status === "payment_required") {
         if (res.data.paymentUrl) {
@@ -184,10 +193,10 @@ const AssessmentInviteRegisterPage = () => {
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginTop: 12 }}>
             <Field label="Full Name" value={info?.student?.name} />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <Field label="Email" value={info?.student?.email} />
+              <Field label="Parent's Email" value={info?.student?.email} />
               <Field label="Date of Birth" value={info?.student?.dob} />
             </div>
-            <Field label="Phone Number" value={info?.student?.phone} />
+            <Field label="Parent's Phone" value={info?.student?.phone} />
           </div>
 
           {/* PAY_FIRST counselling itemisation */}
@@ -216,6 +225,12 @@ const AssessmentInviteRegisterPage = () => {
               borderRadius: 12, padding: "12px 18px", fontSize: "0.88rem", color: "#065f46", marginTop: 20,
             }}>
               You are already enrolled in this assessment — continue to start.
+            </div>
+          )}
+
+          {!alreadyRegistered && (
+            <div style={{ marginTop: 20 }}>
+              <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
             </div>
           )}
 

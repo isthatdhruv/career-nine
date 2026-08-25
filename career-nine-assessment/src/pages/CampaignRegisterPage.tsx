@@ -10,6 +10,7 @@ import {
 } from "../api-clients/campaignAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 import DuplicateEmailDialog, { DuplicateEmailPayload } from "../components/DuplicateEmailDialog"
+import ParentalConsentSection from "../components/ParentalConsent"
 import { CAREER9_LOGO } from "../hooks/useStudentBranding"
 
 // The campaign's brand logo when one is set (http(s) only — same guard as
@@ -85,6 +86,8 @@ const CampaignRegisterPage = () => {
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
+  // DPDP parental consent — registration cannot proceed without it.
+  const [dpdpConsent, setDpdpConsent] = useState(false)
 
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(aidFromUrl)
   const [selectedTierId, setSelectedTierId] = useState<number | null>(tidFromUrl)
@@ -222,6 +225,10 @@ const CampaignRegisterPage = () => {
       showErrorToast("Date of Birth must be in dd-mm-yyyy format.")
       return
     }
+    if (!dpdpConsent) {
+      showErrorToast("Please confirm the parental consent to continue.")
+      return
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       showErrorToast("Please enter a valid email address.")
       return
@@ -241,6 +248,8 @@ const CampaignRegisterPage = () => {
         dob,
         phone: phone.trim(),
         gender,
+        // DPDP parental consent (submit is gated on the checkbox above).
+        dpdpConsent,
       }
       if (!isTryFirst && promoApplied) data.promoCode = promoApplied.code
       if (selectedClassId != null) data.classId = selectedClassId
@@ -544,7 +553,7 @@ const CampaignRegisterPage = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
                     <label style={s.label}>
-                      Email <span style={{ color: "#f43f5e" }}>*</span>
+                      Parent's Email <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
                       ref={emailRef}
@@ -580,7 +589,7 @@ const CampaignRegisterPage = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
                     <label style={s.label}>
-                      Phone Number <span style={{ color: "#f43f5e" }}>*</span>
+                      Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
                       type="tel"
@@ -700,6 +709,10 @@ const CampaignRegisterPage = () => {
                     <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>INR {discountedPriceInr}</span>
                   </div>
                 )}
+              </div>
+
+              <div style={{ marginTop: 20 }}>
+                <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
               </div>
 
               <button
