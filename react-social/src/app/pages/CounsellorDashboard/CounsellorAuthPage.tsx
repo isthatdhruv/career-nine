@@ -47,7 +47,7 @@ const CounsellorAuthPage: React.FC = () => {
               marginBottom: 32, boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
             }}
           >
-            <img src={toAbsoluteUrl('/media/logos/kcc.jpg')} alt='Career-9' style={{ height: 48, display: 'block' }} />
+            <img src={toAbsoluteUrl('/media/logos/kcc.webp')} alt='Career-9' style={{ height: 48, display: 'block' }} />
           </div>
           <h1 style={{ fontSize: 32, fontWeight: 800, color: '#fff', margin: '0 0 12px', lineHeight: 1.2 }}>
             Counsellor Portal

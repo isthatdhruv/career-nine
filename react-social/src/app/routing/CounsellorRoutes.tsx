@@ -43,7 +43,7 @@ const CounsellorFallback: FC = () => (
     }}
   >
     <div style={{ textAlign: 'center' }}>
-      <img src='/media/logos/kcc.jpg' alt='Career-9' style={{ height: 30, marginBottom: 20 }} />
+      <img src='/media/logos/kcc.webp' alt='Career-9' style={{ height: 30, marginBottom: 20 }} />
       <div style={{ color: '#6B7A8D', fontSize: 14 }}>Loading ...</div>
     </div>
   </div>
