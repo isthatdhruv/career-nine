@@ -1406,7 +1406,7 @@ export interface GeneralAssessmentData {
   userStudentId: number;
   assessmentId: number;
   classGroup: string;
-  studentClass: number;
+  studentClass: string;
 
   // Personality
   personalityScores: string; // JSON string

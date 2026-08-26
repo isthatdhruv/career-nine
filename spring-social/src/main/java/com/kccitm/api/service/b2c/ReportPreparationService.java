@@ -46,12 +46,12 @@ public class ReportPreparationService {
     public static class PreparationResult {
         public final String reportType;
         public final String reportUrl;
-        public final Integer studentClassUsed;
+        public final String studentClassUsed;
         public final boolean success;
         public final Long logId;
 
         private PreparationResult(String reportType, String reportUrl,
-                                  Integer studentClassUsed, boolean success, Long logId) {
+                                  String studentClassUsed, boolean success, Long logId) {
             this.reportType = reportType;
             this.reportUrl = reportUrl;
             this.studentClassUsed = studentClassUsed;
@@ -66,7 +66,7 @@ public class ReportPreparationService {
                         "Entitlement " + entitlementId + " not found"));
 
         Long userStudentId = entitlement.getUserStudentId();
-        Integer studentClass = lookupStudentClass(userStudentId);
+        String studentClass = lookupStudentClass(userStudentId);
         String reportType = resolveReportType(assessmentId, studentClass);
 
         try {
@@ -109,7 +109,7 @@ public class ReportPreparationService {
                                              String attemptType, Throwable err) {
         Long userStudentId = entitlementRepository.findById(entitlementId)
                 .map(StudentEntitlement::getUserStudentId).orElse(null);
-        Integer studentClass = lookupStudentClass(userStudentId);
+        String studentClass = lookupStudentClass(userStudentId);
         String reportType = resolveReportType(assessmentId, studentClass);
         return reportGenerationLogService.log(
                 entitlementId, assessmentId, reportType, studentClass, attemptType, err);
@@ -125,7 +125,7 @@ public class ReportPreparationService {
      * The legacy {@code "navigator"} string was renamed to {@code "legacy"} in
      * V20260526005; new code uses {@code "legacy"}.
      */
-    private String resolveReportType(Long assessmentId, Integer studentClass) {
+    private String resolveReportType(Long assessmentId, String studentClass) {
         if (assessmentId == null) return "pager";
         Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
         if (!opt.isPresent()) return "pager";
@@ -145,7 +145,7 @@ public class ReportPreparationService {
                 : "pager";
     }
 
-    private Integer lookupStudentClass(Long userStudentId) {
+    private String lookupStudentClass(Long userStudentId) {
         if (userStudentId == null) return null;
         return userStudentRepository.findById(userStudentId)
                 .map(UserStudent::getStudentInfo)
@@ -189,10 +189,10 @@ public class ReportPreparationService {
     public static class ReportPreparationException extends RuntimeException {
         private static final long serialVersionUID = 1L;
         public final String reportType;
-        public final Integer studentClassUsed;
+        public final String studentClassUsed;
         public final Long logId;
 
-        public ReportPreparationException(String reportType, Integer studentClassUsed,
+        public ReportPreparationException(String reportType, String studentClassUsed,
                                           Long logId, Throwable cause) {
             super(cause);
             this.reportType = reportType;

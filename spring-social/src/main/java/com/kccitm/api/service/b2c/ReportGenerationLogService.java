@@ -34,7 +34,7 @@ public class ReportGenerationLogService {
     public ReportGenerationLog log(Long entitlementId,
                                    Long assessmentId,
                                    String reportType,
-                                   Integer studentClassAtAttempt,
+                                   String studentClassAtAttempt,
                                    String attemptType,
                                    Throwable err) {
         ReportGenerationLog row = new ReportGenerationLog();

@@ -61,7 +61,7 @@ export type StudentDossier = {
     family?: string;
     sibling?: number;
     schoolBoard?: string;
-    studentClass?: number;
+    studentClass?: string;
     username?: string;
     careerNineRollNumber?: string;
     infoCompleted?: boolean;

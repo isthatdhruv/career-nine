@@ -1302,7 +1302,7 @@ public class StudentInfoController {
         if (request.containsKey("studentClass")) {
             Object classVal = request.get("studentClass");
             if (classVal != null) {
-                studentInfo.setStudentClass(Integer.valueOf(classVal.toString()));
+                studentInfo.setStudentClass(classVal.toString());
             }
         }
         if (request.containsKey("email")) {

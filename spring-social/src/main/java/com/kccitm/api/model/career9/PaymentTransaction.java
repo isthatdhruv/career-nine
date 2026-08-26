@@ -79,7 +79,7 @@ public class PaymentTransaction implements Serializable {
      * non-class campaigns / non-numeric classes.
      */
     @Column(name = "student_class")
-    private Integer studentClass;
+    private String studentClass;
 
     @Column(name = "user_student_id")
     private Long userStudentId;
@@ -224,8 +224,8 @@ public class PaymentTransaction implements Serializable {
     public Date getStudentDob() { return studentDob; }
     public void setStudentDob(Date studentDob) { this.studentDob = studentDob; }
 
-    public Integer getStudentClass() { return studentClass; }
-    public void setStudentClass(Integer studentClass) { this.studentClass = studentClass; }
+    public String getStudentClass() { return studentClass; }
+    public void setStudentClass(String studentClass) { this.studentClass = studentClass; }
 
     public Long getUserStudentId() { return userStudentId; }
     public void setUserStudentId(Long userStudentId) { this.userStudentId = userStudentId; }

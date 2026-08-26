@@ -969,7 +969,7 @@ public class PaymentWebhookController {
             studentInfo.setPhoneNumber(phone);
             studentInfo.setSchoolSectionId(sectionId);
             if (classId != null) {
-                studentInfo.setStudentClass(parseClassNumber(classId));
+                studentInfo.setStudentClass(resolveClassLabel(classId));
             }
             studentInfo.setUser(user);
             studentInfo = studentInfoRepository.save(studentInfo);
@@ -1140,20 +1140,13 @@ public class PaymentWebhookController {
         }
     }
 
-    private Integer parseClassNumber(Integer classId) {
+    private String resolveClassLabel(Integer classId) {
         if (classId == null) return null;
         Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
         if (classOpt.isPresent()) {
             String className = classOpt.get().getClassName();
-            if (className != null) {
-                String digits = className.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    try {
-                        return Integer.parseInt(digits);
-                    } catch (NumberFormatException e) {
-                        logger.warn("Could not parse class number from className for classId: {}", classId);
-                    }
-                }
+            if (className != null && !className.trim().isEmpty()) {
+                return className.trim();
             }
         }
         // Never fall back to classId (a DB primary key) — that would corrupt studentClass.

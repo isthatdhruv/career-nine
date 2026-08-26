@@ -347,7 +347,8 @@ public class SchoolDashboardDataService {
             ScoredStudent entry = new ScoredStudent();
             entry.userStudentId = student.getUserStudentId();
             entry.sessionId = info == null ? null : longOf(info.getSessionId());
-            entry.classId = info == null ? null : longOf(info.getStudentClass());
+            entry.classId = info == null ? null
+                    : longOf(com.kccitm.api.util.GradeParser.numericGradeOrNull(info.getStudentClass()));
             entry.sectionId = info == null ? null : longOf(info.getSchoolSectionId());
             entry.sectionName = sectionName(info, sectionNameCache);
             entry.status = normalizeStatus(mapping.getStatus());
@@ -443,8 +444,9 @@ public class SchoolDashboardDataService {
 
         row.school = student.getInstitute() != null ? safe(student.getInstitute().getInstituteName()) : "";
         row.studentName = info != null ? safe(info.getName()) : safe(scores.studentName);
-        row.studentClass = info != null && info.getStudentClass() != null
-                ? info.getStudentClass() : parseClass(scores.studentClass);
+        Integer infoGrade = info != null
+                ? com.kccitm.api.util.GradeParser.numericGradeOrNull(info.getStudentClass()) : null;
+        row.studentClass = infoGrade != null ? infoGrade : parseClass(scores.studentClass);
         row.section = sectionName(info, sectionNameCache);
         row.gender = normalizeGender(info != null ? info.getGender() : null);
 
@@ -514,14 +516,7 @@ public class SchoolDashboardDataService {
     }
 
     private static Integer parseClass(String studentClass) {
-        if (studentClass == null) {
-            return null;
-        }
-        try {
-            return Integer.valueOf(studentClass.trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
     }
 
     private static Integer score(Map<String, Integer> scores, String key) {

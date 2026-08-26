@@ -846,24 +846,22 @@ public class NavigatorReportDataController {
     // ═══════════════════════ TEMPLATE HELPERS ═══════════════════════
 
     private String resolveTemplateName(String studentClass) {
-        if (studentClass == null) return "9-10.html";
-        try {
-            int classNum = Integer.parseInt(studentClass.trim());
+        Integer classNum = com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
+        if (classNum != null) {
             if (classNum >= 6 && classNum <= 8) return "6-8.html";
             if (classNum >= 9 && classNum <= 10) return "9-10.html";
             if (classNum >= 11 && classNum <= 12) return "11-12.html";
-        } catch (NumberFormatException ignored) {}
+        }
         return "9-10.html";
     }
 
     private String resolveReportType(String studentClass) {
-        if (studentClass == null) return "stream_navigator";
-        try {
-            int classNum = Integer.parseInt(studentClass.trim());
+        Integer classNum = com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
+        if (classNum != null) {
             if (classNum >= 6 && classNum <= 8) return "insight_navigator";
             if (classNum >= 9 && classNum <= 10) return "stream_navigator";
             if (classNum >= 11 && classNum <= 12) return "career_navigator";
-        } catch (NumberFormatException ignored) {}
+        }
         return "stream_navigator";
     }
 

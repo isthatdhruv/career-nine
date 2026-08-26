@@ -61,7 +61,7 @@ export interface StudentWithMapping {
     username?: string;
     schoolSectionId?: number;
     /** Flat student_info.student_class — Grade fallback when schoolSectionId is unset. */
-    studentClass?: number | null;
+    studentClass?: string | null;
     gender?: string;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];
@@ -291,7 +291,7 @@ export interface StudentScoresResponse {
     student: {
         name: string;
         rollNumber: string;
-        studentClass: number | null;
+        studentClass: string | null;
         dob: string;
     };
     scores: StudentScoreDetail[];

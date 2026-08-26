@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { getInstituteTerms } from "../utils/instituteTerms";
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
 import { MdQrCode } from "react-icons/md";
 import { ActionIcon } from "../../../components/ActionIcon";
@@ -24,13 +25,16 @@ import CatalogSelector from "./CatalogSelector";
 interface Props {
   instituteCode: number;
   instituteName: string;
+  /** false → college wording (Year/Course); true/undefined → school wording. */
+  isSchool?: boolean | null;
   active?: boolean;
 }
 
 const assessmentAppBase = process.env.REACT_APP_ASSESSMENT_APP_URL || "https://assessment.career-9.com";
 const registrationUrl = (token: string) => `${assessmentAppBase}/assessment-register/${token}`;
 
-const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
+const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Props) => {
+  const terms = getInstituteTerms(isSchool);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [mappings, setMappings] = useState<AssessmentInstituteMapping[]>([]);
@@ -243,7 +247,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
       for (const session of sessions) {
         const cls = (session.schoolClasses || []).find((c: any) => c.id === mapping.classId);
         if (cls) {
-          parts.push(`Class ${cls.className}`);
+          parts.push(`${terms.unit} ${cls.className}`);
           if (mapping.sectionId) {
             const sec = (cls.schoolSections || []).find((s: any) => s.id === mapping.sectionId);
             if (sec) parts.push(`Section ${sec.sectionName}`);
@@ -340,7 +344,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                 >
                   <option value="INSTITUTE">Institute (whole institute)</option>
                   <option value="SESSION">Session</option>
-                  <option value="CLASS">Class</option>
+                  <option value="CLASS">{terms.unit}</option>
                   <option value="SECTION">Section</option>
                 </Form.Select>
               </div>

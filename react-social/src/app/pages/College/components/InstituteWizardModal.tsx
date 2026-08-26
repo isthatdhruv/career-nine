@@ -84,6 +84,8 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
       existing?.maxContactPersons != null ? String(existing.maxContactPersons) : "",
     display: 1,
     isWhitelabel: existing?.isWhitelabel ?? false,
+    // legacy institutes (null) default to school
+    isSchool: existing ? existing.isSchool !== false : true,
   };
 
   // Reset whenever the modal is opened or the target institute changes.
@@ -491,6 +493,33 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
               )}
             </div>
 
+            {/* Institute Type — drives Class/Board vs Year/Course wording everywhere */}
+            <div className="fv-row mb-2 mt-6">
+              <label className="fs-6 fw-bold mb-2">Institute Type :</label>
+              <div className="d-flex gap-6">
+                <label className="form-check form-check-custom form-check-solid">
+                  <input
+                    className="form-check-input"
+                    type="radio"
+                    name="isSchool"
+                    checked={formik.values.isSchool === true}
+                    onChange={() => formik.setFieldValue("isSchool", true)}
+                  />
+                  <span className="form-check-label fw-semibold">School (Classes &amp; Boards)</span>
+                </label>
+                <label className="form-check form-check-custom form-check-solid">
+                  <input
+                    className="form-check-input"
+                    type="radio"
+                    name="isSchool"
+                    checked={formik.values.isSchool === false}
+                    onChange={() => formik.setFieldValue("isSchool", false)}
+                  />
+                  <span className="form-check-label fw-semibold">College (Years &amp; Courses)</span>
+                </label>
+              </div>
+            </div>
+
             <div className="fv-row mb-2 mt-6">
               <label className="fs-6 fw-bold mb-2">White-label this school :</label>
               <Form.Check
@@ -541,6 +570,7 @@ const InstituteWizardModal = ({ show, onHide, setPageLoading, existing }: Props)
           <InstituteSessionDetailsPanel
             ref={sessionPanelRef}
             instituteCode={instituteCode}
+            isSchool={formik.values.isSchool}
           />
         )}
 

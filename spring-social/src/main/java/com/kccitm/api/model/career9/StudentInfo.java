@@ -107,7 +107,9 @@ public class StudentInfo implements Serializable {
 
     private Long controlNumber;
 
-    private Integer studentClass;
+    // Display class label stored verbatim ("10", "10-A", "1st Year");
+    // numeric grade is derived on demand via GradeParser where band logic needs it.
+    private String studentClass;
 
     @Column(name = "institute_id")
     private Integer instituteId;
@@ -291,12 +293,12 @@ public class StudentInfo implements Serializable {
         this.schoolName = schoolName;
     }
 
-    public Integer getStudentClass() {
+    public String getStudentClass() {
         return studentClass;
     }
 
-    public void setStudentClass(Integer studentClass) {
-        this.studentClass = studentClass;
+    public void setStudentClass(String studentClass) {
+        this.studentClass = studentClass == null ? null : studentClass.trim();
     }
 
     public Integer getSchoolSectionId() {

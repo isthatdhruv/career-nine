@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { getInstituteTerms } from "../utils/instituteTerms";
 import { Button, Form, Spinner } from "react-bootstrap";
 import { MdQrCode } from "react-icons/md";
 import { ActionIcon } from "../../../components/ActionIcon";
@@ -18,10 +19,13 @@ import SchoolTierManagementModal from "./SchoolTierManagementModal";
 interface Props {
   instituteCode: number;
   instituteName: string;
+  /** false → college wording (Year/Course); true/undefined → school wording. */
+  isSchool?: boolean | null;
   active?: boolean;
 }
 
-const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = true }: Props) => {
+const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, isSchool, active = true }: Props) => {
+  const terms = getInstituteTerms(isSchool);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [selectedSession, setSelectedSession] = useState<string>("");
@@ -356,7 +360,7 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                           title="Select all"
                         />
                       </th>
-                      {["Class", "Assessment", "Status"].map((h) => (
+                      {[terms.unit, "Assessment", "Status"].map((h) => (
                         <th key={h} style={{
                           padding: "12px 16px", fontWeight: 700, fontSize: "0.78rem",
                           color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",

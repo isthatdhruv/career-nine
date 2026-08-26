@@ -1308,13 +1308,12 @@ public class NavigatorCoreAnalysis {
     }
 
     private String getClassGroup(String studentClass) {
-        if (studentClass == null || studentClass.isEmpty()) return "9-10";
-        try {
-            int classNum = Integer.parseInt(studentClass.trim());
+        Integer classNum = com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
+        if (classNum != null) {
             if (classNum >= 6 && classNum <= 8) return "6-8";
             if (classNum >= 9 && classNum <= 10) return "9-10";
             if (classNum >= 11 && classNum <= 12) return "11-12";
-        } catch (NumberFormatException ignored) {}
+        }
         return "9-10";
     }
 

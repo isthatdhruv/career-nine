@@ -60,7 +60,13 @@ const DemographicDetailsPage: React.FC = () => {
         const mappedData: DemographicData = {
           name: data.name || "",
           gender: data.gender || "",
-          grade: data.studentClass ? `${data.studentClass}${data.studentClass === 3 ? 'rd' : data.studentClass === 4 || data.studentClass === 5 ? 'th' : ''} Grade` : "",
+          grade: (() => {
+            if (!data.studentClass) return "";
+            const label = String(data.studentClass);
+            const num = /^\d+$/.test(label) ? Number(label) : null;
+            if (num === null) return label; // free-form label ("10-A", "1st Year") shown verbatim
+            return `${num}${num === 3 ? 'rd' : num === 4 || num === 5 ? 'th' : ''} Grade`;
+          })(),
           schoolBoard: data.schoolBoard || "",
           siblings: data.sibling !== null && data.sibling !== undefined
             ? (data.sibling >= 3 ? "3 or more" : String(data.sibling))

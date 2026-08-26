@@ -37,6 +37,8 @@ export type MappingInfo = {
   assessmentName: string;
   instituteCode: string;
   instituteName: string;
+  /** false → college (Year/Course wording); true/absent → school (Class/Board). */
+  isSchool?: boolean | null;
   inclusions: MappingInclusions;
   activeTierName?: string;
   // Post-assessment counselling payment timing + fee breakdown (PAID links only).
@@ -192,6 +194,8 @@ export type InviteInfo = {
   assessmentId: number;
   assessmentName?: string;
   instituteName?: string;
+  /** false → college (Year/Course wording); true/absent → school (Class/Board). */
+  isSchool?: boolean | null;
   tierName?: string;
   amount: number;
   payableTotal?: number;

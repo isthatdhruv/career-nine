@@ -11,12 +11,14 @@ import {
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 import { validateReferralCode } from "../api-clients/referralCodeAPI"
 import { TierCard, Tier } from "../components/TierCard"
+import { getInstituteTerms } from "../utils/instituteTerms"
 
 const AssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
 
   const [mappingInfo, setMappingInfo] = useState<MappingInfo | null>(null)
+  const terms = getInstituteTerms(mappingInfo?.isSchool)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -538,7 +540,7 @@ const AssessmentRegisterPage = () => {
           </h2>
           <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "0.88rem" }}>
             {mappingInfo?.instituteName || ""}
-            {mappingInfo?.className && ` · Class ${mappingInfo.className}`}
+            {mappingInfo?.className && ` · ${terms.unit} ${mappingInfo.className}`}
             {mappingInfo?.sectionName && ` (${mappingInfo.sectionName})`}
             {mappingInfo?.sessionYear && ` · ${mappingInfo.sessionYear}`}
           </p>
@@ -681,7 +683,7 @@ const AssessmentRegisterPage = () => {
                   <div style={{ display: "grid", gridTemplateColumns: instituteClassSections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
                     <div>
                       <label style={s.label}>
-                        Class <span style={{ color: "#f43f5e" }}>*</span>
+                        {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
                       </label>
                       <select
                         value={selectedClassId}
@@ -694,7 +696,7 @@ const AssessmentRegisterPage = () => {
                         onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
                         onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
                       >
-                        <option value="">Select Class</option>
+                        <option value="">{terms.selectUnit}</option>
                         {instituteClasses.map((c: any) => (
                           <option key={c.id} value={c.id}>{c.className}</option>
                         ))}
@@ -727,7 +729,7 @@ const AssessmentRegisterPage = () => {
               <div style={{ display: "grid", gridTemplateColumns: selectedClassSections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
                 <div>
                   <label style={s.label}>
-                    Class <span style={{ color: "#f43f5e" }}>*</span>
+                    {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
                   </label>
                   <select
                     value={selectedClassId}
@@ -740,7 +742,7 @@ const AssessmentRegisterPage = () => {
                     onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
                     onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
                   >
-                    <option value="">Select Class</option>
+                    <option value="">{terms.selectUnit}</option>
                     {availableClasses.map((c: any) => (
                       <option key={c.id} value={c.id}>{c.className}</option>
                     ))}
@@ -792,7 +794,7 @@ const AssessmentRegisterPage = () => {
                 border: "1.5px solid #a7f3d0", borderRadius: 12,
                 padding: "14px 20px", fontSize: "0.88rem", color: "#065f46",
               }}>
-                Class: <strong>{mappingInfo.className}</strong> &middot; Section: <strong>{mappingInfo.sectionName}</strong>
+                {terms.unit}: <strong>{mappingInfo.className}</strong> &middot; Section: <strong>{mappingInfo.sectionName}</strong>
               </div>
             )}
 

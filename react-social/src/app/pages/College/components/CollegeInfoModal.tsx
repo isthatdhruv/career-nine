@@ -5,6 +5,7 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import { MapContactsAndBoards, GetInstituteMappings, UpdateCollegeData } from "../API/College_APIs";
 import { ReadBoardData } from "../../Board/API/Board_APIs";
+import { getInstituteTerms } from "../utils/instituteTerms";
 import { ReadContactInformationData } from "../../ContactPerson/API/Contact_Person_APIs";
 
 type ContactPerson = {
@@ -38,6 +39,7 @@ type Props = {
 };
 
 const CollegeInfoModal = (props: Props) => {
+  const terms = getInstituteTerms(props.data?.isSchool as boolean | null | undefined);
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
 
@@ -215,7 +217,7 @@ const CollegeInfoModal = (props: Props) => {
   };
 
   const getBoardLabel = (board: Board) =>
-    board.boardName ?? board.name ?? (board.id !== undefined ? String(board.id) : "Board");
+    board.boardName ?? board.name ?? (board.id !== undefined ? String(board.id) : terms.catalog);
 
   const selectedContactList = selectedContactIndexes.map((i) => availableContacts[i]);
   const selectedBoardList = selectedBoardIndexes.map((i) => availableBoards[i]);
@@ -234,7 +236,7 @@ const CollegeInfoModal = (props: Props) => {
       <Modal.Header className="border-0 pb-0">
         <div className="d-flex flex-column">
           <h3 id="college-info-modal-title" className="mb-1 fw-bold">
-            Map Board &amp; Contact Person(s)
+            Map {terms.catalog} &amp; Contact Person(s)
           </h3>
           <span className="text-muted small">
             Link the institute with appropriate contact person(s), board(s) and max class.
