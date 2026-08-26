@@ -130,6 +130,14 @@ public class StudentInfo implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy")
     private Date studentDob;
 
+    // DPDP (Digital Personal Data Protection Act, 2023): server-side timestamp of the
+    // parental consent given on the registration form. Stamped on every registration
+    // path — inline for free/trial/invite registrations, and via the PaymentTransaction
+    // consent flag for students provisioned later by the Razorpay webhook. NULL for
+    // students created before consent capture existed (or by admin/bulk imports).
+    @Column(name = "dpdp_consent_at")
+    private Date dpdpConsentAt;
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id")
     private User user;
@@ -141,6 +149,14 @@ public class StudentInfo implements Serializable {
 
     public void setStudentDob(Date studentDob) {
         this.studentDob = studentDob;
+    }
+
+    public Date getDpdpConsentAt() {
+        return dpdpConsentAt;
+    }
+
+    public void setDpdpConsentAt(Date dpdpConsentAt) {
+        this.dpdpConsentAt = dpdpConsentAt;
     }
 
     public Integer getId() {

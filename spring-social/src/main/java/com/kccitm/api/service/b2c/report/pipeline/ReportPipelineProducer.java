@@ -48,6 +48,7 @@ public class ReportPipelineProducer {
     @Autowired private InstituteEmailSettingService instituteEmailSettingService;
     @Autowired private EmailAccountRepository accountRepository;
     @Autowired private EmailTemplateRepository templateRepository;
+    @Autowired private com.kccitm.api.service.b2c.EntitlementService entitlementService;
 
     @Value("${report.pipeline.enabled:true}")
     private boolean enabled;
@@ -99,6 +100,7 @@ public class ReportPipelineProducer {
         ev.emailAccountId = resolveAccountId(instituteCode);
         ev.emailTemplateId = resolveReportTemplateId();
         ev.studentName = info != null ? info.getName() : null;
+        ev.entitlementId = resolveEntitlementId(userStudent.getUserStudentId(), assessmentId);
         try {
             kafkaTemplate.send(ReportPipelineConfig.TOPIC_GENERATE, ev.key(),
                     objectMapper.writeValueAsString(ev));
@@ -144,6 +146,7 @@ public class ReportPipelineProducer {
         ev.emailAccountId = resolveAccountId(institute != null ? institute.getInstituteCode() : null);
         ev.emailTemplateId = resolveReportTemplateId();
         ev.studentName = info != null ? info.getName() : null;
+        ev.entitlementId = resolveEntitlementId(userStudentId, assessmentId);
         try {
             kafkaTemplate.send(ReportPipelineConfig.TOPIC_GENERATE, ev.key(),
                     objectMapper.writeValueAsString(ev));
@@ -152,6 +155,23 @@ public class ReportPipelineProducer {
         } catch (Exception e) {
             throw new IllegalStateException("Kafka enqueue failed for student " + userStudentId
                     + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * B2C entitlement gate: the id of the entitlement whose tier includes the final
+     * report (so the email stage mails the student the CDN report link + PDF), or
+     * null. Best-effort — a lookup failure must never block report generation.
+     */
+    private Long resolveEntitlementId(Long userStudentId, Long assessmentId) {
+        try {
+            com.kccitm.api.model.career9.b2c.StudentEntitlement e =
+                    entitlementService.resolvePipelineReportEmail(userStudentId, assessmentId);
+            return e != null ? e.getEntitlementId() : null;
+        } catch (Exception ex) {
+            logger.warn("Report pipeline: entitlement lookup failed student={} assessment={}: {}",
+                    userStudentId, assessmentId, ex.getMessage());
+            return null;
         }
     }
 

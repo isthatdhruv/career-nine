@@ -5,6 +5,7 @@ import http from "../api/http";
 import { getSchoolInfo, registerSchoolStudent, verifyStudentDetails } from "../api-clients/schoolRegistrationAPI";
 import { validatePromoCode } from "../api-clients/promoCodeAPI";
 import { validateReferralCode } from "../api-clients/referralCodeAPI";
+import ParentalConsentSection from "../components/ParentalConsent";
 
 const SchoolAssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>();
@@ -30,6 +31,9 @@ const SchoolAssessmentRegisterPage = () => {
   const [promoApplied, setPromoApplied] = useState<{ code: string; discountPercent: number } | null>(null);
   const [promoError, setPromoError] = useState("");
   const [promoValidating, setPromoValidating] = useState(false);
+  const [showPromo, setShowPromo] = useState(false);
+  // DPDP parental consent — registration cannot proceed without it.
+  const [dpdpConsent, setDpdpConsent] = useState(false);
 
   // Referral code
   const [hasReferral, setHasReferral] = useState(false);
@@ -190,6 +194,10 @@ const SchoolAssessmentRegisterPage = () => {
       showErrorToast("Please select your class.");
       return;
     }
+    if (!dpdpConsent) {
+      showErrorToast("Please confirm the parental consent to continue.");
+      return;
+    }
     if (!/^\d{2}-\d{2}-\d{4}$/.test(dob)) {
       showErrorToast("Date of Birth must be in dd-mm-yyyy format.");
       return;
@@ -208,6 +216,8 @@ const SchoolAssessmentRegisterPage = () => {
         phone: phone.trim(),
         gender,
         classId: Number(selectedClassId),
+        // DPDP parental consent (submit is gated on the checkbox above).
+        dpdpConsent,
       };
       if (selectedSectionId) data.schoolSectionId = Number(selectedSectionId);
       if (promoApplied) data.promoCode = promoApplied.code;
@@ -390,7 +400,16 @@ const SchoolAssessmentRegisterPage = () => {
         <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #e2e8f0, transparent)", margin: "0 32px" }} />
 
         {/* Form */}
-        <form onSubmit={handleSubmit} style={{ padding: "28px 32px 32px" }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ padding: "28px 32px 32px" }}
+          // Enter in a text field must never submit the registration — only the
+          // explicit submit button does. Field-level handlers (promo/referral apply)
+          // still run first, since the event bubbles from the input up to the form.
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
+          }}
+        >
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
 
             {/* Class + Section row */}
@@ -466,7 +485,7 @@ const SchoolAssessmentRegisterPage = () => {
             {/* Email + DOB */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div>
-                <label style={s.label}>Email <span style={{ color: "#f43f5e" }}>*</span></label>
+                <label style={s.label}>Parent's Email <span style={{ color: "#f43f5e" }}>*</span></label>
                 <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={s.input}
                   onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
               </div>
@@ -484,7 +503,7 @@ const SchoolAssessmentRegisterPage = () => {
                     (which gates the submit button) only fires once email+phone+dob
                     are all filled — rendering it as optional left students unable
                     to submit with no explanation. */}
-                <label style={s.label}>Phone Number <span style={{ color: "#f43f5e" }}>*</span></label>
+                <label style={s.label}>Parent's Phone <span style={{ color: "#f43f5e" }}>*</span></label>
                 <input type="tel" placeholder="Enter phone number" value={phone} onChange={(e) => setPhone(e.target.value)} required style={s.input}
                   onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
               </div>
@@ -535,8 +554,20 @@ const SchoolAssessmentRegisterPage = () => {
               </div>
             )}
 
-            {/* Promo Code */}
-            {isPaid && selectedClassId && (
+            {/* Promo Code — hidden behind a toggle until the student asks for it */}
+            {isPaid && selectedClassId && !showPromo && !promoApplied && (
+              <button
+                type="button"
+                onClick={() => setShowPromo(true)}
+                style={{
+                  background: "none", border: "none", padding: 0, textAlign: "left",
+                  color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+                }}
+              >
+                Do you have a promo code?
+              </button>
+            )}
+            {isPaid && selectedClassId && (showPromo || promoApplied) && (
               <div>
                 <label style={s.label}>Promo Code</label>
                 {promoApplied ? (
@@ -610,6 +641,10 @@ const SchoolAssessmentRegisterPage = () => {
                 )}
               </div>
             )}
+          </div>
+
+          <div style={{ marginTop: 20 }}>
+            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
           </div>
 
           {/* Submit */}

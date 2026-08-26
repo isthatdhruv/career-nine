@@ -37,6 +37,9 @@ public class ReportEmailConsumer {
     @Autowired private EmailRateLimiter rateLimiter;
     @Autowired private DigitalOceanSpacesService spacesService;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private ReportEmailComposer composer;
+    @Autowired private com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository
+            serviceDeliveryLogRepository;
 
     @RetryableTopic(
             attempts = "${report.pipeline.max-attempts:5}",
@@ -62,11 +65,13 @@ public class ReportEmailConsumer {
         }
 
         // Invariant: a report is emailed only when the student is whitelabel, the
-        // assessment's "email report" toggle is on (Phase 4), or an admin enqueued
-        // with emailMode="all". The generate stage already gates on this; re-check
-        // defensively so a stray/replayed event can never email someone who shouldn't be.
-        if (!ev.whitelabel && !ev.emailReportEnabled && !"all".equals(ev.emailMode)) {
-            logger.warn("Report email skipped (neither whitelabel, toggle, nor admin-all; mode={}) student={} assessment={}",
+        // assessment's "email report" toggle is on (Phase 4), the student holds a
+        // final-report entitlement (B2C), or an admin enqueued with emailMode="all".
+        // The generate stage already gates on this; re-check defensively so a
+        // stray/replayed event can never email someone who shouldn't be.
+        if (!ev.whitelabel && !ev.emailReportEnabled && ev.entitlementId == null
+                && !"all".equals(ev.emailMode)) {
+            logger.warn("Report email skipped (neither whitelabel, toggle, entitlement, nor admin-all; mode={}) student={} assessment={}",
                     ev.emailMode, ev.userStudentId, ev.assessmentId);
             return;
         }
@@ -93,6 +98,7 @@ public class ReportEmailConsumer {
             rateLimiter.acquire();
             emailSender.sendReportEmail(ev, pdf);
             idempotency.markSent(ev.userStudentId, ev.assessmentId, ev.batchId);
+            logEntitlementDelivery(ev);
             logger.info("Report email sent student={} assessment={} withPdf={}",
                     ev.userStudentId, ev.assessmentId, (pdf != null));
         } catch (Exception e) {
@@ -102,6 +108,37 @@ public class ReportEmailConsumer {
                     ev.userStudentId, ev.assessmentId, e.getMessage());
             idempotency.release(ev.userStudentId, ev.assessmentId, ev.batchId); // let the retry re-claim
             throw e; // → @RetryableTopic retry → DLT
+        }
+    }
+
+    /**
+     * B2C audit continuity: entitlement emails used to be sent by EntitlementService
+     * through NotificationDispatcher, which wrote the "final_report" ServiceDeliveryLog
+     * row the admin Tracker's communications view and resend flow read. Now that the
+     * pipeline delivers that email, write the same row here. Best-effort — the email
+     * IS sent at this point, so a logging failure must not trigger a retry (which
+     * would double-send).
+     */
+    private void logEntitlementDelivery(ReportEmailEvent ev) {
+        if (ev.entitlementId == null) return;
+        try {
+            com.kccitm.api.model.career9.b2c.ServiceDeliveryLog log =
+                    new com.kccitm.api.model.career9.b2c.ServiceDeliveryLog();
+            log.setEntitlementId(ev.entitlementId);
+            log.setUserStudentId(ev.userStudentId);
+            log.setServiceType("final_report");
+            log.setChannel("email");
+            log.setRecipient(ev.recipientEmail);
+            log.setSubject(composer.subject(ev));
+            // CDN links carry no access token — safe to store unredacted.
+            log.setLinkUrl(ev.pdfUrl != null ? ev.pdfUrl : ev.reportUrl);
+            log.setTemplateKey("final_report");
+            log.setDeliveryStatus("sent");
+            log.setSentAt(new java.util.Date());
+            serviceDeliveryLogRepository.save(log);
+        } catch (Exception e) {
+            logger.warn("Could not write final_report ServiceDeliveryLog entitlement={} student={}: {}",
+                    ev.entitlementId, ev.userStudentId, e.getMessage());
         }
     }
 

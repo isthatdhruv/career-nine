@@ -149,8 +149,11 @@ public class SlotMaterializationService {
             List<CounsellingSlot> sameDay = slotRepository
                     .findByCounsellorIdAndDateBetween(template.getCounsellor().getId(), date, date);
 
-            // Generate slots for this date
+            // Generate slots for this date. Consecutive slots are separated by the
+            // template's break (0/NULL = back-to-back, the historic behaviour).
             boolean isToday = date.equals(today);
+            int breakMinutes = template.getBreakMinutes() != null && template.getBreakMinutes() > 0
+                    ? template.getBreakMinutes() : 0;
             LocalTime slotStart = template.getStartTime();
             LocalTime slotEnd = slotStart.plusMinutes(template.getDefaultSlotDuration());
 
@@ -180,8 +183,11 @@ public class SlotMaterializationService {
                     created++;
                 }
 
-                slotStart = slotEnd;
+                slotStart = slotEnd.plusMinutes(breakMinutes);
                 slotEnd = slotStart.plusMinutes(template.getDefaultSlotDuration());
+                // LocalTime wraps at midnight — a wrapped end reads as "early morning",
+                // which would slip past the endTime guard and loop forever.
+                if (slotEnd.isBefore(slotStart)) break;
             }
         }
 

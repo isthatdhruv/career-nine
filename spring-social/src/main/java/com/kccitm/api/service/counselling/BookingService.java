@@ -487,9 +487,10 @@ public class BookingService {
         logger.info("Created appointment {} for student {} on slot {} (mode={})",
                 appointment.getId(), student.getUserStudentId(), slotId, mode);
 
-        // Auto-confirmed at booking — send the mode-aware confirmation
-        // (meeting link for ONLINE / office address for OFFLINE) plus a calendar
-        // (.ics) invite by email and a best-effort WhatsApp confirmation.
+        // Auto-confirmed at booking — send the confirmation mail: session details,
+        // assessment-report guidance (what Manage Sessions re-sends), the calendar
+        // (.ics) invite, plus a best-effort WhatsApp confirmation. The mail retries
+        // until the student's copy is accepted; a total failure is logged, never thrown.
         notificationService.sendConfirmationWithCalendar(appointment);
 
         // Send in-app notification to student — UserStudent stores userId (Long),

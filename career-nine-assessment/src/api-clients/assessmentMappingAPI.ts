@@ -76,6 +76,8 @@ export function registerStudentByToken(
     classId?: number;
     schoolSectionId?: number;
     promoCode?: string;
+    /** DPDP parental consent given on the form; the backend stamps dpdp_consent_at from it. */
+    dpdpConsent?: boolean;
   }
 ) {
   return http.post(`/assessment-mapping/public/register/${token}`, studentData);
@@ -206,6 +208,6 @@ export function getInviteInfoByToken(token: string) {
   return http.get<InviteInfo>(`/assessment-mapping/public/student-invite/info/${token}`);
 }
 
-export function registerInviteByToken(token: string, body?: { phone?: string }) {
+export function registerInviteByToken(token: string, body?: { phone?: string; dpdpConsent?: boolean }) {
   return http.post(`/assessment-mapping/public/student-invite/register/${token}`, body ?? {});
 }

@@ -22,7 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
+import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
+import com.kccitm.api.service.counselling.AvailabilityTemplateService;
 import com.kccitm.api.service.counselling.BookingService;
 
 @RestController
@@ -36,6 +38,12 @@ public class CounsellingSlotController {
 
     @Autowired
     private BookingService bookingService;
+
+    @Autowired
+    private CounsellingAppointmentRepository appointmentRepository;
+
+    @Autowired
+    private AvailabilityTemplateService templateService;
 
     @PreAuthorize("@auth.allows('counselling.slot.read', #instituteCode, null, null, null)")
     @GetMapping("/available")
@@ -141,9 +149,24 @@ public class CounsellingSlotController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Cannot delete slot: only AVAILABLE or blocked slots can be deleted.");
         }
+        if (appointmentRepository.existsBySlot_Id(id)) {
+            // A past appointment still points at this slot — a rescheduled or cancelled
+            // session leaves the row behind even after the slot goes back to AVAILABLE.
+            // The FK makes the row undeletable, so say so instead of failing with a 500.
+            logger.warn("Cannot delete slot {}: an appointment still references it", id);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Cannot delete slot: a past or rescheduled session is still linked to it.");
+        }
+        Long templateId = slot.getTemplate() != null ? slot.getTemplate().getId() : null;
         slotRepository.deleteById(id);
         logger.info("Deleted counselling slot {}", id);
-        return ResponseEntity.ok().build();
+        // Clearing a schedule's last remaining slot clears the schedule: leaving the weekly
+        // rule behind would keep advertising a day that no longer yields anything bookable.
+        boolean templateRemoved = templateService.deleteTemplateIfExhausted(templateId);
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("deleted", true);
+        body.put("templateRemoved", templateRemoved);
+        return ResponseEntity.ok(body);
     }
 
     /**

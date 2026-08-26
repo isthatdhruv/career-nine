@@ -635,6 +635,10 @@ public class SchoolRegistrationController {
         String gender = (String) studentData.get("gender");
         Integer classId = studentData.get("classId") != null ? Integer.valueOf(studentData.get("classId").toString()) : null;
         Integer schoolSectionId = studentData.get("schoolSectionId") != null ? Integer.valueOf(studentData.get("schoolSectionId").toString()) : null;
+        // DPDP parental consent given on the form (the UI enforces it; older clients omit it).
+        Object dpdpObj = studentData.get("dpdpConsent");
+        boolean dpdpConsent = dpdpObj instanceof Boolean ? (Boolean) dpdpObj
+                : dpdpObj != null && ("true".equalsIgnoreCase(dpdpObj.toString()) || "1".equals(dpdpObj.toString()));
 
         if (name == null || email == null || dobStr == null || classId == null
                 || phone == null || phone.trim().isEmpty()) {
@@ -731,7 +735,7 @@ public class SchoolRegistrationController {
                 return handleExistingStudentWithPayment(byEmail.get(0), assessmentId, instituteCode,
                         config.getConfigId(), activeTierId, finalAmount, originalAmount,
                         promoCodeStr, promoDiscountPercent, referralCodeStr,
-                        name, email, dob, phone);
+                        name, email, dob, phone, dpdpConsent);
             }
             return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, activeTierId,
                     config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr);
@@ -746,7 +750,7 @@ public class SchoolRegistrationController {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
                             config.getConfigId(), activeTierId, finalAmount, originalAmount,
                             promoCodeStr, promoDiscountPercent, referralCodeStr,
-                            name, email, dob, phone);
+                            name, email, dob, phone, dpdpConsent);
                 }
                 return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId,
                         config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr);
@@ -757,7 +761,8 @@ public class SchoolRegistrationController {
         if (paymentRequired && finalAmount > 0) {
             return createPaymentAndRedirect(config.getConfigId(), activeTierId, assessmentId, instituteCode,
                     finalAmount, originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr,
-                    name, email, dob, dobStr, phone, gender, classId, schoolSectionId, studentClass);
+                    name, email, dob, dobStr, phone, gender, classId, schoolSectionId, studentClass,
+                    dpdpConsent);
         }
 
         // 10. Create student
@@ -783,6 +788,8 @@ public class SchoolRegistrationController {
         studentInfo.setStudentClass(studentClass);
         studentInfo.setSchoolSectionId(schoolSectionId);
         studentInfo.setUser(user);
+        // DPDP: record the parental consent given on this registration form.
+        if (dpdpConsent) studentInfo.setDpdpConsentAt(new Date());
         studentInfo = studentInfoRepository.save(studentInfo);
 
         InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
@@ -870,7 +877,7 @@ public class SchoolRegistrationController {
             Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
             String referralCodeStr, String name, String email, Date dob, String dobStr, String phone, String gender,
-            Integer classId, Integer schoolSectionId, Integer studentClass) {
+            Integer classId, Integer schoolSectionId, Integer studentClass, boolean dpdpConsent) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
@@ -890,6 +897,9 @@ public class SchoolRegistrationController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
+            // DPDP: carry consent to the webhook, which creates the student and
+            // stamps StudentInfo.dpdpConsentAt from it.
+            txn.setDpdpConsent(dpdpConsent ? Boolean.TRUE : null);
             txn.setStatus("created");
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
                 txn.setPromoCode(promoCodeStr.trim().toUpperCase());
@@ -952,7 +962,7 @@ public class SchoolRegistrationController {
             Integer instituteCode, Long schoolConfigId, Long mappingTierId,
             Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent, String referralCodeStr,
-            String name, String email, Date dob, String phone) {
+            String name, String email, Date dob, String phone, boolean dpdpConsent) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (!userStudents.isEmpty()) {
             UserStudent userStudent = userStudents.get(0);
@@ -971,7 +981,7 @@ public class SchoolRegistrationController {
         String dobStr = sdfFmt.format(dob);
         return createPaymentAndRedirect(schoolConfigId, mappingTierId, assessmentId, instituteCode,
                 finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent, referralCodeStr,
-                name, email, dob, dobStr, phone, null, null, null, null);
+                name, email, dob, dobStr, phone, null, null, null, null, dpdpConsent);
     }
 
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,

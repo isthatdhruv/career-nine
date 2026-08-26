@@ -338,6 +338,8 @@ public class CampaignPublicController {
         // Optional: the class the student picked (class-based campaigns). Persisted
         // as a grade number on StudentInfo so reports resolve the right template.
         Integer classId = intFromBody(body, "classId");
+        // DPDP parental consent given on the form (the UI enforces it; older clients omit it).
+        boolean dpdpConsent = boolFromBody(body, "dpdpConsent");
 
         if (name == null || email == null || dobStr == null || phone == null) {
             return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
@@ -405,13 +407,13 @@ public class CampaignPublicController {
         if (finalInr == 0L) {
             return provisionFreeAndRespond(campaign, mapping, tierMapping, pricingTier,
                     existing, name, email, dob, dobStr, phone, gender, classId,
-                    promoCodeSaved, promoDiscountPercent, originalInr, httpResponse);
+                    promoCodeSaved, promoDiscountPercent, originalInr, dpdpConsent, httpResponse);
         }
 
         // 7. Paid path → create Razorpay payment link + PaymentTransaction
         return createPaymentAndRedirect(campaign, mapping, tierMapping, pricingTier,
                 name, email, dob, dobStr, phone, gender, classId,
-                finalInr, originalInr, promoCodeSaved, promoDiscountPercent);
+                finalInr, originalInr, promoCodeSaved, promoDiscountPercent, dpdpConsent);
     }
 
     /**
@@ -457,6 +459,7 @@ public class CampaignPublicController {
         String gender = strFromBody(body, "gender");
         Integer classId = intFromBody(body, "classId");
         Integer studentClass = parseClassNumber(classId);
+        boolean dpdpConsent = boolFromBody(body, "dpdpConsent");
 
         if (name == null || email == null || dobStr == null || phone == null) {
             return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
@@ -522,6 +525,9 @@ public class CampaignPublicController {
             userStudent = userStudentRepository.save(new UserStudent(user, info, null));
             studentProvisioningService.provision(userStudent);
         }
+
+        // DPDP: record when the parent consented on this registration form.
+        stampDpdpConsent(userStudent.getStudentInfo(), dpdpConsent);
 
         // Set the campaign's institute as primary + record membership.
         // No-op when campaign has no institute mapped (legacy campaign pre-backfill).
@@ -860,6 +866,7 @@ public class CampaignPublicController {
             String name, String email, Date dob, String dobStr, String phone, String gender,
             Integer classId,
             String promoCodeSaved, Integer promoDiscountPercent, long originalInr,
+            boolean dpdpConsent,
             HttpServletResponse httpResponse) {
 
         Integer studentClass = parseClassNumber(classId);
@@ -918,6 +925,10 @@ public class CampaignPublicController {
             userStudent = userStudentRepository.save(userStudent);
             studentProvisioningService.provision(userStudent);
         }
+
+        // DPDP: record when the parent consented on this registration form. First
+        // consent wins — an existing timestamp is the original consent record.
+        stampDpdpConsent(userStudent.getStudentInfo(), dpdpConsent);
 
         membershipService.assignFromCampaign(userStudent, campaign, "campaign-register");
 
@@ -1011,7 +1022,8 @@ public class CampaignPublicController {
             PricingTier pricingTier,
             String name, String email, Date dob, String dobStr, String phone, String gender,
             Integer classId,
-            long finalInr, long originalInr, String promoCodeSaved, Integer promoDiscountPercent) {
+            long finalInr, long originalInr, String promoCodeSaved, Integer promoDiscountPercent,
+            boolean dpdpConsent) {
 
         // Re-check campaign expiry — see provisionFreeAndRespond comment.
         if (campaign.getValidTo() != null && campaign.getValidTo().before(new Date())) {
@@ -1037,6 +1049,8 @@ public class CampaignPublicController {
             // Carry the grade to the webhook, which creates the StudentInfo for
             // pay-first registrations (class context isn't available there).
             txn.setStudentClass(parseClassNumber(classId));
+            // Carry DPDP consent the same way — the webhook stamps dpdpConsentAt.
+            txn.setDpdpConsent(dpdpConsent ? Boolean.TRUE : null);
             txn.setStatus("created");
             if (promoCodeSaved != null) {
                 txn.setPromoCode(promoCodeSaved);
@@ -1543,6 +1557,25 @@ public class CampaignPublicController {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    /**
+     * DPDP: record the parental consent given on the registration form. First consent
+     * wins — an existing timestamp is the original consent record and is never moved.
+     */
+    private void stampDpdpConsent(StudentInfo info, boolean consent) {
+        if (!consent || info == null || info.getDpdpConsentAt() != null) return;
+        info.setDpdpConsentAt(new Date());
+        studentInfoRepository.save(info);
+    }
+
+    /** Truthy parse of a body flag ("true"/true/1). Absent or anything else → false. */
+    private static boolean boolFromBody(Map<String, Object> body, String key) {
+        Object v = body.get(key);
+        if (v instanceof Boolean) return (Boolean) v;
+        if (v == null) return false;
+        String s = v.toString().trim();
+        return "true".equalsIgnoreCase(s) || "1".equals(s);
     }
 
     private static String strFromBody(Map<String, Object> body, String key) {

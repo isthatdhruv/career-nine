@@ -154,6 +154,10 @@ public class BlockDateRequestController {
             if (oldSlot != null) {
                 oldSlot.setStatus("CANCELLED");
                 oldSlot.setIsBlocked(true);
+                // Same marker as the sibling loop below — this row belongs to the date
+                // block, so it should keep showing under Blocked Dates in the panels.
+                oldSlot.setBlockReason("Date blocked: "
+                        + (request.getReason() != null ? request.getReason() : ""));
                 slotRepository.save(oldSlot);
             }
 

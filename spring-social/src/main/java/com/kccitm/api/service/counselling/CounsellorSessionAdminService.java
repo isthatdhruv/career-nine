@@ -219,14 +219,17 @@ public class CounsellorSessionAdminService {
         public boolean isReportIncluded() { return reportIncluded; }
     }
 
-    @Transactional(readOnly = true)
+    // NOT readOnly: the dispatch path writes the send audit row (email_send_log),
+    // and a readOnly connection makes MySQL reject that INSERT (S1009).
+    @Transactional
     public MailOutcome mailStudent(Long appointmentId) {
         CounsellingAppointment a = require(appointmentId);
         List<String> to = notificationService.sendSessionSummaryToStudent(a);
         return new MailOutcome(to, notificationService.bookingReportLink(a) != null);
     }
 
-    @Transactional(readOnly = true)
+    // NOT readOnly: same email_send_log INSERT as mailStudent above.
+    @Transactional
     public MailOutcome mailCounsellor(Long appointmentId) {
         CounsellingAppointment a = require(appointmentId);
         String to = notificationService.sendSessionSummaryToCounsellor(a);

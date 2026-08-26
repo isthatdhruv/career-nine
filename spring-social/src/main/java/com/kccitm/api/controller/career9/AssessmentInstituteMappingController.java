@@ -744,6 +744,8 @@ public class AssessmentInstituteMappingController {
         String dobStr = (String) studentData.get("dob");
         String phone = (String) studentData.get("phone");
         String gender = (String) studentData.get("gender");
+        // DPDP parental consent given on the form (the UI enforces it; older clients omit it).
+        boolean dpdpConsent = truthy(studentData.get("dpdpConsent"));
 
         if (name == null || email == null || dobStr == null
                 || phone == null || phone.trim().isEmpty()) {
@@ -880,7 +882,7 @@ public class AssessmentInstituteMappingController {
             if (paymentRequired && finalAmount > 0) {
                 return handleExistingStudentWithPayment(existing, assessmentId, instituteCode,
                         mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                        referralCodeStr, name, email, dob, phone, activeTierId, httpResponse);
+                        referralCodeStr, name, email, dob, phone, activeTierId, dpdpConsent, httpResponse);
             }
             return handleExistingStudent(existing, assessmentId, instituteCode,
                     mapping.getMappingId(), activeTierId, referralCodeStr, httpResponse);
@@ -894,7 +896,7 @@ public class AssessmentInstituteMappingController {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
                             mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                            referralCodeStr, name, email, dob, phone, activeTierId, httpResponse);
+                            referralCodeStr, name, email, dob, phone, activeTierId, dpdpConsent, httpResponse);
                 }
                 return handleExistingStudent(byDob.get(0), assessmentId, instituteCode,
                         mapping.getMappingId(), activeTierId, referralCodeStr, httpResponse);
@@ -905,7 +907,7 @@ public class AssessmentInstituteMappingController {
         if (paymentRequired && finalAmount > 0) {
             return createPaymentAndRedirect(mapping.getMappingId(), assessmentId, instituteCode,
                     finalAmount, originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr,
-                    name, email, dob, dobStr, phone, gender, activeTierId);
+                    name, email, dob, dobStr, phone, gender, activeTierId, dpdpConsent);
         }
 
         // 9. Free registration (no amount, or 100% promo discount) — create student directly.
@@ -961,6 +963,8 @@ public class AssessmentInstituteMappingController {
         studentInfo.setStudentClass(studentClass);
         studentInfo.setSchoolSectionId(schoolSectionId);
         studentInfo.setUser(user);
+        // DPDP: record the parental consent given on this registration form.
+        if (dpdpConsent) studentInfo.setDpdpConsentAt(new Date());
         studentInfo = studentInfoRepository.save(studentInfo);
 
         // Create UserStudent
@@ -1432,7 +1436,7 @@ public class AssessmentInstituteMappingController {
     private ResponseEntity<?> createPaymentAndRedirect(Long mappingId, Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
             String referralCodeStr, String name, String email, Date dob, String dobStr, String phone,
-            String gender, Long mappingTierId) {
+            String gender, Long mappingTierId, boolean dpdpConsent) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
@@ -1452,6 +1456,9 @@ public class AssessmentInstituteMappingController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
+            // DPDP: carry consent to the webhook, which creates the student and
+            // stamps StudentInfo.dpdpConsentAt from it.
+            txn.setDpdpConsent(dpdpConsent ? Boolean.TRUE : null);
             txn.setStatus("created");
             txn.setMappingTierId(mappingTierId);
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
@@ -1512,7 +1519,7 @@ public class AssessmentInstituteMappingController {
             Integer instituteCode, Long mappingId, Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent, String referralCodeStr,
             String name, String email, Date dob, String phone, Long mappingTierId,
-            HttpServletResponse httpResponse) {
+            boolean dpdpConsent, HttpServletResponse httpResponse) {
         // Check if already assigned
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (!userStudents.isEmpty()) {
@@ -1535,7 +1542,7 @@ public class AssessmentInstituteMappingController {
         String dobStr = sdf.format(dob);
         return createPaymentAndRedirect(mappingId, assessmentId, instituteCode,
                 finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent, referralCodeStr,
-                name, email, dob, dobStr, phone, null, mappingTierId);
+                name, email, dob, dobStr, phone, null, mappingTierId, dpdpConsent);
     }
 
     /**
@@ -1758,6 +1765,14 @@ public class AssessmentInstituteMappingController {
      * Parse class number from SchoolClasses ID.
      * Looks up the SchoolClasses entity and tries to parse className as an integer.
      */
+    /** Truthy parse of a request-body flag ("true"/true/1). Absent or anything else → false. */
+    private static boolean truthy(Object v) {
+        if (v instanceof Boolean) return (Boolean) v;
+        if (v == null) return false;
+        String s = v.toString().trim();
+        return "true".equalsIgnoreCase(s) || "1".equals(s);
+    }
+
     private Integer parseClassNumber(Integer classId) {
         if (classId == null) return null;
         Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
@@ -2166,6 +2181,14 @@ public class AssessmentInstituteMappingController {
             response.putAll(studentSessionService.buildSessionPayload(us.getUserStudentId()));
             issueAssessmentSessionCookie(httpResponse, us, assessmentId);
             return ResponseEntity.ok(response);
+        }
+
+        // DPDP: record the parental consent ticked on the invite confirmation form.
+        // The student row already exists here (invites are bound to known students),
+        // so stamp directly; first consent wins.
+        if (truthy(body != null ? body.get("dpdpConsent") : null) && si.getDpdpConsentAt() == null) {
+            si.setDpdpConsentAt(new Date());
+            studentInfoRepository.save(si);
         }
 
         long payable = computeInvitePayable(inv, tier, mapping);

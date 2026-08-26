@@ -25,6 +25,8 @@ export function registerForCampaignTier(
     promoCode?: string
     // Set for class-based campaigns so the backend records the student's grade.
     classId?: number
+    /** DPDP parental consent given on the form; the backend stamps dpdp_consent_at from it. */
+    dpdpConsent?: boolean
   }
 ) {
   return http.post(
@@ -43,6 +45,8 @@ export function registerTrial(
     phone: string
     gender?: string
     classId?: number
+    /** DPDP parental consent given on the form; the backend stamps dpdp_consent_at from it. */
+    dpdpConsent?: boolean
   }
 ) {
   return http.post(

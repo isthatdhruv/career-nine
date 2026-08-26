@@ -10,6 +10,13 @@ import {
 } from "../api-clients/campaignAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 import DuplicateEmailDialog, { DuplicateEmailPayload } from "../components/DuplicateEmailDialog"
+import ParentalConsentSection from "../components/ParentalConsent"
+import { CAREER9_LOGO } from "../hooks/useStudentBranding"
+
+// The campaign's brand logo when one is set (http(s) only — same guard as
+// brandLogoSrc), otherwise the default Career-9 logo.
+const campaignLogoSrc = (url?: string | null): string =>
+  url && /^https?:\/\//i.test(url) ? url : CAREER9_LOGO
 
 type Tier = {
   campaignAssessmentTierId: number
@@ -79,6 +86,8 @@ const CampaignRegisterPage = () => {
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
+  // DPDP parental consent — registration cannot proceed without it.
+  const [dpdpConsent, setDpdpConsent] = useState(false)
 
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(aidFromUrl)
   const [selectedTierId, setSelectedTierId] = useState<number | null>(tidFromUrl)
@@ -98,6 +107,7 @@ const CampaignRegisterPage = () => {
   const [promoApplied, setPromoApplied] = useState<{ code: string; discountPercent: number } | null>(null)
   const [promoError, setPromoError] = useState("")
   const [promoValidating, setPromoValidating] = useState(false)
+  const [showPromo, setShowPromo] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -215,6 +225,10 @@ const CampaignRegisterPage = () => {
       showErrorToast("Date of Birth must be in dd-mm-yyyy format.")
       return
     }
+    if (!dpdpConsent) {
+      showErrorToast("Please confirm the parental consent to continue.")
+      return
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       showErrorToast("Please enter a valid email address.")
       return
@@ -234,6 +248,8 @@ const CampaignRegisterPage = () => {
         dob,
         phone: phone.trim(),
         gender,
+        // DPDP parental consent (submit is gated on the checkbox above).
+        dpdpConsent,
       }
       if (!isTryFirst && promoApplied) data.promoCode = promoApplied.code
       if (selectedClassId != null) data.classId = selectedClassId
@@ -369,9 +385,7 @@ const CampaignRegisterPage = () => {
       <div style={s.glassCard}>
         {/* Header */}
         <div style={s.header}>
-          {info.campaign.brandLogoUrl && (
-            <img src={info.campaign.brandLogoUrl} alt="" style={s.brandLogo} />
-          )}
+          <img src={campaignLogoSrc(info.campaign.brandLogoUrl)} alt="" style={s.brandLogo} />
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
             <div style={{
               width: 10, height: 10, borderRadius: "50%",
@@ -495,7 +509,15 @@ const CampaignRegisterPage = () => {
 
           {/* Registration form */}
           {showForm && (
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={handleSubmit}
+              // Enter in a text field must never submit the registration — only the
+              // explicit submit button does. Field-level handlers (promo apply) still
+              // run first, since the event bubbles from the input up to the form.
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault()
+              }}
+            >
               <h3 style={s.sectionTitle}>Your details</h3>
               {formError && (
                 <div style={s.errorBanner}>
@@ -531,7 +553,7 @@ const CampaignRegisterPage = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
                     <label style={s.label}>
-                      Email <span style={{ color: "#f43f5e" }}>*</span>
+                      Parent's Email <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
                       ref={emailRef}
@@ -567,7 +589,7 @@ const CampaignRegisterPage = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
                     <label style={s.label}>
-                      Phone Number <span style={{ color: "#f43f5e" }}>*</span>
+                      Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
                       type="tel"
@@ -597,8 +619,20 @@ const CampaignRegisterPage = () => {
                   </div>
                 </div>
 
-                {/* Promo code */}
-                {isPaid && (
+                {/* Promo code — hidden behind a toggle until the student asks for it */}
+                {isPaid && !showPromo && !promoApplied && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPromo(true)}
+                    style={{
+                      background: "none", border: "none", padding: 0, textAlign: "left",
+                      color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+                    }}
+                  >
+                    Do you have a promo code?
+                  </button>
+                )}
+                {isPaid && (showPromo || promoApplied) && (
                   <div>
                     <label style={s.label}>Promo Code</label>
                     {promoApplied ? (
@@ -675,6 +709,10 @@ const CampaignRegisterPage = () => {
                     <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>INR {discountedPriceInr}</span>
                   </div>
                 )}
+              </div>
+
+              <div style={{ marginTop: 20 }}>
+                <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
               </div>
 
               <button

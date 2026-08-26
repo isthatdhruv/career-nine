@@ -505,6 +505,11 @@ public class AppointmentService {
         if (ROLE_COUNSELLOR.equals(role)) {
             slot.setStatus("CANCELLED");
             slot.setIsBlocked(true);
+            // Marks this as session-cancellation residue, not a deliberate date block —
+            // the availability panels hide these rows (the story lives on the appointment).
+            if (slot.getBlockReason() == null || slot.getBlockReason().isEmpty()) {
+                slot.setBlockReason("Counsellor cancelled");
+            }
         } else {
             slot.setStatus("AVAILABLE");
             slot.setIsBlocked(false);
@@ -641,10 +646,13 @@ public class AppointmentService {
         // rejects every attempt, since a past time is always "within 2 hours of now".
         boolean missed = "MISSED".equals(oldAppointment.getStatus());
 
-        // Student window on the old slot. Skipped for an admin rebook of an already-passed
-        // session, and for a session the counsellor force-shifted her into — she did not
-        // choose that time, so the window has no business holding her to it.
-        if (!bypassCancellationWindow && !parked && !missed && !oldAppointment.getForceShifted()) {
+        // Student window on the old slot. It exists to stop HER changing a session at the last
+        // minute; an admin moving it is doing so on purpose and on someone's behalf, so it does
+        // not apply to them — an admin must be able to move any session, however many times and
+        // however close to its start. Also skipped for an already-passed session being rebooked
+        // and for one the counsellor force-shifted her into: she did not choose that time, so
+        // the window has no business holding her to it.
+        if (!isAdmin && !bypassCancellationWindow && !parked && !missed && !oldAppointment.getForceShifted()) {
             LocalDateTime oldSessionTime = clock.sessionStart(oldSlot.getDate(), oldSlot.getStartTime());
             if (clock.isWithinHoursOfNow(oldSessionTime, studentWindowHours)) {
                 throw new BadRequestException(

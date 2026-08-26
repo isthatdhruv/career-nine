@@ -110,6 +110,8 @@ export interface ExistingSlot {
   endTime: string
   status?: string
   isBlocked?: boolean
+  /** The weekly schedule that generated this slot, when it came from one. */
+  template?: { id: number } | null
 }
 
 export interface ExistingTemplate {
@@ -128,6 +130,8 @@ interface FormState {
   startTime: string
   endTime: string
   slotDurationMinutes: number
+  /** Gap between consecutive slots, minutes. 0 = back-to-back. */
+  slotGapMinutes: number
   mode: 'ONLINE' | 'OFFLINE'
   startDate: string
   endDate: string
@@ -141,6 +145,7 @@ const EMPTY_FORM: FormState = {
   startTime: '09:00',
   endTime: '17:00',
   slotDurationMinutes: 30,
+  slotGapMinutes: 0,
   mode: 'ONLINE',
   startDate: '',
   endDate: '',
@@ -383,6 +388,7 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
                 startTime: block.from,
                 endTime: block.to,
                 defaultSlotDuration: form.slotDurationMinutes,
+                breakMinutes: form.slotGapMinutes > 0 ? form.slotGapMinutes : null,
                 mode,
                 startDate: form.startDate || null,
                 endDate: form.endDate || null,
@@ -551,7 +557,7 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 10, alignItems: 'end' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, alignItems: 'end' }}>
         <div>
           <label style={labelStyle}>Start date</label>
           <input
@@ -602,6 +608,23 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
             <option value={30}>30 min</option>
             <option value={45}>45 min</option>
             <option value={60}>60 min</option>
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle} title='Gap left after each slot before the next one starts.'>
+            Break Between
+          </label>
+          <select
+            value={form.slotGapMinutes}
+            onChange={(e) => setForm((f) => ({ ...f, slotGapMinutes: Number(e.target.value) }))}
+            style={inputStyle}
+          >
+            <option value={0}>None</option>
+            <option value={5}>5 min</option>
+            <option value={10}>10 min</option>
+            <option value={15}>15 min</option>
+            <option value={20}>20 min</option>
+            <option value={30}>30 min</option>
           </select>
         </div>
       </div>

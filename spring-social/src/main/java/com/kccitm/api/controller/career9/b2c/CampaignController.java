@@ -57,6 +57,7 @@ public class CampaignController {
     @Autowired private CampaignResolutionService campaignResolutionService;
 
     @Autowired private com.kccitm.api.service.career9.InstituteAssessmentService instituteAssessmentService;
+    @Autowired private com.kccitm.api.service.DigitalOceanSpacesService spacesService;
 
     @PreAuthorize("@auth.allows('campaign.read.all')")
     @GetMapping("/getAll")
@@ -170,6 +171,88 @@ public class CampaignController {
             }
         }
         return ResponseEntity.ok(savedCampaign);
+    }
+
+    /**
+     * Upload a campaign brand logo to DigitalOcean Spaces and return its public
+     * CDN URL. The admin UI stores the returned URL into the campaign's
+     * {@code brandLogoUrl} field and persists it via {@code /create} or
+     * {@code /update}. Mirrors {@code /instituteDetail/upload-logo}.
+     *
+     * <p>Body: {@code { "base64Data": "data:image/png;base64,...", "campaignId": 12,
+     * "previousUrl": "https://.../campaign-logos/..." }} — {@code campaignId} and
+     * {@code previousUrl} are optional (previousUrl, if present, is deleted on success).
+     *
+     * <p><b>PNG/JPEG only</b> — the logo renders on student-facing pages and may be
+     * reused in transactional emails, and Outlook does not render WebP.
+     */
+    @PreAuthorize("@auth.allows('campaign.update')")
+    @PostMapping(value = "/upload-logo", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<Map<String, String>> uploadLogo(@RequestBody Map<String, Object> request) {
+        Object base64Obj = request.get("base64Data");
+        String base64Data = base64Obj == null ? null : base64Obj.toString();
+        if (base64Data == null || base64Data.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "base64Data is required"));
+        }
+
+        // Decode first (tolerating an optional data: URL prefix and any whitespace), then decide
+        // the type from the ACTUAL magic bytes — not the caller-declared MIME — so the check is
+        // both robust (works whether the client sends a "data:" URL or raw base64) and trustworthy.
+        byte[] bytes;
+        try {
+            int comma = base64Data.indexOf(',');
+            String raw = base64Data.startsWith("data:") && comma >= 0
+                    ? base64Data.substring(comma + 1)
+                    : base64Data;
+            bytes = java.util.Base64.getMimeDecoder().decode(raw);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid base64 image data"));
+        }
+
+        String contentType;
+        String ext;
+        if (isPngBytes(bytes)) {
+            contentType = "image/png";
+            ext = ".png";
+        } else if (isJpegBytes(bytes)) {
+            contentType = "image/jpeg";
+            ext = ".jpg";
+        } else {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Logo must be a PNG or JPG/JPEG image"));
+        }
+
+        Object idObj = request.get("campaignId");
+        String folder = idObj != null ? "campaign-logos/campaign-" + idObj : "campaign-logos";
+        String fileName = java.util.UUID.randomUUID().toString() + ext;
+
+        try {
+            String url = spacesService.uploadBytes(bytes, contentType, folder, fileName);
+            // Best-effort cleanup of the replaced logo. Scoped to the campaign-logos area so a
+            // crafted previousUrl cannot delete arbitrary objects elsewhere in the bucket.
+            Object previousUrl = request.get("previousUrl");
+            if (previousUrl != null && previousUrl.toString().contains("/campaign-logos/")) {
+                try {
+                    spacesService.deleteFileByUrl(previousUrl.toString());
+                } catch (Exception ignore) {
+                    // never fail the upload on a cleanup error
+                }
+            }
+            return ResponseEntity.ok(Map.of("url", url));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private boolean isPngBytes(byte[] b) {
+        return b.length >= 4 && (b[0] & 0xFF) == 0x89 && (b[1] & 0xFF) == 0x50
+                && (b[2] & 0xFF) == 0x4E && (b[3] & 0xFF) == 0x47;
+    }
+
+    private boolean isJpegBytes(byte[] b) {
+        return b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8
+                && (b[2] & 0xFF) == 0xFF;
     }
 
     @PreAuthorize("@auth.allows('campaign.delete')")
