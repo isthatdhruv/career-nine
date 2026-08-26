@@ -181,7 +181,7 @@ public class GeneralAssessmentProcessingService {
                 .orElseThrow(() -> new RuntimeException("No assessment mapping found for student " + userStudentId + " assessment " + assessmentId));
 
         // 2. Get student class info
-        Integer studentClass = getStudentClass(userStudentId);
+        String studentClass = getStudentClass(userStudentId);
         String classGroup = getClassGroup(studentClass);
 
         // 3. Load raw scores (MQT-level aggregated scores)
@@ -676,7 +676,7 @@ public class GeneralAssessmentProcessingService {
     // HELPER METHODS
     // =====================================================================
 
-    private Integer getStudentClass(Long userStudentId) {
+    private String getStudentClass(Long userStudentId) {
         try {
             return userStudentRepository.findById(userStudentId)
                     .map(us -> {
@@ -692,11 +692,12 @@ public class GeneralAssessmentProcessingService {
         }
     }
 
-    private String getClassGroup(Integer studentClass) {
-        if (studentClass == null) return "9-10"; // default
-        if (studentClass >= 6 && studentClass <= 8) return "6-8";
-        if (studentClass >= 9 && studentClass <= 10) return "9-10";
-        if (studentClass >= 11 && studentClass <= 12) return "11-12";
+    private String getClassGroup(String studentClass) {
+        Integer grade = com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
+        if (grade == null) return "9-10"; // default
+        if (grade >= 6 && grade <= 8) return "6-8";
+        if (grade >= 9 && grade <= 10) return "9-10";
+        if (grade >= 11 && grade <= 12) return "11-12";
         return "9-10";
     }
 

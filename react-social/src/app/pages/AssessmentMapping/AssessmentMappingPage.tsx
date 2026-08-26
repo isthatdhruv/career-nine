@@ -154,6 +154,8 @@ const AssessmentMappingPage = () => {
                 ? "School Level Mapping"
                 : level === "INVITE"
                 ? "Per-Student Invite"
+                : (selectedInstitute as { isSchool?: boolean | null }).isSchool === false
+                ? "Year / Section / Session Level Mapping"
                 : "Class / Section / Session Level Mapping"}
             </div>
             <div style={{ fontSize: "0.8rem", opacity: 0.85, marginTop: 2 }}>
@@ -164,6 +166,7 @@ const AssessmentMappingPage = () => {
             <SchoolAssessmentMappingPanel
               instituteCode={selectedInstitute.instituteCode}
               instituteName={selectedInstitute.instituteName}
+              isSchool={(selectedInstitute as { isSchool?: boolean | null }).isSchool}
               active
             />
           ) : level === "INVITE" ? (
@@ -176,6 +179,7 @@ const AssessmentMappingPage = () => {
             <AssessmentMappingPanel
               instituteCode={selectedInstitute.instituteCode}
               instituteName={selectedInstitute.instituteName}
+              isSchool={(selectedInstitute as { isSchool?: boolean | null }).isSchool}
               active
             />
           )}

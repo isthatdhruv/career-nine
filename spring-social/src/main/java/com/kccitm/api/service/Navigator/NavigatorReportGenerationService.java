@@ -1077,9 +1077,8 @@ public class NavigatorReportGenerationService {
 
     private String resolveClass(StudentInfo si) {
         if (si == null) return "";
-        Integer studentClass = si.getStudentClass();
-        if (studentClass != null) return String.valueOf(studentClass);
-        return "";
+        String studentClass = si.getStudentClass();
+        return studentClass != null ? studentClass : "";
     }
 
     // ═══════════════════════ BAR CHART GENERATION ═══════════════════════

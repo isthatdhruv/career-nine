@@ -58,7 +58,7 @@ type StudentRow = {
   studentDob?: string;
   schoolSectionId?: number;
   /** Flat student_info.student_class — Grade fallback when the section link is unset. */
-  studentClass?: number | null;
+  studentClass?: string | null;
   assessments?: { assessmentId: number; assessmentName: string; status: string }[];
   assignedAssessmentIds?: number[];
 };

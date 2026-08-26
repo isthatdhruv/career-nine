@@ -684,7 +684,11 @@ public class AssessmentInstituteMappingController {
                 .ifPresent(a -> info.put("assessmentName", a.getAssessmentName()));
 
         InstituteDetail institute = instituteDetailRepository.findById(mapping.getInstituteCode().intValue());
-        if (institute != null) info.put("instituteName", institute.getInstituteName());
+        if (institute != null) {
+            info.put("instituteName", institute.getInstituteName());
+            // null → school; drives Class/Board vs Year/Course wording on the portal
+            info.put("isSchool", institute.getIsSchool());
+        }
         info.put("branding", brandingService.forInstitute(institute));
 
         // Coordinates already fixed on the mapping.
@@ -762,16 +766,16 @@ public class AssessmentInstituteMappingController {
         }
 
         // 3. Resolve class info based on mapping level
-        Integer studentClass = null;
+        String studentClass = null;
         Integer schoolSectionId = null;
 
         if ("SECTION".equals(mapping.getMappingLevel())) {
             schoolSectionId = mapping.getSectionId();
             if (mapping.getClassId() != null) {
-                studentClass = parseClassNumber(mapping.getClassId());
+                studentClass = resolveClassLabel(mapping.getClassId());
             }
         } else if ("CLASS".equals(mapping.getMappingLevel())) {
-            studentClass = parseClassNumber(mapping.getClassId());
+            studentClass = resolveClassLabel(mapping.getClassId());
             // Section is optional from request
             if (studentData.get("schoolSectionId") != null) {
                 schoolSectionId = Integer.valueOf(studentData.get("schoolSectionId").toString());
@@ -782,7 +786,7 @@ public class AssessmentInstituteMappingController {
             // student self-select session -> class -> section).
             if (studentData.get("classId") != null) {
                 Integer classId = Integer.valueOf(studentData.get("classId").toString());
-                studentClass = parseClassNumber(classId);
+                studentClass = resolveClassLabel(classId);
             }
             if (studentData.get("schoolSectionId") != null) {
                 schoolSectionId = Integer.valueOf(studentData.get("schoolSectionId").toString());
@@ -888,10 +892,19 @@ public class AssessmentInstituteMappingController {
                     mapping.getMappingId(), activeTierId, referralCodeStr, httpResponse);
         }
 
-        // 7. Duplicate check by DOB + institute + class + name
+        // 7. Duplicate check by DOB + institute + class + name. Legacy rows stored the
+        // digit-stripped grade ("10" for a class named "10-A"), so fall back to the
+        // numeric form when the verbatim label finds nothing.
         if (studentClass != null) {
             List<StudentInfo> byDob = studentInfoRepository
                     .findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(dob, instituteCode, studentClass, name);
+            if (byDob.isEmpty()) {
+                Integer legacyGrade = com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
+                if (legacyGrade != null && !String.valueOf(legacyGrade).equals(studentClass)) {
+                    byDob = studentInfoRepository.findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(
+                            dob, instituteCode, String.valueOf(legacyGrade), name);
+                }
+            }
             if (!byDob.isEmpty()) {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
@@ -1762,8 +1775,8 @@ public class AssessmentInstituteMappingController {
     }
 
     /**
-     * Parse class number from SchoolClasses ID.
-     * Looks up the SchoolClasses entity and tries to parse className as an integer.
+     * Resolve a SchoolClasses id to its display label, stored verbatim on
+     * StudentInfo.studentClass.
      */
     /** Truthy parse of a request-body flag ("true"/true/1). Absent or anything else → false. */
     private static boolean truthy(Object v) {
@@ -1773,20 +1786,13 @@ public class AssessmentInstituteMappingController {
         return "true".equalsIgnoreCase(s) || "1".equals(s);
     }
 
-    private Integer parseClassNumber(Integer classId) {
+    private String resolveClassLabel(Integer classId) {
         if (classId == null) return null;
         Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
         if (classOpt.isPresent()) {
             String className = classOpt.get().getClassName();
-            if (className != null) {
-                String digits = className.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    try {
-                        return Integer.parseInt(digits);
-                    } catch (NumberFormatException e) {
-                        logger.warn("Could not parse class number from className for classId: {}", classId);
-                    }
-                }
+            if (className != null && !className.trim().isEmpty()) {
+                return className.trim();
             }
         }
         // Never fall back to classId (a DB primary key) — that would corrupt studentClass
@@ -2101,7 +2107,11 @@ public class AssessmentInstituteMappingController {
         assessmentTableRepository.findById(inv.getAssessmentId())
                 .ifPresent(a -> info.put("assessmentName", a.getAssessmentName()));
         InstituteDetail institute = instituteDetailRepository.findById(mapping.getInstituteCode().intValue());
-        if (institute != null) info.put("instituteName", institute.getInstituteName());
+        if (institute != null) {
+            info.put("instituteName", institute.getInstituteName());
+            // null → school; drives Class/Board vs Year/Course wording on the portal
+            info.put("isSchool", institute.getIsSchool());
+        }
         info.put("branding", brandingService.forInstitute(institute));
 
         info.put("tierName", tier.getName());

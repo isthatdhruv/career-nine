@@ -272,7 +272,7 @@ export function getReleasedScopes(instituteCode: number, assessmentId: number) {
 export interface FlaggedStudent {
   userStudentId: number;
   name: string;
-  studentClass: number | null;
+  studentClass: string | null;
   rollNumber: string | null;
 }
 

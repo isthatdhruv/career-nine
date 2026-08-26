@@ -765,7 +765,11 @@ public class PrincipalDashboardReleaseService {
                 if (!groupMembers.contains(us.getUserStudentId())) continue;
             } else {
                 if (!dimMatches(scope.getSessionId(), us.getStudentInfo().getSessionId())) continue;
-                if (!dimMatches(scope.getClassId(), us.getStudentInfo().getStudentClass())) continue;
+                // NOTE (pre-existing): scope.classId is a SchoolClasses PK while the
+                // student side is the numeric grade parsed from the class label — the
+                // comparison semantics are unchanged by the String migration.
+                if (!dimMatches(scope.getClassId(),
+                        com.kccitm.api.util.GradeParser.numericGradeOrNull(us.getStudentInfo().getStudentClass()))) continue;
                 if (!dimMatches(scope.getSectionId(), us.getStudentInfo().getSchoolSectionId())) continue;
             }
             count++;

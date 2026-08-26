@@ -26,7 +26,7 @@ export interface ReportErrorRow {
   assessmentId?: number;
   assessmentName?: string;
   reportType?: string;
-  studentClassAtAttempt?: number | null;
+  studentClassAtAttempt?: string | null;
   attemptType: string;
   status: string;
   errorClass?: string;

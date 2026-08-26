@@ -56,7 +56,7 @@ public class DashboardService {
             // Access student details through StudentInfo relationship
             if (student.getStudentInfo() != null) {
                 studentInfo.put("name", student.getStudentInfo().getName() != null ? student.getStudentInfo().getName() : "Demo Student");
-                studentInfo.put("grade", student.getStudentInfo().getStudentClass() != null ? student.getStudentInfo().getStudentClass() : 3);
+                studentInfo.put("grade", student.getStudentInfo().getStudentClass() != null ? student.getStudentInfo().getStudentClass() : "3");
                 studentInfo.put("schoolBoard", student.getStudentInfo().getSchoolBoard() != null ? student.getStudentInfo().getSchoolBoard() : "CBSE");
                 studentInfo.put("familyType", student.getStudentInfo().getFamily() != null ? student.getStudentInfo().getFamily() : "Nuclear");
                 studentInfo.put("siblingsCount", student.getStudentInfo().getSibling() != null ? student.getStudentInfo().getSibling() : 1);

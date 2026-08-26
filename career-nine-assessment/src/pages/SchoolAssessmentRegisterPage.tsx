@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { showErrorToast } from "../utils/toast";
 import http from "../api/http";
 import { getSchoolInfo, registerSchoolStudent, verifyStudentDetails } from "../api-clients/schoolRegistrationAPI";
+import { getInstituteTerms } from "../utils/instituteTerms";
 import { validatePromoCode } from "../api-clients/promoCodeAPI";
 import { validateReferralCode } from "../api-clients/referralCodeAPI";
 import ParentalConsentSection from "../components/ParentalConsent";
@@ -18,6 +19,7 @@ const SchoolAssessmentRegisterPage = () => {
   const [result, setResult] = useState<any>(null);
 
   // Form fields
+  const terms = getInstituteTerms(schoolInfo?.isSchool);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [dob, setDob] = useState("");
@@ -415,7 +417,7 @@ const SchoolAssessmentRegisterPage = () => {
             {/* Class + Section row */}
             <div style={{ display: "grid", gridTemplateColumns: sections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
               <div>
-                <label style={s.label}>Class <span style={{ color: "#f43f5e" }}>*</span></label>
+                <label style={s.label}>{terms.unit} <span style={{ color: "#f43f5e" }}>*</span></label>
                 <select
                   value={selectedClassId}
                   onChange={(e) => handleClassChange(e.target.value)}
@@ -424,7 +426,7 @@ const SchoolAssessmentRegisterPage = () => {
                   onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
                   onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
                 >
-                  <option value="">Select Class</option>
+                  <option value="">{terms.selectUnit}</option>
                   {classes.map((c: any) => (
                     <option key={c.classId} value={c.classId}>{c.className}</option>
                   ))}
