@@ -30,7 +30,6 @@ const AssessmentRegisterPage = () => {
   const [email, setEmail] = useState("")
   const [dob, setDob] = useState("")
   const [phone, setPhone] = useState("")
-  const [gender, setGender] = useState("")
 
   const [duplicateInfo, setDuplicateInfo] = useState<DuplicateEmailPayload | null>(null)
   const emailRef = useRef<HTMLInputElement | null>(null)
@@ -90,18 +89,16 @@ const AssessmentRegisterPage = () => {
     ? Math.floor(payableInr * (100 - promoApplied.discountPercent) / 100)
     : payableInr
 
+  // The native date picker works in yyyy-mm-dd; everything downstream of this
+  // page (validation, payload, localStorage password) expects dd-mm-yyyy.
+  const dobToInputValue = (d: string) => {
+    const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : ""
+  }
+
   const handleDobChange = (value: string) => {
-    let cleaned = value.replace(/[^0-9-]/g, "")
-    const digits = cleaned.replace(/-/g, "")
-    if (digits.length <= 2) {
-      cleaned = digits
-    } else if (digits.length <= 4) {
-      cleaned = digits.slice(0, 2) + "-" + digits.slice(2)
-    } else {
-      cleaned =
-        digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4, 8)
-    }
-    setDob(cleaned)
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    setDob(m ? `${m[3]}-${m[2]}-${m[1]}` : "")
   }
 
   const handleApplyPromo = async () => {
@@ -189,7 +186,6 @@ const AssessmentRegisterPage = () => {
         email: email.trim(),
         dob: dob,
         phone: phone.trim(),
-        gender: gender,
         // DPDP parental consent (submit is gated on the checkbox above).
         dpdpConsent,
       }
@@ -627,51 +623,33 @@ const AssessmentRegisterPage = () => {
                 </label>
                 <input
                   ref={dobRef}
-                  type="text"
-                  placeholder="dd-mm-yyyy"
-                  value={dob}
+                  type="date"
+                  value={dobToInputValue(dob)}
                   onChange={(e) => handleDobChange(e.target.value)}
-                  maxLength={10}
+                  max={new Date().toISOString().split("T")[0]}
                   required
-                  style={s.input}
+                  style={{ ...s.input, color: dob ? "#1e293b" : "#94a3b8" }}
                   onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
                   onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
                 />
               </div>
             </div>
 
-            {/* Phone + Gender row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div>
-                <label style={s.label}>
-                  Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
-                </label>
-                <input
-                  type="tel"
-                  placeholder="Enter phone number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  style={s.input}
-                  onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                  onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                />
-              </div>
-              <div>
-                <label style={s.label}>Gender</label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  style={{ ...s.input, color: gender ? "#1e293b" : "#94a3b8" }}
-                  onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                  onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                >
-                  <option value="">Select Gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
+            {/* Phone */}
+            <div>
+              <label style={s.label}>
+                Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
+              </label>
+              <input
+                type="tel"
+                placeholder="Enter phone number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                style={s.input}
+                onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+              />
             </div>
 
             {/* Session → Class → Section cascade for INSTITUTE level */}
@@ -1046,7 +1024,7 @@ const AssessmentRegisterPage = () => {
 
           {/* Footer note */}
           <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-            By registering, you agree to the assessment terms and conditions.
+            By registering, I agree to the Career-9's terms and conditions.
           </p>
         </form>
       </div>

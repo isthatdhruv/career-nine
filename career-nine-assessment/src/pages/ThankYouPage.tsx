@@ -154,6 +154,15 @@ const ThankYouPage: React.FC = () => {
     // Ensures the slot picker auto-opens at most once per page mount (so the
     // student isn't trapped re-opening it after they deliberately close it).
     const autoOpenedPickerRef = useRef<boolean>(false);
+    // Timer for the deliberate 2s pause between landing on the thank-you page
+    // and the slot picker auto-opening. Kept in a ref (not effect cleanup) so a
+    // dependency re-run can't cancel the pending open; cleared only on unmount.
+    const autoOpenPickerTimerRef = useRef<number | null>(null);
+    useEffect(() => () => {
+        if (autoOpenPickerTimerRef.current !== null) {
+            window.clearTimeout(autoOpenPickerTimerRef.current);
+        }
+    }, []);
     // Forwards the counselling request at most once per mount (the POST is also
     // idempotent server-side, so this just avoids a redundant call/email).
     const counsellingForwardedRef = useRef<boolean>(false);
@@ -297,7 +306,8 @@ const ThankYouPage: React.FC = () => {
         const canBook = !!upgradeInfo.counsellingActive && !!upgradeInfo.accessToken && remaining > 0;
         if (canBook && !bookedAppointment) {
             autoOpenedPickerRef.current = true;
-            setIsSlotPickerOpen(true);
+            // Give the completion moment 2 seconds to land before the picker takes over.
+            autoOpenPickerTimerRef.current = window.setTimeout(() => setIsSlotPickerOpen(true), 2000);
         }
     }, [upgradeInfoLoaded, upgradeInfo, bookedAppointment]);
 
@@ -309,7 +319,8 @@ const ThankYouPage: React.FC = () => {
         if (!schoolCounselling || autoOpenedPickerRef.current) return;
         if (schoolCounselling.offered && !bookedAppointment) {
             autoOpenedPickerRef.current = true;
-            setIsSlotPickerOpen(true);
+            // Give the completion moment 2 seconds to land before the picker takes over.
+            autoOpenPickerTimerRef.current = window.setTimeout(() => setIsSlotPickerOpen(true), 2000);
         }
     }, [schoolCounselling, bookedAppointment]);
 
@@ -621,6 +632,48 @@ const ThankYouPage: React.FC = () => {
                                     Your responses have been recorded securely. <br className="d-none d-sm-inline" />
                                     Now explore your personalized insights and career possibilities!
                                 </p>
+
+                                {/* Report-emailed notice */}
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        gap: '12px',
+                                        textAlign: 'left',
+                                        background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
+                                        border: '1px solid #A7F3D0',
+                                        borderRadius: '14px',
+                                        padding: '1rem 1.25rem',
+                                        marginBottom: '1.5rem',
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: '38px',
+                                            height: '38px',
+                                            borderRadius: '10px',
+                                            background: 'linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="2" y="4" width="20" height="16" rx="2" />
+                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p style={{ margin: '0 0 2px', fontSize: '0.92rem', fontWeight: 700, color: '#065F46' }}>
+                                            Report sent to your registered email
+                                        </p>
+                                        <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.55, color: '#047857' }}>
+                                            A copy of your assessment report has also been shared on your registered
+                                            email address. Kindly check your inbox — and the spam folder, just in case.
+                                        </p>
+                                    </div>
+                                </div>
 
                                 {/* 5-star feedback rating */}
                                 <div

@@ -131,9 +131,16 @@ const DemographicDetailsPage: React.FC = () => {
 
   const getLabel = (field: DemographicField) => field.customLabel || field.displayLabel;
 
+  // Labels/options may carry HTML styling (bold, colors, fonts) exactly as
+  // stored in the DB — rendered via dangerouslySetInnerHTML below. Plain-text
+  // variant for places HTML cannot render: error messages, placeholders,
+  // native <option> elements.
+  const stripHtml = (s: string) => s.replace(/<[^>]*>/g, "").trim();
+  const getPlainLabel = (field: DemographicField) => stripHtml(getLabel(field)) || getLabel(field);
+
   const validateField = (field: DemographicField, value: string): string => {
     if (field.isMandatory && (!value || !value.trim())) {
-      return `${getLabel(field)} is required`;
+      return `${getPlainLabel(field)} is required`;
     }
 
     if (value && value.trim()) {
@@ -141,7 +148,7 @@ const DemographicDetailsPage: React.FC = () => {
         try {
           const regex = new RegExp(field.validationRegex);
           if (!regex.test(value)) {
-            return field.validationMessage || `Invalid value for ${getLabel(field)}`;
+            return field.validationMessage || `Invalid value for ${getPlainLabel(field)}`;
           }
         } catch {
           // Invalid regex pattern, skip validation
@@ -149,10 +156,10 @@ const DemographicDetailsPage: React.FC = () => {
       }
 
       if (field.dataType === 'TEXT' && field.minValue && value.length < field.minValue) {
-        return `${getLabel(field)} must be at least ${field.minValue} characters`;
+        return `${getPlainLabel(field)} must be at least ${field.minValue} characters`;
       }
       if (field.dataType === 'TEXT' && field.maxValue && value.length > field.maxValue) {
-        return `${getLabel(field)} must be at most ${field.maxValue} characters`;
+        return `${getPlainLabel(field)} must be at most ${field.maxValue} characters`;
       }
 
       if (field.dataType === 'NUMBER') {
@@ -342,7 +349,7 @@ const DemographicDetailsPage: React.FC = () => {
         return (
           <div className="mb-3" key={field.fieldId}>
             <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-              {label} {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
+              <span dangerouslySetInnerHTML={{ __html: label }} /> {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
             </label>
             <input
               type="text"
@@ -370,7 +377,7 @@ const DemographicDetailsPage: React.FC = () => {
         return (
           <div className="mb-3" key={field.fieldId}>
             <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-              {label} {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
+              <span dangerouslySetInnerHTML={{ __html: label }} /> {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
             </label>
             <input
               type="number"
@@ -400,7 +407,7 @@ const DemographicDetailsPage: React.FC = () => {
         return (
           <div className="mb-3" key={field.fieldId}>
             <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-              {label} {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
+              <span dangerouslySetInnerHTML={{ __html: label }} /> {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
             </label>
             <input
               type="date"
@@ -428,7 +435,7 @@ const DemographicDetailsPage: React.FC = () => {
           return (
             <div className="mb-3" key={field.fieldId}>
               <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-                {label} {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
+                <span dangerouslySetInnerHTML={{ __html: label }} /> {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
               </label>
               <div className="d-flex gap-2 gap-md-3 flex-wrap">
                 {field.options.map((option) => (
@@ -462,7 +469,7 @@ const DemographicDetailsPage: React.FC = () => {
                       onBlur={() => handleBlur(field.fieldId)}
                       style={{ width: '18px', height: '18px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#5DD68D' }}
                     />
-                    <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
+                    <span style={{ fontSize: '0.9rem', color: '#2d3748' }} dangerouslySetInnerHTML={{ __html: option.optionLabel }} />
                   </label>
                 ))}
               </div>
@@ -470,7 +477,7 @@ const DemographicDetailsPage: React.FC = () => {
               {fieldHasOtherOption(field) && isOtherValue(values[field.fieldId]) && (
                 <input
                   type="text"
-                  placeholder={`Please specify ${label.toLowerCase()}`}
+                  placeholder={`Please specify ${getPlainLabel(field).toLowerCase()}`}
                   value={otherValues[field.fieldId] || ''}
                   onChange={(e) =>
                     setOtherValues((prev) => ({ ...prev, [field.fieldId]: e.target.value }))
@@ -496,7 +503,7 @@ const DemographicDetailsPage: React.FC = () => {
         return (
           <div className="mb-3" key={field.fieldId}>
             <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-              {label} {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
+              <span dangerouslySetInnerHTML={{ __html: label }} /> {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
             </label>
             <select
               className={`form-select ${error && isTouched ? 'is-invalid' : ''}`}
@@ -514,7 +521,7 @@ const DemographicDetailsPage: React.FC = () => {
             >
               <option value="">Select an option</option>
               {field.options.map((option) => (
-                <option key={option.optionId} value={option.optionValue}>{option.optionLabel}</option>
+                <option key={option.optionId} value={option.optionValue}>{stripHtml(option.optionLabel) || option.optionLabel}</option>
               ))}
             </select>
             {/* "Other" custom textbox for dropdown-style single-select */}
@@ -548,7 +555,7 @@ const DemographicDetailsPage: React.FC = () => {
         return (
           <div className="mb-3" key={field.fieldId}>
             <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-              {label} {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
+              <span dangerouslySetInnerHTML={{ __html: label }} /> {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
             </label>
             <div className="d-flex flex-wrap gap-2">
               {field.options.map((option) => {
@@ -574,7 +581,7 @@ const DemographicDetailsPage: React.FC = () => {
                       onBlur={() => handleBlur(field.fieldId)}
                       style={{ width: '16px', height: '16px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#5DD68D' }}
                     />
-                    <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
+                    <span style={{ fontSize: '0.9rem', color: '#2d3748' }} dangerouslySetInnerHTML={{ __html: option.optionLabel }} />
                   </label>
                 );
               })}
@@ -710,7 +717,7 @@ const DemographicDetailsPage: React.FC = () => {
                           Saving...
                         </>
                       ) : (
-                        "Save and Continue to Assessment"
+                        "Next"
                       )}
                     </button>
                   </form>
