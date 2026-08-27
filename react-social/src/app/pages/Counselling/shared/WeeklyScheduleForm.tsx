@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createTemplate } from '../API/AvailabilityTemplateAPI'
 import { updateCounsellor } from '../API/CounsellorAPI'
+import { isValidMeetingLink, MEETING_LINK_PLACEHOLDER } from './meetingLink'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -57,9 +58,8 @@ const coveredDates = (days: string[], startDate: string, endDate: string): strin
   return out
 }
 
-/** Sessions run on Microsoft Teams only — no other provider's link is accepted. */
-export const isTeamsLink = (link?: string) =>
-  /^https:\/\/teams\.(microsoft|live)\.com\//i.test((link || '').trim())
+/** Sessions run on Microsoft Teams or Google Meet — re-exported for existing importers. */
+export const isTeamsLink = isValidMeetingLink
 
 interface WeeklyScheduleFormProps {
   /** One id from the counsellor portal; the ticked rows when an admin runs it. */
@@ -218,7 +218,7 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
   // but nobody can join it. A bulk selection is exempt — each counsellor carries
   // their own link, so there is no single field to fill in here.
   const needsMeetingLink = mode === 'ONLINE' && !multiple && !!onMeetingLinkChange
-  const meetingLinkValid = isTeamsLink(meetingLink)
+  const meetingLinkValid = isValidMeetingLink(meetingLink)
   const meetingLinkMissing = needsMeetingLink && !meetingLinkValid
 
   // The link already on file, so the hint can tell a value prefilled from the
@@ -323,11 +323,11 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
     // counsellor has their permanent Teams link on file.
     if (mode === 'ONLINE' && !multiple) {
       if (!meetingLink.trim()) {
-        onError('Add the counsellor\'s Microsoft Teams meeting link before creating online slots.')
+        onError('Add the counsellor\'s meeting link (Microsoft Teams or Google Meet) before creating online slots.')
         return
       }
-      if (!isTeamsLink(meetingLink)) {
-        onError('The meeting link must be a Microsoft Teams link (teams.microsoft.com or teams.live.com).')
+      if (!isValidMeetingLink(meetingLink)) {
+        onError('The meeting link must be a Microsoft Teams or Google Meet link (teams.microsoft.com, teams.live.com or meet.google.com).')
         return
       }
     }
@@ -482,9 +482,9 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
         </div>
         <div style={{ fontSize: 11, color: '#6B7A8D', marginTop: 4 }}>
           {multiple
-            ? 'Several counsellors selected — in-person is unavailable because each has their own office address. Anyone without a Teams link on file will produce online slots with no meeting link.'
+            ? 'Several counsellors selected — in-person is unavailable because each has their own office address. Anyone without a meeting link on file will produce online slots with no meeting link.'
             : mode === 'ONLINE'
-            ? 'The student is emailed the counsellor\'s Microsoft Teams link (below).'
+            ? 'The student is emailed the counsellor\'s meeting link (below).'
             : 'The student is sent the office address (below).'}
         </div>
       </div>
@@ -495,7 +495,7 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
       {needsMeetingLink && (
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>
-            Microsoft Teams meeting link <span style={{ color: '#DC2626' }}>*</span>
+            Meeting link — Microsoft Teams or Google Meet <span style={{ color: '#DC2626' }}>*</span>
           </label>
           <input
             type='url'
@@ -505,7 +505,7 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
             value={meetingLink}
             onChange={(e) => { setLinkTouched(true); onMeetingLinkChange!(e.target.value) }}
             onBlur={() => setLinkTouched(true)}
-            placeholder='https://teams.microsoft.com/l/meetup-join/...'
+            placeholder={MEETING_LINK_PLACEHOLDER}
             style={{
               ...inputStyle,
               borderColor: linkTouched && !meetingLinkValid ? '#DC2626' : (inputStyle as any).borderColor,
@@ -513,14 +513,14 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
           />
           {linkTouched && meetingLink.trim() && !meetingLinkValid ? (
             <div style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>
-              That is not a Microsoft Teams link — it must start with
-              https://teams.microsoft.com/ or https://teams.live.com/.
+              That is not a Microsoft Teams or Google Meet link — it must start with
+              https://teams.microsoft.com/, https://teams.live.com/ or https://meet.google.com/.
             </div>
           ) : (
             <div style={{ fontSize: 11, color: '#6B7A8D', marginTop: 4 }}>
               {prefilledLink.current && meetingLinkValid && meetingLink.trim() === prefilledLink.current
                 ? 'Filled in from your profile. Editing it here updates your profile when you save.'
-                : 'In Teams: Calendar → New meeting → repeat with no end date → Save → copy the "Join the meeting now" link. Saved to your profile when you save this schedule.'}
+                : 'Teams: Calendar → New meeting → repeat with no end date → Save → copy the join link. Meet: meet.google.com → New meeting → "Create a meeting for later" → copy the link. Saved to your profile when you save this schedule.'}
             </div>
           )}
         </div>
@@ -685,8 +685,8 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
           title={
             meetingLinkMissing
               ? meetingLink.trim()
-                ? 'The meeting link must be a Microsoft Teams link'
-                : 'Add the Microsoft Teams meeting link first — online slots are unbookable without it'
+                ? 'The meeting link must be a Microsoft Teams or Google Meet link'
+                : 'Add the meeting link first — online slots are unbookable without it'
               : undefined
           }
           style={{
@@ -701,8 +701,8 @@ const WeeklyScheduleForm: React.FC<WeeklyScheduleFormProps> = ({
         {meetingLinkMissing && !saving && (
           <span style={{ fontSize: 11.5, color: '#92400E' }}>
             {meetingLink.trim()
-              ? 'Enter a valid Teams link to continue.'
-              : 'Add your Teams meeting link to continue.'}
+              ? 'Enter a valid Teams or Meet link to continue.'
+              : 'Add your meeting link to continue.'}
           </span>
         )}
         {onCancel && (

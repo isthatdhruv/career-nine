@@ -158,7 +158,7 @@ const ParentalConsentSection = ({ checked, onChange }: Props) => {
         type="button"
         onClick={() => setShowModal(true)}
         style={{
-          background: "none", border: "none", padding: 0, marginTop: 8, marginLeft: 26,
+          background: "none", border: "none", padding: "12px 8px", margin: "-4px 0 -12px 18px",
           color: "#059669", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer",
           textDecoration: "underline",
         }}

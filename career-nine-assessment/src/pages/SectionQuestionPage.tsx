@@ -20,6 +20,7 @@ import { usePerQuestionProctoring } from "../hooks/usePerQuestionProctoring";
 import { submitProctoringData } from "../api/proctoringApi";
 import { savePartialAnswers, restorePartialAnswers } from "../api/assessmentApi";
 import type { ProctoringPayload } from "../types/proctoring";
+import { MarkdownInstructions } from "../utils/instructionMarkdown";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { timeoutSignal } from "../utils/timeoutSignal";
 import { apiUrl } from "../utils/apiUrl";
@@ -152,6 +153,9 @@ const SectionQuestionPage: React.FC = () => {
   const [inactivityAcknowledged, setInactivityAcknowledged] =
     useState<boolean>(false);
   const inactivityTimerRef = useRef<number | null>(null);
+  // Auto-advance timer — cancelled on any manual navigation so a fast student's
+  // own Next/Back tap doesn't get yanked 400ms later by the stale timeout.
+  const autoAdvanceRef = useRef<number | null>(null);
   // Themed reload-confirmation modal. Shown when the student tries to reload
   // via the keyboard (F5 / Ctrl+R) — the browser-toolbar reload button cannot
   // be intercepted with custom UI, so that path still gets the native
@@ -162,14 +166,39 @@ const SectionQuestionPage: React.FC = () => {
   const [seenSectionInstructions, setSeenSectionInstructions] = useState<
     Set<string>
   >(() => {
-    const stored = localStorage.getItem("assessmentSeenSectionInstructions");
-    return stored ? new Set(JSON.parse(stored)) : new Set();
+    // Corrupt/legacy values must not crash first render (error boundary loop).
+    try {
+      const stored = localStorage.getItem("assessmentSeenSectionInstructions");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      localStorage.removeItem("assessmentSeenSectionInstructions");
+      return new Set();
+    }
   });
+  // 3s read-timer on the section-instruction popup: OK stays locked (and the
+  // backdrop won't dismiss) until it reaches 0, so instructions can't be
+  // reflex-dismissed without at least a glance.
+  const [instructionOkCountdown, setInstructionOkCountdown] = useState(0);
   const [showSectionInstruction, setShowSectionInstruction] =
     useState<boolean>(false);
   const [sectionInstructionTexts, setSectionInstructionTexts] = useState<
     Array<{ text: string; language: string }>
   >([]);
+
+  useEffect(() => {
+    if (!showSectionInstruction) return;
+    setInstructionOkCountdown(3);
+    const timer = window.setInterval(() => {
+      setInstructionOkCountdown((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [showSectionInstruction]);
 
   // Heartbeat moved below the answer-state refs (it reads them for the live
   // answeredCount) — see the useHeartbeat call after the ref declarations.
@@ -193,28 +222,36 @@ const SectionQuestionPage: React.FC = () => {
   const [savedForLater, setSavedForLater] = useState<
     Record<string, Set<number>>
   >(() => {
-    const stored = localStorage.getItem("assessmentSavedForLater");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Convert arrays back to Sets
-      const result: Record<string, Set<number>> = {};
-      for (const key in parsed) {
-        result[key] = new Set(parsed[key]);
+    try {
+      const stored = localStorage.getItem("assessmentSavedForLater");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert arrays back to Sets
+        const result: Record<string, Set<number>> = {};
+        for (const key in parsed) {
+          result[key] = new Set(parsed[key]);
+        }
+        return result;
       }
-      return result;
+    } catch {
+      localStorage.removeItem("assessmentSavedForLater");
     }
     return {};
   });
   const [skipped, setSkipped] = useState<Record<string, Set<number>>>(() => {
-    const stored = localStorage.getItem("assessmentSkipped");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Convert arrays back to Sets
-      const result: Record<string, Set<number>> = {};
-      for (const key in parsed) {
-        result[key] = new Set(parsed[key]);
+    try {
+      const stored = localStorage.getItem("assessmentSkipped");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert arrays back to Sets
+        const result: Record<string, Set<number>> = {};
+        for (const key in parsed) {
+          result[key] = new Set(parsed[key]);
+        }
+        return result;
       }
-      return result;
+    } catch {
+      localStorage.removeItem("assessmentSkipped");
     }
     return {};
   });
@@ -690,7 +727,10 @@ const SectionQuestionPage: React.FC = () => {
     return <div className="text-center mt-5">Loading Assessment</div>;
   }
 
-  const question = questions[currentIndex];
+  // URL may point past the section end (stale history entry / shortened
+  // questionnaire) — clamp instead of crashing into the error boundary.
+  const question =
+    questions[Math.min(Math.max(currentIndex, 0), questions.length - 1)];
   const qId = question.questionnaireQuestionId;
 
   const selectedOptions = answers[sectionId!]?.[qId] || [];
@@ -1056,7 +1096,9 @@ const SectionQuestionPage: React.FC = () => {
 
     // Auto-advance to next unanswered question after a short delay (to let user see their selection)
     if (willAutoAdvance) {
-      setTimeout(() => {
+      if (autoAdvanceRef.current) window.clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = window.setTimeout(() => {
+        autoAdvanceRef.current = null;
         const nextUnanswered = findNextUnansweredQuestion(
           sectionId!,
           currentIndex,
@@ -1146,7 +1188,9 @@ const SectionQuestionPage: React.FC = () => {
 
     // Auto-advance to next unanswered question after a short delay
     if (willAutoAdvance) {
-      setTimeout(() => {
+      if (autoAdvanceRef.current) window.clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = window.setTimeout(() => {
+        autoAdvanceRef.current = null;
         const nextUnanswered = findNextUnansweredQuestion(
           sectionId!,
           currentIndex,
@@ -1224,7 +1268,15 @@ const SectionQuestionPage: React.FC = () => {
     // If no unanswered questions remain, stay on current question
   };
 
+  const cancelAutoAdvance = () => {
+    if (autoAdvanceRef.current) {
+      window.clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = null;
+    }
+  };
+
   const goNext = () => {
+    cancelAutoAdvance();
     if (selectedOptions.length === 0) markSkipped();
 
     // Advance strictly in order (13 → 14), even past answered questions —
@@ -1240,6 +1292,7 @@ const SectionQuestionPage: React.FC = () => {
   };
 
   const goBack = () => {
+    cancelAutoAdvance();
     if (currentIndex > 0) {
       const newIndex = currentIndex - 1;
       setCurrentIndex(newIndex);
@@ -1684,10 +1737,9 @@ const SectionQuestionPage: React.FC = () => {
 
   return (
     <div
+      className="question-page-root"
       style={{
         display: "flex",
-        height: "100dvh",
-        minHeight: "100vh",
         background: "linear-gradient(135deg, #0f172a 0%, #1a2238 50%, #1e293b 100%)",
         colorScheme: "light",
         overflow: "hidden",
@@ -1723,7 +1775,9 @@ const SectionQuestionPage: React.FC = () => {
             justifyContent: "center",
             zIndex: 9999,
           }}
-          onClick={() => setShowSectionInstruction(false)}
+          onClick={() => {
+            if (instructionOkCountdown === 0) setShowSectionInstruction(false);
+          }}
         >
           <div
             style={{
@@ -1767,22 +1821,18 @@ const SectionQuestionPage: React.FC = () => {
                     {item.language}
                   </div>
                 )}
-                <p
-                  style={{
-                    whiteSpace: "pre-line",
-                    lineHeight: 1.7,
-                    margin: 0,
-                    fontSize: "1rem",
-                    color: "#4a5568",
-                  }}
+                <div
+                  className="instruction-box"
+                  style={{ lineHeight: 1.7, fontSize: "1rem", color: "#4a5568" }}
                 >
-                  {item.text}
-                </p>
+                  <MarkdownInstructions text={item.text} />
+                </div>
               </div>
             ))}
             <div style={{ textAlign: "right", marginTop: "20px" }}>
               <button
                 onClick={() => setShowSectionInstruction(false)}
+                disabled={instructionOkCountdown > 0}
                 style={{
                   background:
                     "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
@@ -1792,10 +1842,12 @@ const SectionQuestionPage: React.FC = () => {
                   padding: "8px 28px",
                   fontWeight: 600,
                   fontSize: "0.95rem",
-                  cursor: "pointer",
+                  cursor: instructionOkCountdown > 0 ? "not-allowed" : "pointer",
+                  opacity: instructionOkCountdown > 0 ? 0.6 : 1,
+                  minWidth: 96,
                 }}
               >
-                OK
+                {instructionOkCountdown > 0 ? `OK (${instructionOkCountdown})` : "OK"}
               </button>
             </div>
           </div>
@@ -1997,14 +2049,15 @@ const SectionQuestionPage: React.FC = () => {
                   <div
                     key={q.questionnaireQuestionId}
                     onClick={() => {
+                      cancelAutoAdvance();
                       setShowSidebar(false);
                       navigate(
                         `/studentAssessment/sections/${sec.section.sectionId}/questions/${i}`,
                       );
                     }}
                     style={{
-                      width: 32,
-                      height: 32,
+                      width: 40,
+                      height: 40,
                       borderRadius: "8px",
                       background: getQuestionColor(
                         String(sec.section.sectionId),
@@ -3124,14 +3177,12 @@ const SectionQuestionPage: React.FC = () => {
                             renderOptionContent(opt)
                           ) : availableLanguages.length > 0 ? (
                             <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  availableLanguages.length > 1
-                                    ? "1fr 1px 1fr"
-                                    : "1fr",
-                                gap: 15,
-                              }}
+                              className={
+                                availableLanguages.length > 1
+                                  ? "instructions-grid instructions-grid--dual"
+                                  : ""
+                              }
+                              style={{ display: "grid", gap: 15 }}
                             >
                               {availableLanguages.map((lang, index) => (
                                 <React.Fragment key={lang.language.languageId}>
@@ -3205,14 +3256,12 @@ const SectionQuestionPage: React.FC = () => {
                             <div>{renderOptionContent(opt)}</div>
                           ) : availableLanguages.length > 0 ? (
                             <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  availableLanguages.length > 1
-                                    ? "1fr 1px 1fr"
-                                    : "1fr",
-                                gap: 15,
-                              }}
+                              className={
+                                availableLanguages.length > 1
+                                  ? "instructions-grid instructions-grid--dual"
+                                  : ""
+                              }
+                              style={{ display: "grid", gap: 15 }}
                             >
                               {availableLanguages.map((lang, index) => (
                                 <React.Fragment key={lang.language.languageId}>
@@ -3412,7 +3461,7 @@ const SectionQuestionPage: React.FC = () => {
           </div>
         </div>
       </div>
-    // </div>
+    </div>
   );
 };
 

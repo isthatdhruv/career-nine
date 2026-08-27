@@ -58,8 +58,10 @@ const SchoolAssessmentRegisterPage = () => {
   }, [token]);
 
   useEffect(() => {
-    setVerifyStatus("idle");
-    setVerifyResult(null);
+    // Functional bail-out: only touch state when it actually changes, so a
+    // keystroke doesn't double-render the whole form (react-hooks/set-state-in-effect).
+    setVerifyStatus((prev) => (prev === "idle" ? prev : "idle"));
+    setVerifyResult((prev) => (prev === null ? prev : null));
 
     if (!token) return;
     const trimmedEmail = email.trim();
@@ -118,13 +120,16 @@ const SchoolAssessmentRegisterPage = () => {
     ? Math.floor(amountRupees * (100 - promoApplied.discountPercent) / 100)
     : amountRupees;
 
+  // The native date picker works in yyyy-mm-dd; everything downstream of this
+  // page (validation, payload, localStorage password) expects dd-mm-yyyy.
+  const dobToInputValue = (d: string) => {
+    const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+  };
+
   const handleDobChange = (value: string) => {
-    let cleaned = value.replace(/[^0-9-]/g, "");
-    const digits = cleaned.replace(/-/g, "");
-    if (digits.length <= 2) cleaned = digits;
-    else if (digits.length <= 4) cleaned = digits.slice(0, 2) + "-" + digits.slice(2);
-    else cleaned = digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4, 8);
-    setDob(cleaned);
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    setDob(m ? `${m[3]}-${m[2]}-${m[1]}` : "");
   };
 
   const handleClassChange = (val: string) => {
@@ -415,7 +420,7 @@ const SchoolAssessmentRegisterPage = () => {
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
 
             {/* Class + Section row */}
-            <div style={{ display: "grid", gridTemplateColumns: sections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: sections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
               <div>
                 <label style={s.label}>{terms.unit} <span style={{ color: "#f43f5e" }}>*</span></label>
                 <select
@@ -485,7 +490,7 @@ const SchoolAssessmentRegisterPage = () => {
             </div>
 
             {/* Email + DOB */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
               <div>
                 <label style={s.label}>Parent's Email <span style={{ color: "#f43f5e" }}>*</span></label>
                 <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={s.input}
@@ -493,13 +498,15 @@ const SchoolAssessmentRegisterPage = () => {
               </div>
               <div>
                 <label style={s.label}>Date of Birth <span style={{ color: "#f43f5e" }}>*</span></label>
-                <input type="text" placeholder="dd-mm-yyyy" value={dob} onChange={(e) => handleDobChange(e.target.value)} maxLength={10} required style={s.input}
+                <input type="date" value={dobToInputValue(dob)} onChange={(e) => handleDobChange(e.target.value)}
+                  max={new Date().toISOString().split("T")[0]} required
+                  style={{ ...s.input, color: dob ? "#1e293b" : "#94a3b8" }}
                   onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
               </div>
             </div>
 
             {/* Phone + Gender */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
               <div>
                 {/* Phone is genuinely mandatory: the duplicate-check round-trip
                     (which gates the submit button) only fires once email+phone+dob
@@ -680,7 +687,7 @@ const SchoolAssessmentRegisterPage = () => {
           })()}
 
           <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-            By registering, you agree to the assessment terms and conditions.
+            By registering, I agree to the Career-9's terms and conditions.
           </p>
         </form>
       </div>
@@ -710,7 +717,7 @@ const s: { [key: string]: React.CSSProperties } = {
   header: { padding: "32px 32px 24px" },
   priceBadge: { display: "inline-flex", alignItems: "center", background: "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)", color: "#065f46", padding: "6px 16px", borderRadius: 10, fontSize: "0.9rem", fontWeight: 700, border: "1px solid #6ee7b7" },
   label: { display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#374151", marginBottom: 6 },
-  input: { width: "100%", padding: "12px 16px", borderRadius: 12, border: "1.5px solid #e2e8f0", background: "rgba(255, 255, 255, 0.8)", fontSize: "0.92rem", color: "#1e293b", outline: "none", transition: "border-color 0.2s, box-shadow 0.2s", boxSizing: "border-box" as const },
+  input: { width: "100%", padding: "12px 16px", borderRadius: 12, border: "1.5px solid #e2e8f0", background: "rgba(255, 255, 255, 0.8)", fontSize: 16, color: "#1e293b", outline: "none", transition: "border-color 0.2s, box-shadow 0.2s", boxSizing: "border-box" as const },
   inputFocus: { borderColor: "#34d399", boxShadow: "0 0 0 3px rgba(52, 211, 153, 0.15)" },
   btnPrimary: { display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "14px 32px", borderRadius: 14, border: "none", background: "linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)", color: "#fff", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 16px rgba(16, 185, 129, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1)", transition: "transform 0.15s, box-shadow 0.15s", letterSpacing: "0.01em" },
   btnOutline: { padding: "12px 20px", borderRadius: 12, border: "1.5px solid #10b981", background: "transparent", color: "#059669", fontSize: "0.88rem", fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" as const, transition: "all 0.15s" },

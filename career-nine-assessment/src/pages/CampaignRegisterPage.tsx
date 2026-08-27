@@ -156,10 +156,27 @@ const CampaignRegisterPage = () => {
     }
   }, [info, classMode, selectedClassId])
 
+  // A stale or garbled deep-link id (deleted tier, retargeted link, NaN) must
+  // not suppress the pickers and dead-end the page — drop it and fall back to
+  // normal selection.
+  useEffect(() => {
+    if (!info || selectedAssessmentId == null) return
+    if (!info.assessments.some((a) => a.assessmentId === selectedAssessmentId)) {
+      setSelectedAssessmentId(null)
+    }
+  }, [info, selectedAssessmentId])
+
   const selectedAssessment: Assessment | null =
     info && selectedAssessmentId != null
       ? info.assessments.find((a) => a.assessmentId === selectedAssessmentId) || null
       : null
+
+  useEffect(() => {
+    if (!selectedAssessment || selectedTierId == null) return
+    if (!selectedAssessment.tiers.some((t) => t.campaignAssessmentTierId === selectedTierId)) {
+      setSelectedTierId(null)
+    }
+  }, [selectedAssessment, selectedTierId])
 
   useEffect(() => {
     if (selectedAssessment && selectedTierId == null && selectedAssessment.tiers.length === 1) {
@@ -180,13 +197,16 @@ const CampaignRegisterPage = () => {
     ? Math.floor(selectedTier.priceInr * (100 - promoApplied.discountPercent) / 100)
     : (selectedTier?.priceInr ?? 0)
 
+  // The native date picker works in yyyy-mm-dd; everything downstream of this
+  // page (validation, payload, localStorage password) expects dd-mm-yyyy.
+  const dobToInputValue = (d: string) => {
+    const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : ""
+  }
+
   const handleDobChange = (value: string) => {
-    let cleaned = value.replace(/[^0-9-]/g, "")
-    const digits = cleaned.replace(/-/g, "")
-    if (digits.length <= 2) cleaned = digits
-    else if (digits.length <= 4) cleaned = digits.slice(0, 2) + "-" + digits.slice(2)
-    else cleaned = digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4, 8)
-    setDob(cleaned)
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    setDob(m ? `${m[3]}-${m[2]}-${m[1]}` : "")
   }
 
   const handleApplyPromo = async () => {
@@ -363,8 +383,11 @@ const CampaignRegisterPage = () => {
     )
   }
 
-  const onlyOneAssessmentInUrl = aidFromUrl != null
-  const onlyOneTierInUrl = tidFromUrl != null
+  const onlyOneAssessmentInUrl =
+    aidFromUrl != null && info.assessments.some((a) => a.assessmentId === aidFromUrl)
+  const onlyOneTierInUrl =
+    tidFromUrl != null && selectedAssessment != null &&
+    selectedAssessment.tiers.some((t) => t.campaignAssessmentTierId === tidFromUrl)
   // In class mode the class picker drives assessment selection, so the raw
   // assessment picker is hidden.
   const showClassPicker = classMode && info.classes!.length > 1
@@ -550,7 +573,7 @@ const CampaignRegisterPage = () => {
                   />
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
                   <div>
                     <label style={s.label}>
                       Parent's Email <span style={{ color: "#f43f5e" }}>*</span>
@@ -573,20 +596,19 @@ const CampaignRegisterPage = () => {
                     </label>
                     <input
                       ref={dobRef}
-                      type="text"
-                      placeholder="dd-mm-yyyy"
-                      value={dob}
+                      type="date"
+                      value={dobToInputValue(dob)}
                       onChange={(e) => handleDobChange(e.target.value)}
-                      maxLength={10}
+                      max={new Date().toISOString().split("T")[0]}
                       required
-                      style={s.input}
+                      style={{ ...s.input, color: dob ? "#1e293b" : "#94a3b8" }}
                       onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
                       onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
                     />
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
                   <div>
                     <label style={s.label}>
                       Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
@@ -741,7 +763,7 @@ const CampaignRegisterPage = () => {
               </button>
 
               <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-                By registering, you agree to the campaign terms and conditions.
+                By registering, I agree to the Career-9's terms and conditions.
               </p>
             </form>
           )}
@@ -1004,7 +1026,7 @@ const s: { [key: string]: React.CSSProperties } = {
     borderRadius: 12,
     border: "1.5px solid #e2e8f0",
     background: "rgba(255, 255, 255, 0.8)",
-    fontSize: "0.92rem",
+    fontSize: 16,
     color: "#1e293b",
     outline: "none",
     transition: "border-color 0.2s, box-shadow 0.2s",

@@ -8,7 +8,7 @@ import {
 } from '../API/BlockDateRequestAPI'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import WeeklySchedulePanel from './WeeklySchedulePanel'
-import { isTeamsLink } from './WeeklyScheduleForm'
+import { isValidMeetingLink, MEETING_LINK_PLACEHOLDER } from './meetingLink'
 import './CounsellorAvailabilityPanel.css'
 
 interface ManualSlotForm {
@@ -219,7 +219,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
   // Online extra slot needs the permanent Teams link on file, exactly as the weekly
   // schedule does — the Add Slot button stays disabled until it is a valid one.
   const manualSlotLinkMissing =
-    manualSlotForm.mode === 'ONLINE' && !isTeamsLink(meetingLink)
+    manualSlotForm.mode === 'ONLINE' && !isValidMeetingLink(meetingLink)
 
   const handleSaveManualSlot = async () => {
     if (!manualSlotForm.date || !manualSlotForm.startTime || !manualSlotForm.endTime) {
@@ -238,10 +238,10 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
       return
     }
     // Online sessions run on Microsoft Teams — no link, no bookable online slot.
-    if (manualSlotForm.mode === 'ONLINE' && !isTeamsLink(meetingLink)) {
+    if (manualSlotForm.mode === 'ONLINE' && !isValidMeetingLink(meetingLink)) {
       setError(meetingLink.trim()
-        ? 'The meeting link must be a Microsoft Teams link (teams.microsoft.com or teams.live.com).'
-        : 'Add the Microsoft Teams meeting link above before creating online slots.')
+        ? 'The meeting link must be a Microsoft Teams or Google Meet link (teams.microsoft.com, teams.live.com or meet.google.com).'
+        : 'Add the meeting link (Microsoft Teams or Google Meet) above before creating online slots.')
       return
     }
     setSlotSaving(true)
@@ -611,7 +611,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                 {manualSlotForm.mode === 'ONLINE' && (
                   <div>
                     <label style={labelStyle}>
-                      Microsoft Teams meeting link <span style={{ color: '#DC2626' }}>*</span>
+                      Meeting link — Microsoft Teams or Google Meet <span style={{ color: '#DC2626' }}>*</span>
                     </label>
                     <input
                       type='url'
@@ -619,10 +619,10 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                       aria-required='true'
                       value={meetingLink}
                       onChange={(e) => setMeetingLink(e.target.value)}
-                      placeholder='https://teams.microsoft.com/l/meetup-join/...'
+                      placeholder={MEETING_LINK_PLACEHOLDER}
                       style={{
                         ...inputStyle,
-                        borderColor: meetingLink.trim() && !isTeamsLink(meetingLink)
+                        borderColor: meetingLink.trim() && !isValidMeetingLink(meetingLink)
                           ? '#DC2626'
                           : (inputStyle as any).borderColor,
                       }}
@@ -651,8 +651,8 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                   disabled={slotSaving || manualSlotLinkMissing}
                   title={manualSlotLinkMissing
                     ? meetingLink.trim()
-                      ? 'The meeting link must be a Microsoft Teams link'
-                      : 'Add the Microsoft Teams meeting link first'
+                      ? 'The meeting link must be a Microsoft Teams or Google Meet link'
+                      : 'Add the meeting link first'
                     : undefined}
                   style={{
                     width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
@@ -23,6 +23,9 @@ type QuestionnaireLanguage = {
 };
 
 const GeneralInstructionsPage: React.FC = () => {
+  // "I have read and understood" acknowledgement — gates the start button.
+  const [ackChecked, setAckChecked] = useState(false);
+  const [ackError, setAckError] = useState(false);
   const navigate = useNavigate();
   const { assessmentData, loading } = useAssessment();
   usePreventReload();
@@ -132,35 +135,51 @@ const GeneralInstructionsPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Info Box */}
-                <div className="assessment-info-box">
-                  <div
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      minWidth: "36px",
-                      background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                {/* Acknowledgement checkbox — must be ticked to start */}
+                <label
+                  className="assessment-info-box"
+                  style={{
+                    cursor: "pointer",
+                    userSelect: "none",
+                    border: ackError && !ackChecked ? "1.5px solid #f43f5e" : undefined,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={ackChecked}
+                    onChange={(e) => {
+                      setAckChecked(e.target.checked);
+                      if (e.target.checked) setAckError(false);
                     }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                      <polyline points="22 4 12 14.01 9 11.01" />
-                    </svg>
-                  </div>
+                    style={{
+                      width: 22,
+                      height: 22,
+                      minWidth: 22,
+                      accentColor: "#3FB876",
+                      cursor: "pointer",
+                    }}
+                  />
                   <p style={{ margin: 0, color: "#4a5568", fontSize: "0.9rem", fontWeight: "500" }}>
-                    <strong style={{ color: "#2d3748" }}>Ready to begin?</strong> Make sure you've read and understood all the instructions before starting.
+                    <strong style={{ color: "#2d3748" }}>Ready to begin?</strong> I have read and understood all the instructions.
                   </p>
-                </div>
+                </label>
+                {ackError && !ackChecked && (
+                  <p className="text-center" style={{ color: "#e11d48", fontSize: "0.85rem", marginTop: "0.5rem", marginBottom: 0 }}>
+                    Please tick the box above to confirm you have read the instructions.
+                  </p>
+                )}
 
                 {/* Start Button */}
                 <div className="text-center">
                   <button
                     className="btn btn-assessment-primary px-4 px-md-5 py-2 py-md-3"
-                    onClick={() => navigate("/studentAssessment")}
+                    onClick={() => {
+                      if (!ackChecked) {
+                        setAckError(true);
+                        return;
+                      }
+                      navigate("/studentAssessment");
+                    }}
                     style={{ fontSize: '1.05rem', display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}
                   >
                     <span>I'm Ready to Start!</span>

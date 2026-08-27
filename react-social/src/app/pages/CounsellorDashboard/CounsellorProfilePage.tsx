@@ -316,8 +316,8 @@ const CounsellorProfilePage: React.FC = () => {
             </div>
           )}
           <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Microsoft Teams meeting link *</label>
-            <input value={form.meetingLink} placeholder='https://teams.microsoft.com/l/meetup-join/...'
+            <label style={labelStyle}>Meeting link — Microsoft Teams or Google Meet *</label>
+            <input value={form.meetingLink} placeholder='https://teams.microsoft.com/l/meetup-join/... or https://meet.google.com/...'
               onChange={(e) => setForm({ ...form, meetingLink: e.target.value })} style={inputStyle} />
             <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 5 }}>
               Used for all your online sessions. In Teams: Calendar → New meeting → set it to repeat

@@ -355,7 +355,15 @@ const SelectSectionPage: React.FC = () => {
                       <div
                         key={section.sectionId}
                         className="section-card card"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleSectionClick(section)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleSectionClick(section);
+                          }
+                        }}
                       >
                         <div className="card-body p-3 d-flex align-items-center gap-3">
                           {/* Section Number Badge */}

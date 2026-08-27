@@ -104,7 +104,8 @@ const MappingPayLaterBooking: React.FC<Props> = ({
         setSubmitting(false);
       }
     } catch (e: any) {
-      setError(e?.response?.data || 'Could not start payment. Please try again.');
+      const body = e?.response?.data;
+      setError(typeof body === 'string' && body ? body : 'Could not start payment. Please try again.');
       setSubmitting(false);
     }
   };
@@ -119,7 +120,7 @@ const MappingPayLaterBooking: React.FC<Props> = ({
         position: 'fixed', inset: 0, background: 'rgba(6, 78, 59, 0.55)', zIndex: 1000,
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
       }}
-      onClick={onClose}
+      onClick={() => { if (!submitting) onClose(); }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -147,7 +148,7 @@ const MappingPayLaterBooking: React.FC<Props> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => { if (!submitting) onClose(); }}
             aria-label="Close"
             style={{ border: 'none', background: 'transparent', fontSize: '1.6rem', lineHeight: 1, cursor: 'pointer', color: '#fff', padding: 4 }}
           >
@@ -236,8 +237,8 @@ const MappingPayLaterBooking: React.FC<Props> = ({
               </div>
               <div style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
                 <input placeholder="Your name *" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-                <input placeholder="Phone *" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
-                <input placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+                <input type="tel" inputMode="tel" placeholder="Phone *" value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
+                <input type="email" inputMode="email" placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
                 <select value={method} onChange={(e) => setMethod(e.target.value as any)} style={inputStyle}>
                   <option value="PHONE">Contact me by phone</option>
                   <option value="WHATSAPP">Contact me on WhatsApp</option>

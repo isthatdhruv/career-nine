@@ -26,6 +26,15 @@ const PaymentRegisterPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [dob, setDob] = useState("");
+  // The native date picker works in yyyy-mm-dd; the backend expects dd-mm-yyyy.
+  const dobToInputValue = (d: string) => {
+    const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+  };
+  const handleDobChange = (value: string) => {
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    setDob(m ? `${m[3]}-${m[2]}-${m[1]}` : "");
+  };
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
   const [studentClass, setStudentClass] = useState("");
@@ -239,7 +248,7 @@ const PaymentRegisterPage = () => {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-            <InputField label="Date of Birth *" value={dob} onChange={setDob} placeholder="DD-MM-YYYY" type="text" />
+            <InputField label="Date of Birth *" value={dobToInputValue(dob)} onChange={handleDobChange} placeholder="" type="date" max={new Date().toISOString().split("T")[0]} />
             <InputField label="Phone" value={phone} onChange={setPhone} placeholder="9876543210" type="tel" />
           </div>
 
@@ -361,9 +370,9 @@ const Footer = () => (
   </div>
 );
 
-const InputField = ({ label, value, onChange, placeholder, type, fullWidth }: {
+const InputField = ({ label, value, onChange, placeholder, type, fullWidth, max }: {
   label: string; value: string; onChange: (v: string) => void;
-  placeholder: string; type: string; fullWidth?: boolean;
+  placeholder: string; type: string; fullWidth?: boolean; max?: string;
 }) => (
   <div style={fullWidth ? { gridColumn: "1 / -1" } : {}}>
     <label style={labelStyle}>{label}</label>
@@ -372,6 +381,7 @@ const InputField = ({ label, value, onChange, placeholder, type, fullWidth }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      max={max}
       style={inputStyle}
     />
   </div>

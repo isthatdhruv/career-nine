@@ -192,7 +192,7 @@ const AssessmentInviteRegisterPage = () => {
           <div style={s.selectionLabel}>Your details</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginTop: 12 }}>
             <Field label="Full Name" value={info?.student?.name} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
               <Field label="Parent's Email" value={info?.student?.email} />
               <Field label="Date of Birth" value={info?.student?.dob} />
             </div>
@@ -249,7 +249,7 @@ const AssessmentInviteRegisterPage = () => {
           </button>
 
           <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-            By registering, you agree to the assessment terms and conditions.
+            By registering, I agree to the Career-9's terms and conditions.
           </p>
         </div>
       </div>

@@ -602,7 +602,7 @@ const AssessmentRegisterPage = () => {
             </div>
 
             {/* Email + DOB row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
               <div>
                 <label style={s.label}>
                   Parent's Email <span style={{ color: "#f43f5e" }}>*</span>
@@ -680,7 +680,7 @@ const AssessmentRegisterPage = () => {
                   </select>
                 </div>
                 {selectedSessionId && instituteClasses.length > 0 && (
-                  <div style={{ display: "grid", gridTemplateColumns: instituteClassSections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: instituteClassSections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
                     <div>
                       <label style={s.label}>
                         {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
@@ -726,7 +726,7 @@ const AssessmentRegisterPage = () => {
 
             {/* Class dropdown for SESSION level */}
             {mappingInfo?.mappingLevel === "SESSION" && availableClasses.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: selectedClassSections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: selectedClassSections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
                 <div>
                   <label style={s.label}>
                     {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
@@ -835,7 +835,7 @@ const AssessmentRegisterPage = () => {
                 type="button"
                 onClick={() => setShowPromo(true)}
                 style={{
-                  background: "none", border: "none", padding: 0, textAlign: "left",
+                  background: "none", border: "none", padding: "10px 0", textAlign: "left",
                   color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
                 }}
               >
@@ -1204,7 +1204,7 @@ const s: { [key: string]: React.CSSProperties } = {
     borderRadius: 12,
     border: "1.5px solid #e2e8f0",
     background: "rgba(255, 255, 255, 0.8)",
-    fontSize: "0.92rem",
+    fontSize: 16,
     color: "#1e293b",
     outline: "none",
     transition: "border-color 0.2s, box-shadow 0.2s",
