@@ -206,8 +206,8 @@ public class LeadStudentService {
         }
     }
 
-    /** Pull the numeric grade/class the signup form sent in the lead's extras JSON. */
-    private Integer parseGradeFromExtras(String extrasJson) {
+    /** Pull the grade/class label the signup form sent in the lead's extras JSON. */
+    private String parseGradeFromExtras(String extrasJson) {
         if (extrasJson == null || extrasJson.isBlank()) {
             return null;
         }
@@ -217,7 +217,7 @@ public class LeadStudentService {
                 return null;
             }
             String raw = node.asText().trim();
-            return raw.isEmpty() ? null : Integer.valueOf(raw);
+            return raw.isEmpty() ? null : raw;
         } catch (Exception e) {
             logger.warn("Could not parse grade from lead extras: {}", e.getMessage());
             return null;

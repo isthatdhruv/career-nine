@@ -56,7 +56,7 @@ interface Institute {
 
 interface Student {
   userStudentId: number;
-  studentInfo?: { name: string; studentClass?: number };
+  studentInfo?: { name: string; studentClass?: string };
   userId?: { name: string };
 }
 

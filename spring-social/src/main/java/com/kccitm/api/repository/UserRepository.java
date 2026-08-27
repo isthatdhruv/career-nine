@@ -73,6 +73,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
            "AND u.career_nine_rollnumber IS NOT NULL", nativeQuery = true)
     List<String> findRollNumbersByClassAndSection(
         @Param("instituteId") Integer instituteId,
-        @Param("studentClass") Integer studentClass,
+        @Param("studentClass") String studentClass,
         @Param("sectionId") Integer sectionId);
 }

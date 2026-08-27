@@ -8,7 +8,7 @@ import React, {
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
-import { usePreventReload } from "../hooks/usePreventReload";
+import { usePreventReload, suppressPreventReload } from "../hooks/usePreventReload";
 import { useStudentBranding, brandLogoSrc, CAREER9_LOGO } from "../hooks/useStudentBranding";
 import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
 import { useDebouncedLocalStorage } from "../hooks/useDebouncedLocalStorage";
@@ -147,7 +147,16 @@ const SectionQuestionPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showInactivityWarning, setShowInactivityWarning] =
     useState<boolean>(false);
+  // "I have read and understood" checkbox inside the focus popup — Continue
+  // stays disabled until it is ticked; reset every time the popup opens.
+  const [inactivityAcknowledged, setInactivityAcknowledged] =
+    useState<boolean>(false);
   const inactivityTimerRef = useRef<number | null>(null);
+  // Themed reload-confirmation modal. Shown when the student tries to reload
+  // via the keyboard (F5 / Ctrl+R) — the browser-toolbar reload button cannot
+  // be intercepted with custom UI, so that path still gets the native
+  // beforeunload dialog from usePreventReload.
+  const [showReloadWarning, setShowReloadWarning] = useState<boolean>(false);
 
   // Track which sections have already shown their instructions (only show once)
   const [seenSectionInstructions, setSeenSectionInstructions] = useState<
@@ -343,6 +352,29 @@ const SectionQuestionPage: React.FC = () => {
     }
   }, [sectionId, questionIndex, assessmentData]);
 
+  // Intercept keyboard reloads (F5, Ctrl/Cmd+R) and show the themed
+  // confirmation modal instead of the browser's native dialog.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isReloadKey =
+        e.key === "F5" ||
+        ((e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R"));
+      if (isReloadKey) {
+        e.preventDefault();
+        setShowReloadWarning(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const confirmReload = () => {
+    // Quiet the beforeunload guard so the student is not shown the native
+    // dialog on top of the confirmation they just gave.
+    suppressPreventReload();
+    window.location.reload();
+  };
+
   // Inactivity watcher: if the student does not interact with the question
   // for 40 seconds, show a focus reminder popup.
   useEffect(() => {
@@ -353,6 +385,7 @@ const SectionQuestionPage: React.FC = () => {
         window.clearTimeout(inactivityTimerRef.current);
       }
       inactivityTimerRef.current = window.setTimeout(() => {
+        setInactivityAcknowledged(false);
         setShowInactivityWarning(true);
       }, 40000);
     };
@@ -1194,14 +1227,14 @@ const SectionQuestionPage: React.FC = () => {
   const goNext = () => {
     if (selectedOptions.length === 0) markSkipped();
 
-    // Jump to the next unanswered question, skipping already-answered ones
-    const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex);
-    if (nextUnanswered) {
+    // Advance strictly in order (13 → 14), even past answered questions —
+    // never jump ahead to the next unanswered one.
+    if (currentIndex + 1 < questions.length) {
       navigate(
-        `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`,
+        `/studentAssessment/sections/${sectionId}/questions/${currentIndex + 1}`,
       );
     } else {
-      // All questions answered — go to next section or completed page
+      // Last question of the section — go to next section or the submit flow
       goToNextSection();
     }
   };
@@ -2193,6 +2226,120 @@ const SectionQuestionPage: React.FC = () => {
               </div>
             , document.body)}
 
+            {/* Reload confirmation - themed replacement for the native dialog
+                on keyboard reloads (F5 / Ctrl+R); portaled to body */}
+            {showReloadWarning && createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "rgba(0, 0, 0, 0.5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 9999,
+                }}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: "16px",
+                    padding: "32px 36px",
+                    maxWidth: "440px",
+                    width: "90%",
+                    textAlign: "center",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                    color: "#2d3748",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "50%",
+                      background:
+                        "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
+                    }}
+                  >
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                      <path d="M21 3v6h-6" />
+                    </svg>
+                  </div>
+                  <h5
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: "12px",
+                      color: "#1a202c",
+                      fontSize: "1.2rem",
+                    }}
+                  >
+                    Reload this page?
+                  </h5>
+                  <p
+                    style={{
+                      color: "#6b7280",
+                      fontSize: "0.95rem",
+                      lineHeight: 1.6,
+                      marginBottom: "24px",
+                    }}
+                  >
+                    Reloading may lose your answers in this section.
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                      alignItems: "center",
+                    }}
+                  >
+                    <button
+                      onClick={() => setShowReloadWarning(false)}
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 28px",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                        cursor: "pointer",
+                        width: "100%",
+                        boxShadow: "0 4px 15px rgba(63, 184, 118, 0.35)",
+                      }}
+                    >
+                      Continue Assessment
+                    </button>
+                    <button
+                      onClick={confirmReload}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#94a3b8",
+                        fontSize: "0.88rem",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        padding: "0.3rem",
+                      }}
+                    >
+                      Reload anyway
+                    </button>
+                  </div>
+                </div>
+              </div>
+            , document.body)}
+
             {/* Inactivity Reminder Popup - portaled to body for mobile compatibility */}
             {showInactivityWarning && createPortal(
               <div
@@ -2208,7 +2355,6 @@ const SectionQuestionPage: React.FC = () => {
                   justifyContent: "center",
                   zIndex: 9999,
                 }}
-                onClick={() => setShowInactivityWarning(false)}
               >
                 <div
                   style={{
@@ -2259,6 +2405,40 @@ const SectionQuestionPage: React.FC = () => {
                   >
                     In case you need help please talk to supervising adult.
                   </p>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      textAlign: "left",
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "10px",
+                      padding: "12px 14px",
+                      marginBottom: "20px",
+                      cursor: "pointer",
+                      color: "#334155",
+                      fontSize: "0.9rem",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={inactivityAcknowledged}
+                      onChange={(e) =>
+                        setInactivityAcknowledged(e.target.checked)
+                      }
+                      style={{
+                        marginTop: "3px",
+                        width: "16px",
+                        height: "16px",
+                        flexShrink: 0,
+                        cursor: "pointer",
+                        accentColor: "#0e7490",
+                      }}
+                    />
+                    <span>I have read and understood</span>
+                  </label>
                   <div
                     style={{
                       display: "flex",
@@ -2266,18 +2446,24 @@ const SectionQuestionPage: React.FC = () => {
                     }}
                   >
                     <button
+                      disabled={!inactivityAcknowledged}
                       onClick={() => setShowInactivityWarning(false)}
                       style={{
-                        background:
-                          "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                        background: inactivityAcknowledged
+                          ? "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)"
+                          : "#cbd5e1",
                         color: "#fff",
                         border: "none",
                         borderRadius: "10px",
                         padding: "10px 28px",
                         fontWeight: 600,
                         fontSize: "0.95rem",
-                        cursor: "pointer",
-                        boxShadow: "0 4px 15px rgba(15, 23, 42, 0.3)",
+                        cursor: inactivityAcknowledged
+                          ? "pointer"
+                          : "not-allowed",
+                        boxShadow: inactivityAcknowledged
+                          ? "0 4px 15px rgba(15, 23, 42, 0.3)"
+                          : "none",
                       }}
                     >
                       Continue

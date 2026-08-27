@@ -142,13 +142,13 @@ public class TokenProvider {
     }
 
     /**
-     * Admin-impersonation minter: mints a short-lived (5 min) access token for
+     * Admin-impersonation minter: mints a short-lived (15 min) access token for
      * {@link com.kccitm.api.controller.ImpersonationController}. A URL/sessionStorage-borne
-     * impersonation token should live only long enough for the admin to open the student
-     * dashboard tab — not the full 60-min {@link #createAccessToken(UserPrincipal)} TTL.
+     * impersonation token should live only long enough for the admin's impersonation
+     * tab session — not the full 60-min {@link #createAccessToken(UserPrincipal)} TTL.
      */
     public String createImpersonationToken(UserPrincipal userPrincipal) {
-        return buildJwt(userPrincipal, 5 * 60 * 1000L, TokenType.ACCESS);
+        return buildJwt(userPrincipal, 15 * 60 * 1000L, TokenType.ACCESS);
     }
 
     /**

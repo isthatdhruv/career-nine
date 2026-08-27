@@ -62,6 +62,7 @@ import com.kccitm.api.service.career9.AssessmentMappingTierService;
 import com.kccitm.api.service.career9.InstituteAssessmentService;
 import com.kccitm.api.service.career9.ReferralService;
 import com.kccitm.api.service.b2c.EntitlementService;
+import com.kccitm.api.util.GradeParser;
 
 @RestController
 @RequestMapping("/school-registration")
@@ -446,6 +447,8 @@ public class SchoolRegistrationController {
         InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
         if (institute != null) {
             info.put("instituteName", institute.getInstituteName());
+            // null → school; drives Class/Board vs Year/Course wording on the portal
+            info.put("isSchool", institute.getIsSchool());
         }
         info.put("branding", brandingService.forInstitute(institute));
         info.put("instituteCode", instituteCode);
@@ -681,8 +684,8 @@ public class SchoolRegistrationController {
         Long mappingAmount = activeTier.getAmount() != null ? activeTier.getAmount() : 0L;
         boolean paymentRequired = mappingAmount > 0;
 
-        // 5. Parse student class number (BUG FIX: always set studentClass)
-        Integer studentClass = parseClassNumber(classId);
+        // 5. Resolve the class row's display label (stored verbatim on StudentInfo)
+        String studentClass = resolveClassLabel(classId);
 
         // 5c. Referral code (applies to free AND paid; records who referred the student)
         String referralCodeStr = (String) studentData.get("referralCode");
@@ -741,10 +744,19 @@ public class SchoolRegistrationController {
                     config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr);
         }
 
-        // 8. Duplicate check by DOB + institute + class + name
+        // 8. Duplicate check by DOB + institute + class + name. Legacy rows stored the
+        // digit-stripped grade ("10" for a class named "10-A"), so fall back to the
+        // numeric form when the verbatim label finds nothing.
         if (studentClass != null) {
             List<StudentInfo> byDob = studentInfoRepository
                     .findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(dob, instituteCode, studentClass, name);
+            if (byDob.isEmpty()) {
+                Integer legacyGrade = GradeParser.numericGradeOrNull(studentClass);
+                if (legacyGrade != null && !String.valueOf(legacyGrade).equals(studentClass)) {
+                    byDob = studentInfoRepository.findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(
+                            dob, instituteCode, String.valueOf(legacyGrade), name);
+                }
+            }
             if (!byDob.isEmpty()) {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
@@ -877,7 +889,7 @@ public class SchoolRegistrationController {
             Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
             String referralCodeStr, String name, String email, Date dob, String dobStr, String phone, String gender,
-            Integer classId, Integer schoolSectionId, Integer studentClass, boolean dpdpConsent) {
+            Integer classId, Integer schoolSectionId, String studentClass, boolean dpdpConsent) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
@@ -922,7 +934,7 @@ public class SchoolRegistrationController {
             notes.put("classId", String.valueOf(classId));
             notes.put("transactionId", String.valueOf(txn.getTransactionId()));
             if (schoolSectionId != null) notes.put("schoolSectionId", String.valueOf(schoolSectionId));
-            if (studentClass != null) notes.put("studentClass", String.valueOf(studentClass));
+            if (studentClass != null) notes.put("studentClass", studentClass);
 
             Map<String, String> rzpResponse = razorpayService.createPaymentLink(
                     finalAmountInr, "INR", assessmentName + " - Payment",
@@ -1103,20 +1115,13 @@ public class SchoolRegistrationController {
         });
     }
 
-    private Integer parseClassNumber(Integer classId) {
+    private String resolveClassLabel(Integer classId) {
         if (classId == null) return null;
         Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
         if (classOpt.isPresent()) {
             String className = classOpt.get().getClassName();
-            if (className != null) {
-                String digits = className.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    try {
-                        return Integer.parseInt(digits);
-                    } catch (NumberFormatException e) {
-                        logger.warn("Could not parse class number from className for classId: {}", classId);
-                    }
-                }
+            if (className != null && !className.trim().isEmpty()) {
+                return className.trim();
             }
         }
         // Never fall back to classId (a DB primary key) — that would corrupt studentClass.

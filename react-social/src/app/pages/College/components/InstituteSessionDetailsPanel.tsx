@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { getInstituteTerms } from "../utils/instituteTerms";
 import {
   CreateClassData,
   CreateSectionData,
@@ -33,12 +34,15 @@ interface ExistingSession {
 
 interface Props {
   instituteCode: string | number;
+  /** false → college wording (Year/Course); true/undefined → school wording. */
+  isSchool?: boolean | null;
 }
 
 const InstituteSessionDetailsPanel = forwardRef<
   InstituteSessionDetailsPanelHandle,
   Props
->(({ instituteCode }, ref) => {
+>(({ instituteCode, isSchool }, ref) => {
+  const terms = getInstituteTerms(isSchool);
   const [existing, setExisting] = useState<ExistingSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -127,7 +131,7 @@ const InstituteSessionDetailsPanel = forwardRef<
     const name = gradeInput.trim();
     if (!name) return;
     if (activeSession.schoolClasses.some((g) => g.className === name)) {
-      showErrorToast("Class already exists for this session.");
+      showErrorToast(`${terms.unit} already exists for this session.`);
       return;
     }
     setBusy(true);
@@ -137,7 +141,7 @@ const InstituteSessionDetailsPanel = forwardRef<
         schoolSession: { id: activeSession.id },
       });
       const created = res.data;
-      showSuccessToast("Class saved");
+      showSuccessToast(`${terms.unit} saved`);
       setGradeInput("");
       await fetchExisting();
       if (created?.id) setActiveGradeId(created.id);
@@ -196,7 +200,7 @@ const InstituteSessionDetailsPanel = forwardRef<
     setBusy(true);
     try {
       await DeleteClassData(id);
-      showSuccessToast("Class deleted");
+      showSuccessToast(`${terms.unit} deleted`);
       if (activeGradeId === id) setActiveGradeId(null);
       await fetchExisting();
     } catch (err) {
@@ -250,7 +254,7 @@ const InstituteSessionDetailsPanel = forwardRef<
                 <thead className="table-light">
                   <tr>
                     <th>Session</th>
-                    <th>Class</th>
+                    <th>{terms.unit}</th>
                     <th>Section</th>
                   </tr>
                 </thead>
@@ -361,13 +365,13 @@ const InstituteSessionDetailsPanel = forwardRef<
         <div className="card border-0 shadow-sm mb-3">
           <div className="card-body">
             <h6 className="fw-semibold mb-2">
-              Add class to "{activeSession.sessionYear}"
+              Add {terms.unitLower} to "{activeSession.sessionYear}"
             </h6>
             <div className="input-group mb-3">
               <input
                 type="text"
                 className="form-control"
-                placeholder="e.g., Class 9"
+                placeholder={terms.unitExample}
                 value={gradeInput}
                 onChange={(e) => setGradeInput(e.target.value)}
                 onKeyDown={(e) => {

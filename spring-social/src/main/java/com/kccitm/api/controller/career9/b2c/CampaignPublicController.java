@@ -55,6 +55,7 @@ import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.StudentSessionService;
+import com.kccitm.api.util.GradeParser;
 
 import javax.servlet.http.HttpServletResponse;
 import java.text.SimpleDateFormat;
@@ -458,7 +459,7 @@ public class CampaignPublicController {
         String phone = strFromBody(body, "phone");
         String gender = strFromBody(body, "gender");
         Integer classId = intFromBody(body, "classId");
-        Integer studentClass = parseClassNumber(classId);
+        String studentClass = resolveClassLabel(classId);
         boolean dpdpConsent = boolFromBody(body, "dpdpConsent");
 
         if (name == null || email == null || dobStr == null || phone == null) {
@@ -869,7 +870,7 @@ public class CampaignPublicController {
             boolean dpdpConsent,
             HttpServletResponse httpResponse) {
 
-        Integer studentClass = parseClassNumber(classId);
+        String studentClass = resolveClassLabel(classId);
 
         // Re-check campaign expiry here. The /register entry already validated
         // it, but the form may have sat open for hours — we don't want to
@@ -1048,7 +1049,7 @@ public class CampaignPublicController {
             txn.setStudentPhone(phone);
             // Carry the grade to the webhook, which creates the StudentInfo for
             // pay-first registrations (class context isn't available there).
-            txn.setStudentClass(parseClassNumber(classId));
+            txn.setStudentClass(resolveClassLabel(classId));
             // Carry DPDP consent the same way — the webhook stamps dpdpConsentAt.
             txn.setDpdpConsent(dpdpConsent ? Boolean.TRUE : null);
             txn.setStatus("created");
@@ -1594,24 +1595,19 @@ public class CampaignPublicController {
     }
 
     /**
-     * Resolve a SchoolClasses id to its grade number (e.g. "Class 10" → 10) for
-     * StudentInfo.studentClass. Mirrors the B2B AssessmentInstituteMappingController
-     * logic: strip non-digits from the class name; return null for non-numeric
-     * names ("Nursery"/"LKG") rather than persisting the PK as a bogus grade.
+     * Resolve a SchoolClasses id to its display label, stored verbatim on
+     * StudentInfo.studentClass. Never falls back to the PK.
      */
-    private Integer parseClassNumber(Integer classId) {
+    private String resolveClassLabel(Integer classId) {
         if (classId == null) return null;
         SchoolClasses sc = schoolClassesRepository.findById(classId).orElse(null);
-        return sc == null ? null : gradeOf(sc.getClassName());
+        String className = sc == null ? null : sc.getClassName();
+        return className == null || className.trim().isEmpty() ? null : className.trim();
     }
 
     /** Grade number from a class name ("Class 10" → 10); null for non-numeric names. */
     private static Integer gradeOf(String className) {
-        if (className == null) return null;
-        String digits = className.replaceAll("[^0-9]", "");
-        if (digits.isEmpty()) return null;
-        try { return Integer.parseInt(digits); }
-        catch (NumberFormatException e) { return null; }
+        return GradeParser.numericGradeOrNull(className);
     }
 
     /** Atomically consume one promo use for a realized redemption; no-op if absent/at-cap. */

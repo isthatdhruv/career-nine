@@ -174,7 +174,7 @@ public class BetReportDataController {
             return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
         } catch (Exception ex) {
             if (reportGenerationLogService != null) {
-                Integer studentClass = lookupStudentClass(userStudentId);
+                String studentClass = lookupStudentClass(userStudentId);
                 reportGenerationLogService.log(entitlementId, assessmentId, "bet",
                         studentClass, "download", ex);
             }
@@ -233,7 +233,7 @@ public class BetReportDataController {
         return reportUrl;
     }
 
-    private Integer lookupStudentClass(Long userStudentId) {
+    private String lookupStudentClass(Long userStudentId) {
         if (userStudentId == null) return null;
         return userStudentRepository.findById(userStudentId)
                 .map(UserStudent::getStudentInfo)

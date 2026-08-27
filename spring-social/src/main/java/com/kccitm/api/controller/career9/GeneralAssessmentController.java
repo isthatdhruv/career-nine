@@ -411,11 +411,11 @@ public class GeneralAssessmentController {
         if (raw instanceof String) {
             String text = ((String) raw).trim();
             if (!text.isEmpty() && !"All".equalsIgnoreCase(text)) {
-                try {
-                    return SchoolDashboard.ClassFilter.of(Integer.parseInt(text));
-                } catch (NumberFormatException e) {
-                    logger.warn("School dashboard: unrecognised classFilter '{}', exporting all classes", text);
+                Integer grade = com.kccitm.api.util.GradeParser.numericGradeOrNull(text);
+                if (grade != null) {
+                    return SchoolDashboard.ClassFilter.of(grade);
                 }
+                logger.warn("School dashboard: unrecognised classFilter '{}', exporting all classes", text);
             }
         }
         return SchoolDashboard.ClassFilter.all();

@@ -42,7 +42,7 @@ public class GeneralAssessmentResult implements Serializable {
     private String classGroup;
 
     @Column(name = "student_class")
-    private Integer studentClass;
+    private String studentClass;
 
     // --- PERSONALITY (RIASEC) ---
     @Column(name = "personality_scores", columnDefinition = "TEXT")
@@ -171,8 +171,8 @@ public class GeneralAssessmentResult implements Serializable {
     public String getClassGroup() { return classGroup; }
     public void setClassGroup(String classGroup) { this.classGroup = classGroup; }
 
-    public Integer getStudentClass() { return studentClass; }
-    public void setStudentClass(Integer studentClass) { this.studentClass = studentClass; }
+    public String getStudentClass() { return studentClass; }
+    public void setStudentClass(String studentClass) { this.studentClass = studentClass; }
 
     public String getPersonalityScores() { return personalityScores; }
     public void setPersonalityScores(String personalityScores) { this.personalityScores = personalityScores; }

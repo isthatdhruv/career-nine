@@ -6,7 +6,7 @@ export type ExistingStudentInfo = {
     maskedPhone?: string | null;
     userId?: string | null;
     schoolName?: string | null;
-    studentClass?: number | null;
+    studentClass?: string | null;
 };
 
 export type DuplicateEmailPayload = {

@@ -30,10 +30,10 @@ public interface StudentInfoRepository extends JpaRepository<StudentInfo, Long> 
     List<StudentInfo> findByEmail(String email);
 
     List<StudentInfo> findByStudentDobAndInstituteIdAndStudentClass(Date studentDob, Integer instituteId,
-            Integer studentClass);
+            String studentClass);
 
     List<StudentInfo> findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(Date studentDob,
-            Integer instituteId, Integer studentClass, String name);
+            Integer instituteId, String studentClass, String name);
 
     List<StudentInfo> findByNameIgnoreCaseAndStudentDobAndInstituteId(String name, Date studentDob,
             Integer instituteId);
