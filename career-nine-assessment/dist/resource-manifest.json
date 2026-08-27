@@ -1,6 +1,6 @@
 {
-  "version": "mta1zbmu",
-  "generated": "2026-08-26T12:11:27.270Z",
+  "version": "mtb607cf",
+  "generated": "2026-08-27T06:51:53.007Z",
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -128,13 +128,8 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/HydroTubeGame-ikAUcWqW.js",
+      "url": "/assets/HydroTubeGame-BdZNrH6p.js",
       "size": 23331,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/index-BMfiFBZ4.js",
-      "size": 1316817,
       "priority": "critical"
     },
     {
@@ -148,12 +143,17 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index.es-Cmt7n5ea.js",
+      "url": "/assets/index-kVsa9F91.js",
+      "size": 1316801,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index.es-jzBWMpa_.js",
       "size": 158825,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-LS_T_v_u.js",
+      "url": "/assets/JungleSpotGame-C1pMXik7.js",
       "size": 23397,
       "priority": "critical"
     },
@@ -163,7 +163,7 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-Bjyd941w.js",
+      "url": "/assets/RabbitPathGame-DOurQkNh.js",
       "size": 26981,
       "priority": "critical"
     },
@@ -210,7 +210,7 @@
   ],
   "summary": {
     "total": 41,
-    "totalSize": 23835005,
+    "totalSize": 23834989,
     "byPriority": {
       "game": {
         "count": 11,
@@ -222,7 +222,7 @@
       },
       "critical": {
         "count": 14,
-        "size": 3404373
+        "size": 3404357
       },
       "other": {
         "count": 4,
