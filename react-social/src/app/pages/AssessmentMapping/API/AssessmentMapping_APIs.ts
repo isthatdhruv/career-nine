@@ -79,6 +79,15 @@ export function getCatalog(instituteCode: number) {
   );
 }
 
+// The institute's enabled-assessments catalog as NAMED summaries (id +
+// assessmentName) — what "assessments mapped to this institute" means for
+// pickers that need labels, not just ids.
+export function getCatalogAssessmentSummaries(instituteCode: number) {
+  return axios.get<{ id: number; assessmentName: string; isActive: boolean | null }[]>(
+    `${API_URL}/assessment-mapping/institute/${instituteCode}/catalog/assessments`
+  );
+}
+
 // Returns the updated catalog. On HTTP 400 the response body is a plain-string
 // message (e.g. maxAssessments cap exceeded) — surface it to the admin.
 export function enableCatalog(instituteCode: number, assessmentIds: number[]) {

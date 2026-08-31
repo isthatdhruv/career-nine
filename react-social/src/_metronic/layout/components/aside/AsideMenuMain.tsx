@@ -104,7 +104,8 @@ export function AsideMenuMain() {
     allowed("/referral-codes");
 
   const showReports = allowed("/reports") || allowed("/reports-hub")
-    || allowed("/admin/report-templates") || allowed("/school-dashboard");
+    || allowed("/admin/report-templates") || allowed("/school-dashboard")
+    || allowed("/report-center");
 
   const showRoles =
     allowed("/user-management/roles/manage") ||
@@ -609,9 +610,15 @@ export function AsideMenuMain() {
               fontIcon="bi-grid-3x3-gap"
             />
           )}
-          {/* Piggybacks on the reports-hub whitelist entry, the same way Report
-              Templates does, so the page is reachable without a role_url seed. */}
-          {(allowed("/school-dashboard") || allowed("/reports-hub")) && (
+          {allowed("/report-center") && (
+            <AsideMenuItem
+              to="/report-center"
+              icon="/media/icons/duotune/graphs/gra010.svg"
+              title="Report Center"
+              fontIcon="bi-send-check"
+            />
+          )}
+          {allowed("/school-dashboard") && (
             <AsideMenuItem
               to="/school-dashboard"
               icon="/media/icons/duotune/graphs/gra008.svg"
@@ -622,7 +629,7 @@ export function AsideMenuMain() {
           {/* The admin side of the dashboard above. Gated on the release whitelist so
               a principal who can read their dashboard does not see the controls that
               generate and withdraw it. */}
-          {(allowed("/school-dashboard/releases") || allowed("/reports-hub")) && (
+          {allowed("/school-dashboard/releases") && (
             <AsideMenuItem
               to="/school-dashboard/releases"
               icon="/media/icons/duotune/general/gen019.svg"
@@ -630,7 +637,7 @@ export function AsideMenuMain() {
               fontIcon="bi-send"
             />
           )}
-          {(allowed("/admin/report-templates") || allowed("/reports-hub")) && (
+          {allowed("/admin/report-templates") && (
             <AsideMenuItem
               to="/admin/report-templates"
               icon="/media/icons/duotune/files/fil003.svg"

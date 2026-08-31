@@ -3,7 +3,12 @@ import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
 export function getAssessmentList() {
-  return axios.get(`${API_URL}/assessments/get/list-summary`);
+  // ABAC-scoped: super-admins get the full catalog, everyone else only
+  // assessments connected to their institutes (deny-by-default when the user
+  // has no institute scope). The BE is the authoritative gate — the
+  // useAssessmentsForCurrentUser narrowing on the page is fail-open and must
+  // not be the only filter.
+  return axios.get(`${API_URL}/assessments/get/list-summary-scoped`);
 }
 
 export function getLiveTracking(assessmentId: number) {

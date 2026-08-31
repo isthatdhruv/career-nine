@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { getInstituteTerms } from "../utils/instituteTerms";
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
 import { MdQrCode } from "react-icons/md";
@@ -62,6 +62,17 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
 
   const selectedClassObj = classes.find((c: any) => String(c.id) === selectedClass);
   const sections: any[] = selectedClassObj?.schoolSections || [];
+
+  // Create-Mapping picker: only assessments allotted to this institute (its
+  // active enabled-assessments catalog). The full list stays available to the
+  // CatalogSelector strip below — that's the surface where new assessments
+  // get allotted to the institute in the first place.
+  const catalogAssessments = useMemo(() => {
+    const enabledIds = new Set(
+      catalog.filter((c) => c.isActive !== false).map((c) => c.assessmentId)
+    );
+    return assessments.filter((a: any) => enabledIds.has(a.id));
+  }, [assessments, catalog]);
 
   useEffect(() => {
     if (active && instituteCode) {
@@ -320,8 +331,12 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
                   onChange={(e) => setSelectedAssessment(e.target.value)}
                   style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: "0.9rem" }}
                 >
-                  <option value="">-- Select an assessment --</option>
-                  {assessments.map((a: any) => (
+                  <option value="">
+                    {catalogAssessments.length === 0
+                      ? "-- No assessments enabled for this institute --"
+                      : "-- Select an assessment --"}
+                  </option>
+                  {catalogAssessments.map((a: any) => (
                     <option key={a.id} value={a.id}>
                       {a.AssessmentName || a.assessmentName}
                     </option>

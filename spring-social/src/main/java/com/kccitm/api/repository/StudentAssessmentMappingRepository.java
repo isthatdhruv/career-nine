@@ -69,6 +69,28 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
     List<Object[]> findLiteByAssessmentId(
         @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
 
+    // ABAC-scoped variant of the lite projection: only students belonging to
+    // one of the caller's institutes.
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT m.userStudent.userStudentId, si.name, si.email, m.status, u.username, si.studentDob " +
+        "FROM StudentAssessmentMapping m " +
+        "JOIN m.userStudent us " +
+        "JOIN us.studentInfo si " +
+        "LEFT JOIN si.user u " +
+        "WHERE m.assessmentId = :assessmentId AND us.institute.instituteCode IN :instituteCodes")
+    List<Object[]> findLiteByAssessmentIdAndInstituteCodes(
+        @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId,
+        @org.springframework.data.repository.query.Param("instituteCodes") java.util.Collection<Integer> instituteCodes);
+
+    // Does any student of these institutes have this assessment allotted?
+    // Used as the ABAC hard check on live-tracking endpoints.
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT COUNT(m) FROM StudentAssessmentMapping m " +
+        "WHERE m.assessmentId = :assessmentId AND m.userStudent.institute.instituteCode IN :instituteCodes")
+    long countByAssessmentIdAndInstituteCodes(
+        @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId,
+        @org.springframework.data.repository.query.Param("instituteCodes") java.util.Collection<Integer> instituteCodes);
+
     // Count of all student-assessment mappings for an institute — used by the
     // "max assessments per institute" limit before allowing new allotments.
     @org.springframework.data.jpa.repository.Query(

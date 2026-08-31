@@ -362,6 +362,7 @@ const PrivateRoutes = () => {
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
   const CounsellingSessionsPage = lazy(() => import("../pages/Counselling/admin/CounsellingSessionsPage"));
   const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
+  const ReportCenterPage = lazy(() => import("../pages/ReportCenter/ReportCenterPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
   const ReferralCodePage = lazy(() => import("../pages/ReferralCode/ReferralCodePage"));
@@ -1522,6 +1523,18 @@ const PrivateRoutes = () => {
             <RequirePermission perm="report.read">
               <SuspensedView>
                 <ReportsHubPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        {/* School-facing report delivery: preview/download/email reports.
+            Own resource code so it is allottable per page — no mixing. */}
+        <Route
+          path="/report-center"
+          element={
+            <RequirePermission perm="report_center.read">
+              <SuspensedView>
+                <ReportCenterPage />
               </SuspensedView>
             </RequirePermission>
           }

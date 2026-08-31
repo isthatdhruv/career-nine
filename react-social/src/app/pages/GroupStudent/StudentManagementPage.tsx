@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useReducer, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
@@ -76,8 +76,51 @@ type StudentAssessmentInfo = {
   status: string;
 };
 
+// Uniform look for the per-row action buttons: identical height and width,
+// centered icon + label, tinted by intent.
+const rowActionBtnStyle = (
+  variant: "neutral" | "warn" | "danger",
+  disabled?: boolean
+): React.CSSProperties => ({
+  background: disabled
+    ? "#f1f5f9"
+    : variant === "warn"
+    ? "#fff7ed"
+    : variant === "danger"
+    ? "#fef2f2"
+    : "#f8fafc",
+  color: disabled
+    ? "#94a3b8"
+    : variant === "warn"
+    ? "#c2410c"
+    : variant === "danger"
+    ? "#dc2626"
+    : "#64748b",
+  border: `1px solid ${
+    variant === "warn" ? "#fed7aa" : variant === "danger" ? "#fecaca" : "#e2e8f0"
+  }`,
+  padding: "0 12px",
+  borderRadius: 6,
+  fontWeight: 500,
+  fontSize: "0.78rem",
+  transition: "all 0.2s",
+  whiteSpace: "nowrap",
+  cursor: disabled ? "not-allowed" : "pointer",
+  minWidth: 150,
+  height: 32,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+});
+
 export default function StudentManagementPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // /student-management is the school-principal-facing surface: row actions are
+  // Edit + Send Credentials only. Destructive/ops actions (Cancel Counselling,
+  // hard Delete) stay on /student-list, which renders this same component.
+  const isPrincipalView = location.pathname === "/student-management";
   const { data: institutes = [] } = useInstitutes<any>();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [students, setStudents] = useState<Student[]>([]);
@@ -1863,7 +1906,12 @@ export default function StudentManagementPage() {
                           : "#e0e0e0",
                         border: "none",
                         borderRadius: "8px",
-                        padding: "0.45rem 0.8rem",
+                        padding: "0 0.9rem",
+                        height: 36,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
                         fontWeight: 600,
                         fontSize: "0.82rem",
                         color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
@@ -1895,7 +1943,12 @@ export default function StudentManagementPage() {
                               : "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
                             border: "none",
                             borderRadius: "8px",
-                            padding: "0.45rem 0.8rem",
+                            padding: "0 0.9rem",
+                            height: 36,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 6,
                             fontWeight: 600,
                             fontSize: "0.82rem",
                             color: bulkDisabled ? "#9e9e9e" : "#fff",
@@ -2252,19 +2305,9 @@ export default function StudentManagementPage() {
                             >
                               <div className="d-flex align-items-center gap-1">
                                 <button
-                                  className="btn btn-sm d-flex align-items-center gap-1"
+                                  className="btn btn-sm"
                                   onClick={() => handleEditStudent(student)}
-                                  style={{
-                                    background: "#f8fafc",
-                                    color: "#64748b",
-                                    border: "1px solid #e2e8f0",
-                                    padding: "5px 10px",
-                                    borderRadius: "6px",
-                                    fontWeight: 400,
-                                    fontSize: "0.78rem",
-                                    transition: "all 0.2s",
-                                    whiteSpace: "nowrap",
-                                  }}
+                                  style={rowActionBtnStyle("neutral")}
                                 >
                                   <ActionIcon type="edit" size="sm" />
                                   Edit
@@ -2273,31 +2316,14 @@ export default function StudentManagementPage() {
                                   email service. Disabled + spinner while a send
                                   for this student is in flight. */}
                                 <button
-                                  className="btn btn-sm d-flex align-items-center gap-1"
+                                  className="btn btn-sm"
                                   onClick={() => handleSendCredentials(student)}
                                   disabled={sendingCredentialsFor.has(student.userStudentId)}
                                   title="Email login credentials to this student"
-                                  style={{
-                                    background: sendingCredentialsFor.has(student.userStudentId)
-                                      ? "#f1f5f9"
-                                      : "#f8fafc",
-                                    color: sendingCredentialsFor.has(student.userStudentId)
-                                      ? "#94a3b8"
-                                      : "#64748b",
-                                    border: `1px solid ${sendingCredentialsFor.has(student.userStudentId)
-                                      ? "#e2e8f0"
-                                      : "#e2e8f0"
-                                      }`,
-                                    padding: "5px 10px",
-                                    borderRadius: "6px",
-                                    fontWeight: 400,
-                                    fontSize: "0.78rem",
-                                    transition: "all 0.2s",
-                                    cursor: sendingCredentialsFor.has(student.userStudentId)
-                                      ? "not-allowed"
-                                      : "pointer",
-                                    whiteSpace: "nowrap",
-                                  }}
+                                  style={rowActionBtnStyle(
+                                    "neutral",
+                                    sendingCredentialsFor.has(student.userStudentId)
+                                  )}
                                 >
                                   {sendingCredentialsFor.has(student.userStudentId) ? (
                                     <>
@@ -2311,52 +2337,39 @@ export default function StudentManagementPage() {
                                     </>
                                   )}
                                 </button>
-                                {/* Cancel this student's upcoming counselling session.
-                                    An admin cancellation costs nobody anything: the slot
-                                    reopens, the session is credited back, and both the
-                                    student and the counsellor are emailed that the team
-                                    will be in touch. */}
-                                <button
-                                  className="btn btn-sm d-flex align-items-center gap-1"
-                                  onClick={() => openCounsellingCancel(student)}
-                                  disabled={cancellingCounsellingFor.has(student.userStudentId)}
-                                  title="Cancel this student's upcoming counselling session"
-                                  style={{
-                                    background: "#fff7ed",
-                                    color: "#c2410c",
-                                    border: "1px solid #fed7aa",
-                                    padding: "5px 10px",
-                                    borderRadius: "6px",
-                                    fontWeight: 400,
-                                    fontSize: "0.78rem",
-                                    transition: "all 0.2s",
-                                    whiteSpace: "nowrap",
-                                    cursor: cancellingCounsellingFor.has(student.userStudentId)
-                                      ? "not-allowed" : "pointer",
-                                  }}
-                                >
-                                  <i className="bi bi-calendar-x"></i>
-                                  Cancel Counselling
-                                </button>
-                                <button
-                                  className="btn btn-sm d-flex align-items-center gap-1"
-                                  onClick={() => { setDeleteConfirmText(""); setDeleteTarget(student); }}
-                                  title="Permanently delete this student and ALL their data"
-                                  style={{
-                                    background: "#fef2f2",
-                                    color: "#dc2626",
-                                    border: "1px solid #fecaca",
-                                    padding: "5px 10px",
-                                    borderRadius: "6px",
-                                    fontWeight: 400,
-                                    fontSize: "0.78rem",
-                                    transition: "all 0.2s",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  <i className="bi bi-trash3"></i>
-                                  Delete
-                                </button>
+                                {/* Ops-only actions — hidden on the principal-facing
+                                    /student-management view; available on /student-list. */}
+                                {!isPrincipalView && (
+                                  <>
+                                    {/* Cancel this student's upcoming counselling session.
+                                        An admin cancellation costs nobody anything: the slot
+                                        reopens, the session is credited back, and both the
+                                        student and the counsellor are emailed that the team
+                                        will be in touch. */}
+                                    <button
+                                      className="btn btn-sm"
+                                      onClick={() => openCounsellingCancel(student)}
+                                      disabled={cancellingCounsellingFor.has(student.userStudentId)}
+                                      title="Cancel this student's upcoming counselling session"
+                                      style={rowActionBtnStyle(
+                                        "warn",
+                                        cancellingCounsellingFor.has(student.userStudentId)
+                                      )}
+                                    >
+                                      <i className="bi bi-calendar-x"></i>
+                                      Cancel Counselling
+                                    </button>
+                                    <button
+                                      className="btn btn-sm"
+                                      onClick={() => { setDeleteConfirmText(""); setDeleteTarget(student); }}
+                                      title="Permanently delete this student and ALL their data"
+                                      style={rowActionBtnStyle("danger")}
+                                    >
+                                      <i className="bi bi-trash3"></i>
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -2965,6 +2978,127 @@ export default function StudentManagementPage() {
                   style={{ borderRadius: "10px" }}
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit basic info — the clone originally dropped this modal's JSX, so
+            the Edit button set modal.type="edit" and nothing rendered. */}
+        {modal.type === "edit" && modal.student && (
+          <div
+            style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(0, 0, 0, 0.5)", display: "flex",
+              alignItems: "center", justifyContent: "center", zIndex: 10060,
+            }}
+            onClick={closeModal}
+          >
+            <div
+              style={{
+                backgroundColor: "white", borderRadius: "20px", maxWidth: "500px",
+                width: "90%", boxShadow: "0 25px 50px rgba(0, 0, 0, 0.15)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                  padding: "1rem 1.25rem", borderRadius: "20px 20px 0 0",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}
+              >
+                <h5 className="mb-0 text-white fw-bold" style={{ fontSize: "1.1rem" }}>
+                  <i className="bi bi-pencil-square me-2"></i>
+                  Edit Student Info
+                </h5>
+                <button type="button" className="btn-close btn-close-white" onClick={closeModal}></button>
+              </div>
+
+              <div style={{ padding: "1.25rem" }}>
+                <p className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>
+                  Editing: <strong>#{modal.student.userStudentId}</strong> &mdash; {modal.student.name || "Unnamed"}
+                </p>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Student name"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    style={{ borderRadius: "10px" }}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Email</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    placeholder="Email address"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                    style={{ borderRadius: "10px" }}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Phone Number</label>
+                  <input
+                    type="tel"
+                    className="form-control"
+                    placeholder="Phone number"
+                    value={editForm.phoneNumber}
+                    onChange={(e) => setEditForm((f) => ({ ...f, phoneNumber: e.target.value }))}
+                    style={{ borderRadius: "10px" }}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Date of Birth</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="dd-MM-yyyy"
+                    value={editForm.studentDob}
+                    onChange={(e) => setEditForm((f) => ({ ...f, studentDob: e.target.value }))}
+                    style={{ borderRadius: "10px" }}
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "0.75rem 1.25rem", borderTop: "1px solid #e2e8f0",
+                  display: "flex", justifyContent: "flex-end", gap: "8px",
+                }}
+              >
+                <button className="btn btn-secondary" onClick={closeModal} style={{ borderRadius: "10px" }}>
+                  Cancel
+                </button>
+                <button
+                  className="btn"
+                  onClick={handleSaveEdit}
+                  disabled={editSaving}
+                  style={{
+                    background: "#4361ee", color: "#fff", border: "none",
+                    borderRadius: "10px", fontWeight: 600,
+                  }}
+                >
+                  {editSaving ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <ActionIcon type="approve" size="sm" className="me-1" />
+                      Save Changes
+                    </>
+                  )}
                 </button>
               </div>
             </div>

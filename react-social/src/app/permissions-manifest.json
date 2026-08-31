@@ -256,6 +256,9 @@
     "/reports",
     "/reports-hub"
   ],
+  "report_center.read": [
+    "/report-center"
+  ],
   "report_generation.read": [
     "/report-generation",
     "/unified-report-management"
