@@ -109,7 +109,7 @@ const visibleBlockedDates = (slots: any[]) => {
     if (s.date && String(s.date).slice(0, 10) < today) return false
     const reason = String(s.blockReason || s.reason || '')
     if (!reason) return false
-    return !/^counsellor (cancelled|unavailable)/i.test(reason)
+    return !/^counsellor (cancelled|unavailable|deactivated)/i.test(reason)
   })
 }
 

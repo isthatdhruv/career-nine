@@ -97,6 +97,13 @@ public class SlotMaterializationService {
     }
 
     private MaterializationResult materializeSlotsForTemplate(AvailabilityTemplate template, int days) {
+        // A suspended counsellor's weekly rules must stop producing bookable hours —
+        // otherwise every materialization run quietly restocks a diary nobody may
+        // book. The templates stay; generation resumes if the counsellor is reactivated.
+        if (template.getCounsellor() != null
+                && Boolean.FALSE.equals(template.getCounsellor().getIsActive())) {
+            return new MaterializationResult(0, 0, 0);
+        }
         DayOfWeek templateDayOfWeek = DayOfWeek.valueOf(template.getDayOfWeek().toUpperCase());
         LocalDate today = LocalDate.now();
         // Honour the template's effective start date: materialize from max(startDate, today).
