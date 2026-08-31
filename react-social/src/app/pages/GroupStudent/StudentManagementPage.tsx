@@ -23,6 +23,7 @@ import {
   sendLoginCredentials,
   generateUnifiedReportOneClick,
   getGeneratedReportsForStudent,
+  purgeStudent,
 } from "../StudentInformation/StudentInfo_APIs";
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 import { useAuth } from "../../modules/auth";
@@ -80,6 +81,11 @@ export default function StudentManagementPage() {
   const { data: institutes = [] } = useInstitutes<any>();
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [students, setStudents] = useState<Student[]>([]);
+  // Hard-delete confirmation: the student being deleted, the typed confirmation
+  // ("DELETE" required — this is irreversible), and the in-flight flag.
+  const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
   // Narrow to assessments mapped to the selected institute (falls back to all when
   // nothing is picked or the institute has no mappings).
@@ -946,6 +952,27 @@ export default function StudentManagementPage() {
       showErrorToast(`Bulk send failed: ${msg}`);
     } finally {
       setBulkSendingCredentials(false);
+    }
+  };
+
+  // IRREVERSIBLE hard delete — the modal requires typing DELETE before this runs.
+  // One backend transaction: a failure rolls everything back (nothing half-deleted).
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget || deleteConfirmText !== "DELETE" || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await purgeStudent(deleteTarget.userStudentId);
+      const total = Object.values(res.data?.deleted || {}).reduce(
+        (a, b) => a + (Number(b) || 0), 0);
+      showSuccessToast(`${deleteTarget.name} deleted permanently (${total} records removed).`);
+      setStudents((prev) => prev.filter((s) => s.userStudentId !== deleteTarget.userStudentId));
+      setDeleteTarget(null);
+      setDeleteConfirmText("");
+    } catch (e: any) {
+      const msg = e?.response?.data;
+      showErrorToast(typeof msg === "string" ? msg : "Delete failed — nothing was removed.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -2311,6 +2338,25 @@ export default function StudentManagementPage() {
                                   <i className="bi bi-calendar-x"></i>
                                   Cancel Counselling
                                 </button>
+                                <button
+                                  className="btn btn-sm d-flex align-items-center gap-1"
+                                  onClick={() => { setDeleteConfirmText(""); setDeleteTarget(student); }}
+                                  title="Permanently delete this student and ALL their data"
+                                  style={{
+                                    background: "#fef2f2",
+                                    color: "#dc2626",
+                                    border: "1px solid #fecaca",
+                                    padding: "5px 10px",
+                                    borderRadius: "6px",
+                                    fontWeight: 400,
+                                    fontSize: "0.78rem",
+                                    transition: "all 0.2s",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  <i className="bi bi-trash3"></i>
+                                  Delete
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -2919,6 +2965,95 @@ export default function StudentManagementPage() {
                   style={{ borderRadius: "10px" }}
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Hard-delete confirmation — irreversible, so it requires typing DELETE. */}
+        {deleteTarget && (
+          <div
+            onClick={() => { if (!deleting) setDeleteTarget(null); }}
+            style={{
+              position: "fixed", inset: 0, background: "rgba(15, 23, 42, 0.55)",
+              backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 1100, padding: 16,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "#fff", borderRadius: 14, maxWidth: 520, width: "100%",
+                boxShadow: "0 24px 60px rgba(15, 23, 42, 0.3)", overflow: "hidden",
+              }}
+            >
+              <div style={{ padding: "16px 22px", borderBottom: "1px solid #fee2e2", background: "#fef2f2" }}>
+                <div style={{ fontWeight: 800, fontSize: "1rem", color: "#991b1b" }}>
+                  <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                  Delete {deleteTarget.name} permanently?
+                </div>
+              </div>
+              <div style={{ padding: "18px 22px", fontSize: "0.88rem", color: "#475569", lineHeight: 1.65 }}>
+                <p style={{ margin: "0 0 10px" }}>
+                  This removes <strong>{deleteTarget.name}</strong>
+                  {deleteTarget.email ? <> ({deleteTarget.email})</> : null} and{" "}
+                  <strong>everything</strong> attached to them:
+                </p>
+                <ul style={{ margin: "0 0 12px", paddingLeft: 20 }}>
+                  <li>Profile, login account and institute memberships</li>
+                  <li>All assessment answers, scores and proctoring data</li>
+                  <li>All generated reports and report data</li>
+                  <li>Entitlements, counselling sessions and demographics</li>
+                  <li>Email/reminder logs (payment records are anonymized, not deleted)</li>
+                </ul>
+                <p style={{ margin: "0 0 14px", color: "#991b1b", fontWeight: 700 }}>
+                  This cannot be undone. Type DELETE to confirm.
+                </p>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder='Type "DELETE"'
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "8px 12px", borderRadius: 8,
+                    border: "1.5px solid #fecaca", fontSize: "0.9rem",
+                  }}
+                />
+              </div>
+              <div style={{
+                padding: "12px 22px", borderTop: "1px solid #e2e8f0",
+                display: "flex", justifyContent: "flex-end", gap: 10,
+              }}>
+                <button
+                  className="btn btn-sm btn-secondary"
+                  disabled={deleting}
+                  onClick={() => setDeleteTarget(null)}
+                  style={{ borderRadius: 8, padding: "7px 18px" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-sm"
+                  disabled={deleteConfirmText !== "DELETE" || deleting}
+                  onClick={handleConfirmDelete}
+                  style={{
+                    borderRadius: 8, padding: "7px 18px", fontWeight: 700,
+                    background: deleteConfirmText === "DELETE" && !deleting ? "#dc2626" : "#fca5a5",
+                    color: "#fff", border: "none",
+                    cursor: deleteConfirmText === "DELETE" && !deleting ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {deleting ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
+                      Deleting…
+                    </>
+                  ) : (
+                    "Delete permanently"
+                  )}
                 </button>
               </div>
             </div>
