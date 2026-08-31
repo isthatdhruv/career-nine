@@ -114,6 +114,9 @@ public class ControllerPreAuthorizeCoverageTest {
             // 30-day counselling_reschedule JWT validated manually in-controller.
             "com.kccitm.api.controller.career9.counselling.CounsellingPublicRescheduleController#confirm",
             "com.kccitm.api.controller.career9.counselling.CounsellingPublicRescheduleController#context",
+            // Booking-link flow for completed-but-unbooked students — same tokenized public
+            // pattern as the reschedule controller above.
+            "com.kccitm.api.controller.career9.counselling.CounsellingPublicBookingController#context",
             // Referral-code public validation (/referral-codes/public/validate) — mirrors promo-code.
             "com.kccitm.api.controller.career9.ReferralCodeController#validate",
             // me — anonymous-friendly: returns 401 when no principal is bound rather than 403 via PreAuthorize.

@@ -318,6 +318,39 @@ public class TokenProvider {
     }
 
     /**
+     * Mint a counselling booking token bound to a student. Emailed to students who completed an
+     * assessment but never booked their counselling session, so they can pick a slot from a public
+     * (no-login) page. Carries {@code scope="counselling_booking"} and the userStudentId as the
+     * subject; validated manually by the public booking controller. TTL: 30 days.
+     */
+    public String createCounsellingBookingToken(Long userStudentId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + 30L * 24 * 60 * 60 * 1000); // 30 days
+        return Jwts.builder()
+                .setSubject(String.valueOf(userStudentId))
+                .claim("scope", "counselling_booking")
+                .setId(UUID.randomUUID().toString())
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(signingKey, SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    /**
+     * Returns the userStudentId carried by a counselling-booking token, or {@code null} if the
+     * token is invalid, expired, or not a {@code counselling_booking}-scoped token. Never throws.
+     */
+    public Long getCounsellingBookingStudentId(String token) {
+        try {
+            Claims claims = parseSigned(token).getBody();
+            if (!"counselling_booking".equals(String.valueOf(claims.get("scope")))) return null;
+            return Long.valueOf(claims.getSubject());
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    /**
      * Returns the appointment id carried by a counselling-reschedule token, or {@code null} if the
      * token is invalid, expired, or not a {@code counselling_reschedule}-scoped token. Never throws.
      */

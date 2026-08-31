@@ -305,6 +305,34 @@ public class CounsellingNotificationService {
      *
      * @param reason optional note from the admin, shown to the student as the why
      */
+    /**
+     * Invite for students who completed an assessment but never booked: a tokenized, no-login
+     * booking link. Sent by an admin from the Manage Students page.
+     */
+    @Async
+    public void sendBookingInviteEmail(String studentName, String studentEmail, String bookingUrl) {
+        try {
+            if (studentEmail == null || studentEmail.isEmpty()) {
+                logger.warn("No student email — cannot send counselling booking link");
+                return;
+            }
+            String name = studentName != null && !studentName.isBlank() ? studentName : "there";
+            String subject = "Book your counselling session";
+            String body = "Dear " + name + ",\n\n"
+                    + "You have completed your assessment — the next step is a one-on-one counselling "
+                    + "session to turn your results into a real plan.\n\n"
+                    + "Pick a time that suits you here (no login needed):\n"
+                    + bookingUrl + "\n\n"
+                    + "Once you choose a slot, your session is confirmed instantly and you'll receive "
+                    + "a confirmation email with the meeting details.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            sendEmail(studentEmail, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send counselling booking invite to {}: {}", studentEmail, e.getMessage());
+        }
+    }
+
     @Async
     public void sendSelfRescheduleInviteEmail(CounsellingAppointment appointment, String rescheduleUrl,
             String reason) {

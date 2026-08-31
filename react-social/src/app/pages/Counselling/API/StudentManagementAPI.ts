@@ -23,3 +23,8 @@ export function setCounsellingAllowed(userStudentId: number, value: boolean) {
 export function setReportsVisible(userStudentId: number, value: boolean) {
   return axios.put(`${BASE}/reports-visible/${userStudentId}`, { value })
 }
+
+/** Email the student a tokenized, no-login counselling booking link. */
+export function sendBookingLink(userStudentId: number) {
+  return axios.post<{ userStudentId: number; sentTo: string }>(`${BASE}/send-booking-link/${userStudentId}`)
+}

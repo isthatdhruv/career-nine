@@ -85,6 +85,14 @@ public class LinkBuilder {
         return assessmentBaseUrl + "/counselling-reschedule/" + token;
     }
 
+    /**
+     * Public, no-login booking page (assessment SPA) reached from the tokenized link emailed to a
+     * student who completed an assessment but never booked counselling.
+     */
+    public String counsellingBooking(String token) {
+        return assessmentBaseUrl + "/counselling-booking/" + token;
+    }
+
     public String lmsLaunch(String accessToken, Long entitlementId) {
         return frontendBaseUrl + "/lms/launch?t=" + accessToken + "&e=" + entitlementId;
     }
