@@ -40,6 +40,8 @@ public class CounsellingBookingLinkService {
     @Autowired private CounsellingNotificationService notificationService;
     @Autowired private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository entitlementRepository;
     @Autowired private com.kccitm.api.repository.StudentAssessmentMappingRepository mappingRepository;
+    /** Optional: availability check for the report-mail CTA; absent where counselling isn't wired. */
+    @Autowired(required = false) private BookingService bookingService;
 
     /**
      * Emails the student their personal booking link.
@@ -87,6 +89,52 @@ public class CounsellingBookingLinkService {
         Long assessmentId = resolveAssessmentId(student.getUserStudentId());
         if (assessmentId != null) out.put("assessmentId", assessmentId);
         return out;
+    }
+
+    /**
+     * Report-mail CTA hook: the tokenized booking-page URL, or null when the mail
+     * should not offer booking — the student already has an active appointment, or
+     * counselling is neither in their tier (active/pending entitlement with sessions
+     * remaining) nor offered by configuration (a counsellor assigned to the
+     * assessment). Unlike {@link #sendBookingInvite} this never throws: report
+     * delivery must not fail over a CTA. The booking page re-checks the appointment
+     * on every open, so a link that goes stale after a thank-you-page booking just
+     * shows the already-booked screen.
+     */
+    @Transactional(readOnly = true)
+    public String bookingUrlIfEligible(Long userStudentId, Long assessmentId, Long entitlementId) {
+        try {
+            if (userStudentId == null) return null;
+            if (!appointmentRepository.findActiveByStudent(userStudentId).isEmpty()) return null;
+            if (!counsellingAvailable(userStudentId, assessmentId, entitlementId)) return null;
+            return linkBuilder.counsellingBooking(tokenProvider.createCounsellingBookingToken(userStudentId));
+        } catch (Exception ex) {
+            logger.warn("Counselling CTA suppressed for student {}: {}", userStudentId, ex.getMessage());
+            return null;
+        }
+    }
+
+    private boolean counsellingAvailable(Long userStudentId, Long assessmentId, Long entitlementId) {
+        java.util.List<com.kccitm.api.model.career9.b2c.StudentEntitlement> candidates;
+        if (entitlementId != null) {
+            candidates = entitlementRepository.findById(entitlementId)
+                    .map(java.util.Collections::singletonList)
+                    .orElse(java.util.Collections.emptyList());
+        } else {
+            candidates = entitlementRepository.findByUserStudentIdOrderByCreatedAtDesc(userStudentId);
+        }
+        for (com.kccitm.api.model.career9.b2c.StudentEntitlement e : candidates) {
+            if (!"active".equals(e.getStatus()) && !"pending".equals(e.getStatus())) continue;
+            if (assessmentId != null && e.getAssessmentId() != null
+                    && !assessmentId.equals(e.getAssessmentId())) continue;
+            int total = e.getCounsellingSessionsTotal() == null ? 0 : e.getCounsellingSessionsTotal();
+            int used = e.getCounsellingSessionsUsed() == null ? 0 : e.getCounsellingSessionsUsed();
+            if (Boolean.TRUE.equals(e.getCounsellingActive()) && total - used > 0) return true;
+        }
+        // Offered-counselling rule (mirrors the public booking endpoint): a counsellor
+        // assigned to the assessment makes booking available regardless of the tier.
+        return bookingService != null && assessmentId != null
+                && bookingService.hasCounsellorForAssessment(assessmentId);
     }
 
     // ---- helpers ------------------------------------------------------------

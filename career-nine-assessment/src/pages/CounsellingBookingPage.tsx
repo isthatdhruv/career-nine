@@ -69,6 +69,39 @@ export default function CounsellingBookingPage() {
     )
   }
 
+  // Booked already — on the thank-you page, via this link earlier, anywhere. The token
+  // resolves on every open, so the emailed button can never double-book: it lands here.
+  if (ctx && ctx.actionable === false) {
+    return (
+      <Shell>
+        <div style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: '#ecfdf5',
+              border: '2px solid #6ee7b7',
+              margin: '0 auto 16px',
+              lineHeight: '60px',
+              fontSize: 30,
+            }}
+          >
+            ✅
+          </div>
+          <h2 style={h2}>You have already booked a slot</h2>
+          <div style={{ color: '#475569', marginTop: 10, lineHeight: 1.65 }}>
+            The session details have been mailed to you — please check your inbox (and the spam
+            folder, just in case).
+          </div>
+          <div style={{ color: '#94a3b8', fontSize: '0.85rem', marginTop: 14, lineHeight: 1.6 }}>
+            Need to make a change? Reply to your confirmation email and we'll sort it out.
+          </div>
+        </div>
+      </Shell>
+    )
+  }
+
   if (!ready) {
     return (
       <Shell>
