@@ -21,6 +21,7 @@ export interface AssessmentInstituteMapping {
   isActive: boolean;
   freeActive: boolean;
   paidActive: boolean;
+  audience18Plus?: boolean;
 }
 
 export function createAssessmentMapping(data: {
@@ -30,6 +31,7 @@ export function createAssessmentMapping(data: {
   sessionId?: number;
   classId?: number;
   sectionId?: number;
+  audience18Plus?: boolean;
 }) {
   return axios.post<AssessmentInstituteMapping>(`${API_URL}/assessment-mapping/create`, data);
 }
@@ -42,7 +44,7 @@ export function getAssessmentMappingsByInstitute(instituteCode: number) {
 
 export function updateAssessmentMapping(
   id: number,
-  data: { isActive: boolean }
+  data: { isActive?: boolean; audience18Plus?: boolean }
 ) {
   return axios.put(`${API_URL}/assessment-mapping/update/${id}`, data);
 }

@@ -35,6 +35,7 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
+import com.kccitm.api.security.RefreshTokenService;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
@@ -50,6 +51,9 @@ public class UserController {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
 
     /** Activating a counsellor's login is the same decision as activating the counsellor. */
     @Autowired
@@ -491,6 +495,10 @@ public class UserController {
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+
+        // Same rule as the self-service reset: a changed password ends every open
+        // session, otherwise a locked-out-and-reset account keeps its old logins alive.
+        refreshTokenService.revokeAllForUser(userId);
 
         boolean sendEmail = Boolean.TRUE.equals(body.get("sendEmail"));
         boolean emailQueued = false;

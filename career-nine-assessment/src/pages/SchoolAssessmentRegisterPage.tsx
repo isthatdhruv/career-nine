@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { showErrorToast } from "../utils/toast";
 import http from "../api/http";
 import { getSchoolInfo, registerSchoolStudent, verifyStudentDetails } from "../api-clients/schoolRegistrationAPI";
-import { getInstituteTerms } from "../utils/instituteTerms";
+import { getInstituteTerms, contactTerms } from "../utils/instituteTerms";
 import { validatePromoCode } from "../api-clients/promoCodeAPI";
 import { validateReferralCode } from "../api-clients/referralCodeAPI";
 import ParentalConsentSection from "../components/ParentalConsent";
@@ -115,6 +115,18 @@ const SchoolAssessmentRegisterPage = () => {
   const amountRupees: number = selectedClassConfig?.amount || 0;
   const isPaid = amountRupees > 0;
 
+  // 18+ cohorts consent for themselves. The flag is per class row, so it is
+  // re-derived on every class change; no class picked yet → minor copy.
+  const adult = !!selectedClassConfig?.audience18Plus;
+  const { emailLabel, phoneLabel } = contactTerms(adult);
+
+  // The consent wording itself changes with the cohort, so a class re-selection
+  // that flips the audience must be re-attested under the new copy. Functional
+  // bail-out so an unchanged value doesn't re-render the form.
+  useEffect(() => {
+    setDpdpConsent((prev) => (prev ? false : prev));
+  }, [adult]);
+
   // Mirror the backend's integer (floor) division so the displayed price matches the charge.
   const discountedAmountRupees = promoApplied
     ? Math.floor(amountRupees * (100 - promoApplied.discountPercent) / 100)
@@ -202,7 +214,11 @@ const SchoolAssessmentRegisterPage = () => {
       return;
     }
     if (!dpdpConsent) {
-      showErrorToast("Please confirm the parental consent to continue.");
+      showErrorToast(
+        adult
+          ? "Please confirm the consent to continue."
+          : "Please confirm the parental consent to continue."
+      );
       return;
     }
     if (!/^\d{2}-\d{2}-\d{4}$/.test(dob)) {
@@ -492,7 +508,7 @@ const SchoolAssessmentRegisterPage = () => {
             {/* Email + DOB */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
               <div>
-                <label style={s.label}>Parent's Email <span style={{ color: "#f43f5e" }}>*</span></label>
+                <label style={s.label}>{emailLabel} <span style={{ color: "#f43f5e" }}>*</span></label>
                 <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={s.input}
                   onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
               </div>
@@ -512,7 +528,7 @@ const SchoolAssessmentRegisterPage = () => {
                     (which gates the submit button) only fires once email+phone+dob
                     are all filled — rendering it as optional left students unable
                     to submit with no explanation. */}
-                <label style={s.label}>Parent's Phone <span style={{ color: "#f43f5e" }}>*</span></label>
+                <label style={s.label}>{phoneLabel} <span style={{ color: "#f43f5e" }}>*</span></label>
                 <input type="tel" placeholder="Enter phone number" value={phone} onChange={(e) => setPhone(e.target.value)} required style={s.input}
                   onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
               </div>
@@ -653,7 +669,7 @@ const SchoolAssessmentRegisterPage = () => {
           </div>
 
           <div style={{ marginTop: 20 }}>
-            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
+            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
           </div>
 
           {/* Submit */}

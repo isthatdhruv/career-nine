@@ -15,6 +15,15 @@ export const PARENTAL_CONSENT_LABEL =
   "and processing my child's personal data for the Navigator360™ assessment and report; " +
   "and I understand I may withdraw this consent at any time."
 
+/**
+ * Self-consent wording for 18+ cohorts (`audience18Plus` on the class /
+ * mapping row). Same DPDP obligations, given by the registrant themselves.
+ */
+export const ADULT_CONSENT_LABEL =
+  "I confirm that I am above 18 years of age; I have read and understood the above; I consent " +
+  "to Career-9 collecting and processing my personal data for the Navigator360™ assessment " +
+  "and report; and I understand I may withdraw this consent at any time."
+
 const h = (text: string) => (
   <div style={{ fontWeight: 800, fontSize: "0.92rem", color: "#0f172a", margin: "18px 0 6px" }}>
     {text}
@@ -30,7 +39,7 @@ const p = (text: string) => (
 // Rendered through a portal to document.body: the registration pages' centered
 // card ancestors have transforms/overflow that would otherwise trap the fixed
 // overlay inside the card instead of covering the viewport.
-const ConsentModal = ({ onClose }: { onClose: () => void }) => createPortal(
+const ConsentModal = ({ adult, onClose }: { adult?: boolean; onClose: () => void }) => createPortal(
   <div
     onClick={onClose}
     style={{
@@ -53,7 +62,7 @@ const ConsentModal = ({ onClose }: { onClose: () => void }) => createPortal(
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
       }}>
         <div style={{ fontWeight: 800, fontSize: "1.02rem", color: "#0f172a" }}>
-          Parental Consent — Navigator360{"™"} Career Assessment
+          {adult ? "Consent" : "Parental Consent"} — Navigator360{"™"} Career Assessment
         </div>
         <button
           type="button"
@@ -69,33 +78,57 @@ const ConsentModal = ({ onClose }: { onClose: () => void }) => createPortal(
       </div>
 
       <div style={{ padding: "6px 24px 20px", overflowY: "auto" }}>
-        {h("Who must complete this")}
-        {p("If the student registering is below 18 years of age, this consent must be given by "
-          + "a parent or lawful guardian. Registration cannot proceed without verified parental "
-          + "consent, as required under the Digital Personal Data Protection Act, 2023.")}
+        {h(adult ? "Who is giving this consent" : "Who must complete this")}
+        {adult
+          ? p("You are registering for this assessment yourself. By ticking the consent box you "
+            + "confirm that you are 18 years of age or above and are giving this consent on your "
+            + "own behalf, as required under the Digital Personal Data Protection Act, 2023.")
+          : p("If the student registering is below 18 years of age, this consent must be given by "
+            + "a parent or lawful guardian. Registration cannot proceed without verified parental "
+            + "consent, as required under the Digital Personal Data Protection Act, 2023.")}
 
         {h("Information we collect")}
         <ul style={{ margin: "0 0 4px", paddingLeft: 20, color: "#475569", fontSize: "0.86rem", lineHeight: 1.65 }}>
-          <li>Student's name, class, school name, and age</li>
-          <li>Parent/guardian's name, relationship to student, mobile number, and email</li>
-          <li>The student's responses to the assessment questions</li>
+          {adult ? (
+            <>
+              <li>Your name, class / year, institute name, and age</li>
+              <li>Your mobile number and email address</li>
+              <li>Your responses to the assessment questions</li>
+            </>
+          ) : (
+            <>
+              <li>Student's name, class, school name, and age</li>
+              <li>Parent/guardian's name, relationship to student, mobile number, and email</li>
+              <li>The student's responses to the assessment questions</li>
+            </>
+          )}
         </ul>
 
         {h("How this information is used")}
-        {p("Solely to generate the student's career guidance report and, if you opt for it, to "
-          + "support counselling sessions with Career-9's experts.")}
+        {adult
+          ? p("Solely to generate your career guidance report and, if you opt for it, to support "
+            + "counselling sessions with Career-9's experts.")
+          : p("Solely to generate the student's career guidance report and, if you opt for it, to "
+            + "support counselling sessions with Career-9's experts.")}
 
         {h("What we do not do")}
-        {p("We do not track children, monitor their behaviour, or show them advertising. We "
-          + "never sell or share personal data with third parties for marketing.")}
+        {adult
+          ? p("We do not track you, monitor your behaviour, or show you advertising. We never "
+            + "sell or share personal data with third parties for marketing.")
+          : p("We do not track children, monitor their behaviour, or show them advertising. We "
+            + "never sell or share personal data with third parties for marketing.")}
 
         {h("Confidentiality and storage")}
-        {p("The student's individual report is shared only with the parent/guardian and the "
-          + "student. All data is stored on encrypted servers, retained only as long as needed, "
-          + "and then securely deleted.")}
+        {adult
+          ? p("Your individual report is shared only with you. All data is stored on encrypted "
+            + "servers, retained only as long as needed, and then securely deleted.")
+          : p("The student's individual report is shared only with the parent/guardian and the "
+            + "student. All data is stored on encrypted servers, retained only as long as needed, "
+            + "and then securely deleted.")}
 
         {h("Your rights")}
-        {p("You may request access to, correction of, or deletion of your child's data, or "
+        {p("You may request access to, correction of, or deletion of "
+          + (adult ? "your data" : "your child's data") + ", or "
           + "withdraw this consent at any time, by writing to support@career-9.com. Withdrawal "
           + "takes effect immediately for all future processing. If your concern is not "
           + "resolved, you have the right to file a complaint with the Data Protection Board "
@@ -133,9 +166,14 @@ const ConsentModal = ({ onClose }: { onClose: () => void }) => createPortal(
 interface Props {
   checked: boolean
   onChange: (checked: boolean) => void
+  /**
+   * true → the registrant's cohort is flagged 18+ (`audience18Plus`), so the
+   * student consents for themselves. Absent/false keeps the parental wording.
+   */
+  adult?: boolean
 }
 
-const ParentalConsentSection = ({ checked, onChange }: Props) => {
+const ParentalConsentSection = ({ checked, onChange, adult }: Props) => {
   const [showModal, setShowModal] = useState(false)
 
   return (
@@ -151,7 +189,7 @@ const ParentalConsentSection = ({ checked, onChange }: Props) => {
           style={{ width: 16, height: 16, marginTop: 3, flexShrink: 0, accentColor: "#059669", cursor: "pointer" }}
         />
         <span style={{ fontSize: "0.8rem", color: "#475569", lineHeight: 1.6 }}>
-          {PARENTAL_CONSENT_LABEL}
+          {adult ? ADULT_CONSENT_LABEL : PARENTAL_CONSENT_LABEL}
         </span>
       </label>
       <button
@@ -163,9 +201,9 @@ const ParentalConsentSection = ({ checked, onChange }: Props) => {
           textDecoration: "underline",
         }}
       >
-        Read the full parental consent notice
+        {adult ? "Read the full consent notice" : "Read the full parental consent notice"}
       </button>
-      {showModal && <ConsentModal onClose={() => setShowModal(false)} />}
+      {showModal && <ConsentModal adult={adult} onClose={() => setShowModal(false)} />}
     </div>
   )
 }

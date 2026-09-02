@@ -11,7 +11,7 @@ import {
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 import { validateReferralCode } from "../api-clients/referralCodeAPI"
 import { TierCard, Tier } from "../components/TierCard"
-import { getInstituteTerms } from "../utils/instituteTerms"
+import { getInstituteTerms, contactTerms } from "../utils/instituteTerms"
 
 const AssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>()
@@ -19,6 +19,9 @@ const AssessmentRegisterPage = () => {
 
   const [mappingInfo, setMappingInfo] = useState<MappingInfo | null>(null)
   const terms = getInstituteTerms(mappingInfo?.isSchool)
+  // The B2B link maps one cohort, so the audience is constant for the whole page.
+  const adult = !!mappingInfo?.audience18Plus
+  const { emailLabel, phoneLabel } = contactTerms(adult)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -171,7 +174,11 @@ const AssessmentRegisterPage = () => {
       return
     }
     if (!dpdpConsent) {
-      showErrorToast("Please confirm the parental consent to continue.")
+      showErrorToast(
+        adult
+          ? "Please confirm the consent to continue."
+          : "Please confirm the parental consent to continue."
+      )
       return
     }
 
@@ -605,7 +612,7 @@ const AssessmentRegisterPage = () => {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
               <div>
                 <label style={s.label}>
-                  Parent's Email <span style={{ color: "#f43f5e" }}>*</span>
+                  {emailLabel} <span style={{ color: "#f43f5e" }}>*</span>
                 </label>
                 <input
                   ref={emailRef}
@@ -640,7 +647,7 @@ const AssessmentRegisterPage = () => {
             {/* Phone */}
             <div>
               <label style={s.label}>
-                Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
+                {phoneLabel} <span style={{ color: "#f43f5e" }}>*</span>
               </label>
               <input
                 type="tel"
@@ -997,7 +1004,7 @@ const AssessmentRegisterPage = () => {
           </div>
 
           <div style={{ marginTop: 20 }}>
-            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
+            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
           </div>
 
           {/* Submit Button */}

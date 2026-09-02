@@ -11,6 +11,7 @@ import {
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 import DuplicateEmailDialog, { DuplicateEmailPayload } from "../components/DuplicateEmailDialog"
 import ParentalConsentSection from "../components/ParentalConsent"
+import { contactTerms } from "../utils/instituteTerms"
 import { CAREER9_LOGO } from "../hooks/useStudentBranding"
 
 // The campaign's brand logo when one is set (http(s) only — same guard as
@@ -43,6 +44,8 @@ type Assessment = {
   purchasePath: string
   counsellingModel: string
   description?: string | null
+  /** true → this assessment's cohort is 18+ (deep-link mode's audience flag). */
+  audience18Plus?: boolean | null
   tiers: Tier[]
 }
 
@@ -51,6 +54,8 @@ type CampaignClass = {
   className: string
   assessmentId: number
   sortOrder?: number
+  /** true → this class route is an 18+ cohort (class mode's audience flag). */
+  audience18Plus?: boolean | null
 }
 
 type CampaignInfo = {
@@ -189,6 +194,24 @@ const CampaignRegisterPage = () => {
       ? selectedAssessment.tiers.find((t) => t.campaignAssessmentTierId === selectedTierId) || null
       : null
 
+  const selectedClassRoute: CampaignClass | null =
+    info && selectedClassId != null
+      ? info.classes?.find((c) => c.classId === selectedClassId) || null
+      : null
+
+  // 18+ cohorts consent for themselves: class mode takes the flag off the picked
+  // class route, deep-link mode off the selected assessment. Nothing picked yet
+  // (or a legacy/null flag) → minor copy.
+  const adult = !!(classMode ? selectedClassRoute?.audience18Plus : selectedAssessment?.audience18Plus)
+  const { emailLabel, phoneLabel } = contactTerms(adult)
+
+  // The consent wording itself changes with the cohort, so a re-selection that
+  // flips the audience must be re-attested under the new copy. Functional
+  // bail-out so an unchanged value doesn't re-render the form.
+  useEffect(() => {
+    setDpdpConsent((prev) => (prev ? false : prev))
+  }, [adult])
+
   const isTryFirst = selectedAssessment?.purchasePath === "B"
   const isPaid = !isTryFirst && (selectedTier?.priceInr ?? 0) > 0
   // Match backend integer-truncation math (Java long division) so the price
@@ -246,7 +269,11 @@ const CampaignRegisterPage = () => {
       return
     }
     if (!dpdpConsent) {
-      showErrorToast("Please confirm the parental consent to continue.")
+      showErrorToast(
+        adult
+          ? "Please confirm the consent to continue."
+          : "Please confirm the parental consent to continue."
+      )
       return
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -576,7 +603,7 @@ const CampaignRegisterPage = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
                   <div>
                     <label style={s.label}>
-                      Parent's Email <span style={{ color: "#f43f5e" }}>*</span>
+                      {emailLabel} <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
                       ref={emailRef}
@@ -611,7 +638,7 @@ const CampaignRegisterPage = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
                   <div>
                     <label style={s.label}>
-                      Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
+                      {phoneLabel} <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
                       type="tel"
@@ -734,7 +761,7 @@ const CampaignRegisterPage = () => {
               </div>
 
               <div style={{ marginTop: 20 }}>
-                <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
+                <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
               </div>
 
               <button

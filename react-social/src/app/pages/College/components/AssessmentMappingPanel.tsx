@@ -48,6 +48,10 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
   const [selectedSession, setSelectedSession] = useState<string>("");
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [selectedSection, setSelectedSection] = useState<string>("");
+  // Per-cohort-row flag: when true, the registration page shows adult
+  // self-consent wording and "Your Email"/"Your Phone" labels instead of the
+  // default minor/parental wording.
+  const [audience18Plus, setAudience18Plus] = useState<boolean>(false);
 
   const [catalogSaving, setCatalogSaving] = useState(false);
 
@@ -147,6 +151,7 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
       instituteCode: instituteCode,
       mappingLevel: mappingLevel,
       paymentTiming: paymentTiming,
+      audience18Plus: audience18Plus,
     };
 
     if (mappingLevel === "SESSION") {
@@ -185,6 +190,7 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
       setSelectedSession("");
       setSelectedClass("");
       setSelectedSection("");
+      setAudience18Plus(false);
       const newMappingId = createRes?.data?.mappingId;
       if (newMappingId) setTierModalMappingId(newMappingId);
     } catch (error: any) {
@@ -213,6 +219,17 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
       ));
     } catch (error) {
       console.error("Failed to update mapping:", error);
+    }
+  };
+
+  const handleToggleAudience18Plus = async (mapping: AssessmentInstituteMapping) => {
+    try {
+      await updateAssessmentMapping(mapping.mappingId, { audience18Plus: !mapping.audience18Plus });
+      setMappings(mappings.map((m) =>
+        m.mappingId === mapping.mappingId ? { ...m, audience18Plus: !m.audience18Plus } : m
+      ));
+    } catch (error: any) {
+      showErrorToast(String(error.response?.data || error.message || "Failed to update 18+ toggle"));
     }
   };
 
@@ -449,6 +466,19 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
               </div>
             )}
 
+            <div style={{ marginBottom: 24 }}>
+              <Form.Check
+                type="checkbox"
+                id="am-audience-18plus"
+                label="Audience is 18+"
+                checked={audience18Plus}
+                onChange={(e) => setAudience18Plus(e.target.checked)}
+              />
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: 6 }}>
+                Adult self-consent wording and Your Email/Phone labels on the registration page
+              </div>
+            </div>
+
             <Button
               onClick={handleCreate}
               disabled={submitting}
@@ -506,7 +536,7 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "#f8fafc" }}>
-                      {["Assessment", "Level", "Details", "Status", "Free Link", "Paid Link", "Actions"].map((h) => (
+                      {["Assessment", "Level", "Details", "Status", "18+", "Free Link", "Paid Link", "Actions"].map((h) => (
                         <th key={h} style={{
                           padding: "14px 18px", fontWeight: 700, fontSize: "0.78rem",
                           color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",
@@ -564,6 +594,23 @@ const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Prop
                             }}
                           >
                             {mapping.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+
+                        <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
+                          <span
+                            onClick={() => handleToggleAudience18Plus(mapping)}
+                            title="Adult self-consent wording and Your Email/Phone labels on the registration page"
+                            style={{
+                              background: mapping.audience18Plus ? "#dbeafe" : "#f1f5f9",
+                              color: mapping.audience18Plus ? "#2563eb" : "#94a3b8",
+                              padding: "5px 14px", borderRadius: 20,
+                              fontWeight: 600, fontSize: "0.78rem",
+                              cursor: "pointer", display: "inline-block",
+                              transition: "all 0.15s",
+                            }}
+                          >
+                            {mapping.audience18Plus ? "18+" : "Minor"}
                           </span>
                         </td>
 

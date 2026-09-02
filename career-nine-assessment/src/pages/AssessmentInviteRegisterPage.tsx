@@ -8,6 +8,7 @@ import {
 } from "../api-clients/assessmentMappingAPI"
 import { TierCard, Tier } from "../components/TierCard"
 import ParentalConsentSection from "../components/ParentalConsent"
+import { contactTerms } from "../utils/instituteTerms"
 
 /**
  * Student-locked invite registration. The link is bound to one already-known
@@ -48,6 +49,9 @@ const AssessmentInviteRegisterPage = () => {
   const counsellingFeeTotal = info?.counsellingFeeTotal || 0
   const isPayFirst = (info?.paymentTiming ?? "PAY_FIRST") === "PAY_FIRST"
   const registrationClosed = info?.registrationClosed === true || info?.status === "REVOKED"
+  // The invite is bound to one mapped cohort, so the audience is page-constant.
+  const adult = !!info?.audience18Plus
+  const { emailLabel, phoneLabel } = contactTerms(adult)
 
   const inc = info?.inclusions
   const selectionTier: Tier | null = info
@@ -70,7 +74,11 @@ const AssessmentInviteRegisterPage = () => {
   const handleSubmit = async () => {
     if (!token || !info) return
     if (!info.alreadyRegistered && !dpdpConsent) {
-      showErrorToast("Please confirm the parental consent to continue.")
+      showErrorToast(
+        adult
+          ? "Please confirm the consent to continue."
+          : "Please confirm the parental consent to continue."
+      )
       return
     }
     setSubmitting(true)
@@ -193,10 +201,10 @@ const AssessmentInviteRegisterPage = () => {
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginTop: 12 }}>
             <Field label="Full Name" value={info?.student?.name} />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-              <Field label="Parent's Email" value={info?.student?.email} />
+              <Field label={emailLabel} value={info?.student?.email} />
               <Field label="Date of Birth" value={info?.student?.dob} />
             </div>
-            <Field label="Parent's Phone" value={info?.student?.phone} />
+            <Field label={phoneLabel} value={info?.student?.phone} />
           </div>
 
           {/* PAY_FIRST counselling itemisation */}
@@ -230,7 +238,7 @@ const AssessmentInviteRegisterPage = () => {
 
           {!alreadyRegistered && (
             <div style={{ marginTop: 20 }}>
-              <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
+              <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
             </div>
           )}
 
