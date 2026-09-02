@@ -114,6 +114,13 @@ const SchoolAssessmentRegisterPage = () => {
   // (SchoolAssessmentTier.amount; RazorpayService converts to paise at the API edge).
   const amountRupees: number = selectedClassConfig?.amount || 0;
   const isPaid = amountRupees > 0;
+  const unitWord = terms.unit.toLowerCase();
+
+  // The class picker lives outside the form; the details form only renders once
+  // a class is chosen, so we always know which cohort (and audience) is filling
+  // it in. A lone class is auto-selected below, so its picker is hidden.
+  const showClassPicker = classes.length > 1;
+  const selectionComplete = !!selectedClassId;
 
   // 18+ cohorts consent for themselves. The flag is per class row, so it is
   // re-derived on every class change; no class picked yet → minor copy.
@@ -152,6 +159,16 @@ const SchoolAssessmentRegisterPage = () => {
     setPromoCode("");
     setPromoError("");
   };
+
+  // If there's only one class, select it outright — a one-item dropdown is noise
+  // and the details form is gated on a class being chosen.
+  useEffect(() => {
+    if (!schoolInfo || selectedClassId) return;
+    if (classes.length === 1) {
+      handleClassChange(String(classes[0].classId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolInfo, selectedClassId]);
 
   const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
@@ -422,221 +439,206 @@ const SchoolAssessmentRegisterPage = () => {
 
         <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #e2e8f0, transparent)", margin: "0 32px" }} />
 
-        {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          style={{ padding: "28px 32px 32px" }}
-          // Enter in a text field must never submit the registration — only the
-          // explicit submit button does. Field-level handlers (promo/referral apply)
-          // still run first, since the event bubbles from the input up to the form.
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
-          }}
-        >
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
+        {/* Cohort picker — outside the <form> so the details form appears only
+            once a class is chosen and we know who is registering. */}
+        <div style={{ padding: "28px 32px 32px", display: "grid", gap: 24 }}>
 
-            {/* Class + Section row */}
-            <div style={{ display: "grid", gridTemplateColumns: sections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
-              <div>
-                <label style={s.label}>{terms.unit} <span style={{ color: "#f43f5e" }}>*</span></label>
-                <select
-                  value={selectedClassId}
-                  onChange={(e) => handleClassChange(e.target.value)}
-                  required
-                  style={{ ...s.input, color: selectedClassId ? "#1e293b" : "#94a3b8" }}
-                  onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                  onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                >
-                  <option value="">{terms.selectUnit}</option>
-                  {classes.map((c: any) => (
-                    <option key={c.classId} value={c.classId}>{c.className}</option>
-                  ))}
-                </select>
+          <section>
+            <h3 style={s.sectionTitle}>{showClassPicker ? `Choose your ${unitWord}` : `Your ${unitWord}`}</h3>
+
+            <div style={{ display: "grid", gap: 16 }}>
+
+              {/* Class + Section row */}
+              {(showClassPicker || sections.length > 0) && (
+              <div style={{ display: "grid", gridTemplateColumns: showClassPicker && sections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
+                {showClassPicker && (
+                  <div>
+                    <label style={s.label}>{terms.unit} <span style={{ color: "#f43f5e" }}>*</span></label>
+                    <select
+                      value={selectedClassId}
+                      onChange={(e) => handleClassChange(e.target.value)}
+                      style={{ ...s.input, color: selectedClassId ? "#1e293b" : "#94a3b8" }}
+                      onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                      onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                    >
+                      <option value="">{terms.selectUnit}</option>
+                      {classes.map((c: any) => (
+                        <option key={c.classId} value={c.classId}>{c.className}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {sections.length > 0 && (
+                  <div>
+                    <label style={s.label}>Section</label>
+                    <select
+                      value={selectedSectionId}
+                      onChange={(e) => setSelectedSectionId(e.target.value)}
+                      style={{ ...s.input, color: selectedSectionId ? "#1e293b" : "#94a3b8" }}
+                      onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
+                      onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                    >
+                      <option value="">Select Section (Optional)</option>
+                      {sections.map((sec: any) => (
+                        <option key={sec.sectionId} value={sec.sectionId}>{sec.sectionName}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-              {sections.length > 0 && (
-                <div>
-                  <label style={s.label}>Section</label>
-                  <select
-                    value={selectedSectionId}
-                    onChange={(e) => setSelectedSectionId(e.target.value)}
-                    style={{ ...s.input, color: selectedSectionId ? "#1e293b" : "#94a3b8" }}
-                    onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                    onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                  >
-                    <option value="">Select Section (Optional)</option>
-                    {sections.map((sec: any) => (
-                      <option key={sec.sectionId} value={sec.sectionId}>{sec.sectionName}</option>
-                    ))}
-                  </select>
+              )}
+
+              {/* Auto-filled assessment info */}
+              {selectedClassId && assessmentName && (
+                <div style={{
+                  background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
+                  border: "1.5px solid #a7f3d0", borderRadius: 12,
+                  padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}>
+                  <div>
+                    <div style={{ fontSize: "0.72rem", color: "#059669", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Assessment</div>
+                    <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#065f46" }}>{assessmentName}</div>
+                    {/* With the picker hidden this is the only place the chosen class is named. */}
+                    {!showClassPicker && selectedClassConfig?.className && (
+                      <div style={{ fontSize: "0.8rem", color: "#047857", fontWeight: 600, marginTop: 4 }}>
+                        {terms.unit}: <strong>{selectedClassConfig.className}</strong>
+                      </div>
+                    )}
+                  </div>
+                  <div style={s.priceBadge}>
+                    {promoApplied && discountedAmountRupees !== amountRupees ? (
+                      <>
+                        <span style={{ textDecoration: "line-through", opacity: 0.5, marginRight: 8, fontWeight: 500 }}>INR {amountRupees}</span>
+                        <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>INR {discountedAmountRupees}</span>
+                      </>
+                    ) : isPaid ? (
+                      <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>INR {amountRupees}</span>
+                    ) : (
+                      <span style={{ fontWeight: 700, fontSize: "0.9rem" }}>Free</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
+          </section>
 
-            {/* Auto-filled assessment info */}
-            {selectedClassId && assessmentName && (
-              <div style={{
-                background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
-                border: "1.5px solid #a7f3d0", borderRadius: 12,
-                padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}>
+          {!selectionComplete && (
+            <p style={s.waiting}>
+              Select your {unitWord} above to continue. The details form appears once we know who is registering.
+            </p>
+          )}
+
+          {selectionComplete && (
+            <form
+              onSubmit={handleSubmit}
+              // Enter in a text field must never submit the registration — only the
+              // explicit submit button does. Field-level handlers (promo/referral apply)
+              // still run first, since the event bubbles from the input up to the form.
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault();
+              }}
+            >
+              <h3 style={s.sectionTitle}>Your details</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
+
+                {/* Name */}
                 <div>
-                  <div style={{ fontSize: "0.72rem", color: "#059669", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>Assessment</div>
-                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#065f46" }}>{assessmentName}</div>
+                  <label style={s.label}>Full Name <span style={{ color: "#f43f5e" }}>*</span></label>
+                  <input type="text" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} required style={s.input}
+                    onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
                 </div>
-                <div style={s.priceBadge}>
-                  {promoApplied && discountedAmountRupees !== amountRupees ? (
-                    <>
-                      <span style={{ textDecoration: "line-through", opacity: 0.5, marginRight: 8, fontWeight: 500 }}>INR {amountRupees}</span>
-                      <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>INR {discountedAmountRupees}</span>
-                    </>
-                  ) : isPaid ? (
-                    <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>INR {amountRupees}</span>
-                  ) : (
-                    <span style={{ fontWeight: 700, fontSize: "0.9rem" }}>Free</span>
-                  )}
-                </div>
-              </div>
-            )}
 
-            {/* Name */}
-            <div>
-              <label style={s.label}>Full Name <span style={{ color: "#f43f5e" }}>*</span></label>
-              <input type="text" placeholder="Enter your full name" value={name} onChange={(e) => setName(e.target.value)} required style={s.input}
-                onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
-            </div>
-
-            {/* Email + DOB */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-              <div>
-                <label style={s.label}>{emailLabel} <span style={{ color: "#f43f5e" }}>*</span></label>
-                <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={s.input}
-                  onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
-              </div>
-              <div>
-                <label style={s.label}>Date of Birth <span style={{ color: "#f43f5e" }}>*</span></label>
-                <input type="date" value={dobToInputValue(dob)} onChange={(e) => handleDobChange(e.target.value)}
-                  max={new Date().toISOString().split("T")[0]} required
-                  style={{ ...s.input, color: dob ? "#1e293b" : "#94a3b8" }}
-                  onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
-              </div>
-            </div>
-
-            {/* Phone + Gender */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-              <div>
-                {/* Phone is genuinely mandatory: the duplicate-check round-trip
-                    (which gates the submit button) only fires once email+phone+dob
-                    are all filled — rendering it as optional left students unable
-                    to submit with no explanation. */}
-                <label style={s.label}>{phoneLabel} <span style={{ color: "#f43f5e" }}>*</span></label>
-                <input type="tel" placeholder="Enter phone number" value={phone} onChange={(e) => setPhone(e.target.value)} required style={s.input}
-                  onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
-              </div>
-              <div>
-                <label style={s.label}>Gender</label>
-                <select value={gender} onChange={(e) => setGender(e.target.value)} style={{ ...s.input, color: gender ? "#1e293b" : "#94a3b8" }}
-                  onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}>
-                  <option value="">Select Gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            {verifyStatus !== "idle" && (
-              <div
-                style={{
-                  borderRadius: 12,
-                  padding: "12px 16px",
-                  fontSize: "0.85rem",
-                  lineHeight: 1.5,
-                  ...(verifyStatus === "verifying" && { background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }),
-                  ...(verifyStatus === "verified" && { background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }),
-                  ...(verifyStatus === "partial" && { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }),
-                  ...(verifyStatus === "duplicate" && { background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }),
-                }}
-              >
-                {verifyStatus === "verifying" && (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ ...s.spinner, width: 14, height: 14, borderWidth: 2 }} />
-                    Verifying details...
-                  </span>
-                )}
-                {verifyStatus === "verified" && <span>{"✓"} Verified</span>}
-                {verifyStatus === "partial" && verifyResult && (
-                  <span>
-                    We found existing details &mdash; username: <strong>{verifyResult.username}</strong>, password:{" "}
-                    <strong>{verifyResult.password}</strong>. Please login, or change your email or phone to register a new account.
-                  </span>
-                )}
-                {verifyStatus === "duplicate" && verifyResult && (
-                  <span>
-                    You are already registered. Please login with username <strong>{verifyResult.username}</strong> and password{" "}
-                    <strong>{verifyResult.password}</strong>, or use a different email and phone to register.
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Promo Code — hidden behind a toggle until the student asks for it */}
-            {isPaid && selectedClassId && !showPromo && !promoApplied && (
-              <button
-                type="button"
-                onClick={() => setShowPromo(true)}
-                style={{
-                  background: "none", border: "none", padding: 0, textAlign: "left",
-                  color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
-                }}
-              >
-                Do you have a promo code?
-              </button>
-            )}
-            {isPaid && selectedClassId && (showPromo || promoApplied) && (
-              <div>
-                <label style={s.label}>Promo Code</label>
-                {promoApplied ? (
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
-                    border: "1.5px solid #6ee7b7", borderRadius: 12, padding: "12px 18px",
-                  }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#d1fae5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", color: "#059669" }}>&#10003;</div>
-                    <span style={{ color: "#065f46", fontWeight: 700, flex: 1, fontSize: "0.92rem" }}>
-                      {promoApplied.code} &mdash; {promoApplied.discountPercent}% off
-                      {promoApplied.discountPercent === 100 && " (Free!)"}
-                    </span>
-                    <button type="button" onClick={handleRemovePromo} style={{ background: "none", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "4px 12px", color: "#ef4444", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}>Remove</button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <input type="text" placeholder="Enter promo code" value={promoCode}
-                      onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(""); }}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyPromo())}
-                      style={{ ...s.input, flex: 1 }}
+                {/* Email + DOB */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+                  <div>
+                    <label style={s.label}>{emailLabel} <span style={{ color: "#f43f5e" }}>*</span></label>
+                    <input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required style={s.input}
                       onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
-                    <button type="button" onClick={handleApplyPromo} disabled={promoValidating || !promoCode.trim()}
-                      style={{ ...s.btnOutline, opacity: promoValidating || !promoCode.trim() ? 0.5 : 1, cursor: promoValidating || !promoCode.trim() ? "not-allowed" : "pointer" }}>
-                      {promoValidating ? "..." : "Apply"}
-                    </button>
+                  </div>
+                  <div>
+                    <label style={s.label}>Date of Birth <span style={{ color: "#f43f5e" }}>*</span></label>
+                    <input type="date" value={dobToInputValue(dob)} onChange={(e) => handleDobChange(e.target.value)}
+                      max={new Date().toISOString().split("T")[0]} required
+                      style={{ ...s.input, color: dob ? "#1e293b" : "#94a3b8" }}
+                      onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
+                  </div>
+                </div>
+
+                {/* Phone + Gender */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+                  <div>
+                    {/* Phone is genuinely mandatory: the duplicate-check round-trip
+                        (which gates the submit button) only fires once email+phone+dob
+                        are all filled — rendering it as optional left students unable
+                        to submit with no explanation. */}
+                    <label style={s.label}>{phoneLabel} <span style={{ color: "#f43f5e" }}>*</span></label>
+                    <input type="tel" placeholder="Enter phone number" value={phone} onChange={(e) => setPhone(e.target.value)} required style={s.input}
+                      onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
+                  </div>
+                  <div>
+                    <label style={s.label}>Gender</label>
+                    <select value={gender} onChange={(e) => setGender(e.target.value)} style={{ ...s.input, color: gender ? "#1e293b" : "#94a3b8" }}
+                      onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}>
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {verifyStatus !== "idle" && (
+                  <div
+                    style={{
+                      borderRadius: 12,
+                      padding: "12px 16px",
+                      fontSize: "0.85rem",
+                      lineHeight: 1.5,
+                      ...(verifyStatus === "verifying" && { background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }),
+                      ...(verifyStatus === "verified" && { background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }),
+                      ...(verifyStatus === "partial" && { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }),
+                      ...(verifyStatus === "duplicate" && { background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }),
+                    }}
+                  >
+                    {verifyStatus === "verifying" && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ ...s.spinner, width: 14, height: 14, borderWidth: 2 }} />
+                        Verifying details...
+                      </span>
+                    )}
+                    {verifyStatus === "verified" && <span>{"✓"} Verified</span>}
+                    {verifyStatus === "partial" && verifyResult && (
+                      <span>
+                        We found existing details &mdash; username: <strong>{verifyResult.username}</strong>, password:{" "}
+                        <strong>{verifyResult.password}</strong>. Please login, or change your email or phone to register a new account.
+                      </span>
+                    )}
+                    {verifyStatus === "duplicate" && verifyResult && (
+                      <span>
+                        You are already registered. Please login with username <strong>{verifyResult.username}</strong> and password{" "}
+                        <strong>{verifyResult.password}</strong>, or use a different email and phone to register.
+                      </span>
+                    )}
                   </div>
                 )}
-                {promoError && <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: 6 }}>{promoError}</div>}
-              </div>
-            )}
 
-            {/* Referral Code — available for free and paid links (needs a class chosen) */}
-            {selectedClassId && (
-              <div>
-                {!hasReferral && !referralApplied ? (
-                  <button type="button" onClick={() => setHasReferral(true)}
-                    style={{ background: "none", border: "none", padding: 0, color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer" }}>
-                    + Have a referral code?
+                {/* Promo Code — hidden behind a toggle until the student asks for it */}
+                {isPaid && selectedClassId && !showPromo && !promoApplied && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPromo(true)}
+                    style={{
+                      background: "none", border: "none", padding: 0, textAlign: "left",
+                      color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+                    }}
+                  >
+                    Do you have a promo code?
                   </button>
-                ) : (
-                  <>
-                    <label style={s.label}>Referral Code</label>
-                    {referralApplied ? (
+                )}
+                {isPaid && selectedClassId && (showPromo || promoApplied) && (
+                  <div>
+                    <label style={s.label}>Promo Code</label>
+                    {promoApplied ? (
                       <div style={{
                         display: "flex", alignItems: "center", gap: 12,
                         background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
@@ -644,68 +646,111 @@ const SchoolAssessmentRegisterPage = () => {
                       }}>
                         <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#d1fae5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", color: "#059669" }}>&#10003;</div>
                         <span style={{ color: "#065f46", fontWeight: 700, flex: 1, fontSize: "0.92rem" }}>
-                          {referralApplied.code}{referralApplied.name ? ` — ${referralApplied.name}` : ""}
+                          {promoApplied.code} &mdash; {promoApplied.discountPercent}% off
+                          {promoApplied.discountPercent === 100 && " (Free!)"}
                         </span>
-                        <button type="button" onClick={handleRemoveReferral} style={{ background: "none", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "4px 12px", color: "#ef4444", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}>Remove</button>
+                        <button type="button" onClick={handleRemovePromo} style={{ background: "none", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "4px 12px", color: "#ef4444", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}>Remove</button>
                       </div>
                     ) : (
                       <div style={{ display: "flex", gap: 10 }}>
-                        <input type="text" placeholder="Enter referral code" value={referralCode}
-                          onChange={(e) => { setReferralCode(e.target.value.toUpperCase()); setReferralError(""); }}
-                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyReferral())}
+                        <input type="text" placeholder="Enter promo code" value={promoCode}
+                          onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(""); }}
+                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyPromo())}
                           style={{ ...s.input, flex: 1 }}
                           onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
-                        <button type="button" onClick={handleApplyReferral} disabled={referralValidating || !referralCode.trim()}
-                          style={{ ...s.btnOutline, opacity: referralValidating || !referralCode.trim() ? 0.5 : 1, cursor: referralValidating || !referralCode.trim() ? "not-allowed" : "pointer" }}>
-                          {referralValidating ? "..." : "Verify"}
+                        <button type="button" onClick={handleApplyPromo} disabled={promoValidating || !promoCode.trim()}
+                          style={{ ...s.btnOutline, opacity: promoValidating || !promoCode.trim() ? 0.5 : 1, cursor: promoValidating || !promoCode.trim() ? "not-allowed" : "pointer" }}>
+                          {promoValidating ? "..." : "Apply"}
                         </button>
                       </div>
                     )}
-                    {referralError && <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: 6 }}>{referralError}</div>}
-                  </>
+                    {promoError && <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: 6 }}>{promoError}</div>}
+                  </div>
+                )}
+
+                {/* Referral Code — available for free and paid links (needs a class chosen) */}
+                {selectedClassId && (
+                  <div>
+                    {!hasReferral && !referralApplied ? (
+                      <button type="button" onClick={() => setHasReferral(true)}
+                        style={{ background: "none", border: "none", padding: 0, color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer" }}>
+                        + Have a referral code?
+                      </button>
+                    ) : (
+                      <>
+                        <label style={s.label}>Referral Code</label>
+                        {referralApplied ? (
+                          <div style={{
+                            display: "flex", alignItems: "center", gap: 12,
+                            background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
+                            border: "1.5px solid #6ee7b7", borderRadius: 12, padding: "12px 18px",
+                          }}>
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#d1fae5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", color: "#059669" }}>&#10003;</div>
+                            <span style={{ color: "#065f46", fontWeight: 700, flex: 1, fontSize: "0.92rem" }}>
+                              {referralApplied.code}{referralApplied.name ? ` — ${referralApplied.name}` : ""}
+                            </span>
+                            <button type="button" onClick={handleRemoveReferral} style={{ background: "none", border: "1.5px solid #fca5a5", borderRadius: 8, padding: "4px 12px", color: "#ef4444", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer" }}>Remove</button>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", gap: 10 }}>
+                            <input type="text" placeholder="Enter referral code" value={referralCode}
+                              onChange={(e) => { setReferralCode(e.target.value.toUpperCase()); setReferralError(""); }}
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyReferral())}
+                              style={{ ...s.input, flex: 1 }}
+                              onFocus={(e) => Object.assign(e.target.style, s.inputFocus)} onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })} />
+                            <button type="button" onClick={handleApplyReferral} disabled={referralValidating || !referralCode.trim()}
+                              style={{ ...s.btnOutline, opacity: referralValidating || !referralCode.trim() ? 0.5 : 1, cursor: referralValidating || !referralCode.trim() ? "not-allowed" : "pointer" }}>
+                              {referralValidating ? "..." : "Verify"}
+                            </button>
+                          </div>
+                        )}
+                        {referralError && <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: 6 }}>{referralError}</div>}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <div style={{ marginTop: 20 }}>
-            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
-          </div>
+              <div style={{ marginTop: 20 }}>
+                <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
+              </div>
 
-          {/* Submit */}
-          {(() => {
-            const submitBlocked = submitting || !selectedClassId || verifyStatus !== "verified";
-            return (
-              <button type="submit" disabled={submitBlocked}
-                style={{ ...s.btnPrimary, width: "100%", marginTop: 28, opacity: submitBlocked ? 0.7 : 1, cursor: submitBlocked ? "not-allowed" : "pointer" }}>
-                {submitting ? (
-                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                    <div style={{ ...s.spinner, width: 18, height: 18, borderWidth: 2 }} />
-                    {isPaid && discountedAmountRupees > 0 ? "Processing..." : "Registering..."}
-                  </span>
-                ) : !selectedClassId ? (
-                  "Select a class to continue"
-                ) : verifyStatus === "verifying" ? (
-                  "Verifying details..."
-                ) : verifyStatus === "duplicate" ? (
-                  "Already registered — please login"
-                ) : verifyStatus === "partial" ? (
-                  "Change email or phone to continue"
-                ) : verifyStatus === "idle" ? (
-                  "Fill email, phone and date of birth"
-                ) : isPaid && discountedAmountRupees > 0 ? (
-                  `Register & Pay INR ${discountedAmountRupees}`
-                ) : (
-                  "Register"
-                )}
-              </button>
-            );
-          })()}
+              {/* Submit */}
+              {(() => {
+                const submitBlocked = submitting || !selectedClassId || verifyStatus !== "verified";
+                return (
+                  <button type="submit" disabled={submitBlocked}
+                    style={{ ...s.btnPrimary, width: "100%", marginTop: 28, opacity: submitBlocked ? 0.7 : 1, cursor: submitBlocked ? "not-allowed" : "pointer" }}>
+                    {submitting ? (
+                      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                        <div style={{ ...s.spinner, width: 18, height: 18, borderWidth: 2 }} />
+                        {isPaid && discountedAmountRupees > 0 ? "Processing..." : "Registering..."}
+                      </span>
+                    ) : !selectedClassId ? (
+                      "Select a class to continue"
+                    ) : verifyStatus === "verifying" ? (
+                      "Verifying details..."
+                    ) : verifyStatus === "duplicate" ? (
+                      "Already registered — please login"
+                    ) : verifyStatus === "partial" ? (
+                      "Change email or phone to continue"
+                    ) : verifyStatus === "idle" ? (
+                      "Fill email, phone and date of birth"
+                    ) : isPaid && discountedAmountRupees > 0 ? (
+                      `Register & Pay INR ${discountedAmountRupees}`
+                    ) : (
+                      "Register"
+                    )}
+                  </button>
+                );
+              })()}
 
-          <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-            By registering, I agree to the Career-9's terms and conditions.
-          </p>
-        </form>
+              <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
+                By registering, I agree to the Career-9's terms and conditions.
+              </p>
+            </form>
+          )}
+        </div>
       </div>
 
       <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", fontSize: "0.72rem", color: "rgba(100, 116, 139, 0.5)", fontWeight: 500, letterSpacing: "0.05em" }}>
@@ -732,6 +777,8 @@ const s: { [key: string]: React.CSSProperties } = {
   glassCard: { width: "100%", maxWidth: 580, background: "rgba(255, 255, 255, 0.72)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: 24, border: "1px solid rgba(255, 255, 255, 0.6)", boxShadow: "0 8px 32px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)", overflow: "hidden", position: "relative", zIndex: 1 },
   header: { padding: "32px 32px 24px" },
   priceBadge: { display: "inline-flex", alignItems: "center", background: "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)", color: "#065f46", padding: "6px 16px", borderRadius: 10, fontSize: "0.9rem", fontWeight: 700, border: "1px solid #6ee7b7" },
+  sectionTitle: { fontSize: "0.92rem", fontWeight: 700, color: "#1e293b", margin: "0 0 12px", letterSpacing: "-0.01em" },
+  waiting: { margin: 0, padding: "14px 18px", border: "1.5px dashed #e2e8f0", borderRadius: 12, color: "#64748b", fontSize: "0.86rem" },
   label: { display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#374151", marginBottom: 6 },
   input: { width: "100%", padding: "12px 16px", borderRadius: 12, border: "1.5px solid #e2e8f0", background: "rgba(255, 255, 255, 0.8)", fontSize: 16, color: "#1e293b", outline: "none", transition: "border-color 0.2s, box-shadow 0.2s", boxSizing: "border-box" as const },
   inputFocus: { borderColor: "#34d399", boxShadow: "0 0 0 3px rgba(52, 211, 153, 0.15)" },
