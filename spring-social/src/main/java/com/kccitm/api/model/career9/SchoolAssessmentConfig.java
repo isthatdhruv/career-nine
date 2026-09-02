@@ -49,6 +49,12 @@ public class SchoolAssessmentConfig implements Serializable {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    // True when this class's cohort is 18+: the school registration page shows adult
+    // self-consent wording and "Your Email/Phone" instead of the parental copy.
+    // NULL/FALSE keeps the existing minor flow.
+    @Column(name = "audience_18_plus", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean audience18Plus = false;
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
@@ -61,6 +67,9 @@ public class SchoolAssessmentConfig implements Serializable {
         }
         if (this.isActive == null) {
             this.isActive = true;
+        }
+        if (this.audience18Plus == null) {
+            this.audience18Plus = false;
         }
     }
 
@@ -86,6 +95,9 @@ public class SchoolAssessmentConfig implements Serializable {
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+
+    public Boolean getAudience18Plus() { return audience18Plus; }
+    public void setAudience18Plus(Boolean audience18Plus) { this.audience18Plus = audience18Plus; }
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }

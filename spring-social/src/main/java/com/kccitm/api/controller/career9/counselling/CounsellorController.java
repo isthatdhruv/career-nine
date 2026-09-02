@@ -133,14 +133,14 @@ public class CounsellorController {
         if (body.get("counsellorType") != null) counsellor.setCounsellorType((String) body.get("counsellorType"));
         if (body.get("companyName") != null) counsellor.setCompanyName(((String) body.get("companyName")).trim());
         if (body.get("meetingLink") != null) {
-            // Teams-only: a link from any other platform is rejected at signup rather than
-            // stored and later emailed to a student.
+            // Teams or Google Meet only: a link from any other platform is rejected at
+            // signup rather than stored and later emailed to a student.
             String meetingLink = ((String) body.get("meetingLink")).trim();
             if (!meetingLink.isEmpty()) {
-                if (!com.kccitm.api.service.counselling.MeetingLinkService.isTeamsLink(meetingLink)) {
+                if (!com.kccitm.api.service.counselling.MeetingLinkService.isAcceptedMeetingLink(meetingLink)) {
                     return ResponseEntity.badRequest().body(Map.of(
-                            "error", "Enter a Microsoft Teams meeting link (it should start with "
-                                   + "https://teams.microsoft.com/ or https://teams.live.com/)."));
+                            "error", "Enter a Microsoft Teams or Google Meet link (it should start with "
+                                   + "https://teams.microsoft.com/, https://teams.live.com/ or https://meet.google.com/)."));
                 }
                 counsellor.setMeetingLink(meetingLink);
             }
@@ -465,14 +465,14 @@ public class CounsellorController {
     @PreAuthorize("@auth.allows('counsellor.update')")
     @PutMapping("/api/counsellor/update/{id}")
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Counsellor counsellor) {
-        // Sessions run on Microsoft Teams only — refuse any other provider's link rather
-        // than storing one that would be emailed to students and not work as expected.
+        // Sessions run on Microsoft Teams or Google Meet — refuse any other provider's
+        // link rather than storing one that would be emailed to students and not work.
         String link = counsellor.getMeetingLink();
         if (link != null && !link.trim().isEmpty()
-                && !com.kccitm.api.service.counselling.MeetingLinkService.isTeamsLink(link)) {
+                && !com.kccitm.api.service.counselling.MeetingLinkService.isAcceptedMeetingLink(link)) {
             return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Enter a Microsoft Teams meeting link (it should start with "
-                           + "https://teams.microsoft.com/ or https://teams.live.com/)."));
+                    "error", "Enter a Microsoft Teams or Google Meet link (it should start with "
+                           + "https://teams.microsoft.com/, https://teams.live.com/ or https://meet.google.com/)."));
         }
         logger.info("Updating counsellor with id: {}", id);
         return ResponseEntity.ok(counsellorService.update(id, counsellor));

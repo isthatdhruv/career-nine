@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import axios from 'axios'
 import { convertImageToWebP } from '../../utils/imageUtils'
+import { isValidMeetingLink, MEETING_LINK_PLACEHOLDER } from '../Counselling/shared/meetingLink'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
 
@@ -97,9 +98,9 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
     // Required, and Teams only — nothing else is accepted. Every online session a student
     // books reuses this one link, so a counsellor without it cannot be given any work.
     const link = form.meetingLink.trim()
-    if (!link) return 'Please add your Microsoft Teams meeting link'
-    if (!/^https:\/\/teams\.(microsoft|live)\.com\//i.test(link)) {
-      return 'The meeting link must be a Microsoft Teams link (teams.microsoft.com or teams.live.com)'
+    if (!link) return 'Please add your meeting link (Microsoft Teams or Google Meet)'
+    if (!isValidMeetingLink(link)) {
+      return 'The meeting link must be a Microsoft Teams or Google Meet link (teams.microsoft.com, teams.live.com or meet.google.com)'
     }
     return null
   }
@@ -346,8 +347,8 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             </div>
           </div>
           <div>
-            <label style={labelStyle}>Microsoft Teams meeting link *</label>
-            <input style={inputStyle} placeholder='https://teams.microsoft.com/l/meetup-join/...'
+            <label style={labelStyle}>Meeting link — Microsoft Teams or Google Meet *</label>
+            <input style={inputStyle} placeholder={MEETING_LINK_PLACEHOLDER}
               autoComplete='off' name='c9-teams-link' data-lpignore='true'
               value={form.meetingLink} onChange={(e) => update('meetingLink', e.target.value)} />
             {/* Every online session this counsellor ever takes reuses this one link. A link
@@ -423,7 +424,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             { label: 'Work-time', value: form.workTime === 'FULL_TIME' ? 'Full-time' : 'Part-time' },
             { label: 'Counsellor Type', value: form.counsellorType === 'SCHOOL' ? 'School' : 'Career' },
             { label: 'Company', value: form.companyName || '-' },
-            { label: 'Teams link', value: form.meetingLink || '-' },
+            { label: 'Meeting link', value: form.meetingLink || '-' },
             { label: 'Qualifications', value: form.qualifications || '-' },
             { label: 'Experience', value: form.yearsOfExperience ? `${form.yearsOfExperience} years` : '-' },
             { label: 'About Me', value: form.bio || '-' },

@@ -302,24 +302,55 @@ public class AssessmentInstituteMappingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Partial update of the three admin-editable fields on a mapping.
+     *
+     * Takes a raw Map, NOT the entity: binding to AssessmentInstituteMapping made
+     * every omitted field indistinguishable from an explicitly-sent one. Jackson
+     * builds the entity through its no-arg constructor, so the field initializers
+     * (isActive = true, audience18Plus = false) run first and a "!= null" guard
+     * then sees those defaults rather than null — an isActive-only PUT silently
+     * reset audience18Plus to false, and an audience18Plus-only PUT silently
+     * reactivated a deactivated mapping. containsKey is the only guard that can
+     * tell "not sent" from "sent as false".
+     */
     @PutMapping("/update/{id}")
     @PreAuthorize("@auth.allows('assessment_institute_mapping.update')")
     public ResponseEntity<?> updateMapping(@PathVariable Long id,
-            @RequestBody AssessmentInstituteMapping updated) {
+            @RequestBody Map<String, Object> req) {
         Optional<AssessmentInstituteMapping> existingOpt = mappingRepository.findById(id);
         if (!existingOpt.isPresent()) {
             return ResponseEntity.notFound().build();
         }
 
         AssessmentInstituteMapping existing = existingOpt.get();
-        if (updated.getIsActive() != null) {
-            existing.setIsActive(updated.getIsActive());
+        if (req.containsKey("isActive")) {
+            existing.setIsActive(toBool(req.get("isActive")));
         }
-        if (updated.getAmount() != null) {
-            existing.setAmount(updated.getAmount());
+        if (req.containsKey("amount")) {
+            existing.setAmount(toLong(req.get("amount")));
+        }
+        if (req.containsKey("audience18Plus")) {
+            existing.setAudience18Plus(toBool(req.get("audience18Plus")));
         }
 
         return ResponseEntity.ok(mappingRepository.save(existing));
+    }
+
+    /** Tolerant boolean coercion so a string/number "isActive" from JSON no longer 500s. */
+    private static Boolean toBool(Object o) {
+        if (o == null) return null;
+        if (o instanceof Boolean) return (Boolean) o;
+        return Boolean.parseBoolean(o.toString().trim());
+    }
+
+    /** Tolerant long coercion: JSON may deliver amount as Integer, Double or String. */
+    private static Long toLong(Object o) {
+        if (o == null) return null;
+        if (o instanceof Number) return ((Number) o).longValue();
+        String s = o.toString().trim();
+        if (s.isEmpty()) return null;
+        return (long) Double.parseDouble(s);
     }
 
     @DeleteMapping("/delete/{id}")
@@ -690,6 +721,9 @@ public class AssessmentInstituteMappingController {
             info.put("isSchool", institute.getIsSchool());
         }
         info.put("branding", brandingService.forInstitute(institute));
+        // 18+ cohort on this mapping row → the registration page shows adult
+        // self-consent wording and "Your Email/Phone" instead of the parental copy.
+        info.put("audience18Plus", Boolean.TRUE.equals(mapping.getAudience18Plus()));
 
         // Coordinates already fixed on the mapping.
         if (mapping.getSessionId() != null) {
@@ -2113,6 +2147,9 @@ public class AssessmentInstituteMappingController {
             info.put("isSchool", institute.getIsSchool());
         }
         info.put("branding", brandingService.forInstitute(institute));
+        // 18+ cohort on the underlying mapping row → adult self-consent wording
+        // and "Your Email/Phone" on the invite page.
+        info.put("audience18Plus", Boolean.TRUE.equals(mapping.getAudience18Plus()));
 
         info.put("tierName", tier.getName());
         // Effective price = invite's custom amount if set, else the tier's base price.

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import Select, { GroupBase } from "react-select";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 import { ActionIcon } from "../../../components/ActionIcon";
 import permissionRoutesManifest from "../../../permissions-manifest.json";
@@ -9,10 +8,16 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 type CodeToRoutes = Record<string, string[]>;
 
-interface RouteOption {
-  label: string;          // displayed path
-  value: string;          // the path itself
-  perm: string;           // the permission code this route is gated by
+interface CatalogPage {
+  path: string;   // route path exactly as registered
+  perm: string;   // the ONE permission gating this route
+  title: string;  // humanized display name
+  group: string;  // display group (first path segment) — display only, no bundling
+}
+
+interface PermissionRow {
+  code: string;
+  description?: string | null;
 }
 
 interface Props {
@@ -23,75 +28,123 @@ interface Props {
 }
 
 /**
- * URL whitelist editor for a single role. Admin picks paths primarily from
- * the build-time-generated route catalog (permissions-manifest.json), with
- * an escape hatch for typing custom paths (wildcards/dynamic segments that
- * need broader matching than a literal route).
+ * Page Access — THE single page catalog for a role.
  *
- * Backend gate runs as an intersection alongside the role's permissions:
- *   user can visit X iff (some role's perm matches X's <RequirePermission>)
- *                       AND (some role's URL list matches X's path)
+ * One checkbox per page route. The catalog is auto-populated from
+ * permissions-manifest.json, which `npm run gen:perms` (wired into
+ * prestart/prebuild) regenerates from PrivateRoutes.tsx — so a new
+ * <Route path=".." element={<RequirePermission perm="..">..} appears here on
+ * the next dev-server start with zero manual seeding.
+ *
+ * Checking a page grants BOTH sides of the route gate in one act:
+ *   - the page URL into the role's whitelist (role_url), and
+ *   - the page's gating permission (role_permission).
+ * Expanding a checked page shows ONLY that page's permission resource
+ * (sibling codes of the gating permission, e.g. report_template.*) so each
+ * page's action permissions are set right there — no prefix-group
+ * select-alls, no cross-page bundling, no silent expansion.
+ *
+ * When one permission gates several routes (e.g. a wizard's steps), the row
+ * says so explicitly — that sharing is a property of the permission scheme
+ * and is surfaced, never hidden.
  */
 const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
-  const routesMap = permissionRoutesManifest as CodeToRoutes;
+  const manifest = permissionRoutesManifest as CodeToRoutes;
 
-  // Build a flat catalog of {path, perm} from the manifest; group by perm.
-  // Same grouped-select pattern as RolePermissionsModal.
-  const grouped: GroupBase<RouteOption>[] = useMemo(() => {
-    const buckets: Record<string, RouteOption[]> = {};
-    for (const [perm, paths] of Object.entries(routesMap)) {
+  // ── Catalog (derived from the generated manifest — single source of truth)
+  const pages: CatalogPage[] = useMemo(() => {
+    const out: CatalogPage[] = [];
+    for (const [perm, paths] of Object.entries(manifest)) {
       for (const p of paths) {
-        const group = perm.indexOf(".") > 0 ? perm.slice(0, perm.indexOf(".")) : "(other)";
-        if (!buckets[group]) buckets[group] = [];
-        buckets[group].push({ label: p, value: p, perm });
+        out.push({ path: p, perm, title: pageTitle(p), group: pageGroup(p) });
       }
     }
-    return Object.keys(buckets)
-      .sort((a, b) => (a === "(other)" ? 1 : b === "(other)" ? -1 : a.localeCompare(b)))
-      .map((name) => ({
-        label: prettifyGroupName(name) + ` (${buckets[name].length})`,
-        options: buckets[name].sort((a, b) => a.value.localeCompare(b.value)),
-      }));
-  }, [routesMap]);
+    return out.sort((a, b) =>
+      a.group === b.group ? a.path.localeCompare(b.path) : a.group.localeCompare(b.group)
+    );
+  }, [manifest]);
 
+  const catalogPathSet = useMemo(() => new Set(pages.map((p) => p.path)), [pages]);
+
+  // How many catalog pages share each gating permission (to surface sharing).
+  const permPageCount = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of pages) m.set(p.perm, (m.get(p.perm) || 0) + 1);
+    return m;
+  }, [pages]);
+
+  // ── State
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [initialPaths, setInitialPaths] = useState<Set<string>>(new Set());
+  const [rolePerms, setRolePerms] = useState<Set<string>>(new Set());
+  const [permCatalog, setPermCatalog] = useState<PermissionRow[]>([]);
+  // Explicit sibling-permission toggles made in this session (code → on/off).
+  const [permOverrides, setPermOverrides] = useState<Record<string, boolean>>({});
+  const [expandedPath, setExpandedPath] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const [customInput, setCustomInput] = useState("");
   const [customError, setCustomError] = useState("");
 
   useEffect(() => {
     if (!show || !role) return;
     setLoading(true);
+    setSearch("");
     setCustomInput("");
     setCustomError("");
-    axios
-      .get<string[]>(`${API_URL}/role/${role.id}/urls`)
-      .then((res) => setSelectedPaths(new Set(res.data || [])))
+    setPermOverrides({});
+    setExpandedPath(null);
+    Promise.all([
+      axios.get<string[]>(`${API_URL}/role/${role.id}/urls`),
+      axios.get<string[]>(`${API_URL}/role/${role.id}/permissions`),
+      axios.get<PermissionRow[]>(`${API_URL}/permission/getAll`),
+    ])
+      .then(([urlsRes, permsRes, catRes]) => {
+        const paths = new Set(urlsRes.data || []);
+        setSelectedPaths(paths);
+        setInitialPaths(new Set(paths));
+        setRolePerms(new Set(permsRes.data || []));
+        setPermCatalog(catRes.data || []);
+      })
       .catch(() => {
         setSelectedPaths(new Set());
-        showErrorToast("Failed to load role URLs");
+        setInitialPaths(new Set());
+        setRolePerms(new Set());
+        setPermCatalog([]);
+        showErrorToast("Failed to load role access");
       })
       .finally(() => setLoading(false));
   }, [show, role]);
 
-  // Split selected paths into "in catalog" (renderable as Select chips) and
-  // "custom" (free-form additions the manifest doesn't know about).
-  const allCatalogPaths = useMemo(() => {
-    const set = new Set<string>();
-    for (const g of grouped) for (const o of g.options) set.add(o.value);
-    return set;
-  }, [grouped]);
-
-  const catalogSelected: RouteOption[] = useMemo(() => {
-    const flat = grouped.flatMap((g) => g.options);
-    return flat.filter((o) => selectedPaths.has(o.value));
-  }, [grouped, selectedPaths]);
-
   const customPaths = useMemo(
-    () => Array.from(selectedPaths).filter((p) => !allCatalogPaths.has(p)),
-    [selectedPaths, allCatalogPaths]
+    () => Array.from(selectedPaths).filter((p) => !catalogPathSet.has(p)).sort(),
+    [selectedPaths, catalogPathSet]
   );
+
+  const isPermOn = (code: string): boolean =>
+    permOverrides[code] !== undefined ? permOverrides[code] : rolePerms.has(code);
+
+  // Sibling permissions of a page = catalog codes sharing the gating
+  // permission's resource (code minus its last segment). Only these are shown
+  // on the page row — "that page's permissions and that only".
+  const siblingsOf = (perm: string): PermissionRow[] => {
+    const resource = resourceOf(perm);
+    return permCatalog
+      .filter((p) => p.code !== perm && resourceOf(p.code) === resource)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  };
+
+  const togglePage = (page: CatalogPage) => {
+    const next = new Set(selectedPaths);
+    if (next.has(page.path)) {
+      next.delete(page.path);
+      if (expandedPath === page.path) setExpandedPath(null);
+    } else {
+      next.add(page.path);
+    }
+    setSelectedPaths(next);
+  };
 
   const handleAddCustom = () => {
     const v = customInput.trim();
@@ -117,16 +170,32 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
     setSelectedPaths(next);
   };
 
-  // Toggle every catalog route in a group on/off in one click. Custom paths are
-  // untouched — they live outside the catalog groups.
-  const handleSelectAllGroup = (groupOpts: RouteOption[]) => {
-    const allOn = groupOpts.every((o) => selectedPaths.has(o.value));
-    const next = new Set(selectedPaths);
-    for (const o of groupOpts) {
-      if (allOn) next.delete(o.value);
-      else next.add(o.value);
+  // Final permission codes: role's current codes, plus this session's explicit
+  // sibling toggles, with gating perms following the page checkboxes —
+  // added for every checked page; removed only when a page that WAS checked
+  // got unchecked and no still-checked page needs that perm. Codes not
+  // touched by any of the above pass through untouched (backend-only grants
+  // made in the advanced Permissions modal are never silently revoked here).
+  const computeFinalCodes = (): string[] => {
+    const final = new Set(rolePerms);
+    for (const [code, on] of Object.entries(permOverrides)) {
+      if (on) final.add(code);
+      else final.delete(code);
     }
-    setSelectedPaths(next);
+    const requiredPerms = new Set(
+      pages.filter((p) => selectedPaths.has(p.path)).map((p) => p.perm)
+    );
+    for (const perm of Array.from(requiredPerms)) final.add(perm);
+    for (const page of pages) {
+      if (
+        !selectedPaths.has(page.path) &&
+        initialPaths.has(page.path) &&
+        !requiredPerms.has(page.perm)
+      ) {
+        final.delete(page.perm);
+      }
+    }
+    return Array.from(final).sort();
   };
 
   const handleSave = async () => {
@@ -136,17 +205,40 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
       await axios.put(`${API_URL}/role/${role.id}/urls`, {
         paths: Array.from(selectedPaths),
       });
-      showSuccessToast(`URL access updated for ${role.name}`);
+      await axios.put(`${API_URL}/role/${role.id}/permissions`, {
+        codes: computeFinalCodes(),
+      });
+      showSuccessToast(`Page access updated for ${role.name}`);
       onSaved?.();
       onHide();
     } catch {
-      showErrorToast("Failed to update URL access");
+      showErrorToast("Failed to update page access");
     } finally {
       setSaving(false);
     }
   };
 
   if (!show || !role) return null;
+
+  const q = search.trim().toLowerCase();
+  const visiblePages = q
+    ? pages.filter(
+        (p) =>
+          p.path.toLowerCase().includes(q) ||
+          p.title.toLowerCase().includes(q) ||
+          p.perm.toLowerCase().includes(q)
+      )
+    : pages;
+
+  // Display grouping only — a group header carries no toggle on purpose.
+  const groupedPages: { group: string; items: CatalogPage[] }[] = [];
+  for (const p of visiblePages) {
+    const last = groupedPages[groupedPages.length - 1];
+    if (last && last.group === p.group) last.items.push(p);
+    else groupedPages.push({ group: p.group, items: [p] });
+  }
+
+  const checkedCount = pages.filter((p) => selectedPaths.has(p.path)).length;
 
   return (
     <div
@@ -159,7 +251,7 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
     >
       <div
         style={{
-          backgroundColor: "#fff", borderRadius: "16px", maxWidth: "780px",
+          backgroundColor: "#fff", borderRadius: "16px", maxWidth: "860px",
           width: "94%", maxHeight: "88vh", display: "flex", flexDirection: "column",
           boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
         }}
@@ -172,23 +264,16 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
         }}>
           <div>
             <h6 className="mb-0 text-white fw-bold" style={{ fontSize: "1rem" }}>
-              <i className="bi bi-globe me-2"></i>URL Access
+              <i className="bi bi-columns-gap me-2"></i>Page Access
             </h6>
             <p className="mb-0 text-white" style={{ fontSize: "0.82rem", opacity: 0.85 }}>
-              {role.name}
+              {role.name} — check a page to grant its URL + its permission together
             </p>
           </div>
           <button type="button" className="btn-close btn-close-white" onClick={onHide}></button>
         </div>
 
         <div style={{ padding: "1rem 1.5rem", overflowY: "auto", flex: 1 }}>
-          <p style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: "0.5rem" }}>
-            Pick which React routes this role unlocks. Users see a screen only
-            if BOTH the permission gate and at least one of their roles'
-            URL list pass (intersection). Use <code>:id</code> for parametric
-            segments and <code>/x/*</code> for prefix wildcards.
-          </p>
-
           {loading ? (
             <div className="text-center py-4">
               <div className="spinner-border spinner-border-sm text-primary"></div>
@@ -196,55 +281,160 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
             </div>
           ) : (
             <>
-              <label className="form-label fw-bold" style={{ fontSize: "0.85rem" }}>
-                Catalog routes
-              </label>
-              <Select<RouteOption, true, GroupBase<RouteOption>>
-                isMulti
-                closeMenuOnSelect={false}
-                options={grouped}
-                value={catalogSelected}
-                onChange={(opts) => {
-                  const nextCatalog = new Set((opts || []).map((o) => o.value));
-                  // Preserve any custom paths that aren't in the catalog.
-                  const next = new Set<string>(customPaths);
-                  for (const p of Array.from(nextCatalog)) next.add(p);
-                  setSelectedPaths(next);
-                }}
-                placeholder="Choose routes from the catalog..."
-                noOptionsMessage={() => "No routes available"}
-                formatGroupLabel={(g) => (
-                  <UrlGroupHeader
-                    label={g.label}
-                    onToggle={() => handleSelectAllGroup(g.options as RouteOption[])}
-                    selectedCount={(g.options as RouteOption[]).filter((o) => selectedPaths.has(o.value)).length}
-                    totalCount={g.options.length}
-                  />
-                )}
-                formatOptionLabel={(opt) => (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontFamily: "monospace", fontWeight: 600 }}>{opt.value}</span>
-                    <span style={{
-                      fontSize: "0.7rem", fontWeight: 600,
-                      padding: "2px 8px", borderRadius: 999,
-                      background: "#fef3c7", color: "#92400e",
-                    }}>
-                      gated by <code style={{ background: "transparent" }}>{opt.perm}</code>
-                    </span>
-                  </div>
-                )}
-                menuPortalTarget={typeof document !== "undefined" ? document.body : null}
-                menuPosition="fixed"
-                styles={{
-                  control: (base) => ({ ...base, borderRadius: "8px", fontSize: "0.85rem", minHeight: "42px" }),
-                  multiValue: (base) => ({ ...base, fontSize: "0.78rem", fontFamily: "monospace" }),
-                  valueContainer: (base) => ({ ...base, maxHeight: "200px", overflowY: "auto" }),
-                  menuPortal: (base) => ({ ...base, zIndex: 10000 }),
-                  menu: (base) => ({ ...base, zIndex: 10000 }),
-                  // Custom header (formatGroupLabel) owns its own padding/bg.
-                  groupHeading: (base) => ({ ...base, padding: 0, marginBottom: 0 }),
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Search pages, paths or permissions…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  borderRadius: 8, border: "1px solid #d1d5db",
+                  fontSize: "0.85rem", marginBottom: 12,
                 }}
               />
+
+              {groupedPages.map(({ group, items }) => (
+                <div key={group} style={{ marginBottom: 10 }}>
+                  <div style={{
+                    fontSize: "0.72rem", fontWeight: 700, color: "#6b7280",
+                    textTransform: "uppercase", letterSpacing: "0.5px",
+                    padding: "6px 2px",
+                  }}>
+                    {group}
+                  </div>
+                  {items.map((page) => {
+                    const checked = selectedPaths.has(page.path);
+                    const expanded = expandedPath === page.path;
+                    const shared = (permPageCount.get(page.perm) || 1) > 1;
+                    const siblings = expanded ? siblingsOf(page.perm) : [];
+                    return (
+                      <div
+                        key={page.path}
+                        style={{
+                          border: `1px solid ${checked ? "#a5f3fc" : "#f1f5f9"}`,
+                          background: checked ? "#f0fdff" : "#fff",
+                          borderRadius: 10, marginBottom: 6,
+                        }}
+                      >
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "8px 12px",
+                        }}>
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={checked}
+                            onChange={() => togglePage(page)}
+                            style={{ cursor: "pointer", flexShrink: 0, marginTop: 0 }}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#111827" }}>
+                              {page.title}
+                            </div>
+                            <div style={{
+                              fontFamily: "monospace", fontSize: "0.74rem",
+                              color: "#6b7280", overflow: "hidden",
+                              textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}>
+                              {page.path}
+                            </div>
+                          </div>
+                          <span
+                            title={
+                              shared
+                                ? `This permission also gates ${(permPageCount.get(page.perm) || 1) - 1} other page(s) — granting it here unlocks those too`
+                                : "Permission gating this page"
+                            }
+                            style={{
+                              fontSize: "0.68rem", fontWeight: 600,
+                              padding: "2px 8px", borderRadius: 999, flexShrink: 0,
+                              background: shared ? "#fef3c7" : "#e0f2fe",
+                              color: shared ? "#92400e" : "#075985",
+                              fontFamily: "monospace",
+                            }}
+                          >
+                            {page.perm}{shared ? " ⚠" : ""}
+                          </span>
+                          {checked && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedPath(expanded ? null : page.path)}
+                              title="Set this page's permissions"
+                              style={{
+                                background: "transparent", border: "none",
+                                color: "#0891b2", cursor: "pointer",
+                                fontSize: "0.78rem", fontWeight: 600,
+                                flexShrink: 0, whiteSpace: "nowrap",
+                              }}
+                            >
+                              {expanded ? "Hide perms ▲" : "Page perms ▼"}
+                            </button>
+                          )}
+                        </div>
+
+                        {checked && expanded && (
+                          <div style={{
+                            borderTop: "1px dashed #bae6fd",
+                            padding: "8px 12px 10px 34px",
+                          }}>
+                            <div style={{
+                              display: "flex", alignItems: "center", gap: 8,
+                              fontSize: "0.78rem", marginBottom: 6,
+                            }}>
+                              <input type="checkbox" className="form-check-input" checked disabled style={{ marginTop: 0 }} />
+                              <code style={{ fontSize: "0.74rem" }}>{page.perm}</code>
+                              <span style={{ color: "#9ca3af", fontSize: "0.7rem" }}>
+                                required — granted with the page
+                              </span>
+                            </div>
+                            {siblings.length === 0 ? (
+                              <div style={{ fontSize: "0.74rem", color: "#9ca3af" }}>
+                                No other permissions exist for this page's resource.
+                              </div>
+                            ) : (
+                              siblings.map((s) => (
+                                <label
+                                  key={s.code}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: 8,
+                                    fontSize: "0.78rem", marginBottom: 4,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="form-check-input"
+                                    checked={isPermOn(s.code)}
+                                    onChange={() =>
+                                      setPermOverrides((prev) => ({
+                                        ...prev,
+                                        [s.code]: !isPermOn(s.code),
+                                      }))
+                                    }
+                                    style={{ marginTop: 0 }}
+                                  />
+                                  <code style={{ fontSize: "0.74rem" }}>{s.code}</code>
+                                  {s.description && (
+                                    <span style={{ color: "#6b7280", fontSize: "0.72rem" }}>
+                                      {s.description}
+                                    </span>
+                                  )}
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {visiblePages.length === 0 && (
+                <div style={{ color: "#9ca3af", fontSize: "0.85rem", padding: "12px 0" }}>
+                  No pages match "{search}".
+                </div>
+              )}
 
               <div style={{ marginTop: "1rem" }}>
                 <label className="form-label fw-bold" style={{ fontSize: "0.85rem" }}>
@@ -325,109 +515,68 @@ const RoleUrlsModal = ({ show, onHide, role, onSaved }: Props) => {
                   </div>
                 )}
               </div>
-
-              <div style={{ marginTop: "0.75rem", fontSize: "0.75rem", color: "#9ca3af" }}>
-                {selectedPaths.size} path{selectedPaths.size === 1 ? "" : "s"} selected
-              </div>
             </>
           )}
         </div>
 
-        <div style={{ padding: "0.75rem 1.5rem", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-          <button className="btn btn-sm btn-light" onClick={onHide} style={{ borderRadius: "6px" }}>Cancel</button>
-          <button
-            className="btn btn-sm"
-            onClick={handleSave}
-            disabled={saving || loading}
-            style={{
-              background: "linear-gradient(135deg, #0891b2 0%, #0e7490 100%)",
-              color: "#fff", border: "none", borderRadius: "6px", fontWeight: 600, padding: "6px 16px",
-            }}
-          >
-            {saving ? (
-              <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</>
-            ) : (
-              <><ActionIcon type="approve" size="sm" className="me-1" />Save</>
-            )}
-          </button>
+        <div style={{
+          padding: "0.75rem 1.5rem", borderTop: "1px solid #f3f4f6",
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px",
+        }}>
+          <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>
+            {checkedCount} page{checkedCount === 1 ? "" : "s"}
+            {customPaths.length > 0 ? ` + ${customPaths.length} custom` : ""} selected
+          </span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-sm btn-light" onClick={onHide} style={{ borderRadius: "6px" }}>Cancel</button>
+            <button
+              className="btn btn-sm"
+              onClick={handleSave}
+              disabled={saving || loading}
+              style={{
+                background: "linear-gradient(135deg, #0891b2 0%, #0e7490 100%)",
+                color: "#fff", border: "none", borderRadius: "6px", fontWeight: 600, padding: "6px 16px",
+              }}
+            >
+              {saving ? (
+                <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</>
+              ) : (
+                <><ActionIcon type="approve" size="sm" className="me-1" />Save</>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// ── Group header with click-to-toggle-all (mirrors RolePermissionsModal) ──────
-interface UrlGroupHeaderProps {
-  label: string;
-  onToggle: () => void;
-  selectedCount: number;
-  totalCount: number;
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+/** "report_template.read" → "report_template"; "dashboard.school.release" → "dashboard.school" */
+function resourceOf(code: string): string {
+  const i = code.lastIndexOf(".");
+  return i > 0 ? code.slice(0, i) : code;
 }
-const UrlGroupHeader = ({ label, onToggle, selectedCount, totalCount }: UrlGroupHeaderProps) => {
-  const allOn = selectedCount === totalCount && totalCount > 0;
-  const someOn = selectedCount > 0 && !allOn;
-  return (
-    <div
-      onClick={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        onToggle();
-      }}
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "6px 12px",
-        background: "#f3f4f6",
-        cursor: "pointer",
-        fontSize: "0.78rem",
-        fontWeight: 700,
-        color: "#374151",
-        textTransform: "uppercase",
-        letterSpacing: "0.5px",
-        userSelect: "none",
-      }}
-      title={allOn ? "Click to clear all in this group" : "Click to select all in this group"}
-    >
-      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <GroupCheckbox allOn={allOn} someOn={someOn} />
-        <span>{label}</span>
-      </span>
-      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: allOn ? "#059669" : someOn ? "#d97706" : "#9ca3af" }}>
-        {allOn ? "All selected" : someOn ? `${selectedCount} of ${totalCount} · select all` : "Select all"}
-      </span>
-    </div>
-  );
-};
 
-// Tri-state checkbox glyph: empty / dash (some) / check (all). Visual only.
-const GroupCheckbox = ({ allOn, someOn }: { allOn: boolean; someOn: boolean }) => (
-  <span
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      width: 16,
-      height: 16,
-      borderRadius: 4,
-      border: `1.5px solid ${allOn || someOn ? "#0891b2" : "#9ca3af"}`,
-      background: allOn || someOn ? "#0891b2" : "#fff",
-      color: "#fff",
-      fontSize: "0.7rem",
-      lineHeight: 1,
-      flexShrink: 0,
-    }}
-  >
-    {allOn ? "✓" : someOn ? "–" : ""}
-  </span>
-);
+function humanize(seg: string): string {
+  return seg
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
-function prettifyGroupName(g: string): string {
-  if (g === "(other)") return "(other)";
-  return g
-    .split("_")
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(" ");
+/** "/admin/report-templates" → "Report Templates"; "/assessments/create/step-2" → "Assessments Create Step 2" */
+function pageTitle(path: string): string {
+  const segs = path
+    .split("/")
+    .filter((s) => s && !s.startsWith(":") && s !== "*");
+  if (segs.length === 0) return path;
+  return segs.map(humanize).join(" ");
+}
+
+function pageGroup(path: string): string {
+  const seg = path.split("/").filter(Boolean)[0] || "(root)";
+  return humanize(seg);
 }
 
 export default RoleUrlsModal;

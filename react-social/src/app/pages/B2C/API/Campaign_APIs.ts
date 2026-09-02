@@ -33,6 +33,7 @@ export interface CampaignAssessmentRow {
   description?: string | null;
   isActive?: boolean;
   sortOrder?: number;
+  audience18Plus?: boolean;
   tiers?: CampaignAssessmentTier[];
 }
 
@@ -57,6 +58,7 @@ export interface CampaignClassRoute {
   className?: string | null;
   sortOrder?: number;
   isActive?: boolean;
+  audience18Plus?: boolean;
 }
 
 export interface CampaignClassOption {
@@ -105,6 +107,7 @@ export const attachAssessment = (campaignId: number, body: {
   purchasePath?: "A" | "B" | null;
   counsellingModel?: "1" | "2" | null;
   sortOrder?: number;
+  audience18Plus?: boolean;
 }) => axios.post(`${API_URL}/campaign/${campaignId}/assessment`, body);
 
 export const updateAssessmentMapping = (mappingId: number, body: {
@@ -113,6 +116,7 @@ export const updateAssessmentMapping = (mappingId: number, body: {
   description?: string | null;
   sortOrder?: number;
   isActive?: boolean;
+  audience18Plus?: boolean;
 }) => axios.put(`${API_URL}/campaign/assessment/${mappingId}`, body);
 
 export const detachAssessment = (mappingId: number) =>
@@ -138,6 +142,7 @@ export const upsertClassRoute = (campaignId: number, body: {
   assessmentId: number;
   sortOrder?: number;
   isActive?: boolean;
+  audience18Plus?: boolean;
 }) => axios.post(`${API_URL}/campaign/${campaignId}/class`, body);
 
 export const deleteClassRoute = (routeId: number) =>

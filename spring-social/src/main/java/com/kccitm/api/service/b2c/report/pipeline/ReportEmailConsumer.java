@@ -40,6 +40,9 @@ public class ReportEmailConsumer {
     @Autowired private ReportEmailComposer composer;
     @Autowired private com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository
             serviceDeliveryLogRepository;
+    /** Optional: "Your Next Step" counselling CTA; absent where counselling isn't wired. */
+    @Autowired(required = false)
+    private com.kccitm.api.service.counselling.CounsellingBookingLinkService bookingLinkService;
 
     @RetryableTopic(
             attempts = "${report.pipeline.max-attempts:5}",
@@ -94,6 +97,13 @@ public class ReportEmailConsumer {
                 } catch (Exception ex) {
                     logger.warn("PDF fetch failed; sending link-only student={}: {}", ev.userStudentId, ex.getMessage());
                 }
+            }
+            // "Your Next Step" CTA: offer counselling booking when it's available to this
+            // student and they haven't booked yet. Best-effort at send time — the booking
+            // page itself is the authoritative already-booked check on every open.
+            if (bookingLinkService != null) {
+                ev.bookingUrl = bookingLinkService.bookingUrlIfEligible(
+                        ev.userStudentId, ev.assessmentId, ev.entitlementId);
             }
             rateLimiter.acquire();
             emailSender.sendReportEmail(ev, pdf);

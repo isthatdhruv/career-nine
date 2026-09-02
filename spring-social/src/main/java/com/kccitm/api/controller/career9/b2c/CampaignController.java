@@ -325,6 +325,8 @@ public class CampaignController {
         m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
         if (req.containsKey("description")) m.setDescription(normalizeDescription((String) req.get("description")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
+        // Guarded so reviving a soft-deleted attachment keeps its prior 18+ setting.
+        if (req.containsKey("audience18Plus")) m.setAudience18Plus(toBool(req.get("audience18Plus")));
         CampaignAssessmentMapping savedMapping = mappingRepository.save(m);
         // Keep the institute<->assessment catalog in sync: an assessment attached to an
         // institute-tied campaign is one that institute now has, so it shows in Reports
@@ -347,6 +349,7 @@ public class CampaignController {
         if (req.containsKey("description")) m.setDescription(normalizeDescription((String) req.get("description")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
         if (req.containsKey("isActive")) m.setIsActive(toBool(req.get("isActive")));
+        if (req.containsKey("audience18Plus")) m.setAudience18Plus(toBool(req.get("audience18Plus")));
         return ResponseEntity.ok(mappingRepository.save(m));
     }
 
@@ -492,6 +495,7 @@ public class CampaignController {
         if (req.containsKey("sessionId")) route.setSessionId(toInt(req.get("sessionId")));
         if (req.containsKey("sortOrder")) route.setSortOrder(toInt(req.get("sortOrder")));
         if (req.containsKey("isActive")) route.setIsActive(toBool(req.get("isActive")));
+        if (req.containsKey("audience18Plus")) route.setAudience18Plus(toBool(req.get("audience18Plus")));
         route.setIsDeleted(false);
         if (route.getIsActive() == null) route.setIsActive(true);
         return ResponseEntity.ok(classRouteRepository.save(route));
@@ -549,6 +553,10 @@ public class CampaignController {
             route.setClassId(cfg.getClassId());
             route.setSessionId(sessionId);
             route.setAssessmentId(cfg.getAssessmentId());
+            // Carry the school row's 18+ audience over; a college cohort imported from
+            // school config must not silently revert to the parental-consent copy.
+            // Import is authoritative: the school row's 18+ flag overwrites any hand-set route flag (same as assessmentId/isActive above).
+            route.setAudience18Plus(Boolean.TRUE.equals(cfg.getAudience18Plus()));
             route.setIsDeleted(false);
             route.setIsActive(true);
             classRouteRepository.save(route);
@@ -625,6 +633,7 @@ public class CampaignController {
             row.put("description", m.getDescription());
             row.put("isActive", m.getIsActive());
             row.put("sortOrder", m.getSortOrder());
+            row.put("audience18Plus", Boolean.TRUE.equals(m.getAudience18Plus()));
             List<CampaignAssessmentTier> tiers = tierMappingRepository
                     .findByCampaignAssessmentMappingIdOrderByIdAsc(m.getId());
             row.put("tiers", tiers);
@@ -646,6 +655,7 @@ public class CampaignController {
             rr.put("assessmentId", r.getAssessmentId());
             rr.put("sortOrder", r.getSortOrder());
             rr.put("isActive", r.getIsActive());
+            rr.put("audience18Plus", Boolean.TRUE.equals(r.getAudience18Plus()));
             SchoolClasses sc = r.getClassId() != null
                     ? schoolClassesRepository.findById(r.getClassId()).orElse(null) : null;
             rr.put("className", sc != null ? sc.getClassName() : null);

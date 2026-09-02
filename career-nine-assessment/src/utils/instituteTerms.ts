@@ -28,3 +28,30 @@ const COLLEGE_TERMS: InstituteTerms = {
 export function getInstituteTerms(isSchool?: boolean | null): InstituteTerms {
   return isSchool === false ? COLLEGE_TERMS : SCHOOL_TERMS;
 }
+
+/**
+ * Contact-field wording on the registration forms. A cohort flagged
+ * `audience18Plus` (per class route / mapping row) registers the student
+ * themselves, so the email and phone collected are the student's own.
+ * `adult` null/undefined/false (legacy rows, minors) keeps the parent wording.
+ */
+export interface ContactTerms {
+  /** "Parent's Email" / "Your Email" */
+  emailLabel: string;
+  /** "Parent's Phone" / "Your Phone" */
+  phoneLabel: string;
+}
+
+const MINOR_CONTACT_TERMS: ContactTerms = {
+  emailLabel: "Parent's Email",
+  phoneLabel: "Parent's Phone",
+};
+
+const ADULT_CONTACT_TERMS: ContactTerms = {
+  emailLabel: "Your Email",
+  phoneLabel: "Your Phone",
+};
+
+export function contactTerms(adult?: boolean | null): ContactTerms {
+  return adult === true ? ADULT_CONTACT_TERMS : MINOR_CONTACT_TERMS;
+}

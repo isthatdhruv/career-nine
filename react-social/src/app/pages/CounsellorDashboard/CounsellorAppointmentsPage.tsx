@@ -1075,7 +1075,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                                 className='cp-action-btn cp-action-btn-primary'
                                 style={{ textDecoration: 'none', display: 'inline-block' }}
                               >
-                                Join Teams meeting
+                                Join meeting
                               </a>
                             )}
                             <input
@@ -1183,7 +1183,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                                 cursor: win.open ? 'pointer' : 'not-allowed',
                               }}
                             >
-                              Join Teams meeting
+                              Join meeting
                             </a>
                           )
                         })()}

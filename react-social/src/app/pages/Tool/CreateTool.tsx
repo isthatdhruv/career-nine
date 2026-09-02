@@ -6,9 +6,12 @@ import { ToolTable } from "./components";
 import PageHeader from "../../components/PageHeader";
 
 const ToolPage = () => {
-  const { data: toolsData = [], isLoading: loading } = useTools<any>();
+  const { data: toolsData = [], isLoading } = useTools<any>();
   const queryClient = useQueryClient();
   const [pageLoading, setPageLoading] = useState(["false"]);
+  // Busy state for the table's delete action (ToolTable calls setLoading around it).
+  const [deleting, setDeleting] = useState(false);
+  const loading = isLoading || deleting;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -57,7 +60,7 @@ const ToolPage = () => {
           <div style={{ padding: "16px" }}>
             <ToolTable
               data={toolsData}
-              setLoading={setLoading}
+              setLoading={setDeleting}
               setPageLoading={setPageLoading}
             />
           </div>

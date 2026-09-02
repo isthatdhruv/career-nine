@@ -4,6 +4,7 @@ import '../Counselling.css'
 import {
   getStudentsByInstitute,
   setCounsellingAllowed,
+  sendBookingLink,
   ManagedStudent,
 } from '../API/StudentManagementAPI'
 import {
@@ -72,6 +73,7 @@ const ManageStudentsPage: React.FC = () => {
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportsError, setReportsError] = useState<string | null>(null)
   const [reportTogglingId, setReportTogglingId] = useState<number | null>(null)
+  const [sendingLinkId, setSendingLinkId] = useState<number | null>(null)
 
   const showSuccess = (msg: string) => {
     setSuccess(msg)
@@ -129,6 +131,21 @@ const ManageStudentsPage: React.FC = () => {
       setError('Failed to update counselling access.')
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  const handleSendBookingLink = async (s: ManagedStudent) => {
+    setSendingLinkId(s.userStudentId)
+    setError(null)
+    setSuccess(null)
+    try {
+      const res = await sendBookingLink(s.userStudentId)
+      setSuccess(`Booking link emailed to ${res.data.sentTo}`)
+    } catch (e: any) {
+      const body = e?.response?.data
+      setError(typeof body === 'string' && body ? body : body?.error || 'Could not send the booking link.')
+    } finally {
+      setSendingLinkId(null)
     }
   }
 
@@ -251,7 +268,7 @@ const ManageStudentsPage: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--sp-border, #D1E5DF)' }}>
-                {['Name', 'Grade', 'Allow Counselling', 'Show Reports'].map((col) => (
+                {['Name', 'Grade', 'Allow Counselling', 'Show Reports', 'Booking Link'].map((col) => (
                   <th key={col} style={{
                     padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: 12,
                     color: 'var(--sp-muted, #5C7A72)', textTransform: 'uppercase', letterSpacing: '0.04em',
@@ -305,6 +322,26 @@ const ManageStudentsPage: React.FC = () => {
                       }}
                     >
                       Show Reports
+                    </button>
+                  </td>
+                  <td style={{ padding: '12px 14px' }}>
+                    <button
+                      onClick={() => handleSendBookingLink(s)}
+                      disabled={sendingLinkId === s.userStudentId}
+                      title="Email the student a no-login link to book their counselling session"
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        borderRadius: 8,
+                        border: '1px solid #0C6B5A',
+                        background: sendingLinkId === s.userStudentId ? '#E6F2EF' : '#0C6B5A',
+                        color: sendingLinkId === s.userStudentId ? '#0C6B5A' : '#fff',
+                        cursor: sendingLinkId === s.userStudentId ? 'wait' : 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {sendingLinkId === s.userStudentId ? 'Sending…' : 'Email Booking Link'}
                     </button>
                   </td>
                 </tr>

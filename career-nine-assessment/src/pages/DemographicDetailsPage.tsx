@@ -80,8 +80,10 @@ const DemographicDetailsPage: React.FC = () => {
   const fetchContactInfo = async () => {
     try {
       const res = await http.get(`/student-demographics/contact-info/${userStudentId}`);
-      setContactEmail(res.data.email || '');
-      setContactPhone(res.data.phoneNumber || '');
+      // Prefill only — never clobber something the student already typed while
+      // the request was in flight on a slow connection.
+      setContactEmail((prev) => (prev.trim() ? prev : res.data.email || ''));
+      setContactPhone((prev) => (prev.trim() ? prev : res.data.phoneNumber || ''));
     } catch (error) {
       console.error('Error fetching contact info:', error);
     }
@@ -528,7 +530,7 @@ const DemographicDetailsPage: React.FC = () => {
             {fieldHasOtherOption(field) && isOtherValue(values[field.fieldId]) && (
               <input
                 type="text"
-                placeholder={`Please specify ${label.toLowerCase()}`}
+                placeholder={`Please specify ${getPlainLabel(field).toLowerCase()}`}
                 value={otherValues[field.fieldId] || ''}
                 onChange={(e) =>
                   setOtherValues((prev) => ({ ...prev, [field.fieldId]: e.target.value }))
@@ -617,10 +619,9 @@ const DemographicDetailsPage: React.FC = () => {
           <p className="mt-3 text-white fw-semibold">Loading your information...</p>
         </div>
       ) : (
-        <div className="container">
-          <div className="row justify-content-center">
-            <div className="col-12 col-md-8 col-lg-6 col-xl-5">
-              <div className="assessment-card card shadow-lg">
+        // Single centered card — the old container/row/col stack cost ~32px per
+        // side on phones and squeezed the long form into a narrow column.
+        <div className="assessment-card card shadow-lg" style={{ maxWidth: 560 }}>
                 <div className="card-body p-3 p-sm-4 p-md-5">
                   {/* Header */}
                   <div className="text-center mb-4">
@@ -722,9 +723,6 @@ const DemographicDetailsPage: React.FC = () => {
                     </button>
                   </form>
                 </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>

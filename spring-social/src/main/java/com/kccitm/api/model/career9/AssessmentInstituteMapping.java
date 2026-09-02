@@ -98,6 +98,12 @@ public class AssessmentInstituteMapping implements Serializable {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    // True when this mapping's cohort is 18+: the registration page and the
+    // student-invite page show adult self-consent wording and "Your Email/Phone"
+    // instead of the parental copy. NULL/FALSE keeps the existing minor flow.
+    @Column(name = "audience_18_plus", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean audience18Plus = false;
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
@@ -119,6 +125,9 @@ public class AssessmentInstituteMapping implements Serializable {
         }
         if (this.paymentTiming == null) {
             this.paymentTiming = "PAY_FIRST";
+        }
+        if (this.audience18Plus == null) {
+            this.audience18Plus = false;
         }
     }
 
@@ -251,6 +260,14 @@ public class AssessmentInstituteMapping implements Serializable {
 
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public Boolean getAudience18Plus() {
+        return audience18Plus;
+    }
+
+    public void setAudience18Plus(Boolean audience18Plus) {
+        this.audience18Plus = audience18Plus;
     }
 
     public Date getCreatedAt() {

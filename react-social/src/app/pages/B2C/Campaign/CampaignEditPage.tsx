@@ -291,6 +291,15 @@ const CampaignEditPage = () => {
     }
   };
 
+  const handleToggleAssessment18Plus = async (row: CampaignAssessmentRow) => {
+    try {
+      await updateAssessmentMapping(row.mappingId, { audience18Plus: !row.audience18Plus });
+      await loadCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update");
+    }
+  };
+
   const availableAssessmentsToAttach = allAssessments.filter(
     a => !assessmentRows.some(r => r.assessmentId === a.id)
   );
@@ -329,6 +338,21 @@ const CampaignEditPage = () => {
         classId: route.classId,
         sessionId: route.sessionId ?? null,
         assessmentId,
+      });
+      await refreshCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update class route");
+    }
+  };
+
+  const handleToggleRoute18Plus = async (route: CampaignClassRoute) => {
+    if (!campaign.campaignId) return;
+    try {
+      await upsertClassRoute(campaign.campaignId, {
+        classId: route.classId,
+        sessionId: route.sessionId ?? null,
+        assessmentId: route.assessmentId,
+        audience18Plus: !route.audience18Plus,
       });
       await refreshCampaign();
     } catch (e: any) {
@@ -502,6 +526,7 @@ const CampaignEditPage = () => {
                       <th>Assessment</th>
                       <th>Path override</th>
                       <th>Counselling override</th>
+                      <th>18+</th>
                       <th>Description</th>
                       <th>Tiers</th>
                       <th></th>
@@ -509,7 +534,7 @@ const CampaignEditPage = () => {
                   </thead>
                   <tbody>
                     {assessmentRows.length === 0 && (
-                      <tr><td colSpan={6} className="text-center text-muted py-4">No assessments attached yet.</td></tr>
+                      <tr><td colSpan={7} className="text-center text-muted py-4">No assessments attached yet.</td></tr>
                     )}
                     {assessmentRows.map(r => (
                       <tr key={r.mappingId}>
@@ -529,6 +554,16 @@ const CampaignEditPage = () => {
                             <option value="1">Model 1 — Self-serve</option>
                             <option value="2">Model 2 — Admin-assigned</option>
                           </Form.Select>
+                        </td>
+                        <td>
+                          <Form.Check
+                            type="switch"
+                            id={`assess-18plus-${r.mappingId}`}
+                            label="18+"
+                            checked={!!r.audience18Plus}
+                            onChange={() => handleToggleAssessment18Plus(r)}
+                            title="Adult self-consent wording and Your Email/Phone labels — applies to direct /c/{slug}/{assessment} deep links"
+                          />
                         </td>
                         <td>
                           <Form.Control
@@ -648,12 +683,13 @@ const CampaignEditPage = () => {
                     <tr>
                       <th>Class</th>
                       <th>Mapped assessment</th>
+                      <th>18+</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {classRoutes.length === 0 && (
-                      <tr><td colSpan={3} className="text-center text-muted py-4">No class mappings yet.</td></tr>
+                      <tr><td colSpan={4} className="text-center text-muted py-4">No class mappings yet.</td></tr>
                     )}
                     {classRoutes.map(route => (
                       <tr key={route.routeId}>
@@ -675,6 +711,16 @@ const CampaignEditPage = () => {
                               </option>
                             )}
                           </Form.Select>
+                        </td>
+                        <td>
+                          <Form.Check
+                            type="switch"
+                            id={`route-18plus-${route.routeId}`}
+                            label="18+"
+                            checked={!!route.audience18Plus}
+                            onChange={() => handleToggleRoute18Plus(route)}
+                            title="Adult self-consent wording and Your Email/Phone labels — applies to class-based registration on /c/{slug}"
+                          />
                         </td>
                         <td>
                           <Button size="sm" variant="outline-danger" onClick={() => handleRemoveClassRoute(route.routeId)}>Remove</Button>

@@ -128,6 +128,8 @@ public class SchoolRegistrationController {
             config.setAssessmentId(assessmentId);
             config.setAmount(amount);
         }
+        // 18+ cohort for this class; guarded so an omitted key keeps the stored value.
+        if (data.containsKey("audience18Plus")) config.setAudience18Plus((Boolean) data.get("audience18Plus"));
 
         configRepository.save(config);
         // Feed the institute_assessment catalog (SSOT) — every school write enrols the
@@ -176,6 +178,8 @@ public class SchoolRegistrationController {
                 config.setAssessmentId(assessmentId);
                 config.setAmount(amount);
             }
+            // 18+ cohort for this class; guarded so an omitted key keeps the stored value.
+            if (c.containsKey("audience18Plus")) config.setAudience18Plus((Boolean) c.get("audience18Plus"));
             configRepository.save(config);
             // Feed the institute_assessment catalog (SSOT) for each saved assessment.
             instituteAssessmentService.ensure(instituteCode, assessmentId);
@@ -212,6 +216,7 @@ public class SchoolRegistrationController {
         if (data.containsKey("assessmentId")) config.setAssessmentId(Long.valueOf(data.get("assessmentId").toString()));
         if (data.containsKey("amount")) config.setAmount(data.get("amount") != null ? Long.valueOf(data.get("amount").toString()) : null);
         if (data.containsKey("isActive")) config.setIsActive((Boolean) data.get("isActive"));
+        if (data.containsKey("audience18Plus")) config.setAudience18Plus((Boolean) data.get("audience18Plus"));
 
         configRepository.save(config);
         return ResponseEntity.ok(config);
@@ -468,6 +473,9 @@ public class SchoolRegistrationController {
             Map<String, Object> classInfo = new HashMap<>();
             classInfo.put("classId", config.getClassId());
             classInfo.put("assessmentId", config.getAssessmentId());
+            // 18+ cohort → adult self-consent wording and "Your Email/Phone" once this
+            // class is picked; null/false rows keep the parental copy.
+            classInfo.put("audience18Plus", Boolean.TRUE.equals(config.getAudience18Plus()));
 
             // Pricing comes from the active tier for this (institute, session, assessment).
             // No active tier → registration closed for that class.

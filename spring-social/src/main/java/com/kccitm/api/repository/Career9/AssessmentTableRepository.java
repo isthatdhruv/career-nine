@@ -64,4 +64,27 @@ public interface AssessmentTableRepository extends JpaRepository<AssessmentTable
            "WHERE ia.instituteCode = :instituteCode AND ia.isActive = true AND (a.isDeleted = false OR a.isDeleted IS NULL)")
     List<AssessmentSummary> findCatalogAssessmentSummariesByInstitute(@Param("instituteCode") Integer instituteCode);
 
+    /**
+     * Multi-institute variant of {@link #findAssessmentSummariesByInstitute} for
+     * ABAC-scoped list endpoints (a user can be mapped to several institutes).
+     */
+    @Query("SELECT DISTINCT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive, q.type AS questionnaireType " +
+           "FROM AssessmentTable a LEFT JOIN a.questionnaire q JOIN AssessmentInstituteMapping m ON a.id = m.assessmentId " +
+           "WHERE m.instituteCode IN :instituteCodes AND m.isActive = true AND (a.isDeleted = false OR a.isDeleted IS NULL)")
+    List<AssessmentSummary> findAssessmentSummariesByInstitutes(
+            @Param("instituteCodes") Collection<Integer> instituteCodes);
+
+    /**
+     * Assessments any of the institutes' students are actually allotted to
+     * (StudentAssessmentMapping), regardless of registration-link mappings.
+     * Unioned with the mapping-based list on scoped endpoints so direct
+     * per-student allotments stay visible (same rule as the Data Download
+     * filter sources).
+     */
+    @Query("SELECT DISTINCT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive, q.type AS questionnaireType " +
+           "FROM AssessmentTable a LEFT JOIN a.questionnaire q JOIN StudentAssessmentMapping sm ON a.id = sm.assessmentId " +
+           "WHERE sm.userStudent.institute.instituteCode IN :instituteCodes AND (a.isDeleted = false OR a.isDeleted IS NULL)")
+    List<AssessmentSummary> findStudentAssignedAssessmentSummariesByInstitutes(
+            @Param("instituteCodes") Collection<Integer> instituteCodes);
+
 }

@@ -11,7 +11,7 @@ import {
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 import { validateReferralCode } from "../api-clients/referralCodeAPI"
 import { TierCard, Tier } from "../components/TierCard"
-import { getInstituteTerms } from "../utils/instituteTerms"
+import { getInstituteTerms, contactTerms } from "../utils/instituteTerms"
 
 const AssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>()
@@ -19,6 +19,9 @@ const AssessmentRegisterPage = () => {
 
   const [mappingInfo, setMappingInfo] = useState<MappingInfo | null>(null)
   const terms = getInstituteTerms(mappingInfo?.isSchool)
+  // The B2B link maps one cohort, so the audience is constant for the whole page.
+  const adult = !!mappingInfo?.audience18Plus
+  const { emailLabel, phoneLabel } = contactTerms(adult)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -171,7 +174,11 @@ const AssessmentRegisterPage = () => {
       return
     }
     if (!dpdpConsent) {
-      showErrorToast("Please confirm the parental consent to continue.")
+      showErrorToast(
+        adult
+          ? "Please confirm the consent to continue."
+          : "Please confirm the parental consent to continue."
+      )
       return
     }
 
@@ -602,10 +609,10 @@ const AssessmentRegisterPage = () => {
             </div>
 
             {/* Email + DOB row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
               <div>
                 <label style={s.label}>
-                  Parent's Email <span style={{ color: "#f43f5e" }}>*</span>
+                  {emailLabel} <span style={{ color: "#f43f5e" }}>*</span>
                 </label>
                 <input
                   ref={emailRef}
@@ -640,7 +647,7 @@ const AssessmentRegisterPage = () => {
             {/* Phone */}
             <div>
               <label style={s.label}>
-                Parent's Phone <span style={{ color: "#f43f5e" }}>*</span>
+                {phoneLabel} <span style={{ color: "#f43f5e" }}>*</span>
               </label>
               <input
                 type="tel"
@@ -680,7 +687,7 @@ const AssessmentRegisterPage = () => {
                   </select>
                 </div>
                 {selectedSessionId && instituteClasses.length > 0 && (
-                  <div style={{ display: "grid", gridTemplateColumns: instituteClassSections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: instituteClassSections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
                     <div>
                       <label style={s.label}>
                         {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
@@ -726,7 +733,7 @@ const AssessmentRegisterPage = () => {
 
             {/* Class dropdown for SESSION level */}
             {mappingInfo?.mappingLevel === "SESSION" && availableClasses.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: selectedClassSections.length > 0 ? "1fr 1fr" : "1fr", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: selectedClassSections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
                 <div>
                   <label style={s.label}>
                     {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
@@ -835,7 +842,7 @@ const AssessmentRegisterPage = () => {
                 type="button"
                 onClick={() => setShowPromo(true)}
                 style={{
-                  background: "none", border: "none", padding: 0, textAlign: "left",
+                  background: "none", border: "none", padding: "10px 0", textAlign: "left",
                   color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
                 }}
               >
@@ -997,7 +1004,7 @@ const AssessmentRegisterPage = () => {
           </div>
 
           <div style={{ marginTop: 20 }}>
-            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} />
+            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
           </div>
 
           {/* Submit Button */}
@@ -1204,7 +1211,7 @@ const s: { [key: string]: React.CSSProperties } = {
     borderRadius: 12,
     border: "1.5px solid #e2e8f0",
     background: "rgba(255, 255, 255, 0.8)",
-    fontSize: "0.92rem",
+    fontSize: 16,
     color: "#1e293b",
     outline: "none",
     transition: "border-color 0.2s, box-shadow 0.2s",
