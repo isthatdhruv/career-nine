@@ -29,12 +29,25 @@ final class CounsellingEmailHtml {
     // ─── palette ──────────────────────────────────────────────────────────────────
     private static final String PAGE_BG   = "#f1f4f9";
     private static final String CARD_BG   = "#ffffff";
-    private static final String BRAND     = "#1b3a6b";
+    /**
+     * The Career-9 green, taken from the registration mails
+     * ({@code SchoolRegistrationController.sendRegistrationEmail}) so counselling mail sits in
+     * the same family as the first mail a student ever gets from us. Two stops of one gradient:
+     * {@code BRAND} is the dark end and does all the work on white — text, links, the solid
+     * colour a client gets when it cannot paint a gradient — while {@code BRAND_LIT} is the
+     * light end, used for the top of the gradient and for panel accents.
+     *
+     * <p>The dark end leads on purpose. White on {@code #059669} is 3.9:1, under the 4.5:1
+     * a 15px button label needs; on {@code #047857} it is 5.6:1. So the fallback colour is the
+     * accessible one, and the gradient only ever makes it lighter towards the corner.
+     */
+    private static final String BRAND     = "#047857";
+    private static final String BRAND_LIT = "#059669";
     private static final String INK       = "#101828";
     private static final String MUTED     = "#667085";
     private static final String BORDER    = "#e4e7ec";
-    private static final String TINT      = "#f5f8ff";
-    private static final String TINT_EDGE = "#c7d7fe";
+    private static final String TINT      = "#f0fdf4";
+    private static final String TINT_EDGE = "#a7f3d0";
 
     private static final String FONT =
             "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
@@ -65,17 +78,22 @@ final class CounsellingEmailHtml {
              + "<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" "
              + "style=\"width:100%;max-width:600px;\">"
 
-             // masthead
-             + "<tr><td style=\"padding:0 4px 14px 4px;\">"
+             // Masthead: the gradient bar the registration mails open with, joined to the
+             // card below it. background comes before background-image so Outlook, which
+             // renders through Word and drops the gradient, still gets a solid green bar
+             // rather than white-on-white.
+             + "<tr><td style=\"background:" + BRAND + ";"
+             + "background-image:linear-gradient(135deg," + BRAND_LIT + " 0%," + BRAND + " 100%);"
+             + "border-radius:12px 12px 0 0;padding:20px 28px;\">"
              + "<span style=\"font-family:" + FONT + ";font-size:17px;font-weight:700;"
-             + "letter-spacing:1.5px;color:" + BRAND + ";\">CAREER&#8209;9</span>"
-             + "<span style=\"font-family:" + FONT + ";font-size:12px;color:" + MUTED + ";"
+             + "letter-spacing:1.5px;color:#ffffff;\">CAREER&#8209;9</span>"
+             + "<span style=\"font-family:" + FONT + ";font-size:12px;color:#d1fae5;"
              + "padding-left:10px;\">Career Counselling</span>"
              + "</td></tr>"
 
              // card
              + "<tr><td style=\"background:" + CARD_BG + ";border:1px solid " + BORDER + ";"
-             + "border-radius:12px;padding:32px 28px;\">"
+             + "border-top:none;border-radius:0 0 12px 12px;padding:32px 28px;\">"
              + "<h1 style=\"margin:0 0 18px 0;font-family:" + FONT + ";font-size:21px;"
              + "line-height:1.35;font-weight:600;color:" + INK + ";\">" + esc(title) + "</h1>"
              + bodyHtml
@@ -104,11 +122,28 @@ final class CounsellingEmailHtml {
              + "line-height:1.6;color:" + MUTED + ";\">" + esc(text) + "</p>";
     }
 
+    /**
+     * The house button: the registration mails' green gradient, with the solid dark green
+     * underneath it for clients that drop gradients.
+     *
+     * <p>Every button in every counselling mail comes through here. That is the point — the
+     * booking button, the join button and the report button were three different sizes and two
+     * different colours before, which is exactly the sort of thing nobody notices individually
+     * and everybody notices in a row.
+     */
+    static String button(String url, String label) {
+        return "<a href=\"" + escAttr(url) + "\" style=\"display:inline-block;"
+             + "background:" + BRAND + ";"
+             + "background-image:linear-gradient(135deg," + BRAND_LIT + " 0%," + BRAND + " 100%);"
+             + "color:#ffffff;font-family:" + FONT + ";font-size:15px;font-weight:700;"
+             + "text-decoration:none;padding:14px 32px;border-radius:8px;\">" + esc(label) + "</a>";
+    }
+
     /** Sign-off. */
     static String signature() {
         return "<p style=\"margin:22px 0 0 0;font-family:" + FONT + ";font-size:15px;"
              + "line-height:1.6;color:" + INK + ";\">Regards,<br>"
-             + "<strong style=\"color:" + BRAND + ";\">Career-Nine Team</strong></p>";
+             + "<strong style=\"color:" + BRAND + ";\">Career-9 Team</strong></p>";
     }
 
     /**
@@ -143,16 +178,30 @@ final class CounsellingEmailHtml {
      * way in.
      */
     static String joinBlock(String url, String label, String note) {
+        return actionBlock(url, label, "Join the session", note);
+    }
+
+    /**
+     * The same panel for any other link a mail is written around — booking, rescheduling, a
+     * report — with the wording of the button left to the caller.
+     *
+     * <p>Every mail that carries a link uses this rather than dropping the address into a
+     * paragraph. A bare URL in prose is the thing a reader has to hunt for, and on a phone it
+     * wraps across four lines of purple text; the panel puts the one action the mail exists for
+     * where the eye lands, and keeps the address underneath for the readers a button fails.
+     *
+     * @param cta the button's words — always the action, never "click here"
+     */
+    static String actionBlock(String url, String label, String cta, String note) {
         return "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" "
              + "style=\"margin:6px 0 18px 0;\"><tr>"
              + "<td align=\"center\" style=\"background:" + TINT + ";border:1px solid " + TINT_EDGE + ";"
              + "border-radius:12px;padding:24px 18px;\">"
-             + "<div style=\"font-family:" + FONT + ";font-size:11px;font-weight:600;"
-             + "letter-spacing:1.6px;text-transform:uppercase;color:" + MUTED + ";"
-             + "padding-bottom:14px;\">" + esc(label) + "</div>"
-             + "<a href=\"" + escAttr(url) + "\" style=\"display:inline-block;background:" + BRAND + ";"
-             + "color:#ffffff;font-family:" + FONT + ";font-size:15px;font-weight:600;"
-             + "text-decoration:none;padding:14px 34px;border-radius:8px;\">Join the session</a>"
+             + (label == null || label.isEmpty() ? ""
+                : "<div style=\"font-family:" + FONT + ";font-size:11px;font-weight:600;"
+                  + "letter-spacing:1.6px;text-transform:uppercase;color:" + MUTED + ";"
+                  + "padding-bottom:14px;\">" + esc(label) + "</div>")
+             + button(url, cta)
              + "<div style=\"font-family:" + FONT + ";font-size:12px;line-height:1.6;"
              + "color:" + MUTED + ";padding-top:14px;word-break:break-all;\">"
              + "Or open this link:<br><a href=\"" + escAttr(url) + "\" "
@@ -200,7 +249,7 @@ final class CounsellingEmailHtml {
              + "style=\"margin:0 0 12px 0;\"><tr><td style=\"border:1px solid " + BRAND + ";"
              + "border-radius:8px;\">"
              + "<a href=\"" + escAttr(url) + "\" style=\"display:inline-block;font-family:" + FONT + ";"
-             + "font-size:14px;font-weight:600;color:" + BRAND + ";text-decoration:none;"
+             + "font-size:14px;font-weight:700;color:" + BRAND + ";text-decoration:none;"
              + "padding:11px 22px;\">" + esc(label) + "</a>"
              + "</td></tr></table>";
     }
