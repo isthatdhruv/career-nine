@@ -1,5 +1,6 @@
 package com.kccitm.api.controller.career9.b2c;
 
+import com.kccitm.api.service.counselling.CounsellingEmailHtml;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -1277,21 +1278,61 @@ public class CampaignPublicController {
         return ResponseEntity.ok(out);
     }
 
+    /**
+     * Where an admin actually resolves this: the Counsellor ↔ Assessment mapping screen.
+     * Built from the same frontend base the rest of the app's links use.
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:3000}")
+    private String adminFrontendUrl;
+
+    private String counsellorMappingUrl() {
+        String base = adminFrontendUrl == null ? "" : adminFrontendUrl.replaceAll("/+$", "");
+        return base + "/admin/counsellors";
+    }
+
     /** Best-effort email to the Career-9 team; the DB row is the source of truth. */
     private void notifyCounsellingForwarded(String assessmentName, String studentName,
             String studentEmail, String studentPhone, String instituteName) {
         if (supportEmail == null || supportEmail.isEmpty()) return;
         try {
             String subject = "Counselling request — " + assessmentName;
+            String intro = "A student has requested career counselling, but no counsellor is "
+                    + "mapped to this assessment yet.";
+            String closing = "Assign a counsellor on the Counsellor ↔ Assessment page to let "
+                    + "the student book.";
+
+            java.util.List<CounsellingEmailHtml.Row> rows = CounsellingEmailHtml.rows();
+            rows.add(new CounsellingEmailHtml.Row("Assessment", assessmentName));
+            if (studentName != null)   rows.add(new CounsellingEmailHtml.Row("Student", studentName));
+            if (studentEmail != null)  rows.add(new CounsellingEmailHtml.Row("Email", studentEmail));
+            if (studentPhone != null)  rows.add(new CounsellingEmailHtml.Row("Phone", studentPhone));
+            if (instituteName != null) rows.add(new CounsellingEmailHtml.Row("Institute", instituteName));
+
+            String html = CounsellingEmailHtml.page(
+                    intro,
+                    "Counselling request needs a counsellor",
+                    CounsellingEmailHtml.p("Dear Admin,")
+                    + CounsellingEmailHtml.p(intro)
+                    + CounsellingEmailHtml.detailsTable(rows)
+                    + CounsellingEmailHtml.actionBlock(counsellorMappingUrl(),
+                            "Counsellor ↔ Assessment", "Assign a counsellor", null)
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
             StringBuilder b = new StringBuilder();
-            b.append("A student has requested career counselling, but no counsellor is mapped to this assessment yet.\n\n");
-            b.append("Assessment: ").append(assessmentName).append('\n');
-            if (studentName != null)  b.append("Student: ").append(studentName).append('\n');
-            if (studentEmail != null) b.append("Email: ").append(studentEmail).append('\n');
-            if (studentPhone != null) b.append("Phone: ").append(studentPhone).append('\n');
-            if (instituteName != null) b.append("Institute: ").append(instituteName).append('\n');
-            b.append("\nAssign a counsellor on the Counsellor ↔ Assessment page to let the student book.");
-            emailDispatchService.sendText(com.kccitm.api.model.email.EmailType.COUNSELLING_REQUEST, supportEmail, subject, b.toString());
+            b.append(intro).append("\n\n");
+            b.append(CounsellingEmailHtml.detailsText(rows));
+            b.append("\n").append("Assign a counsellor: ").append(counsellorMappingUrl()).append("\n\n");
+            b.append(closing);
+
+            com.kccitm.api.model.email.EmailSendRequest req =
+                    new com.kccitm.api.model.email.EmailSendRequest();
+            req.setEmailType(com.kccitm.api.model.email.EmailType.COUNSELLING_REQUEST);
+            req.getTo().add(supportEmail);
+            req.setSubject(subject);
+            req.setHtmlContent(html);
+            req.setTextContent(b.toString());
+            emailDispatchService.send(req);
         } catch (Exception ex) {
             // Forwarding email is best-effort — never fail the request on a mail error.
             logger.warn("Failed to email counselling request notice to {}: {}", supportEmail, ex.getMessage());
