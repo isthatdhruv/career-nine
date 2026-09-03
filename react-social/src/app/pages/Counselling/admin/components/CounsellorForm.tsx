@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import '../../Counselling.css'
+import { isValidMeetingLink, MEETING_LINK_ERROR, MEETING_LINK_PLACEHOLDER } from '../../shared/meetingLink'
 
 interface CounsellorData {
   counsellorId?: number
@@ -67,8 +68,8 @@ const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave }) =
     }
     // Sessions run on Microsoft Teams only, so no other provider's link is accepted.
     const link = (form.meetingLink ?? '').trim()
-    if (link && !/^https:\/\/teams\.(microsoft|live)\.com\//i.test(link)) {
-      newErrors.meetingLink = 'Enter a Microsoft Teams link (teams.microsoft.com or teams.live.com)'
+    if (link && !isValidMeetingLink(link)) {
+      newErrors.meetingLink = MEETING_LINK_ERROR
     }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -199,7 +200,7 @@ const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave }) =
         {/* Teams meeting link — used for every online session this counsellor takes */}
         <div style={fieldStyle}>
           <label style={labelStyle} htmlFor='cf-meetingLink'>
-            Microsoft Teams meeting link
+            Meeting link (Microsoft Teams or Google Meet)
           </label>
           <input
             id='cf-meetingLink'
@@ -207,7 +208,7 @@ const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave }) =
             type='text'
             value={form.meetingLink ?? ''}
             onChange={handleChange}
-            placeholder='https://teams.microsoft.com/l/meetup-join/...'
+            placeholder={MEETING_LINK_PLACEHOLDER}
             style={{ ...inputStyle, borderColor: errors.meetingLink ? '#EF4444' : 'var(--sp-border, #D1E5DF)' }}
           />
           {errors.meetingLink

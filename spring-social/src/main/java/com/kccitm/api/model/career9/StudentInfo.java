@@ -107,7 +107,9 @@ public class StudentInfo implements Serializable {
 
     private Long controlNumber;
 
-    private Integer studentClass;
+    // Display class label stored verbatim ("10", "10-A", "1st Year");
+    // numeric grade is derived on demand via GradeParser where band logic needs it.
+    private String studentClass;
 
     @Column(name = "institute_id")
     private Integer instituteId;
@@ -130,6 +132,14 @@ public class StudentInfo implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy")
     private Date studentDob;
 
+    // DPDP (Digital Personal Data Protection Act, 2023): server-side timestamp of the
+    // parental consent given on the registration form. Stamped on every registration
+    // path — inline for free/trial/invite registrations, and via the PaymentTransaction
+    // consent flag for students provisioned later by the Razorpay webhook. NULL for
+    // students created before consent capture existed (or by admin/bulk imports).
+    @Column(name = "dpdp_consent_at")
+    private Date dpdpConsentAt;
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id")
     private User user;
@@ -141,6 +151,14 @@ public class StudentInfo implements Serializable {
 
     public void setStudentDob(Date studentDob) {
         this.studentDob = studentDob;
+    }
+
+    public Date getDpdpConsentAt() {
+        return dpdpConsentAt;
+    }
+
+    public void setDpdpConsentAt(Date dpdpConsentAt) {
+        this.dpdpConsentAt = dpdpConsentAt;
     }
 
     public Integer getId() {
@@ -275,12 +293,12 @@ public class StudentInfo implements Serializable {
         this.schoolName = schoolName;
     }
 
-    public Integer getStudentClass() {
+    public String getStudentClass() {
         return studentClass;
     }
 
-    public void setStudentClass(Integer studentClass) {
-        this.studentClass = studentClass;
+    public void setStudentClass(String studentClass) {
+        this.studentClass = studentClass == null ? null : studentClass.trim();
     }
 
     public Integer getSchoolSectionId() {

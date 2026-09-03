@@ -181,6 +181,8 @@ public class CounsellorCancellationService {
         if (slot != null) {
             slot.setStatus("CANCELLED");
             slot.setIsBlocked(true);
+            // Residue marker — the availability panels hide cancellation-blocked rows.
+            slot.setBlockReason("Counsellor unavailable — awaiting reschedule");
             slotRepository.save(slot);
         }
 

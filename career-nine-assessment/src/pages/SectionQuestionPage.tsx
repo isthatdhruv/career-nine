@@ -8,8 +8,8 @@ import React, {
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
-import { usePreventReload } from "../hooks/usePreventReload";
-import { useStudentBranding, brandLogoSrc } from "../hooks/useStudentBranding";
+import { usePreventReload, suppressPreventReload } from "../hooks/usePreventReload";
+import { useStudentBranding, brandLogoSrc, CAREER9_LOGO } from "../hooks/useStudentBranding";
 import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
 import { useDebouncedLocalStorage } from "../hooks/useDebouncedLocalStorage";
 import QuestionNavigationGrid from "../components/QuestionNavigationGrid";
@@ -20,6 +20,7 @@ import { usePerQuestionProctoring } from "../hooks/usePerQuestionProctoring";
 import { submitProctoringData } from "../api/proctoringApi";
 import { savePartialAnswers, restorePartialAnswers } from "../api/assessmentApi";
 import type { ProctoringPayload } from "../types/proctoring";
+import { MarkdownInstructions } from "../utils/instructionMarkdown";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 import { timeoutSignal } from "../utils/timeoutSignal";
 import { apiUrl } from "../utils/apiUrl";
@@ -108,6 +109,12 @@ const SectionQuestionPage: React.FC = () => {
   const saveLater = assessmentConfig?.saveLater !== false;
   usePreventReload();
   const branding = useStudentBranding();
+  // B2C campaign students always see the Career-9 logo here — school whitelabel
+  // co-branding is a B2B feature, and the campaign's own brand logo belongs on
+  // the registration page, not inside the assessment. Every entry flow clear()s
+  // localStorage before seeding, so a present campaignId reliably marks this
+  // session as campaign-registered.
+  const isCampaignStudent = !!localStorage.getItem("campaignId");
   const { scheduleWrite, flush: flushLocalStorage } =
     useDebouncedLocalStorage(500);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -141,20 +148,57 @@ const SectionQuestionPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showInactivityWarning, setShowInactivityWarning] =
     useState<boolean>(false);
+  // "I have read and understood" checkbox inside the focus popup — Continue
+  // stays disabled until it is ticked; reset every time the popup opens.
+  const [inactivityAcknowledged, setInactivityAcknowledged] =
+    useState<boolean>(false);
   const inactivityTimerRef = useRef<number | null>(null);
+  // Auto-advance timer — cancelled on any manual navigation so a fast student's
+  // own Next/Back tap doesn't get yanked 400ms later by the stale timeout.
+  const autoAdvanceRef = useRef<number | null>(null);
+  // Themed reload-confirmation modal. Shown when the student tries to reload
+  // via the keyboard (F5 / Ctrl+R) — the browser-toolbar reload button cannot
+  // be intercepted with custom UI, so that path still gets the native
+  // beforeunload dialog from usePreventReload.
+  const [showReloadWarning, setShowReloadWarning] = useState<boolean>(false);
 
   // Track which sections have already shown their instructions (only show once)
   const [seenSectionInstructions, setSeenSectionInstructions] = useState<
     Set<string>
   >(() => {
-    const stored = localStorage.getItem("assessmentSeenSectionInstructions");
-    return stored ? new Set(JSON.parse(stored)) : new Set();
+    // Corrupt/legacy values must not crash first render (error boundary loop).
+    try {
+      const stored = localStorage.getItem("assessmentSeenSectionInstructions");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      localStorage.removeItem("assessmentSeenSectionInstructions");
+      return new Set();
+    }
   });
+  // 3s read-timer on the section-instruction popup: OK stays locked (and the
+  // backdrop won't dismiss) until it reaches 0, so instructions can't be
+  // reflex-dismissed without at least a glance.
+  const [instructionOkCountdown, setInstructionOkCountdown] = useState(0);
   const [showSectionInstruction, setShowSectionInstruction] =
     useState<boolean>(false);
   const [sectionInstructionTexts, setSectionInstructionTexts] = useState<
     Array<{ text: string; language: string }>
   >([]);
+
+  useEffect(() => {
+    if (!showSectionInstruction) return;
+    setInstructionOkCountdown(3);
+    const timer = window.setInterval(() => {
+      setInstructionOkCountdown((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [showSectionInstruction]);
 
   // Heartbeat moved below the answer-state refs (it reads them for the live
   // answeredCount) — see the useHeartbeat call after the ref declarations.
@@ -178,28 +222,36 @@ const SectionQuestionPage: React.FC = () => {
   const [savedForLater, setSavedForLater] = useState<
     Record<string, Set<number>>
   >(() => {
-    const stored = localStorage.getItem("assessmentSavedForLater");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Convert arrays back to Sets
-      const result: Record<string, Set<number>> = {};
-      for (const key in parsed) {
-        result[key] = new Set(parsed[key]);
+    try {
+      const stored = localStorage.getItem("assessmentSavedForLater");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert arrays back to Sets
+        const result: Record<string, Set<number>> = {};
+        for (const key in parsed) {
+          result[key] = new Set(parsed[key]);
+        }
+        return result;
       }
-      return result;
+    } catch {
+      localStorage.removeItem("assessmentSavedForLater");
     }
     return {};
   });
   const [skipped, setSkipped] = useState<Record<string, Set<number>>>(() => {
-    const stored = localStorage.getItem("assessmentSkipped");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Convert arrays back to Sets
-      const result: Record<string, Set<number>> = {};
-      for (const key in parsed) {
-        result[key] = new Set(parsed[key]);
+    try {
+      const stored = localStorage.getItem("assessmentSkipped");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert arrays back to Sets
+        const result: Record<string, Set<number>> = {};
+        for (const key in parsed) {
+          result[key] = new Set(parsed[key]);
+        }
+        return result;
       }
-      return result;
+    } catch {
+      localStorage.removeItem("assessmentSkipped");
     }
     return {};
   });
@@ -337,6 +389,29 @@ const SectionQuestionPage: React.FC = () => {
     }
   }, [sectionId, questionIndex, assessmentData]);
 
+  // Intercept keyboard reloads (F5, Ctrl/Cmd+R) and show the themed
+  // confirmation modal instead of the browser's native dialog.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isReloadKey =
+        e.key === "F5" ||
+        ((e.ctrlKey || e.metaKey) && (e.key === "r" || e.key === "R"));
+      if (isReloadKey) {
+        e.preventDefault();
+        setShowReloadWarning(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const confirmReload = () => {
+    // Quiet the beforeunload guard so the student is not shown the native
+    // dialog on top of the confirmation they just gave.
+    suppressPreventReload();
+    window.location.reload();
+  };
+
   // Inactivity watcher: if the student does not interact with the question
   // for 40 seconds, show a focus reminder popup.
   useEffect(() => {
@@ -347,6 +422,7 @@ const SectionQuestionPage: React.FC = () => {
         window.clearTimeout(inactivityTimerRef.current);
       }
       inactivityTimerRef.current = window.setTimeout(() => {
+        setInactivityAcknowledged(false);
         setShowInactivityWarning(true);
       }, 40000);
     };
@@ -651,7 +727,10 @@ const SectionQuestionPage: React.FC = () => {
     return <div className="text-center mt-5">Loading Assessment</div>;
   }
 
-  const question = questions[currentIndex];
+  // URL may point past the section end (stale history entry / shortened
+  // questionnaire) — clamp instead of crashing into the error boundary.
+  const question =
+    questions[Math.min(Math.max(currentIndex, 0), questions.length - 1)];
   const qId = question.questionnaireQuestionId;
 
   const selectedOptions = answers[sectionId!]?.[qId] || [];
@@ -1017,7 +1096,9 @@ const SectionQuestionPage: React.FC = () => {
 
     // Auto-advance to next unanswered question after a short delay (to let user see their selection)
     if (willAutoAdvance) {
-      setTimeout(() => {
+      if (autoAdvanceRef.current) window.clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = window.setTimeout(() => {
+        autoAdvanceRef.current = null;
         const nextUnanswered = findNextUnansweredQuestion(
           sectionId!,
           currentIndex,
@@ -1107,7 +1188,9 @@ const SectionQuestionPage: React.FC = () => {
 
     // Auto-advance to next unanswered question after a short delay
     if (willAutoAdvance) {
-      setTimeout(() => {
+      if (autoAdvanceRef.current) window.clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = window.setTimeout(() => {
+        autoAdvanceRef.current = null;
         const nextUnanswered = findNextUnansweredQuestion(
           sectionId!,
           currentIndex,
@@ -1185,22 +1268,31 @@ const SectionQuestionPage: React.FC = () => {
     // If no unanswered questions remain, stay on current question
   };
 
+  const cancelAutoAdvance = () => {
+    if (autoAdvanceRef.current) {
+      window.clearTimeout(autoAdvanceRef.current);
+      autoAdvanceRef.current = null;
+    }
+  };
+
   const goNext = () => {
+    cancelAutoAdvance();
     if (selectedOptions.length === 0) markSkipped();
 
-    // Jump to the next unanswered question, skipping already-answered ones
-    const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex);
-    if (nextUnanswered) {
+    // Advance strictly in order (13 → 14), even past answered questions —
+    // never jump ahead to the next unanswered one.
+    if (currentIndex + 1 < questions.length) {
       navigate(
-        `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`,
+        `/studentAssessment/sections/${sectionId}/questions/${currentIndex + 1}`,
       );
     } else {
-      // All questions answered — go to next section or completed page
+      // Last question of the section — go to next section or the submit flow
       goToNextSection();
     }
   };
 
   const goBack = () => {
+    cancelAutoAdvance();
     if (currentIndex > 0) {
       const newIndex = currentIndex - 1;
       setCurrentIndex(newIndex);
@@ -1645,10 +1737,9 @@ const SectionQuestionPage: React.FC = () => {
 
   return (
     <div
+      className="question-page-root"
       style={{
         display: "flex",
-        height: "100dvh",
-        minHeight: "100vh",
         background: "linear-gradient(135deg, #0f172a 0%, #1a2238 50%, #1e293b 100%)",
         colorScheme: "light",
         overflow: "hidden",
@@ -1684,7 +1775,9 @@ const SectionQuestionPage: React.FC = () => {
             justifyContent: "center",
             zIndex: 9999,
           }}
-          onClick={() => setShowSectionInstruction(false)}
+          onClick={() => {
+            if (instructionOkCountdown === 0) setShowSectionInstruction(false);
+          }}
         >
           <div
             style={{
@@ -1728,22 +1821,18 @@ const SectionQuestionPage: React.FC = () => {
                     {item.language}
                   </div>
                 )}
-                <p
-                  style={{
-                    whiteSpace: "pre-line",
-                    lineHeight: 1.7,
-                    margin: 0,
-                    fontSize: "1rem",
-                    color: "#4a5568",
-                  }}
+                <div
+                  className="instruction-box"
+                  style={{ lineHeight: 1.7, fontSize: "1rem", color: "#4a5568" }}
                 >
-                  {item.text}
-                </p>
+                  <MarkdownInstructions text={item.text} />
+                </div>
               </div>
             ))}
             <div style={{ textAlign: "right", marginTop: "20px" }}>
               <button
                 onClick={() => setShowSectionInstruction(false)}
+                disabled={instructionOkCountdown > 0}
                 style={{
                   background:
                     "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
@@ -1753,10 +1842,12 @@ const SectionQuestionPage: React.FC = () => {
                   padding: "8px 28px",
                   fontWeight: 600,
                   fontSize: "0.95rem",
-                  cursor: "pointer",
+                  cursor: instructionOkCountdown > 0 ? "not-allowed" : "pointer",
+                  opacity: instructionOkCountdown > 0 ? 0.6 : 1,
+                  minWidth: 96,
                 }}
               >
-                OK
+                {instructionOkCountdown > 0 ? `OK (${instructionOkCountdown})` : "OK"}
               </button>
             </div>
           </div>
@@ -1783,15 +1874,15 @@ const SectionQuestionPage: React.FC = () => {
             }}
           >
             <img
-              src={brandLogoSrc(branding)}
-              alt={branding.whitelabel ? (branding.schoolName || "School") + " logo" : "Career-9 logo"}
+              src={isCampaignStudent ? CAREER9_LOGO : brandLogoSrc(branding)}
+              alt={!isCampaignStudent && branding.whitelabel ? (branding.schoolName || "School") + " logo" : "Career-9 logo"}
               style={{
                 height: "48px",
                 objectFit: "contain",
               }}
             />
           </div>
-          {branding.whitelabel && (
+          {!isCampaignStudent && branding.whitelabel && (
             <div style={{ textAlign: "center", fontSize: "0.62rem", color: "#94a3b8", marginTop: "-6px", marginBottom: "6px" }}>
               Powered by Career-9
             </div>
@@ -1958,14 +2049,15 @@ const SectionQuestionPage: React.FC = () => {
                   <div
                     key={q.questionnaireQuestionId}
                     onClick={() => {
+                      cancelAutoAdvance();
                       setShowSidebar(false);
                       navigate(
                         `/studentAssessment/sections/${sec.section.sectionId}/questions/${i}`,
                       );
                     }}
                     style={{
-                      width: 32,
-                      height: 32,
+                      width: 40,
+                      height: 40,
                       borderRadius: "8px",
                       background: getQuestionColor(
                         String(sec.section.sectionId),
@@ -2187,6 +2279,120 @@ const SectionQuestionPage: React.FC = () => {
               </div>
             , document.body)}
 
+            {/* Reload confirmation - themed replacement for the native dialog
+                on keyboard reloads (F5 / Ctrl+R); portaled to body */}
+            {showReloadWarning && createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "rgba(0, 0, 0, 0.5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 9999,
+                }}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: "16px",
+                    padding: "32px 36px",
+                    maxWidth: "440px",
+                    width: "90%",
+                    textAlign: "center",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                    color: "#2d3748",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "50%",
+                      background:
+                        "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
+                    }}
+                  >
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                      <path d="M21 3v6h-6" />
+                    </svg>
+                  </div>
+                  <h5
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: "12px",
+                      color: "#1a202c",
+                      fontSize: "1.2rem",
+                    }}
+                  >
+                    Reload this page?
+                  </h5>
+                  <p
+                    style={{
+                      color: "#6b7280",
+                      fontSize: "0.95rem",
+                      lineHeight: 1.6,
+                      marginBottom: "24px",
+                    }}
+                  >
+                    Reloading may lose your answers in this section.
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                      alignItems: "center",
+                    }}
+                  >
+                    <button
+                      onClick={() => setShowReloadWarning(false)}
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 28px",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                        cursor: "pointer",
+                        width: "100%",
+                        boxShadow: "0 4px 15px rgba(63, 184, 118, 0.35)",
+                      }}
+                    >
+                      Continue Assessment
+                    </button>
+                    <button
+                      onClick={confirmReload}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#94a3b8",
+                        fontSize: "0.88rem",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        padding: "0.3rem",
+                      }}
+                    >
+                      Reload anyway
+                    </button>
+                  </div>
+                </div>
+              </div>
+            , document.body)}
+
             {/* Inactivity Reminder Popup - portaled to body for mobile compatibility */}
             {showInactivityWarning && createPortal(
               <div
@@ -2202,7 +2408,6 @@ const SectionQuestionPage: React.FC = () => {
                   justifyContent: "center",
                   zIndex: 9999,
                 }}
-                onClick={() => setShowInactivityWarning(false)}
               >
                 <div
                   style={{
@@ -2253,6 +2458,40 @@ const SectionQuestionPage: React.FC = () => {
                   >
                     In case you need help please talk to supervising adult.
                   </p>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      textAlign: "left",
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "10px",
+                      padding: "12px 14px",
+                      marginBottom: "20px",
+                      cursor: "pointer",
+                      color: "#334155",
+                      fontSize: "0.9rem",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={inactivityAcknowledged}
+                      onChange={(e) =>
+                        setInactivityAcknowledged(e.target.checked)
+                      }
+                      style={{
+                        marginTop: "3px",
+                        width: "16px",
+                        height: "16px",
+                        flexShrink: 0,
+                        cursor: "pointer",
+                        accentColor: "#0e7490",
+                      }}
+                    />
+                    <span>I have read and understood</span>
+                  </label>
                   <div
                     style={{
                       display: "flex",
@@ -2260,18 +2499,24 @@ const SectionQuestionPage: React.FC = () => {
                     }}
                   >
                     <button
+                      disabled={!inactivityAcknowledged}
                       onClick={() => setShowInactivityWarning(false)}
                       style={{
-                        background:
-                          "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                        background: inactivityAcknowledged
+                          ? "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)"
+                          : "#cbd5e1",
                         color: "#fff",
                         border: "none",
                         borderRadius: "10px",
                         padding: "10px 28px",
                         fontWeight: 600,
                         fontSize: "0.95rem",
-                        cursor: "pointer",
-                        boxShadow: "0 4px 15px rgba(15, 23, 42, 0.3)",
+                        cursor: inactivityAcknowledged
+                          ? "pointer"
+                          : "not-allowed",
+                        boxShadow: inactivityAcknowledged
+                          ? "0 4px 15px rgba(15, 23, 42, 0.3)"
+                          : "none",
                       }}
                     >
                       Continue
@@ -2932,14 +3177,12 @@ const SectionQuestionPage: React.FC = () => {
                             renderOptionContent(opt)
                           ) : availableLanguages.length > 0 ? (
                             <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  availableLanguages.length > 1
-                                    ? "1fr 1px 1fr"
-                                    : "1fr",
-                                gap: 15,
-                              }}
+                              className={
+                                availableLanguages.length > 1
+                                  ? "instructions-grid instructions-grid--dual"
+                                  : ""
+                              }
+                              style={{ display: "grid", gap: 15 }}
                             >
                               {availableLanguages.map((lang, index) => (
                                 <React.Fragment key={lang.language.languageId}>
@@ -3013,14 +3256,12 @@ const SectionQuestionPage: React.FC = () => {
                             <div>{renderOptionContent(opt)}</div>
                           ) : availableLanguages.length > 0 ? (
                             <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns:
-                                  availableLanguages.length > 1
-                                    ? "1fr 1px 1fr"
-                                    : "1fr",
-                                gap: 15,
-                              }}
+                              className={
+                                availableLanguages.length > 1
+                                  ? "instructions-grid instructions-grid--dual"
+                                  : ""
+                              }
+                              style={{ display: "grid", gap: 15 }}
                             >
                               {availableLanguages.map((lang, index) => (
                                 <React.Fragment key={lang.language.languageId}>
@@ -3220,7 +3461,7 @@ const SectionQuestionPage: React.FC = () => {
           </div>
         </div>
       </div>
-    // </div>
+    </div>
   );
 };
 

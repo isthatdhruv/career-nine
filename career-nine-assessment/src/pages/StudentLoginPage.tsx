@@ -122,7 +122,8 @@ const StudentLoginPage: React.FC = () => {
     { value: '11', label: 'Nov' }, { value: '12', label: 'Dec' },
   ];
 
-  const years = Array.from({ length: 40 }, (_, i) => String(2024 - i));
+  // 2024 down to 1990
+  const years = Array.from({ length: 75 }, (_, i) => String(2024 - i));
   const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -141,7 +142,18 @@ const StudentLoginPage: React.FC = () => {
           alert('Invalid credentials. Please try again.');
           return;
         }
+        // pendingGameResult:* buffers are the ONLY copy of unsynced game
+        // results (each entry carries its own userStudentId) — survive the wipe
+        // exactly like the mount effect does.
+        const preservePending: Record<string, string> = {};
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('pendingGameResult:')) {
+            const val = localStorage.getItem(key);
+            if (val) preservePending[key] = val;
+          }
+        }
         localStorage.clear();
+        Object.entries(preservePending).forEach(([key, val]) => localStorage.setItem(key, val));
         // Reset auth carriers a second time at submit — covers the case where the
         // student typed credentials between mount and submit (mint runs later on
         // Start click; the prior session's cookies must not survive into that mint).
@@ -167,10 +179,9 @@ const StudentLoginPage: React.FC = () => {
 
   return (
     <div className="assessment-bg">
-      <div className="container">
-        <div className="row justify-content-center">
-          <div className="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5">
-            <div className="assessment-card card shadow-lg">
+      {/* Single centered card — the old container/row/col stack layered three
+          different gutters and made the side margins jump between breakpoints. */}
+      <div className="assessment-card card shadow-lg" style={{ maxWidth: 420 }}>
               <div className="card-body p-3 p-sm-4 p-md-5">
                 {/* Login is pre-auth / institute-agnostic, so no logo here — Career-9 stays
                     present via the grey subline below (shown for everyone). */}
@@ -305,9 +316,6 @@ const StudentLoginPage: React.FC = () => {
                   <div className="text-center mt-3 mt-md-4" style={{ color: '#718096', fontSize: '0.85rem' }}>Need help? Contact your administrator</div>
                 </form>
               </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

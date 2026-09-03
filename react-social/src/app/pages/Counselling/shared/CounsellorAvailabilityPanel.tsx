@@ -8,7 +8,7 @@ import {
 } from '../API/BlockDateRequestAPI'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import WeeklySchedulePanel from './WeeklySchedulePanel'
-import { isTeamsLink } from './WeeklyScheduleForm'
+import { isValidMeetingLink, MEETING_LINK_PLACEHOLDER } from './meetingLink'
 import './CounsellorAvailabilityPanel.css'
 
 interface ManualSlotForm {
@@ -95,6 +95,25 @@ const labelStyle: React.CSSProperties = {
 }
 
 /**
+ * The blocked rows worth showing under "Blocked Dates": deliberate date blocks that are
+ * still ahead of us. A slot that got blocked as the residue of a cancelled session (the
+ * server stamps those "Counsellor cancelled…" / "Counsellor unavailable…", legacy rows
+ * have no reason at all) stays hidden — the session's story lives on the appointment,
+ * and leaving these here made every cancelled booking linger in the panel forever.
+ */
+const visibleBlockedDates = (slots: any[]) => {
+  const d = new Date()
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return slots.filter((s: any) => {
+    if (!s?.isBlocked) return false
+    if (s.date && String(s.date).slice(0, 10) < today) return false
+    const reason = String(s.blockReason || s.reason || '')
+    if (!reason) return false
+    return !/^counsellor (cancelled|unavailable|deactivated)/i.test(reason)
+  })
+}
+
+/**
  * The whole availability workspace for one counsellor: weekly schedule, upcoming
  * slots, extra slots, and date blocking.
  *
@@ -146,7 +165,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
     ]).then(([sRes, brRes]) => {
       const slots: any[] = sRes.data || []
       setManualSlots(slots.filter((s: any) => !s.isBlocked))
-      setBlockedDates(slots.filter((s: any) => s.isBlocked))
+      setBlockedDates(visibleBlockedDates(slots))
       setBlockRequests(Array.isArray(brRes.data) ? brRes.data : [])
     }).catch(() => {})
   }, [counsellorId])
@@ -168,7 +187,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
       .then((res) => {
         const slots: any[] = res.data || []
         setManualSlots(slots.filter((s) => !s.isBlocked))
-        setBlockedDates(slots.filter((s) => s.isBlocked))
+        setBlockedDates(visibleBlockedDates(slots))
       })
       .catch(() => setError('Failed to reload slots.'))
   }
@@ -200,7 +219,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
   // Online extra slot needs the permanent Teams link on file, exactly as the weekly
   // schedule does — the Add Slot button stays disabled until it is a valid one.
   const manualSlotLinkMissing =
-    manualSlotForm.mode === 'ONLINE' && !isTeamsLink(meetingLink)
+    manualSlotForm.mode === 'ONLINE' && !isValidMeetingLink(meetingLink)
 
   const handleSaveManualSlot = async () => {
     if (!manualSlotForm.date || !manualSlotForm.startTime || !manualSlotForm.endTime) {
@@ -219,10 +238,10 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
       return
     }
     // Online sessions run on Microsoft Teams — no link, no bookable online slot.
-    if (manualSlotForm.mode === 'ONLINE' && !isTeamsLink(meetingLink)) {
+    if (manualSlotForm.mode === 'ONLINE' && !isValidMeetingLink(meetingLink)) {
       setError(meetingLink.trim()
-        ? 'The meeting link must be a Microsoft Teams link (teams.microsoft.com or teams.live.com).'
-        : 'Add the Microsoft Teams meeting link above before creating online slots.')
+        ? 'The meeting link must be a Microsoft Teams or Google Meet link (teams.microsoft.com, teams.live.com or meet.google.com).'
+        : 'Add the meeting link (Microsoft Teams or Google Meet) above before creating online slots.')
       return
     }
     setSlotSaving(true)
@@ -592,7 +611,7 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                 {manualSlotForm.mode === 'ONLINE' && (
                   <div>
                     <label style={labelStyle}>
-                      Microsoft Teams meeting link <span style={{ color: '#DC2626' }}>*</span>
+                      Meeting link — Microsoft Teams or Google Meet <span style={{ color: '#DC2626' }}>*</span>
                     </label>
                     <input
                       type='url'
@@ -600,10 +619,10 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                       aria-required='true'
                       value={meetingLink}
                       onChange={(e) => setMeetingLink(e.target.value)}
-                      placeholder='https://teams.microsoft.com/l/meetup-join/...'
+                      placeholder={MEETING_LINK_PLACEHOLDER}
                       style={{
                         ...inputStyle,
-                        borderColor: meetingLink.trim() && !isTeamsLink(meetingLink)
+                        borderColor: meetingLink.trim() && !isValidMeetingLink(meetingLink)
                           ? '#DC2626'
                           : (inputStyle as any).borderColor,
                       }}
@@ -632,8 +651,8 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                   disabled={slotSaving || manualSlotLinkMissing}
                   title={manualSlotLinkMissing
                     ? meetingLink.trim()
-                      ? 'The meeting link must be a Microsoft Teams link'
-                      : 'Add the Microsoft Teams meeting link first'
+                      ? 'The meeting link must be a Microsoft Teams or Google Meet link'
+                      : 'Add the meeting link first'
                     : undefined}
                   style={{
                     width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
@@ -745,8 +764,8 @@ const CounsellorAvailabilityPanel: React.FC<Props> = ({
                               <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>
                                 {formatTime(s.startTime)} – {formatTime(s.endTime)}
                               </div>
-                              {s.reason && (
-                                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{s.reason}</div>
+                              {(s.blockReason || s.reason) && (
+                                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{s.blockReason || s.reason}</div>
                               )}
                             </div>
                           ))}

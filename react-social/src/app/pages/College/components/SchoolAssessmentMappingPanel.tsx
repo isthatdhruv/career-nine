@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { getInstituteTerms } from "../utils/instituteTerms";
 import { Button, Form, Spinner } from "react-bootstrap";
 import { MdQrCode } from "react-icons/md";
 import { ActionIcon } from "../../../components/ActionIcon";
@@ -18,17 +19,20 @@ import SchoolTierManagementModal from "./SchoolTierManagementModal";
 interface Props {
   instituteCode: number;
   instituteName: string;
+  /** false → college wording (Year/Course); true/undefined → school wording. */
+  isSchool?: boolean | null;
   active?: boolean;
 }
 
-const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = true }: Props) => {
+const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, isSchool, active = true }: Props) => {
+  const terms = getInstituteTerms(isSchool);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [selectedSession, setSelectedSession] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [classConfigs, setClassConfigs] = useState<Record<string, { assessmentId: string; configId?: number }>>({});
+  const [classConfigs, setClassConfigs] = useState<Record<string, { assessmentId: string; configId?: number; audience18Plus?: boolean }>>({});
 
   const [bulkSelectedClasses, setBulkSelectedClasses] = useState<Set<string>>(new Set());
   const [bulkAssessmentId, setBulkAssessmentId] = useState<string>("");
@@ -73,11 +77,12 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
         getSchoolLink(instituteCode, Number(sessionId)),
       ]);
 
-      const configs: Record<string, { assessmentId: string; configId?: number }> = {};
+      const configs: Record<string, { assessmentId: string; configId?: number; audience18Plus?: boolean }> = {};
       for (const c of configRes.data || []) {
         configs[String(c.classId)] = {
           assessmentId: String(c.assessmentId),
           configId: c.configId,
+          audience18Plus: !!c.audience18Plus,
         };
       }
       setClassConfigs(configs);
@@ -99,6 +104,13 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
     setClassConfigs((prev) => ({
       ...prev,
       [classId]: { ...prev[classId], [field]: value },
+    }));
+  };
+
+  const toggleClassAudience18Plus = (classId: string, value: boolean) => {
+    setClassConfigs((prev) => ({
+      ...prev,
+      [classId]: { ...prev[classId], audience18Plus: value },
     }));
   };
 
@@ -145,13 +157,14 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
   const handleSaveAll = async () => {
     if (!selectedSession) return;
 
-    const configs: { classId: number; assessmentId: number }[] = classes
+    const configs: { classId: number; assessmentId: number; audience18Plus?: boolean }[] = classes
       .filter((c: any) => classConfigs[String(c.id)]?.assessmentId)
       .map((c: any) => {
         const cfg = classConfigs[String(c.id)];
         return {
           classId: c.id,
           assessmentId: Number(cfg.assessmentId),
+          audience18Plus: !!cfg.audience18Plus,
         };
       });
 
@@ -356,7 +369,7 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                           title="Select all"
                         />
                       </th>
-                      {["Class", "Assessment", "Status"].map((h) => (
+                      {[terms.unit, "Assessment", "Status"].map((h) => (
                         <th key={h} style={{
                           padding: "12px 16px", fontWeight: 700, fontSize: "0.78rem",
                           color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",
@@ -386,18 +399,35 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                             {cls.className}
                           </td>
                           <td style={{ padding: "12px 16px" }}>
-                            <Form.Select
-                              value={cfg.assessmentId}
-                              onChange={(e) => updateClassConfig(String(cls.id), "assessmentId", e.target.value)}
-                              style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.85rem" }}
-                            >
-                              <option value="">-- No assessment --</option>
-                              {assessments.map((a: any) => (
-                                <option key={a.id} value={a.id}>
-                                  {a.AssessmentName || a.assessmentName}
-                                </option>
-                              ))}
-                            </Form.Select>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <Form.Select
+                                value={cfg.assessmentId}
+                                onChange={(e) => updateClassConfig(String(cls.id), "assessmentId", e.target.value)}
+                                style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.85rem", flex: 1 }}
+                              >
+                                <option value="">-- No assessment --</option>
+                                {assessments.map((a: any) => (
+                                  <option key={a.id} value={a.id}>
+                                    {a.AssessmentName || a.assessmentName}
+                                  </option>
+                                ))}
+                              </Form.Select>
+                              <label
+                                style={{
+                                  display: "inline-flex", alignItems: "center", gap: 4,
+                                  fontSize: "0.75rem", color: "#475569", whiteSpace: "nowrap", cursor: "pointer",
+                                }}
+                                title="Adult self-consent wording and Your Email/Phone labels on the registration page"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={!!cfg.audience18Plus}
+                                  onChange={(e) => toggleClassAudience18Plus(String(cls.id), e.target.checked)}
+                                  style={{ cursor: "pointer", width: 14, height: 14 }}
+                                />
+                                18+
+                              </label>
+                            </div>
                           </td>
                           <td style={{ padding: "12px 16px" }}>
                             {cfg.configId ? (

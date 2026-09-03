@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { getInstituteTerms } from "../utils/instituteTerms";
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
 import { MdQrCode } from "react-icons/md";
 import { ActionIcon } from "../../../components/ActionIcon";
@@ -24,13 +25,16 @@ import CatalogSelector from "./CatalogSelector";
 interface Props {
   instituteCode: number;
   instituteName: string;
+  /** false → college wording (Year/Course); true/undefined → school wording. */
+  isSchool?: boolean | null;
   active?: boolean;
 }
 
 const assessmentAppBase = process.env.REACT_APP_ASSESSMENT_APP_URL || "https://assessment.career-9.com";
 const registrationUrl = (token: string) => `${assessmentAppBase}/assessment-register/${token}`;
 
-const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
+const AssessmentMappingPanel = ({ instituteCode, isSchool, active = true }: Props) => {
+  const terms = getInstituteTerms(isSchool);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [mappings, setMappings] = useState<AssessmentInstituteMapping[]>([]);
@@ -44,6 +48,10 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
   const [selectedSession, setSelectedSession] = useState<string>("");
   const [selectedClass, setSelectedClass] = useState<string>("");
   const [selectedSection, setSelectedSection] = useState<string>("");
+  // Per-cohort-row flag: when true, the registration page shows adult
+  // self-consent wording and "Your Email"/"Your Phone" labels instead of the
+  // default minor/parental wording.
+  const [audience18Plus, setAudience18Plus] = useState<boolean>(false);
 
   const [catalogSaving, setCatalogSaving] = useState(false);
 
@@ -58,6 +66,17 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
 
   const selectedClassObj = classes.find((c: any) => String(c.id) === selectedClass);
   const sections: any[] = selectedClassObj?.schoolSections || [];
+
+  // Create-Mapping picker: only assessments allotted to this institute (its
+  // active enabled-assessments catalog). The full list stays available to the
+  // CatalogSelector strip below — that's the surface where new assessments
+  // get allotted to the institute in the first place.
+  const catalogAssessments = useMemo(() => {
+    const enabledIds = new Set(
+      catalog.filter((c) => c.isActive !== false).map((c) => c.assessmentId)
+    );
+    return assessments.filter((a: any) => enabledIds.has(a.id));
+  }, [assessments, catalog]);
 
   useEffect(() => {
     if (active && instituteCode) {
@@ -132,6 +151,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
       instituteCode: instituteCode,
       mappingLevel: mappingLevel,
       paymentTiming: paymentTiming,
+      audience18Plus: audience18Plus,
     };
 
     if (mappingLevel === "SESSION") {
@@ -170,6 +190,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
       setSelectedSession("");
       setSelectedClass("");
       setSelectedSection("");
+      setAudience18Plus(false);
       const newMappingId = createRes?.data?.mappingId;
       if (newMappingId) setTierModalMappingId(newMappingId);
     } catch (error: any) {
@@ -198,6 +219,17 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
       ));
     } catch (error) {
       console.error("Failed to update mapping:", error);
+    }
+  };
+
+  const handleToggleAudience18Plus = async (mapping: AssessmentInstituteMapping) => {
+    try {
+      await updateAssessmentMapping(mapping.mappingId, { audience18Plus: !mapping.audience18Plus });
+      setMappings(mappings.map((m) =>
+        m.mappingId === mapping.mappingId ? { ...m, audience18Plus: !m.audience18Plus } : m
+      ));
+    } catch (error: any) {
+      showErrorToast(String(error.response?.data || error.message || "Failed to update 18+ toggle"));
     }
   };
 
@@ -243,7 +275,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
       for (const session of sessions) {
         const cls = (session.schoolClasses || []).find((c: any) => c.id === mapping.classId);
         if (cls) {
-          parts.push(`Class ${cls.className}`);
+          parts.push(`${terms.unit} ${cls.className}`);
           if (mapping.sectionId) {
             const sec = (cls.schoolSections || []).find((s: any) => s.id === mapping.sectionId);
             if (sec) parts.push(`Section ${sec.sectionName}`);
@@ -316,8 +348,12 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                   onChange={(e) => setSelectedAssessment(e.target.value)}
                   style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: "0.9rem" }}
                 >
-                  <option value="">-- Select an assessment --</option>
-                  {assessments.map((a: any) => (
+                  <option value="">
+                    {catalogAssessments.length === 0
+                      ? "-- No assessments enabled for this institute --"
+                      : "-- Select an assessment --"}
+                  </option>
+                  {catalogAssessments.map((a: any) => (
                     <option key={a.id} value={a.id}>
                       {a.AssessmentName || a.assessmentName}
                     </option>
@@ -340,7 +376,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                 >
                   <option value="INSTITUTE">Institute (whole institute)</option>
                   <option value="SESSION">Session</option>
-                  <option value="CLASS">Class</option>
+                  <option value="CLASS">{terms.unit}</option>
                   <option value="SECTION">Section</option>
                 </Form.Select>
               </div>
@@ -430,6 +466,19 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
               </div>
             )}
 
+            <div style={{ marginBottom: 24 }}>
+              <Form.Check
+                type="checkbox"
+                id="am-audience-18plus"
+                label="Audience is 18+"
+                checked={audience18Plus}
+                onChange={(e) => setAudience18Plus(e.target.checked)}
+              />
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: 6 }}>
+                Adult self-consent wording and Your Email/Phone labels on the registration page
+              </div>
+            </div>
+
             <Button
               onClick={handleCreate}
               disabled={submitting}
@@ -487,7 +536,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "#f8fafc" }}>
-                      {["Assessment", "Level", "Details", "Status", "Free Link", "Paid Link", "Actions"].map((h) => (
+                      {["Assessment", "Level", "Details", "Status", "18+", "Free Link", "Paid Link", "Actions"].map((h) => (
                         <th key={h} style={{
                           padding: "14px 18px", fontWeight: 700, fontSize: "0.78rem",
                           color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",
@@ -545,6 +594,23 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                             }}
                           >
                             {mapping.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+
+                        <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
+                          <span
+                            onClick={() => handleToggleAudience18Plus(mapping)}
+                            title="Adult self-consent wording and Your Email/Phone labels on the registration page"
+                            style={{
+                              background: mapping.audience18Plus ? "#dbeafe" : "#f1f5f9",
+                              color: mapping.audience18Plus ? "#2563eb" : "#94a3b8",
+                              padding: "5px 14px", borderRadius: 20,
+                              fontWeight: 600, fontSize: "0.78rem",
+                              cursor: "pointer", display: "inline-block",
+                              transition: "all 0.15s",
+                            }}
+                          >
+                            {mapping.audience18Plus ? "18+" : "Minor"}
                           </span>
                         </td>
 

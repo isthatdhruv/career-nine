@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Career-9 Assessment Autofill (Dev)",
+  "version": "1.0.0",
+  "description": "Dev/testing tool: random-fills the assessment portal from the demographic page to the last question via DOM clicks, mirroring the in-app dev autofill. Never submits.",
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

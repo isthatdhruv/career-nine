@@ -131,9 +131,9 @@ public class Counsellor implements Serializable {
     @Column(name = "company_name", length = 200)
     private String companyName;
 
-    // Permanent Microsoft Teams meeting link used for every ONLINE session of this
-    // counsellor (a recurring meeting or "Meet now" link they own). Teams is the only
-    // supported platform, so nothing is generated when this is blank.
+    // Permanent Microsoft Teams / Google Meet link used for every ONLINE session of this
+    // counsellor (a recurring meeting or "Meet now" link they own). Teams and Meet
+    // are the only supported platforms, so nothing is generated when this is blank.
     @Column(name = "meeting_link", length = 1000)
     private String meetingLink;
 

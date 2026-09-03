@@ -36,7 +36,7 @@ export interface GroupStudentRow {
   schoolRollNumber?: string;
   email?: string;
   phoneNumber?: string;
-  studentClass?: number | null;
+  studentClass?: string | null;
   gender?: string;
   username?: string;
   sectionName?: string;

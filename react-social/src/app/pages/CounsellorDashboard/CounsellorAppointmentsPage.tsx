@@ -43,15 +43,9 @@ function msUntilStart(appt: any, now: number): number {
 const ABSENT_GRACE_MS = 10 * 60 * 1000
 
 /**
- * How early the counsellor's time-based actions unlock — check-in and Join alike. Mirrors
- * `app.counselling.checkin-opens-before-minutes` on the server, which is what enforces it.
- */
-const CHECKIN_OPENS_BEFORE_MS = 15 * 60 * 1000
-
-/**
- * Check-in is only open around the session: from 10 minutes before the start until the slot
- * ends. Without this the code box could be opened days ahead, and a student marked present
- * for a session that had not happened.
+ * Start session / Join is open any time up to the end of the slot — there is no
+ * "opens N minutes before" lock any more (mirrors the server, which dropped its
+ * lower bound too). Only a session that has already ended is closed.
  */
 function checkinWindow(appt: any, now: number): { open: boolean; reason?: string } {
   const start = buildSlotDate(appt)
@@ -63,12 +57,6 @@ function checkinWindow(appt: any, now: number): { open: boolean; reason?: string
     ? new Date(`${appt.slot.date}T${String(endStr).slice(0, 8)}`).getTime()
     : startMs + 60 * 60 * 1000
 
-  if (now < startMs - CHECKIN_OPENS_BEFORE_MS) {
-    return {
-      open: false,
-      reason: 'Check-in opens 15 minutes before the scheduled start time.',
-    }
-  }
   if (now > endMs) {
     return { open: false, reason: 'This session has ended and can no longer be checked in.' }
   }
@@ -1087,7 +1075,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                                 className='cp-action-btn cp-action-btn-primary'
                                 style={{ textDecoration: 'none', display: 'inline-block' }}
                               >
-                                Join Teams meeting
+                                Join meeting
                               </a>
                             )}
                             <input
@@ -1195,7 +1183,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                                 cursor: win.open ? 'pointer' : 'not-allowed',
                               }}
                             >
-                              Join Teams meeting
+                              Join meeting
                             </a>
                           )
                         })()}

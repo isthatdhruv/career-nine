@@ -33,24 +33,21 @@ const clearGameCompletionMarkers = () => {
 };
 
 export default function AllottedAssessmentPage() {
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>(() => {
+    // Lazy init: reading localStorage in a mount effect painted an empty
+    // "No Assessments Found" frame first on every load.
+    try {
+      return JSON.parse(localStorage.getItem('allottedAssessments') || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [showOngoingModal, setShowOngoingModal] = useState(false);
   const [showMobileWarning, setShowMobileWarning] = useState(false);
   const navigate = useNavigate();
   const { fetchAssessmentData, mintAssessmentSessionCookie } = useAssessment();
   usePreventReload();
-
-  useEffect(() => {
-    const storedAssessments = localStorage.getItem('allottedAssessments');
-    if (storedAssessments) {
-      try {
-        setAssessments(JSON.parse(storedAssessments));
-      } catch (e) {
-        console.error('Error parsing assessments:', e);
-      }
-    }
-  }, []);
 
   const handleStartAssessment = async (assessment: Assessment) => {
     const userStudentId = localStorage.getItem('userStudentId');
@@ -257,7 +254,39 @@ export default function AllottedAssessmentPage() {
   return (
     <div className="assessment-bg--full">
       <div className="assessment-scroll-container" style={{ padding: '2rem 1rem' }}>
-      <div className="container-lg">
+      <div className="container-lg" style={{ position: 'relative' }}>
+        {/* Logout — top right. Navigating to the login page runs its mount
+            cleanup, which wipes session state while preserving unsynced game
+            buffers and unsaved answers. */}
+        <button
+          type="button"
+          onClick={() => navigate('/student-login', { replace: true })}
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: '0.75rem',
+            zIndex: 5,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 16px',
+            borderRadius: 12,
+            border: '1.5px solid rgba(255, 255, 255, 0.35)',
+            background: 'rgba(255, 255, 255, 0.12)',
+            backdropFilter: 'blur(8px)',
+            color: '#fff',
+            fontWeight: 600,
+            fontSize: '0.88rem',
+            cursor: 'pointer',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Logout
+        </button>
         {/* Header Section */}
         <header className="allotted-header text-center mb-4 mb-md-5">
           <div
@@ -314,6 +343,17 @@ export default function AllottedAssessmentPage() {
                 <p style={{ color: '#718096', fontSize: '1rem', lineHeight: '1.6' }}>
                   There are currently no assessments allotted to your account. Please check back later or contact your administrator.
                 </p>
+                <p style={{ color: '#718096', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '1rem' }}>
+                  If you believe this is a mistake, your session may have expired — try logging in again.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate('/student-login', { replace: true })}
+                  className="btn-assessment-primary"
+                  style={{ border: 'none' }}
+                >
+                  Re-login to the portal
+                </button>
               </div>
             </div>
           </div>
@@ -444,7 +484,9 @@ export default function AllottedAssessmentPage() {
                       disabled={
                         assessment.studentStatus === 'completed' ||
                         !assessment.isActive ||
-                        loadingId === assessment.assessmentId
+                        // While ANY start flow is in flight, every card locks —
+                        // two interleaved starts corrupt the shared session state.
+                        loadingId !== null
                       }
                       className="btn w-100"
                       style={{
@@ -507,7 +549,7 @@ export default function AllottedAssessmentPage() {
                       assessment.studentStatus !== 'completed' && (
                         <button
                           onClick={() => handleDevAutoFill(assessment)}
-                          disabled={loadingId === assessment.assessmentId}
+                          disabled={loadingId !== null}
                           className="btn w-100 mt-2"
                           style={{
                             padding: '0.5rem',

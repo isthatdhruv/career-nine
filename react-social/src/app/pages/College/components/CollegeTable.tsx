@@ -44,6 +44,7 @@ type ModalData = {
   instituteName?: string;
   instituteAddress?: string;
   instituteCode?: string;
+  isSchool?: boolean | null;
   display?: string | number | undefined;
   questionOptions?: string[];
   contactPersons?: any[];
@@ -165,6 +166,7 @@ const CollegeTable = (props: {
       instituteName: row.instituteName ?? "",
       instituteAddress: row.instituteAddress ?? "",
       instituteCode: row.instituteCode ?? "",
+      isSchool: (row as { isSchool?: boolean | null }).isSchool,
       display,
       // preserve if API returned these already, otherwise use minimal defaults
       questionOptions: row.questionOptions ?? [""],
@@ -212,6 +214,9 @@ const CollegeTable = (props: {
               name={data.instituteName}
             />
             <span>{data.instituteName ?? ""}</span>
+            {(data as { isSchool?: boolean | null }).isSchool === false && (
+              <span className="badge badge-light-info">College</span>
+            )}
           </div>
         ),
         code: data.instituteCode ?? "",

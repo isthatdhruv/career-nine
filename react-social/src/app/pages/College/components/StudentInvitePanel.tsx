@@ -3,6 +3,8 @@ import { Form, Spinner, Button, Badge } from "react-bootstrap";
 import { QRCodeCanvas } from "qrcode.react";
 import {
   getAssessmentSummaryList,
+  getCatalog,
+  InstituteAssessment,
   ensureInviteMapping,
   createStudentInvite,
   getInvitesByInstitute,
@@ -38,6 +40,7 @@ interface Props {
  */
 const StudentInvitePanel = ({ instituteCode, instituteName }: Props) => {
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
+  const [catalog, setCatalog] = useState<InstituteAssessment[]>([]);
   const [assessmentId, setAssessmentId] = useState<string>("");
 
   const [mappingId, setMappingId] = useState<number | null>(null);
@@ -86,6 +89,12 @@ const StudentInvitePanel = ({ instituteCode, instituteName }: Props) => {
         setAssessments(list.filter((a) => a.isActive !== false));
       })
       .catch(() => !cancelled && setAssessments([]));
+
+    // The invite picker only offers assessments allotted to this institute
+    // (its active enabled-assessments catalog).
+    getCatalog(instituteCode)
+      .then((res) => !cancelled && setCatalog(res.data || []))
+      .catch(() => !cancelled && setCatalog([]));
 
     setStudentsError("");
     getInviteStudents(instituteCode)
@@ -147,6 +156,14 @@ const StudentInvitePanel = ({ instituteCode, instituteName }: Props) => {
     () => assessments.find((a) => String(a.id) === assessmentId)?.assessmentName || "Assessment",
     [assessments, assessmentId]
   );
+
+  // Only assessments allotted to this institute are offered for invites.
+  const catalogAssessments = useMemo(() => {
+    const enabledIds = new Set(
+      catalog.filter((c) => c.isActive !== false).map((c) => c.assessmentId)
+    );
+    return assessments.filter((a) => enabledIds.has(a.id));
+  }, [assessments, catalog]);
 
   const selectedTier = pricingTiers.find((t) => String(t.tierId) === pricingTierId);
 
@@ -221,8 +238,12 @@ const StudentInvitePanel = ({ instituteCode, instituteName }: Props) => {
         onChange={(e) => handleAssessmentChange(e.target.value)}
         style={sel}
       >
-        <option value="">-- Select an assessment --</option>
-        {assessments.map((a) => (
+        <option value="">
+          {catalogAssessments.length === 0
+            ? "-- No assessments enabled for this institute --"
+            : "-- Select an assessment --"}
+        </option>
+        {catalogAssessments.map((a) => (
           <option key={a.id} value={a.id}>
             {a.assessmentName}
           </option>

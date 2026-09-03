@@ -47,6 +47,11 @@ public class AvailabilityTemplate implements Serializable {
     @Column(name = "default_slot_duration", nullable = false)
     private Integer defaultSlotDuration;
 
+    // Gap left between consecutive generated slots (e.g. 30-min slots with a 10-min
+    // break run 10:00, 10:40, 11:20 …). 0 / NULL = back-to-back, the historic behaviour.
+    @Column(name = "break_minutes")
+    private Integer breakMinutes;
+
     // Delivery mode for slots generated from this template: ONLINE | OFFLINE.
     @Column(name = "mode", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'ONLINE'")
     private String mode = "ONLINE";
@@ -136,6 +141,14 @@ public class AvailabilityTemplate implements Serializable {
 
     public void setDefaultSlotDuration(Integer defaultSlotDuration) {
         this.defaultSlotDuration = defaultSlotDuration;
+    }
+
+    public Integer getBreakMinutes() {
+        return breakMinutes;
+    }
+
+    public void setBreakMinutes(Integer breakMinutes) {
+        this.breakMinutes = breakMinutes;
     }
 
     public String getMode() {

@@ -443,8 +443,7 @@ public class StudentDemographicResponseController {
             case "schoolBoard":
                 return studentInfo.getSchoolBoard();
             case "studentClass":
-                return studentInfo.getStudentClass() != null
-                        ? String.valueOf(studentInfo.getStudentClass()) : null;
+                return studentInfo.getStudentClass();
             case "sibling":
                 return studentInfo.getSibling() != null
                         ? String.valueOf(studentInfo.getSibling()) : null;
@@ -477,7 +476,7 @@ public class StudentDemographicResponseController {
                 break;
             case "studentClass":
                 if (!value.isEmpty()) {
-                    studentInfo.setStudentClass(Integer.parseInt(value));
+                    studentInfo.setStudentClass(value);
                 }
                 break;
             case "sibling":

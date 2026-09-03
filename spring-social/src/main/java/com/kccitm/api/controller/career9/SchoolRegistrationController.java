@@ -62,6 +62,7 @@ import com.kccitm.api.service.career9.AssessmentMappingTierService;
 import com.kccitm.api.service.career9.InstituteAssessmentService;
 import com.kccitm.api.service.career9.ReferralService;
 import com.kccitm.api.service.b2c.EntitlementService;
+import com.kccitm.api.util.GradeParser;
 
 @RestController
 @RequestMapping("/school-registration")
@@ -127,6 +128,8 @@ public class SchoolRegistrationController {
             config.setAssessmentId(assessmentId);
             config.setAmount(amount);
         }
+        // 18+ cohort for this class; guarded so an omitted key keeps the stored value.
+        if (data.containsKey("audience18Plus")) config.setAudience18Plus((Boolean) data.get("audience18Plus"));
 
         configRepository.save(config);
         // Feed the institute_assessment catalog (SSOT) — every school write enrols the
@@ -175,6 +178,8 @@ public class SchoolRegistrationController {
                 config.setAssessmentId(assessmentId);
                 config.setAmount(amount);
             }
+            // 18+ cohort for this class; guarded so an omitted key keeps the stored value.
+            if (c.containsKey("audience18Plus")) config.setAudience18Plus((Boolean) c.get("audience18Plus"));
             configRepository.save(config);
             // Feed the institute_assessment catalog (SSOT) for each saved assessment.
             instituteAssessmentService.ensure(instituteCode, assessmentId);
@@ -211,6 +216,7 @@ public class SchoolRegistrationController {
         if (data.containsKey("assessmentId")) config.setAssessmentId(Long.valueOf(data.get("assessmentId").toString()));
         if (data.containsKey("amount")) config.setAmount(data.get("amount") != null ? Long.valueOf(data.get("amount").toString()) : null);
         if (data.containsKey("isActive")) config.setIsActive((Boolean) data.get("isActive"));
+        if (data.containsKey("audience18Plus")) config.setAudience18Plus((Boolean) data.get("audience18Plus"));
 
         configRepository.save(config);
         return ResponseEntity.ok(config);
@@ -446,6 +452,8 @@ public class SchoolRegistrationController {
         InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
         if (institute != null) {
             info.put("instituteName", institute.getInstituteName());
+            // null → school; drives Class/Board vs Year/Course wording on the portal
+            info.put("isSchool", institute.getIsSchool());
         }
         info.put("branding", brandingService.forInstitute(institute));
         info.put("instituteCode", instituteCode);
@@ -465,6 +473,9 @@ public class SchoolRegistrationController {
             Map<String, Object> classInfo = new HashMap<>();
             classInfo.put("classId", config.getClassId());
             classInfo.put("assessmentId", config.getAssessmentId());
+            // 18+ cohort → adult self-consent wording and "Your Email/Phone" once this
+            // class is picked; null/false rows keep the parental copy.
+            classInfo.put("audience18Plus", Boolean.TRUE.equals(config.getAudience18Plus()));
 
             // Pricing comes from the active tier for this (institute, session, assessment).
             // No active tier → registration closed for that class.
@@ -635,6 +646,10 @@ public class SchoolRegistrationController {
         String gender = (String) studentData.get("gender");
         Integer classId = studentData.get("classId") != null ? Integer.valueOf(studentData.get("classId").toString()) : null;
         Integer schoolSectionId = studentData.get("schoolSectionId") != null ? Integer.valueOf(studentData.get("schoolSectionId").toString()) : null;
+        // DPDP parental consent given on the form (the UI enforces it; older clients omit it).
+        Object dpdpObj = studentData.get("dpdpConsent");
+        boolean dpdpConsent = dpdpObj instanceof Boolean ? (Boolean) dpdpObj
+                : dpdpObj != null && ("true".equalsIgnoreCase(dpdpObj.toString()) || "1".equals(dpdpObj.toString()));
 
         if (name == null || email == null || dobStr == null || classId == null
                 || phone == null || phone.trim().isEmpty()) {
@@ -677,8 +692,8 @@ public class SchoolRegistrationController {
         Long mappingAmount = activeTier.getAmount() != null ? activeTier.getAmount() : 0L;
         boolean paymentRequired = mappingAmount > 0;
 
-        // 5. Parse student class number (BUG FIX: always set studentClass)
-        Integer studentClass = parseClassNumber(classId);
+        // 5. Resolve the class row's display label (stored verbatim on StudentInfo)
+        String studentClass = resolveClassLabel(classId);
 
         // 5c. Referral code (applies to free AND paid; records who referred the student)
         String referralCodeStr = (String) studentData.get("referralCode");
@@ -731,22 +746,31 @@ public class SchoolRegistrationController {
                 return handleExistingStudentWithPayment(byEmail.get(0), assessmentId, instituteCode,
                         config.getConfigId(), activeTierId, finalAmount, originalAmount,
                         promoCodeStr, promoDiscountPercent, referralCodeStr,
-                        name, email, dob, phone);
+                        name, email, dob, phone, dpdpConsent);
             }
             return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, activeTierId,
                     config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr);
         }
 
-        // 8. Duplicate check by DOB + institute + class + name
+        // 8. Duplicate check by DOB + institute + class + name. Legacy rows stored the
+        // digit-stripped grade ("10" for a class named "10-A"), so fall back to the
+        // numeric form when the verbatim label finds nothing.
         if (studentClass != null) {
             List<StudentInfo> byDob = studentInfoRepository
                     .findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(dob, instituteCode, studentClass, name);
+            if (byDob.isEmpty()) {
+                Integer legacyGrade = GradeParser.numericGradeOrNull(studentClass);
+                if (legacyGrade != null && !String.valueOf(legacyGrade).equals(studentClass)) {
+                    byDob = studentInfoRepository.findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(
+                            dob, instituteCode, String.valueOf(legacyGrade), name);
+                }
+            }
             if (!byDob.isEmpty()) {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
                             config.getConfigId(), activeTierId, finalAmount, originalAmount,
                             promoCodeStr, promoDiscountPercent, referralCodeStr,
-                            name, email, dob, phone);
+                            name, email, dob, phone, dpdpConsent);
                 }
                 return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId,
                         config.getConfigId(), originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr);
@@ -757,7 +781,8 @@ public class SchoolRegistrationController {
         if (paymentRequired && finalAmount > 0) {
             return createPaymentAndRedirect(config.getConfigId(), activeTierId, assessmentId, instituteCode,
                     finalAmount, originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr,
-                    name, email, dob, dobStr, phone, gender, classId, schoolSectionId, studentClass);
+                    name, email, dob, dobStr, phone, gender, classId, schoolSectionId, studentClass,
+                    dpdpConsent);
         }
 
         // 10. Create student
@@ -783,6 +808,8 @@ public class SchoolRegistrationController {
         studentInfo.setStudentClass(studentClass);
         studentInfo.setSchoolSectionId(schoolSectionId);
         studentInfo.setUser(user);
+        // DPDP: record the parental consent given on this registration form.
+        if (dpdpConsent) studentInfo.setDpdpConsentAt(new Date());
         studentInfo = studentInfoRepository.save(studentInfo);
 
         InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
@@ -870,7 +897,7 @@ public class SchoolRegistrationController {
             Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
             String referralCodeStr, String name, String email, Date dob, String dobStr, String phone, String gender,
-            Integer classId, Integer schoolSectionId, Integer studentClass) {
+            Integer classId, Integer schoolSectionId, String studentClass, boolean dpdpConsent) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
@@ -890,6 +917,9 @@ public class SchoolRegistrationController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
+            // DPDP: carry consent to the webhook, which creates the student and
+            // stamps StudentInfo.dpdpConsentAt from it.
+            txn.setDpdpConsent(dpdpConsent ? Boolean.TRUE : null);
             txn.setStatus("created");
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
                 txn.setPromoCode(promoCodeStr.trim().toUpperCase());
@@ -912,7 +942,7 @@ public class SchoolRegistrationController {
             notes.put("classId", String.valueOf(classId));
             notes.put("transactionId", String.valueOf(txn.getTransactionId()));
             if (schoolSectionId != null) notes.put("schoolSectionId", String.valueOf(schoolSectionId));
-            if (studentClass != null) notes.put("studentClass", String.valueOf(studentClass));
+            if (studentClass != null) notes.put("studentClass", studentClass);
 
             Map<String, String> rzpResponse = razorpayService.createPaymentLink(
                     finalAmountInr, "INR", assessmentName + " - Payment",
@@ -952,7 +982,7 @@ public class SchoolRegistrationController {
             Integer instituteCode, Long schoolConfigId, Long mappingTierId,
             Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent, String referralCodeStr,
-            String name, String email, Date dob, String phone) {
+            String name, String email, Date dob, String phone, boolean dpdpConsent) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (!userStudents.isEmpty()) {
             UserStudent userStudent = userStudents.get(0);
@@ -971,7 +1001,7 @@ public class SchoolRegistrationController {
         String dobStr = sdfFmt.format(dob);
         return createPaymentAndRedirect(schoolConfigId, mappingTierId, assessmentId, instituteCode,
                 finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent, referralCodeStr,
-                name, email, dob, dobStr, phone, null, null, null, null);
+                name, email, dob, dobStr, phone, null, null, null, null, dpdpConsent);
     }
 
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
@@ -1093,20 +1123,13 @@ public class SchoolRegistrationController {
         });
     }
 
-    private Integer parseClassNumber(Integer classId) {
+    private String resolveClassLabel(Integer classId) {
         if (classId == null) return null;
         Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
         if (classOpt.isPresent()) {
             String className = classOpt.get().getClassName();
-            if (className != null) {
-                String digits = className.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    try {
-                        return Integer.parseInt(digits);
-                    } catch (NumberFormatException e) {
-                        logger.warn("Could not parse class number from className for classId: {}", classId);
-                    }
-                }
+            if (className != null && !className.trim().isEmpty()) {
+                return className.trim();
             }
         }
         // Never fall back to classId (a DB primary key) — that would corrupt studentClass.

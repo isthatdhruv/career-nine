@@ -6,6 +6,8 @@ import { PageTitle } from "../../../_metronic/layout/core";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
 import { useAuth } from "../../modules/auth/core/Auth";
 import { Scope } from "../../modules/auth";
+import { getUserCollegeMappings } from "../Users/API/UserMapping_APIs";
+import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import SearchableSelect from "../../components/SearchableSelect";
 import {
   AdminDashboardSnapshot,
@@ -135,7 +137,23 @@ const applyScopeToSnapshot = (
   rules: Scope[],
   isSuperAdmin: boolean
 ): AdminDashboardSnapshot => {
-  if (isSuperAdmin || !rules.length) return snap;
+  if (isSuperAdmin) return snap;
+  if (!rules.length) {
+    // Deny-by-default: a non-super-admin with no institute scope (neither
+    // user_role_scope nor ContactPerson) sees nothing rather than the whole
+    // platform — same rule as the BE AccessScopeService.
+    return {
+      ...snap,
+      students: [],
+      studentMappings: [],
+      institutes: [],
+      assessments: [],
+      reports: [],
+      appointments: [],
+      counsellors: [],
+      ratingSummary: [],
+    };
+  }
 
   const studentDims = (s: any) => ({
     i: toNum(pick(s, ["instituteId", "institute_id"])),
@@ -234,13 +252,105 @@ const DashboardAdminContent: FC = () => {
   const userScopes: Scope[] = useMemo(() => currentUser?.scopes ?? [], [currentUser]);
   const isSuperAdmin = currentUser?.superAdmin === true;
 
+  // user_role_scope rows are the canonical scope source, but many school
+  // accounts are only mapped via ContactPerson rows (the legacy "Map to
+  // College" UI). Mirror useScopedAssessments: fall back to ContactPerson
+  // institutes, and deny-by-default when neither source yields anything.
+  // null = fallback not resolved yet.
+  const [fallbackRules, setFallbackRules] = useState<Scope[] | null>(null);
+  useEffect(() => {
+    if (isSuperAdmin || userScopes.length > 0 || currentUser?.id == null) {
+      setFallbackRules([]);
+      return;
+    }
+    let cancelled = false;
+    getUserCollegeMappings(currentUser.id)
+      .then((res: any) => {
+        if (cancelled) return;
+        const rules: Scope[] = (res.data || [])
+          .map((cp: any) => Number(cp.institute?.instituteCode ?? cp.instituteCode))
+          .filter((v: number) => Number.isFinite(v))
+          .map((i: number) => ({ i }));
+        setFallbackRules(rules);
+      })
+      .catch(() => {
+        if (!cancelled) setFallbackRules([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSuperAdmin, userScopes.length, currentUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const effectiveRules = useMemo<Scope[]>(
+    () => (userScopes.length > 0 ? userScopes : fallbackRules ?? []),
+    [userScopes, fallbackRules]
+  );
+  // Hold the snapshot fetch until scope is resolved so the first paint can't
+  // flash unscoped platform-wide data to a school account.
+  const scopeReady = isSuperAdmin || userScopes.length > 0 || fallbackRules !== null;
+  const scopeDenied = scopeReady && !isSuperAdmin && effectiveRules.length === 0;
+  // School mode: a scoped (non-super-admin) viewer gets an institute-focused
+  // dashboard — platform-wide widgets are hidden below.
+  const schoolMode = !isSuperAdmin;
+
   // raw data
   const [students, setStudents] = useState<any[]>([]);
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [counsellors, setCounsellors] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [ratingSummary, setRatingSummary] = useState<any[]>([]);
-  const [assessments, setAssessments] = useState<any[]>([]);
+  const [rawAssessments, setRawAssessments] = useState<any[]>([]);
+  // The snapshot's `assessments` section is only scope-narrowed by the BE for
+  // users with user_role_scope rows — ContactPerson-fallback users get the
+  // org-wide list, which made the hero "Assessments" count platform-wide.
+  // Mirror the BE rule (DashboardDataService#queryAssessments: assessments
+  // with an active AssessmentInstituteMapping to a scoped institute).
+  // null = no restriction (super-admin / wildcard / still resolving).
+  const [scopedAssessmentIds, setScopedAssessmentIds] = useState<Set<number> | null>(null);
+  useEffect(() => {
+    if (isSuperAdmin || !scopeReady || effectiveRules.length === 0) {
+      setScopedAssessmentIds(null);
+      return;
+    }
+    if (effectiveRules.some((r) => r.i == null)) {
+      // wildcard institute rule → every institute's assessments are in scope
+      setScopedAssessmentIds(null);
+      return;
+    }
+    const codes = Array.from(
+      new Set(effectiveRules.map((r) => r.i).filter((v): v is number => v != null))
+    );
+    let cancelled = false;
+    Promise.all(
+      codes.map((code) =>
+        getAssessmentMappingsByInstitute(code)
+          .then((res: any) =>
+            (res.data || [])
+              .filter((m: any) => m.isActive !== false)
+              .map((m: any) => Number(m.assessmentId))
+          )
+          .catch(() => [] as number[])
+      )
+    ).then((perInstitute) => {
+      if (cancelled) return;
+      const ids = new Set<number>();
+      perInstitute.forEach((arr) => arr.forEach((id) => Number.isFinite(id) && ids.add(id)));
+      setScopedAssessmentIds(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSuperAdmin, scopeReady, effectiveRules]);
+
+  const assessments = useMemo(
+    () =>
+      scopedAssessmentIds == null
+        ? rawAssessments
+        : rawAssessments.filter((a: any) =>
+            scopedAssessmentIds.has(Number(a?.id ?? a?.assessmentId))
+          ),
+    [rawAssessments, scopedAssessmentIds]
+  );
   const [logins, setLogins] = useState<any[]>([]);
   const [loginsLoading, setLoginsLoading] = useState(false);
   const [reports, setReports] = useState<any[]>([]);
@@ -305,6 +415,7 @@ const DashboardAdminContent: FC = () => {
   // Single cached snapshot call: returns a 24h-cached blob from the server (or
   // recomputes server-side if older). Manual refresh forces a recompute.
   useEffect(() => {
+    if (!scopeReady) return;
     let cancelled = false;
     setLoading(true);
     (async () => {
@@ -313,13 +424,13 @@ const DashboardAdminContent: FC = () => {
           ? await refreshAdminDashboardSnapshot()
           : await fetchAdminDashboardSnapshot();
         if (cancelled) return;
-        const snap = applyScopeToSnapshot(raw, userScopes, isSuperAdmin);
+        const snap = applyScopeToSnapshot(raw, effectiveRules, isSuperAdmin);
         setStudents(snap.students);
         setInstitutes(snap.institutes);
         setCounsellors(snap.counsellors);
         setAppointments(snap.appointments);
         setRatingSummary(snap.ratingSummary);
-        setAssessments(snap.assessments);
+        setRawAssessments(snap.assessments);
         setReports(snap.reports);
         setStudentMappings(snap.studentMappings);
         setComputedAt(snap.computedAt);
@@ -342,7 +453,7 @@ const DashboardAdminContent: FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [refreshNonce, userScopes, isSuperAdmin]);
+  }, [refreshNonce, effectiveRules, isSuperAdmin, scopeReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Logins: re-fetch whenever the date range changes
   useEffect(() => {
@@ -849,12 +960,46 @@ const DashboardAdminContent: FC = () => {
               ? `${Object.keys(errors).length} source(s) failed`
               : null
           }
-          quickStats={[
-            { label: "Students", value: loading ? "—" : fmtNum(validStudents.length) },
-            { label: "Institutes", value: loading ? "—" : fmtNum(institutes.length) },
-            { label: "Assessments", value: loading ? "—" : fmtNum(assessments.length) },
-          ]}
+          quickStats={
+            schoolMode
+              ? [
+                  {
+                    label: "Institute",
+                    value: loading
+                      ? "—"
+                      : institutes.length > 1
+                      ? `${institutes.length} institutes`
+                      : institutes[0]?.instituteName || "Not mapped",
+                  },
+                  { label: "Students", value: loading ? "—" : fmtNum(validStudents.length) },
+                  { label: "Assessments", value: loading ? "—" : fmtNum(assessments.length) },
+                ]
+              : [
+                  { label: "Students", value: loading ? "—" : fmtNum(validStudents.length) },
+                  { label: "Institutes", value: loading ? "—" : fmtNum(institutes.length) },
+                  { label: "Assessments", value: loading ? "—" : fmtNum(assessments.length) },
+                ]
+          }
         />
+
+        {scopeDenied && (
+          <div
+            style={{
+              marginTop: 24,
+              padding: "18px 22px",
+              borderRadius: 14,
+              background: t.warningSoft,
+              border: `1px solid ${t.warning}`,
+              color: t.text,
+              fontSize: "0.9rem",
+            }}
+          >
+            <strong>No institute is mapped to your account.</strong>{" "}
+            This dashboard only shows data for your own institute, and your
+            account isn't linked to one yet — ask an administrator to map you
+            to your institute.
+          </div>
+        )}
 
         <DateRangeBar
           t={t}
@@ -893,11 +1038,14 @@ const DashboardAdminContent: FC = () => {
                   : `Distinct students whose report generated in ${rangeLabel(rangeKey, range).toLowerCase()}`
                 : errors.students
                 ? `Failed: ${errors.students}`
+                : schoolMode && institutes.length === 1
+                ? `At ${institutes[0]?.instituteName || "your institute"}`
                 : `Across ${institutes.length} active institutes`
             }
             errored={rangeActive ? !!errors.reports : !!errors.students}
             dateFiltered={rangeActive}
           />
+          {!(schoolMode && institutes.length <= 1) && (
           <KpiCard
             t={t}
             tone={tone("success")}
@@ -926,6 +1074,7 @@ const DashboardAdminContent: FC = () => {
             dateFiltered={rangeActive}
             warn={rangeActive && hasWindowOvershoot ? overshootTooltip : undefined}
           />
+          )}
           <KpiCard
             t={t}
             tone={tone("info")}
@@ -951,6 +1100,9 @@ const DashboardAdminContent: FC = () => {
             errored={rangeActive ? false : !!errors.assessments}
             dateFiltered={rangeActive}
           />
+          {/* Counsellor roster is platform-wide (not row-filtered by scope) —
+              only meaningful to super-admins. */}
+          {!schoolMode && (
           <KpiCard
             t={t}
             tone={tone("warning")}
@@ -967,6 +1119,7 @@ const DashboardAdminContent: FC = () => {
             }
             errored={!!errors.counsellors}
           />
+          )}
           <KpiCard
             t={t}
             tone={tone("purple")}
@@ -1075,36 +1228,43 @@ const DashboardAdminContent: FC = () => {
           />
         </div>
 
-        {/* COUNSELLOR LEADERBOARD */}
-        <div style={{ marginTop: 24 }}>
-          <CounsellorLeaderboardCard
-            t={t}
-            counsellors={counsellors}
-            appointments={appointments}
-            ratingSummary={ratingSummary}
-            loading={loading}
-            errored={!!errors.counsellors || !!errors.appointments}
-          />
-        </div>
+        {/* COUNSELLOR LEADERBOARD — platform-wide ratings, super-admin only */}
+        {!schoolMode && (
+          <div style={{ marginTop: 24 }}>
+            <CounsellorLeaderboardCard
+              t={t}
+              counsellors={counsellors}
+              appointments={appointments}
+              ratingSummary={ratingSummary}
+              loading={loading}
+              errored={!!errors.counsellors || !!errors.appointments}
+            />
+          </div>
+        )}
 
-        {/* DATA HEALTH */}
-        {rangeActive && (dataHealth.orphanedStudents > 0 || dataHealth.reportsWithoutAid > 0) && (
+        {/* DATA HEALTH — ops diagnostics, super-admin only */}
+        {!schoolMode &&
+          rangeActive &&
+          (dataHealth.orphanedStudents > 0 || dataHealth.reportsWithoutAid > 0) && (
           <div style={{ marginTop: 24 }}>
             <DataHealthRow t={t} health={dataHealth} />
           </div>
         )}
 
-        {/* INSTITUTES TABLE */}
-        <div style={{ marginTop: 24 }}>
-          <InstitutesTable
-            t={t}
-            data={topInstitutes}
-            loading={loading}
-            rangeActive={rangeActive}
-            rangeLabelText={rangeLabel(rangeKey, range)}
-            activity={institutesActivity}
-          />
-        </div>
+        {/* INSTITUTES TABLE — cross-institute comparison; pointless when the
+            viewer is scoped to a single institute */}
+        {!(schoolMode && institutes.length <= 1) && (
+          <div style={{ marginTop: 24 }}>
+            <InstitutesTable
+              t={t}
+              data={topInstitutes}
+              loading={loading}
+              rangeActive={rangeActive}
+              rangeLabelText={rangeLabel(rangeKey, range)}
+              activity={institutesActivity}
+            />
+          </div>
+        )}
       </div>
     </>
   );

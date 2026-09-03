@@ -28,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -72,6 +73,8 @@ import com.kccitm.api.service.StudentProvisioningService;
 @RestController
 @RequestMapping("/student-info")
 public class StudentInfoController {
+    private static final org.slf4j.Logger logger =
+            org.slf4j.LoggerFactory.getLogger(StudentInfoController.class);
     @Autowired
     private UserRepository userRepository;
     @Autowired
@@ -99,6 +102,8 @@ public class StudentInfoController {
     private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired
     private com.kccitm.api.service.AssessmentSessionService assessmentSessionService;
+    @Autowired
+    private com.kccitm.api.service.StudentPurgeService studentPurgeService;
     @Autowired
     private StudentProvisioningService studentProvisioningService;
     @Autowired
@@ -1227,6 +1232,51 @@ public class StudentInfoController {
         studentInfoRepository.deleteById(id);
     }
 
+    /**
+     * IRREVERSIBLE hard delete of a student and every trace of their data —
+     * answers, scores, reports, entitlements, counselling, demographics,
+     * memberships, logs, the account rows themselves (payment transactions are
+     * anonymized, not deleted — they are the financial ledger). Admin "Delete
+     * student" action on the Data Download page; also the DPDP erasure backend.
+     * Returns per-table deletion counts so the admin sees exactly what went.
+     */
+    // no scope arg: identifies by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.delete')")
+    @DeleteMapping("/purge-student/{userStudentId}")
+    public ResponseEntity<?> purgeStudent(@PathVariable("userStudentId") Long userStudentId) {
+        com.kccitm.api.service.StudentPurgeService.PurgeResult result;
+        try {
+            result = studentPurgeService.purge(userStudentId);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            // One transaction: a failure rolled the whole purge back — nothing was deleted.
+            logger.error("Student purge FAILED (rolled back, nothing deleted): userStudentId={}",
+                    userStudentId, e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Purge failed — nothing was deleted: " + e.getMessage());
+        }
+        // Login row cleanup in its own transaction; the purge above is already committed.
+        String userRowOutcome;
+        try {
+            studentPurgeService.tryDeleteUser(result.userId);
+            userRowOutcome = "deleted";
+        } catch (Exception e) {
+            try {
+                studentPurgeService.scrubUser(result.userId);
+                userRowOutcome = "scrubbed";
+            } catch (Exception e2) {
+                userRowOutcome = "left-in-place";
+            }
+        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("userStudentId", userStudentId);
+        response.put("deleted", result.deleted);
+        response.put("loginRow", userRowOutcome);
+        return ResponseEntity.ok(response);
+    }
+
     // no scope arg: identifies by userStudentId; scope-filter narrows access
     @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping("/getDemographics/{userStudentId}")
@@ -1302,7 +1352,7 @@ public class StudentInfoController {
         if (request.containsKey("studentClass")) {
             Object classVal = request.get("studentClass");
             if (classVal != null) {
-                studentInfo.setStudentClass(Integer.valueOf(classVal.toString()));
+                studentInfo.setStudentClass(classVal.toString());
             }
         }
         if (request.containsKey("email")) {

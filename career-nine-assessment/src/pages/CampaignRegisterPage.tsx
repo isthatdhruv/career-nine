@@ -10,6 +10,14 @@ import {
 } from "../api-clients/campaignAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 import DuplicateEmailDialog, { DuplicateEmailPayload } from "../components/DuplicateEmailDialog"
+import ParentalConsentSection from "../components/ParentalConsent"
+import { contactTerms } from "../utils/instituteTerms"
+import { CAREER9_LOGO } from "../hooks/useStudentBranding"
+
+// The campaign's brand logo when one is set (http(s) only — same guard as
+// brandLogoSrc), otherwise the default Career-9 logo.
+const campaignLogoSrc = (url?: string | null): string =>
+  url && /^https?:\/\//i.test(url) ? url : CAREER9_LOGO
 
 type Tier = {
   campaignAssessmentTierId: number
@@ -36,6 +44,8 @@ type Assessment = {
   purchasePath: string
   counsellingModel: string
   description?: string | null
+  /** true → this assessment's cohort is 18+ (deep-link mode's audience flag). */
+  audience18Plus?: boolean | null
   tiers: Tier[]
 }
 
@@ -44,6 +54,8 @@ type CampaignClass = {
   className: string
   assessmentId: number
   sortOrder?: number
+  /** true → this class route is an 18+ cohort (class mode's audience flag). */
+  audience18Plus?: boolean | null
 }
 
 type CampaignInfo = {
@@ -79,6 +91,8 @@ const CampaignRegisterPage = () => {
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
+  // DPDP parental consent — registration cannot proceed without it.
+  const [dpdpConsent, setDpdpConsent] = useState(false)
 
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(aidFromUrl)
   const [selectedTierId, setSelectedTierId] = useState<number | null>(tidFromUrl)
@@ -98,6 +112,7 @@ const CampaignRegisterPage = () => {
   const [promoApplied, setPromoApplied] = useState<{ code: string; discountPercent: number } | null>(null)
   const [promoError, setPromoError] = useState("")
   const [promoValidating, setPromoValidating] = useState(false)
+  const [showPromo, setShowPromo] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -146,10 +161,27 @@ const CampaignRegisterPage = () => {
     }
   }, [info, classMode, selectedClassId])
 
+  // A stale or garbled deep-link id (deleted tier, retargeted link, NaN) must
+  // not suppress the pickers and dead-end the page — drop it and fall back to
+  // normal selection.
+  useEffect(() => {
+    if (!info || selectedAssessmentId == null) return
+    if (!info.assessments.some((a) => a.assessmentId === selectedAssessmentId)) {
+      setSelectedAssessmentId(null)
+    }
+  }, [info, selectedAssessmentId])
+
   const selectedAssessment: Assessment | null =
     info && selectedAssessmentId != null
       ? info.assessments.find((a) => a.assessmentId === selectedAssessmentId) || null
       : null
+
+  useEffect(() => {
+    if (!selectedAssessment || selectedTierId == null) return
+    if (!selectedAssessment.tiers.some((t) => t.campaignAssessmentTierId === selectedTierId)) {
+      setSelectedTierId(null)
+    }
+  }, [selectedAssessment, selectedTierId])
 
   useEffect(() => {
     if (selectedAssessment && selectedTierId == null && selectedAssessment.tiers.length === 1) {
@@ -162,6 +194,24 @@ const CampaignRegisterPage = () => {
       ? selectedAssessment.tiers.find((t) => t.campaignAssessmentTierId === selectedTierId) || null
       : null
 
+  const selectedClassRoute: CampaignClass | null =
+    info && selectedClassId != null
+      ? info.classes?.find((c) => c.classId === selectedClassId) || null
+      : null
+
+  // 18+ cohorts consent for themselves: class mode takes the flag off the picked
+  // class route, deep-link mode off the selected assessment. Nothing picked yet
+  // (or a legacy/null flag) → minor copy.
+  const adult = !!(classMode ? selectedClassRoute?.audience18Plus : selectedAssessment?.audience18Plus)
+  const { emailLabel, phoneLabel } = contactTerms(adult)
+
+  // The consent wording itself changes with the cohort, so a re-selection that
+  // flips the audience must be re-attested under the new copy. Functional
+  // bail-out so an unchanged value doesn't re-render the form.
+  useEffect(() => {
+    setDpdpConsent((prev) => (prev ? false : prev))
+  }, [adult])
+
   const isTryFirst = selectedAssessment?.purchasePath === "B"
   const isPaid = !isTryFirst && (selectedTier?.priceInr ?? 0) > 0
   // Match backend integer-truncation math (Java long division) so the price
@@ -170,13 +220,16 @@ const CampaignRegisterPage = () => {
     ? Math.floor(selectedTier.priceInr * (100 - promoApplied.discountPercent) / 100)
     : (selectedTier?.priceInr ?? 0)
 
+  // The native date picker works in yyyy-mm-dd; everything downstream of this
+  // page (validation, payload, localStorage password) expects dd-mm-yyyy.
+  const dobToInputValue = (d: string) => {
+    const m = d.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : ""
+  }
+
   const handleDobChange = (value: string) => {
-    let cleaned = value.replace(/[^0-9-]/g, "")
-    const digits = cleaned.replace(/-/g, "")
-    if (digits.length <= 2) cleaned = digits
-    else if (digits.length <= 4) cleaned = digits.slice(0, 2) + "-" + digits.slice(2)
-    else cleaned = digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4, 8)
-    setDob(cleaned)
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    setDob(m ? `${m[3]}-${m[2]}-${m[1]}` : "")
   }
 
   const handleApplyPromo = async () => {
@@ -215,6 +268,14 @@ const CampaignRegisterPage = () => {
       showErrorToast("Date of Birth must be in dd-mm-yyyy format.")
       return
     }
+    if (!dpdpConsent) {
+      showErrorToast(
+        adult
+          ? "Please confirm the consent to continue."
+          : "Please confirm the parental consent to continue."
+      )
+      return
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       showErrorToast("Please enter a valid email address.")
       return
@@ -234,6 +295,8 @@ const CampaignRegisterPage = () => {
         dob,
         phone: phone.trim(),
         gender,
+        // DPDP parental consent (submit is gated on the checkbox above).
+        dpdpConsent,
       }
       if (!isTryFirst && promoApplied) data.promoCode = promoApplied.code
       if (selectedClassId != null) data.classId = selectedClassId
@@ -347,8 +410,11 @@ const CampaignRegisterPage = () => {
     )
   }
 
-  const onlyOneAssessmentInUrl = aidFromUrl != null
-  const onlyOneTierInUrl = tidFromUrl != null
+  const onlyOneAssessmentInUrl =
+    aidFromUrl != null && info.assessments.some((a) => a.assessmentId === aidFromUrl)
+  const onlyOneTierInUrl =
+    tidFromUrl != null && selectedAssessment != null &&
+    selectedAssessment.tiers.some((t) => t.campaignAssessmentTierId === tidFromUrl)
   // In class mode the class picker drives assessment selection, so the raw
   // assessment picker is hidden.
   const showClassPicker = classMode && info.classes!.length > 1
@@ -369,9 +435,7 @@ const CampaignRegisterPage = () => {
       <div style={s.glassCard}>
         {/* Header */}
         <div style={s.header}>
-          {info.campaign.brandLogoUrl && (
-            <img src={info.campaign.brandLogoUrl} alt="" style={s.brandLogo} />
-          )}
+          <img src={campaignLogoSrc(info.campaign.brandLogoUrl)} alt="" style={s.brandLogo} />
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
             <div style={{
               width: 10, height: 10, borderRadius: "50%",
@@ -495,7 +559,15 @@ const CampaignRegisterPage = () => {
 
           {/* Registration form */}
           {showForm && (
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={handleSubmit}
+              // Enter in a text field must never submit the registration — only the
+              // explicit submit button does. Field-level handlers (promo apply) still
+              // run first, since the event bubbles from the input up to the form.
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault()
+              }}
+            >
               <h3 style={s.sectionTitle}>Your details</h3>
               {formError && (
                 <div style={s.errorBanner}>
@@ -528,10 +600,10 @@ const CampaignRegisterPage = () => {
                   />
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
                   <div>
                     <label style={s.label}>
-                      Email <span style={{ color: "#f43f5e" }}>*</span>
+                      {emailLabel} <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
                       ref={emailRef}
@@ -551,23 +623,22 @@ const CampaignRegisterPage = () => {
                     </label>
                     <input
                       ref={dobRef}
-                      type="text"
-                      placeholder="dd-mm-yyyy"
-                      value={dob}
+                      type="date"
+                      value={dobToInputValue(dob)}
                       onChange={(e) => handleDobChange(e.target.value)}
-                      maxLength={10}
+                      max={new Date().toISOString().split("T")[0]}
                       required
-                      style={s.input}
+                      style={{ ...s.input, color: dob ? "#1e293b" : "#94a3b8" }}
                       onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
                       onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
                     />
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
                   <div>
                     <label style={s.label}>
-                      Phone Number <span style={{ color: "#f43f5e" }}>*</span>
+                      {phoneLabel} <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
                       type="tel"
@@ -597,8 +668,20 @@ const CampaignRegisterPage = () => {
                   </div>
                 </div>
 
-                {/* Promo code */}
-                {isPaid && (
+                {/* Promo code — hidden behind a toggle until the student asks for it */}
+                {isPaid && !showPromo && !promoApplied && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPromo(true)}
+                    style={{
+                      background: "none", border: "none", padding: 0, textAlign: "left",
+                      color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+                    }}
+                  >
+                    Do you have a promo code?
+                  </button>
+                )}
+                {isPaid && (showPromo || promoApplied) && (
                   <div>
                     <label style={s.label}>Promo Code</label>
                     {promoApplied ? (
@@ -677,6 +760,10 @@ const CampaignRegisterPage = () => {
                 )}
               </div>
 
+              <div style={{ marginTop: 20 }}>
+                <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
+              </div>
+
               <button
                 type="submit"
                 disabled={submitting}
@@ -703,7 +790,7 @@ const CampaignRegisterPage = () => {
               </button>
 
               <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-                By registering, you agree to the campaign terms and conditions.
+                By registering, I agree to the Career-9's terms and conditions.
               </p>
             </form>
           )}
@@ -966,7 +1053,7 @@ const s: { [key: string]: React.CSSProperties } = {
     borderRadius: 12,
     border: "1.5px solid #e2e8f0",
     background: "rgba(255, 255, 255, 0.8)",
-    fontSize: "0.92rem",
+    fontSize: 16,
     color: "#1e293b",
     outline: "none",
     transition: "border-color 0.2s, box-shadow 0.2s",

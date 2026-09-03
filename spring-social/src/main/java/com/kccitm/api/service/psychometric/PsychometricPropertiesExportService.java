@@ -157,8 +157,9 @@ public class PsychometricPropertiesExportService {
         r.school = student.getInstitute() != null && student.getInstitute().getInstituteName() != null
                 ? student.getInstitute().getInstituteName() : "";
         r.name = info != null && info.getName() != null ? info.getName() : safe(scores.studentName);
-        r.studentClass = info != null && info.getStudentClass() != null
-                ? info.getStudentClass() : parseClass(scores.studentClass);
+        Integer infoGrade = info != null
+                ? com.kccitm.api.util.GradeParser.numericGradeOrNull(info.getStudentClass()) : null;
+        r.studentClass = infoGrade != null ? infoGrade : parseClass(scores.studentClass);
         r.band = PsychometricDataset.bandOf(r.studentClass);
 
         for (int i = 0; i < MI_SCORE_KEYS.length; i++) {
@@ -614,12 +615,7 @@ public class PsychometricPropertiesExportService {
     }
 
     private static Integer parseClass(String studentClass) {
-        if (studentClass == null) return null;
-        try {
-            return Integer.valueOf(studentClass.trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
     }
 
     private static String safe(String s) {

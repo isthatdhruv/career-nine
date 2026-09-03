@@ -302,24 +302,55 @@ public class AssessmentInstituteMappingController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Partial update of the three admin-editable fields on a mapping.
+     *
+     * Takes a raw Map, NOT the entity: binding to AssessmentInstituteMapping made
+     * every omitted field indistinguishable from an explicitly-sent one. Jackson
+     * builds the entity through its no-arg constructor, so the field initializers
+     * (isActive = true, audience18Plus = false) run first and a "!= null" guard
+     * then sees those defaults rather than null — an isActive-only PUT silently
+     * reset audience18Plus to false, and an audience18Plus-only PUT silently
+     * reactivated a deactivated mapping. containsKey is the only guard that can
+     * tell "not sent" from "sent as false".
+     */
     @PutMapping("/update/{id}")
     @PreAuthorize("@auth.allows('assessment_institute_mapping.update')")
     public ResponseEntity<?> updateMapping(@PathVariable Long id,
-            @RequestBody AssessmentInstituteMapping updated) {
+            @RequestBody Map<String, Object> req) {
         Optional<AssessmentInstituteMapping> existingOpt = mappingRepository.findById(id);
         if (!existingOpt.isPresent()) {
             return ResponseEntity.notFound().build();
         }
 
         AssessmentInstituteMapping existing = existingOpt.get();
-        if (updated.getIsActive() != null) {
-            existing.setIsActive(updated.getIsActive());
+        if (req.containsKey("isActive")) {
+            existing.setIsActive(toBool(req.get("isActive")));
         }
-        if (updated.getAmount() != null) {
-            existing.setAmount(updated.getAmount());
+        if (req.containsKey("amount")) {
+            existing.setAmount(toLong(req.get("amount")));
+        }
+        if (req.containsKey("audience18Plus")) {
+            existing.setAudience18Plus(toBool(req.get("audience18Plus")));
         }
 
         return ResponseEntity.ok(mappingRepository.save(existing));
+    }
+
+    /** Tolerant boolean coercion so a string/number "isActive" from JSON no longer 500s. */
+    private static Boolean toBool(Object o) {
+        if (o == null) return null;
+        if (o instanceof Boolean) return (Boolean) o;
+        return Boolean.parseBoolean(o.toString().trim());
+    }
+
+    /** Tolerant long coercion: JSON may deliver amount as Integer, Double or String. */
+    private static Long toLong(Object o) {
+        if (o == null) return null;
+        if (o instanceof Number) return ((Number) o).longValue();
+        String s = o.toString().trim();
+        if (s.isEmpty()) return null;
+        return (long) Double.parseDouble(s);
     }
 
     @DeleteMapping("/delete/{id}")
@@ -684,8 +715,15 @@ public class AssessmentInstituteMappingController {
                 .ifPresent(a -> info.put("assessmentName", a.getAssessmentName()));
 
         InstituteDetail institute = instituteDetailRepository.findById(mapping.getInstituteCode().intValue());
-        if (institute != null) info.put("instituteName", institute.getInstituteName());
+        if (institute != null) {
+            info.put("instituteName", institute.getInstituteName());
+            // null → school; drives Class/Board vs Year/Course wording on the portal
+            info.put("isSchool", institute.getIsSchool());
+        }
         info.put("branding", brandingService.forInstitute(institute));
+        // 18+ cohort on this mapping row → the registration page shows adult
+        // self-consent wording and "Your Email/Phone" instead of the parental copy.
+        info.put("audience18Plus", Boolean.TRUE.equals(mapping.getAudience18Plus()));
 
         // Coordinates already fixed on the mapping.
         if (mapping.getSessionId() != null) {
@@ -744,6 +782,8 @@ public class AssessmentInstituteMappingController {
         String dobStr = (String) studentData.get("dob");
         String phone = (String) studentData.get("phone");
         String gender = (String) studentData.get("gender");
+        // DPDP parental consent given on the form (the UI enforces it; older clients omit it).
+        boolean dpdpConsent = truthy(studentData.get("dpdpConsent"));
 
         if (name == null || email == null || dobStr == null
                 || phone == null || phone.trim().isEmpty()) {
@@ -760,16 +800,16 @@ public class AssessmentInstituteMappingController {
         }
 
         // 3. Resolve class info based on mapping level
-        Integer studentClass = null;
+        String studentClass = null;
         Integer schoolSectionId = null;
 
         if ("SECTION".equals(mapping.getMappingLevel())) {
             schoolSectionId = mapping.getSectionId();
             if (mapping.getClassId() != null) {
-                studentClass = parseClassNumber(mapping.getClassId());
+                studentClass = resolveClassLabel(mapping.getClassId());
             }
         } else if ("CLASS".equals(mapping.getMappingLevel())) {
-            studentClass = parseClassNumber(mapping.getClassId());
+            studentClass = resolveClassLabel(mapping.getClassId());
             // Section is optional from request
             if (studentData.get("schoolSectionId") != null) {
                 schoolSectionId = Integer.valueOf(studentData.get("schoolSectionId").toString());
@@ -780,7 +820,7 @@ public class AssessmentInstituteMappingController {
             // student self-select session -> class -> section).
             if (studentData.get("classId") != null) {
                 Integer classId = Integer.valueOf(studentData.get("classId").toString());
-                studentClass = parseClassNumber(classId);
+                studentClass = resolveClassLabel(classId);
             }
             if (studentData.get("schoolSectionId") != null) {
                 schoolSectionId = Integer.valueOf(studentData.get("schoolSectionId").toString());
@@ -880,21 +920,30 @@ public class AssessmentInstituteMappingController {
             if (paymentRequired && finalAmount > 0) {
                 return handleExistingStudentWithPayment(existing, assessmentId, instituteCode,
                         mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                        referralCodeStr, name, email, dob, phone, activeTierId, httpResponse);
+                        referralCodeStr, name, email, dob, phone, activeTierId, dpdpConsent, httpResponse);
             }
             return handleExistingStudent(existing, assessmentId, instituteCode,
                     mapping.getMappingId(), activeTierId, referralCodeStr, httpResponse);
         }
 
-        // 7. Duplicate check by DOB + institute + class + name
+        // 7. Duplicate check by DOB + institute + class + name. Legacy rows stored the
+        // digit-stripped grade ("10" for a class named "10-A"), so fall back to the
+        // numeric form when the verbatim label finds nothing.
         if (studentClass != null) {
             List<StudentInfo> byDob = studentInfoRepository
                     .findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(dob, instituteCode, studentClass, name);
+            if (byDob.isEmpty()) {
+                Integer legacyGrade = com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
+                if (legacyGrade != null && !String.valueOf(legacyGrade).equals(studentClass)) {
+                    byDob = studentInfoRepository.findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(
+                            dob, instituteCode, String.valueOf(legacyGrade), name);
+                }
+            }
             if (!byDob.isEmpty()) {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
                             mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                            referralCodeStr, name, email, dob, phone, activeTierId, httpResponse);
+                            referralCodeStr, name, email, dob, phone, activeTierId, dpdpConsent, httpResponse);
                 }
                 return handleExistingStudent(byDob.get(0), assessmentId, instituteCode,
                         mapping.getMappingId(), activeTierId, referralCodeStr, httpResponse);
@@ -905,7 +954,7 @@ public class AssessmentInstituteMappingController {
         if (paymentRequired && finalAmount > 0) {
             return createPaymentAndRedirect(mapping.getMappingId(), assessmentId, instituteCode,
                     finalAmount, originalAmount, promoCodeStr, promoDiscountPercent, referralCodeStr,
-                    name, email, dob, dobStr, phone, gender, activeTierId);
+                    name, email, dob, dobStr, phone, gender, activeTierId, dpdpConsent);
         }
 
         // 9. Free registration (no amount, or 100% promo discount) — create student directly.
@@ -961,6 +1010,8 @@ public class AssessmentInstituteMappingController {
         studentInfo.setStudentClass(studentClass);
         studentInfo.setSchoolSectionId(schoolSectionId);
         studentInfo.setUser(user);
+        // DPDP: record the parental consent given on this registration form.
+        if (dpdpConsent) studentInfo.setDpdpConsentAt(new Date());
         studentInfo = studentInfoRepository.save(studentInfo);
 
         // Create UserStudent
@@ -1432,7 +1483,7 @@ public class AssessmentInstituteMappingController {
     private ResponseEntity<?> createPaymentAndRedirect(Long mappingId, Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
             String referralCodeStr, String name, String email, Date dob, String dobStr, String phone,
-            String gender, Long mappingTierId) {
+            String gender, Long mappingTierId, boolean dpdpConsent) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
@@ -1452,6 +1503,9 @@ public class AssessmentInstituteMappingController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
+            // DPDP: carry consent to the webhook, which creates the student and
+            // stamps StudentInfo.dpdpConsentAt from it.
+            txn.setDpdpConsent(dpdpConsent ? Boolean.TRUE : null);
             txn.setStatus("created");
             txn.setMappingTierId(mappingTierId);
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
@@ -1512,7 +1566,7 @@ public class AssessmentInstituteMappingController {
             Integer instituteCode, Long mappingId, Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent, String referralCodeStr,
             String name, String email, Date dob, String phone, Long mappingTierId,
-            HttpServletResponse httpResponse) {
+            boolean dpdpConsent, HttpServletResponse httpResponse) {
         // Check if already assigned
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (!userStudents.isEmpty()) {
@@ -1535,7 +1589,7 @@ public class AssessmentInstituteMappingController {
         String dobStr = sdf.format(dob);
         return createPaymentAndRedirect(mappingId, assessmentId, instituteCode,
                 finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent, referralCodeStr,
-                name, email, dob, dobStr, phone, null, mappingTierId);
+                name, email, dob, dobStr, phone, null, mappingTierId, dpdpConsent);
     }
 
     /**
@@ -1755,23 +1809,24 @@ public class AssessmentInstituteMappingController {
     }
 
     /**
-     * Parse class number from SchoolClasses ID.
-     * Looks up the SchoolClasses entity and tries to parse className as an integer.
+     * Resolve a SchoolClasses id to its display label, stored verbatim on
+     * StudentInfo.studentClass.
      */
-    private Integer parseClassNumber(Integer classId) {
+    /** Truthy parse of a request-body flag ("true"/true/1). Absent or anything else → false. */
+    private static boolean truthy(Object v) {
+        if (v instanceof Boolean) return (Boolean) v;
+        if (v == null) return false;
+        String s = v.toString().trim();
+        return "true".equalsIgnoreCase(s) || "1".equals(s);
+    }
+
+    private String resolveClassLabel(Integer classId) {
         if (classId == null) return null;
         Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
         if (classOpt.isPresent()) {
             String className = classOpt.get().getClassName();
-            if (className != null) {
-                String digits = className.replaceAll("[^0-9]", "");
-                if (!digits.isEmpty()) {
-                    try {
-                        return Integer.parseInt(digits);
-                    } catch (NumberFormatException e) {
-                        logger.warn("Could not parse class number from className for classId: {}", classId);
-                    }
-                }
+            if (className != null && !className.trim().isEmpty()) {
+                return className.trim();
             }
         }
         // Never fall back to classId (a DB primary key) — that would corrupt studentClass
@@ -2086,8 +2141,15 @@ public class AssessmentInstituteMappingController {
         assessmentTableRepository.findById(inv.getAssessmentId())
                 .ifPresent(a -> info.put("assessmentName", a.getAssessmentName()));
         InstituteDetail institute = instituteDetailRepository.findById(mapping.getInstituteCode().intValue());
-        if (institute != null) info.put("instituteName", institute.getInstituteName());
+        if (institute != null) {
+            info.put("instituteName", institute.getInstituteName());
+            // null → school; drives Class/Board vs Year/Course wording on the portal
+            info.put("isSchool", institute.getIsSchool());
+        }
         info.put("branding", brandingService.forInstitute(institute));
+        // 18+ cohort on the underlying mapping row → adult self-consent wording
+        // and "Your Email/Phone" on the invite page.
+        info.put("audience18Plus", Boolean.TRUE.equals(mapping.getAudience18Plus()));
 
         info.put("tierName", tier.getName());
         // Effective price = invite's custom amount if set, else the tier's base price.
@@ -2166,6 +2228,14 @@ public class AssessmentInstituteMappingController {
             response.putAll(studentSessionService.buildSessionPayload(us.getUserStudentId()));
             issueAssessmentSessionCookie(httpResponse, us, assessmentId);
             return ResponseEntity.ok(response);
+        }
+
+        // DPDP: record the parental consent ticked on the invite confirmation form.
+        // The student row already exists here (invites are bound to known students),
+        // so stamp directly; first consent wins.
+        if (truthy(body != null ? body.get("dpdpConsent") : null) && si.getDpdpConsentAt() == null) {
+            si.setDpdpConsentAt(new Date());
+            studentInfoRepository.save(si);
         }
 
         long payable = computeInvitePayable(inv, tier, mapping);

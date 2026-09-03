@@ -61,7 +61,7 @@ export interface StudentWithMapping {
     username?: string;
     schoolSectionId?: number;
     /** Flat student_info.student_class — Grade fallback when schoolSectionId is unset. */
-    studentClass?: number | null;
+    studentClass?: string | null;
     gender?: string;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];
@@ -222,6 +222,16 @@ export function resetAssessment(userStudentId: number, assessmentId: number) {
     });
 }
 
+// IRREVERSIBLE: hard-deletes the student and every trace of their data
+// (answers, scores, reports, entitlements, counselling, demographics, logs,
+// account rows; payment transactions are anonymized, not deleted). Returns
+// per-table deletion counts.
+export function purgeStudent(userStudentId: number) {
+    return axios.delete<{ success: boolean; deleted: Record<string, number>; loginRow: string }>(
+        `${STUDENT_INFO_BASE}/purge-student/${userStudentId}`
+    );
+}
+
 // Bulk fetch proctoring data for multiple student+assessment pairs
 export function getBulkProctoringData(pairs: { userStudentId: number; assessmentId: number }[]) {
     return axios.post<any[]>(`${API_URL}/assessment-proctoring/getBulkProctoringData`, pairs);
@@ -291,7 +301,7 @@ export interface StudentScoresResponse {
     student: {
         name: string;
         rollNumber: string;
-        studentClass: number | null;
+        studentClass: string | null;
         dob: string;
     };
     scores: StudentScoreDetail[];

@@ -33,6 +33,7 @@ export interface CampaignAssessmentRow {
   description?: string | null;
   isActive?: boolean;
   sortOrder?: number;
+  audience18Plus?: boolean;
   tiers?: CampaignAssessmentTier[];
 }
 
@@ -57,6 +58,7 @@ export interface CampaignClassRoute {
   className?: string | null;
   sortOrder?: number;
   isActive?: boolean;
+  audience18Plus?: boolean;
 }
 
 export interface CampaignClassOption {
@@ -85,6 +87,15 @@ export const getAllCampaigns = () => axios.get<Campaign[]>(`${API_URL}/campaign/
 export const getCampaign = (id: number) => axios.get<CampaignFullDto>(`${API_URL}/campaign/get/${id}`);
 export const getCampaignBySlug = (slug: string) => axios.get<CampaignFullDto>(`${API_URL}/campaign/get/by-slug/${slug}`);
 export const createCampaign = (body: Campaign) => axios.post<Campaign>(`${API_URL}/campaign/create`, body);
+
+// Brand logo (PNG/JPG only — may be reused in emails) → DigitalOcean Spaces.
+// Returns { url } (CDN URL) to store in the campaign's brandLogoUrl.
+export const uploadCampaignLogo = (base64Data: string, campaignId?: number, previousUrl?: string) =>
+  axios.post<{ url: string }>(`${API_URL}/campaign/upload-logo`, {
+    base64Data,
+    campaignId: campaignId ?? undefined,
+    previousUrl: previousUrl || undefined,
+  });
 export const updateCampaign = (id: number, body: Partial<Campaign>) =>
   axios.put<Campaign>(`${API_URL}/campaign/update/${id}`, body);
 export const deleteCampaign = (id: number) => axios.delete(`${API_URL}/campaign/delete/${id}`);
@@ -96,6 +107,7 @@ export const attachAssessment = (campaignId: number, body: {
   purchasePath?: "A" | "B" | null;
   counsellingModel?: "1" | "2" | null;
   sortOrder?: number;
+  audience18Plus?: boolean;
 }) => axios.post(`${API_URL}/campaign/${campaignId}/assessment`, body);
 
 export const updateAssessmentMapping = (mappingId: number, body: {
@@ -104,6 +116,7 @@ export const updateAssessmentMapping = (mappingId: number, body: {
   description?: string | null;
   sortOrder?: number;
   isActive?: boolean;
+  audience18Plus?: boolean;
 }) => axios.put(`${API_URL}/campaign/assessment/${mappingId}`, body);
 
 export const detachAssessment = (mappingId: number) =>
@@ -129,6 +142,7 @@ export const upsertClassRoute = (campaignId: number, body: {
   assessmentId: number;
   sortOrder?: number;
   isActive?: boolean;
+  audience18Plus?: boolean;
 }) => axios.post(`${API_URL}/campaign/${campaignId}/class`, body);
 
 export const deleteClassRoute = (routeId: number) =>

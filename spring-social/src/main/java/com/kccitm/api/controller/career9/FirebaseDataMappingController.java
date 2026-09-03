@@ -1080,16 +1080,12 @@ public class FirebaseDataMappingController {
      * Career Navigator: 11-12, Insight Navigator: 6-8, Subject Navigator: 9-10
      */
     private String classToNavigator(String studentClass) {
-        if (studentClass == null || studentClass.trim().isEmpty()) return "unknown";
-        try {
-            int cls = Integer.parseInt(studentClass.trim());
-            if (cls >= 11) return "career";
-            if (cls >= 9) return "subject";
-            if (cls >= 6) return "insight";
-            return "unknown";
-        } catch (NumberFormatException e) {
-            return "unknown";
-        }
+        Integer cls = com.kccitm.api.util.GradeParser.numericGradeOrNull(studentClass);
+        if (cls == null) return "unknown";
+        if (cls >= 11) return "career";
+        if (cls >= 9) return "subject";
+        if (cls >= 6) return "insight";
+        return "unknown";
     }
 
     @SuppressWarnings("unchecked")
@@ -1208,7 +1204,7 @@ public class FirebaseDataMappingController {
                 String phone = getString(student, "phone");
                 Integer instituteCode = getInteger(student, "instituteCode");
                 Integer schoolSectionId = getInteger(student, "schoolSectionId");
-                Integer studentClass = getInteger(student, "studentClass");
+                String studentClass = getString(student, "studentClass");
 
                 Map<String, Object> resultMap = new LinkedHashMap<>();
                 resultMap.put("firebaseDocId", firebaseDocId);

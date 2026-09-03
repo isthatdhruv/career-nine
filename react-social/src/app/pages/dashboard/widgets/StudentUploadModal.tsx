@@ -37,7 +37,7 @@ const findColumnIndexMap = (hdrRow: any[]): Record<string, number> => {
     else if (["phone2", "phone_2", "mobile2", "mobile_2"].includes(n))
       map["Phone2"] = idx;
     else if (["email", "email address", "e-mail"].includes(n)) map["Email"] = idx;
-    else if (["class", "grade"].includes(n)) map["Class"] = idx;
+    else if (["class", "grade", "year"].includes(n)) map["Class"] = idx;
     else if (["section", "group"].includes(n)) map["Section"] = idx;
   });
   return map;

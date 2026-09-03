@@ -6,7 +6,7 @@ export type ExistingStudentInfo = {
     maskedPhone?: string | null;
     userId?: string | null;
     schoolName?: string | null;
-    studentClass?: number | null;
+    studentClass?: string | null;
 };
 
 export type DuplicateEmailPayload = {
@@ -97,6 +97,8 @@ const st: Record<string, React.CSSProperties> = {
         padding: '1.75rem 1.5rem 1.5rem',
         maxWidth: 460,
         width: '100%',
+        maxHeight: '85dvh',
+        overflowY: 'auto' as const,
         boxShadow: '0 30px 80px rgba(15, 23, 42, 0.35)',
         position: 'relative',
     },

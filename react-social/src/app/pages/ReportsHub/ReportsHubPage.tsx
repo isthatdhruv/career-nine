@@ -58,7 +58,7 @@ type StudentRow = {
   studentDob?: string;
   schoolSectionId?: number;
   /** Flat student_info.student_class — Grade fallback when the section link is unset. */
-  studentClass?: number | null;
+  studentClass?: string | null;
   assessments?: { assessmentId: number; assessmentName: string; status: string }[];
   assignedAssessmentIds?: number[];
 };
@@ -295,9 +295,9 @@ const ReportsHubPage: React.FC = () => {
     ])
       .then(([studentsRes, sessionsRes]) => {
         setStudents(studentsRes.data || []);
-        // Every student starts ticked — the user deselects the ones they
-        // don't want instead of building the selection up from nothing.
-        setSelectedStudentIds(new Set((studentsRes.data || []).map((s: StudentRow) => s.userStudentId)));
+        // Nobody starts ticked — the user builds the selection up (the table
+        // header checkbox selects all visible rows in one click when needed).
+        setSelectedStudentIds(new Set());
         const lookup = new Map<number, SectionInfo>();
         for (const session of sessionsRes.data || []) {
           for (const cls of session.schoolClasses || []) {
@@ -321,9 +321,9 @@ const ReportsHubPage: React.FC = () => {
   // Reset on selection change
   useEffect(() => { setSelectedAssessment(""); }, [selectedInstitute]);
   useEffect(() => {
-    // Back to the default of everyone ticked (not cleared) — the user
-    // deselects the students they don't want.
-    setSelectedStudentIds(new Set(students.map((s) => s.userStudentId)));
+    // Back to the default of nobody ticked — selection is built up
+    // explicitly (header checkbox = select all visible).
+    setSelectedStudentIds(new Set());
     setCurrentPage(1);
     setNameQuery("");
     setSelectedGrade("");

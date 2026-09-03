@@ -17,9 +17,16 @@ public interface CounsellorAssessmentAssignmentRepository
 
     boolean existsByCounsellorIdAndAssessmentId(Long counsellorId, Long assessmentId);
 
-    /** Active counsellor ids assigned to an assessment — used to filter bookable slots. */
+    /**
+     * Active counsellor ids assigned to an assessment — used to filter bookable slots.
+     * Checks the COUNSELLOR's own active flag as well as the assignment's: a suspended
+     * counsellor whose assignment row was never deactivated must not stay bookable
+     * (that gap let students keep booking suspended counsellors from the thank-you
+     * page). NULL-tolerant so counsellors predating the flag stay bookable.
+     */
     @Query("SELECT a.counsellor.id FROM CounsellorAssessmentAssignment a "
-            + "WHERE a.assessmentId = :assessmentId AND a.isActive = true")
+            + "WHERE a.assessmentId = :assessmentId AND a.isActive = true "
+            + "AND (a.counsellor.isActive IS NULL OR a.counsellor.isActive = true)")
     List<Long> findActiveCounsellorIdsForAssessment(@Param("assessmentId") Long assessmentId);
 
     /**

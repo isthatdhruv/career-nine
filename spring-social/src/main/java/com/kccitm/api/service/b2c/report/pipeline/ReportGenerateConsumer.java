@@ -103,14 +103,18 @@ public class ReportGenerateConsumer {
             // Email decision — emailMode and force are fully orthogonal.
             //   "all"  → email anyone with an address (whitelabel ignored; admin toggle ON)
             //   "none" → generate only (admin toggle OFF)
-            //   "auto" → automatic pipeline: whitelabel students always, plus any
-            //            assessment with the "email report" toggle on (Phase 4)
+            //   "auto" → automatic pipeline: whitelabel students always, any assessment
+            //            with the "email report" toggle on (Phase 4), plus B2C students
+            //            whose entitlement tier includes the final report (the pipeline
+            //            replaced EntitlementService's legacy on-completion send, so the
+            //            email carries the CDN report link + PDF instead of a viewer link)
             boolean hasEmail = ev.recipientEmail != null && !ev.recipientEmail.isBlank();
             String mode = ev.emailMode == null ? "auto" : ev.emailMode;
             boolean shouldEmail =
                     "all".equals(mode)  ? hasEmail
                   : "none".equals(mode) ? false
-                  :                       ((ev.whitelabel || ev.emailReportEnabled) && hasEmail);
+                  :                       ((ev.whitelabel || ev.emailReportEnabled
+                                                || ev.entitlementId != null) && hasEmail);
             // A counsellor-release tier overrides both the whitelabel rule and the school's
             // per-assessment toggle: those decide HOW the report reaches the student, this one
             // decides WHETHER it may leave yet, and it may not until the counsellor releases it.

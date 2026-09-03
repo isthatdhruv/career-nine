@@ -6,6 +6,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,14 +18,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.model.career9.AssessmentInstituteMapping;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
+import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.security.access.AccessScope;
+import com.kccitm.api.security.access.AccessScopeService;
 import com.kccitm.api.service.AssessmentSessionService;
 
 @RestController
@@ -45,9 +51,52 @@ public class LiveTrackingController {
     @Autowired
     private AssessmentSessionService assessmentSessionService;
 
+    @Autowired
+    private AccessScopeService accessScopeService;
+
+    @Autowired
+    private AssessmentInstituteMappingRepository assessmentInstituteMappingRepository;
+
     // Matches the @JsonFormat(pattern = "dd-MM-yyyy") used on StudentInfo.studentDob
     private static String formatDob(Date dob) {
         return dob != null ? new SimpleDateFormat("dd-MM-yyyy").format(dob) : "";
+    }
+
+    // ─── ABAC hard checks ────────────────────────────────────────────────
+    // @PreAuthorize is log-only in all profiles, so scope enforcement must be
+    // an in-controller check (same pattern as InstituteDetailController).
+
+    /** Empty = super-admin, no filtering. Present = allowed institute codes (may be empty ⇒ deny). */
+    private Optional<Set<Integer>> allowedInstituteCodesForCurrentUser() {
+        Optional<AccessScope> scope = accessScopeService.forCurrentUser();
+        if (!scope.isPresent()) return Optional.empty();
+        return Optional.of(scope.get().getAllowedInstituteCodes());
+    }
+
+    /**
+     * An assessment is in scope when it has a (still-active) registration-link
+     * mapping to one of the caller's institutes, or when any student of those
+     * institutes is directly allotted to it.
+     */
+    private boolean assessmentInScope(Long assessmentId, Set<Integer> allowedCodes) {
+        if (allowedCodes.isEmpty()) return false;
+        for (AssessmentInstituteMapping m : assessmentInstituteMappingRepository.findByAssessmentId(assessmentId)) {
+            if (!Boolean.FALSE.equals(m.getIsActive())
+                    && m.getInstituteCode() != null
+                    && allowedCodes.contains(m.getInstituteCode())) {
+                return true;
+            }
+        }
+        return studentAssessmentMappingRepository
+                .countByAssessmentIdAndInstituteCodes(assessmentId, allowedCodes) > 0;
+    }
+
+    private ResponseEntity<?> forbiddenOutOfScope() {
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", 403);
+        body.put("error", "Forbidden");
+        body.put("message", "This assessment is not allotted to your institute");
+        return ResponseEntity.status(403).body(body);
     }
 
     /**
@@ -58,12 +107,20 @@ public class LiveTrackingController {
     @PreAuthorize("@auth.allows('live_tracking.read')")
     @GetMapping("/{assessmentId}/live-tracking-lite")
     public ResponseEntity<?> getLiveTrackingLite(@PathVariable Long assessmentId) {
+        Optional<Set<Integer>> allowed = allowedInstituteCodesForCurrentUser();
+        if (allowed.isPresent() && !assessmentInScope(assessmentId, allowed.get())) {
+            return forbiddenOutOfScope();
+        }
+
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
         if (assessment == null) {
             return ResponseEntity.notFound().build();
         }
 
-        List<Object[]> rows = studentAssessmentMappingRepository.findLiteByAssessmentId(assessmentId);
+        List<Object[]> rows = allowed.isPresent()
+                ? studentAssessmentMappingRepository
+                        .findLiteByAssessmentIdAndInstituteCodes(assessmentId, allowed.get())
+                : studentAssessmentMappingRepository.findLiteByAssessmentId(assessmentId);
 
         int notStarted = 0, ongoing = 0, completed = 0;
         List<Map<String, Object>> students = new ArrayList<>();
@@ -116,6 +173,13 @@ public class LiveTrackingController {
     @PreAuthorize("@auth.allows('live_tracking.read')")
     @GetMapping("/{assessmentId}/live-tracking")
     public ResponseEntity<?> getLiveTracking(@PathVariable Long assessmentId) {
+        // 0. ABAC hard check — non-super-admins may only track assessments
+        // connected to their own institutes.
+        Optional<Set<Integer>> allowed = allowedInstituteCodesForCurrentUser();
+        if (allowed.isPresent() && !assessmentInScope(assessmentId, allowed.get())) {
+            return forbiddenOutOfScope();
+        }
+
         // 1. Get the assessment
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
             .orElseThrow(() -> new ResourceNotFoundException("AssessmentTable", "id", assessmentId));
@@ -159,6 +223,16 @@ public class LiveTrackingController {
         List<Map<String, Object>> students = new ArrayList<>();
 
         for (StudentAssessmentMapping mapping : mappings) {
+            UserStudent us = mapping.getUserStudent();
+            if (us == null) continue;
+
+            // ABAC row filter: an assessment shared across institutes must not
+            // leak other institutes' students to a scoped viewer.
+            if (allowed.isPresent()) {
+                Integer code = us.getInstitute() != null ? us.getInstitute().getInstituteCode() : null;
+                if (code == null || !allowed.get().contains(code)) continue;
+            }
+
             String status = mapping.getStatus() != null ? mapping.getStatus() : "notstarted";
 
             switch (status) {
@@ -172,9 +246,6 @@ public class LiveTrackingController {
                     notStarted++;
                     break;
             }
-
-            UserStudent us = mapping.getUserStudent();
-            if (us == null) continue;
 
             Map<String, Object> entry = new HashMap<>();
             entry.put("userStudentId", us.getUserStudentId());
@@ -247,7 +318,9 @@ public class LiveTrackingController {
         response.put("students", students);
 
         Map<String, Integer> summary = new HashMap<>();
-        summary.put("total", mappings.size());
+        // Count only the rows actually returned — with an ABAC scope active,
+        // mappings.size() would leak the other institutes' student count.
+        summary.put("total", notStarted + ongoing + completed);
         summary.put("notStarted", notStarted);
         summary.put("ongoing", ongoing);
         summary.put("completed", completed);

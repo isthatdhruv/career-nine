@@ -46,6 +46,13 @@ public class CounsellingNotificationService {
     @Autowired
     private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
 
+    /** Campaign slug + link building for the post-session referral share link. */
+    @Autowired
+    private com.kccitm.api.repository.Career9.b2c.CampaignRepository campaignRepository;
+
+    @Autowired
+    private com.kccitm.api.service.b2c.LinkBuilder linkBuilder;
+
     @Autowired
     private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
 
@@ -305,6 +312,34 @@ public class CounsellingNotificationService {
      *
      * @param reason optional note from the admin, shown to the student as the why
      */
+    /**
+     * Invite for students who completed an assessment but never booked: a tokenized, no-login
+     * booking link. Sent by an admin from the Manage Students page.
+     */
+    @Async
+    public void sendBookingInviteEmail(String studentName, String studentEmail, String bookingUrl) {
+        try {
+            if (studentEmail == null || studentEmail.isEmpty()) {
+                logger.warn("No student email — cannot send counselling booking link");
+                return;
+            }
+            String name = studentName != null && !studentName.isBlank() ? studentName : "there";
+            String subject = "Book your counselling session";
+            String body = "Dear " + name + ",\n\n"
+                    + "You have completed your assessment — the next step is a one-on-one counselling "
+                    + "session to turn your results into a real plan.\n\n"
+                    + "Pick a time that suits you here (no login needed):\n"
+                    + bookingUrl + "\n\n"
+                    + "Once you choose a slot, your session is confirmed instantly and you'll receive "
+                    + "a confirmation email with the meeting details.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            sendEmail(studentEmail, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send counselling booking invite to {}: {}", studentEmail, e.getMessage());
+        }
+    }
+
     @Async
     public void sendSelfRescheduleInviteEmail(CounsellingAppointment appointment, String rescheduleUrl,
             String reason) {
@@ -476,20 +511,57 @@ public class CounsellingNotificationService {
         try {
             String studentEmail = studentEmail(appointment);
             String studentName = studentName(appointment);
-            String date = appointment.getSlot().getDate().format(DATE_FMT);
 
-            String subject = "Session Complete \u2014 View Counsellor Remarks";
-            String body = "Dear " + studentName + ",\n\n"
-                    + "Your counselling session on " + date + " has been completed.\n\n"
-                    + "Your counsellor has added remarks for this session. Please log in to Career-Nine "
-                    + "to view your session notes and any recommendations.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+            // Post-session thank-you (approved design). Deliberately says nothing about
+            // session notes or counsellor remarks \u2014 those stay in the portal.
+            String referralUrl = referralShareUrl(appointment);
+            String subject = "Thank you for your session \u2014 Career-9";
+            String html = postSessionThankYouHtml(studentName, referralUrl);
+            String body = "Hi " + studentName + ",\n\n"
+                    + "Thank you for being a part of Career-9!\n\n"
+                    + "We hope your counselling session helped you discover new possibilities, understand "
+                    + "yourself better, and take a step closer to making confident career choices. "
+                    + "Remember, your career journey doesn't end with one session. Keep exploring, keep "
+                    + "learning, and keep believing in yourself!\n\n"
+                    + "Know someone who needs career clarity? If you found your Career-9 experience "
+                    + "valuable, share it with friends, cousins or family members who may also be "
+                    + "wondering what to choose for their future: " + referralUrl + "\n\n"
+                    + "See you again in 6 months! Your interests, strengths and aspirations can evolve "
+                    + "as you grow - we'd love to reconnect and see where you want to go next.\n\n"
+                    + "Your future is a journey. We're happy to be part of it.\n\n"
+                    + "Warm regards,\nTeam Career-9";
 
-            sendEmail(studentEmail, subject, body);
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, studentEmail, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send session-complete email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
         }
+    }
+
+    /**
+     * Share link for the post-session mail's referral button: the campaign landing
+     * page the student came through, or the assessment site root when they didn't
+     * come via a campaign. There is no per-student referral tracking yet \u2014 this is
+     * a share link, nothing more.
+     */
+    private String referralShareUrl(CounsellingAppointment appointment) {
+        try {
+            Long entitlementId = appointment != null ? appointment.getEntitlementId() : null;
+            if (entitlementId != null) {
+                com.kccitm.api.model.career9.b2c.StudentEntitlement ent =
+                        studentEntitlementRepository.findById(entitlementId).orElse(null);
+                if (ent != null && ent.getCampaignId() != null) {
+                    com.kccitm.api.model.career9.b2c.Campaign c =
+                            campaignRepository.findById(ent.getCampaignId()).orElse(null);
+                    if (c != null && c.getSlug() != null && !c.getSlug().isBlank()) {
+                        return linkBuilder.campaignLanding(c.getSlug());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            logger.debug("Referral link fell back to assessment home: {}", ex.getMessage());
+        }
+        return linkBuilder.assessmentHome();
     }
 
     // ─── Admin-triggered session emails (Manage Sessions) ────────────────────────
@@ -985,33 +1057,29 @@ public class CounsellingNotificationService {
             // One mail carries everything the student gets at booking: the confirmation,
             // the calendar invite, and the report guidance the Manage Sessions summary
             // used to send separately — two near-identical mails taught students to skim.
-            String body = "Dear " + studentName + ",\n\n"
-                    + "Your counselling session has been confirmed.\n\n"
-                    + "Session Details:\n"
+            String body = "Hi " + studentName + ",\n\n"
+                    + "It's official! Your Career-9 counselling session is booked.\n\n"
+                    + "You've taken an important step towards understanding your strengths, exploring "
+                    + "possibilities, and getting clarity about your future.\n\n"
+                    + "Your Session Details:\n"
                     + sessionDetailsBlock(appointment, true, false)
                     + "\n"
                     + reportGuidance(appointment, false)
                     + (gcal != null ? "Add to Google Calendar: " + gcal + "\n\n" : "")
                     + "A calendar invite is also attached so you can add this to any calendar.\n\n"
-                    + "If any of the above is incorrect, please write to us before the session so we "
-                    + "can put it right.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+                    + "Come curious. Leave clear. This is your session, so bring all your questions:\n"
+                    + "  - \"Which career is right for me?\"\n"
+                    + "  - \"What am I really good at?\"\n"
+                    + "  - \"Which subjects should I choose?\"\n"
+                    + "  - \"What options do I have after school or college?\"\n\n"
+                    + "Ask. Explore. Challenge. Discover. Your Career-9 report has the insights - "
+                    + "now let's turn those insights into possibilities.\n\n"
+                    + "Need to make a change? Write to us before the session so we can put it right.\n\n"
+                    + "See you soon!\nTeam Career-9";
 
-            // The join panel comes before the details table: this mail is read once now and
-            // again on the day, and on the day the only thing wanted from it is the way in.
-            String html = CounsellingEmailHtml.page(
-                    joinPreheader(appointment),
-                    "Your counselling session is confirmed",
-                    CounsellingEmailHtml.p("Dear " + studentName + ",")
-                    + CounsellingEmailHtml.p("Your counselling session has been confirmed. "
-                            + "The details are below — please keep this email for the day of the session.")
-                    + attendanceBlock(appointment, false)
-                    + CounsellingEmailHtml.detailsTable(
-                            sessionDetailRows(appointment, true, false, false))
-                    + (gcal != null ? CounsellingEmailHtml.outlineButton(gcal, "Add to Google Calendar") : "")
-                    + CounsellingEmailHtml.small(
-                            "A calendar invite is also attached so you can add this to any calendar.")
-                    + CounsellingEmailHtml.signature());
+            // Approved flat-green campaign design; the join action sits inside the
+            // details panel so on the day the way in is still the first thing found.
+            String html = bookingConfirmationHtml(appointment, studentName, gcal);
 
             // Recipients: the student, the parent/guardian if one was given, and the
             // counsellor taking the session — they need the same calendar entry on their own
@@ -2033,6 +2101,193 @@ public class CounsellingNotificationService {
     }
 
     // ─── Private Helper ───────────────────────────────────────────────────────────
+
+    // ─── Green campaign-suite mails (approved designs) ───────────────────────────
+    // Self-contained inline-styled HTML, entities only — deliberately distinct from
+    // the navy CounsellingEmailHtml framework the operational counselling mails use.
+
+    /** Booking-confirmation body: session-details panel with the join action inside it. */
+    private String bookingConfirmationHtml(CounsellingAppointment a, String studentName, String gcal) {
+        String name = CounsellingEmailHtml.esc(studentName);
+
+        StringBuilder rows = new StringBuilder();
+        if (a.getSlot() != null) {
+            if (a.getSlot().getDate() != null) {
+                rows.append(greenDetailRow("Date", CounsellingEmailHtml.esc(a.getSlot().getDate().format(DATE_FMT))));
+            }
+            if (a.getSlot().getStartTime() != null) {
+                String time = a.getSlot().getStartTime().format(TIME_FMT)
+                        + (a.getSlot().getEndTime() != null
+                                ? " &ndash; " + a.getSlot().getEndTime().format(TIME_FMT) : "");
+                rows.append(greenDetailRow("Time", time));
+            }
+        }
+        if (a.getCounsellor() != null && a.getCounsellor().getName() != null) {
+            rows.append(greenDetailRow("Counsellor", CounsellingEmailHtml.esc(a.getCounsellor().getName())));
+        }
+        boolean offline = "OFFLINE".equals(a.getMode());
+        rows.append(greenDetailRow("Mode", offline ? "In-person" : "Online"));
+        if (offline) {
+            String loc = a.getLocation();
+            rows.append(greenDetailRow("Venue", loc != null && !loc.isEmpty()
+                    ? CounsellingEmailHtml.esc(loc)
+                    : "Your counsellor will share the address shortly."));
+        }
+
+        String joinPart;
+        String link = a.getMeetingLink();
+        if (!offline && link != null && !link.isEmpty()) {
+            joinPart = "<div style=\"text-align:center;margin:14px 0 4px;\">"
+                    + "<a href=\"" + link + "\" style=\"display:inline-block;padding:12px 32px;"
+                    +     "background:#059669;color:#ffffff;text-decoration:none;border-radius:8px;"
+                    +     "font-weight:700;font-size:14.5px;\">Join your session</a>"
+                    + "</div>"
+                    + "<p style=\"text-align:center;margin:6px 0 0;font-size:12px;color:#8a978f;"
+                    +     "word-break:break-all;\">" + CounsellingEmailHtml.esc(link) + "</p>";
+        } else if (!offline) {
+            joinPart = "<p style=\"margin:12px 0 0;font-size:12.5px;line-height:1.6;color:#8a978f;\">"
+                    + "The meeting link will be shared with you before the session.</p>";
+        } else {
+            joinPart = "";
+        }
+
+        String gcalPart = gcal != null
+                ? "<div style=\"text-align:center;margin:0 0 8px;\">"
+                    + "<a href=\"" + gcal + "\" style=\"display:inline-block;padding:11px 28px;"
+                    +     "background:#ffffff;color:#059669;border:2px solid #059669;text-decoration:none;"
+                    +     "border-radius:8px;font-weight:700;font-size:13.5px;\">Add to Google Calendar</a>"
+                    + "</div>"
+                : "";
+
+        return greenPage("It&rsquo;s official! &#127881; Your counselling session is booked",
+
+                "<p style=\"margin:0 0 6px;font-size:15px;line-height:1.6;color:#0f1f18;\">"
+                +     "Hi " + name + " &#128075;</p>"
+                + "<p style=\"margin:0 0 22px;font-size:14.5px;line-height:1.65;color:#5f6f67;\">"
+                +     "You&rsquo;ve taken an important step towards understanding your strengths, "
+                +     "exploring possibilities, and getting clarity about your future. &#128640;</p>"
+
+                + "<div style=\"background:#f6f8f7;border:1px solid #e3e8e5;border-radius:10px;"
+                +     "padding:18px 20px;margin:0 0 18px;\">"
+                + "<div style=\"font-size:11px;font-weight:700;letter-spacing:1.2px;color:#8a978f;"
+                +     "margin:0 0 10px;\">&#128197; YOUR SESSION DETAILS</div>"
+                + "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;font-size:13.5px;\">"
+                +     rows
+                + "</table>"
+                + joinPart
+                + "</div>"
+
+                + gcalPart
+                + "<p style=\"text-align:center;margin:0 0 24px;font-size:12.5px;color:#8a978f;\">"
+                +     "A calendar invite is also attached so you can add this to any calendar.</p>"
+
+                + greenDivider("&#128161; COME CURIOUS. LEAVE CLEAR.")
+                + "<p style=\"margin:0 0 14px;font-size:14.5px;line-height:1.65;color:#0f1f18;\">"
+                +     "This is <strong>your</strong> session, so bring all your questions!</p>"
+                + "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\""
+                +     " style=\"margin:0 0 16px;font-size:14px;line-height:1.7;color:#3d4a44;\">"
+                + "<tr><td style=\"width:28px;vertical-align:top;\">&#129300;</td>"
+                +     "<td>&ldquo;Which career is right for me?&rdquo;</td></tr>"
+                + "<tr><td style=\"vertical-align:top;\">&#127919;</td>"
+                +     "<td>&ldquo;What am I really good at?&rdquo;</td></tr>"
+                + "<tr><td style=\"vertical-align:top;\">&#128218;</td>"
+                +     "<td>&ldquo;Which subjects should I choose?&rdquo;</td></tr>"
+                + "<tr><td style=\"vertical-align:top;\">&#128640;</td>"
+                +     "<td>&ldquo;What options do I have after school or college?&rdquo;</td></tr>"
+                + "</table>"
+                + "<p style=\"margin:0 0 16px;font-size:14.5px;line-height:1.65;color:#0f1f18;\">"
+                +     "Ask. Explore. Challenge. Discover.</p>"
+                + "<p style=\"margin:0 0 22px;font-size:14.5px;line-height:1.65;color:#0f1f18;\">"
+                +     "Your Career&#8209;9 report has the insights. Now, let&rsquo;s turn those insights "
+                +     "into possibilities. &#128153;</p>"
+
+                + "<p style=\"margin:0 0 4px;font-size:15px;line-height:1.6;color:#0f1f18;\">See you soon!</p>"
+                + "<p style=\"margin:0 0 24px;font-size:15px;line-height:1.6;font-weight:700;color:#059669;\">"
+                +     "Team Career&#8209;9</p>"
+                + "<p style=\"margin:0 0 28px;font-size:12.5px;line-height:1.6;color:#8a978f;\">"
+                +     "Need to make a change? Write to us before the session so we can put it right.</p>");
+    }
+
+    /** Post-session thank-you body: gratitude, referral share, see-you-in-6-months. */
+    private String postSessionThankYouHtml(String studentName, String referralUrl) {
+        String name = CounsellingEmailHtml.esc(studentName);
+        return greenPage("Thank you for being a part of Career&#8209;9! &#127775;",
+
+                "<p style=\"margin:0 0 16px;font-size:15px;line-height:1.6;color:#0f1f18;\">"
+                +     "Hi " + name + " &#128075;</p>"
+                + "<p style=\"margin:0 0 14px;font-size:14.5px;line-height:1.65;color:#5f6f67;\">"
+                +     "We hope your counselling session helped you discover new possibilities, understand "
+                +     "yourself better, and take a step closer to making confident career choices. &#128640;</p>"
+                + "<p style=\"margin:0 0 22px;font-size:14.5px;line-height:1.65;color:#0f1f18;\">"
+                +     "Remember, your career journey doesn&rsquo;t end with one session. Keep exploring, "
+                +     "keep learning, and keep believing in yourself!</p>"
+
+                + greenDivider("&#128153; KNOW SOMEONE WHO NEEDS CAREER CLARITY?")
+                + "<p style=\"margin:0 0 10px;font-size:14.5px;line-height:1.65;color:#3d4a44;\">"
+                +     "If you found your Career&#8209;9 experience valuable, share it with friends, cousins "
+                +     "or family members who may also be wondering:</p>"
+                + "<p style=\"margin:0 0 14px;font-size:15px;line-height:1.6;color:#0f1f18;text-align:center;\">"
+                +     "<em>&ldquo;What should I choose for my future?&rdquo;</em> &#129300;</p>"
+                + "<p style=\"margin:0 0 18px;font-size:14px;line-height:1.65;color:#5f6f67;\">"
+                +     "Your recommendation could help someone else discover a path that&rsquo;s right for them.</p>"
+                + "<div style=\"text-align:center;margin:0 0 24px;\">"
+                + "<a href=\"" + referralUrl + "\" style=\"display:inline-block;padding:13px 32px;"
+                +     "background:#059669;color:#ffffff;text-decoration:none;border-radius:8px;"
+                +     "font-weight:700;font-size:14.5px;\">&#128073; Refer a friend or family member</a>"
+                + "</div>"
+
+                + greenDivider("&#128260; SEE YOU AGAIN IN 6 MONTHS!")
+                + "<p style=\"margin:0 0 18px;font-size:14.5px;line-height:1.65;color:#5f6f67;\">"
+                +     "Your interests, strengths and aspirations can evolve as you grow. That&rsquo;s why "
+                +     "we&rsquo;d love to reconnect with you in 6 months and see what has changed, what "
+                +     "you&rsquo;ve discovered, and where you want to go next.</p>"
+                + "<p style=\"margin:0 0 22px;font-size:14.5px;line-height:1.65;color:#0f1f18;\">"
+                +     "Your future is a journey. We&rsquo;re happy to be part of it. &#128153;</p>"
+
+                + "<p style=\"margin:0 0 4px;font-size:15px;line-height:1.6;color:#0f1f18;\">Warm regards,</p>"
+                + "<p style=\"margin:0 0 28px;font-size:15px;line-height:1.6;font-weight:700;color:#059669;\">"
+                +     "Team Career&#8209;9</p>");
+    }
+
+    /** Shared shell of the green suite: neutral ground, wordmark, accent-lined card, footer. */
+    private static String greenPage(String titleHtml, String bodyHtml) {
+        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head>"
+                + "<body style=\"margin:0;background:#f3f5f4;"
+                + "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;\">"
+                + "<div style=\"background:#f3f5f4;padding:40px 16px;\">"
+                + "<div style=\"max-width:560px;margin:0 auto;\">"
+                + "<div style=\"padding:0 6px 12px;\">"
+                + "<span style=\"font-size:14px;font-weight:800;letter-spacing:2px;color:#059669;\">CAREER&#8209;9</span>"
+                + "</div>"
+                + "<div style=\"background:#ffffff;border:1px solid #e3e8e5;border-radius:14px;overflow:hidden;\">"
+                + "<div style=\"height:4px;background:#059669;\"></div>"
+                + "<div style=\"padding:32px 32px 8px;\">"
+                + "<h1 style=\"margin:0 0 8px;font-size:22px;line-height:1.3;font-weight:700;color:#0f1f18;\">"
+                +     titleHtml + "</h1>"
+                + bodyHtml
+                + "</div>"
+                + "<div style=\"background:#f6f8f7;border-top:1px solid #e3e8e5;padding:14px 32px;\">"
+                + "<p style=\"margin:0;font-size:11px;line-height:1.6;color:#8a978f;\">"
+                +     "This is an automated message from Career&#8209;9 &mdash; please don&rsquo;t reply "
+                +     "to this address.<br>&copy; Career&#8209;9. All rights reserved.</p>"
+                + "</div>"
+                + "</div></div></div></body></html>";
+    }
+
+    /** Labelled section divider of the green suite. */
+    private static String greenDivider(String labelHtml) {
+        return "<div style=\"border-top:1px solid #e3e8e5;text-align:center;margin:0 0 20px;\">"
+                + "<span style=\"position:relative;top:-9px;background:#ffffff;padding:0 12px;"
+                +     "font-size:11px;font-weight:700;letter-spacing:1.2px;color:#8a978f;\">"
+                +     labelHtml + "</span>"
+                + "</div>";
+    }
+
+    /** One label/value row of the green session-details panel (value is pre-escaped HTML). */
+    private static String greenDetailRow(String label, String valueHtml) {
+        return "<tr><td style=\"padding:4px 0;color:#5f6f67;width:110px;vertical-align:top;\">" + label + "</td>"
+                + "<td style=\"padding:4px 0;color:#0f1f18;font-weight:700;\">" + valueHtml + "</td></tr>";
+    }
 
     private void sendEmail(String toEmail, String subject, String body) {
         if (blankAddress(toEmail, subject)) return;

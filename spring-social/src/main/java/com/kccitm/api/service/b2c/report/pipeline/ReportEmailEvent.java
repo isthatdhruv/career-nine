@@ -29,6 +29,15 @@ public class ReportEmailEvent {
     public Long emailAccountId;        // resolved sending account (institute → global); null = worker default
     public Long emailTemplateId;       // resolved REPORT_READY template; null = composer HTML
     public String studentName;         // for {{student_name}} in a REPORT_READY template
+    /** B2C entitlement whose tier includes the final report; null = not an entitlement email. */
+    public Long entitlementId;
+    /**
+     * Tokenized public counselling-booking page URL for the "Your Next Step" CTA.
+     * Never produced by the generate stage: the email consumer (or the legacy/resend
+     * senders) stamp it just before rendering, and only when counselling is available
+     * to the student and no active appointment exists. Null → section omitted.
+     */
+    public String bookingUrl;
 
     public ReportEmailEvent() {
     }
@@ -49,6 +58,7 @@ public class ReportEmailEvent {
         this.emailAccountId = src.emailAccountId;
         this.emailTemplateId = src.emailTemplateId;
         this.studentName = src.studentName;
+        this.entitlementId = src.entitlementId;
     }
 
     public String key() {

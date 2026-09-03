@@ -7,6 +7,8 @@ import {
   InviteInfo,
 } from "../api-clients/assessmentMappingAPI"
 import { TierCard, Tier } from "../components/TierCard"
+import ParentalConsentSection from "../components/ParentalConsent"
+import { contactTerms } from "../utils/instituteTerms"
 
 /**
  * Student-locked invite registration. The link is bound to one already-known
@@ -23,6 +25,9 @@ const AssessmentInviteRegisterPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  // DPDP parental consent — a NEW registration cannot proceed without it (an
+  // already-enrolled student continuing to their assessment is not gated).
+  const [dpdpConsent, setDpdpConsent] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -44,6 +49,9 @@ const AssessmentInviteRegisterPage = () => {
   const counsellingFeeTotal = info?.counsellingFeeTotal || 0
   const isPayFirst = (info?.paymentTiming ?? "PAY_FIRST") === "PAY_FIRST"
   const registrationClosed = info?.registrationClosed === true || info?.status === "REVOKED"
+  // The invite is bound to one mapped cohort, so the audience is page-constant.
+  const adult = !!info?.audience18Plus
+  const { emailLabel, phoneLabel } = contactTerms(adult)
 
   const inc = info?.inclusions
   const selectionTier: Tier | null = info
@@ -65,9 +73,18 @@ const AssessmentInviteRegisterPage = () => {
 
   const handleSubmit = async () => {
     if (!token || !info) return
+    if (!info.alreadyRegistered && !dpdpConsent) {
+      showErrorToast(
+        adult
+          ? "Please confirm the consent to continue."
+          : "Please confirm the parental consent to continue."
+      )
+      return
+    }
     setSubmitting(true)
     try {
-      const res = await registerInviteByToken(token)
+      // DPDP parental consent travels with the confirm (gated above for new registrations).
+      const res = await registerInviteByToken(token, { dpdpConsent })
 
       if (res.data.status === "payment_required") {
         if (res.data.paymentUrl) {
@@ -183,11 +200,11 @@ const AssessmentInviteRegisterPage = () => {
           <div style={s.selectionLabel}>Your details</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginTop: 12 }}>
             <Field label="Full Name" value={info?.student?.name} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <Field label="Email" value={info?.student?.email} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+              <Field label={emailLabel} value={info?.student?.email} />
               <Field label="Date of Birth" value={info?.student?.dob} />
             </div>
-            <Field label="Phone Number" value={info?.student?.phone} />
+            <Field label={phoneLabel} value={info?.student?.phone} />
           </div>
 
           {/* PAY_FIRST counselling itemisation */}
@@ -219,6 +236,12 @@ const AssessmentInviteRegisterPage = () => {
             </div>
           )}
 
+          {!alreadyRegistered && (
+            <div style={{ marginTop: 20 }}>
+              <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
+            </div>
+          )}
+
           <button
             onClick={handleSubmit}
             disabled={submitting}
@@ -234,7 +257,7 @@ const AssessmentInviteRegisterPage = () => {
           </button>
 
           <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-            By registering, you agree to the assessment terms and conditions.
+            By registering, I agree to the Career-9's terms and conditions.
           </p>
         </div>
       </div>

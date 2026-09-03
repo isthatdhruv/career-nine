@@ -19,6 +19,7 @@ import {
   InstituteOption,
   updateAssessmentMapping,
   updateCampaign,
+  uploadCampaignLogo,
   upsertClassRoute,
 } from "../API/Campaign_APIs";
 import { useInstitutes } from "../../../lib/queries/lookups";
@@ -45,6 +46,18 @@ const emptyCampaign: Campaign = {
 // generated registration link would 404 until reload.
 const slugify = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
 
+// Brand logo constraints — mirror the institute logo upload (PNG/JPG only because
+// the asset may be reused in emails, and Outlook won't render WebP).
+const MAX_LOGO_SIZE = 1024 * 1024; // 1 MB
+
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 const CampaignEditPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -69,6 +82,12 @@ const CampaignEditPage = () => {
   const { data: allInstitutes = [] } = useInstitutes<InstituteOption>();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Brand logo: picked file is held locally and only uploaded to DO Spaces on save,
+  // so an abandoned form doesn't leave an orphaned object in the bucket.
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
 
   // Tier-config drawer state — track by mappingId so the row stays in sync with refreshed assessmentRows
   const [tierDrawerMappingId, setTierDrawerMappingId] = useState<number | null>(null);
@@ -159,22 +178,65 @@ const CampaignEditPage = () => {
 
   useEffect(() => { loadAssessments(campaign.instituteCode); /* eslint-disable-next-line */ }, [campaign.instituteCode]);
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setLogoError(null);
+    if (file && !["image/png", "image/jpeg"].includes(file.type)) {
+      setLogoError("Logo must be a PNG or JPG/JPEG image");
+      setLogoFile(null);
+      setLogoPreview(null);
+      e.target.value = "";
+      return;
+    }
+    if (file && file.size > MAX_LOGO_SIZE) {
+      setLogoError("Logo must be under 1 MB");
+      setLogoFile(null);
+      setLogoPreview(null);
+      e.target.value = "";
+      return;
+    }
+    setLogoFile(file);
+    setLogoPreview(file ? URL.createObjectURL(file) : null);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setLogoError(null);
+    upd("brandLogoUrl", "");
+  };
+
   const handleSaveBasics = async () => {
     if (!campaign.name?.trim()) { showErrorToast("Name is required"); return; }
     if (!campaign.slug?.trim()) { showErrorToast("Slug is required"); return; }
     if (!campaign.instituteCode) { showErrorToast("Institute is required"); return; }
     setSaving(true);
     try {
+      // Brand logo → upload to DO Spaces first, then persist the returned CDN URL
+      // on brandLogoUrl. The old logo object (if any) is cleaned up server-side.
+      const payload = { ...campaign };
+      if (logoFile) {
+        const dataUrl = await fileToDataUrl(logoFile);
+        const up = await uploadCampaignLogo(
+          dataUrl,
+          isEdit ? Number(id) : undefined,
+          campaign.brandLogoUrl || undefined
+        );
+        payload.brandLogoUrl = up.data.url;
+      }
       if (isEdit) {
-        await updateCampaign(Number(id), campaign);
+        await updateCampaign(Number(id), payload);
+        setCampaign(payload);
+        setLogoFile(null);
+        setLogoPreview(null);
         showSuccessToast("Campaign updated");
       } else {
-        const res = await createCampaign(campaign);
+        const res = await createCampaign(payload);
         showSuccessToast("Campaign created");
         navigate(`/b2c/campaigns/edit/${res.data.campaignId}`);
       }
     } catch (e: any) {
-      showErrorToast(e?.response?.data || "Failed to save");
+      showErrorToast(e?.response?.data?.error || e?.response?.data || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -229,6 +291,15 @@ const CampaignEditPage = () => {
     }
   };
 
+  const handleToggleAssessment18Plus = async (row: CampaignAssessmentRow) => {
+    try {
+      await updateAssessmentMapping(row.mappingId, { audience18Plus: !row.audience18Plus });
+      await loadCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update");
+    }
+  };
+
   const availableAssessmentsToAttach = allAssessments.filter(
     a => !assessmentRows.some(r => r.assessmentId === a.id)
   );
@@ -267,6 +338,21 @@ const CampaignEditPage = () => {
         classId: route.classId,
         sessionId: route.sessionId ?? null,
         assessmentId,
+      });
+      await refreshCampaign();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update class route");
+    }
+  };
+
+  const handleToggleRoute18Plus = async (route: CampaignClassRoute) => {
+    if (!campaign.campaignId) return;
+    try {
+      await upsertClassRoute(campaign.campaignId, {
+        classId: route.classId,
+        sessionId: route.sessionId ?? null,
+        assessmentId: route.assessmentId,
+        audience18Plus: !route.audience18Plus,
       });
       await refreshCampaign();
     } catch (e: any) {
@@ -337,8 +423,25 @@ const CampaignEditPage = () => {
                 <Form.Control value={campaign.targetAudience ?? ""} onChange={e => upd("targetAudience", e.target.value)} placeholder="Class 11–12, Science stream" />
               </div>
               <div className="col-md-6 mb-3">
-                <Form.Label>Brand logo URL</Form.Label>
-                <Form.Control value={campaign.brandLogoUrl ?? ""} onChange={e => upd("brandLogoUrl", e.target.value)} />
+                <Form.Label>Brand logo</Form.Label>
+                <Form.Control type="file" accept="image/png,image/jpeg" onChange={handleLogoChange} />
+                <Form.Text className="text-muted">
+                  PNG or JPG/JPEG, under 1 MB. Shown on the registration, thank-you and payment pages.
+                  {logoFile && " Uploads when you save."}
+                </Form.Text>
+                {logoError && <div className="text-danger small mt-1">{logoError}</div>}
+                {(logoPreview || campaign.brandLogoUrl) && (
+                  <div className="d-flex align-items-center gap-3 mt-2">
+                    <img
+                      src={logoPreview || campaign.brandLogoUrl}
+                      alt="Brand logo preview"
+                      style={{ maxHeight: 50, maxWidth: 200, objectFit: "contain" }}
+                    />
+                    <Button size="sm" variant="outline-danger" onClick={handleRemoveLogo}>
+                      Remove logo
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="col-md-6 mb-3">
                 <Form.Label>
@@ -423,6 +526,7 @@ const CampaignEditPage = () => {
                       <th>Assessment</th>
                       <th>Path override</th>
                       <th>Counselling override</th>
+                      <th>18+</th>
                       <th>Description</th>
                       <th>Tiers</th>
                       <th></th>
@@ -430,7 +534,7 @@ const CampaignEditPage = () => {
                   </thead>
                   <tbody>
                     {assessmentRows.length === 0 && (
-                      <tr><td colSpan={6} className="text-center text-muted py-4">No assessments attached yet.</td></tr>
+                      <tr><td colSpan={7} className="text-center text-muted py-4">No assessments attached yet.</td></tr>
                     )}
                     {assessmentRows.map(r => (
                       <tr key={r.mappingId}>
@@ -450,6 +554,16 @@ const CampaignEditPage = () => {
                             <option value="1">Model 1 — Self-serve</option>
                             <option value="2">Model 2 — Admin-assigned</option>
                           </Form.Select>
+                        </td>
+                        <td>
+                          <Form.Check
+                            type="switch"
+                            id={`assess-18plus-${r.mappingId}`}
+                            label="18+"
+                            checked={!!r.audience18Plus}
+                            onChange={() => handleToggleAssessment18Plus(r)}
+                            title="Adult self-consent wording and Your Email/Phone labels — applies to direct /c/{slug}/{assessment} deep links"
+                          />
                         </td>
                         <td>
                           <Form.Control
@@ -569,12 +683,13 @@ const CampaignEditPage = () => {
                     <tr>
                       <th>Class</th>
                       <th>Mapped assessment</th>
+                      <th>18+</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {classRoutes.length === 0 && (
-                      <tr><td colSpan={3} className="text-center text-muted py-4">No class mappings yet.</td></tr>
+                      <tr><td colSpan={4} className="text-center text-muted py-4">No class mappings yet.</td></tr>
                     )}
                     {classRoutes.map(route => (
                       <tr key={route.routeId}>
@@ -596,6 +711,16 @@ const CampaignEditPage = () => {
                               </option>
                             )}
                           </Form.Select>
+                        </td>
+                        <td>
+                          <Form.Check
+                            type="switch"
+                            id={`route-18plus-${route.routeId}`}
+                            label="18+"
+                            checked={!!route.audience18Plus}
+                            onChange={() => handleToggleRoute18Plus(route)}
+                            title="Adult self-consent wording and Your Email/Phone labels — applies to class-based registration on /c/{slug}"
+                          />
                         </td>
                         <td>
                           <Button size="sm" variant="outline-danger" onClick={() => handleRemoveClassRoute(route.routeId)}>Remove</Button>

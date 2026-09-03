@@ -57,7 +57,7 @@ public class ReportGenerationLog implements Serializable {
     private String reportType;
 
     @Column(name = "student_class_at_attempt")
-    private Integer studentClassAtAttempt;
+    private String studentClassAtAttempt;
 
     @Column(name = "attempt_type", length = 32)
     private String attemptType;
@@ -111,8 +111,8 @@ public class ReportGenerationLog implements Serializable {
     public void setCampaignId(Long v) { this.campaignId = v; }
     public String getReportType() { return reportType; }
     public void setReportType(String v) { this.reportType = v; }
-    public Integer getStudentClassAtAttempt() { return studentClassAtAttempt; }
-    public void setStudentClassAtAttempt(Integer v) { this.studentClassAtAttempt = v; }
+    public String getStudentClassAtAttempt() { return studentClassAtAttempt; }
+    public void setStudentClassAtAttempt(String v) { this.studentClassAtAttempt = v; }
     public String getAttemptType() { return attemptType; }
     public void setAttemptType(String v) { this.attemptType = v; }
     public String getStatus() { return status; }

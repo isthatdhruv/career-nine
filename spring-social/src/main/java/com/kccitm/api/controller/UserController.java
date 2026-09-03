@@ -35,6 +35,7 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
+import com.kccitm.api.security.RefreshTokenService;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
@@ -50,6 +51,9 @@ public class UserController {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
 
     /** Activating a counsellor's login is the same decision as activating the counsellor. */
     @Autowired
@@ -265,11 +269,7 @@ public class UserController {
                 userStudent.getStudentInfo().setSchoolBoard(schoolBoard.trim());
             }
             if (grade != null && !grade.trim().isEmpty()) {
-                try {
-                    userStudent.getStudentInfo().setStudentClass(Integer.valueOf(grade.trim()));
-                } catch (NumberFormatException ignored) {
-                    // non-numeric grade ignored
-                }
+                userStudent.getStudentInfo().setStudentClass(grade.trim());
             }
         }
 
@@ -353,7 +353,7 @@ public class UserController {
      * Uniqueness scoped by institute + class + section.
      */
     private String generateRollNumber(UserStudent userStudent) {
-        Integer studentClass = null;
+        String studentClass = null;
         Integer sectionId = null;
         Integer instituteId = null;
 
@@ -364,7 +364,7 @@ public class UserController {
         }
 
         // Fallbacks
-        if (studentClass == null) studentClass = 0;
+        if (studentClass == null || studentClass.isEmpty()) studentClass = "0";
         if (sectionId == null) sectionId = 0;
         if (instituteId == null && userStudent.getInstitute() != null) {
             instituteId = userStudent.getInstitute().getInstituteCode();
@@ -495,6 +495,10 @@ public class UserController {
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+
+        // Same rule as the self-service reset: a changed password ends every open
+        // session, otherwise a locked-out-and-reset account keeps its old logins alive.
+        refreshTokenService.revokeAllForUser(userId);
 
         boolean sendEmail = Boolean.TRUE.equals(body.get("sendEmail"));
         boolean emailQueued = false;

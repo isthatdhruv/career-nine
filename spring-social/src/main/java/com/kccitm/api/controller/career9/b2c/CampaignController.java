@@ -57,6 +57,7 @@ public class CampaignController {
     @Autowired private CampaignResolutionService campaignResolutionService;
 
     @Autowired private com.kccitm.api.service.career9.InstituteAssessmentService instituteAssessmentService;
+    @Autowired private com.kccitm.api.service.DigitalOceanSpacesService spacesService;
 
     @PreAuthorize("@auth.allows('campaign.read.all')")
     @GetMapping("/getAll")
@@ -172,6 +173,88 @@ public class CampaignController {
         return ResponseEntity.ok(savedCampaign);
     }
 
+    /**
+     * Upload a campaign brand logo to DigitalOcean Spaces and return its public
+     * CDN URL. The admin UI stores the returned URL into the campaign's
+     * {@code brandLogoUrl} field and persists it via {@code /create} or
+     * {@code /update}. Mirrors {@code /instituteDetail/upload-logo}.
+     *
+     * <p>Body: {@code { "base64Data": "data:image/png;base64,...", "campaignId": 12,
+     * "previousUrl": "https://.../campaign-logos/..." }} — {@code campaignId} and
+     * {@code previousUrl} are optional (previousUrl, if present, is deleted on success).
+     *
+     * <p><b>PNG/JPEG only</b> — the logo renders on student-facing pages and may be
+     * reused in transactional emails, and Outlook does not render WebP.
+     */
+    @PreAuthorize("@auth.allows('campaign.update')")
+    @PostMapping(value = "/upload-logo", consumes = "application/json", produces = "application/json")
+    public ResponseEntity<Map<String, String>> uploadLogo(@RequestBody Map<String, Object> request) {
+        Object base64Obj = request.get("base64Data");
+        String base64Data = base64Obj == null ? null : base64Obj.toString();
+        if (base64Data == null || base64Data.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "base64Data is required"));
+        }
+
+        // Decode first (tolerating an optional data: URL prefix and any whitespace), then decide
+        // the type from the ACTUAL magic bytes — not the caller-declared MIME — so the check is
+        // both robust (works whether the client sends a "data:" URL or raw base64) and trustworthy.
+        byte[] bytes;
+        try {
+            int comma = base64Data.indexOf(',');
+            String raw = base64Data.startsWith("data:") && comma >= 0
+                    ? base64Data.substring(comma + 1)
+                    : base64Data;
+            bytes = java.util.Base64.getMimeDecoder().decode(raw);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid base64 image data"));
+        }
+
+        String contentType;
+        String ext;
+        if (isPngBytes(bytes)) {
+            contentType = "image/png";
+            ext = ".png";
+        } else if (isJpegBytes(bytes)) {
+            contentType = "image/jpeg";
+            ext = ".jpg";
+        } else {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Logo must be a PNG or JPG/JPEG image"));
+        }
+
+        Object idObj = request.get("campaignId");
+        String folder = idObj != null ? "campaign-logos/campaign-" + idObj : "campaign-logos";
+        String fileName = java.util.UUID.randomUUID().toString() + ext;
+
+        try {
+            String url = spacesService.uploadBytes(bytes, contentType, folder, fileName);
+            // Best-effort cleanup of the replaced logo. Scoped to the campaign-logos area so a
+            // crafted previousUrl cannot delete arbitrary objects elsewhere in the bucket.
+            Object previousUrl = request.get("previousUrl");
+            if (previousUrl != null && previousUrl.toString().contains("/campaign-logos/")) {
+                try {
+                    spacesService.deleteFileByUrl(previousUrl.toString());
+                } catch (Exception ignore) {
+                    // never fail the upload on a cleanup error
+                }
+            }
+            return ResponseEntity.ok(Map.of("url", url));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private boolean isPngBytes(byte[] b) {
+        return b.length >= 4 && (b[0] & 0xFF) == 0x89 && (b[1] & 0xFF) == 0x50
+                && (b[2] & 0xFF) == 0x4E && (b[3] & 0xFF) == 0x47;
+    }
+
+    private boolean isJpegBytes(byte[] b) {
+        return b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8
+                && (b[2] & 0xFF) == 0xFF;
+    }
+
     @PreAuthorize("@auth.allows('campaign.delete')")
     @org.springframework.transaction.annotation.Transactional
     @DeleteMapping("/delete/{id}")
@@ -242,6 +325,8 @@ public class CampaignController {
         m.setCounsellingModel(normalizeModel((String) req.get("counsellingModel")));
         if (req.containsKey("description")) m.setDescription(normalizeDescription((String) req.get("description")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
+        // Guarded so reviving a soft-deleted attachment keeps its prior 18+ setting.
+        if (req.containsKey("audience18Plus")) m.setAudience18Plus(toBool(req.get("audience18Plus")));
         CampaignAssessmentMapping savedMapping = mappingRepository.save(m);
         // Keep the institute<->assessment catalog in sync: an assessment attached to an
         // institute-tied campaign is one that institute now has, so it shows in Reports
@@ -264,6 +349,7 @@ public class CampaignController {
         if (req.containsKey("description")) m.setDescription(normalizeDescription((String) req.get("description")));
         if (req.containsKey("sortOrder")) m.setSortOrder(toInt(req.get("sortOrder")));
         if (req.containsKey("isActive")) m.setIsActive(toBool(req.get("isActive")));
+        if (req.containsKey("audience18Plus")) m.setAudience18Plus(toBool(req.get("audience18Plus")));
         return ResponseEntity.ok(mappingRepository.save(m));
     }
 
@@ -409,6 +495,7 @@ public class CampaignController {
         if (req.containsKey("sessionId")) route.setSessionId(toInt(req.get("sessionId")));
         if (req.containsKey("sortOrder")) route.setSortOrder(toInt(req.get("sortOrder")));
         if (req.containsKey("isActive")) route.setIsActive(toBool(req.get("isActive")));
+        if (req.containsKey("audience18Plus")) route.setAudience18Plus(toBool(req.get("audience18Plus")));
         route.setIsDeleted(false);
         if (route.getIsActive() == null) route.setIsActive(true);
         return ResponseEntity.ok(classRouteRepository.save(route));
@@ -466,6 +553,10 @@ public class CampaignController {
             route.setClassId(cfg.getClassId());
             route.setSessionId(sessionId);
             route.setAssessmentId(cfg.getAssessmentId());
+            // Carry the school row's 18+ audience over; a college cohort imported from
+            // school config must not silently revert to the parental-consent copy.
+            // Import is authoritative: the school row's 18+ flag overwrites any hand-set route flag (same as assessmentId/isActive above).
+            route.setAudience18Plus(Boolean.TRUE.equals(cfg.getAudience18Plus()));
             route.setIsDeleted(false);
             route.setIsActive(true);
             classRouteRepository.save(route);
@@ -542,6 +633,7 @@ public class CampaignController {
             row.put("description", m.getDescription());
             row.put("isActive", m.getIsActive());
             row.put("sortOrder", m.getSortOrder());
+            row.put("audience18Plus", Boolean.TRUE.equals(m.getAudience18Plus()));
             List<CampaignAssessmentTier> tiers = tierMappingRepository
                     .findByCampaignAssessmentMappingIdOrderByIdAsc(m.getId());
             row.put("tiers", tiers);
@@ -563,6 +655,7 @@ public class CampaignController {
             rr.put("assessmentId", r.getAssessmentId());
             rr.put("sortOrder", r.getSortOrder());
             rr.put("isActive", r.getIsActive());
+            rr.put("audience18Plus", Boolean.TRUE.equals(r.getAudience18Plus()));
             SchoolClasses sc = r.getClassId() != null
                     ? schoolClassesRepository.findById(r.getClassId()).orElse(null) : null;
             rr.put("className", sc != null ? sc.getClassName() : null);

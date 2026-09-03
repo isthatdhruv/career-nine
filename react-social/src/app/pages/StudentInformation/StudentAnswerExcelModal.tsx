@@ -23,7 +23,7 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
   const [studentDetails, setStudentDetails] = useState<{
     name: string;
     rollNumber: string;
-    studentClass: number | null;
+    studentClass: string | null;
     dob: string;
   } | null>(null);
   const [error, setError] = useState<string>("");

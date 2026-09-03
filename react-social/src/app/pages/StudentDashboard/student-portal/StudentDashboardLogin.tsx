@@ -16,7 +16,7 @@ const months = [
 ]
 
 const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'))
-const years = Array.from({ length: 40 }, (_, i) => String(2024 - i))
+const years = Array.from({ length: 75 }, (_, i) => String(2024 - i))
 
 const StudentDashboardLogin: React.FC = () => {
   const navigate = useNavigate()

@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +36,9 @@ public class StudentManagementController {
 
     @Autowired
     private UserStudentRepository userStudentRepository;
+
+    @Autowired
+    private com.kccitm.api.service.counselling.CounsellingBookingLinkService bookingLinkService;
 
     @Autowired
     private GeneratedReportRepository generatedReportRepository;
@@ -70,6 +74,18 @@ public class StudentManagementController {
             result.add(row);
         }
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Email the student a tokenized, no-login counselling booking link — for students who
+     * completed their assessment but never booked. Returns the address it went to.
+     */
+    // no scope arg: identifies by userStudentId; admin-triggered email
+    @PreAuthorize("@auth.allows('counselling.student_management.update')")
+    @PostMapping("/send-booking-link/{userStudentId}")
+    public ResponseEntity<?> sendBookingLink(@PathVariable Long userStudentId) {
+        String recipient = bookingLinkService.sendBookingInvite(userStudentId);
+        return ResponseEntity.ok(Map.of("userStudentId", userStudentId, "sentTo", recipient));
     }
 
     /** Toggle the counsellingAllowed flag for a student */

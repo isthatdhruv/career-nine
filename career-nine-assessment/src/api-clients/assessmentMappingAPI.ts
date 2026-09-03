@@ -37,6 +37,10 @@ export type MappingInfo = {
   assessmentName: string;
   instituteCode: string;
   instituteName: string;
+  /** false → college (Year/Course wording); true/absent → school (Class/Board). */
+  isSchool?: boolean | null;
+  /** true → the mapped cohort is 18+: self-consent wording and "Your Email/Phone" labels. */
+  audience18Plus?: boolean | null;
   inclusions: MappingInclusions;
   activeTierName?: string;
   // Post-assessment counselling payment timing + fee breakdown (PAID links only).
@@ -76,6 +80,8 @@ export function registerStudentByToken(
     classId?: number;
     schoolSectionId?: number;
     promoCode?: string;
+    /** DPDP parental consent given on the form; the backend stamps dpdp_consent_at from it. */
+    dpdpConsent?: boolean;
   }
 ) {
   return http.post(`/assessment-mapping/public/register/${token}`, studentData);
@@ -190,6 +196,10 @@ export type InviteInfo = {
   assessmentId: number;
   assessmentName?: string;
   instituteName?: string;
+  /** false → college (Year/Course wording); true/absent → school (Class/Board). */
+  isSchool?: boolean | null;
+  /** true → the mapped cohort is 18+: self-consent wording and "Your Email/Phone" labels. */
+  audience18Plus?: boolean | null;
   tierName?: string;
   amount: number;
   payableTotal?: number;
@@ -206,6 +216,6 @@ export function getInviteInfoByToken(token: string) {
   return http.get<InviteInfo>(`/assessment-mapping/public/student-invite/info/${token}`);
 }
 
-export function registerInviteByToken(token: string, body?: { phone?: string }) {
+export function registerInviteByToken(token: string, body?: { phone?: string; dpdpConsent?: boolean }) {
   return http.post(`/assessment-mapping/public/student-invite/register/${token}`, body ?? {});
 }

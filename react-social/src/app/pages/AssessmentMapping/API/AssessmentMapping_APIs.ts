@@ -21,6 +21,7 @@ export interface AssessmentInstituteMapping {
   isActive: boolean;
   freeActive: boolean;
   paidActive: boolean;
+  audience18Plus?: boolean;
 }
 
 export function createAssessmentMapping(data: {
@@ -30,6 +31,7 @@ export function createAssessmentMapping(data: {
   sessionId?: number;
   classId?: number;
   sectionId?: number;
+  audience18Plus?: boolean;
 }) {
   return axios.post<AssessmentInstituteMapping>(`${API_URL}/assessment-mapping/create`, data);
 }
@@ -42,7 +44,7 @@ export function getAssessmentMappingsByInstitute(instituteCode: number) {
 
 export function updateAssessmentMapping(
   id: number,
-  data: { isActive: boolean }
+  data: { isActive?: boolean; audience18Plus?: boolean }
 ) {
   return axios.put(`${API_URL}/assessment-mapping/update/${id}`, data);
 }
@@ -76,6 +78,15 @@ export interface InstituteAssessment {
 export function getCatalog(instituteCode: number) {
   return axios.get<InstituteAssessment[]>(
     `${API_URL}/assessment-mapping/institute/${instituteCode}/catalog`
+  );
+}
+
+// The institute's enabled-assessments catalog as NAMED summaries (id +
+// assessmentName) — what "assessments mapped to this institute" means for
+// pickers that need labels, not just ids.
+export function getCatalogAssessmentSummaries(instituteCode: number) {
+  return axios.get<{ id: number; assessmentName: string; isActive: boolean | null }[]>(
+    `${API_URL}/assessment-mapping/institute/${instituteCode}/catalog/assessments`
   );
 }
 

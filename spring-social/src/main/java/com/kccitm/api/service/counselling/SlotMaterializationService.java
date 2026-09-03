@@ -97,6 +97,13 @@ public class SlotMaterializationService {
     }
 
     private MaterializationResult materializeSlotsForTemplate(AvailabilityTemplate template, int days) {
+        // A suspended counsellor's weekly rules must stop producing bookable hours —
+        // otherwise every materialization run quietly restocks a diary nobody may
+        // book. The templates stay; generation resumes if the counsellor is reactivated.
+        if (template.getCounsellor() != null
+                && Boolean.FALSE.equals(template.getCounsellor().getIsActive())) {
+            return new MaterializationResult(0, 0, 0);
+        }
         DayOfWeek templateDayOfWeek = DayOfWeek.valueOf(template.getDayOfWeek().toUpperCase());
         LocalDate today = LocalDate.now();
         // Honour the template's effective start date: materialize from max(startDate, today).
@@ -149,8 +156,11 @@ public class SlotMaterializationService {
             List<CounsellingSlot> sameDay = slotRepository
                     .findByCounsellorIdAndDateBetween(template.getCounsellor().getId(), date, date);
 
-            // Generate slots for this date
+            // Generate slots for this date. Consecutive slots are separated by the
+            // template's break (0/NULL = back-to-back, the historic behaviour).
             boolean isToday = date.equals(today);
+            int breakMinutes = template.getBreakMinutes() != null && template.getBreakMinutes() > 0
+                    ? template.getBreakMinutes() : 0;
             LocalTime slotStart = template.getStartTime();
             LocalTime slotEnd = slotStart.plusMinutes(template.getDefaultSlotDuration());
 
@@ -180,8 +190,11 @@ public class SlotMaterializationService {
                     created++;
                 }
 
-                slotStart = slotEnd;
+                slotStart = slotEnd.plusMinutes(breakMinutes);
                 slotEnd = slotStart.plusMinutes(template.getDefaultSlotDuration());
+                // LocalTime wraps at midnight — a wrapped end reads as "early morning",
+                // which would slip past the endTime guard and loop forever.
+                if (slotEnd.isBefore(slotStart)) break;
             }
         }
 
