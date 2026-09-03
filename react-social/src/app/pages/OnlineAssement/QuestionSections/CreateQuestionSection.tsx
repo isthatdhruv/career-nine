@@ -1,15 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
-import { useQuestionSections } from "../../../lib/queries/lookups";
+import { useQueryClient } from "react-query";
+import { useQuestionSections, lookupKeys } from "../../../lib/queries/lookups";
 import QuestionSectionTable from "./components/QuestionSectionTable";
 
 const QuestionSectionPage = () => {
-  const { data: questionSectionData = [], isLoading: loading } = useQuestionSections<any>();
+  const { data: questionSectionData = [], isLoading } = useQuestionSections<any>();
+  const queryClient = useQueryClient();
   const [pageLoading, setPageLoading] = useState(["false"]);
+  // Busy state for the table's delete action (QuestionSectionTable calls setLoading around it).
+  const [deleting, setDeleting] = useState(false);
+  const loading = isLoading || deleting;
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (pageLoading[0] === "true") {
+      queryClient.invalidateQueries(lookupKeys.questionSections);
+      setPageLoading(["false"]);
+    }
+  }, [pageLoading, queryClient]);
 
   return (
     <div className="card">
@@ -51,7 +63,7 @@ const QuestionSectionPage = () => {
         <div className="card-body pt-5">
           <QuestionSectionTable
             data={questionSectionData}
-            setLoading={setLoading}
+            setLoading={setDeleting}
             setPageLoading={setPageLoading}
           />
         </div>
