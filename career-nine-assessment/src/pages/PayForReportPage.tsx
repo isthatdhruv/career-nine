@@ -300,6 +300,12 @@ const PayForReportPage = () => {
           >
             {submitting ? "Processing…" : `Pay INR ${discountedPriceInr}`}
           </button>
+          {selectedTier && discountedPriceInr <= 0 && (
+            <p style={{ color: "#b45309", fontSize: "0.85rem", marginTop: 10, textAlign: "center" }}>
+              This code brings your total to INR 0, which can't be charged online.
+              Please contact your counsellor or support to redeem it.
+            </p>
+          )}
 
           <h3 style={{ ...s.sectionTitle, marginTop: 32 }}>Frequently asked</h3>
           <FaqAccordion items={FAQS} />
@@ -310,9 +316,9 @@ const PayForReportPage = () => {
 }
 
 const DetailRow = ({ label, value }: { label: string; value: string }) => (
-  <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: "0.92rem" }}>
-    <span style={{ color: "#64748b", fontWeight: 600 }}>{label}</span>
-    <span style={{ color: "#0f172a", fontWeight: 600 }}>{value}</span>
+  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "8px 0", fontSize: "0.92rem" }}>
+    <span style={{ color: "#64748b", fontWeight: 600, flexShrink: 0 }}>{label}</span>
+    <span style={{ color: "#0f172a", fontWeight: 600, minWidth: 0, textAlign: "right", overflowWrap: "anywhere" }}>{value}</span>
   </div>
 )
 
@@ -402,7 +408,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   input: {
     border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "10px 14px",
-    fontSize: "0.92rem", color: "#0f172a", background: "#fff",
+    fontSize: 16, color: "#0f172a", background: "#fff",
   },
   btnPrimary: {
     border: "none",
@@ -417,7 +423,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   btnRemove: {
     background: "none", border: "1.5px solid #fca5a5", borderRadius: 8,
-    padding: "4px 12px", color: "#ef4444", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
+    padding: "10px 14px", color: "#ef4444", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
   },
   promoApplied: {
     display: "flex", alignItems: "center", gap: 12,
@@ -442,7 +448,8 @@ const s: Record<string, React.CSSProperties> = {
   errorBannerText: { color: "#991b1b", fontSize: "0.88rem", flex: 1, lineHeight: 1.5 },
   errorBannerClose: {
     background: "none", border: "none", color: "#991b1b", cursor: "pointer",
-    fontSize: "1.1rem", padding: 0, width: 22, height: 22,
+    fontSize: "1.1rem", padding: 0, width: 40, height: 40, margin: "-9px -9px -9px 0",
+    display: "flex", alignItems: "center", justifyContent: "center",
   },
   errorOrb: {
     width: 72, height: 72, borderRadius: "50%", margin: "0 auto 20px",

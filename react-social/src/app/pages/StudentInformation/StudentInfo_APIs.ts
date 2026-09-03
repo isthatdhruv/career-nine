@@ -222,6 +222,16 @@ export function resetAssessment(userStudentId: number, assessmentId: number) {
     });
 }
 
+// IRREVERSIBLE: hard-deletes the student and every trace of their data
+// (answers, scores, reports, entitlements, counselling, demographics, logs,
+// account rows; payment transactions are anonymized, not deleted). Returns
+// per-table deletion counts.
+export function purgeStudent(userStudentId: number) {
+    return axios.delete<{ success: boolean; deleted: Record<string, number>; loginRow: string }>(
+        `${STUDENT_INFO_BASE}/purge-student/${userStudentId}`
+    );
+}
+
 // Bulk fetch proctoring data for multiple student+assessment pairs
 export function getBulkProctoringData(pairs: { userStudentId: number; assessmentId: number }[]) {
     return axios.post<any[]>(`${API_URL}/assessment-proctoring/getBulkProctoringData`, pairs);

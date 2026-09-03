@@ -62,9 +62,15 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
     /** Soft-hold sweep: REQUESTED slots whose hold TTL has expired (Counselling Phase 3). */
     List<CounsellingSlot> findByStatusAndHeldUntilBefore(String status, LocalDateTime cutoff);
 
-    /** Find available slots for a specific set of counsellors (institute-filtered) */
+    /**
+     * Find available slots for a specific set of counsellors (institute-filtered).
+     * Re-checks the counsellor's own active flag even though callers pass an
+     * already-filtered id list — the pool may have been resolved before a
+     * suspension, and a suspended counsellor's hours must never be offered.
+     */
     @Query("SELECT s FROM CounsellingSlot s WHERE s.status = 'AVAILABLE' AND s.isBlocked = false "
          + "AND s.counsellor.id IN :counsellorIds AND s.date BETWEEN :start AND :end "
+         + "AND (s.counsellor.isActive IS NULL OR s.counsellor.isActive = true) "
          + "ORDER BY s.date, s.startTime")
     List<CounsellingSlot> findAvailableSlotsForCounsellors(
             @Param("counsellorIds") List<Long> counsellorIds,
@@ -78,11 +84,28 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
      */
     @Query("SELECT s FROM CounsellingSlot s WHERE s.isBlocked = false AND s.status <> 'CANCELLED' "
          + "AND s.counsellor.id IN :counsellorIds AND s.date BETWEEN :start AND :end "
+         + "AND (s.counsellor.isActive IS NULL OR s.counsellor.isActive = true) "
          + "ORDER BY s.date, s.startTime")
     List<CounsellingSlot> findActiveSlotsForCounsellors(
             @Param("counsellorIds") List<Long> counsellorIds,
             @Param("start") LocalDate start,
             @Param("end") LocalDate end);
+
+    /**
+     * Deactivation sweep: close every future hour of a suspended counsellor that is
+     * still open for booking. Listing filters and the book/hold guards make these
+     * unbookable regardless — closing them keeps the panels and counts honest.
+     */
+    // @Transactional here (not just on callers): the plain toggle-active path has no
+    // surrounding transaction, and a @Modifying query without one throws.
+    @org.springframework.transaction.annotation.Transactional
+    @Modifying
+    @Query("UPDATE CounsellingSlot s SET s.status = 'CANCELLED', s.isBlocked = true, "
+         + "s.blockReason = 'Counsellor deactivated' "
+         + "WHERE s.counsellor.id = :counsellorId AND s.date >= :from "
+         + "AND s.status = 'AVAILABLE' AND s.isBlocked = false")
+    int closeFutureAvailableByCounsellor(@Param("counsellorId") Long counsellorId,
+                                         @Param("from") LocalDate from);
 
     /** Slots generated from one template — cleanup when that template is deleted. */
     List<CounsellingSlot> findByTemplateId(Long templateId);

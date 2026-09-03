@@ -11,8 +11,26 @@ import http from '../api/http'
  * bubbles to the page instead of redirecting to /permission-denied.
  */
 
+/**
+ * One class row of `GET /school-registration/public/info/{token}`. Only the
+ * fields this SPA needs to type are declared; the payload carries more
+ * (sections, amount, assessmentId/Name, …) and the page reads it loosely.
+ */
+export type SchoolPublicClassConfig = {
+  classId: number
+  className?: string
+  /** true → this class is an 18+ cohort: self-consent wording and "Your Email/Phone" labels. */
+  audience18Plus?: boolean | null
+}
+
+export type SchoolPublicInfo = {
+  /** false → college (Year/Course wording); true/absent → school (Class/Board). */
+  isSchool?: boolean | null
+  classes?: SchoolPublicClassConfig[]
+}
+
 export function getSchoolInfo(token: string) {
-  return http.get(`/school-registration/public/info/${token}`)
+  return http.get<SchoolPublicInfo>(`/school-registration/public/info/${token}`)
 }
 
 export function verifyStudentDetails(

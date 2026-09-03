@@ -13,6 +13,15 @@ const statusConfig: Record<string, {
   gradientOrb1: string
   gradientOrb2: string
 }> = {
+  loading: {
+    title: "Checking Payment...",
+    subtitle: "Fetching your payment status. This takes just a moment.",
+    icon: "\u23f3",
+    accentColor: "#f59e0b",
+    accentLight: "rgba(245, 158, 11, 0.12)",
+    gradientOrb1: "radial-gradient(circle at 20% 50%, rgba(245, 158, 11, 0.15) 0%, transparent 50%)",
+    gradientOrb2: "radial-gradient(circle at 80% 20%, rgba(251, 191, 36, 0.1) 0%, transparent 50%)",
+  },
   paid: {
     title: "Payment Successful!",
     subtitle: "Your assessment has been allotted. Redirecting you in a moment...",
@@ -223,7 +232,9 @@ const PaymentStatusPage = () => {
             // If the URL doesn't say paid, fall back to the original
             // "verifying" state so the student knows the payment isn't
             // confirmed.
-            setStatus(urlSaysPaid ? "paid" : "created")
+            // Exhausted without confirmation: surface the "couldn't verify
+            // right now, check your email" state instead of an eternal spinner.
+            setStatus(urlSaysPaid ? "paid" : "error")
           }
         })
         .catch(() => {
@@ -245,7 +256,7 @@ const PaymentStatusPage = () => {
     }
   }, [searchParams, navigate])
 
-  const config = statusConfig[status] || statusConfig.failed
+  const config = statusConfig[status] || statusConfig.error
 
   return (
     <div

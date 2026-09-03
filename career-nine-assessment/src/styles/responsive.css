@@ -342,7 +342,9 @@
   flex-shrink: 0;
 }
 
-/* Question page main content card */
+/* Question page main content card — fixed footprint: the card fills the
+   question area at a stable size and the content scrolls INSIDE it, so the
+   layout never jumps between short and long questions. */
 .question-main-card {
   width: 1200px;
   max-width: 100%;
@@ -352,6 +354,27 @@
   background: #ffffff;
   color-scheme: light;
   color: #2d3748;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.question-main-card > .card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #cbd5e1 transparent;
+}
+.question-main-card > .card-body::-webkit-scrollbar {
+  width: 6px;
+}
+.question-main-card > .card-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.question-main-card > .card-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Assessment cards grid */
@@ -458,6 +481,7 @@
     left: 0;
     z-index: 1050;
     height: 100vh;
+    height: 100dvh;
     width: 280px;
     border-radius: 0 16px 16px 0;
   }
@@ -476,8 +500,12 @@
 /* Phones */
 @media (max-width: 575.98px) {
   .assessment-bg {
-    padding: 1rem 0.5rem;
-    align-items: flex-start;
+    padding: 1rem 1.25rem;
+    /* Cards cap their own height (max-height + internal scroll), so vertical
+       centering is safe; "safe center" still falls back to top-alignment if a
+       card ever overflows instead of clipping its top edge. */
+    align-items: center;
+    align-items: safe center;
   }
 
   .assessment-card {
@@ -669,6 +697,14 @@
   }
 }
 
+/* Question page root — fills the VISUAL viewport (dvh) so the bottom of the
+   card is not clipped behind Chrome Android's toolbar; vh is the fallback for
+   browsers without dvh. */
+.question-page-root {
+  height: 100vh;
+  height: 100dvh;
+}
+
 /* Sidebar toggle button (shown on mobile) */
 .sidebar-toggle-btn {
   display: none;
@@ -819,20 +855,29 @@
   }
 }
 
-/* Question area padding */
+/* Question area padding — the card stretches to fill it (stable height);
+   overflow lives inside the card's body, not here. */
 .question-area {
   flex: 1;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: stretch;
   padding: 1.5rem;
-  overflow-y: auto;
+  overflow-y: hidden;
   min-height: 0;
 }
 
 @media (min-width: 992px) {
   .question-area {
     padding: 30px;
+  }
+}
+
+/* The floating sidebar toggle (fixed, bottom-left, 50px) must never cover the
+   full-width Back/Next buttons at the end of the scrolled card body. */
+@media (max-width: 991.98px) {
+  .question-main-card > .card-body {
+    padding-bottom: 84px !important;
   }
 }
 

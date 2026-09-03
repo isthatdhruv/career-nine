@@ -153,6 +153,11 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const prefetchPromiseRef = useRef<Promise<void> | null>(null);
   const preloadPromiseRef = useRef<Promise<void> | null>(null);
   const cachedAssessmentIdRef = useRef<string | null>(null);
+  // Live mirrors of assessmentData/assessmentConfig: fetchAssessmentData checks
+  // them AFTER awaiting an in-flight preload, where the closure's state values
+  // are stale (they'd still be null and trigger a duplicate full download).
+  const assessmentDataRef = useRef<any>(null);
+  const assessmentConfigRef = useRef<any>(null);
 
   /**
    * Phase 19 cookie-auth state.
@@ -175,6 +180,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   /** Store fetched assessment data in context + sessionStorage */
   const applyAssessmentResult = (assessmentId: string, data: any, config: any) => {
     cachedAssessmentIdRef.current = assessmentId;
+    assessmentDataRef.current = data;
+    assessmentConfigRef.current = config;
     setAssessmentData(data);
     setAssessmentConfig(config);
     cacheToSession(assessmentId, data, config);
@@ -350,8 +357,12 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (preloadPromiseRef.current) {
       await preloadPromiseRef.current;
     }
-    // Only use cached data if it matches the requested assessmentId
-    if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) {
+    // Only use cached data if it matches the requested assessmentId. Read the
+    // refs, not state: after the awaits above, this closure's state values are
+    // from the render that created the callback (stale while a preload was in
+    // flight), which caused a duplicate full questionnaire download.
+    if (assessmentDataRef.current && assessmentConfigRef.current
+        && cachedAssessmentIdRef.current === assessmentId) {
       return true;
     }
 
@@ -380,7 +391,9 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const stored = sessionStorage.getItem('assessmentData');
     if (stored) {
       try {
-        setAssessmentData(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        assessmentDataRef.current = parsed;
+        setAssessmentData(parsed);
       } catch (e) {
         console.error('Failed to parse stored assessment data, clearing corrupted entry');
         sessionStorage.removeItem('assessmentData');
@@ -391,7 +404,9 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const storedConfig = sessionStorage.getItem('assessmentConfig');
     if (storedConfig) {
       try {
-        setAssessmentConfig(JSON.parse(storedConfig));
+        const parsedConfig = JSON.parse(storedConfig);
+        assessmentConfigRef.current = parsedConfig;
+        setAssessmentConfig(parsedConfig);
       } catch (e) {
         console.error('Failed to parse stored assessment config, clearing corrupted entry');
         sessionStorage.removeItem('assessmentConfig');

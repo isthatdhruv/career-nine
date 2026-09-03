@@ -289,6 +289,18 @@ public class BookingService {
     }
 
     /** True once a slot's start time has passed — nothing may be booked into it. */
+    /**
+     * A suspended/inactive counsellor takes no new appointments, ever. Thrown at
+     * book/hold time as the last line of defence — the listing queries hide their
+     * slots, but a picker can be open across the moment of suspension.
+     */
+    private void guardCounsellorActive(CounsellingSlot slot) {
+        if (slot.getCounsellor() != null && Boolean.FALSE.equals(slot.getCounsellor().getIsActive())) {
+            throw new BadRequestException(
+                    "This counsellor is no longer available. Please pick a different time slot.");
+        }
+    }
+
     private boolean hasStarted(CounsellingSlot slot) {
         if (slot == null || slot.getDate() == null || slot.getStartTime() == null) return false;
         return !clock.sessionStart(slot.getDate(), slot.getStartTime()).isAfter(clock.now());
@@ -352,6 +364,10 @@ public class BookingService {
             throw new BadRequestException(
                     "Slot " + slotId + " is not available for booking. Current status: " + slot.getStatus());
         }
+        // Suspended counsellors take no new appointments — full stop. The listing
+        // queries already hide their slots, but this is the backstop for a picker
+        // opened before the suspension (or any path that bypasses the listing).
+        guardCounsellorActive(slot);
 
         // Counselling-timezone comparison: the raw JVM clock runs UTC in a container and would
         // wave through anything that started in the last 5h30m — including from a picker left
@@ -390,6 +406,8 @@ public class BookingService {
             throw new BadRequestException(
                     "Slot " + slotId + " is not available. Current status: " + slot.getStatus());
         }
+        // Same backstop as bookSlot: a suspended counsellor's hour cannot be held either.
+        guardCounsellorActive(slot);
         if (hasStarted(slot)) {
             throw new BadRequestException("Slot " + slotId + " is in the past and cannot be held.");
         }

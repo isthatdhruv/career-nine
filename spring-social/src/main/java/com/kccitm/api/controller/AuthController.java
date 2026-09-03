@@ -733,11 +733,28 @@ public class AuthController {
                 .body(new ApiResponse(false, "This reset link is invalid."));
         }
 
+        // Rejected BEFORE the token is consumed, so the user can retry with the
+        // same link instead of having to request a new one.
+        if (user.getPassword() != null
+                && passwordEncoder.matches(payload.getNewPassword(), user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false,
+                    "New password must be different from your current password."));
+        }
+
+        // Conditional update, not read-then-save: two concurrent requests both pass
+        // the isConsumed() read above; only one wins this UPDATE ... WHERE used_at IS NULL.
+        if (passwordResetTokenRepository.consume(token.getId(), Instant.now()) == 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "This reset link has already been used."));
+        }
+
         user.setPassword(passwordEncoder.encode(payload.getNewPassword()));
         userRepository.save(user);
 
-        token.setUsedAt(Instant.now());
-        passwordResetTokenRepository.save(token);
+        // A reset must end every open session: someone resetting a compromised
+        // password expects the intruder logged out, not just the door code changed.
+        refreshTokenService.revokeAllForUser(user.getId());
 
         try {
             emailDispatchService.sendHtml(EmailType.PASSWORD_RESET_CONFIRM,
@@ -770,7 +787,7 @@ public class AuthController {
              + "<p>We received a request to reset your Career-9 password. Click the button below to set a new password. This link is valid for "
              + RESET_TOKEN_TTL_MINUTES + " minutes and can be used only once.</p>"
              + "<p style=\"text-align: center; margin: 32px 0;\">"
-             + "<a href=\"" + resetLink + "\" style=\"display: inline-block; background: linear-gradient(135deg, #10b981 0%, #f59e0b 100%); color: #ffffff; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600;\">Reset Password</a>"
+             + "<a href=\"" + resetLink + "\" style=\"display: inline-block; background: #009ef7; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600;\">Reset Password</a>"
              + "</p>"
              + "<p style=\"color: #6b7280; font-size: 14px;\">If the button doesn't work, copy and paste this URL into your browser:</p>"
              + "<p style=\"color: #4b5563; font-size: 13px; word-break: break-all;\">" + resetLink + "</p>"

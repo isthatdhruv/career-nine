@@ -75,7 +75,7 @@ const LoginPage: React.FC = () => {
   };
 
   const handleForgotPassword = () => {
-    window.location.href = '/login/reset-password/enter-email';
+    window.location.href = '/auth/forgot-password';
   };
 
   return (

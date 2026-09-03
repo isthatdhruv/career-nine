@@ -33,9 +33,6 @@ import AssessmentQuestion from "../pages/CreateAssessment/components/AssessmentQ
 import ContactPersonCreatePage from "../pages/ContactPerson/components/ContactPersonCreatePage";
 import ContactPersonPage from "../pages/ContactPerson/ContactPersonPage";
 import LoginPage from "../pages/Login/components/LoginPage";
-import LoginEnterEmail from "../pages/Login/components/LoginEnterEmail";
-import LoginCheckEmail from "../pages/Login/components/LoginCheckEmail";
-import LoginChangePassword from "../pages/Login/components/LoginChangePassword";
 import Users from "../pages/Users/components/Users";
 import UserRegistration from "../pages/Users/components/UserRegistration";
 import ListCreatePage from "../pages/List/components/ListCreatePage";
@@ -106,7 +103,6 @@ const ALWAYS_ALLOWED = [
   "/allotted-assessment",
   "/general-instructions",
   "/demographics",
-  "/login/reset-password",
   "/b2c",
 ];
 // Suppress "declared but never read" — kept intentionally per locked decision (see comment above).
@@ -362,6 +358,7 @@ const PrivateRoutes = () => {
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
   const CounsellingSessionsPage = lazy(() => import("../pages/Counselling/admin/CounsellingSessionsPage"));
   const ReportTemplatesPage = lazy(() => import("../pages/ReportTemplates/ReportTemplatesPage"));
+  const ReportCenterPage = lazy(() => import("../pages/ReportCenter/ReportCenterPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
   const ReferralCodePage = lazy(() => import("../pages/ReferralCode/ReferralCodePage"));
@@ -380,22 +377,14 @@ const PrivateRoutes = () => {
   return (
     <Routes>
 
+      {/* The old mock reset flow (enter-email → check-email → change-password) is
+          retired; the real flow is /auth/forgot-password → emailed link →
+          /auth/reset-password/:token. Old links land on the real entry point. */}
       <Route
-        path="/login/reset-password/enter-email"
-        element={
-          <SuspensedView>
-            <LoginEnterEmail />
-          </SuspensedView>
-        }
+        path="/login/reset-password/*"
+        element={<Navigate to="/auth/forgot-password" replace />}
       />
-      <Route
-        path="/"
-        element={
-          <SuspensedView>
-            <LoginEnterEmail />
-          </SuspensedView>
-        }
-      />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
 
       <Route path="/login" element={<LoginPage />} />
@@ -586,22 +575,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route
-          path="/login/reset-password/check-email"
-          element={
-            <SuspensedView>
-              <LoginCheckEmail />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/login/reset-password/change-password"
-          element={
-            <SuspensedView>
-              <LoginChangePassword />
-            </SuspensedView>
-          }
-        />
         <Route path="/school/principal/dashboard/studentList" element={
           <RequirePermission perm="student.read">
             <SuspensedView>
@@ -1522,6 +1495,18 @@ const PrivateRoutes = () => {
             <RequirePermission perm="report.read">
               <SuspensedView>
                 <ReportsHubPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        {/* School-facing report delivery: preview/download/email reports.
+            Own resource code so it is allottable per page — no mixing. */}
+        <Route
+          path="/report-center"
+          element={
+            <RequirePermission perm="report_center.read">
+              <SuspensedView>
+                <ReportCenterPage />
               </SuspensedView>
             </RequirePermission>
           }

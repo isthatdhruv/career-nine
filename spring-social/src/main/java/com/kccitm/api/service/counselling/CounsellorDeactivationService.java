@@ -145,6 +145,17 @@ public class CounsellorDeactivationService {
             rows.add(row);
         }
 
+        // Deallot the diary: every hour still open for booking is closed in one sweep.
+        // Counted BEFORE the flag flip so the admin's summary reports it — setActive
+        // runs its own (then-empty) sweep as the safety net for the other doors.
+        int slotsClosed = 0;
+        try {
+            slotsClosed = slotRepository.closeFutureAvailableByCounsellor(counsellorId, clock.today());
+        } catch (Exception e) {
+            logger.warn("Could not close open slots while deactivating counsellor {}: {}",
+                    counsellorId, e.getMessage());
+        }
+
         // Flags last, so a failure above leaves the counsellor active and the state coherent.
         counsellorService.setActiveForCounsellor(counsellor, false);
 
@@ -159,8 +170,8 @@ public class CounsellorDeactivationService {
             logger.warn("Deactivation admin alert for counsellor {} failed: {}", counsellorId, e.getMessage());
         }
 
-        logger.info("Counsellor {} deactivated: {} parked, {} cancelled, {} failed",
-                counsellorId, parked, cancelled, failed);
+        logger.info("Counsellor {} deactivated: {} parked, {} cancelled, {} failed, {} open slots closed",
+                counsellorId, parked, cancelled, failed, slotsClosed);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("counsellorId", counsellorId);
@@ -168,6 +179,7 @@ public class CounsellorDeactivationService {
         result.put("parked", parked);
         result.put("cancelled", cancelled);
         result.put("failed", failed);
+        result.put("slotsClosed", slotsClosed);
         result.put("sessions", rows);
         return result;
     }

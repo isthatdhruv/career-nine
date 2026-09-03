@@ -146,6 +146,30 @@ public class ReportZipController {
     }
 
     /**
+     * CORS-proof PDF fetch for the client-side zip builders: streams one of
+     * OUR OWN Spaces objects through the API origin, so the browser can read
+     * the bytes even when the bucket CORS policy hasn't been applied to this
+     * origin. Restricted to our CDN base URL — this is deliberately NOT a
+     * general-purpose proxy (SSRF guard).
+     */
+    @GetMapping("/fetch-pdf")
+    @PreAuthorize("@auth.allows('report_zip.read')")
+    public ResponseEntity<?> fetchPdf(@RequestParam String url) {
+        if (!spacesService.isOwnSpacesUrl(url)) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Only this platform's Spaces URLs can be fetched"));
+        }
+        byte[] bytes = spacesService.downloadFileByUrl(url);
+        if (bytes == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "File not found"));
+        }
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                .body(bytes);
+    }
+
+    /**
      * Delete a ZIP file from DigitalOcean Spaces by URL.
      */
     @DeleteMapping("/delete")

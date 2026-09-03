@@ -31,6 +31,15 @@ public class CounsellorService {
     @Autowired
     private com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository appointmentRepository;
 
+    @Autowired
+    private com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository slotRepository;
+
+    @Autowired
+    private SlotMaterializationService slotMaterializationService;
+
+    @Autowired
+    private CounsellingClock counsellingClock;
+
     public Counsellor create(Counsellor counsellor) {
         return counsellorRepository.save(counsellor);
     }
@@ -200,6 +209,26 @@ public class CounsellorService {
         counsellor.setIsActive(newActive);
         counsellor.setOnboardingStatus(newActive ? "ACTIVE" : "SUSPENDED");
         logger.debug("Toggled counsellor id: {} → isActive={}, onboardingStatus={}", id, newActive, counsellor.getOnboardingStatus());
+
+        // Deallot / reallot the diary in the same breath, whichever door asked (the
+        // toggle, User Management, or the deactivation cascade). Suspension closes
+        // every future hour still open for booking — a suspended counsellor takes no
+        // new appointments, at all (the listing filters and book/hold guards enforce
+        // that too; this keeps the panels honest). Reactivation regenerates slots
+        // from the weekly templates so the diary comes back without waiting for the
+        // next materialization run. Best-effort — never block the toggle itself.
+        try {
+            if (newActive) {
+                int created = slotMaterializationService.materializeSlotsForCounsellor(id);
+                logger.info("Counsellor {} reactivated — {} slots re-materialized", id, created);
+            } else {
+                int closed = slotRepository.closeFutureAvailableByCounsellor(id, counsellingClock.today());
+                logger.info("Counsellor {} suspended — {} open future slots closed", id, closed);
+            }
+        } catch (Exception e) {
+            logger.warn("Slot sweep after counsellor {} active={} failed (flags still applied): {}",
+                    id, newActive, e.getMessage());
+        }
 
         // Keep the linked login User in lock-step with approval. Best-effort — never block
         // the admin's toggle on an auth-wiring hiccup.

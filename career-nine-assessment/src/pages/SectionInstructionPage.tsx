@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
@@ -25,7 +25,7 @@ const isNA = (text: string | null | undefined): boolean => {
 const SectionInstructionPage: React.FC = () => {
   const { sectionId } = useParams();
   const navigate = useNavigate();
-  const { assessmentData } = useAssessment();
+  const { assessmentData, fetchAssessmentData } = useAssessment();
   usePreventReload();
 
   useHeartbeat({
@@ -37,10 +37,40 @@ const SectionInstructionPage: React.FC = () => {
 
   const [instructions, setInstructions] = useState<Instruction[] | null>(null);
 
+  // Self-heal (mirrors SelectSectionPage): a cold/restored tab can mount this
+  // page with an empty provider. Load the questionnaire ourselves; if it cannot
+  // be loaded, fall back to the section list page, which has the full retry UI.
+  const loadAttemptRef = useRef(false);
+  useEffect(() => {
+    if (assessmentData && assessmentData[0]) return;
+    const assessmentId = localStorage.getItem('assessmentId');
+    if (!assessmentId) {
+      navigate('/student-login', { replace: true });
+      return;
+    }
+    if (loadAttemptRef.current) return;
+    loadAttemptRef.current = true;
+    fetchAssessmentData(assessmentId)
+      .then((ok: any) => {
+        if (!ok) navigate('/studentAssessment', { replace: true });
+      })
+      .catch(() => navigate('/studentAssessment', { replace: true }));
+  }, [assessmentData, fetchAssessmentData, navigate]);
+
+  // Watchdog: if nothing arrived after 20s, hand off to the recovery UI
+  // instead of spinning forever.
+  useEffect(() => {
+    if (assessmentData && assessmentData[0]) return;
+    const timer = window.setTimeout(() => {
+      navigate('/studentAssessment', { replace: true });
+    }, 20_000);
+    return () => window.clearTimeout(timer);
+  }, [assessmentData, navigate]);
+
   useEffect(() => {
     if (assessmentData && assessmentData[0]) {
       const questionnaire = assessmentData[0];
-      const section = questionnaire.sections.find(
+      const section = (questionnaire.sections || []).find(
         (sec: any) => String(sec.section.sectionId) === String(sectionId)
       );
 
