@@ -68,7 +68,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 "/auth/assessment-session",
                 "/auth/oauth-exchange",
                 "/entitlement/redeem-token",
-                "/leads/capture"));
+                "/leads/capture",
+                // Anonymous password-reset pair: forgot-password sends a real email per
+                // request (inbox-bombing / enumeration vector) and reset-password takes
+                // attacker-controlled tokens. Both are exact paths.
+                "/auth/forgot-password",
+                "/auth/reset-password"));
         PER_IP_PATHS = Collections.unmodifiableSet(s);
     }
 

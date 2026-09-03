@@ -20,7 +20,7 @@ const Redirect_URL =
 // values are zero-padded and combined in that order.
 const DOB_DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
 const DOB_MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-const DOB_YEARS = Array.from({ length: 40 }, (_, i) => String(2024 - i));
+const DOB_YEARS = Array.from({ length: 75 }, (_, i) => String(2024 - i));
 
 const Login = () => {
   const [loading, setLoading] = useState(false);

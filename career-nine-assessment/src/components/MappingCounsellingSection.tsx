@@ -194,6 +194,9 @@ const MappingCounsellingSection: React.FC = () => {
   //    if the student closes it, this card lets them reopen it. ──
   if (bookable) {
     const payLaterTierId = opts.tiers[0]?.tierId;
+    // PAY_LATER booking renders only when a tier exists (the picker below is
+    // gated on payLaterTierId) — without one the CTA would silently do nothing.
+    if (opts.payPerSlot && payLaterTierId == null) return null;
     return (
       <>
         {card(

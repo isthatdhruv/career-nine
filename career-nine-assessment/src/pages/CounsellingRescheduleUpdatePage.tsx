@@ -90,12 +90,19 @@ export default function CounsellingRescheduleUpdatePage() {
         return
       } catch (e) {
         lastErr = e
+        // Only a definitive server-side conflict (slot taken/gone) justifies
+        // trying another counsellor's slot. A timeout or network drop may mean
+        // the booking actually landed — re-submitting a different slot could
+        // double-book the student. Stop and re-fetch the state instead.
+        const status = (e as any)?.response?.status
+        if (status !== 409 && status !== 410 && status !== 404) break
       }
     }
     setSubmitting(false)
     setError(readErr(lastErr, 'That time was just taken. Please pick another slot.'))
     setSelected(null)
-    load() // refresh availability
+    load() // refresh availability (also flips to the booked state if the lost
+           // response actually landed server-side)
   }
 
   // ---- render states -------------------------------------------------------

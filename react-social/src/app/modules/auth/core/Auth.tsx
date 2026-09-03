@@ -114,6 +114,37 @@ const AuthInit: FC<WithChildren> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep the session's RBAC view fresh. /auth/me reads urls AND permissions
+  // live from the DB (perms are deliberately NOT in the JWT — the filter walks
+  // role_permission per request), so refetching it is authoritative: an
+  // admin's role edit (page removed from a group, permission revoked) reaches
+  // an already-open session on the next tab focus / interval tick instead of
+  // requiring a re-login. Failures are ignored — the response interceptor
+  // owns the expired-session redirect.
+  useEffect(() => {
+    let last = Date.now();
+    const MIN_GAP_MS = 60_000;
+    const refresh = async () => {
+      if (!didRequest.current) return; // bootstrap not done yet
+      if (Date.now() - last < MIN_GAP_MS) return;
+      last = Date.now();
+      try {
+        const { data } = await getCurrentUser();
+        if (data) setCurrentUser(data);
+      } catch {
+        /* transient failure or expired session — interceptor handles 401 */
+      }
+    };
+    const onFocus = () => { void refresh(); };
+    window.addEventListener("focus", onFocus);
+    const iv = window.setInterval(() => { void refresh(); }, 5 * 60_000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(iv);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return showSplashScreen ? <LayoutSplashScreen /> : <>{children}</>;
 };
 

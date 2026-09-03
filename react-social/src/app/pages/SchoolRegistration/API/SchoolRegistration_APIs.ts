@@ -10,6 +10,7 @@ export function createSchoolConfig(data: {
   classId: number;
   assessmentId: number;
   amount?: number;
+  audience18Plus?: boolean;
 }) {
   return axios.post(`${API_URL}/school-registration/config/create`, data);
 }
@@ -17,7 +18,7 @@ export function createSchoolConfig(data: {
 export function batchSaveSchoolConfigs(data: {
   instituteCode: number;
   sessionId: number;
-  configs: { classId: number; assessmentId: number; amount?: number }[];
+  configs: { classId: number; assessmentId: number; amount?: number; audience18Plus?: boolean }[];
 }) {
   return axios.post(`${API_URL}/school-registration/config/batch-save`, data);
 }
@@ -26,7 +27,7 @@ export function getSchoolConfigs(instituteCode: number, sessionId: number) {
   return axios.get(`${API_URL}/school-registration/config/by-institute/${instituteCode}/${sessionId}`);
 }
 
-export function updateSchoolConfig(configId: number, data: { assessmentId?: number; amount?: number; isActive?: boolean }) {
+export function updateSchoolConfig(configId: number, data: { assessmentId?: number; amount?: number; isActive?: boolean; audience18Plus?: boolean }) {
   return axios.put(`${API_URL}/school-registration/config/update/${configId}`, data);
 }
 

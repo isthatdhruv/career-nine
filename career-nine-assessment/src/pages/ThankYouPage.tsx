@@ -370,6 +370,9 @@ const ThankYouPage: React.FC = () => {
     };
 
     const handleDownloadReport = async () => {
+        // Multi-second client-side PDF conversion — a second tap while one is
+        // in flight would start a concurrent conversion and can freeze the tab.
+        if (isDownloading) return;
         // "pager" reports live as HTML on DO Spaces — we fetch + convert in the
         // browser so the user gets a single PDF download without round-tripping
         // through Flying Saucer. "bet" reports keep the existing server-side
@@ -877,11 +880,16 @@ const ThankYouPage: React.FC = () => {
                                         <div
                                             onClick={handleDownloadReport}
                                             className="text-center"
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleDownloadReport(); }}
                                             style={{
                                                 background: 'linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%)',
                                                 borderRadius: '16px',
                                                 padding: '1.25rem 1.5rem',
-                                                cursor: 'pointer',
+                                                cursor: isDownloading ? 'wait' : 'pointer',
+                                                pointerEvents: isDownloading ? 'none' : 'auto',
+                                                opacity: isDownloading ? 0.75 : 1,
                                                 transition: 'all 0.3s ease',
                                                 boxShadow: '0 10px 35px rgba(245, 158, 11, 0.4)',
                                                 width: '100%',
@@ -914,10 +922,10 @@ const ThankYouPage: React.FC = () => {
                                                 </svg>
                                             </div>
                                             <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
-                                                Download Report
+                                                {isDownloading ? 'Preparing PDF\u2026' : 'Download Report'}
                                             </h3>
                                             <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
-                                                Open your detailed Career-9 report
+                                                {isDownloading ? 'This can take a few seconds on your phone' : 'Open your detailed Career-9 report'}
                                             </p>
                                         </div>
                                     )}
@@ -1383,13 +1391,14 @@ const ThankYouPage: React.FC = () => {
 const overlayStyle = (z: number): React.CSSProperties => ({
     position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: 16, zIndex: z, backdropFilter: 'blur(2px)',
+    padding: 16, zIndex: z, backdropFilter: 'blur(2px)', overflowY: 'auto',
 });
 const celebrationCardStyle: React.CSSProperties = {
     background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
     border: '1.5px solid #6EE7B7', borderRadius: 18, maxWidth: 420, width: '100%',
     padding: '2rem 1.75rem', boxShadow: '0 24px 70px rgba(16,185,129,0.3)',
     fontFamily: 'inherit', textAlign: 'center',
+    maxHeight: 'min(90vh, 90dvh)', overflowY: 'auto',
 };
 const primaryBtnStyle: React.CSSProperties = {
     padding: '13px 20px', border: 'none', borderRadius: 12,

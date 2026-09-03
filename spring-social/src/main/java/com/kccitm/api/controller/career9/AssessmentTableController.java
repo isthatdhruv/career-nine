@@ -5,10 +5,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +46,8 @@ import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
+import com.kccitm.api.security.access.AccessScope;
+import com.kccitm.api.security.access.AccessScopeService;
 
 @RestController
 @RequestMapping("/assessments")
@@ -78,6 +84,9 @@ public class AssessmentTableController {
 
     @Autowired
     private InstituteBrandingService brandingService;
+
+    @Autowired
+    private AccessScopeService accessScopeService;
 
     // ─── Locked assessment JSON snapshot helpers ───
 
@@ -496,6 +505,36 @@ public class AssessmentTableController {
     @PreAuthorize("@auth.allows('assessment.read.all')")
     public List<AssessmentTableRepository.AssessmentSummary> getAssessmentSummaryList() {
         return assessmentTableRepository.findAssessmentSummaryListNotDeleted();
+    }
+
+    /**
+     * ABAC-scoped assessment list for viewing surfaces (e.g. Live Tracking).
+     * Super-admins get the full catalog; everyone else only assessments
+     * connected to their institutes — active registration-link mappings
+     * unioned with assessments their institutes' students are allotted to.
+     * Deny-by-default: a user with no institute scope gets an empty list.
+     */
+    @GetMapping("/get/list-summary-scoped")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
+    public List<AssessmentTableRepository.AssessmentSummary> getScopedAssessmentSummaryList() {
+        Optional<AccessScope> scope = accessScopeService.forCurrentUser();
+        if (!scope.isPresent()) {
+            return assessmentTableRepository.findAssessmentSummaryListNotDeleted();
+        }
+        Set<Integer> codes = scope.get().getAllowedInstituteCodes();
+        if (codes.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<Long, AssessmentTableRepository.AssessmentSummary> byId = new LinkedHashMap<>();
+        for (AssessmentTableRepository.AssessmentSummary s
+                : assessmentTableRepository.findAssessmentSummariesByInstitutes(codes)) {
+            byId.put(s.getId(), s);
+        }
+        for (AssessmentTableRepository.AssessmentSummary s
+                : assessmentTableRepository.findStudentAssignedAssessmentSummariesByInstitutes(codes)) {
+            byId.putIfAbsent(s.getId(), s);
+        }
+        return new ArrayList<>(byId.values());
     }
 
     @GetMapping("/get/list-ids")

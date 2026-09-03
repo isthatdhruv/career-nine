@@ -67,6 +67,7 @@ const QuestionSectionTable = (props: {
               } catch (error) {
                 console.error("Delete failed:", error);
                 showErrorToast("Failed to delete section. Please try again.");
+              } finally {
                 props.setLoading(false);
               }
             }}

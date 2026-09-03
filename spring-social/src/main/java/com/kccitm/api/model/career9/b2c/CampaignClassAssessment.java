@@ -67,6 +67,11 @@ public class CampaignClassAssessment implements Serializable {
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
+    /** True when this class/cohort is 18+: registration pages show adult self-consent
+     *  wording and "Your Email/Phone" instead of the parental copy. */
+    @Column(name = "audience_18_plus", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean audience18Plus = false;
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
@@ -85,6 +90,7 @@ public class CampaignClassAssessment implements Serializable {
         if (sortOrder == null) sortOrder = 0;
         if (isActive == null) isActive = true;
         if (isDeleted == null) isDeleted = false;
+        if (audience18Plus == null) audience18Plus = false;
     }
 
     @PreUpdate
@@ -108,6 +114,8 @@ public class CampaignClassAssessment implements Serializable {
     public void setIsActive(Boolean v) { this.isActive = v; }
     public Boolean getIsDeleted() { return isDeleted; }
     public void setIsDeleted(Boolean v) { this.isDeleted = v; }
+    public Boolean getAudience18Plus() { return audience18Plus; }
+    public void setAudience18Plus(Boolean v) { this.audience18Plus = v; }
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date v) { this.createdAt = v; }
     public Date getUpdatedAt() { return updatedAt; }

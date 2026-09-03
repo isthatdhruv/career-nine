@@ -123,3 +123,44 @@ to the appropriate role group before the `enforce` flip, or that flow breaks.
 - Plan 15-06: removes the `@Disabled` annotation here and turns this test into a build gate
 - `docs/AUTH_REMEDIATION_PLAN.md` Phase 0 (Tasks 0.1–0.4)
 - `.planning/ROADMAP.md` Phase 15
+
+---
+
+# Email Dispatch Routing Test
+
+`EmailDispatchRoutingTest` asserts that no class outside `com.kccitm.api.service.email..`
+calls a mail transport (`SmtpEmailService`, `GmailApiEmailServiceImpl`, `OdooEmailService`,
+`JavaMailSender`, …) directly. Everything must go through `EmailDispatchService`.
+
+## Why
+
+`EmailDispatchService` is the only thing that writes an `email_send_log` row, and that table
+is what the admin **Email Logs** screen reads. A send that goes straight to a transport still
+lands in the student's inbox — which is what makes the omission so easy to miss. Nothing looks
+broken; there is simply no record. The cost is paid months later, when someone asks whether a
+student was ever contacted and the honest answer is that we cannot tell.
+
+```
+cd spring-social
+mvn -Dtest=EmailDispatchRoutingTest test
+```
+
+The failure message names each bypass as `Caller#method → Transport.send*()`.
+
+## Exclusions
+
+- `GmailReportEmailSender` / `SmtpReportEmailSender` — the report pipeline's own senders. They
+  hold `EmailSendLogRepository` and write their own log row, because they compose and render
+  the report mail themselves.
+- `OdooEmailSender` — opt-in transport (`report.pipeline.email-transport=odoo`), off by
+  default. This one genuinely does **not** log. If that transport is ever switched on, give it
+  a log row first.
+
+To add an exclusion, edit `EXCLUSIONS` with a one-line justification. Every entry is a set of
+emails that will never appear on the Email Logs screen, so keep the list short.
+
+## Not covered: WhatsApp
+
+`WhatsAppService.sendTemplate` (booking nudges, session reminders, no-show notices) writes
+nothing to any table — it returns a boolean and logs to slf4j. Counselling reaches students on
+both channels, so "was this student contacted?" is only half answered by `email_send_log`.

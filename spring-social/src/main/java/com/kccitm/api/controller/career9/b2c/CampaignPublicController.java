@@ -192,6 +192,9 @@ public class CampaignPublicController {
             aDto.put("purchasePath", m.getPurchasePath() != null ? m.getPurchasePath() : defaultPurchasePath);
             aDto.put("counsellingModel", m.getCounsellingModel() != null ? m.getCounsellingModel() : defaultCounsellingModel);
             aDto.put("description", m.getDescription());
+            // 18+ cohort → the registration page swaps to adult self-consent wording
+            // and "Your Email/Phone". Used in deep-link mode (no class picker).
+            aDto.put("audience18Plus", Boolean.TRUE.equals(m.getAudience18Plus()));
 
             List<CampaignAssessmentTier> tiers = tierMappingRepository
                     .findByCampaignAssessmentMappingIdOrderByIdAsc(m.getId())
@@ -269,6 +272,9 @@ public class CampaignPublicController {
                 cDto.put("className", sc.getClassName());
                 cDto.put("assessmentId", r.getAssessmentId());
                 cDto.put("sortOrder", r.getSortOrder());
+                // Per-class 18+ flag; in class-mode the SPA uses the selected class's
+                // flag rather than the assessment mapping's.
+                cDto.put("audience18Plus", Boolean.TRUE.equals(r.getAudience18Plus()));
                 classesOut.add(cDto);
             }
             // Grade order ("Class 9" before "Class 10"); non-numeric names last, by name.

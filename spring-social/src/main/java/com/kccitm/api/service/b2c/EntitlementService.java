@@ -66,6 +66,11 @@ public class EntitlementService {
     @Autowired private NotificationDispatcher notificationDispatcher;
     @Autowired private LinkBuilder linkBuilder;
     @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
+    /** Single source of the report-mail body — legacy and resend paths render through it. */
+    @Autowired private com.kccitm.api.service.b2c.report.pipeline.ReportEmailComposer reportEmailComposer;
+    /** Optional: counselling CTA for the report mail; absent where counselling isn't wired. */
+    @Autowired(required = false)
+    private com.kccitm.api.service.counselling.CounsellingBookingLinkService counsellingBookingLinkService;
 
     /**
      * Mirrors {@code report.pipeline.enabled}. When the Kafka report pipeline is on,
@@ -611,8 +616,7 @@ public class EntitlementService {
                 // viewer link — no PDF exists yet at completion time.
                 String finalLink = linkBuilder.finalReport(token, e.getEntitlementId());
                 String subject = "Your Career-9 report is ready";
-                String body = simpleHtml("Your full Career-9 report is ready.",
-                        "View your detailed report:", finalLink, "Open report");
+                String body = reportReadyEmailBody(e, finalLink, null);
                 notificationDispatcher.sendEmail(e, studentEmail, "final_report", subject, body, finalLink);
             } else {
                 String subject = "Your Career-9 1-pager is ready";
@@ -767,17 +771,17 @@ public class EntitlementService {
                 break;
             case "final_report": {
                 if (!Boolean.TRUE.equals(e.getFinalReportActive())) return new ResendResult(false, "Final report not in this tier");
-                subject = "Your Career-9 report";
+                subject = "Your Career-9 report is ready";
                 // Prefer the generated report's Spaces CDN links (same delivery as the
                 // report-pipeline email); fall back to the tokenized viewer link when
                 // no generated report exists yet.
                 GeneratedReport gr = latestGeneratedReport(e.getUserStudentId(), e.getAssessmentId());
                 if (gr != null) {
                     link = gr.getReportUrl();
-                    body = reportReadyHtml(gr.getReportUrl(), gr.getPdfUrl());
+                    body = reportReadyEmailBody(e, gr.getReportUrl(), gr.getPdfUrl());
                 } else {
                     link = linkBuilder.finalReport(token, eid);
-                    body = simpleHtml("Your full report.", "View it:", link, "Open report");
+                    body = reportReadyEmailBody(e, link, null);
                 }
                 break;
             }
@@ -924,102 +928,94 @@ public class EntitlementService {
     }
 
     /**
-     * Glassmorphic amber→green welcome email. Two entry options (magic link,
-     * manual sign-in with credentials). Inline styles only — backdrop-filter is
-     * unsupported in mail clients, so the "glass" look is approximated with
-     * pastel gradients + soft borders.
+     * Flat green welcome email (approved design): white card on a neutral ground,
+     * one green accent, primary magic-link button, then a quiet manual-login
+     * credentials panel. Inline styles only; emoji/dashes as HTML entities so the
+     * source and every mail client stay ASCII-safe.
      */
     private static String welcomeEmailHtml(String displayName, String username, String dobStr,
                                            String magicLink, String manualLoginUrl) {
         String credentialsBlock;
         if (username != null && dobStr != null) {
             credentialsBlock =
-                "<div style='background:#ffffff;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;"
-                +     "font-family:\"Courier New\",Consolas,monospace;'>"
-                + "  <div style='margin-bottom:6px;'>"
-                + "    <span style='display:inline-block;width:80px;color:#94a3b8;font-size:0.74rem;"
-                +         "text-transform:uppercase;letter-spacing:0.05em;font-weight:600;'>User ID</span>"
-                + "    <span style='font-weight:700;color:#0f172a;font-size:0.95rem;'>" + username + "</span>"
-                + "  </div>"
-                + "  <div>"
-                + "    <span style='display:inline-block;width:80px;color:#94a3b8;font-size:0.74rem;"
-                +         "text-transform:uppercase;letter-spacing:0.05em;font-weight:600;'>Password</span>"
-                + "    <span style='font-weight:700;color:#0f172a;font-size:0.95rem;'>" + dobStr
-                +     "</span><span style='color:#64748b;font-size:0.82rem;margin-left:6px;'>(your date of birth)</span>"
-                + "  </div>"
-                + "</div>";
+                "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;font-size:13.5px;\">"
+                + "<tr><td style=\"padding:4px 0;color:#5f6f67;width:110px;\">Username</td>"
+                + "<td style=\"padding:4px 0;color:#0f1f18;font-family:Consolas,'Courier New',monospace;font-weight:700;\">"
+                +     username + "</td></tr>"
+                + "<tr><td style=\"padding:4px 0;color:#5f6f67;\">Password</td>"
+                + "<td style=\"padding:4px 0;color:#0f1f18;font-family:Consolas,'Courier New',monospace;font-weight:700;\">"
+                +     dobStr
+                + " <span style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
+                +     "color:#8a978f;font-weight:400;\">(your date of birth)</span></td></tr>"
+                + "</table>";
         } else {
             credentialsBlock =
-                "<p style='margin:0;font-size:0.88rem;color:#92400e;'>"
+                "<p style=\"margin:0;font-size:13.5px;line-height:1.6;color:#3d4a44;\">"
                 + "Use the user ID and date of birth you provided at registration to sign in."
                 + "</p>";
         }
 
         return ""
-            + "<div style='background:linear-gradient(135deg,#fef3c7 0%,#d1fae5 100%);padding:48px 16px;"
-            +     "font-family:\"Inter\",\"Segoe UI\",Arial,sans-serif;'>"
-            + "  <div style='max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;"
-            +       "overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.08);'>"
+            + "<div style=\"background:#f3f5f4;padding:40px 16px;"
+            +     "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;\">"
+            + "<div style=\"max-width:560px;margin:0 auto;\">"
 
-            // Header — amber → green gradient
-            + "    <div style='background:linear-gradient(135deg,#f59e0b 0%,#10b981 100%);"
-            +         "padding:32px 32px 28px;color:#ffffff;'>"
-            + "      <div style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
-            +           "letter-spacing:0.1em;opacity:0.9;margin-bottom:10px;'>CAREER-9 · WELCOME</div>"
-            + "      <h1 style='margin:0;font-size:1.55rem;font-weight:800;line-height:1.25;'>"
-            +           "Welcome aboard, " + escape(displayName) + "!</h1>"
-            + "      <p style='margin:10px 0 0;font-size:0.95rem;line-height:1.5;opacity:0.95;'>"
-            +           "Your purchase is confirmed. Let's get you started on your assessment.</p>"
-            + "    </div>"
+            // Wordmark above the card
+            + "<div style=\"padding:0 6px 12px;\">"
+            + "<span style=\"font-size:14px;font-weight:800;letter-spacing:2px;color:#059669;\">CAREER&#8209;9</span>"
+            + "</div>"
 
-            // Body
-            + "    <div style='padding:32px;color:#1e293b;'>"
-            + "      <p style='margin:0 0 22px;font-size:0.95rem;line-height:1.55;color:#475569;'>"
-            +           "You have two ways to start — pick whichever works for you.</p>"
+            // Card, single green accent line
+            + "<div style=\"background:#ffffff;border:1px solid #e3e8e5;border-radius:14px;overflow:hidden;\">"
+            + "<div style=\"height:4px;background:#059669;\"></div>"
+            + "<div style=\"padding:32px 32px 8px;\">"
 
-            // Option 1: Magic link (green tint)
-            + "      <div style='background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);"
-            +           "border:1.5px solid #6ee7b7;border-radius:14px;padding:20px 22px;margin-bottom:18px;'>"
-            + "        <div style='font-size:0.72rem;font-weight:700;color:#059669;text-transform:uppercase;"
-            +             "letter-spacing:0.06em;margin-bottom:8px;'>Option 1 · One-click start</div>"
-            + "        <p style='margin:0 0 16px;font-size:0.92rem;line-height:1.55;color:#374151;'>"
-            +             "Click below — we'll sign you in and take you straight to your assessment.</p>"
-            + "        <div style='text-align:center;'>"
-            + "          <a href='" + magicLink + "' style='display:inline-block;padding:14px 32px;"
-            +               "background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#ffffff;"
-            +               "text-decoration:none;border-radius:12px;font-weight:700;font-size:0.95rem;"
-            +               "box-shadow:0 4px 16px rgba(16,185,129,0.35);letter-spacing:0.01em;'>"
-            +               "Start Assessment &rarr;</a>"
-            + "        </div>"
-            + "      </div>"
+            + "<h1 style=\"margin:0 0 8px;font-size:22px;line-height:1.3;font-weight:700;color:#0f1f18;\">"
+            +     "Welcome aboard, " + escape(displayName) + "!</h1>"
+            + "<p style=\"margin:0 0 24px;font-size:15px;line-height:1.6;color:#5f6f67;\">"
+            +     "Your purchase is confirmed. Your assessment is ready when you are &mdash; "
+            +     "you can pause and resume anytime.</p>"
 
-            // Option 2: Manual login (amber tint) with credentials
-            + "      <div style='background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);"
-            +           "border:1.5px solid #fbbf24;border-radius:14px;padding:20px 22px;'>"
-            + "        <div style='font-size:0.72rem;font-weight:700;color:#b45309;text-transform:uppercase;"
-            +             "letter-spacing:0.06em;margin-bottom:8px;'>Option 2 · Sign in manually</div>"
-            + "        <p style='margin:0 0 14px;font-size:0.92rem;line-height:1.55;color:#374151;'>"
-            +             "Visit <a href='" + manualLoginUrl + "' style='color:#059669;text-decoration:none;"
-            +                 "font-weight:700;'>" + manualLoginUrl + "</a> and sign in with these credentials:"
-            + "        </p>"
-            +          credentialsBlock
-            + "        <p style='margin:14px 0 0;font-size:0.8rem;line-height:1.5;color:#92400e;'>"
-            +             "Keep these safe &mdash; you'll need them to resume your assessment or access your report later.</p>"
-            + "      </div>"
+            // Primary action: magic link
+            + "<p style=\"margin:0 0 14px;font-size:14px;line-height:1.6;color:#0f1f18;\">"
+            +     "One click signs you in and takes you straight to your assessment:</p>"
+            + "<div style=\"text-align:center;margin:0 0 26px;\">"
+            + "<a href=\"" + magicLink + "\" style=\"display:inline-block;padding:14px 36px;background:#059669;"
+            +     "color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;\">"
+            +     "Start Assessment &rarr;</a>"
+            + "</div>"
+
+            // Divider
+            + "<div style=\"border-top:1px solid #e3e8e5;text-align:center;margin:0 0 20px;\">"
+            + "<span style=\"position:relative;top:-9px;background:#ffffff;padding:0 12px;"
+            +     "font-size:11px;font-weight:700;letter-spacing:1.2px;color:#8a978f;\">OR SIGN IN MANUALLY</span>"
+            + "</div>"
+
+            // Credentials panel
+            + "<div style=\"background:#f6f8f7;border:1px solid #e3e8e5;border-radius:10px;padding:18px 20px;margin:0 0 22px;\">"
+            + "<p style=\"margin:0 0 12px;font-size:13.5px;line-height:1.6;color:#3d4a44;\">Visit "
+            + "<a href=\"" + manualLoginUrl + "\" style=\"color:#059669;font-weight:700;text-decoration:none;\">"
+            +     manualLoginUrl + "</a> and use:</p>"
+            + credentialsBlock
+            + "<p style=\"margin:12px 0 0;font-size:12px;line-height:1.6;color:#8a978f;\">"
+            +     "Keep these safe &mdash; you&rsquo;ll need them to resume your assessment or open your report later.</p>"
+            + "</div>"
 
             // Fallback raw link
-            + "      <p style='margin:24px 0 0;font-size:0.76rem;color:#94a3b8;text-align:center;line-height:1.5;'>"
-            +           "If the button doesn't work, paste this link into your browser:<br/>"
-            + "        <span style='word-break:break-all;color:#64748b;'>" + magicLink + "</span></p>"
-            + "    </div>"
+            + "<p style=\"margin:0 0 28px;font-size:12px;line-height:1.6;color:#8a978f;text-align:center;\">"
+            +     "If the button doesn&rsquo;t work, paste this link into your browser:<br>"
+            + "<span style=\"word-break:break-all;color:#5f6f67;\">" + magicLink + "</span></p>"
+
+            + "</div>"
 
             // Footer
-            + "    <div style='background:#f8fafc;padding:18px 32px;text-align:center;border-top:1px solid #e2e8f0;'>"
-            + "      <p style='margin:0;font-size:0.72rem;color:#94a3b8;font-weight:600;letter-spacing:0.08em;'>"
-            +           "CAREER<span style='color:#10b981;'>-9</span></p>"
-            + "    </div>"
-            + "  </div>"
-            + "</div>";
+            + "<div style=\"background:#f6f8f7;border-top:1px solid #e3e8e5;padding:14px 32px;\">"
+            + "<p style=\"margin:0;font-size:11px;line-height:1.6;color:#8a978f;\">"
+            +     "This is an automated message from Career&#8209;9 &mdash; please don&rsquo;t reply to this address.<br>"
+            +     "&copy; Career&#8209;9. All rights reserved.</p>"
+            + "</div>"
+
+            + "</div></div></div>";
     }
 
     /** Minimal HTML escape for values interpolated into the email body. */
@@ -1054,23 +1050,39 @@ public class EntitlementService {
         }
     }
 
-    /** Final-report email body: Spaces CDN report link as the CTA + a direct PDF link. */
-    private static String reportReadyHtml(String reportUrl, String pdfUrl) {
-        String pdfLine = (pdfUrl != null && !pdfUrl.trim().isEmpty())
-                ? "<p style='text-align:center;margin:0 0 8px;'><a href='" + pdfUrl
-                        + "' style='color:#059669;font-weight:bold;'>Download your report as a PDF</a></p>"
-                : "";
-        return "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;'>"
-                + "<div style='background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:24px;border-radius:12px 12px 0 0;color:white;'>"
-                + "<h2 style='margin:0;'>Your full Career-9 report is ready.</h2></div>"
-                + "<div style='padding:24px;background:#fff;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 12px 12px;'>"
-                + "<p>View your detailed report:</p>"
-                + "<div style='text-align:center;margin:24px 0 12px;'>"
-                + "<a href='" + reportUrl + "' style='display:inline-block;padding:14px 32px;background:#059669;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;'>Open report</a>"
-                + "</div>"
-                + pdfLine
-                + "<p style='color:#64748b;font-size:0.85em;margin-top:24px;'>If the button doesn't work, copy this link: " + reportUrl + "</p>"
-                + "</div></div>";
+    /**
+     * Report-ready body rendered through the pipeline's ReportEmailComposer, so
+     * every path (pipeline, legacy immediate send, admin resend) mails the same
+     * design. linkOnly is always true here — these paths never attach the PDF;
+     * when a CDN pdfUrl exists it is offered as a download link instead.
+     */
+    private String reportReadyEmailBody(StudentEntitlement e, String reportUrl, String pdfUrl) {
+        com.kccitm.api.service.b2c.report.pipeline.ReportEmailEvent ev =
+                new com.kccitm.api.service.b2c.report.pipeline.ReportEmailEvent();
+        ev.userStudentId = e.getUserStudentId();
+        ev.assessmentId = e.getAssessmentId();
+        ev.entitlementId = e.getEntitlementId();
+        ev.reportUrl = reportUrl;
+        ev.pdfUrl = pdfUrl;
+        ev.linkOnly = true;
+        ev.studentName = resolveStudentName(e);
+        if (counsellingBookingLinkService != null) {
+            ev.bookingUrl = counsellingBookingLinkService.bookingUrlIfEligible(
+                    e.getUserStudentId(), e.getAssessmentId(), e.getEntitlementId());
+        }
+        return reportEmailComposer.html(ev);
+    }
+
+    /** Student's name for the email greeting; null when unavailable. */
+    private String resolveStudentName(StudentEntitlement e) {
+        try {
+            if (e.getUserStudentId() == null) return null;
+            UserStudent us = userStudentRepository.findById(e.getUserStudentId()).orElse(null);
+            if (us == null || us.getStudentInfo() == null) return null;
+            return us.getStudentInfo().getName();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private static String simpleHtml(String greeting, String preLink, String link, String cta) {

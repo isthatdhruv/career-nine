@@ -16,6 +16,7 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.model.career9.counselling.CounsellorAssessmentAssignment;
+import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.GeneratedReportRepository;
@@ -202,16 +203,29 @@ public class CounsellorReportNotificationService {
 
         String studentName = studentName(userStudentId);
         String subject = "Report ready — " + studentName;
+        String lead = studentName + " has completed " + assessmentName(assessmentId)
+                + ", and the report is ready.";
+        String closing = "Please look through it before your session so you can go straight to "
+                + "what matters.";
+
+        String html = CounsellingEmailHtml.page(
+                studentName + "'s report is ready to read before the session.",
+                "Report ready — " + studentName,
+                CounsellingEmailHtml.p("Hello,")
+                + CounsellingEmailHtml.p(lead)
+                + CounsellingEmailHtml.actionBlock(link, "Assessment report", "Open report", null)
+                + CounsellingEmailHtml.small(closing)
+                + CounsellingEmailHtml.signature());
+
         String body = "Hello,\n\n"
-                + studentName + " has completed " + assessmentName(assessmentId)
-                + ", and the report is ready.\n\n"
+                + lead + "\n\n"
                 + "  Report: " + link + "\n\n"
-                + "Please look through it before your session so you can go straight to what matters.\n\n"
-                + "Regards,\nCareer-Nine Team";
+                + closing + "\n\n"
+                + "Regards,\nCareer-9 Team";
 
         for (String to : recipients) {
             try {
-                emailDispatchService.sendText(EmailType.REPORT_READY, to, subject, body);
+                sendRich(to, subject, html, body);
             } catch (Exception e) {
                 logger.warn("Report-ready email to counsellor {} failed for student={} assessment={}: {}",
                         to, userStudentId, assessmentId, e.getMessage());
@@ -260,16 +274,29 @@ public class CounsellorReportNotificationService {
 
                 String when = sessionWhen(a);
                 String subject = "Assessment report ready for your counselling session";
-                String body = "Hello,\n\n"
-                        + "The assessment report for " + studentName(userStudentId)
+                String lead = "The assessment report for " + studentName(userStudentId)
                         + " is now ready, ahead of the counselling session"
-                        + (when != null ? " on " + when : "") + ".\n\n"
+                        + (when != null ? " on " + when : "") + ".";
+                String closing = "Please read it before the session so the time can be spent on "
+                        + "what matters most.";
+
+                String html = CounsellingEmailHtml.page(
+                        "The report is ready ahead of the counselling session.",
+                        "Assessment report ready",
+                        CounsellingEmailHtml.p("Hello,")
+                        + CounsellingEmailHtml.p(lead)
+                        + CounsellingEmailHtml.actionBlock(link, "Assessment report", "Open report", null)
+                        + CounsellingEmailHtml.small(closing)
+                        + CounsellingEmailHtml.signature());
+
+                String body = "Hello,\n\n"
+                        + lead + "\n\n"
                         + "  Report: " + link + "\n\n"
-                        + "Please read it before the session so the time can be spent on what matters most.\n\n"
-                        + "Regards,\nCareer-Nine Team";
+                        + closing + "\n\n"
+                        + "Regards,\nCareer-9 Team";
 
                 for (String addr : to) {
-                    emailDispatchService.sendText(EmailType.REPORT_READY, addr, subject, body);
+                    sendRich(addr, subject, html, body);
                 }
                 logger.info("Report link delivered to {} recipient(s) for booked session {}", to.size(), a.getId());
             } catch (Exception e) {
@@ -277,6 +304,20 @@ public class CounsellorReportNotificationService {
                 logger.warn("Could not send report link for booked session {}: {}", a.getId(), e.getMessage());
             }
         }
+    }
+
+    /**
+     * A branded mail with its plain-text alternative, through the same dispatcher the rest of
+     * this class uses. Best-effort like everything here: a failure is the caller's to log.
+     */
+    private void sendRich(String to, String subject, String html, String text) {
+        EmailSendRequest req = new EmailSendRequest();
+        req.setEmailType(EmailType.REPORT_READY);
+        req.getTo().add(to);
+        req.setSubject(subject);
+        req.setHtmlContent(html);
+        req.setTextContent(text);
+        emailDispatchService.send(req);
     }
 
     /** The address the student gave when booking, falling back to their profile. */

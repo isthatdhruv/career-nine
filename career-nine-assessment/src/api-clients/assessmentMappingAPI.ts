@@ -39,6 +39,8 @@ export type MappingInfo = {
   instituteName: string;
   /** false → college (Year/Course wording); true/absent → school (Class/Board). */
   isSchool?: boolean | null;
+  /** true → the mapped cohort is 18+: self-consent wording and "Your Email/Phone" labels. */
+  audience18Plus?: boolean | null;
   inclusions: MappingInclusions;
   activeTierName?: string;
   // Post-assessment counselling payment timing + fee breakdown (PAID links only).
@@ -196,6 +198,8 @@ export type InviteInfo = {
   instituteName?: string;
   /** false → college (Year/Course wording); true/absent → school (Class/Board). */
   isSchool?: boolean | null;
+  /** true → the mapped cohort is 18+: self-consent wording and "Your Email/Phone" labels. */
+  audience18Plus?: boolean | null;
   tierName?: string;
   amount: number;
   payableTotal?: number;

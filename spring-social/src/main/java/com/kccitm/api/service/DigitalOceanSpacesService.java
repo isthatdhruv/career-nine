@@ -229,6 +229,17 @@ public class DigitalOceanSpacesService {
     }
 
     /**
+     * True when the URL points into our own Spaces bucket/CDN. Callers that
+     * proxy downloads for the browser MUST check this first — the HTTP
+     * fallback in {@link #downloadFileByUrl} would otherwise fetch arbitrary
+     * URLs (SSRF).
+     */
+    public boolean isOwnSpacesUrl(String fileUrl) {
+        return fileUrl != null && cdnUrl != null && !cdnUrl.isEmpty()
+                && fileUrl.startsWith(cdnUrl + "/");
+    }
+
+    /**
      * Download a file from DigitalOcean Spaces by its full URL.
      * Returns the file bytes, or null if not found.
      */

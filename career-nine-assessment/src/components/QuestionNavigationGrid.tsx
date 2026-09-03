@@ -23,17 +23,19 @@ const QuestionNavigationGrid: React.FC<QuestionNavigationGridProps> = React.memo
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fill, minmax(36px, 1fr))",
+      gridTemplateColumns: "repeat(auto-fill, minmax(40px, 1fr))",
       gap: "6px",
     }}>
       {questions.map((q, idx) => (
-        <div
+        <button
+          type="button"
           key={q.questionnaireQuestionId}
           onClick={() => onQuestionClick(idx)}
           title={`Question ${idx + 1}`}
           style={{
-            width: "36px",
-            height: "36px",
+            padding: 0,
+            width: "40px",
+            height: "40px",
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
@@ -48,7 +50,7 @@ const QuestionNavigationGrid: React.FC<QuestionNavigationGridProps> = React.memo
           }}
         >
           {idx + 1}
-        </div>
+        </button>
       ))}
     </div>
   );

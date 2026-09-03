@@ -407,7 +407,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           borderRadius: 16,
           width: '100%',
           maxWidth: 560,
-          maxHeight: '90vh',
+          maxHeight: 'min(90vh, 90dvh)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -960,7 +960,7 @@ const calWeekdayStyle: React.CSSProperties = {
 function calDayStyle(o: { selected: boolean; hasDay: boolean; free: number; today: boolean }): React.CSSProperties {
   const base: React.CSSProperties = {
     position: 'relative',
-    height: 32,
+    height: 40,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

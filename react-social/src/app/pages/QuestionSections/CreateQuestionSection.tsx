@@ -1,15 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuestionSections } from "../../lib/queries/lookups";
+import { useQueryClient } from "react-query";
+import { useQuestionSections, lookupKeys } from "../../lib/queries/lookups";
 import QuestionSectionTable from "./components/QuestionSectionTable";
 import QuestionSectionRecycleBinModal from "./components/QuestionSectionRecycleBinModal";
 import PageHeader from "../../components/PageHeader";
 
 const QuestionSectionPage = () => {
-  const { data: questionSectionData = [], isLoading: loading } = useQuestionSections<any>();
+  const { data: questionSectionData = [], isLoading } = useQuestionSections<any>();
+  const queryClient = useQueryClient();
   const [pageLoading, setPageLoading] = useState(["false"]);
+  // Busy state for the table's delete action (QuestionSectionTable calls setLoading around it).
+  const [deleting, setDeleting] = useState(false);
+  const loading = isLoading || deleting;
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (pageLoading[0] === "true") {
+      queryClient.invalidateQueries(lookupKeys.questionSections);
+      setPageLoading(["false"]);
+    }
+  }, [pageLoading, queryClient]);
 
   return (
     <div className="ph-page">
@@ -57,7 +69,7 @@ const QuestionSectionPage = () => {
           <div style={{ padding: "16px" }}>
             <QuestionSectionTable
               data={questionSectionData}
-              setLoading={setLoading}
+              setLoading={setDeleting}
               setPageLoading={setPageLoading}
             />
           </div>
@@ -67,7 +79,7 @@ const QuestionSectionPage = () => {
       <QuestionSectionRecycleBinModal
         show={showRecycleBin}
         onHide={() => setShowRecycleBin(false)}
-        onRestoreComplete={() => setPageLoading([String(Date.now())])}
+        onRestoreComplete={() => queryClient.invalidateQueries(lookupKeys.questionSections)}
       />
     </div>
   );
