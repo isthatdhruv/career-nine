@@ -41,6 +41,10 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentRawScore;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.userDefinedModel.ExcelOptionData;
@@ -86,6 +90,9 @@ public class StudentInfoController {
     private UserStudentRepository userStudentRepository;
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
     @Autowired
     private InstituteDetailRepository instituteDetailRepository;
     @Autowired
@@ -539,11 +546,46 @@ public class StudentInfoController {
                     // Only create new mapping if it doesn't exist
                     StudentAssessmentMapping mapping = new StudentAssessmentMapping(userStudentId, assessmentId);
                     savedMappings.add(studentAssessmentMappingRepository.save(mapping));
+                    publishAssessmentMapped(mapping, userStudentOpt.orElse(null));
                 }
                 // If mapping exists, skip (don't create duplicate)
             }
         }
         return ResponseEntity.ok(savedMappings);
+    }
+
+    /**
+     * ASSESSMENT_MAPPED for a bulk assignment (admin automations). Only the ids and what the
+     * already-loaded UserStudent carries; reported after the fact, never affects the flow.
+     */
+    private void publishAssessmentMapped(StudentAssessmentMapping mapping, UserStudent userStudent) {
+        if (mailEvents == null || mapping == null) return;
+        try {
+            Long userStudentId = userStudent != null ? userStudent.getUserStudentId()
+                    : (mapping.getUserStudent() != null ? mapping.getUserStudent().getUserStudentId() : null);
+            StudentInfo info = userStudent != null ? userStudent.getStudentInfo() : null;
+            Integer instituteCode = (userStudent != null && userStudent.getInstitute() != null)
+                    ? userStudent.getInstitute().getInstituteCode() : null;
+            String name = info != null ? info.getName() : null;
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.ASSESSMENT_MAPPED)
+                    .subject("mapping", mapping.getStudentAssessmentId())
+                    .subject("student", userStudentId)
+                    .recipient(MailRecipientRole.STUDENT, info != null ? info.getEmail() : null, name)
+                    .field("student_name", name)
+                    .ref("mappingId", mapping.getStudentAssessmentId())
+                    .ref("userStudentId", userStudentId)
+                    .ref("assessmentId", mapping.getAssessmentId())
+                    .ref("instituteCode", instituteCode == null ? null : instituteCode.longValue())
+                    .institute(instituteCode)
+                    .student(userStudentId);
+            if (userStudent != null && userStudent.getInstitute() != null) {
+                b.field("school_name", userStudent.getInstitute().getInstituteName());
+            }
+            if (name != null && !name.trim().isEmpty()) b.field("first_name", name.trim().split("\\s+")[0]);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.ASSESSMENT_MAPPED.key(), e.getMessage());
+        }
     }
 
     @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")

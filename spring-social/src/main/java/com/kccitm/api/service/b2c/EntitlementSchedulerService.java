@@ -41,9 +41,14 @@ public class EntitlementSchedulerService {
     @Autowired private LinkBuilder linkBuilder;
     @Autowired private EntitlementService entitlementService;
     @Autowired(required = false) private ReminderConfigService reminderConfigService;
+    /** When the mail automation engine is on, the seeded "Assessment invite nudge" automation owns this send. */
+    @Autowired(required = false) private com.kccitm.api.service.mail.MailSettingsService mailSettings;
 
     @Scheduled(cron = "0 23 * * * *") // 23 minutes past every hour to avoid clustering
     public void nudgeUnstartedAssessments() {
+        if (mailSettings != null && mailSettings.engineEnabled()) {
+            return; // handed over to the mail automation engine (mail_setting engine_enabled)
+        }
         // Honour central reminder config when present (Phase: Reminder Management).
         if (reminderConfigService != null
                 && !reminderConfigService.isEnabled(ReminderServiceType.ASSESSMENT_INVITE_B2C)) {

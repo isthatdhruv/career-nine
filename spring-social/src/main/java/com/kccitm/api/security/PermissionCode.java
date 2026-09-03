@@ -584,6 +584,10 @@ public enum PermissionCode {
     EMAIL_TEMPLATE_READ ("email_template.read", "View email templates"),
     EMAIL_TEMPLATE_EDIT ("email_template.edit", "Create, edit and delete email templates"),
 
+    // ── Mail automation engine (V20260903003 seed) ─────────────────────
+    MAIL_AUTOMATION_READ ("mail_automation.read", "View mail automations, the send queue and engine settings"),
+    MAIL_AUTOMATION_EDIT ("mail_automation.edit", "Create and edit mail automations, manage the queue and engine settings"),
+
     // ── Notification recipients (V20260813001 seed) ─────────────────────
     EMAIL_RECIPIENT_READ ("email_recipient.read", "View automatic-notification recipient lists"),
     EMAIL_RECIPIENT_EDIT ("email_recipient.edit", "Add, edit and remove automatic-notification recipients");

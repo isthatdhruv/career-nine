@@ -2,6 +2,10 @@ package com.kccitm.api.service.b2c.report.pipeline;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.service.DigitalOceanSpacesService;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +47,9 @@ public class ReportEmailConsumer {
     /** Optional: "Your Next Step" counselling CTA; absent where counselling isn't wired. */
     @Autowired(required = false)
     private com.kccitm.api.service.counselling.CounsellingBookingLinkService bookingLinkService;
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     @RetryableTopic(
             attempts = "${report.pipeline.max-attempts:5}",
@@ -109,6 +116,7 @@ public class ReportEmailConsumer {
             emailSender.sendReportEmail(ev, pdf);
             idempotency.markSent(ev.userStudentId, ev.assessmentId, ev.batchId);
             logEntitlementDelivery(ev);
+            publishReportReady(ev);
             logger.info("Report email sent student={} assessment={} withPdf={}",
                     ev.userStudentId, ev.assessmentId, (pdf != null));
         } catch (Exception e) {
@@ -149,6 +157,37 @@ public class ReportEmailConsumer {
         } catch (Exception e) {
             logger.warn("Could not write final_report ServiceDeliveryLog entitlement={} student={}: {}",
                     ev.entitlementId, ev.userStudentId, e.getMessage());
+        }
+    }
+
+    /**
+     * REPORT_READY for admin automations, after the email is sent and marked. Own try/catch:
+     * the email IS sent at this point, so a failure here must never trigger a retry (which
+     * would double-send). Plain values from the event; no scheduling or web context assumed.
+     */
+    private void publishReportReady(ReportEmailEvent ev) {
+        if (mailEvents == null || ev == null) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.REPORT_READY)
+                    .subject("entitlement", ev.entitlementId)
+                    .subject("student", ev.userStudentId)
+                    .recipient(MailRecipientRole.STUDENT, ev.recipientEmail, ev.studentName)
+                    .field("student_name", ev.studentName)
+                    .field("report_link", ev.reportUrl)
+                    .field("report_pdf_link", ev.pdfUrl)
+                    .field("report_type", "final_report")
+                    .field("booking_link", ev.bookingUrl)
+                    .field("school_name", ev.schoolName)
+                    .ref("entitlementId", ev.entitlementId)
+                    .ref("userStudentId", ev.userStudentId)
+                    .ref("assessmentId", ev.assessmentId)
+                    .student(ev.userStudentId);
+            if (ev.studentName != null && !ev.studentName.trim().isEmpty()) {
+                b.field("first_name", ev.studentName.trim().split("\\s+")[0]);
+            }
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.REPORT_READY.key(), e.getMessage());
         }
     }
 

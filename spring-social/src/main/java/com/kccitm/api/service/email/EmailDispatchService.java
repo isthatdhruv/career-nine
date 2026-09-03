@@ -17,6 +17,7 @@ import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailSendStatus;
 import com.kccitm.api.model.email.EmailTemplate;
 import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.model.email.PortState;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.email.EmailAccountRepository;
 import com.kccitm.api.repository.email.EmailSendLogRepository;
@@ -59,6 +60,10 @@ public class EmailDispatchService {
 
     @Autowired
     private EmailTemplateRenderer templateRenderer;
+
+    /** Optional: the automation engine's daily send budget; counts every send when present. */
+    @Autowired(required = false)
+    private com.kccitm.api.service.mail.MailSendBudget sendBudget;
 
     /** Convenience for the common single-recipient HTML send. */
     public EmailSendResult sendHtml(EmailType type, String to, String subject, String html) {
@@ -135,6 +140,9 @@ public class EmailDispatchService {
                 row.setStatus(EmailSendStatus.SENT);
                 row.setSentAt(new Date());
                 logRepository.save(row);
+                if (sendBudget != null) {
+                    sendBudget.recordSend(account.getId());
+                }
                 return EmailSendResult.sent(row.getId(), account.getId());
             } catch (Exception e) {
                 logger.error("Sync email send failed ({} → {}): {}",
@@ -188,13 +196,25 @@ public class EmailDispatchService {
         if (req.getOverrideTemplateId() != null) {
             EmailTemplate t = templateRepository.findById(req.getOverrideTemplateId()).orElse(null);
             if (t != null && Boolean.TRUE.equals(t.getActive())) {
-                return t;
+                if (t.getPortState() == PortState.CONTENT_ONLY && !req.isAllowContentOnlyTemplate()) {
+                    logger.warn("Ignoring override template {} ({}): ported from code for review only",
+                            t.getId(), t.getMailKey());
+                } else {
+                    return t;
+                }
             }
         }
         if (req.getEmailType() != null) {
-            return templateRepository
+            EmailTemplate def = templateRepository
                     .findFirstByEmailTypeAndIsDefaultTrueAndActiveTrue(req.getEmailType().name())
                     .orElse(null);
+            if (def != null && def.getPortState() == PortState.CONTENT_ONLY) {
+                // Guarded in the editor too; this is the belt for a direct DB edit.
+                logger.warn("Default template {} for {} is CONTENT_ONLY; falling back to inline copy",
+                        def.getId(), req.getEmailType());
+                return null;
+            }
+            return def;
         }
         return null;
     }
@@ -259,7 +279,15 @@ public class EmailDispatchService {
         row.setDeliveryMode(mode);
         row.setStatus(status);
         row.setErrorMessage(truncate(error, 2000));
+        row.setAutomationId(req.getAutomationId());
+        row.setJobId(req.getJobId());
+        row.setEventKey(req.getEventKey());
         return logRepository.save(row);
+    }
+
+    /** Record that the automation engine decided not to send (cap, cancel, unsubscribed, ...). Every outcome is logged. */
+    public EmailSendResult logSkipped(EmailSendRequest req, String reason) {
+        return logSkip(req, null, reason);
     }
 
     private EmailSendResult logSkip(EmailSendRequest req, EmailAccount account, String reason) {

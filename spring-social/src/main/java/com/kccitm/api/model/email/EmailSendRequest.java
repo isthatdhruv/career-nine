@@ -43,6 +43,16 @@ public class EmailSendRequest {
     private Map<String, String> templateContext = new HashMap<>();
 
     private List<SmtpEmailRequest.EmailAttachment> attachments = new ArrayList<>();
+    /**
+     * Test sends only: let {@link #overrideTemplateId} point at a CONTENT_ONLY template (one
+     * lifted from code for review whose sender still builds the mail inline). Normal sends
+     * never render those, because their placeholders would come out empty.
+     */
+    private boolean allowContentOnlyTemplate;
+    /** Set by the automation engine so the log row records what produced the send. */
+    private Long automationId;
+    private String jobId;
+    private String eventKey;
 
     public EmailSendRequest() {
     }
@@ -87,6 +97,15 @@ public class EmailSendRequest {
     public void setTemplateContext(Map<String, String> templateContext) {
         this.templateContext = templateContext != null ? templateContext : new HashMap<>();
     }
+    public Long getAutomationId() { return automationId; }
+    public void setAutomationId(Long automationId) { this.automationId = automationId; }
+    public String getJobId() { return jobId; }
+    public void setJobId(String jobId) { this.jobId = jobId; }
+    public String getEventKey() { return eventKey; }
+    public void setEventKey(String eventKey) { this.eventKey = eventKey; }
+    public boolean isAllowContentOnlyTemplate() { return allowContentOnlyTemplate; }
+    public void setAllowContentOnlyTemplate(boolean allowContentOnlyTemplate) { this.allowContentOnlyTemplate = allowContentOnlyTemplate; }
+
     /** Fluent helper to add a single placeholder value. */
     public EmailSendRequest put(String key, String value) {
         if (key != null) {

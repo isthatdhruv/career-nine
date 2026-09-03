@@ -41,6 +41,10 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.model.career9.school.SchoolSections;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
@@ -138,6 +142,10 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private AssessmentMappingTierService tierService;
+
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     @Autowired
     private com.kccitm.api.service.counselling.BookingService bookingService;
@@ -1056,6 +1064,7 @@ public class AssessmentInstituteMappingController {
         String assessmentName = assessmentTableRepository.findById(assessmentId)
                 .map(a -> a.getAssessmentName()).orElse("Assessment");
         sendRegistrationEmail(email, name, user.getUsername(), dobStr, assessmentName);
+        publishAssessmentMapped(sam, userStudent.getUserStudentId(), name, email, assessmentName, institute, instituteCode);
 
         return ResponseEntity.ok(response);
     }
@@ -1469,6 +1478,7 @@ public class AssessmentInstituteMappingController {
             response.put("paymentUrl", rzpResponse.get("shortUrl"));
             response.put("transactionId", txn.getTransactionId());
             response.put("amount", wave.getAmount());
+            publishPaymentLinkCreated(txn, assessmentName, entitlementId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Failed to create upgrade payment link: {}", e.getMessage(), e);
@@ -1544,6 +1554,7 @@ public class AssessmentInstituteMappingController {
             // resubmit (price/promo changed) can't leave multiple chargeable links live
             // at different amounts. Mirrors the school flow.
             cancelPriorOutstandingLinks(email, assessmentId, txn.getTransactionId());
+            publishPaymentLinkCreated(txn, assessmentName, null);
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "payment_required");
@@ -1640,12 +1651,13 @@ public class AssessmentInstituteMappingController {
                         userStudent.getUserStudentId(), assessmentId);
 
         Map<String, Object> response = new HashMap<>();
+        StudentAssessmentMapping sam = null;
         if (existingMapping.isPresent()) {
             response.put("status", "already_registered");
             response.put("message", "You are already registered for this assessment.");
         } else {
             // Assign assessment
-            StudentAssessmentMapping sam = new StudentAssessmentMapping(
+            sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
             studentAssessmentMappingRepository.save(sam);
             // Free tiered completion by an existing student: consume a tier slot and
@@ -1685,6 +1697,10 @@ public class AssessmentInstituteMappingController {
                         .map(a -> a.getAssessmentName()).orElse("Assessment");
                 sendRegistrationEmail(existingStudentInfo.getEmail(), existingStudentInfo.getName(),
                         user.getUsername(), dobFormatted, assessmentName);
+                if (sam != null) {
+                    publishAssessmentMapped(sam, userStudent.getUserStudentId(), existingStudentInfo.getName(),
+                            existingStudentInfo.getEmail(), assessmentName, null, instituteCode);
+                }
             }
         }
 
@@ -1812,6 +1828,67 @@ public class AssessmentInstituteMappingController {
      * Resolve a SchoolClasses id to its display label, stored verbatim on
      * StudentInfo.studentClass.
      */
+    // ===== Mail events (admin automations): reported after the fact, never affect the flow =====
+
+    /** ASSESSMENT_MAPPED: the school's assessment is now assigned to this student. */
+    private void publishAssessmentMapped(StudentAssessmentMapping sam, Long userStudentId, String name, String email,
+                                         String assessmentName, InstituteDetail institute, Integer instituteCode) {
+        if (mailEvents == null || sam == null) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.ASSESSMENT_MAPPED)
+                    .subject("mapping", sam.getStudentAssessmentId())
+                    .subject("student", userStudentId)
+                    .recipient(MailRecipientRole.STUDENT, email, name)
+                    .field("student_name", name)
+                    .field("assessment_name", assessmentName)
+                    .ref("mappingId", sam.getStudentAssessmentId())
+                    .ref("userStudentId", userStudentId)
+                    .ref("assessmentId", sam.getAssessmentId())
+                    .ref("instituteCode", instituteCode == null ? null : instituteCode.longValue())
+                    .institute(instituteCode)
+                    .student(userStudentId);
+            if (institute != null) b.field("school_name", institute.getInstituteName());
+            String first = firstNameOf(name);
+            if (first != null) b.field("first_name", first);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.ASSESSMENT_MAPPED.key(), e.getMessage());
+        }
+    }
+
+    /** PAYMENT_LINK_CREATED once the Razorpay link is stamped on the transaction. */
+    private void publishPaymentLinkCreated(PaymentTransaction txn, String assessmentName, Long entitlementId) {
+        if (mailEvents == null || txn == null) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.PAYMENT_LINK_CREATED)
+                    .subject("payment", txn.getTransactionId())
+                    .subject("student", txn.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, txn.getStudentEmail(), txn.getStudentName())
+                    .field("student_name", txn.getStudentName())
+                    .field("amount", txn.getAmount())
+                    .field("assessment_name", assessmentName)
+                    .field("payment_link", txn.getShortUrl() != null ? txn.getShortUrl() : txn.getPaymentLinkUrl())
+                    .ref("paymentId", txn.getTransactionId())
+                    .ref("userStudentId", txn.getUserStudentId())
+                    .ref("assessmentId", txn.getAssessmentId())
+                    .ref("entitlementId", entitlementId)
+                    .ref("instituteCode", txn.getInstituteCode() == null ? null : txn.getInstituteCode().longValue())
+                    .institute(txn.getInstituteCode())
+                    .student(txn.getUserStudentId());
+            String first = firstNameOf(txn.getStudentName());
+            if (first != null) b.field("first_name", first);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.PAYMENT_LINK_CREATED.key(), e.getMessage());
+        }
+    }
+
+    /** First word of a display name, for the {@code first_name} placeholder; null when there is no name. */
+    private static String firstNameOf(String name) {
+        if (name == null || name.trim().isEmpty()) return null;
+        return name.trim().split("\\s+")[0];
+    }
+
     /** Truthy parse of a request-body flag ("true"/true/1). Absent or anything else → false. */
     private static boolean truthy(Object v) {
         if (v instanceof Boolean) return (Boolean) v;

@@ -26,6 +26,10 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
@@ -62,6 +66,8 @@ public class StudentCheckoutController {
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private com.kccitm.api.service.PaymentTransactionWriter paymentTransactionWriter;
     @Autowired private RazorpayService razorpayService;
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false) private MailEvents mailEvents;
 
     @Autowired(required = false) private CampaignRepository campaignRepository;
     @Autowired(required = false) private CampaignAssessmentMappingRepository campaignAssessmentMappingRepository;
@@ -221,6 +227,29 @@ public class StudentCheckoutController {
             txn.setPaymentLinkUrl(linkResult.get("paymentLinkUrl"));
             txn.setShortUrl(linkResult.get("shortUrl"));
             txn = paymentTransactionWriter.saveInNewTransaction(txn);
+
+            // Mail event (admin automations); reported after the fact, never affects the flow.
+            if (mailEvents != null) {
+                try {
+                    MailEventContext.Builder b = MailEventContext.of(MailEvent.PAYMENT_LINK_CREATED)
+                            .subject("payment", txn.getTransactionId())
+                            .subject("student", ctx.userStudentId)
+                            .recipient(MailRecipientRole.STUDENT, studentEmail, studentName)
+                            .field("student_name", studentName)
+                            .field("amount", priceInr)
+                            .field("assessment_name", assessmentName)
+                            .field("plan_name", pricing.getName())
+                            .field("payment_link", txn.getShortUrl())
+                            .ref("paymentId", txn.getTransactionId())
+                            .ref("userStudentId", ctx.userStudentId)
+                            .ref("assessmentId", ctx.assessmentId)
+                            .student(ctx.userStudentId);
+                    if (!studentName.trim().isEmpty()) b.field("first_name", studentName.trim().split("\\s+")[0]);
+                    mailEvents.publish(b.build());
+                } catch (Exception e) {
+                    logger.warn("mail event {} failed: {}", MailEvent.PAYMENT_LINK_CREATED.key(), e.getMessage());
+                }
+            }
 
             Map<String, Object> response = new HashMap<>();
             response.put("transactionId", txn.getTransactionId());

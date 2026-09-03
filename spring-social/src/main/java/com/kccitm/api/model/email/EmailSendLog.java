@@ -60,6 +60,16 @@ public class EmailSendLog implements Serializable {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    /** Automation that produced this send; null for code-driven or manual sends. */
+    @Column(name = "automation_id")
+    private Long automationId;
+
+    @Column(name = "job_id", length = 40)
+    private String jobId;
+
+    @Column(name = "event_key", length = 60)
+    private String eventKey;
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", nullable = false)
     private Date createdAt;
@@ -101,4 +111,11 @@ public class EmailSendLog implements Serializable {
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
     public Date getSentAt() { return sentAt; }
     public void setSentAt(Date sentAt) { this.sentAt = sentAt; }
+
+    public Long getAutomationId() { return automationId; }
+    public void setAutomationId(Long automationId) { this.automationId = automationId; }
+    public String getJobId() { return jobId; }
+    public void setJobId(String jobId) { this.jobId = jobId; }
+    public String getEventKey() { return eventKey; }
+    public void setEventKey(String eventKey) { this.eventKey = eventKey; }
 }

@@ -33,6 +33,10 @@ import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.school.InstituteDetail;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
@@ -98,6 +102,13 @@ public class PaymentWebhookController {
 
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
+
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false) private MailEvents mailEvents;
+
+    /** Base of the retry link PaymentEmailService puts in its failed/expired/cancelled mails. */
+    @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
+    private String callbackBaseUrl;
 
     // Self-reference through the Spring proxy so the reconcile entry points
     // (public status poll + admin Tracker check-status) actually engage
@@ -481,6 +492,7 @@ public class PaymentWebhookController {
         // provisioning + GA purchase tracking below.
         if ("COUNSELLING_EXTRA".equals(txn.getPurpose())) {
             finalizeExtraCounsellingSlot(txn);
+            publishPaymentSucceeded(txn);
             return true;
         }
 
@@ -489,6 +501,7 @@ public class PaymentWebhookController {
         // consuming a pooled session — PAY_LATER grants none.
         if ("COUNSELLING_PAYLATER".equals(txn.getPurpose())) {
             finalizePayLaterCounsellingSlot(txn);
+            publishPaymentSucceeded(txn);
             return true;
         }
 
@@ -531,6 +544,7 @@ public class PaymentWebhookController {
         // it never blocks or fails this transaction.
         sendPurchaseConversionToGa(txn);
 
+        publishPaymentSucceeded(txn);
         return true;
     }
 
@@ -688,8 +702,10 @@ public class PaymentWebhookController {
                 .findByRazorpayLinkIdForUpdate(razorpayLinkId).orElse(null);
         if (txn == null) return;
         if ("paid".equals(txn.getStatus())) return;
+        String previousStatus = txn.getStatus();
         txn.setStatus(status);
         paymentTransactionRepository.save(txn);
+        if (!status.equals(previousStatus)) publishPaymentFailed(txn, status, null);
     }
 
     private void provisionB2CStudentAndEntitlement(PaymentTransaction txn) {
@@ -823,6 +839,7 @@ public class PaymentWebhookController {
         }
 
         PaymentTransaction txn = txnOpt.get();
+        String previousStatus = txn.getStatus();
         txn.setStatus(status);
         paymentTransactionRepository.save(txn);
         logger.info("Payment link {} status changed to: {}", linkId, status);
@@ -838,6 +855,7 @@ public class PaymentWebhookController {
             String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
             paymentEmailService.sendFailedOrPendingEmail(txn, assessmentName, status);
+            if (!status.equals(previousStatus)) publishPaymentFailed(txn, status, assessmentName);
         }
     }
 
@@ -867,6 +885,7 @@ public class PaymentWebhookController {
             return;
         }
 
+        String previousStatus = txn.getStatus();
         txn.setStatus("failed");
         txn.setRazorpayPaymentId(paymentId);
 
@@ -891,6 +910,7 @@ public class PaymentWebhookController {
             String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
             paymentEmailService.sendFailedOrPendingEmail(txn, assessmentName, "failed");
+            if (!"failed".equals(previousStatus)) publishPaymentFailed(txn, "failed", assessmentName);
         }
     }
 
@@ -1003,6 +1023,7 @@ public class PaymentWebhookController {
             String dobStr = sdf.format(dob);
 
             paymentEmailService.sendWelcomeEmail(email, name, user.getUsername(), dobStr, assessmentName, txn);
+            publishAssessmentMapped(sam, userStudent, name, email, assessmentName, instituteCode);
 
             logger.info("Student created and assessment allotted via payment. UserStudentId: {}, TransactionId: {}",
                     userStudent.getUserStudentId(), txn.getTransactionId());
@@ -1041,8 +1062,9 @@ public class PaymentWebhookController {
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(
                         userStudent.getUserStudentId(), assessmentId);
 
+        StudentAssessmentMapping sam = null;
         if (!existingMapping.isPresent()) {
-            StudentAssessmentMapping sam = new StudentAssessmentMapping(
+            sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
             studentAssessmentMappingRepository.save(sam);
             // Count the paid seat once per newly-assigned assessment — covers both a freshly
@@ -1067,6 +1089,10 @@ public class PaymentWebhookController {
             String dobStr = user.getDobDate() != null ? sdf.format(user.getDobDate()) : "";
             paymentEmailService.sendWelcomeEmail(existingStudent.getEmail(), existingStudent.getName(),
                     user.getUsername(), dobStr, assessmentName, txn);
+            if (sam != null) {
+                publishAssessmentMapped(sam, userStudent, existingStudent.getName(), existingStudent.getEmail(),
+                        assessmentName, instituteCode);
+            }
         }
 
         logger.info("Existing student assigned assessment via payment. UserStudentId: {}", userStudent.getUserStudentId());
@@ -1151,6 +1177,108 @@ public class PaymentWebhookController {
         }
         // Never fall back to classId (a DB primary key) — that would corrupt studentClass.
         return null;
+    }
+
+    // ===== Mail events (admin automations): reported after the fact, never affect the flow =====
+
+    /** Same retry link PaymentEmailService builds for its failed/expired/cancelled mails. */
+    private String registrationUrl(PaymentTransaction txn) {
+        String base = (callbackBaseUrl != null && !callbackBaseUrl.isEmpty())
+                ? callbackBaseUrl : "https://dashboard.career-9.com";
+        return base + "/payment-register/" + txn.getTransactionId();
+    }
+
+    /**
+     * PAYMENT_SUCCEEDED once per transaction: only when this run leaves the txn "paid".
+     * markPaidAndProvision already early-returns for an already-paid txn, so a webhook
+     * redelivery or reconcile race never reaches here twice; a provisioning failure flips
+     * the status and the successful redrive reports then.
+     */
+    private void publishPaymentSucceeded(PaymentTransaction txn) {
+        if (mailEvents == null || txn == null || !"paid".equals(txn.getStatus())) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.PAYMENT_SUCCEEDED)
+                    .subject("payment", txn.getTransactionId())
+                    .subject("student", txn.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, txn.getStudentEmail(), txn.getStudentName())
+                    .field("student_name", txn.getStudentName())
+                    .field("amount", txn.getAmount())
+                    .field("invoice_id", txn.getRazorpayPaymentId() != null
+                            ? txn.getRazorpayPaymentId() : txn.getRazorpayLinkId())
+                    .field("payment_date", new SimpleDateFormat("dd-MM-yyyy").format(new Date()))
+                    .ref("paymentId", txn.getTransactionId())
+                    .ref("userStudentId", txn.getUserStudentId())
+                    .ref("assessmentId", txn.getAssessmentId())
+                    .ref("instituteCode", txn.getInstituteCode() == null ? null : txn.getInstituteCode().longValue())
+                    .institute(txn.getInstituteCode())
+                    .student(txn.getUserStudentId());
+            String first = firstNameOf(txn.getStudentName());
+            if (first != null) b.field("first_name", first);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.PAYMENT_SUCCEEDED.key(), e.getMessage());
+        }
+    }
+
+    /**
+     * PAYMENT_FAILED on the first transition into failed/expired/cancelled. Callers pass the
+     * previous status check, so a webhook redelivery or a reconcile after the webhook is silent.
+     */
+    private void publishPaymentFailed(PaymentTransaction txn, String reason, String assessmentName) {
+        if (mailEvents == null || txn == null) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.PAYMENT_FAILED)
+                    .subject("payment", txn.getTransactionId())
+                    .subject("student", txn.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, txn.getStudentEmail(), txn.getStudentName())
+                    .field("student_name", txn.getStudentName())
+                    .field("amount", txn.getAmount())
+                    .field("payment_link", registrationUrl(txn))
+                    .field("failure_reason", reason)
+                    .ref("paymentId", txn.getTransactionId())
+                    .ref("userStudentId", txn.getUserStudentId())
+                    .ref("assessmentId", txn.getAssessmentId())
+                    .ref("instituteCode", txn.getInstituteCode() == null ? null : txn.getInstituteCode().longValue())
+                    .institute(txn.getInstituteCode())
+                    .student(txn.getUserStudentId());
+            if (assessmentName != null) b.field("assessment_name", assessmentName);
+            String first = firstNameOf(txn.getStudentName());
+            if (first != null) b.field("first_name", first);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.PAYMENT_FAILED.key(), e.getMessage());
+        }
+    }
+
+    /** ASSESSMENT_MAPPED for a paid B2B/school registration: the student now has this assessment assigned. */
+    private void publishAssessmentMapped(StudentAssessmentMapping sam, UserStudent userStudent, String name,
+                                         String email, String assessmentName, Integer instituteCode) {
+        if (mailEvents == null || sam == null || userStudent == null) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.ASSESSMENT_MAPPED)
+                    .subject("mapping", sam.getStudentAssessmentId())
+                    .subject("student", userStudent.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, email, name)
+                    .field("student_name", name)
+                    .field("assessment_name", assessmentName)
+                    .ref("mappingId", sam.getStudentAssessmentId())
+                    .ref("userStudentId", userStudent.getUserStudentId())
+                    .ref("assessmentId", sam.getAssessmentId())
+                    .ref("instituteCode", instituteCode == null ? null : instituteCode.longValue())
+                    .institute(instituteCode)
+                    .student(userStudent.getUserStudentId());
+            String first = firstNameOf(name);
+            if (first != null) b.field("first_name", first);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.ASSESSMENT_MAPPED.key(), e.getMessage());
+        }
+    }
+
+    /** First word of a display name, for the {@code first_name} placeholder; null when there is no name. */
+    private static String firstNameOf(String name) {
+        if (name == null || name.trim().isEmpty()) return null;
+        return name.trim().split("\\s+")[0];
     }
 
     /** Calendar-day equality (ignores time-of-day); false if either date is null. */

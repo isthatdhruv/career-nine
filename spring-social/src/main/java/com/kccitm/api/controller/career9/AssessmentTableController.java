@@ -36,6 +36,10 @@ import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.AssessmentSession;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.service.AssessmentSessionService;
 import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
@@ -87,6 +91,45 @@ public class AssessmentTableController {
 
     @Autowired
     private AccessScopeService accessScopeService;
+
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
+
+    /** ASSESSMENT_STARTED from the mapping the start endpoint already holds; never affects the flow. */
+    private void publishAssessmentStarted(StudentAssessmentMapping mapping) {
+        if (mailEvents == null || mapping == null) return;
+        try {
+            com.kccitm.api.model.career9.UserStudent us = mapping.getUserStudent();
+            com.kccitm.api.model.career9.StudentInfo info = us != null ? us.getStudentInfo() : null;
+            Long userStudentId = us != null ? us.getUserStudentId() : null;
+            Integer instituteCode = (us != null && us.getInstitute() != null)
+                    ? us.getInstitute().getInstituteCode() : null;
+            String name = info != null ? info.getName() : null;
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.ASSESSMENT_STARTED)
+                    .subject("mapping", mapping.getStudentAssessmentId())
+                    .subject("student", userStudentId)
+                    .recipient(MailRecipientRole.STUDENT, info != null ? info.getEmail() : null, name)
+                    .field("student_name", name)
+                    .ref("mappingId", mapping.getStudentAssessmentId())
+                    .ref("userStudentId", userStudentId)
+                    .ref("assessmentId", mapping.getAssessmentId())
+                    .ref("instituteCode", instituteCode == null ? null : instituteCode.longValue())
+                    .institute(instituteCode)
+                    .student(userStudentId);
+            String first = firstNameOf(name);
+            if (first != null) b.field("first_name", first);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.ASSESSMENT_STARTED.key(), e.getMessage());
+        }
+    }
+
+    /** First word of a display name, for the {@code first_name} placeholder; null when there is no name. */
+    private static String firstNameOf(String name) {
+        if (name == null || name.trim().isEmpty()) return null;
+        return name.trim().split("\\s+")[0];
+    }
 
     // ─── Locked assessment JSON snapshot helpers ───
 
@@ -686,6 +729,7 @@ public class AssessmentTableController {
         //   - no stale lock blocks the new session
         assessmentSessionService.clearAllForMapping(userStudentId, assessmentId);
 
+        String previousStatus = mapping.getStatus();
         // Reset persistenceState — any prior pending/failed state is moot now
         // that the student is taking the assessment fresh.
         mapping.setStatus("ongoing");
@@ -694,6 +738,10 @@ public class AssessmentTableController {
 
         // Create a fresh Redis-backed session and return the token
         AssessmentSession session = assessmentSessionService.createSession(userStudentId, assessmentId);
+
+        // Mail event (admin automations): only on the first move out of "notstarted". A resume
+        // re-enters here with the status already "ongoing" and is not a new start.
+        if (!"ongoing".equals(previousStatus)) publishAssessmentStarted(mapping);
 
         response.put("sessionToken", session.getSessionToken());
         response.put("success", true);

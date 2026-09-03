@@ -13,9 +13,13 @@ import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.service.b2c.ReportReleaseGate;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.mail.MailEvents;
 
 /**
  * The counsellor's "Send report" button.
@@ -43,6 +47,10 @@ public class CounsellorReportReleaseService {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    /** Mail-automation hook. Absent until the engine is wired; every publish is best-effort. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     /** What the counsellor is told after pressing the button. */
     public static class ReleaseOutcome {
@@ -132,6 +140,50 @@ public class CounsellorReportReleaseService {
 
         logger.info("Report released to student for appointment {} by counsellor {}",
                 appointmentId, appointment.getCounsellor() != null ? appointment.getCounsellor().getId() : null);
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(releasedEvent(appointment, to, studentName, counsellorName, link));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for appointment {}: {}", appointmentId, e.getMessage());
+            }
+        }
         return new ReleaseOutcome(List.of(to), link, releasedAt);
+    }
+
+    // ─── Mail events ─────────────────────────────────────────────────────────────
+
+    /**
+     * The release as a mail event. The student and nobody else, for the reason given above the
+     * send; no parent recipient is offered. Nothing is sent from here — the engine decides after
+     * commit.
+     */
+    private MailEventContext releasedEvent(CounsellingAppointment a, String to, String studentName,
+                                           String counsellorName, String link) {
+        Long userStudentId = a.getStudent() != null ? a.getStudent().getUserStudentId() : null;
+        MailEventContext.Builder b = MailEventContext.of(MailEvent.REPORT_RELEASED)
+                .subject("appointment", a.getId())
+                .subject("entitlement", a.getEntitlementId())
+                .subject("student", userStudentId)
+                .recipient(MailRecipientRole.STUDENT, to, studentName)
+                .field("student_name", studentName)
+                .field("first_name", firstName(studentName))
+                .field("counsellor_name", counsellorName)
+                .field("report_link", link)
+                .ref("appointmentId", a.getId())
+                .ref("entitlementId", a.getEntitlementId())
+                .ref("userStudentId", userStudentId)
+                .ref("counsellorId", a.getCounsellor() != null ? a.getCounsellor().getId() : null)
+                .student(userStudentId);
+        if (a.getStudent() != null && a.getStudent().getInstitute() != null) {
+            b.institute(a.getStudent().getInstitute().getInstituteCode());
+        }
+        return b.build();
+    }
+
+    private static String firstName(String name) {
+        if (name == null) return null;
+        String t = name.trim();
+        int sp = t.indexOf(' ');
+        return sp > 0 ? t.substring(0, sp) : t;
     }
 }

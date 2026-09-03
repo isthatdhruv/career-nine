@@ -1,5 +1,6 @@
 package com.kccitm.api.service;
 
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,6 +36,7 @@ import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.AssessmentSubmissionFailureRepository;
@@ -45,6 +47,10 @@ import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesR
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 
 /**
  * Async processor for assessment submissions.
@@ -136,6 +142,10 @@ public class AssessmentSubmissionProcessorService {
     // Whitelabel report-on-completion pipeline (optional — absent if disabled).
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.report.pipeline.ReportPipelineProducer reportPipelineProducer;
+
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     // ── Entry points ─────────────────────────────────────────────────────────
 
@@ -542,9 +552,61 @@ public class AssessmentSubmissionProcessorService {
                     studentId, assessmentId, reportErr);
         }
 
+        // 12. Mail event for admin automations (non-critical). Once per submission: only the
+        // pass that flipped the row reaches here (persistToMySQL returned true), and the
+        // idempotency guard above stops the retry scheduler / startup sweep from re-firing it.
+        publishAssessmentCompleted(userStudent, assessment, mapping);
+
         logger.info("Processing succeeded: student={} assessment={} answers={} scores={} warnings={}/{}",
                 studentId, assessmentId, answersToSave.size(), rawScoresToSave.size(),
                 duplicateCount, skippedUnknownCount);
+    }
+
+    /** ASSESSMENT_COMPLETED, read from the same fetched objects the completion email uses. */
+    private void publishAssessmentCompleted(UserStudent userStudent, AssessmentTable assessment,
+                                            StudentAssessmentMapping mapping) {
+        if (mailEvents == null || userStudent == null || mapping == null) return;
+        try {
+            StudentInfo info = userStudent.getStudentInfo();
+            String name = info != null ? info.getName() : null;
+            String email = info != null ? info.getEmail() : null;
+            Integer instituteCode = userStudent.getInstitute() != null
+                    ? userStudent.getInstitute().getInstituteCode() : null;
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.ASSESSMENT_COMPLETED)
+                    .subject("mapping", mapping.getStudentAssessmentId())
+                    .subject("student", userStudent.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, email, name)
+                    .field("student_name", name)
+                    .field("student_email", email)
+                    .field("assessment_name", assessment != null ? assessment.getAssessmentName() : null)
+                    .ref("mappingId", mapping.getStudentAssessmentId())
+                    .ref("userStudentId", userStudent.getUserStudentId())
+                    .ref("assessmentId", mapping.getAssessmentId())
+                    .ref("instituteCode", instituteCode == null ? null : instituteCode.longValue())
+                    .institute(instituteCode)
+                    .student(userStudent.getUserStudentId());
+            if (userStudent.getInstitute() != null) {
+                b.field("school_name", userStudent.getInstitute().getInstituteName());
+            }
+            String first = firstNameOf(name);
+            if (first != null) b.field("first_name", first);
+            // Login credentials, read the same way the completion mail reads them.
+            if (info != null && info.getUser() != null) {
+                if (info.getUser().getUsername() != null) b.field("username", info.getUser().getUsername());
+                if (info.getUser().getDobDate() != null) {
+                    b.field("password", new SimpleDateFormat("dd-MM-yyyy").format(info.getUser().getDobDate()));
+                }
+            }
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.ASSESSMENT_COMPLETED.key(), e.getMessage());
+        }
+    }
+
+    /** First word of a display name, for the {@code first_name} placeholder; null when there is no name. */
+    private static String firstNameOf(String name) {
+        if (name == null || name.trim().isEmpty()) return null;
+        return name.trim().split("\\s+")[0];
     }
 
     private StudentAssessmentMapping loadMapping(Long studentId, Long assessmentId) {

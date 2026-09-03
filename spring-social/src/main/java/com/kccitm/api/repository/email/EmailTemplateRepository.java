@@ -17,4 +17,8 @@ public interface EmailTemplateRepository extends JpaRepository<EmailTemplate, Lo
     List<EmailTemplate> findByEmailTypeAndIsDefaultTrue(String emailType);
 
     List<EmailTemplate> findAllByOrderByEmailTypeAscNameAsc();
+
+    boolean existsByMailKey(String mailKey);
+
+    List<EmailTemplate> findByMailKey(String mailKey);
 }

@@ -13,6 +13,10 @@ import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.career9.PrincipalDashboardReleaseLog;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.repository.ContactPersonRepository;
 import com.kccitm.api.service.email.EmailDispatchService;
 
@@ -41,6 +45,10 @@ public class PrincipalDashboardNotificationService {
 
     @Autowired
     private PrincipalDashboardReleaseLogger trace;
+
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
@@ -125,6 +133,8 @@ public class PrincipalDashboardNotificationService {
                 outcome.error = PrincipalDashboardReleaseLogger.describe(e);
                 log.warn("Dashboard notification to {} failed: {}", recipient.email, e.toString());
             }
+            // One mail event per contact actually notified; a failed send can be retried by the admin.
+            if (outcome.sent) publishDashboardReleased(instituteCode, instituteName, assessmentName, recipient);
             outcomes.add(outcome);
         }
 
@@ -138,6 +148,30 @@ public class PrincipalDashboardNotificationService {
                 describe(outcomes, sent));
 
         return outcomes;
+    }
+
+    /**
+     * DASHBOARD_RELEASED for admin automations. The release subject is the same id this act is
+     * logged under ("notify-{instituteCode}"); the dashboard link is the one in {@link #body}.
+     */
+    private void publishDashboardReleased(Long instituteCode, String instituteName, String assessmentName,
+                                          Recipient recipient) {
+        if (mailEvents == null || recipient == null) return;
+        try {
+            mailEvents.publish(MailEventContext.of(MailEvent.DASHBOARD_RELEASED)
+                    .subject("release", "notify-" + instituteCode)
+                    .subject("institute", instituteCode)
+                    .recipient(MailRecipientRole.SCHOOL_CONTACT, recipient.email, recipient.name)
+                    .field("contact_person_name", recipient.name)
+                    .field("school_name", instituteName)
+                    .field("dashboard_link", frontendUrl + "/school-dashboard")
+                    .field("assessment_name", assessmentName)
+                    .ref("instituteCode", instituteCode)
+                    .institute(instituteCode == null ? null : instituteCode.intValue())
+                    .build());
+        } catch (Exception e) {
+            log.warn("mail event {} failed: {}", MailEvent.DASHBOARD_RELEASED.key(), e.getMessage());
+        }
     }
 
     private static String describe(List<SendOutcome> outcomes, long sent) {

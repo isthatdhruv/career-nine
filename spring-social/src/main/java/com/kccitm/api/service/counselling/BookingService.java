@@ -3,6 +3,8 @@ package com.kccitm.api.service.counselling;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,9 +22,14 @@ import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
+import com.kccitm.api.model.career9.counselling.Counsellor;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.service.counselling.CounsellorInstituteMappingService;
+import com.kccitm.api.service.mail.MailEvents;
 
 @Service
 public class BookingService {
@@ -64,6 +71,10 @@ public class BookingService {
 
     @Autowired
     private com.kccitm.api.repository.Career9.UserStudentRepository userStudentRepository;
+
+    /** Mail-automation hook. Absent until the engine is wired; every publish is best-effort. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     /**
      * Returns all available slots for the week starting at weekStart (inclusive)
@@ -510,6 +521,13 @@ public class BookingService {
         // (.ics) invite, plus a best-effort WhatsApp confirmation. The mail retries
         // until the student's copy is accepted; a total failure is logged, never thrown.
         notificationService.sendConfirmationWithCalendar(appointment);
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(confirmedEvent(appointment));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for appointment {}: {}", appointment.getId(), e.getMessage());
+            }
+        }
 
         // Send in-app notification to student — UserStudent stores userId (Long),
         // not a User entity. We build a lightweight User reference using the stored userId.
@@ -600,5 +618,74 @@ public class BookingService {
               .append("OFFLINE".equals(mode) ? "In-person" : "Online").append(")");
         }
         return sb.toString().trim();
+    }
+
+    // ─── Mail events ─────────────────────────────────────────────────────────────
+
+    /**
+     * The booking as a mail event, snapshotted as the confirmation goes out. Nothing is sent
+     * from here: the mail-automation engine matches it against admin automations once the
+     * transaction commits. Date/time text is formatted exactly as the inline mail formats it;
+     * the start/end instants are the slot's wall-clock times in the counselling zone, for
+     * automations scheduled relative to the session.
+     */
+    private MailEventContext confirmedEvent(CounsellingAppointment a) {
+        CounsellingSlot slot = a.getSlot();
+        Counsellor c = a.getCounsellor();
+        UserStudent s = a.getStudent();
+        Long userStudentId = s != null ? s.getUserStudentId() : null;
+        String studentName = notificationService.studentName(a);
+        String studentEmail = notificationService.studentEmail(a);
+        MailEventContext.Builder b = MailEventContext.of(MailEvent.APPOINTMENT_CONFIRMED)
+                .subject("appointment", a.getId())
+                .subject("entitlement", a.getEntitlementId())
+                .subject("student", userStudentId)
+                // The same three readers sendConfirmationWithCalendar addresses.
+                .recipient(MailRecipientRole.STUDENT, studentEmail, studentName)
+                .recipient(MailRecipientRole.PARENT, a.getParentEmail(), null)
+                .recipient(MailRecipientRole.COUNSELLOR, c != null ? c.getEmail() : null,
+                        c != null ? c.getName() : null)
+                .field("student_name", studentName)
+                .field("first_name", firstName(studentName))
+                .field("student_email", studentEmail)
+                .field("counsellor_name", c != null ? c.getName() : null)
+                .field("counsellor_email", c != null ? c.getEmail() : null)
+                .field("meeting_link", a.getMeetingLink())
+                .field("venue", a.getLocation())
+                .field("reschedule_link", notificationService.portalCounsellingUrl())
+                .field("calendar_link", notificationService.googleCalendarLink(a))
+                .ref("appointmentId", a.getId())
+                .ref("entitlementId", a.getEntitlementId())
+                .ref("userStudentId", userStudentId)
+                .ref("counsellorId", c != null ? c.getId() : null)
+                .student(userStudentId);
+        if (s != null && s.getInstitute() != null) {
+            b.institute(s.getInstitute().getInstituteCode());
+        }
+        if (slot != null) {
+            b.field("duration_minutes", slot.getDurationMinutes());
+            if (slot.getDate() != null && slot.getStartTime() != null) {
+                String date = slot.getDate().format(CounsellingNotificationService.DATE_FMT);
+                String time = slot.getStartTime().format(CounsellingNotificationService.TIME_FMT);
+                b.field("session_date", date)
+                 .field("session_time", time)
+                 .field("session_datetime", date + " at " + time)
+                 .date("session_start", Date.from(
+                         ZonedDateTime.of(slot.getDate(), slot.getStartTime(), clock.zone()).toInstant()));
+            }
+            if (slot.getDate() != null && slot.getEndTime() != null) {
+                b.field("session_end_time", slot.getEndTime().format(CounsellingNotificationService.TIME_FMT))
+                 .date("session_end", Date.from(
+                         ZonedDateTime.of(slot.getDate(), slot.getEndTime(), clock.zone()).toInstant()));
+            }
+        }
+        return b.build();
+    }
+
+    private static String firstName(String name) {
+        if (name == null) return null;
+        String t = name.trim();
+        int sp = t.indexOf(' ');
+        return sp > 0 ? t.substring(0, sp) : t;
     }
 }

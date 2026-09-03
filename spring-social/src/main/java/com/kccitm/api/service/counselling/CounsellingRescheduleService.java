@@ -2,7 +2,9 @@ package com.kccitm.api.service.counselling;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,11 +23,16 @@ import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
+import com.kccitm.api.model.career9.counselling.Counsellor;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.b2c.LinkBuilder;
+import com.kccitm.api.service.mail.MailEvents;
 
 /**
  * Public, token-gated self-service rescheduling. When a counsellor is marked absent, each affected
@@ -68,6 +75,10 @@ public class CounsellingRescheduleService {
 
     @Autowired
     private CounsellingNotificationService notificationService;
+
+    /** Mail-automation hook. Absent until the engine is wired; every publish is best-effort. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     /** Statuses an admin can still hand back to the student to re-pick. */
     private static final List<String> INVITABLE = List.of(
@@ -184,6 +195,13 @@ public class CounsellingRescheduleService {
 
         old.setStatus("RESCHEDULED");
         appointmentRepository.save(old);
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(rescheduledEvent(old, neu));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for appointment {}: {}", neu.getId(), e.getMessage());
+            }
+        }
 
         logger.info("Self-reschedule: appointment {} -> new appointment {} on slot {}",
                 old.getId(), neu.getId(), slotId);
@@ -265,5 +283,76 @@ public class CounsellingRescheduleService {
     private static String infoPhone(UserStudent s) {
         StudentInfo i = s != null ? s.getStudentInfo() : null;
         return i != null ? i.getPhoneNumber() : null;
+    }
+
+    // ─── Mail events ─────────────────────────────────────────────────────────────
+
+    /**
+     * The self-service re-pick as a mail event. Same readers as the booking confirmation the new
+     * session just triggered (student, parent, counsellor). Nothing is sent from here — the
+     * engine decides after commit.
+     *
+     * <p>Note that {@code bookSlot} has already published APPOINTMENT_CONFIRMED for the new row;
+     * this is the same booking seen from the old session's side, with the previous time.
+     */
+    private MailEventContext rescheduledEvent(CounsellingAppointment old, CounsellingAppointment neu) {
+        CounsellingSlot slot = neu.getSlot();
+        CounsellingSlot oldSlot = old.getSlot();
+        Counsellor c = neu.getCounsellor();
+        Long userStudentId = neu.getStudent() != null ? neu.getStudent().getUserStudentId() : null;
+        String studentName = notificationService.studentName(neu);
+        MailEventContext.Builder b = MailEventContext.of(MailEvent.APPOINTMENT_RESCHEDULED)
+                .subject("appointment", neu.getId())
+                .subject("appointment", old.getId())
+                .subject("entitlement", neu.getEntitlementId())
+                .subject("student", userStudentId)
+                .recipient(MailRecipientRole.STUDENT, notificationService.studentEmail(neu), studentName)
+                .recipient(MailRecipientRole.PARENT, neu.getParentEmail(), null)
+                .recipient(MailRecipientRole.COUNSELLOR, c != null ? c.getEmail() : null,
+                        c != null ? c.getName() : null)
+                .field("student_name", studentName)
+                .field("first_name", firstName(studentName))
+                .field("counsellor_name", c != null ? c.getName() : null)
+                .field("counsellor_email", c != null ? c.getEmail() : null)
+                .field("meeting_link", neu.getMeetingLink())
+                .field("venue", neu.getLocation())
+                .field("reschedule_link", notificationService.portalCounsellingUrl())
+                .field("reschedule_reason", neu.getStudentReason())
+                .ref("appointmentId", neu.getId())
+                .ref("entitlementId", neu.getEntitlementId())
+                .ref("userStudentId", userStudentId)
+                .ref("counsellorId", c != null ? c.getId() : null)
+                .student(userStudentId);
+        if (neu.getStudent() != null && neu.getStudent().getInstitute() != null) {
+            b.institute(neu.getStudent().getInstitute().getInstituteCode());
+        }
+        if (oldSlot != null && oldSlot.getDate() != null && oldSlot.getStartTime() != null) {
+            b.field("old_session_date", oldSlot.getDate().format(CounsellingNotificationService.DATE_FMT))
+             .field("old_session_time", oldSlot.getStartTime().format(CounsellingNotificationService.TIME_FMT));
+        }
+        if (slot != null) {
+            b.field("duration_minutes", slot.getDurationMinutes());
+            if (slot.getDate() != null && slot.getStartTime() != null) {
+                String date = slot.getDate().format(CounsellingNotificationService.DATE_FMT);
+                String time = slot.getStartTime().format(CounsellingNotificationService.TIME_FMT);
+                b.field("session_date", date)
+                 .field("session_time", time)
+                 .field("session_datetime", date + " at " + time)
+                 .date("session_start", Date.from(
+                         ZonedDateTime.of(slot.getDate(), slot.getStartTime(), clock.zone()).toInstant()));
+            }
+            if (slot.getDate() != null && slot.getEndTime() != null) {
+                b.date("session_end", Date.from(
+                        ZonedDateTime.of(slot.getDate(), slot.getEndTime(), clock.zone()).toInstant()));
+            }
+        }
+        return b.build();
+    }
+
+    private static String firstName(String name) {
+        if (name == null) return null;
+        String t = name.trim();
+        int sp = t.indexOf(' ');
+        return sp > 0 ? t.substring(0, sp) : t;
     }
 }

@@ -21,6 +21,10 @@ import com.kccitm.api.model.career9.Lead;
 import com.kccitm.api.model.email.EmailPlaceholder;
 import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.service.email.EmailNotificationRecipientService;
 
@@ -75,6 +79,10 @@ public class LeadNotificationService {
     @Autowired
     private EmailNotificationRecipientService recipientService;
 
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Async
@@ -91,6 +99,21 @@ public class LeadNotificationService {
             sendAcknowledgement(lead);
         } catch (Exception e) {
             logger.error("Lead {}: acknowledgement email failed: {}", lead.getId(), e.getMessage(), e);
+        }
+        // Mail event for admin automations: the same placeholder values the lead templates use.
+        if (mailEvents != null) {
+            try {
+                MailEventContext.Builder b = MailEventContext.of(MailEvent.LEAD_CAPTURED)
+                        .subject("lead", lead.getId())
+                        .recipient(MailRecipientRole.LEAD_CONTACT, lead.getEmail(), lead.getFullName())
+                        .fields(context(lead))
+                        .ref("leadId", lead.getId());
+                String name = lead.getFullName();
+                if (name != null && !name.trim().isEmpty()) b.field("first_name", name.trim().split("\\s+")[0]);
+                mailEvents.publish(b.build());
+            } catch (Exception e) {
+                logger.warn("mail event {} failed: {}", MailEvent.LEAD_CAPTURED.key(), e.getMessage());
+            }
         }
     }
 

@@ -18,8 +18,12 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.model.career9.counselling.SessionNotes;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.SessionNotesRepository;
+import com.kccitm.api.service.mail.MailEvents;
 
 @Service
 public class SessionNotesService {
@@ -37,6 +41,10 @@ public class SessionNotesService {
 
     @Autowired
     private AuditLogService auditLogService;
+
+    /** Mail-automation hook. Absent until the engine is wired; every publish is best-effort. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     /**
      * Creates session notes for a session that has genuinely taken place.
@@ -108,6 +116,13 @@ public class SessionNotesService {
             logger.warn("Failed to create in-app notification for student after notes saved: {}",
                     e.getMessage());
         }
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(completedEvent(appointment));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for appointment {}: {}", appointment.getId(), e.getMessage());
+            }
+        }
 
         // Audit log
         Map<String, Object> newValues = new HashMap<>();
@@ -164,5 +179,50 @@ public class SessionNotesService {
         SessionNotes saved = sessionNotesRepository.save(existing);
         logger.info("Updated session notes with ID {}", id);
         return saved;
+    }
+
+    // ─── Mail events ─────────────────────────────────────────────────────────────
+
+    /**
+     * The saved notes as a mail event. The thank-you mail above goes to the student alone, so
+     * that is the only recipient offered; the notes themselves stay in the portal, so no notes
+     * HTML is supplied. Nothing is sent from here — the engine decides after commit.
+     */
+    private MailEventContext completedEvent(CounsellingAppointment a) {
+        CounsellingSlot slot = a.getSlot();
+        Long userStudentId = a.getStudent() != null ? a.getStudent().getUserStudentId() : null;
+        String studentName = notificationService.studentName(a);
+        MailEventContext.Builder b = MailEventContext.of(MailEvent.SESSION_COMPLETED)
+                .subject("appointment", a.getId())
+                .subject("entitlement", a.getEntitlementId())
+                .subject("student", userStudentId)
+                .recipient(MailRecipientRole.STUDENT, notificationService.studentEmail(a), studentName)
+                .field("student_name", studentName)
+                .field("first_name", firstName(studentName))
+                .field("counsellor_name", a.getCounsellor() != null ? a.getCounsellor().getName() : null)
+                .field("booking_link", notificationService.portalCounsellingUrl())
+                .ref("appointmentId", a.getId())
+                .ref("entitlementId", a.getEntitlementId())
+                .ref("userStudentId", userStudentId)
+                .ref("counsellorId", a.getCounsellor() != null ? a.getCounsellor().getId() : null)
+                .student(userStudentId);
+        if (a.getStudent() != null && a.getStudent().getInstitute() != null) {
+            b.institute(a.getStudent().getInstitute().getInstituteCode());
+        }
+        if (slot != null && slot.getDate() != null && slot.getStartTime() != null) {
+            String date = slot.getDate().format(CounsellingNotificationService.DATE_FMT);
+            String time = slot.getStartTime().format(CounsellingNotificationService.TIME_FMT);
+            b.field("session_date", date)
+             .field("session_time", time)
+             .field("session_datetime", date + " at " + time);
+        }
+        return b.build();
+    }
+
+    private static String firstName(String name) {
+        if (name == null) return null;
+        String t = name.trim();
+        int sp = t.indexOf(' ');
+        return sp > 0 ? t.substring(0, sp) : t;
     }
 }

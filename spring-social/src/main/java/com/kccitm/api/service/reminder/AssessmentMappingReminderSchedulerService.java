@@ -30,6 +30,10 @@ import com.kccitm.api.repository.UserRepository;
  */
 @Service
 public class AssessmentMappingReminderSchedulerService {
+    /** When the mail automation engine is on, the seeded "School assessment reminder" automation owns this send. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.kccitm.api.service.mail.MailSettingsService mailSettings;
+
 
     private static final Logger log = LoggerFactory.getLogger(AssessmentMappingReminderSchedulerService.class);
 
@@ -42,6 +46,9 @@ public class AssessmentMappingReminderSchedulerService {
     // automatically. Re-enable by uncommenting the @Scheduled annotation below.
     // @Scheduled(cron = "0 15 * * * *")
     public void runScheduledNudges() {
+        if (mailSettings != null && mailSettings.engineEnabled()) {
+            return; // handed over to the mail automation engine
+        }
         ReminderConfig cfg = configService.get(ReminderServiceType.ASSESSMENT_MAPPING);
         if (cfg == null || !Boolean.TRUE.equals(cfg.getEnabled())) {
             return;

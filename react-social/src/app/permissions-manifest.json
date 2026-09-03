@@ -127,6 +127,9 @@
   "email_template.read": [
     "/admin/email-templates"
   ],
+  "mail_automation.read": [
+    "/admin/mail-automations"
+  ],
   "faculty.create": [
     "/faculty/registration-form"
   ],

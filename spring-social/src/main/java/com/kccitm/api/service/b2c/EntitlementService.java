@@ -29,6 +29,10 @@ import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.SchoolAssessmentTierRepository;
@@ -71,6 +75,9 @@ public class EntitlementService {
     /** Optional: counselling CTA for the report mail; absent where counselling isn't wired. */
     @Autowired(required = false)
     private com.kccitm.api.service.counselling.CounsellingBookingLinkService counsellingBookingLinkService;
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     /**
      * Mirrors {@code report.pipeline.enabled}. When the Kafka report pipeline is on,
@@ -186,6 +193,7 @@ public class EntitlementService {
         List<StudentEntitlement> existing = entitlementRepository
                 .findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(userStudentId, assessmentId);
         StudentEntitlement e = existing.isEmpty() ? new StudentEntitlement() : existing.get(0);
+        boolean wasActive = !existing.isEmpty() && "active".equals(existing.get(0).getStatus());
 
         e.setUserStudentId(userStudentId);
         e.setAssessmentId(assessmentId);
@@ -226,6 +234,8 @@ public class EntitlementService {
         logger.info("School entitlement granted/updated: id={} userStudent={} assessment={} counselling={} sessions={}",
                 saved.getEntitlementId(), userStudentId, assessmentId,
                 saved.getCounsellingActive(), saved.getCounsellingSessionsTotal());
+        // Mail event only on the first activation; re-registration re-runs are top-ups, not grants.
+        if (!wasActive) publishEntitlementGranted(saved, null, null, null, null, null);
         return saved;
     }
 
@@ -345,7 +355,9 @@ public class EntitlementService {
             entitlement.setAccessToken(generateToken());
             entitlement.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
         }
-        return entitlementRepository.save(entitlement);
+        entitlement = entitlementRepository.save(entitlement);
+        publishEntitlementGranted(entitlement, txn.getStudentEmail(), txn.getStudentName(), null, null, null);
+        return entitlement;
     }
 
     /** Latest non-terminal B2B entitlement for (student, assessment), or a fresh row. */
@@ -426,7 +438,9 @@ public class EntitlementService {
             entitlement.setAccessToken(generateToken());
             entitlement.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
         }
-        return entitlementRepository.save(entitlement);
+        entitlement = entitlementRepository.save(entitlement);
+        publishEntitlementGranted(entitlement, txn.getStudentEmail(), txn.getStudentName(), null, null, null);
+        return entitlement;
     }
 
     /** Latest non-terminal school entitlement for (student, assessment), or a fresh row. */
@@ -618,11 +632,13 @@ public class EntitlementService {
                 String subject = "Your Career-9 report is ready";
                 String body = reportReadyEmailBody(e, finalLink, null);
                 notificationDispatcher.sendEmail(e, studentEmail, "final_report", subject, body, finalLink);
+                publishReportReady(e, studentEmail, finalLink, "final_report", onePagerLink);
             } else {
                 String subject = "Your Career-9 1-pager is ready";
                 String body = simpleHtml("Your free 1-page Career-9 summary is ready.",
                         "View your summary or unlock the full report from there:", onePagerLink, "Open 1-pager");
                 notificationDispatcher.sendEmail(e, studentEmail, "one_pager", subject, body, onePagerLink);
+                publishReportReady(e, studentEmail, onePagerLink, "one_pager", onePagerLink);
             }
             return;
         }
@@ -925,6 +941,7 @@ public class EntitlementService {
         String subject = "Welcome to Career-9 — start your assessment";
         String body = welcomeEmailHtml(displayName, username, dobStr, magicLink, manualLoginUrl);
         notificationDispatcher.sendEmail(entitlement, to, "assessment_invite", subject, body, magicLink);
+        publishEntitlementGranted(entitlement, to, txn.getStudentName(), username, dobStr, magicLink);
     }
 
     /**
@@ -1120,6 +1137,91 @@ public class EntitlementService {
         if (a == null) return b;
         if (b == null) return a;
         return a.after(b) ? a : b;
+    }
+
+    // ===== Mail events (admin automations): reported after the fact, never affect the flow =====
+
+    /**
+     * ENTITLEMENT_GRANTED once an entitlement has become active. Links are the same LinkBuilder
+     * links the inline mails use (short links are deduplicated by target); each is offered only
+     * when that service is on. Credentials are passed only by the path that already mails them.
+     */
+    private void publishEntitlementGranted(StudentEntitlement e, String studentEmail, String studentName,
+                                           String username, String password, String actionLink) {
+        if (mailEvents == null || e == null) return;
+        try {
+            String token = e.getAccessToken();
+            Long eid = e.getEntitlementId();
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.ENTITLEMENT_GRANTED)
+                    .subject("entitlement", eid)
+                    .subject("student", e.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, studentEmail, studentName)
+                    .field("student_name", studentName)
+                    .field("student_email", studentEmail)
+                    .ref("entitlementId", eid)
+                    .ref("userStudentId", e.getUserStudentId())
+                    .ref("assessmentId", e.getAssessmentId())
+                    .ref("paymentId", e.getPaymentTransactionId())
+                    .date("expires_at", e.getExpiresAt())
+                    .student(e.getUserStudentId());
+            String first = firstNameOf(studentName);
+            if (first != null) b.field("first_name", first);
+            if (e.getExpiresAt() != null) {
+                b.field("expiry_date", new SimpleDateFormat("dd-MM-yyyy").format(e.getExpiresAt()));
+            }
+            if (token != null) {
+                b.field("action_link", actionLink != null ? actionLink : linkBuilder.assessmentStart(token, eid));
+                if (Boolean.TRUE.equals(e.getDashboardActive())) {
+                    b.field("dashboard_link", linkBuilder.dashboard(token, eid));
+                }
+                if (Boolean.TRUE.equals(e.getCounsellingActive())) {
+                    b.field("booking_link", "1".equals(e.getCounsellingModel())
+                            ? linkBuilder.counsellingBook(token, eid)
+                            : linkBuilder.counsellingMySessions(token, eid));
+                }
+            }
+            if (Boolean.TRUE.equals(e.getCounsellingActive())) {
+                int total = e.getCounsellingSessionsTotal() != null ? e.getCounsellingSessionsTotal() : 0;
+                int used = e.getCounsellingSessionsUsed() != null ? e.getCounsellingSessionsUsed() : 0;
+                b.field("remaining_sessions", Math.max(0, total - used));
+            }
+            if (username != null) b.field("username", username);
+            if (password != null) b.field("password", password);
+            mailEvents.publish(b.build());
+        } catch (Exception ex) {
+            logger.warn("mail event {} failed: {}", MailEvent.ENTITLEMENT_GRANTED.key(), ex.getMessage());
+        }
+    }
+
+    /** REPORT_READY for the legacy (pipeline-off) immediate final-report send and the 1-pager mail. */
+    private void publishReportReady(StudentEntitlement e, String studentEmail, String reportLink,
+                                    String reportType, String onePagerLink) {
+        if (mailEvents == null || e == null) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.REPORT_READY)
+                    .subject("entitlement", e.getEntitlementId())
+                    .subject("student", e.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, studentEmail, null)
+                    .field("report_link", reportLink)
+                    .field("report_type", reportType)
+                    .field("one_pager_link", onePagerLink)
+                    .ref("entitlementId", e.getEntitlementId())
+                    .ref("userStudentId", e.getUserStudentId())
+                    .ref("assessmentId", e.getAssessmentId())
+                    .student(e.getUserStudentId());
+            if (e.getAccessToken() != null && Boolean.TRUE.equals(e.getDashboardActive())) {
+                b.field("dashboard_link", linkBuilder.dashboard(e.getAccessToken(), e.getEntitlementId()));
+            }
+            mailEvents.publish(b.build());
+        } catch (Exception ex) {
+            logger.warn("mail event {} failed: {}", MailEvent.REPORT_READY.key(), ex.getMessage());
+        }
+    }
+
+    /** First word of a display name, for the {@code first_name} placeholder; null when there is no name. */
+    private static String firstNameOf(String name) {
+        if (name == null || name.trim().isEmpty()) return null;
+        return name.trim().split("\\s+")[0];
     }
 
     public static class ResendResult {

@@ -65,7 +65,7 @@ public class PlaceholderResolver {
         // 5. HTML-escape every value except the known raw-HTML blocks, matching the escaping
         //    the original inline senders did on text fields (defense against injection).
         for (Map.Entry<String, String> e : ctx.entrySet()) {
-            if (!RAW_HTML_KEYS.contains(e.getKey())) {
+            if (!isRawHtmlKey(e.getKey())) {
                 e.setValue(escapeHtml(e.getValue()));
             }
         }
@@ -84,6 +84,15 @@ public class PlaceholderResolver {
     private static final Set<String> RAW_HTML_KEYS = new HashSet<>(Arrays.asList(
             EmailPlaceholder.EMAIL_HEADER.key(), EmailPlaceholder.EMAIL_FOOTER.key(),
             EmailPlaceholder.LEAD_DETAILS.key()));
+
+    /**
+     * Raw-HTML placeholders: the explicit set above plus any key ending in {@code _html}, the
+     * convention ported templates use for blocks a sender pre-renders (a list of sessions, a
+     * table of report links). Whoever builds such a block must escape the text inside it.
+     */
+    public static boolean isRawHtmlKey(String key) {
+        return key != null && (RAW_HTML_KEYS.contains(key) || key.endsWith("_html"));
+    }
 
     private static String escapeHtml(String input) {
         if (input == null) {

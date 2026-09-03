@@ -31,12 +31,18 @@ public class AsyncEmailExecutor {
     @Autowired
     private EmailSendLogRepository logRepository;
 
+    @Autowired(required = false)
+    private com.kccitm.api.service.mail.MailSendBudget sendBudget;
+
     /** Send and update the pre-created {@code email_send_log} row to SENT/FAILED. */
     @Async
     public void sendAsync(Long logId, EmailAccount account, SmtpEmailRequest message) {
         try {
             senderFactory.forAccount(account).send(message);
             updateLog(logId, EmailSendStatus.SENT, null);
+            if (sendBudget != null) {
+                sendBudget.recordSend(account.getId());
+            }
         } catch (Exception e) {
             logger.error("Async email send failed (logId={}, account={}): {}",
                     logId, account.getId(), e.getMessage(), e);

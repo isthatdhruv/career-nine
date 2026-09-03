@@ -5,19 +5,28 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import com.kccitm.api.model.email.EmailTemplate;
 import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.model.email.PortState;
+import com.kccitm.api.model.email.SeedOrigin;
 import com.kccitm.api.repository.email.EmailTemplateRepository;
 import com.kccitm.api.service.LoginCredentialsEmailService;
 
 /**
  * Seeds the flagship default email templates on boot. Idempotent: a type is seeded only when it
- * has no template yet, so admin edits/deletes are never overwritten on restart. Bodies come from
- * the senders' shared HTML builders, tokenised — guaranteeing parity with the inline fallback.
+ * has no live ({@link PortState#PORTED}) template yet, so admin edits/deletes are never
+ * overwritten on restart. Bodies come from the senders' shared HTML builders, tokenised,
+ * guaranteeing parity with the inline fallback.
+ *
+ * <p>Also stamps catalogue provenance on these rows ({@link SeedOrigin#SEED}, a mail key, and
+ * the seed-time content hash), including on rows seeded before those columns existed, so the
+ * dashboard can tell whether an admin has changed them since.
  */
 @Component
+@Order(100)
 public class EmailTemplateSeeder implements ApplicationRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailTemplateSeeder.class);
@@ -30,10 +39,8 @@ public class EmailTemplateSeeder implements ApplicationRunner {
         seed(EmailType.LOGIN_CREDENTIALS, "Login credentials (default)",
                 LoginCredentialsEmailService.defaultSubjectTemplate(),
                 LoginCredentialsEmailService.defaultBodyTemplate());
-
         seed(EmailType.LEAD_NOTIFICATION, "New lead alert (default)",
                 LEAD_ALERT_SUBJECT, LEAD_ALERT_BODY);
-
         seed(EmailType.LEAD_WELCOME, "Lead acknowledgement (default)",
                 LEAD_WELCOME_SUBJECT, LEAD_WELCOME_BODY);
     }
@@ -47,10 +54,8 @@ public class EmailTemplateSeeder implements ApplicationRunner {
      * /admin/email-templates is the supported way to change the wording, and a restart will
      * not put these strings back over an edit.
      */
-
     private static final String LEAD_ALERT_SUBJECT =
             "New {{lead_type}} lead: {{lead_name}}";
-
     private static final String LEAD_ALERT_BODY =
             "<div style=\"font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827\">"
             + "<p style=\"font-size:17px;font-weight:700;margin:0 0 4px\">New enquiry from the website</p>"
@@ -68,7 +73,6 @@ public class EmailTemplateSeeder implements ApplicationRunner {
 
     private static final String LEAD_WELCOME_SUBJECT =
             "Thanks for getting in touch with Career-9";
-
     private static final String LEAD_WELCOME_BODY =
             "{{email_header}}"
             + "<div style=\"font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827\">"
@@ -83,14 +87,35 @@ public class EmailTemplateSeeder implements ApplicationRunner {
 
     private void seed(EmailType type, String name, String subject, String body) {
         try {
-            if (!templateRepository.findByEmailTypeOrderByNameAsc(type.name()).isEmpty()) {
-                return; // already has a template — never clobber admin content
+            String mailKey = type.name().toLowerCase();
+            String seedHash = TemplateContentHash.of(subject, body, null);
+            boolean hasLive = false;
+            for (EmailTemplate existing : templateRepository.findByEmailTypeOrderByNameAsc(type.name())) {
+                if (existing.getPortState() != PortState.CONTENT_ONLY) {
+                    hasLive = true;
+                }
+                // Backfill provenance on rows seeded before the catalogue columns existed.
+                if (name.equals(existing.getName()) && existing.getSeededHash() == null) {
+                    existing.setSeedOrigin(SeedOrigin.SEED);
+                    if (existing.getMailKey() == null) {
+                        existing.setMailKey(mailKey);
+                    }
+                    existing.setSeededHash(seedHash);
+                    templateRepository.save(existing);
+                }
+            }
+            if (hasLive) {
+                return; // already has a live template — never clobber admin content
             }
             EmailTemplate t = new EmailTemplate();
             t.setName(name);
             t.setEmailType(type.name());
+            t.setMailKey(mailKey);
             t.setSubjectTemplate(subject);
             t.setBodyTemplate(body);
+            t.setSeedOrigin(SeedOrigin.SEED);
+            t.setSeededHash(seedHash);
+            t.setPortState(PortState.PORTED);
             t.setIsDefault(true);
             t.setDeliveryMode(type.defaultDeliveryMode());
             t.setActive(true);

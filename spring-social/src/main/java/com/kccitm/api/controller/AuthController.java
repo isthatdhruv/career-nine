@@ -60,6 +60,10 @@ import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.UserActivityLogService;
 import com.kccitm.api.model.career9.UserStudent;
@@ -148,6 +152,10 @@ public class AuthController {
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
+
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     /** Reset link single-use TTL. Single-use is also enforced via used_at stamp. */
     private static final long RESET_TOKEN_TTL_MINUTES = 60;
@@ -657,6 +665,24 @@ public class AuthController {
         emailDispatchService.sendText(EmailType.ACCOUNT_WELCOME, user.getEmail(), subject, body);
     } catch (Exception e) {
         // log and continue - do not fail registration because of email
+    }
+
+    // Mail event for admin automations (no student row yet, so the user id is the subject).
+    if (mailEvents != null) {
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.ACCOUNT_CREATED)
+                    .subject("student", result.getId())
+                    .recipient(MailRecipientRole.STUDENT, result.getEmail(), result.getName())
+                    .field("student_name", result.getName())
+                    .field("student_email", result.getEmail())
+                    .field("dashboard_link", frontendUrl);
+            if (signUpRequest.getFirstname() != null && !signUpRequest.getFirstname().isBlank()) {
+                b.field("first_name", signUpRequest.getFirstname().trim());
+            }
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.ACCOUNT_CREATED.key(), e.getMessage());
+        }
     }
 
     return ResponseEntity.created(location)

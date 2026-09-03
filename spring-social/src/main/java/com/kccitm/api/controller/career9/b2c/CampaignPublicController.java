@@ -34,6 +34,10 @@ import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.CampaignClassAssessment;
 import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.model.career9.counselling.CounsellingRequest;
 import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
@@ -89,6 +93,8 @@ public class CampaignPublicController {
     @Autowired(required = false) private com.kccitm.api.service.b2c.EntitlementService entitlementService;
     @Autowired(required = false) private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
     @Autowired(required = false) private com.kccitm.api.service.b2c.LinkBuilder linkBuilder;
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false) private MailEvents mailEvents;
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
     @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
@@ -821,11 +827,41 @@ public class CampaignPublicController {
             response.put("paymentUrl", rzpResponse.get("shortUrl"));
             response.put("transactionId", txn.getTransactionId());
             response.put("amount", finalInr);
+            publishPaymentLinkCreated(txn, pricingTier.getName(), entitlement.getEntitlementId());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Failed to create upgrade payment link for entitlement {}", entitlement.getEntitlementId(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to create payment link. Please try again.");
+        }
+    }
+
+    /**
+     * PAYMENT_LINK_CREATED (admin automations) once the Razorpay link is stamped on the
+     * transaction; payment_link is the short URL the student is redirected to. Reported after
+     * the fact; never affects the flow.
+     */
+    private void publishPaymentLinkCreated(PaymentTransaction txn, String planName, Long entitlementId) {
+        if (mailEvents == null || txn == null) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.PAYMENT_LINK_CREATED)
+                    .subject("payment", txn.getTransactionId())
+                    .subject("student", txn.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, txn.getStudentEmail(), txn.getStudentName())
+                    .field("student_name", txn.getStudentName())
+                    .field("amount", txn.getAmount())
+                    .field("plan_name", planName)
+                    .field("payment_link", txn.getShortUrl() != null ? txn.getShortUrl() : txn.getPaymentLinkUrl())
+                    .ref("paymentId", txn.getTransactionId())
+                    .ref("userStudentId", txn.getUserStudentId())
+                    .ref("assessmentId", txn.getAssessmentId())
+                    .ref("entitlementId", entitlementId)
+                    .student(txn.getUserStudentId());
+            String name = txn.getStudentName();
+            if (name != null && !name.trim().isEmpty()) b.field("first_name", name.trim().split("\\s+")[0]);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.PAYMENT_LINK_CREATED.key(), e.getMessage());
         }
     }
 
@@ -1090,6 +1126,7 @@ public class CampaignPublicController {
             response.put("paymentUrl", rzpResponse.get("shortUrl"));
             response.put("transactionId", txn.getTransactionId());
             response.put("amount", finalInr);
+            publishPaymentLinkCreated(txn, pricingTier.getName(), null);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Failed to create campaign payment link", e);

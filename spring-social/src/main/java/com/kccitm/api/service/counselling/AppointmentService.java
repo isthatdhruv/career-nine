@@ -2,6 +2,9 @@ package com.kccitm.api.service.counselling;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,10 +23,14 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 import com.kccitm.api.service.b2c.EntitlementService;
+import com.kccitm.api.service.mail.MailEvents;
 
 @Service
 public class AppointmentService {
@@ -77,6 +84,10 @@ public class AppointmentService {
 
     @Autowired
     private EntitlementService entitlementService;
+
+    /** Mail-automation hook. Absent until the engine is wired; every publish is best-effort. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
 
     // ─── Queries ─────────────────────────────────────────────────────────────────
 
@@ -224,6 +235,13 @@ public class AppointmentService {
 
         // Notify student
         notificationService.sendConfirmedToStudentEmail(appointment);
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(confirmedEvent(appointment));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for appointment {}: {}", appointmentId, e.getMessage());
+            }
+        }
 
         // In-app notification to student
         try {
@@ -417,9 +435,19 @@ public class AppointmentService {
         releaseSlot(slot, role);
         appointment = appointmentRepository.save(appointment);
 
+        // Sessions left on the entitlement after the credit-back, for the cancellation mail event.
+        // Only known when the credit-back ran — it is the one place this method touches the row.
+        Integer remainingSessions = null;
         if (creditBack && appointment.getEntitlementId() != null) {
             try {
-                entitlementService.creditBackCounsellingSession(appointment.getEntitlementId());
+                com.kccitm.api.model.career9.b2c.StudentEntitlement credited =
+                        entitlementService.creditBackCounsellingSession(appointment.getEntitlementId());
+                if (credited != null) {
+                    remainingSessions = (credited.getCounsellingSessionsTotal() == null
+                            ? 0 : credited.getCounsellingSessionsTotal())
+                            - (credited.getCounsellingSessionsUsed() == null
+                            ? 0 : credited.getCounsellingSessionsUsed());
+                }
             } catch (Exception e) {
                 logger.warn("Session credit-back failed for appointment {} (entitlement {}): {}",
                         appointmentId, appointment.getEntitlementId(), e.getMessage());
@@ -431,6 +459,14 @@ public class AppointmentService {
                 reasonCode, slot != null ? slot.getStatus() : "n/a", creditBack);
 
         notifyOnCancellation(appointment, assignedCounsellor, cancelledBy, role, reason, creditBack, notifyCounsellor);
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(cancelledEvent(appointment, assignedCounsellor, cancelledBy, role, reason,
+                        notifyCounsellor, remainingSessions));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for appointment {}: {}", appointmentId, e.getMessage());
+            }
+        }
 
         Map<String, Object> oldValues = new HashMap<>();
         oldValues.put("status", oldStatus);
@@ -759,6 +795,13 @@ public class AppointmentService {
 
         // Notify student of reschedule
         notificationService.sendRescheduleEmail(oldAppointment, newAppointment);
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(rescheduledEvent(oldAppointment, newAppointment));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for appointment {}: {}", newAppointment.getId(), e.getMessage());
+            }
+        }
 
         // In-app notification to student — UserStudent stores userId (Long),
         // not a User entity. Build a lightweight User reference using the stored userId.
@@ -792,5 +835,145 @@ public class AppointmentService {
                 "Rescheduled from appointment " + appointmentId, null, newAuditValues);
 
         return newAppointment;
+    }
+
+    // ─── Mail events ─────────────────────────────────────────────────────────────
+    //
+    // Each transition above reports itself to the mail-automation engine after its own
+    // notifications have gone out. Nothing here sends anything: the engine matches the event
+    // against admin-configured automations once the transaction commits, and a missing engine
+    // (mailEvents == null) or a failure inside it changes nothing above.
+
+    /**
+     * Subjects, refs and the session facts every appointment event carries, with date/time text
+     * formatted exactly as the inline mails format it.
+     *
+     * @param supersededAppointmentId the row this one replaces (a reschedule), so pending mail
+     *                                indexed under the old appointment can be cancelled; null otherwise
+     */
+    private MailEventContext.Builder appointmentEvent(MailEvent event, CounsellingAppointment a,
+                                                      Long supersededAppointmentId) {
+        CounsellingSlot slot = a.getSlot();
+        Counsellor c = a.getCounsellor();
+        Long userStudentId = a.getStudent() != null ? a.getStudent().getUserStudentId() : null;
+        String studentName = notificationService.studentName(a);
+        MailEventContext.Builder b = MailEventContext.of(event)
+                .subject("appointment", a.getId())
+                .subject("appointment", supersededAppointmentId)
+                .subject("entitlement", a.getEntitlementId())
+                .subject("student", userStudentId)
+                .field("student_name", studentName)
+                .field("first_name", firstName(studentName))
+                .field("counsellor_name", c != null ? c.getName() : null)
+                .ref("appointmentId", a.getId())
+                .ref("entitlementId", a.getEntitlementId())
+                .ref("userStudentId", userStudentId)
+                .ref("counsellorId", c != null ? c.getId() : null)
+                .student(userStudentId);
+        if (a.getStudent() != null && a.getStudent().getInstitute() != null) {
+            b.institute(a.getStudent().getInstitute().getInstituteCode());
+        }
+        if (slot != null && slot.getDate() != null && slot.getStartTime() != null) {
+            String date = slot.getDate().format(CounsellingNotificationService.DATE_FMT);
+            String time = slot.getStartTime().format(CounsellingNotificationService.TIME_FMT);
+            b.field("session_date", date)
+             .field("session_time", time)
+             .field("session_datetime", date + " at " + time);
+        }
+        return b;
+    }
+
+    /**
+     * Joining details plus the start/end instants — for the events that describe a session that
+     * is still going to happen. The instants are the slot's wall-clock times in the counselling
+     * zone, which is what relative scheduling ("two hours before") has to count from.
+     */
+    private MailEventContext.Builder withSessionDetails(MailEventContext.Builder b, CounsellingAppointment a) {
+        Counsellor c = a.getCounsellor();
+        CounsellingSlot slot = a.getSlot();
+        b.field("counsellor_email", c != null ? c.getEmail() : null)
+         .field("meeting_link", a.getMeetingLink())
+         .field("venue", a.getLocation())
+         .field("reschedule_link", notificationService.portalCounsellingUrl());
+        if (slot != null) {
+            b.field("duration_minutes", slot.getDurationMinutes());
+            if (slot.getDate() != null && slot.getStartTime() != null) {
+                b.date("session_start", instantOf(slot.getDate(), slot.getStartTime()));
+            }
+            if (slot.getDate() != null && slot.getEndTime() != null) {
+                b.field("session_end_time", slot.getEndTime().format(CounsellingNotificationService.TIME_FMT))
+                 .date("session_end", instantOf(slot.getDate(), slot.getEndTime()));
+            }
+        }
+        return b;
+    }
+
+    /** A counsellor confirming an assigned session: the inline mail reaches the student alone. */
+    private MailEventContext confirmedEvent(CounsellingAppointment a) {
+        MailEventContext.Builder b = appointmentEvent(MailEvent.APPOINTMENT_CONFIRMED, a, null);
+        withSessionDetails(b, a);
+        String studentEmail = notificationService.studentEmail(a);
+        return b.recipient(MailRecipientRole.STUDENT, studentEmail, notificationService.studentName(a))
+                .field("student_email", studentEmail)
+                .field("calendar_link", notificationService.googleCalendarLink(a))
+                .build();
+    }
+
+    /** Same two readers as sendRescheduleEmail: the student and the counsellor on the new session. */
+    private MailEventContext rescheduledEvent(CounsellingAppointment oldAppointment, CounsellingAppointment a) {
+        MailEventContext.Builder b = appointmentEvent(MailEvent.APPOINTMENT_RESCHEDULED, a, oldAppointment.getId());
+        withSessionDetails(b, a);
+        CounsellingSlot oldSlot = oldAppointment.getSlot();
+        if (oldSlot != null && oldSlot.getDate() != null && oldSlot.getStartTime() != null) {
+            b.field("old_session_date", oldSlot.getDate().format(CounsellingNotificationService.DATE_FMT))
+             .field("old_session_time", oldSlot.getStartTime().format(CounsellingNotificationService.TIME_FMT));
+        }
+        Counsellor c = a.getCounsellor();
+        return b.recipient(MailRecipientRole.STUDENT, notificationService.studentEmail(a),
+                        notificationService.studentName(a))
+                .recipient(MailRecipientRole.COUNSELLOR, c != null ? c.getEmail() : null,
+                        c != null ? c.getName() : null)
+                .build();
+    }
+
+    /**
+     * Recipients mirror notifyOnCancellation exactly: whoever the inline mails already reach for
+     * this role, and nobody else — the party who cancelled is not written to about it.
+     */
+    private MailEventContext cancelledEvent(CounsellingAppointment a, Counsellor counsellor, User cancelledBy,
+                                            String role, String reason, boolean notifyCounsellor,
+                                            Integer remainingSessions) {
+        MailEventContext.Builder b = appointmentEvent(MailEvent.APPOINTMENT_CANCELLED, a, null)
+                .field("cancellation_reason", reason)
+                .field("cancelled_by_name", cancelledBy != null && cancelledBy.getName() != null
+                        ? cancelledBy.getName() : "Career-9")
+                .field("booking_link", notificationService.portalCounsellingUrl())
+                .field("remaining_sessions", remainingSessions)
+                .recipient(MailRecipientRole.STUDENT, notificationService.studentEmail(a),
+                        notificationService.studentName(a));
+        boolean studentCancelled = ROLE_STUDENT.equals(role);
+        boolean counsellorCancelled = ROLE_COUNSELLOR.equals(role);
+        // Student and admin cancellations go out with the cancelled invite to student + parent;
+        // a counsellor cancellation is a plain notice to the student only.
+        if (!counsellorCancelled) {
+            b.recipient(MailRecipientRole.PARENT, a.getParentEmail(), null);
+        }
+        boolean counsellorTold = counsellor != null
+                && (studentCancelled || (!counsellorCancelled && notifyCounsellor));
+        if (counsellorTold) {
+            b.recipient(MailRecipientRole.COUNSELLOR, counsellor.getEmail(), counsellor.getName());
+        }
+        return b.build();
+    }
+
+    private Date instantOf(LocalDate date, LocalTime time) {
+        return Date.from(ZonedDateTime.of(date, time, clock.zone()).toInstant());
+    }
+
+    private static String firstName(String name) {
+        if (name == null) return null;
+        String t = name.trim();
+        int sp = t.indexOf(' ');
+        return sp > 0 ? t.substring(0, sp) : t;
     }
 }

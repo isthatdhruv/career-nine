@@ -3,9 +3,11 @@ package com.kccitm.api.service.counselling;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,11 +27,15 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.model.career9.counselling.Counsellor;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
 import com.kccitm.api.repository.Career9.counselling.BlockDateRequestRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.b2c.LinkBuilder;
+import com.kccitm.api.service.mail.MailEvents;
 
 /**
  * A counsellor dropping one booked session, and the automatic re-placement of the student.
@@ -92,6 +98,10 @@ public class CounsellorCancellationService {
     @Autowired
     private LinkBuilder linkBuilder;
 
+    /** Mail-automation hook. Absent until the engine is wired; every publish is best-effort. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
+
     /** How the session was re-placed, echoed back so the caller can say what happened. */
     public enum Outcome { REASSIGNED_SAME_TIME, SHIFTED_LATER, PARKED }
 
@@ -150,15 +160,25 @@ public class CounsellorCancellationService {
         // student moves but wrong here; re-block it afterwards.)
         blockVacatedSlot(oldSlot, reasonCode);
 
+        String rescheduleUrl = null;
         if (sameTime) {
             notificationService.sendCounsellorSwappedEmail(moved);
             result.put("outcome", Outcome.REASSIGNED_SAME_TIME.name());
             result.put("message", "Reassigned to another counsellor at the same time.");
         } else {
-            notificationService.sendSessionShiftedEmail(moved, originalTimeLabel, selfRescheduleUrl(moved));
+            rescheduleUrl = selfRescheduleUrl(moved);
+            notificationService.sendSessionShiftedEmail(moved, originalTimeLabel, rescheduleUrl);
             result.put("outcome", Outcome.SHIFTED_LATER.name());
             result.put("message", "Moved to " + replacement.getStartTime().format(TIME_FMT)
                     + ". The student can change it at no cost.");
+        }
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(rescheduledEvent(moved, appointmentId, date, originalTimeLabel,
+                        reasonCode, note, rescheduleUrl));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for appointment {}: {}", moved.getId(), e.getMessage());
+            }
         }
         result.put("appointmentId", moved.getId());
         result.put("newSlotId", replacement.getId());
@@ -366,5 +386,76 @@ public class CounsellorCancellationService {
     private String selfRescheduleUrl(CounsellingAppointment appointment) {
         return linkBuilder.counsellingReschedule(
                 tokenProvider.createCounsellingRescheduleToken(appointment.getId()));
+    }
+
+    // ─── Mail events ─────────────────────────────────────────────────────────────
+
+    /**
+     * The re-placement as a mail event: from the student's side a swap or a shift is a
+     * reschedule. Same readers as the swapped/shifted mails (student plus parent). Nothing is
+     * sent from here — the engine decides after commit.
+     *
+     * <p>Note that {@code moveTo} runs through {@code AppointmentService.reschedule}, which
+     * publishes its own APPOINTMENT_RESCHEDULED for the same new row (as it also sends its own
+     * reschedule mail); this one carries the re-placed counsellor, the reason and the link.
+     */
+    private MailEventContext rescheduledEvent(CounsellingAppointment moved, Long oldAppointmentId,
+                                              LocalDate oldDate, String oldTimeLabel,
+                                              String reasonCode, String note, String rescheduleUrl) {
+        CounsellingSlot slot = moved.getSlot();
+        Counsellor c = moved.getCounsellor();
+        Long userStudentId = moved.getStudent() != null ? moved.getStudent().getUserStudentId() : null;
+        String studentName = notificationService.recipientStudentName(moved);
+        String reason = reasonCode == null || reasonCode.isBlank() ? note
+                : (note == null || note.isBlank() ? reasonCode : reasonCode + ": " + note);
+        MailEventContext.Builder b = MailEventContext.of(MailEvent.APPOINTMENT_RESCHEDULED)
+                .subject("appointment", moved.getId())
+                .subject("appointment", oldAppointmentId)
+                .subject("entitlement", moved.getEntitlementId())
+                .subject("student", userStudentId)
+                .recipient(MailRecipientRole.STUDENT, notificationService.recipientStudentEmail(moved), studentName)
+                .recipient(MailRecipientRole.PARENT, moved.getParentEmail(), null)
+                .field("student_name", studentName)
+                .field("first_name", firstName(studentName))
+                .field("counsellor_name", c != null ? c.getName() : null)
+                .field("counsellor_email", c != null ? c.getEmail() : null)
+                .field("old_session_date", oldDate != null ? oldDate.format(CounsellingNotificationService.DATE_FMT) : null)
+                .field("old_session_time", oldTimeLabel)
+                .field("meeting_link", moved.getMeetingLink())
+                .field("venue", moved.getLocation())
+                .field("reschedule_link", rescheduleUrl)
+                .field("reschedule_reason", reason)
+                .ref("appointmentId", moved.getId())
+                .ref("entitlementId", moved.getEntitlementId())
+                .ref("userStudentId", userStudentId)
+                .ref("counsellorId", c != null ? c.getId() : null)
+                .student(userStudentId);
+        if (moved.getStudent() != null && moved.getStudent().getInstitute() != null) {
+            b.institute(moved.getStudent().getInstitute().getInstituteCode());
+        }
+        if (slot != null) {
+            b.field("duration_minutes", slot.getDurationMinutes());
+            if (slot.getDate() != null && slot.getStartTime() != null) {
+                String date = slot.getDate().format(CounsellingNotificationService.DATE_FMT);
+                String time = slot.getStartTime().format(CounsellingNotificationService.TIME_FMT);
+                b.field("session_date", date)
+                 .field("session_time", time)
+                 .field("session_datetime", date + " at " + time)
+                 .date("session_start", Date.from(
+                         ZonedDateTime.of(slot.getDate(), slot.getStartTime(), clock.zone()).toInstant()));
+            }
+            if (slot.getDate() != null && slot.getEndTime() != null) {
+                b.date("session_end", Date.from(
+                        ZonedDateTime.of(slot.getDate(), slot.getEndTime(), clock.zone()).toInstant()));
+            }
+        }
+        return b.build();
+    }
+
+    private static String firstName(String name) {
+        if (name == null) return null;
+        String t = name.trim();
+        int sp = t.indexOf(' ');
+        return sp > 0 ? t.substring(0, sp) : t;
     }
 }

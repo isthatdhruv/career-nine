@@ -22,6 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.kccitm.api.model.career9.AssessmentInstituteMapping;
 import com.kccitm.api.model.career9.PaymentNotificationLog;
 import com.kccitm.api.model.career9.PaymentTransaction;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
+import com.kccitm.api.service.mail.MailEvents;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentNotificationLogRepository;
@@ -74,6 +78,10 @@ public class PaymentController {
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
 
+    /** Optional: reports mail events to the admin automation engine; absent until wired. Never affects the flow. */
+    @Autowired(required = false)
+    private MailEvents mailEvents;
+
     @Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
 
@@ -81,6 +89,37 @@ public class PaymentController {
         String base = (callbackBaseUrl != null && !callbackBaseUrl.isEmpty())
                 ? callbackBaseUrl : "https://dashboard.career-9.com";
         return base + "/payment-register/" + txn.getTransactionId();
+    }
+
+    /**
+     * PAYMENT_LINK_CREATED (admin automations) once the link is stamped on the transaction.
+     * payment_link is the same /payment-register page this controller's own mail sends.
+     * Reported after the fact; never affects the flow.
+     */
+    private void publishPaymentLinkCreated(PaymentTransaction txn, String assessmentName, String planName) {
+        if (mailEvents == null || txn == null) return;
+        try {
+            MailEventContext.Builder b = MailEventContext.of(MailEvent.PAYMENT_LINK_CREATED)
+                    .subject("payment", txn.getTransactionId())
+                    .subject("student", txn.getUserStudentId())
+                    .recipient(MailRecipientRole.STUDENT, txn.getStudentEmail(), txn.getStudentName())
+                    .field("student_name", txn.getStudentName())
+                    .field("amount", txn.getAmount())
+                    .field("assessment_name", assessmentName)
+                    .field("payment_link", getRegistrationUrl(txn))
+                    .ref("paymentId", txn.getTransactionId())
+                    .ref("userStudentId", txn.getUserStudentId())
+                    .ref("assessmentId", txn.getAssessmentId())
+                    .ref("instituteCode", txn.getInstituteCode() == null ? null : txn.getInstituteCode().longValue())
+                    .institute(txn.getInstituteCode())
+                    .student(txn.getUserStudentId());
+            if (planName != null) b.field("plan_name", planName);
+            String name = txn.getStudentName();
+            if (name != null && !name.trim().isEmpty()) b.field("first_name", name.trim().split("\\s+")[0]);
+            mailEvents.publish(b.build());
+        } catch (Exception e) {
+            logger.warn("mail event {} failed: {}", MailEvent.PAYMENT_LINK_CREATED.key(), e.getMessage());
+        }
     }
 
     @PreAuthorize("@auth.allows('payment.create')")
@@ -131,6 +170,7 @@ public class PaymentController {
             txn.setShortUrl(linkResult.get("shortUrl"));
             txn.setStatus("created");
             txn = paymentTransactionRepository.save(txn);
+            publishPaymentLinkCreated(txn, assessmentName, null);
 
             Map<String, Object> response = new HashMap<>();
             response.put("transactionId", txn.getTransactionId());
@@ -244,6 +284,7 @@ public class PaymentController {
             txn.setShortUrl(linkResult.get("shortUrl"));
             txn.setStatus("created");
             txn = paymentTransactionRepository.save(txn);
+            publishPaymentLinkCreated(txn, assessmentName, pricingTierOpt.get().getName());
 
             Map<String, Object> response = new HashMap<>();
             response.put("transactionId", txn.getTransactionId());

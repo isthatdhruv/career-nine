@@ -18,11 +18,15 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.model.career9.counselling.Counsellor;
+import com.kccitm.api.model.mail.MailEvent;
+import com.kccitm.api.model.mail.MailEventContext;
+import com.kccitm.api.model.mail.MailRecipientRole;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.b2c.LinkBuilder;
+import com.kccitm.api.service.mail.MailEvents;
 
 /**
  * Deactivating a counsellor who still has sessions booked.
@@ -71,6 +75,8 @@ public class CounsellorDeactivationService {
     @Autowired private CounsellingClock clock;
     @Autowired private LinkBuilder linkBuilder;
     @Autowired private TokenProvider tokenProvider;
+    /** Mail-automation hook. Absent until the engine is wired; every publish is best-effort. */
+    @Autowired(required = false) private MailEvents mailEvents;
 
     /** One affected session, as the confirmation dialog and the admin email both need it. */
     public static class AffectedSession {
@@ -122,9 +128,16 @@ public class CounsellorDeactivationService {
             AffectedSession row = describe(a, alternative);
             try {
                 if (alternative) {
-                    parkForRebooking(a);
+                    String rescheduleUrl = parkForRebooking(a);
                     row.outcome = "PARKED";
                     parked++;
+                    if (mailEvents != null) {
+                        try {
+                            mailEvents.publish(parkedSessionEvent(a, admin, rescheduleUrl));
+                        } catch (Exception e) {
+                            logger.warn("Mail event publish failed for appointment {}: {}", a.getId(), e.getMessage());
+                        }
+                    }
                 } else {
                     // notifyCounsellor=false: they get the single suspension notice below
                     // instead of one "your session was cancelled" mail per student.
@@ -163,6 +176,13 @@ public class CounsellorDeactivationService {
             notificationService.sendCounsellorDeactivatedEmail(counsellor, parked + cancelled);
         } catch (Exception e) {
             logger.warn("Deactivation notice to counsellor {} failed: {}", counsellorId, e.getMessage());
+        }
+        if (mailEvents != null) {
+            try {
+                mailEvents.publish(deactivatedEvent(counsellor, parked + cancelled, admin));
+            } catch (Exception e) {
+                logger.warn("Mail event publish failed for counsellor {} deactivation: {}", counsellorId, e.getMessage());
+            }
         }
         try {
             notificationService.sendCounsellorDeactivatedAdminAlert(counsellor, rows, admin);
@@ -239,7 +259,7 @@ public class CounsellorDeactivationService {
      * lifecycle sweep noticing afterwards. The slot is closed, not reopened: the counsellor
      * is suspended, so that hour must not be sold to anybody else.
      */
-    private void parkForRebooking(CounsellingAppointment appointment) {
+    private String parkForRebooking(CounsellingAppointment appointment) {
         appointment.setStatus("AWAITING_RESCHEDULE");
         // Not a no-show by anybody — the session never got the chance to happen.
         appointment.setMissedByRole(null);
@@ -256,9 +276,10 @@ public class CounsellorDeactivationService {
             slotRepository.save(slot);
         }
 
-        notificationService.sendCounsellorDeactivatedStudentEmail(
-                appointment, linkBuilder.counsellingReschedule(
-                        tokenProvider.createCounsellingRescheduleToken(appointment.getId())));
+        String rescheduleUrl = linkBuilder.counsellingReschedule(
+                tokenProvider.createCounsellingRescheduleToken(appointment.getId()));
+        notificationService.sendCounsellorDeactivatedStudentEmail(appointment, rescheduleUrl);
+        return rescheduleUrl;
     }
 
     private AffectedSession describe(CounsellingAppointment a, boolean hasAlternative) {
@@ -275,5 +296,72 @@ public class CounsellorDeactivationService {
         row.status = a.getStatus();
         row.hasAlternative = hasAlternative;
         return row;
+    }
+
+    // ─── Mail events ─────────────────────────────────────────────────────────────
+    //
+    // Nothing is sent from here; the engine decides after commit. Sessions cancelled outright go
+    // through AppointmentService.cancel, which publishes its own event, so a parked session is
+    // the only one reported from this class.
+
+    /**
+     * A parked session, from the student's side: her session is off and she has a link to pick a
+     * new time. Same readers as sendCounsellorDeactivatedStudentEmail (student plus parent); the
+     * counsellor gets the single deactivation notice instead.
+     */
+    private MailEventContext parkedSessionEvent(CounsellingAppointment a, User admin, String rescheduleUrl) {
+        CounsellingSlot slot = a.getSlot();
+        Long userStudentId = a.getStudent() != null ? a.getStudent().getUserStudentId() : null;
+        String studentName = notificationService.recipientStudentName(a);
+        MailEventContext.Builder b = MailEventContext.of(MailEvent.APPOINTMENT_CANCELLED)
+                .subject("appointment", a.getId())
+                .subject("entitlement", a.getEntitlementId())
+                .subject("student", userStudentId)
+                .recipient(MailRecipientRole.STUDENT, notificationService.recipientStudentEmail(a), studentName)
+                .recipient(MailRecipientRole.PARENT, a.getParentEmail(), null)
+                .field("student_name", studentName)
+                .field("first_name", firstName(studentName))
+                .field("counsellor_name", a.getCounsellor() != null ? a.getCounsellor().getName() : null)
+                // The same wording AppointmentService.cancel builds for the sessions cancelled outright.
+                .field("cancellation_reason", "COUNSELLOR_DEACTIVATED: The counsellor's account has been deactivated.")
+                .field("cancelled_by_name", admin != null && admin.getName() != null ? admin.getName() : "Career-9")
+                // The self-service link she was just mailed — the only honest "book" link here.
+                .field("booking_link", rescheduleUrl)
+                .ref("appointmentId", a.getId())
+                .ref("entitlementId", a.getEntitlementId())
+                .ref("userStudentId", userStudentId)
+                .ref("counsellorId", a.getCounsellor() != null ? a.getCounsellor().getId() : null)
+                .student(userStudentId);
+        if (a.getStudent() != null && a.getStudent().getInstitute() != null) {
+            b.institute(a.getStudent().getInstitute().getInstituteCode());
+        }
+        if (slot != null && slot.getDate() != null && slot.getStartTime() != null) {
+            String date = slot.getDate().format(CounsellingNotificationService.DATE_FMT);
+            String time = slot.getStartTime().format(CounsellingNotificationService.TIME_FMT);
+            b.field("session_date", date)
+             .field("session_time", time)
+             .field("session_datetime", date + " at " + time);
+        }
+        return b.build();
+    }
+
+    /** The deactivation itself, addressed to the counsellor as the suspension notice is. */
+    private MailEventContext deactivatedEvent(Counsellor counsellor, int sessionsAffected, User admin) {
+        return MailEventContext.of(MailEvent.COUNSELLOR_DEACTIVATED)
+                .subject("counsellor", counsellor.getId())
+                .recipient(MailRecipientRole.COUNSELLOR, counsellor.getEmail(), counsellor.getName())
+                .field("counsellor_name", counsellor.getName())
+                .field("counsellor_email", counsellor.getEmail())
+                .field("sessions_affected", sessionsAffected)
+                .field("admin_name", admin != null && admin.getName() != null ? admin.getName() : "Career-9 admin")
+                .ref("counsellorId", counsellor.getId())
+                .build();
+    }
+
+    private static String firstName(String name) {
+        if (name == null) return null;
+        String t = name.trim();
+        int sp = t.indexOf(' ');
+        return sp > 0 ? t.substring(0, sp) : t;
     }
 }

@@ -117,9 +117,10 @@ export function AsideMenuMain() {
   const showEmailAccounts = allowed("/admin/email-accounts");
   const showEmailLog = allowed("/admin/email-log");
   const showEmailTemplates = allowed("/admin/email-templates");
+  const showMailAutomations = allowed("/admin/mail-automations");
   const showEmailRecipients = allowed("/admin/email-recipients");
   const showEmail =
-    showEmailAccounts || showEmailLog || showEmailTemplates || showEmailRecipients;
+    showEmailAccounts || showEmailLog || showEmailTemplates || showMailAutomations || showEmailRecipients;
   const showLeads = allowed("/leads");
   const showOldDataMapping = allowed("/old-data-mapping");
   const showScoreDebug = allowed("/score-debug");
@@ -744,6 +745,14 @@ export function AsideMenuMain() {
                   icon="/media/icons/duotune/communication/com009.svg"
                   title="Email Templates"
                   fontIcon="bi-envelope-paper-heart"
+                />
+              )}
+              {showMailAutomations && (
+                <AsideMenuItem
+                  to="/admin/mail-automations"
+                  icon="/media/icons/duotune/abstract/abs027.svg"
+                  title="Mail Automations"
+                  fontIcon="bi-diagram-3"
                 />
               )}
               {showEmailRecipients && (

@@ -30,8 +30,9 @@ public class CounsellingNotificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(CounsellingNotificationService.class);
 
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMMM d, yyyy");
-    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("h:mm a");
+    /** Package-private so the counselling services stamp mail events with the same date/time text. */
+    static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("MMMM d, yyyy");
+    static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("h:mm a");
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -1291,7 +1292,7 @@ public class CounsellingNotificationService {
      * Times are converted from IST (Asia/Kolkata) to the UTC instants Google expects.
      * Returns null if the slot data is incomplete.
      */
-    private String googleCalendarLink(CounsellingAppointment a) {
+    public String googleCalendarLink(CounsellingAppointment a) {
         try {
             if (a.getSlot() == null || a.getSlot().getDate() == null
                     || a.getSlot().getStartTime() == null || a.getSlot().getEndTime() == null) return null;
@@ -1962,7 +1963,7 @@ public class CounsellingNotificationService {
     // ─── Cancellation/no-show helpers ────────────────────────────────────────────
 
     /** The student's counselling page — where every "book a new time" link should land. */
-    private String portalCounsellingUrl() {
+    public String portalCounsellingUrl() {
         String base = frontendUrl == null ? "" : frontendUrl.replaceAll("/+$", "");
         return base + "/student/dashboard/counselling";
     }

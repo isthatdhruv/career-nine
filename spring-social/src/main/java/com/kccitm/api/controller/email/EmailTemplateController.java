@@ -23,7 +23,10 @@ import com.kccitm.api.model.email.EmailTemplateForm;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.email.EmailTemplateService;
 
-/** Admin CRUD for reusable email templates, plus the EmailType catalog, preview and test-send. */
+/**
+ * Admin CRUD for reusable email templates, plus the EmailType catalog, the mail catalogue
+ * (every mail with provenance, lint findings and review state), preview, lint and test-send.
+ */
 @RestController
 @RequestMapping("/email-templates")
 public class EmailTemplateController {
@@ -42,6 +45,13 @@ public class EmailTemplateController {
     @GetMapping("/catalog")
     public ResponseEntity<?> catalog() {
         return ResponseEntity.ok(templateService.catalog());
+    }
+
+    /** Every mail the system sends: provenance, live state, edit state, findings, review. */
+    @PreAuthorize("@auth.allows('email_template.read')")
+    @GetMapping("/catalogue")
+    public ResponseEntity<?> catalogue() {
+        return ResponseEntity.ok(templateService.catalogue());
     }
 
     @PreAuthorize("@auth.allows('email_template.read')")
@@ -88,11 +98,37 @@ public class EmailTemplateController {
         return ResponseEntity.ok(success("Deleted"));
     }
 
+    /** Record the admin's review verdict and notes on a catalogue row. */
+    @PreAuthorize("@auth.allows('email_template.edit')")
+    @PutMapping("/{id}/review")
+    public ResponseEntity<?> review(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String status = body.get("reviewStatus") == null ? null : String.valueOf(body.get("reviewStatus"));
+        String notes = body.containsKey("reviewNotes")
+                ? (body.get("reviewNotes") == null ? "" : String.valueOf(body.get("reviewNotes")))
+                : null;
+        try {
+            Map<String, Object> dto = templateService.review(id, status, notes, currentUserId());
+            if (dto == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(error(e.getMessage()));
+        }
+    }
+
     /** Render a (possibly unsaved) template with sample values for the live preview. */
     @PreAuthorize("@auth.allows('email_template.read')")
     @PostMapping("/preview")
     public ResponseEntity<?> preview(@RequestBody EmailTemplateForm form) {
         return ResponseEntity.ok(templateService.preview(form));
+    }
+
+    /** Lint a (possibly unsaved) template. */
+    @PreAuthorize("@auth.allows('email_template.read')")
+    @PostMapping("/lint")
+    public ResponseEntity<?> lint(@RequestBody EmailTemplateForm form) {
+        return ResponseEntity.ok(templateService.lint(form));
     }
 
     @PreAuthorize("@auth.allows('email_template.edit')")
