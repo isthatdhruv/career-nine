@@ -520,12 +520,31 @@ services:
 
 volumes:
   mysql_data:
+  # Staging data lives on the attached DO block volume (/dev/sda), NOT the root
+  # disk: root (/dev/vda1) sits at ~90% and holds production's data. These are
+  # named volumes backed by a bind to the block-storage mount, so compose
+  # wiring stays unchanged. The device dirs must exist before `up`.
   mysql_staging_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume_blr1_1788264729539/staging/mysql
   redis_data:
   redis_staging_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume_blr1_1788264729539/staging/redis
   redisinsight_data:
   kafka_data:
   kafka_staging_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume_blr1_1788264729539/staging/kafka
 
 networks:
   career_shared_net:

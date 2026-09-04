@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
+import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
@@ -91,17 +92,34 @@ public class CounsellorReportReleaseService {
                 ? appointment.getCounsellor().getName() : null;
 
         String subject = "Your assessment report is ready";
-        String body = "Dear " + studentName + ",\n\n"
-                + "Your assessment report has been released"
+        String lead = "Your assessment report has been released"
                 + (counsellorName != null && !counsellorName.isBlank() ? " by " + counsellorName : "")
-                + " following your counselling session.\n\n"
-                + "  Report: " + link + "\n\n"
-                + "Take your time with it, and do come back to your counsellor with anything you would "
-                + "like explained further.\n\n"
-                + "Regards,\nCareer-Nine Team";
+                + " following your counselling session.";
+        String closing = "Take your time with it, and do come back to your counsellor with anything "
+                + "you would like explained further.";
 
-        EmailSendResult result = emailDispatchService.sendText(
-                EmailType.REPORT_READY, to, subject, body);
+        String html = CounsellingEmailHtml.page(
+                "Your assessment report has been released.",
+                "Your assessment report is ready",
+                CounsellingEmailHtml.p("Dear " + studentName + ",")
+                + CounsellingEmailHtml.p(lead)
+                + CounsellingEmailHtml.actionBlock(link, "Your report", "Open my report", null)
+                + CounsellingEmailHtml.small(closing)
+                + CounsellingEmailHtml.signature());
+
+        String body = "Dear " + studentName + ",\n\n"
+                + lead + "\n\n"
+                + "  Report: " + link + "\n\n"
+                + closing + "\n\n"
+                + "Regards,\nCareer-9 Team";
+
+        EmailSendRequest req = new EmailSendRequest();
+        req.setEmailType(EmailType.REPORT_READY);
+        req.getTo().add(to);
+        req.setSubject(subject);
+        req.setHtmlContent(html);
+        req.setTextContent(body);
+        EmailSendResult result = emailDispatchService.send(req);
         if (result == null || !result.isSuccess()) {
             String failure = result != null ? result.getError() : null;
             throw new IllegalStateException("The email could not be sent: "

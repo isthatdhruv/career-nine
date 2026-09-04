@@ -19,7 +19,6 @@ import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.model.career9.counselling.Notification;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.Career9.counselling.NotificationRepository;
-import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
@@ -134,16 +133,34 @@ public class CounsellingNotificationService {
             int duration = appointment.getSlot().getDurationMinutes();
 
             String subject = "Counselling Request Received";
-            String body = "Dear " + studentName + ",\n\n"
-                    + "Your counselling request has been received and is being reviewed.\n\n"
-                    + "Appointment Details:\n"
-                    + "  Date: " + date + "\n"
-                    + "  Time: " + time + "\n"
-                    + "  Duration: " + duration + " minutes\n\n"
-                    + "You will be notified once your session is confirmed.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+            String intro = "Your counselling request has been received and is being reviewed.";
+            String closing = "You will be notified once your session is confirmed.";
 
-            sendEmail(studentEmail, subject, body);
+            List<CounsellingEmailHtml.Row> rows = CounsellingEmailHtml.rows();
+            rows.add(row("Date", date));
+            rows.add(row("Time", time));
+            if (duration > 0) rows.add(row("Duration", duration + " minutes"));
+
+            String html = CounsellingEmailHtml.page(
+                    "We have your request for " + date + " at " + time + ".",
+                    "Counselling request received",
+                    CounsellingEmailHtml.p("Dear " + studentName + ",")
+                    + CounsellingEmailHtml.p(intro)
+                    + CounsellingEmailHtml.detailsTable(rows)
+                    + CounsellingEmailHtml.actionBlock(portalCounsellingUrl(),
+                            "Your counselling sessions", "View my session", null)
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + studentName + ",\n\n"
+                    + intro + "\n\n"
+                    + "Appointment Details:\n"
+                    + CounsellingEmailHtml.detailsText(rows) + "\n"
+                    + "View my session: " + portalCounsellingUrl() + "\n\n"
+                    + closing + "\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, studentEmail, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send booking received email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -158,15 +175,31 @@ public class CounsellingNotificationService {
             String reason = appointment.getStudentReason();
 
             String subject = "New Counselling Session Assigned to You";
-            String body = "Dear " + counsellorName + ",\n\n"
-                    + "A new counselling session has been assigned to you.\n\n"
-                    + "Session Details:\n"
-                    + (reason != null && !reason.isEmpty() ? "  Reason: " + reason + "\n" : "")
-                    + sessionDetailsBlock(appointment, true)
-                    + "\nPlease review and confirm the appointment.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+            String intro = "A new counselling session has been assigned to you.";
+            String closing = "Please review and confirm the appointment.";
 
-            sendEmail(counsellorEmail, subject, body);
+            List<CounsellingEmailHtml.Row> rows = sessionDetailRows(appointment, true, true, false);
+            if (reason != null && !reason.isEmpty()) rows.add(0, row("Reason", reason));
+
+            String html = CounsellingEmailHtml.page(
+                    intro,
+                    "New session assigned to you",
+                    CounsellingEmailHtml.p("Dear " + counsellorName + ",")
+                    + CounsellingEmailHtml.p(intro)
+                    + CounsellingEmailHtml.detailsTable(rows)
+                    + attendanceBlock(appointment, true)
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + counsellorName + ",\n\n"
+                    + intro + "\n\n"
+                    + "Session Details:\n"
+                    + CounsellingEmailHtml.detailsText(rows)
+                    + "  " + attendanceLine(appointment) + "\n\n"
+                    + closing + "\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, counsellorEmail, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send assigned-to-counsellor email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -182,38 +215,37 @@ public class CounsellingNotificationService {
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
             int duration = appointment.getSlot().getDurationMinutes();
 
-            // Mode-aware channel line: ONLINE sessions carry the meeting link,
-            // OFFLINE sessions carry the counsellor's office address.
-            boolean isOffline = "OFFLINE".equals(appointment.getMode());
-            String modeLine;
-            String channelLine;
-            if (isOffline) {
-                String address = appointment.getLocation();
-                modeLine = "  Mode: In-person (Offline)\n";
-                channelLine = (address != null && !address.isEmpty())
-                        ? "  Venue: " + address + "\n"
-                        : "  Venue: Your counsellor will share the address shortly.\n";
-            } else {
-                String meetingLink = appointment.getMeetingLink();
-                modeLine = "  Mode: Online\n";
-                channelLine = (meetingLink != null && !meetingLink.isEmpty())
-                        ? "  Meeting Link: " + meetingLink + "\n"
-                        : "";
-            }
-
             String subject = "Counselling Session Confirmed";
-            String body = "Dear " + studentName + ",\n\n"
-                    + "Your counselling session has been confirmed.\n\n"
-                    + "Session Details:\n"
-                    + "  Date: " + date + "\n"
-                    + "  Time: " + time + "\n"
-                    + "  Duration: " + duration + " minutes\n"
-                    + modeLine
-                    + channelLine
-                    + "\nPlease be on time for your session.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+            String intro = "Your counselling session has been confirmed.";
+            String closing = "Please be on time for your session.";
 
-            sendEmail(studentEmail, subject, body);
+            // Mode and the way in are carried by the shared attendance panel, so the table
+            // below stays the plain session facts rather than printing the link twice.
+            List<CounsellingEmailHtml.Row> rows = CounsellingEmailHtml.rows();
+            rows.add(row("Date", date));
+            rows.add(row("Time", time));
+            if (duration > 0) rows.add(row("Duration", duration + " minutes"));
+            rows.add(row("Mode", "OFFLINE".equals(appointment.getMode()) ? "In-person" : "Online"));
+
+            String html = CounsellingEmailHtml.page(
+                    "Confirmed for " + date + " at " + time + ".",
+                    "Your counselling session is confirmed",
+                    CounsellingEmailHtml.p("Dear " + studentName + ",")
+                    + CounsellingEmailHtml.p(intro)
+                    + CounsellingEmailHtml.detailsTable(rows)
+                    + attendanceBlock(appointment, false)
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + studentName + ",\n\n"
+                    + intro + "\n\n"
+                    + "Session Details:\n"
+                    + CounsellingEmailHtml.detailsText(rows)
+                    + "  " + attendanceLine(appointment) + "\n\n"
+                    + closing + "\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, studentEmail, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send confirmed-to-student email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -243,14 +275,39 @@ public class CounsellingNotificationService {
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
 
             String subject = "Counselling Session Cancelled";
-            String body = "Dear " + recipientName + ",\n\n"
-                    + "Your counselling session scheduled on " + date + " at " + time
-                    + " has been cancelled by " + cancelledByName + ".\n\n"
-                    + (reason != null && !reason.isEmpty() ? "Reason given: " + reason + "\n\n" : "")
-                    + "If you have any questions, please contact us.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+            String lead = "Your counselling session scheduled on " + date + " at " + time
+                    + " has been cancelled by " + cancelledByName + ".";
+            String reasonLine = (reason != null && !reason.isEmpty()) ? "Reason given: " + reason : "";
+            String closing = "If you have any questions, please contact us.";
 
-            sendEmail(recipientEmail, subject, body);
+            // This one mail goes to whichever side did NOT do the cancelling, so the button has
+            // to follow the reader: a counsellor wants their own diary, a student wants the page
+            // where they can pick a new time.
+            boolean toCounsellor = appointment.getCounsellor() != null
+                    && appointment.getCounsellor().getEmail() != null
+                    && appointment.getCounsellor().getEmail().equalsIgnoreCase(recipientEmail);
+            String ctaUrl = toCounsellor ? counsellorPortalUrl() : portalCounsellingUrl();
+            String ctaLabel = toCounsellor ? "Your sessions" : "Your counselling sessions";
+            String cta = toCounsellor ? "Open my dashboard" : "Book a new time";
+
+            String html = CounsellingEmailHtml.page(
+                    "Your session on " + date + " at " + time + " has been cancelled.",
+                    "Counselling session cancelled",
+                    CounsellingEmailHtml.p("Dear " + recipientName + ",")
+                    + CounsellingEmailHtml.p(lead)
+                    + (reasonLine.isEmpty() ? "" : CounsellingEmailHtml.p(reasonLine))
+                    + CounsellingEmailHtml.actionBlock(ctaUrl, ctaLabel, cta, null)
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + recipientName + ",\n\n"
+                    + lead + "\n\n"
+                    + (reasonLine.isEmpty() ? "" : reasonLine + "\n\n")
+                    + cta + ": " + ctaUrl + "\n\n"
+                    + closing + "\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, recipientEmail, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send cancellation email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -274,20 +331,35 @@ public class CounsellingNotificationService {
                     : "your counsellor";
 
             String subject = "Counselling Session Cancelled — Please Rebook";
+            String why = "Unfortunately, " + counsellorName + " is on leave on "
+                    + date + ", and no other counsellor was available at " + time + ".";
+            // Nothing here is the student's doing, so this never touches her free
+            // changes and rescheduling is always open to her — no allowance check.
+            String portal = portalCounsellingUrl();
+
+            String html = CounsellingEmailHtml.page(
+                    "Your session was cancelled — pick a new time at no cost.",
+                    "Your counselling session was cancelled",
+                    CounsellingEmailHtml.p("Dear " + studentName + ",")
+                    + CounsellingEmailHtml.p(why)
+                    + CounsellingEmailHtml.p("Your session has been cancelled.")
+                    + CounsellingEmailHtml.actionBlock(portal, "Pick a new time at no cost",
+                            "Open Counselling", "Go to Past Sessions and press Reschedule.")
+                    + CounsellingEmailHtml.small(
+                            "This cancellation does not count against your free changes.")
+                    + CounsellingEmailHtml.small("We apologise for the inconvenience.")
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + studentName + ",\n\n"
-                    + "Unfortunately, " + counsellorName + " is on leave on "
-                    + date + ", and no other counsellor was available at "
-                    + time + ".\n\n"
+                    + why + "\n\n"
                     + "Your session has been cancelled.\n\n"
-                    // Nothing here is the student's doing, so this never touches her free
-                    // changes and rescheduling is always open to her — no allowance check.
                     + "Pick a new time at no cost — open Counselling, go to Past Sessions and "
-                    + "press Reschedule:\n" + portalCounsellingUrl() + "\n\n"
+                    + "press Reschedule:\n" + portal + "\n\n"
                     + "This cancellation does not count against your free changes.\n\n"
                     + "We apologise for the inconvenience.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+                    + "Regards,\nCareer-9 Team";
 
-            sendEmail(studentEmail, subject, body);
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, studentEmail, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send counsellor-leave cancellation email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -325,16 +397,29 @@ public class CounsellingNotificationService {
             }
             String name = studentName != null && !studentName.isBlank() ? studentName : "there";
             String subject = "Book your counselling session";
+            String intro = "You have completed your assessment — the next step is a one-on-one "
+                    + "counselling session to turn your results into a real plan.";
+            String closing = "Once you choose a slot, your session is confirmed instantly and you'll "
+                    + "receive a confirmation email with the meeting details.";
+
+            String html = CounsellingEmailHtml.page(
+                    "Pick a time for your counselling session — no login needed.",
+                    "Book your counselling session",
+                    CounsellingEmailHtml.p("Dear " + name + ",")
+                    + CounsellingEmailHtml.p(intro)
+                    + CounsellingEmailHtml.actionBlock(bookingUrl, "Pick a time that suits you",
+                            "Book my session", "No login needed.")
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + name + ",\n\n"
-                    + "You have completed your assessment — the next step is a one-on-one counselling "
-                    + "session to turn your results into a real plan.\n\n"
+                    + intro + "\n\n"
                     + "Pick a time that suits you here (no login needed):\n"
                     + bookingUrl + "\n\n"
-                    + "Once you choose a slot, your session is confirmed instantly and you'll receive "
-                    + "a confirmation email with the meeting details.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+                    + closing + "\n\n"
+                    + "Regards,\nCareer-9 Team";
 
-            sendEmail(studentEmail, subject, body);
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, studentEmail, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send counselling booking invite to {}: {}", studentEmail, e.getMessage());
         }
@@ -371,19 +456,37 @@ public class CounsellingNotificationService {
 
             String subject = "Reschedule your counselling session";
             String opening = adminReason == null
-                    ? counsellorName + " is no longer available for your counselling session" + when + ".\n\n"
-                    : "Your counselling session" + when + " needs to be moved to another time.\n\n"
-                            + (adminReason.isEmpty() ? "" : "Reason: " + adminReason + "\n\n");
+                    ? counsellorName + " is no longer available for your counselling session" + when + "."
+                    : "Your counselling session" + when + " needs to be moved to another time.";
+            String reasonLine = adminReason == null || adminReason.isEmpty()
+                    ? "" : "Reason: " + adminReason;
+            String closing = "Once you choose a time, your session is confirmed instantly and you'll "
+                    + "get a confirmation with the meeting details.";
+
+            String html = CounsellingEmailHtml.page(
+                    "Your session has not been cancelled — pick a new time.",
+                    "Reschedule your counselling session",
+                    CounsellingEmailHtml.p("Dear " + studentName + ",")
+                    + CounsellingEmailHtml.p(opening)
+                    + (reasonLine.isEmpty() ? "" : CounsellingEmailHtml.p(reasonLine))
+                    + CounsellingEmailHtml.p("Your session has NOT been cancelled — please pick a "
+                            + "new slot that suits you.")
+                    + CounsellingEmailHtml.actionBlock(rescheduleUrl, "Choose a new time",
+                            "Pick a new slot", "No login needed.")
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.small("We're sorry for the inconvenience.")
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + studentName + ",\n\n"
-                    + opening
+                    + opening + "\n\n"
+                    + (reasonLine.isEmpty() ? "" : reasonLine + "\n\n")
                     + "Your session has NOT been cancelled — please pick a new slot that suits you here:\n"
                     + rescheduleUrl + "\n\n"
-                    + "Once you choose a time, your session is confirmed instantly and you'll get a "
-                    + "confirmation with the meeting details.\n\n"
+                    + closing + "\n\n"
                     + "We're sorry for the inconvenience.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+                    + "Regards,\nCareer-9 Team";
 
-            sendEmail(studentEmail, subject, body);
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, studentEmail, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send self-reschedule email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -400,35 +503,78 @@ public class CounsellingNotificationService {
             String oldTime = oldAppointment.getSlot().getStartTime().format(TIME_FMT);
 
             String subject = "Counselling Session Rescheduled";
+            String newDate = newAppointment.getSlot().getDate().format(DATE_FMT);
+            String newTime = newAppointment.getSlot().getStartTime().format(TIME_FMT);
+            String preheader = "Now " + newDate + " at " + newTime + ".";
+
             // The new session is described in full — school, assessment, venue/link and the
             // report — because a reschedule replaces the confirmation the student was working
             // from. Telling them only the new date and time would leave the report link
             // stranded in a mail about a session that no longer happens.
-            String body = "Dear " + studentName + ",\n\n"
-                    + "Your counselling session has been rescheduled.\n\n"
-                    + "Previous Schedule:\n"
-                    + "  Date: " + oldDate + "\n"
-                    + "  Time: " + oldTime + "\n\n"
-                    + "New Schedule:\n"
-                    + sessionDetailsBlock(newAppointment, false)
-                    + "\nPlease update your calendar accordingly.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+            List<CounsellingEmailHtml.Row> was = CounsellingEmailHtml.rows();
+            was.add(row("Date", oldDate));
+            was.add(row("Time", oldTime));
 
-            sendEmail(studentEmail, subject, body);
+            String studentIntro = "Your counselling session has been rescheduled.";
+            List<CounsellingEmailHtml.Row> studentRows =
+                    sessionDetailRows(newAppointment, false, false, false);
+
+            String html = CounsellingEmailHtml.page(
+                    preheader,
+                    "Your counselling session has been rescheduled",
+                    CounsellingEmailHtml.p("Dear " + studentName + ",")
+                    + CounsellingEmailHtml.p(studentIntro)
+                    + CounsellingEmailHtml.small("Previous schedule")
+                    + CounsellingEmailHtml.detailsTable(was)
+                    + CounsellingEmailHtml.small("New schedule")
+                    + CounsellingEmailHtml.detailsTable(studentRows)
+                    + attendanceBlock(newAppointment, false)
+                    + CounsellingEmailHtml.small("Please update your calendar accordingly.")
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + studentName + ",\n\n"
+                    + studentIntro + "\n\n"
+                    + "Previous Schedule:\n"
+                    + CounsellingEmailHtml.detailsText(was) + "\n"
+                    + "New Schedule:\n"
+                    + CounsellingEmailHtml.detailsText(studentRows)
+                    + "  " + attendanceLine(newAppointment) + "\n\n"
+                    + "Please update your calendar accordingly.\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, studentEmail, subject, html, body);
+
             // The counsellor is on the new session too — they were told about the original
             // and would otherwise be left holding a time that has moved.
             if (newAppointment.getCounsellor() != null) {
                 String counsellorEmail = newAppointment.getCounsellor().getEmail();
                 if (counsellorEmail != null && !counsellorEmail.isBlank()) {
-                    sendEmail(counsellorEmail, subject,
-                            "Dear " + newAppointment.getCounsellor().getName() + ",\n\n"
-                            + "A counselling session has been rescheduled.\n\n"
+                    String counsellorIntro = "A counselling session has been rescheduled.";
+                    List<CounsellingEmailHtml.Row> counsellorRows =
+                            sessionDetailRows(newAppointment, true, true, false);
+
+                    String cHtml = CounsellingEmailHtml.page(
+                            preheader,
+                            "A counselling session has been rescheduled",
+                            CounsellingEmailHtml.p("Dear " + newAppointment.getCounsellor().getName() + ",")
+                            + CounsellingEmailHtml.p(counsellorIntro)
+                            + CounsellingEmailHtml.small("Previous schedule")
+                            + CounsellingEmailHtml.detailsTable(was)
+                            + CounsellingEmailHtml.small("New schedule")
+                            + CounsellingEmailHtml.detailsTable(counsellorRows)
+                            + attendanceBlock(newAppointment, true)
+                            + CounsellingEmailHtml.signature());
+
+                    String cBody = "Dear " + newAppointment.getCounsellor().getName() + ",\n\n"
+                            + counsellorIntro + "\n\n"
                             + "Previous Schedule:\n"
-                            + "  Date: " + oldDate + "\n"
-                            + "  Time: " + oldTime + "\n\n"
+                            + CounsellingEmailHtml.detailsText(was) + "\n"
                             + "New Schedule:\n"
-                            + sessionDetailsBlock(newAppointment, true)
-                            + "\nRegards,\nCareer-Nine Team");
+                            + CounsellingEmailHtml.detailsText(counsellorRows)
+                            + "  " + attendanceLine(newAppointment) + "\n\n"
+                            + "Regards,\nCareer-9 Team";
+
+                    sendRich(EmailType.COUNSELLING_NOTIFICATION, counsellorEmail, subject, cHtml, cBody);
                 }
             }
         } catch (Exception e) {
@@ -454,7 +600,7 @@ public class CounsellingNotificationService {
                     + "Session Details:\n"
                     + sessionDetailsBlock(appointment, false)
                     + "\nPlease be prepared for your session.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+                    + "Regards,\nCareer-9 Team";
             // The join panel sits directly under the reminder line. This is the mail a student
             // has open at the start time, so the way in is the first thing on it.
             String studentHtml = CounsellingEmailHtml.page(
@@ -486,7 +632,7 @@ public class CounsellingNotificationService {
                         + "This is a reminder that you have a counselling session in " + period + ".\n\n"
                         + "Session Details:\n"
                         + sessionDetailsBlock(appointment, true)
-                        + "\nRegards,\nCareer-Nine Team";
+                        + "\nRegards,\nCareer-9 Team";
                 String counsellorHtml = CounsellingEmailHtml.page(
                         joinPreheader(appointment),
                         "Counselling session in " + period,
@@ -619,7 +765,7 @@ public class CounsellingNotificationService {
                 + reportGuidance(appointment, false)
                 + "If any of the above is incorrect, please write to us before the session so we can "
                 + "put it right.\n\n"
-                + "Regards,\nCareer-Nine Team";
+                + "Regards,\nCareer-9 Team";
 
         List<String> accepted = new java.util.ArrayList<>();
         String failure = null;
@@ -674,7 +820,7 @@ public class CounsellingNotificationService {
                 + sessionDetailsBlock(appointment, true)
                 + "\n"
                 + reportGuidance(appointment, true)
-                + "Regards,\nCareer-Nine Team";
+                + "Regards,\nCareer-9 Team";
 
         EmailSendResult result = sendRich(
                 EmailType.COUNSELLING_NOTIFICATION, to, subject, html, body);
@@ -718,20 +864,36 @@ public class CounsellingNotificationService {
         String adminEmail = "admin@career-9.net";
         String subject = "Block Date Request — " + counsellor.getName();
 
+        String intro = "A counsellor has requested to block a date.";
+        String closing = "Please log in to the Career-9 admin panel to approve or reject this "
+                + "request: Manage Counsellors → Block Date Requests.";
+
+        List<CounsellingEmailHtml.Row> rows = CounsellingEmailHtml.rows();
+        rows.add(row("Counsellor", counsellor.getName()));
+        rows.add(row("Email", counsellor.getEmail()));
+        rows.add(row("Date to block", date));
+        rows.add(row("Reason", (reason != null && !reason.isEmpty()) ? reason : "Not specified"));
+
+        String html = CounsellingEmailHtml.page(
+                counsellor.getName() + " has asked to block " + date + ".",
+                "Block date request",
+                CounsellingEmailHtml.p("Dear Admin,")
+                + CounsellingEmailHtml.p(intro)
+                + CounsellingEmailHtml.detailsTable(rows)
+                + CounsellingEmailHtml.actionBlock(adminCounsellorsUrl(),
+                        "Manage Counsellors", "Review this request", null)
+                + CounsellingEmailHtml.small(closing)
+                + CounsellingEmailHtml.signature());
+
         String body = "Dear Admin,\n\n"
-                + "A counsellor has requested to block a date.\n\n"
-                + "────────────────────────────\n"
-                + "Counsellor: " + counsellor.getName() + "\n"
-                + "Email: " + counsellor.getEmail() + "\n"
-                + "Date to Block: " + date + "\n"
-                + "Reason: " + (reason != null && !reason.isEmpty() ? reason : "Not specified") + "\n"
-                + "────────────────────────────\n\n"
-                + "Please log in to the Career-9 admin panel to approve or reject this request.\n"
-                + "Go to: Manage Counsellors → Block Date Requests\n\n"
+                + intro + "\n\n"
+                + CounsellingEmailHtml.detailsText(rows) + "\n"
+                + "Review this request: " + adminCounsellorsUrl() + "\n\n"
+                + closing + "\n\n"
                 + "Regards,\n"
                 + "Career-9 System";
 
-        sendEmail(adminEmail, subject, body);
+        sendRich(EmailType.COUNSELLING_NOTIFICATION, adminEmail, subject, html, body);
         logger.info("Block date request email sent to admin for counsellor {} on date {}", counsellor.getName(), date);
     }
 
@@ -1230,14 +1392,31 @@ public class CounsellingNotificationService {
                         date + " " + time + " — " + attendanceLine(appointment)));
         if (!sent) {
             String subject = "Reminder: Counselling Session " + whenLabel;
+            String lead = "You have a counselling session " + whenLabel + " with "
+                    + studentName(appointment) + ".";
+
+            List<CounsellingEmailHtml.Row> rows = CounsellingEmailHtml.rows();
+            rows.add(row("Student", studentName(appointment)));
+            rows.add(row("Date", date));
+            rows.add(row("Time", time));
+
+            String html = CounsellingEmailHtml.page(
+                    lead,
+                    "Reminder: counselling session " + whenLabel,
+                    CounsellingEmailHtml.p("Dear " + appointment.getCounsellor().getName() + ",")
+                    + CounsellingEmailHtml.p(lead)
+                    + CounsellingEmailHtml.detailsTable(rows)
+                    + attendanceBlock(appointment, true)
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + appointment.getCounsellor().getName() + ",\n\n"
-                    + "You have a counselling session " + whenLabel + " with "
-                    + studentName(appointment) + ".\n\n"
-                    + "  Date: " + date + "\n"
-                    + "  Time: " + time + "\n"
+                    + lead + "\n\n"
+                    + CounsellingEmailHtml.detailsText(rows)
                     + "  " + attendanceLine(appointment) + "\n\n"
-                    + "Regards,\nCareer-Nine Team";
-            sendEmail(appointment.getCounsellor().getEmail(), subject, body);
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION,
+                    appointment.getCounsellor().getEmail(), subject, html, body);
         }
     }
 
@@ -1295,20 +1474,41 @@ public class CounsellingNotificationService {
     @Async
     public void sendCounsellorDailyDigest(Counsellor counsellor, List<CounsellingAppointment> appointments, String dateLabel) {
         if (counsellor == null || appointments == null || appointments.isEmpty()) return;
+        // One row per session: the time is the label the counsellor scans down, the student
+        // and mode the value. Same list feeds the table and the plain-text alternative.
+        List<CounsellingEmailHtml.Row> rows = CounsellingEmailHtml.rows();
         StringBuilder list = new StringBuilder();
         int i = 1;
         for (CounsellingAppointment a : appointments) {
             String time = a.getSlot().getStartTime().format(TIME_FMT);
             String mode = "OFFLINE".equals(a.getMode()) ? "In-person" : "Online";
+            rows.add(row(time, studentName(a) + " (" + mode + ")"));
             list.append("  ").append(i++).append(". ").append(time)
                     .append(" — ").append(studentName(a))
                     .append(" (").append(mode).append(")\n");
         }
         String subject = "Your counselling sessions for " + dateLabel + " (" + appointments.size() + ")";
+        String intro = "Here are your counselling sessions scheduled for " + dateLabel + ":";
+
+        String html = CounsellingEmailHtml.page(
+                appointments.size() + (appointments.size() == 1 ? " session" : " sessions")
+                        + " on " + dateLabel + ".",
+                "Your sessions for " + dateLabel,
+                CounsellingEmailHtml.p("Dear " + counsellor.getName() + ",")
+                + CounsellingEmailHtml.p(intro)
+                + CounsellingEmailHtml.detailsTable(rows)
+                + CounsellingEmailHtml.actionBlock(counsellorPortalUrl(),
+                        "Your counsellor dashboard", "Open my dashboard", null)
+                + CounsellingEmailHtml.small("Please be available on time.")
+                + CounsellingEmailHtml.signature());
+
         String body = "Dear " + counsellor.getName() + ",\n\n"
-                + "Here are your counselling sessions scheduled for " + dateLabel + ":\n\n"
-                + list + "\nPlease be available on time.\n\nRegards,\nCareer-Nine Team";
-        sendEmail(counsellor.getEmail(), subject, body);
+                + intro + "\n\n"
+                + list + "\n"
+                + "Open my dashboard: " + counsellorPortalUrl() + "\n\n"
+                + "Please be available on time.\n\nRegards,\nCareer-9 Team";
+
+        sendRich(EmailType.COUNSELLING_NOTIFICATION, counsellor.getEmail(), subject, html, body);
         whatsAppService.sendTemplate(counsellor.getPhone(), whatsAppService.counsellorDigestCampaign(),
                 Arrays.asList(counsellor.getName(), dateLabel, String.valueOf(appointments.size())));
     }
@@ -1325,14 +1525,30 @@ public class CounsellingNotificationService {
                 Arrays.asList(safeName, String.valueOf(sessionsRemaining)));
         if (!sent && email != null && !email.isEmpty()) {
             String subject = "You have a counselling session waiting to be booked";
-            String body = "Dear " + safeName + ",\n\n"
-                    + "You have " + sessionsRemaining + " counselling session"
+            String lead = "You have " + sessionsRemaining + " counselling session"
                     + (sessionsRemaining == 1 ? "" : "s")
                     + " included in your plan that "
-                    + (sessionsRemaining == 1 ? "hasn't" : "haven't") + " been booked yet.\n\n"
-                    + "Log in to Career-9 and pick a time that works for you to speak with a counsellor.\n\n"
-                    + "Regards,\nCareer-Nine Team";
-            sendEmail(email, subject, body);
+                    + (sessionsRemaining == 1 ? "hasn't" : "haven't") + " been booked yet.";
+            String closing = "Log in to Career-9 and pick a time that works for you to speak "
+                    + "with a counsellor.";
+
+            String html = CounsellingEmailHtml.page(
+                    lead,
+                    "A counselling session is waiting for you",
+                    CounsellingEmailHtml.p("Dear " + safeName + ",")
+                    + CounsellingEmailHtml.p(lead)
+                    + CounsellingEmailHtml.actionBlock(portalCounsellingUrl(),
+                            "Pick a time that suits you", "Book my session", null)
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + safeName + ",\n\n"
+                    + lead + "\n\n"
+                    + "Book my session: " + portalCounsellingUrl() + "\n\n"
+                    + closing + "\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, email, subject, html, body);
         }
         if (userId != null) {
             try {
@@ -1369,13 +1585,28 @@ public class CounsellingNotificationService {
 
             if (email != null && !email.isEmpty()) {
                 String subject = "You missed your counselling session";
+                String lead = "We noticed you didn't attend your counselling session scheduled on "
+                        + date + " at " + time + ".";
+                String closing = "If you'd still like to speak with a counsellor, log in to Career-9 "
+                        + "and book a new session at a time that works for you.";
+
+                String html = CounsellingEmailHtml.page(
+                        "Your session on " + date + " at " + time + " was not attended.",
+                        "You missed your counselling session",
+                        CounsellingEmailHtml.p("Dear " + name + ",")
+                        + CounsellingEmailHtml.p(lead)
+                        + CounsellingEmailHtml.actionBlock(portalCounsellingUrl(),
+                                "Your counselling sessions", "Book a new session", null)
+                        + CounsellingEmailHtml.small(closing)
+                        + CounsellingEmailHtml.signature());
+
                 String body = "Dear " + name + ",\n\n"
-                        + "We noticed you didn't attend your counselling session scheduled on "
-                        + date + " at " + time + ".\n\n"
-                        + "If you'd still like to speak with a counsellor, log in to Career-9 and book "
-                        + "a new session at a time that works for you.\n\n"
-                        + "Regards,\nCareer-Nine Team";
-                sendEmail(email, subject, body);
+                        + lead + "\n\n"
+                        + "Book a new session: " + portalCounsellingUrl() + "\n\n"
+                        + closing + "\n\n"
+                        + "Regards,\nCareer-9 Team";
+
+                sendRich(EmailType.COUNSELLING_NOTIFICATION, email, subject, html, body);
             }
 
             try {
@@ -1439,15 +1670,28 @@ public class CounsellingNotificationService {
                     : "You have no free changes remaining.";
 
             String subject = "Your counselling session has been cancelled";
+            String cancelled = "Your counselling session on " + date + " at " + time
+                    + " has been cancelled as you requested.";
+
+            String html = CounsellingEmailHtml.page(
+                    "Your session was cancelled — here is where you stand.",
+                    "Your counselling session has been cancelled",
+                    CounsellingEmailHtml.p("Dear " + name + ",")
+                    + CounsellingEmailHtml.p(cancelled)
+                    + CounsellingEmailHtml.p(consequence + " " + allowance)
+                    + CounsellingEmailHtml.p(nextStepLead(missesRemaining) + ".")
+                    + CounsellingEmailHtml.actionBlock(portalCounsellingUrl(), "Your next step",
+                            nextStepCta(missesRemaining), null)
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + name + ",\n\n"
-                    + "Your counselling session on " + date + " at " + time + " has been cancelled "
-                    + "as you requested.\n\n"
+                    + cancelled + "\n\n"
                     + consequence + "\n"
                     + allowance + "\n\n"
                     + nextStepLine(missesRemaining) + "\n\n"
-                    + "Regards,\nCareer-Nine Team";
+                    + "Regards,\nCareer-9 Team";
 
-            sendWithCancelledInvite(appointment, subject, body);
+            sendWithCancelledInvite(appointment, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send student cancellation confirmation for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -1478,25 +1722,62 @@ public class CounsellingNotificationService {
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
 
             String subject = "Your counselling session has been cancelled";
-            String studentBody = "Dear " + studentName(appointment) + ",\n\n"
-                    + "Your counselling session scheduled on " + date + " at " + time
-                    + " has been cancelled by the Career-9 team.\n\n"
-                    + "This does not affect your counselling entitlement in any way — our team will "
-                    + "be in touch shortly to arrange a new time.\n\n"
-                    + "We apologise for the inconvenience.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+            String studentLead = "Your counselling session scheduled on " + date + " at " + time
+                    + " has been cancelled by the Career-9 team.";
+            String studentReassure = "This does not affect your counselling entitlement in any way "
+                    + "— our team will be in touch shortly to arrange a new time.";
 
-            sendWithCancelledInvite(appointment, subject, studentBody);
+            List<CounsellingEmailHtml.Row> was = CounsellingEmailHtml.rows();
+            was.add(row("Date", date));
+            was.add(row("Time", time));
+
+            String studentHtml = CounsellingEmailHtml.page(
+                    "Your session on " + date + " at " + time + " has been cancelled.",
+                    "Your counselling session has been cancelled",
+                    CounsellingEmailHtml.p("Dear " + studentName(appointment) + ",")
+                    + CounsellingEmailHtml.p(studentLead)
+                    + CounsellingEmailHtml.detailsTable(was)
+                    + CounsellingEmailHtml.p(studentReassure)
+                    + CounsellingEmailHtml.actionBlock(portalCounsellingUrl(),
+                            "Prefer not to wait?", "Pick a new time", null)
+                    + CounsellingEmailHtml.small("We apologise for the inconvenience.")
+                    + CounsellingEmailHtml.signature());
+
+            String studentBody = "Dear " + studentName(appointment) + ",\n\n"
+                    + studentLead + "\n\n"
+                    + studentReassure + "\n\n"
+                    + "Prefer not to wait? Pick a new time: " + portalCounsellingUrl() + "\n\n"
+                    + "We apologise for the inconvenience.\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendWithCancelledInvite(appointment, subject, studentHtml, studentBody);
 
             Counsellor counsellor = includeCounsellor ? appointment.getCounsellor() : null;
             if (counsellor != null && counsellor.getEmail() != null && !counsellor.getEmail().isEmpty()) {
+                String counsellorLead = "The counselling session with " + studentName(appointment)
+                        + " on " + date + " at " + time + " has been cancelled by the Career-9 team.";
+                String counsellorReassure = "Nothing is recorded against you and your slot has been "
+                        + "reopened. The team will be in touch with the student to arrange a new time.";
+
+                String counsellorHtml = CounsellingEmailHtml.page(
+                        "The " + time + " session on " + date + " has been cancelled.",
+                        "A counselling session has been cancelled",
+                        CounsellingEmailHtml.p("Dear " + counsellor.getName() + ",")
+                        + CounsellingEmailHtml.p(counsellorLead)
+                        + CounsellingEmailHtml.detailsTable(was)
+                        + CounsellingEmailHtml.actionBlock(counsellorPortalUrl(),
+                                "Your sessions", "Open my dashboard", null)
+                        + CounsellingEmailHtml.small(counsellorReassure)
+                        + CounsellingEmailHtml.signature());
+
                 String counsellorBody = "Dear " + counsellor.getName() + ",\n\n"
-                        + "The counselling session with " + studentName(appointment) + " on "
-                        + date + " at " + time + " has been cancelled by the Career-9 team.\n\n"
-                        + "Nothing is recorded against you and your slot has been reopened. "
-                        + "The team will be in touch with the student to arrange a new time.\n\n"
-                        + "Regards,\nCareer-Nine Team";
-                sendEmail(counsellor.getEmail(), subject, counsellorBody);
+                        + counsellorLead + "\n\n"
+                        + counsellorReassure + "\n\n"
+                        + "Open my dashboard: " + counsellorPortalUrl() + "\n\n"
+                        + "Regards,\nCareer-9 Team";
+
+                sendRich(EmailType.COUNSELLING_NOTIFICATION, counsellor.getEmail(),
+                        subject, counsellorHtml, counsellorBody);
             }
         } catch (Exception e) {
             logger.error("Failed to send admin cancellation emails for appointment {}: {}",
@@ -1517,18 +1798,32 @@ public class CounsellingNotificationService {
             boolean offline = "OFFLINE".equals(appointment.getMode());
 
             String subject = "Your counselling session is confirmed — updated details";
-            String body = "Dear " + studentName(appointment) + ",\n\n"
-                    + "Your counselling session on " + date + " at " + time
-                    + " is going ahead exactly as planned — the time has not changed.\n\n"
-                    + "A different counsellor will now be taking it, so please use the updated "
-                    + (offline ? "venue" : "joining link") + " below:\n"
-                    + "  " + attendanceLine(appointment) + "\n\n"
-                    + (offline
-                        ? "Please note the venue has changed — do check it before you set out.\n\n"
-                        : "")
-                    + "Regards,\nCareer-Nine Team";
+            String unchanged = "Your counselling session on " + date + " at " + time
+                    + " is going ahead exactly as planned — the time has not changed.";
+            String swapped = "A different counsellor will now be taking it, so please use the updated "
+                    + (offline ? "venue" : "joining link") + " below:";
+            String caution = offline
+                    ? "Please note the venue has changed — do check it before you set out."
+                    : "";
 
-            sendToStudentAndParent(appointment, subject, body);
+            String html = CounsellingEmailHtml.page(
+                    "Same time — updated " + (offline ? "venue" : "joining link") + ".",
+                    "Your session is confirmed — updated details",
+                    CounsellingEmailHtml.p("Dear " + studentName(appointment) + ",")
+                    + CounsellingEmailHtml.p(unchanged)
+                    + CounsellingEmailHtml.p(swapped)
+                    + attendanceBlock(appointment, false)
+                    + (caution.isEmpty() ? "" : CounsellingEmailHtml.small(caution))
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + studentName(appointment) + ",\n\n"
+                    + unchanged + "\n\n"
+                    + swapped + "\n"
+                    + "  " + attendanceLine(appointment) + "\n\n"
+                    + (caution.isEmpty() ? "" : caution + "\n\n")
+                    + "Regards,\nCareer-9 Team";
+
+            sendRichToStudentAndParent(appointment, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send counsellor-swap email for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -1547,16 +1842,32 @@ public class CounsellingNotificationService {
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
 
             String subject = "Your counselling session has moved to " + time;
+            String moved = "Your counsellor is no longer available at " + originalTimeLabel
+                    + ", so we have moved your session to " + time + " on " + date + ".";
+
+            String html = CounsellingEmailHtml.page(
+                    "Your session has moved to " + time + " on " + date + ".",
+                    "Your counselling session has moved",
+                    CounsellingEmailHtml.p("Dear " + studentName(appointment) + ",")
+                    + CounsellingEmailHtml.p(moved)
+                    + attendanceBlock(appointment, false)
+                    + CounsellingEmailHtml.p(
+                            "If that new time does not suit you, you can pick another one.")
+                    + CounsellingEmailHtml.actionBlock(rescheduleUrl, "Prefer a different time?",
+                            "Choose another time",
+                            "Choosing your own time uses one of your free changes.")
+                    + CounsellingEmailHtml.small("We are sorry for the disruption.")
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + studentName(appointment) + ",\n\n"
-                    + "Your counsellor is no longer available at " + originalTimeLabel
-                    + ", so we have moved your session to " + time + " on " + date + ".\n\n"
+                    + moved + "\n\n"
                     + "  " + attendanceLine(appointment) + "\n\n"
                     + "If that new time does not suit you, you can pick another one here — "
                     + "choosing your own time uses one of your free changes:\n" + rescheduleUrl + "\n\n"
                     + "We are sorry for the disruption.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+                    + "Regards,\nCareer-9 Team";
 
-            sendToStudentAndParent(appointment, subject, body);
+            sendRichToStudentAndParent(appointment, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send session-shifted email for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -1661,7 +1972,7 @@ public class CounsellingNotificationService {
                         + "4-digit code printed on your Career-9 report.\n\n"
                         + "Please do not share it with anyone else — it is what records you as "
                         + "present for your sessions.\n\n"
-                        + "Regards,\nCareer-Nine Team";
+                        + "Regards,\nCareer-9 Team";
 
                 // Only counted as delivered if the dispatcher actually took it. A skipped send
                 // — no email account configured — used to be reported to the counsellor as
@@ -1696,13 +2007,30 @@ public class CounsellingNotificationService {
             String email = studentEmail(appointment);
             if (email == null || email.isEmpty()) return;
             String subject = "Your counselling session is waiting to start";
+            String lead = "Your session has not been started yet. Please read out the 4-digit "
+                    + "check-in code from your Career-9 report so your counsellor can begin.";
+            String closing = "If nobody has joined, you do not need to do anything else — your "
+                    + "session will be preserved and we will send you a link to pick a new time.";
+
+            String html = CounsellingEmailHtml.page(
+                    "Read out your check-in code so the session can begin.",
+                    "Your session is waiting to start",
+                    CounsellingEmailHtml.p("Dear " + studentName(appointment) + ",")
+                    + CounsellingEmailHtml.p(lead)
+                    + attendanceBlock(appointment, false)
+                    + CounsellingEmailHtml.outlineButton(portalCounsellingUrl(),
+                            "Find my check-in code")
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + studentName(appointment) + ",\n\n"
-                    + "Your session has not been started yet. Please read out the 4-digit check-in "
-                    + "code from your Career-9 report so your counsellor can begin.\n\n"
-                    + "If nobody has joined, you do not need to do anything else — your session will "
-                    + "be preserved and we will send you a link to pick a new time.\n\n"
-                    + "Regards,\nCareer-Nine Team";
-            sendEmail(email, subject, body);
+                    + lead + "\n\n"
+                    + "  " + attendanceLine(appointment) + "\n"
+                    + "  Find my check-in code: " + portalCounsellingUrl() + "\n\n"
+                    + closing + "\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, email, subject, html, body);
         } catch (Exception e) {
             logger.warn("Check-in prompt to student failed for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -1724,17 +2052,33 @@ public class CounsellingNotificationService {
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
 
             String subject = "Action needed: session with " + studentName(appointment) + " not started";
+            String lead = "Your " + time + " session with " + studentName(appointment)
+                    + " has not been checked in.";
+            String action = "Please either enter the student's check-in code, or mark the student "
+                    + "absent if they have not appeared.";
+            String warning = "If neither is recorded before the session ends, it will be logged as "
+                    + "YOUR no-show rather than the student's.";
+
+            String html = CounsellingEmailHtml.page(
+                    "The " + time + " session has not been checked in.",
+                    "Action needed: session not started",
+                    CounsellingEmailHtml.p("Dear " + counsellor.getName() + ",")
+                    + CounsellingEmailHtml.p(lead)
+                    + CounsellingEmailHtml.p(action)
+                    + CounsellingEmailHtml.actionBlock(counsellorPortalUrl(),
+                            "Your sessions", "Open the session", null)
+                    + CounsellingEmailHtml.small(warning)
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + counsellor.getName() + ",\n\n"
-                    + "Your " + time + " session with " + studentName(appointment)
-                    + " has not been checked in.\n\n"
-                    + "Please either enter the student's check-in code, or mark the student absent "
-                    + "if they have not appeared.\n\n"
-                    + "If neither is recorded before the session ends, it will be logged as YOUR "
-                    + "no-show rather than the student's.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+                    + lead + "\n\n"
+                    + action + "\n\n"
+                    + "Open the session: " + counsellorPortalUrl() + "\n\n"
+                    + warning + "\n\n"
+                    + "Regards,\nCareer-9 Team";
 
             if (counsellor.getEmail() != null && !counsellor.getEmail().isEmpty()) {
-                sendEmail(counsellor.getEmail(), subject, body);
+                sendRich(EmailType.COUNSELLING_NOTIFICATION, counsellor.getEmail(), subject, html, body);
             }
             if (counsellor.getUser() != null) {
                 createInAppNotification(counsellor.getUser(), "CHECKIN_REQUIRED",
@@ -1762,23 +2106,40 @@ public class CounsellingNotificationService {
             String date = appointment.getSlot().getDate().format(DATE_FMT);
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
 
-            String consequence = (missesRemaining > 0
-                        ? "You have " + missesRemaining + " free change" + (missesRemaining == 1 ? "" : "s")
-                          + " remaining.\n\n"
-                        : "")
+            String allowance = missesRemaining > 0
+                    ? "You have " + missesRemaining + " free change" + (missesRemaining == 1 ? "" : "s")
+                      + " remaining."
+                    : "";
+            String consequence = (allowance.isEmpty() ? "" : allowance + "\n\n")
                     + nextStepLine(missesRemaining);
+            String recorded = "Your counsellor has recorded that you did not attend your session on "
+                    + date + " at " + time + ".";
+            String dispute = "If you were present and believe this is a mistake, reply to this email or "
+                    + "raise it from your Career-9 dashboard — the session will be reviewed and "
+                    + "nothing will count against you until it is settled.";
 
             String subject = "You were marked absent from your counselling session";
-            String body = "Dear " + name + ",\n\n"
-                    + "Your counsellor has recorded that you did not attend your session on "
-                    + date + " at " + time + ".\n\n"
-                    + consequence + "\n\n"
-                    + "If you were present and believe this is a mistake, reply to this email or "
-                    + "raise it from your Career-9 dashboard — the session will be reviewed and "
-                    + "nothing will count against you until it is settled.\n\n"
-                    + "Regards,\nCareer-Nine Team";
+            String html = CounsellingEmailHtml.page(
+                    "You were marked absent — here is what you can do next.",
+                    "You were marked absent",
+                    CounsellingEmailHtml.p("Dear " + name + ",")
+                    + CounsellingEmailHtml.p(recorded)
+                    + (allowance.isEmpty() ? "" : CounsellingEmailHtml.p(allowance))
+                    + CounsellingEmailHtml.p(nextStepLead(missesRemaining) + ".")
+                    + CounsellingEmailHtml.actionBlock(portalCounsellingUrl(), "Your next step",
+                            nextStepCta(missesRemaining), null)
+                    + CounsellingEmailHtml.small(dispute)
+                    + CounsellingEmailHtml.signature());
 
-            if (email != null && !email.isEmpty()) sendEmail(email, subject, body);
+            String body = "Dear " + name + ",\n\n"
+                    + recorded + "\n\n"
+                    + consequence + "\n\n"
+                    + dispute + "\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            if (email != null && !email.isEmpty()) {
+                sendRich(EmailType.COUNSELLING_NOTIFICATION, email, subject, html, body);
+            }
 
             Long userId = appointment.getStudent() != null ? appointment.getStudent().getUserId() : null;
             if (userId != null) {
@@ -1853,15 +2214,32 @@ public class CounsellingNotificationService {
             String subject = upheld
                     ? "Your counselling attendance review — outcome"
                     : "Good news — your counselling session has been corrected";
+            String outcome = upheld
+                    ? "We have reviewed your session on " + date + " and the record that you did "
+                      + "not attend stands. It counts as one of your changes."
+                    : "We have reviewed your session on " + date + " and corrected it — it is now "
+                      + "recorded as attended, and nothing has been counted against you.";
+            String noteLine = (note != null && !note.isEmpty()) ? "Note from our team: " + note : "";
+
+            String html = CounsellingEmailHtml.page(
+                    upheld ? "The record for " + date + " stands."
+                           : "Your session on " + date + " is now recorded as attended.",
+                    upheld ? "Your attendance review — outcome"
+                           : "Your session has been corrected",
+                    CounsellingEmailHtml.p("Dear " + studentName(appointment) + ",")
+                    + CounsellingEmailHtml.p(outcome)
+                    + CounsellingEmailHtml.actionBlock(portalCounsellingUrl(),
+                            "Your counselling sessions", "View my sessions", null)
+                    + (noteLine.isEmpty() ? "" : CounsellingEmailHtml.small(noteLine))
+                    + CounsellingEmailHtml.signature());
+
             String body = "Dear " + studentName(appointment) + ",\n\n"
-                    + (upheld
-                        ? "We have reviewed your session on " + date + " and the record that you did "
-                          + "not attend stands. It counts as one of your changes."
-                        : "We have reviewed your session on " + date + " and corrected it — it is now "
-                          + "recorded as attended, and nothing has been counted against you.")
-                    + (note != null && !note.isEmpty() ? "\n\nNote from our team: " + note : "")
-                    + "\n\nRegards,\nCareer-Nine Team";
-            sendEmail(email, subject, body);
+                    + outcome + "\n\n"
+                    + "View my sessions: " + portalCounsellingUrl()
+                    + (noteLine.isEmpty() ? "" : "\n\n" + noteLine)
+                    + "\n\nRegards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, email, subject, html, body);
         } catch (Exception e) {
             logger.warn("Failed to send dispute outcome for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -1872,8 +2250,27 @@ public class CounsellingNotificationService {
 
     /** The student's counselling page — where every "book a new time" link should land. */
     private String portalCounsellingUrl() {
-        String base = frontendUrl == null ? "" : frontendUrl.replaceAll("/+$", "");
-        return base + "/student/dashboard/counselling";
+        return portalBase() + "/student/dashboard/counselling";
+    }
+
+    /** Trailing slashes off once, so the three helpers below read as one thing. */
+    private String portalBase() {
+        return frontendUrl == null ? "" : frontendUrl.replaceAll("/+$", "");
+    }
+
+    /** Where a counsellor lands: their own sessions, availability and notes. */
+    private String counsellorPortalUrl() {
+        return portalBase() + "/counsellor/dashboard";
+    }
+
+    /** Manage Sessions — the admin screen these operational alerts are about. */
+    private String adminSessionsUrl() {
+        return portalBase() + "/admin/counselling-sessions";
+    }
+
+    /** Manage Counsellors — block-date requests and counsellor/assessment mapping. */
+    private String adminCounsellorsUrl() {
+        return portalBase() + "/admin/counsellors";
     }
 
     /**
@@ -1887,19 +2284,34 @@ public class CounsellingNotificationService {
      * button she will actually find when she gets there.
      */
     private String nextStepLine(int missesRemaining) {
+        return nextStepLead(missesRemaining) + ":\n" + portalCounsellingUrl();
+    }
+
+    /**
+     * The same sentence without the address, for the HTML side where a button carries the link.
+     *
+     * <p>Split rather than duplicated: the two halves of this mail must never drift apart, and
+     * the wording is the part that gets edited.
+     */
+    private String nextStepLead(int missesRemaining) {
         if (missesRemaining > 0) {
             return "Reschedule it yourself at no extra cost — open Counselling, go to "
-                    + "Past Sessions and press Reschedule to pick a new slot:\n"
-                    + portalCounsellingUrl();
+                    + "Past Sessions and press Reschedule to pick a new slot";
         }
         return "You have no free changes left, so this session can no longer be moved. "
-                + "You can book a new session here:\n" + portalCounsellingUrl();
+                + "You can book a new session here";
+    }
+
+    /** What that button says — rescheduling and booking afresh are not the same action. */
+    private String nextStepCta(int missesRemaining) {
+        return missesRemaining > 0 ? "Reschedule my session" : "Book a session";
     }
 
     /** Student plus parent/guardian, matching the confirmation email's recipient list. */
-    private void sendToStudentAndParent(CounsellingAppointment appointment, String subject, String body) {
+    private void sendRichToStudentAndParent(CounsellingAppointment appointment, String subject,
+                                            String html, String text) {
         for (String addr : studentAndParentEmails(appointment)) {
-            sendEmail(addr, subject, body);
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, addr, subject, html, text);
         }
     }
 
@@ -1917,7 +2329,8 @@ public class CounsellingNotificationService {
      * event disappears from their calendars instead of sitting there with a live meeting link.
      * Falls back to plain text if the attachment cannot be built or sent.
      */
-    private void sendWithCancelledInvite(CounsellingAppointment appointment, String subject, String body) {
+    private void sendWithCancelledInvite(CounsellingAppointment appointment, String subject,
+                                         String html, String text) {
         List<String> to = studentAndParentEmails(appointment);
         if (to.isEmpty()) return;
 
@@ -1927,7 +2340,7 @@ public class CounsellingNotificationService {
                 SmtpEmailRequest req = new SmtpEmailRequest();
                 req.setTo(to);
                 req.setSubject(subject);
-                req.setHtmlContent("<pre style=\"font-family:inherit\">" + body + "</pre>");
+                req.setHtmlContent(html);
                 req.setFromName("Career-9");
                 req.setFromEmail("notifications@career-9.net");
                 req.setAttachments(Arrays.asList(new SmtpEmailRequest.EmailAttachment(
@@ -1939,7 +2352,7 @@ public class CounsellingNotificationService {
                         appointment.getId(), e.getMessage());
             }
         }
-        for (String addr : to) sendEmail(addr, subject, body);
+        for (String addr : to) sendRich(EmailType.COUNSELLING_NOTIFICATION, addr, subject, html, text);
     }
 
     public String studentName(CounsellingAppointment a) {
@@ -1976,23 +2389,34 @@ public class CounsellingNotificationService {
         try {
             if (counsellor == null || counsellor.getEmail() == null || counsellor.getEmail().isEmpty()) return;
             String subject = "Your Career-9 counsellor account has been deactivated";
-            StringBuilder body = new StringBuilder();
-            body.append("Dear ").append(counsellor.getName()).append(",\n\n")
-                .append("Your Career-9 counsellor account has been deactivated by the team. ")
-                .append("You will not be able to sign in to the counsellor portal, and no new ")
-                .append("sessions can be booked with you.\n\n");
-            if (sessionsAffected > 0) {
-                body.append("Your ").append(sessionsAffected)
-                    .append(sessionsAffected == 1 ? " upcoming session has" : " upcoming sessions have")
-                    .append(" been taken off your calendar and the students have been contacted ")
-                    .append("directly. Nothing is recorded against you and no action is needed ")
-                    .append("from your side.\n\n");
-            } else {
-                body.append("You had no upcoming sessions booked, so no student has been affected.\n\n");
-            }
-            body.append("If you believe this is a mistake, please contact the Career-9 team.\n\n")
-                .append("Regards,\nCareer-Nine Team");
-            sendEmail(counsellor.getEmail(), subject, body.toString());
+            String lead = "Your Career-9 counsellor account has been deactivated by the team. "
+                    + "You will not be able to sign in to the counsellor portal, and no new "
+                    + "sessions can be booked with you.";
+            String sessions = sessionsAffected > 0
+                    ? "Your " + sessionsAffected
+                      + (sessionsAffected == 1 ? " upcoming session has" : " upcoming sessions have")
+                      + " been taken off your calendar and the students have been contacted "
+                      + "directly. Nothing is recorded against you and no action is needed "
+                      + "from your side."
+                    : "You had no upcoming sessions booked, so no student has been affected.";
+            String closing = "If you believe this is a mistake, please contact the Career-9 team.";
+
+            String html = CounsellingEmailHtml.page(
+                    "Your counsellor account has been deactivated.",
+                    "Your counsellor account has been deactivated",
+                    CounsellingEmailHtml.p("Dear " + counsellor.getName() + ",")
+                    + CounsellingEmailHtml.p(lead)
+                    + CounsellingEmailHtml.p(sessions)
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + counsellor.getName() + ",\n\n"
+                    + lead + "\n\n"
+                    + sessions + "\n\n"
+                    + closing + "\n\n"
+                    + "Regards,\nCareer-9 Team";
+
+            sendRich(EmailType.COUNSELLING_NOTIFICATION, counsellor.getEmail(), subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send deactivation notice to counsellor {}: {}",
                     counsellor != null ? counsellor.getId() : "null", e.getMessage());
@@ -2010,18 +2434,34 @@ public class CounsellingNotificationService {
             String date = appointment.getSlot().getDate().format(DATE_FMT);
             String time = appointment.getSlot().getStartTime().format(TIME_FMT);
             String subject = "Your counselling session has been cancelled — please pick a new time";
-            String body = "Dear " + studentName(appointment) + ",\n\n"
-                    + "Your counselling session scheduled on " + date + " at " + time
+            String cancelled = "Your counselling session scheduled on " + date + " at " + time
                     + " has been cancelled by the Career-9 team, as your counsellor is no longer "
-                    + "available.\n\n"
-                    + "This does not affect your counselling entitlement in any way. Another "
-                    + "counsellor is available, so you can choose a new time right away:\n\n"
+                    + "available.";
+            String reassurance = "This does not affect your counselling entitlement in any way. Another "
+                    + "counsellor is available, so you can choose a new time right away";
+            String closing = "No login is needed — the link opens your booking page directly. If you "
+                    + "would rather we arranged it for you, simply reply to this email.";
+
+            String html = CounsellingEmailHtml.page(
+                    "Your session was cancelled — choose a new time right away.",
+                    "Your counselling session has been cancelled",
+                    CounsellingEmailHtml.p("Dear " + studentName(appointment) + ",")
+                    + CounsellingEmailHtml.p(cancelled)
+                    + CounsellingEmailHtml.p(reassurance + ".")
+                    + CounsellingEmailHtml.actionBlock(rescheduleUrl, "Choose a new time",
+                            "Pick a new slot", "No login needed.")
+                    + CounsellingEmailHtml.small(closing)
+                    + CounsellingEmailHtml.small("We apologise for the inconvenience.")
+                    + CounsellingEmailHtml.signature());
+
+            String body = "Dear " + studentName(appointment) + ",\n\n"
+                    + cancelled + "\n\n"
+                    + reassurance + ":\n\n"
                     + "  " + rescheduleUrl + "\n\n"
-                    + "No login is needed — the link opens your booking page directly. If you would "
-                    + "rather we arranged it for you, simply reply to this email.\n\n"
+                    + closing + "\n\n"
                     + "We apologise for the inconvenience.\n\n"
-                    + "Regards,\nCareer-Nine Team";
-            sendWithCancelledInvite(appointment, subject, body);
+                    + "Regards,\nCareer-9 Team";
+            sendWithCancelledInvite(appointment, subject, html, body);
         } catch (Exception e) {
             logger.error("Failed to send counsellor-deactivated student email for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -2057,23 +2497,52 @@ public class CounsellingNotificationService {
                     + (counsellor != null ? counsellor.getName() : "unknown")
                     + " — " + affected + (affected == 1 ? " session affected" : " sessions affected");
 
+            List<CounsellingEmailHtml.Row> summary = CounsellingEmailHtml.rows();
+            summary.add(row("Counsellor", counsellor != null ? counsellor.getName() : "unknown"));
+            summary.add(row("Email", counsellor != null ? counsellor.getEmail() : "-"));
+            summary.add(row("Deactivated by",
+                    admin != null && admin.getName() != null ? admin.getName() : "Career-9 admin"));
+            summary.add(row("Sessions affected", String.valueOf(affected)));
+
+            StringBuilder htmlBody = new StringBuilder();
+            htmlBody.append(CounsellingEmailHtml.p("A counsellor has been deactivated."))
+                    .append(CounsellingEmailHtml.detailsTable(summary));
+
             StringBuilder body = new StringBuilder();
             body.append("A counsellor has been deactivated.\n\n")
-                .append("Counsellor: ").append(counsellor != null ? counsellor.getName() : "unknown").append("\n")
-                .append("Email: ").append(counsellor != null ? counsellor.getEmail() : "-").append("\n")
-                .append("Deactivated by: ")
-                .append(admin != null && admin.getName() != null ? admin.getName() : "Career-9 admin").append("\n")
-                .append("Sessions affected: ").append(affected).append("\n\n");
+                .append(CounsellingEmailHtml.detailsText(summary)).append("\n");
 
             if (affected == 0) {
                 body.append("No upcoming sessions were booked with this counsellor.\n\n");
+                htmlBody.append(CounsellingEmailHtml.small(
+                        "No upcoming sessions were booked with this counsellor."));
             } else {
+                String explain = "The students below have had their session taken off the calendar. "
+                        + "Those marked REBOOKING LINK SENT can pick a new time themselves; those "
+                        + "marked NEEDS FOLLOW-UP have no other counsellor covering their assessment "
+                        + "and were told the team would be in touch — they need contacting.";
+                htmlBody.append(CounsellingEmailHtml.p(explain));
                 body.append("The students below have had their session taken off the calendar.\n")
                     .append("Those marked REBOOKING LINK SENT can pick a new time themselves; those\n")
                     .append("marked NEEDS FOLLOW-UP have no other counsellor covering their assessment\n")
                     .append("and were told the team would be in touch — they need contacting.\n\n");
                 for (CounsellorDeactivationService.AffectedSession row : sessions) {
-                    body.append("  • ").append(row.studentName == null ? "Student" : row.studentName).append("\n")
+                    String studentLabel = row.studentName == null ? "Student" : row.studentName;
+                    String outcomeLabel = "PARKED".equals(row.outcome) ? "REBOOKING LINK SENT"
+                            : "CANCELLED".equals(row.outcome) ? "NEEDS FOLLOW-UP"
+                            : "COULD NOT BE SETTLED — CHECK MANUALLY";
+                    String contact = (row.studentEmail == null ? "-" : row.studentEmail)
+                            + (row.studentPhone != null && !row.studentPhone.isEmpty()
+                                    ? " · " + row.studentPhone : "");
+
+                    List<CounsellingEmailHtml.Row> one = CounsellingEmailHtml.rows();
+                    one.add(row("When", row.date + " " + (row.startTime == null ? "" : row.startTime)));
+                    one.add(row("Contact", contact));
+                    one.add(row("Outcome", outcomeLabel));
+                    htmlBody.append(CounsellingEmailHtml.small(studentLabel))
+                            .append(CounsellingEmailHtml.detailsTable(one));
+
+                    body.append("  • ").append(studentLabel).append("\n")
                         .append("      When:    ").append(row.date).append(" ")
                         .append(row.startTime == null ? "" : row.startTime).append("\n")
                         .append("      Contact: ").append(row.studentEmail == null ? "-" : row.studentEmail);
@@ -2088,12 +2557,23 @@ public class CounsellingNotificationService {
                         .append("\n\n");
                 }
             }
-            body.append("Regards,\nCareer-Nine System");
+            body.append("Open Manage Sessions: ").append(adminSessionsUrl()).append("\n\n")
+                .append("Regards,\nCareer-9 System");
 
             String text = body.toString();
-            for (String to : who.to) sendEmail(to, subject, text);
-            for (String cc : who.cc) sendEmail(cc, subject, text);
-            for (String bcc : who.bcc) sendEmail(bcc, subject, text);
+            String html = CounsellingEmailHtml.page(
+                    (counsellor != null ? counsellor.getName() : "A counsellor")
+                            + " deactivated — " + affected
+                            + (affected == 1 ? " session affected." : " sessions affected."),
+                    "Counsellor deactivated",
+                    htmlBody.toString()
+                    + CounsellingEmailHtml.actionBlock(adminSessionsUrl(),
+                            "Manage Sessions", "Open Manage Sessions", null)
+                    + CounsellingEmailHtml.signature());
+
+            for (String to : who.to) sendRich(EmailType.COUNSELLING_NOTIFICATION, to, subject, html, text);
+            for (String cc : who.cc) sendRich(EmailType.COUNSELLING_NOTIFICATION, cc, subject, html, text);
+            for (String bcc : who.bcc) sendRich(EmailType.COUNSELLING_NOTIFICATION, bcc, subject, html, text);
         } catch (Exception e) {
             logger.error("Failed to send counsellor-deactivated admin alert for counsellor {}: {}",
                     counsellor != null ? counsellor.getId() : "null", e.getMessage());
@@ -2289,12 +2769,6 @@ public class CounsellingNotificationService {
                 + "<td style=\"padding:4px 0;color:#0f1f18;font-weight:700;\">" + valueHtml + "</td></tr>";
     }
 
-    private void sendEmail(String toEmail, String subject, String body) {
-        if (blankAddress(toEmail, subject)) return;
-        // Routed through the central dispatcher (logged + account-routed); legacy provider retired.
-        emailDispatchService.sendText(EmailType.COUNSELLING_NOTIFICATION, toEmail, subject, body);
-    }
-
     /**
      * A branded mail: the HTML the reader sees, and the plain-text alternative carried
      * alongside it in the same message.
@@ -2306,7 +2780,7 @@ public class CounsellingNotificationService {
      */
     private EmailSendResult sendRich(EmailType type, String toEmail, String subject,
                                      String html, String text) {
-        if (blankAddress(toEmail, subject)) return null;
+        noteBlankAddress(toEmail, subject);
         EmailSendRequest req = new EmailSendRequest();
         req.setEmailType(type);
         req.getTo().add(toEmail);
@@ -2317,16 +2791,22 @@ public class CounsellingNotificationService {
     }
 
     /**
-     * True when there is no address to write to — and says so in this service's own log.
+     * Names a missing address in this service's own log — and then lets the send proceed to the
+     * dispatcher anyway, which records it as SKIPPED / "No recipient".
      *
-     * <p>An empty address is not an error the dispatcher can report usefully: it records the
-     * attempt as "No recipient" and returns a skip, which is indistinguishable from a mail
-     * nobody was supposed to get. Every caller here does mean to reach someone, so a missing
-     * address is a data fault worth naming, with the subject to identify which mail was lost.
+     * <p>This used to return early. The reasoning was that a skip row is indistinguishable from
+     * a mail nobody was supposed to get, so the slf4j line carried more meaning. That had it
+     * backwards: every caller here does mean to reach someone, so the row is the whole point.
+     * Stopping short of the dispatcher left a student who never got their booking link with no
+     * trace anywhere an admin can see — the Email Logs screen reads {@code email_send_log}, not
+     * the server log, and "did this student ever get written to?" is exactly the question that
+     * screen exists to answer. Now it is answered, with the reason attached.
+     *
+     * <p>The dispatcher handles the empty recipient itself and returns a failed result, so
+     * callers that check {@code isSuccess()} behave as they did before.
      */
-    private boolean blankAddress(String toEmail, String subject) {
-        if (toEmail != null && !toEmail.isBlank()) return false;
+    private void noteBlankAddress(String toEmail, String subject) {
+        if (toEmail != null && !toEmail.isBlank()) return;
         logger.error("No address on record to send \"{}\" to — this mail was NOT sent", subject);
-        return true;
     }
 }

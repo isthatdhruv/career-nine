@@ -57,7 +57,7 @@ Add to Google Calendar: {link}
 A calendar invite is also attached so you can add this to any calendar.
 
 Regards,
-Career-Nine Team
+Career-9 Team
 ```
 
 ---

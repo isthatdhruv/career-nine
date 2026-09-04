@@ -24,7 +24,7 @@
 # ═══════════════════════════════════════════════════════════════════════
 spring:
   profiles:
-    active: production , report-worker
+    active: dev
   servlet:
     multipart:
       max-file-size: 1GB
@@ -427,6 +427,10 @@ app:
   b2c:
     frontendBaseUrl: http://localhost:3000
     assessmentBaseUrl: http://localhost:5173
+    # Backend-served links (final-report PDF, /s/{code} short links). Was previously
+    # unset in every profile, so it fell back to the production default and dev/staging
+    # emitted api.career-9.com URLs.
+    apiBaseUrl: http://localhost:8080
     # Institute that career-9.com student-form leads are enrolled into (LeadStudentService).
     # Blank = create with no institute (B2C wildcard scope). Set to a valid institute_code per env.
     leadInstituteCode: ${APP_LEAD_INSTITUTE_CODE:}
@@ -553,6 +557,7 @@ app:
   b2c:
     frontendBaseUrl: https://staging-dashboard.career-9.com
     assessmentBaseUrl: https://staging-assessment.career-9.com
+    apiBaseUrl: https://api-staging.career-9.com
     # Institute that career-9.com student-form leads are enrolled into (LeadStudentService).
     # Blank = create with no institute (B2C wildcard scope). Set to a valid institute_code per env.
     leadInstituteCode: ${APP_LEAD_INSTITUTE_CODE:}
@@ -658,6 +663,7 @@ app:
   b2c:
     frontendBaseUrl: https://dashboard.career-9.com
     assessmentBaseUrl: https://assessment.career-9.com
+    apiBaseUrl: https://api.career-9.com
     # Institute that career-9.com student-form leads are enrolled into (LeadStudentService).
     # Blank = create with no institute (B2C wildcard scope). Set to a valid institute_code per env.
     leadInstituteCode: ${APP_LEAD_INSTITUTE_CODE:}

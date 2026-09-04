@@ -160,7 +160,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             // Phase 2 (Task 2.2 / HIGH-A): counsellor self-registration + login are pre-auth flows
             // for users who have no session yet. Now reachable anonymously; their @PreAuthorize is removed.
             "/api/counsellor/self-register",
-            "/api/counsellor/login"
+            "/api/counsellor/login",
+            // Emailed short links (/s/{code}) — a student opens these from their phone with no
+            // session. The endpoint only reveals a URL; that URL's own token is the actual gate.
+            "/s/**"
     };
 
     /**
