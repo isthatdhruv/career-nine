@@ -260,19 +260,24 @@ public final class CounsellingMails {
             .notice("If neither is recorded before the session ends, it will be logged as your no-show rather than the student&rsquo;s.").signature().build();
     }
     public static Mail markedAbsent(String firstName, Session s, int changesLeft, MailLink sessions) {
-        // With a change left the session comes back and rebooking is free, so "book again" is
-        // the true next step. With none left it does not: the session can no longer be moved and
-        // a fresh booking is chargeable, and inviting her to "book a new time" would spring that
-        // on her at the payment page. Both halves — sentence and button — switch together.
-        boolean canRebook = changesLeft > 0;
-        return Mail.builder().subject("You were marked absent from your counselling session").preheader("Here is where you stand and what you can do next.")
+        // The two outcomes are genuinely different actions, and calling both "book a new session"
+        // misled in both directions. With a change left she books nothing: she reschedules the
+        // session she already paid for, from Past Sessions, and it costs her nothing. With none
+        // left rescheduling is not offered at all and a fresh booking is chargeable. Sentence and
+        // button switch together — and at zero the allowance notice is dropped, because the
+        // paragraph that replaces it already says there are no changes left.
+        boolean canReschedule = changesLeft > 0;
+        Mail.Builder m = Mail.builder().subject("You were marked absent from your counselling session")
+            .preheader("Here is where you stand and what you can do next.")
             .title("You were marked absent").p(hi(firstName))
-            .p("Your counsellor has recorded that you did not attend your session on " + b(s.date) + " at " + b(s.time) + ".")
-            .notice("You have " + b(String.valueOf(changesLeft)) + " free change" + (changesLeft == 1 ? "" : "s") + " left.")
-            .p(canRebook
-                    ? "Your session has been returned to your plan, so you can book again."
-                    : "You have no free changes left, so this session can no longer be moved. You can book a new session.")
-            .action(sessions, canRebook ? "Book a new time" : "View my sessions")
+            .p("Your counsellor has recorded that you did not attend your session on " + b(s.date) + " at " + b(s.time) + ".");
+        if (canReschedule) {
+            m.notice("You have " + b(String.valueOf(changesLeft)) + " free change" + (changesLeft == 1 ? "" : "s") + " left.")
+             .p("Reschedule it yourself at no extra cost &mdash; open Counselling, go to Past Sessions and press Reschedule to pick a new slot.");
+        } else {
+            m.p("You have no free changes left, so this session can no longer be moved. You can book a new session.");
+        }
+        return m.action(sessions, canReschedule ? "Reschedule my session" : "View my sessions")
             .small("If you were present and believe this is a mistake, raise it from your Career-9 dashboard or write to " + SUPPORT + ". The session will be reviewed and nothing counts against you until it is settled.").signature().build();
     }
     public static Mail disputeOutcome(String firstName, String date, boolean upheld, String note, MailLink sessions) {

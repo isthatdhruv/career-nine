@@ -463,7 +463,7 @@ public class CounsellingNotificationService {
             String studentName = studentName(appointment);
 
             // Post-session thank-you (approved design). Deliberately says nothing about
-            // session notes or counsellor remarks \u2014 those stay in the portal.
+            // session notes or counsellor remarks — those stay in the portal.
             Mail mail = CounsellingMails.sessionComplete(
                     AccountMails.firstName(studentName),
                     mailLinks.of(referralShareUrl(appointment), "referral"));
@@ -478,7 +478,7 @@ public class CounsellingNotificationService {
     /**
      * Share link for the post-session mail's referral button: the campaign landing
      * page the student came through, or the assessment site root when they didn't
-     * come via a campaign. There is no per-student referral tracking yet \u2014 this is
+     * come via a campaign. There is no per-student referral tracking yet — this is
      * a share link, nothing more.
      */
     private String referralShareUrl(CounsellingAppointment appointment) {
@@ -1693,8 +1693,15 @@ public class CounsellingNotificationService {
         try {
             String email = studentEmail(appointment);
             if (email == null || email.isEmpty()) return;
-            String date = appointment.getSlot() != null && appointment.getSlot().getDate() != null
-                    ? appointment.getSlot().getDate().format(DATE_FMT) : null;
+            // The date carries the preheader and the opening sentence, so a mail without one
+            // would read "Your session on  is now recorded as attended". Nothing to say means
+            // nothing sent — which is what happened before, by way of a caught NPE.
+            if (appointment.getSlot() == null || appointment.getSlot().getDate() == null) {
+                logger.warn("Dispute outcome not sent for appointment {}: the session has no date",
+                        appointment.getId());
+                return;
+            }
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
 
             Mail mail = CounsellingMails.disputeOutcome(
                     AccountMails.firstName(studentName(appointment)), date, upheld, note,
