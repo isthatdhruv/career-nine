@@ -183,4 +183,100 @@ public final class CounsellingMails {
             .small("No login is needed; the link opens your booking page directly. If you would rather we arranged it for you, write to " + SUPPORT + ". We apologise for the inconvenience.")
             .signature().build();
     }
+
+    // ─── Reminders, check-in and follow-ups ──────────────────────────────────────
+
+    public static Mail reminderStudent(String firstName, String whenLabel, Session s) {
+        return Mail.builder().subject("Your counselling session is " + whenLabel)
+            .preheader(s.date + ", " + s.time + ". Join link inside.")
+            .title("Your counselling session is " + v(whenLabel)).p(hi(firstName))
+            .p("This is a reminder that your counselling session is " + b(whenLabel) + ".").details(rows(s, false, false))
+            .action(s.join, "Join the session").links(null, s.report, "Open your assessment report").small(EARLY).signature().build();
+    }
+    public static Mail reminderCounsellor(String counsellorName, String studentName, String whenLabel, Session s) {
+        return Mail.builder().subject("Reminder: session " + whenLabel + " with " + studentName)
+            .preheader(s.date + ", " + s.time + ". Join link inside.")
+            .title("Session " + v(whenLabel) + ": " + v(studentName)).p(hi(counsellorName))
+            .p("You have a counselling session " + b(whenLabel) + " with " + b(studentName) + ".")
+            .details(new Mail.Row("Student", studentName), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Mode", s.mode))
+            .action(s.join, "Join the session").small(EARLY).signature().build();
+    }
+    public static Mail sessionComplete(String firstName, MailLink referral) {
+        return Mail.builder().subject("Thank you for your session with Career-9")
+            .preheader("We hope it brought clarity. Know someone who needs it too?")
+            .title("Thank you for being a part of Career-9 &#127775;").p("Hi " + v(firstName) + " &#128075;")
+            .p("We hope your counselling session helped you discover new possibilities, understand yourself better, and take a step closer to making confident career choices. &#128640;")
+            .p("Remember, your career journey doesn&rsquo;t end with one session. Keep exploring, keep learning, and keep believing in yourself.")
+            .p(b("&#128153; Know someone who needs career clarity?") + " If you found your Career-9 experience valuable, share it with friends, cousins or family members who may also be wondering &ldquo;What should I choose for my future?&rdquo; &#129300;")
+            .action(referral, "Refer a friend or family member")
+            .p(b("&#128260; See you again in 6 months.") + " Your interests, strengths and aspirations evolve as you grow, so we would love to reconnect in 6 months and see what has changed and where you want to go next.")
+            .p("Your future is a journey. We&rsquo;re happy to be part of it. &#128153;").signature().build();
+    }
+    public static Mail bookingInvite(String firstName, MailLink booking) {
+        return Mail.builder().subject("Book your counselling session").preheader("Pick a time that suits you. No login needed.")
+            .title("Book your counselling session").p(hi(firstName))
+            .p("You have completed your assessment. The next step is a one-to-one counselling session to turn your results into a real plan.")
+            .action(booking, "Book my session")
+            .small("No login needed. Once you choose a slot, your session is confirmed instantly and you will receive the meeting details by email.").signature().build();
+    }
+    public static Mail dailyDigest(String counsellorName, String dateLabel, List<String[]> rows, MailLink portal) {
+        return Mail.builder().subject("Your sessions for " + dateLabel + " (" + rows.size() + ")")
+            .preheader(rows.size() + (rows.size() == 1 ? " session" : " sessions") + " tomorrow. Times and students inside.")
+            .title("Your sessions for " + v(dateLabel)).p(hi(counsellorName))
+            .p("Here are your counselling sessions scheduled for " + b(dateLabel) + ":")
+            .table(new String[]{"Time", "Student", "Mode"}, rows)
+            .action(portal, "Open my dashboard").small("Please be available on time.").signature().build();
+    }
+    public static Mail bookingNudge(String firstName, int sessionsLeft, MailLink booking) {
+        return Mail.builder().subject("A counselling session is waiting for you")
+            .preheader(sessionsLeft + (sessionsLeft == 1 ? " session" : " sessions") + " in your plan " + (sessionsLeft == 1 ? "hasn't" : "haven't") + " been booked yet. Pick a time.")
+            .title("A counselling session is waiting for you").p(hi(firstName))
+            .p("You have " + b(String.valueOf(sessionsLeft)) + " counselling session" + (sessionsLeft == 1 ? "" : "s") + " included in your plan that " + (sessionsLeft == 1 ? "hasn&rsquo;t" : "haven&rsquo;t") + " been booked yet.")
+            .action(booking, "Book my session").small("Pick a time that works for you to speak with a counsellor. No login needed.").signature().build();
+    }
+    public static Mail checkinCode(String firstName, String code, Session s) {
+        return Mail.builder().subject("Your counselling check-in code").preheader("Read this code out to your counsellor to start the session.")
+            .title("Your check-in code").p(hi(firstName))
+            .p("Read the code below out to your counsellor to start your counselling session.")
+            .code(code, "Check-in code")
+            .details(new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Counsellor", s.counsellor))
+            .action(s.join, "Join the session")
+            .small("This is the same 4-digit code printed on your Career-9 report. Please don&rsquo;t share it with anyone else; it is what records you as present.").signature().build();
+    }
+    public static Mail checkinPromptStudent(String firstName, Session s, MailLink findCode) {
+        return Mail.builder().subject("Your counselling session is waiting to start").preheader("Read out your check-in code so the session can begin.")
+            .title("Your session is waiting to start").p(hi(firstName))
+            .p("Your session has not been started yet. Please read out the 4-digit check-in code from your Career-9 report so your counsellor can begin.")
+            .action(s.join, "Join the session").links(null, findCode, "Find my check-in code")
+            .small("If nobody has joined, you do not need to do anything else. Your session will be preserved and we will send you a link to pick a new time.").signature().build();
+    }
+    public static Mail checkinPromptCounsellor(String counsellorName, String studentName, String time, MailLink portal) {
+        return Mail.builder().subject("Action needed: session with " + studentName + " not started")
+            .preheader("The " + time + " session has not been checked in.")
+            .title("Action needed: session not started").p(hi(counsellorName))
+            .p("Your " + b(time) + " session with " + b(studentName) + " has not been checked in.")
+            .p("Please either enter the student&rsquo;s check-in code, or mark the student absent if they have not appeared.")
+            .action(portal, "Open the session")
+            .notice("If neither is recorded before the session ends, it will be logged as your no-show rather than the student&rsquo;s.").signature().build();
+    }
+    public static Mail markedAbsent(String firstName, Session s, int changesLeft, MailLink sessions) {
+        return Mail.builder().subject("You were marked absent from your counselling session").preheader("Here is where you stand and what you can do next.")
+            .title("You were marked absent").p(hi(firstName))
+            .p("Your counsellor has recorded that you did not attend your session on " + b(s.date) + " at " + b(s.time) + ".")
+            .notice("You have " + b(String.valueOf(changesLeft)) + " free change" + (changesLeft == 1 ? "" : "s") + " left.")
+            .p("Your session has been returned to your plan, so you can book again.")
+            .action(sessions, "Book a new time")
+            .small("If you were present and believe this is a mistake, raise it from your Career-9 dashboard or write to " + SUPPORT + ". The session will be reviewed and nothing counts against you until it is settled.").signature().build();
+    }
+    public static Mail disputeOutcome(String firstName, String date, boolean upheld, String note, MailLink sessions) {
+        Mail.Builder m = upheld
+            ? Mail.builder().subject("Your attendance review outcome").preheader("The record for " + date + " stands.")
+                .title("Your attendance review outcome").p(hi(firstName))
+                .p("We have reviewed your session on " + b(date) + " and the record that you did not attend stands. It counts as one of your changes.")
+            : Mail.builder().subject("Your counselling session has been corrected").preheader("Your session on " + date + " is now recorded as attended.")
+                .title("Your session has been corrected").p(hi(firstName))
+                .p("We have reviewed your session on " + b(date) + " and corrected it. It is now recorded as attended, and nothing has been counted against you.");
+        if (note != null && !note.isEmpty()) m.notice("Note from our team: " + v(note));
+        return m.action(sessions, "View my sessions").signature().build();
+    }
 }

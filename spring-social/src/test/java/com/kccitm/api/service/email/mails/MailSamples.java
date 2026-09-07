@@ -74,6 +74,18 @@ public final class MailSamples {
         m.put("counselling-counsellor-swapped-in-person", CounsellingMails.counsellorSwapped(FIRST, OFFLINE, "Rohit Verma"));
         m.put("counselling-session-shifted", CounsellingMails.sessionShifted(FIRST, S, "3:00 – 3:30 PM IST", RESCHEDULE));
         m.put("counsellor-deactivated-student", CounsellingMails.counsellorDeactivatedStudent(FIRST, S, RESCHEDULE));
+        m.put("counselling-reminder-fallback", CounsellingMails.reminderStudent(FIRST, "in 2 hours", S));
+        m.put("counselling-counsellor-reminder-fallback", CounsellingMails.reminderCounsellor(COUNSELLOR, STUDENT, "in 2 hours", S));
+        m.put("counselling-session-complete-thankyou", CounsellingMails.sessionComplete(FIRST, L("https://assessment.career-9.com")));
+        m.put("counselling-booking-invite", CounsellingMails.bookingInvite(FIRST, L("https://assessment.career-9.com/counselling-booking/eyJhbGciOiJIUzI1NiJ9.eyJhIjoxfQ.sig")));
+        m.put("counselling-daily-digest", CounsellingMails.dailyDigest(COUNSELLOR, "Tuesday, 9 Sep 2026", java.util.Arrays.asList(new String[]{"10:00 \u2013 10:30 AM", "Aarav Sharma", "Online"}, new String[]{"11:30 AM \u2013 12:00 PM", "Diya Patel", "Online"}, new String[]{"3:00 \u2013 3:30 PM", "Kabir Rao", "In-person"}), PORTAL));
+        m.put("counselling-booking-nudge-fallback", CounsellingMails.bookingNudge(FIRST, 1, L("https://dashboard.career-9.com/counselling/book?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79")));
+        m.put("counselling-checkin-code", CounsellingMails.checkinCode(FIRST, "4829", S));
+        m.put("counselling-checkin-prompt-student", CounsellingMails.checkinPromptStudent(FIRST, S, SESSIONS));
+        m.put("counselling-checkin-prompt-counsellor", CounsellingMails.checkinPromptCounsellor(COUNSELLOR, STUDENT, TIME, PORTAL));
+        m.put("counselling-marked-absent", CounsellingMails.markedAbsent(FIRST, S, 1, SESSIONS));
+        m.put("counselling-dispute-outcome", CounsellingMails.disputeOutcome(FIRST, DATE, false, "The counsellor confirmed you joined at 4:41 PM.", SESSIONS));
+        m.put("counselling-dispute-outcome-upheld", CounsellingMails.disputeOutcome(FIRST, DATE, true, null, SESSIONS));
         return m;
     }
 }
