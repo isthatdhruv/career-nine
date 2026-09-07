@@ -37,7 +37,7 @@ public class ReportEmailConsumer {
     @Autowired private EmailRateLimiter rateLimiter;
     @Autowired private DigitalOceanSpacesService spacesService;
     @Autowired private ObjectMapper objectMapper;
-    @Autowired private ReportEmailComposer composer;
+    @Autowired private com.kccitm.api.service.email.theme.BrandResolver brandResolver;
     @Autowired private com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository
             serviceDeliveryLogRepository;
     /** Optional: "Your Next Step" counselling CTA; absent where counselling isn't wired. */
@@ -139,7 +139,11 @@ public class ReportEmailConsumer {
             log.setServiceType("final_report");
             log.setChannel("email");
             log.setRecipient(ev.recipientEmail);
-            log.setSubject(composer.subject(ev));
+            com.kccitm.api.service.email.theme.Brand brand = brandResolver.of(
+                    new com.kccitm.api.service.branding.BrandingDto(ev.whitelabel, ev.schoolName, ev.logoUrl));
+            log.setSubject(com.kccitm.api.service.email.mails.ReportMails.reportReady(
+                    com.kccitm.api.service.email.mails.AccountMails.firstName(ev.studentName),
+                    brand.getName(), null, null, false, null).getSubject());
             // CDN links carry no access token — safe to store unredacted.
             log.setLinkUrl(ev.pdfUrl != null ? ev.pdfUrl : ev.reportUrl);
             log.setTemplateKey("final_report");

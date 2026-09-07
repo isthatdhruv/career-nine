@@ -17,6 +17,7 @@ import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.theme.Mail;
 
 /**
  * Wraps the Gmail email service and writes a ServiceDeliveryLog row
@@ -87,6 +88,54 @@ public class NotificationDispatcher {
         return serviceDeliveryLogRepository.save(log);
     }
 
+    /**
+     * Sends a themed {@link Mail} rather than raw HTML. Used by the report-ready paths
+     * (pipeline-disabled immediate send, admin resend) that now render through the theme.
+     */
+    public ServiceDeliveryLog sendEmail(StudentEntitlement entitlement,
+                                        String recipient,
+                                        String serviceType,
+                                        Mail mail,
+                                        String linkUrl) {
+        ServiceDeliveryLog log = new ServiceDeliveryLog();
+        log.setEntitlementId(entitlement != null ? entitlement.getEntitlementId() : null);
+        log.setUserStudentId(entitlement != null ? entitlement.getUserStudentId() : null);
+        log.setServiceType(serviceType);
+        log.setChannel("email");
+        log.setRecipient(recipient);
+        log.setSubject(mail != null ? mail.getSubject() : null);
+        // See the html overload above: the stored audit copy masks the access token.
+        log.setLinkUrl(redactToken(linkUrl));
+        log.setTemplateKey(serviceType);
+
+        if (recipient == null || recipient.trim().isEmpty()) {
+            log.setDeliveryStatus("failed");
+            log.setFailureReason("No recipient email");
+            return serviceDeliveryLogRepository.save(log);
+        }
+
+        try {
+            EmailSendRequest req = EmailSendRequest.mail(mapServiceType(serviceType), recipient, mail);
+            if (entitlement != null) {
+                req.setUserStudentId(entitlement.getUserStudentId());
+            }
+            req.setDeliveryModeOverride(EmailDeliveryMode.ASYNC);
+            EmailSendResult result = emailDispatchService.send(req);
+            if (result != null && result.isSuccess()) {
+                log.setDeliveryStatus("sent");
+                log.setSentAt(new Date());
+            } else {
+                log.setDeliveryStatus("failed");
+                log.setFailureReason(result != null ? result.getError() : "dispatch failed");
+            }
+        } catch (Exception e) {
+            logger.error("Email send failed for serviceType={} to={}", serviceType, recipient, e);
+            log.setDeliveryStatus("failed");
+            log.setFailureReason(e.getMessage());
+        }
+        return serviceDeliveryLogRepository.save(log);
+    }
+
     /** Best-effort mapping of the B2C serviceType to an {@link EmailType} for logging/templating. */
     private static EmailType mapServiceType(String serviceType) {
         if (serviceType == null) {
@@ -94,8 +143,7 @@ public class NotificationDispatcher {
         }
         switch (serviceType) {
             case "assessment_invite": return EmailType.ENTITLEMENT_GRANTED;
-            case "final_report":
-            case "one_pager":         return EmailType.REPORT_READY;
+            case "final_report":      return EmailType.REPORT_READY;
             default:                  return EmailType.GENERIC;
         }
     }

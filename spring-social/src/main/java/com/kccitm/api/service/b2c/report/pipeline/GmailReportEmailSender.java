@@ -46,6 +46,13 @@ import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
 import com.kccitm.api.service.email.EmailTemplateRenderer;
 import com.kccitm.api.service.email.SenderFactory;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.mails.ReportMails;
+import com.kccitm.api.service.email.theme.Brand;
+import com.kccitm.api.service.email.theme.BrandResolver;
+import com.kccitm.api.service.email.theme.Mail;
+import com.kccitm.api.service.email.theme.MailLinks;
+import com.kccitm.api.service.email.theme.MailRenderer;
 
 /**
  * Default {@link EmailSender} for the report worker. Sends the report email through the
@@ -53,8 +60,8 @@ import com.kccitm.api.service.email.SenderFactory;
  * global default, stamped at produce-time) via {@link SenderFactory} — the same per-account
  * transport (Gmail-API / Gmail-SMTP / Odoo) the rest of the platform uses. When a
  * {@code REPORT_READY} template is configured ({@link ReportEmailEvent#emailTemplateId}) the
- * subject + body are rendered from it; otherwise the built-in {@link ReportEmailComposer} HTML
- * is used. Every send writes an {@code email_send_log} row.
+ * subject + body are rendered from it; otherwise the built-in {@link ReportMails#reportReady}
+ * mail is used. Every send writes an {@code email_send_log} row.
  *
  * <p>Deliberately <b>synchronous</b> and <b>throws on failure</b> — that's what lets the email
  * consumer commit the Kafka offset only on a real delivery, preserving retry → DLT. If no
@@ -76,13 +83,15 @@ public class GmailReportEmailSender implements EmailSender {
     @Value("${app.gmail.sender-email:notifications@career-9.net}")
     private String senderEmail;
 
-    @Autowired private ReportEmailComposer composer;
     @Autowired private EmailAccountRepository accountRepository;
     @Autowired private EmailTemplateRepository templateRepository;
     @Autowired private EmailSendLogRepository logRepository;
     @Autowired private SenderFactory senderFactory;
     @Autowired private EmailTemplateRenderer templateRenderer;
     @Autowired private InstituteBrandingService brandingService;
+    @Autowired private BrandResolver brandResolver;
+    @Autowired private MailRenderer mailRenderer;
+    @Autowired private MailLinks mailLinks;
 
     @Override
     public void sendReportEmail(ReportEmailEvent event, byte[] pdfBytes) throws Exception {
@@ -97,36 +106,40 @@ public class GmailReportEmailSender implements EmailSender {
 
         boolean withPdf = pdfBytes != null && pdfBytes.length > 0 && !event.linkOnly;
 
-        String subject;
-        String html;
+        Brand brand = brandResolver.of(new BrandingDto(event.whitelabel, event.schoolName, event.logoUrl));
+        Mail mail = ReportMails.reportReady(AccountMails.firstName(event.studentName), brand.getName(),
+                mailLinks.of(event.reportUrl, "report"),
+                event.pdfUrl == null ? null : mailLinks.of(event.pdfUrl, "report_pdf"),
+                withPdf,
+                event.bookingUrl == null ? null : mailLinks.of(event.bookingUrl, "counselling_booking"));
+        MailRenderer.Rendered r = mailRenderer.render(mail, brand);
         if (template != null) {
             Map<String, String> ctx = reportPlaceholders(event);
-            subject = templateRenderer.render(template.getSubjectTemplate(), ctx);
+            String subject = templateRenderer.render(template.getSubjectTemplate(), ctx);
             if (subject == null || subject.trim().isEmpty()) {
-                subject = composer.subject(event);
+                subject = mail.getSubject();
             }
-            html = templateRenderer.render(template.getBodyTemplate(), ctx);
-        } else {
-            subject = composer.subject(event);
-            html = composer.html(event);
+            String html = templateRenderer.render(template.getBodyTemplate(), ctx);
+            r = mailRenderer.wrapForeign(subject, mailLinks.rewrite(html), brand);
         }
 
-        EmailSendLog logRow = newLog(event, account, template, subject);
+        EmailSendLog logRow = newLog(event, account, template, r.subject);
         try {
             if (account != null) {
                 SmtpEmailRequest msg = new SmtpEmailRequest();
                 msg.setFromEmail(account.getFromEmail());
                 msg.setFromName(account.getFromName());
                 msg.getTo().add(event.recipientEmail);
-                msg.setSubject(subject);
-                msg.setHtmlContent(html);
+                msg.setSubject(r.subject);
+                msg.setHtmlContent(r.html);
+                msg.setTextContent(r.text);
                 if (withPdf) {
                     msg.getAttachments().add(new SmtpEmailRequest.EmailAttachment(
                             "Career-9-Report.pdf", pdfBytes, "application/pdf"));
                 }
                 senderFactory.forAccount(account).send(msg); // synchronous, throws on failure
             } else {
-                sendViaClasspath(event, subject, html, pdfBytes, withPdf);
+                sendViaClasspath(event, r.subject, r.html, pdfBytes, withPdf);
             }
             logRow.setStatus(EmailSendStatus.SENT);
             logRow.setSentAt(new Date());

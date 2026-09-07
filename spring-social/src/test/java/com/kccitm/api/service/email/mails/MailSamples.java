@@ -43,6 +43,13 @@ public final class MailSamples {
         m.put("payment-failed-cancelled-expired-cancelled", PaymentMails.paymentFailed(FIRST, ASSESSMENT, "1,499", PaymentMails.Outcome.CANCELLED, PAYMENT_RETRY));
         m.put("payment-pending-nudge", PaymentMails.paymentPending(FIRST, ASSESSMENT, "1,499", PAYMENT_RETRY));
         m.put("payment-link", PaymentMails.paymentLink(FIRST, ASSESSMENT, "1,499", PAYMENT_RETRY));
+        m.put("assessment-completion", ReportMails.assessmentCompletion(FIRST, ASSESSMENT, "20260412", "15-05-2010", SIGN_IN));
+        m.put("report-ready-pipeline", ReportMails.reportReady(FIRST, "Career-9", REPORT, L("https://storage-c9.sgp1.cdn.digitaloceanspaces.com/reports/2026/09/aarav-sharma-career-report.pdf"), true, L("https://assessment.career-9.com/counselling-booking/eyJhbGciOiJIUzI1NiJ9.eyJhIjoxfQ.sig")));
+        m.put("counsellor-report-ready", ReportMails.counsellorReportReady(COUNSELLOR, STUDENT, ASSESSMENT, REPORT));
+        m.put("booked-session-report-ready", ReportMails.bookedSessionReportReady(STUDENT, DATE, REPORT));
+        m.put("counsellor-report-release", ReportMails.reportReleased(FIRST, COUNSELLOR, REPORT));
+        m.put("contact-person-reports-zip", ReportMails.reportsZip("Suresh Menon", SCHOOL, ASSESSMENT, "Navigator", java.util.Arrays.asList("Aarav Sharma", "Diya Patel", "Kabir Rao"), 3, java.util.Collections.emptyList()));
+        m.put("school-dashboard-ready", ReportMails.schoolDashboardReady("Suresh Menon", SCHOOL, ASSESSMENT, L("https://dashboard.career-9.com/school-dashboard")));
         return m;
     }
 }

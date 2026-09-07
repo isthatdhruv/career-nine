@@ -74,11 +74,6 @@ public class LinkBuilder {
         return frontendBaseUrl + "/auth";
     }
 
-    public String onePager(String accessToken, Long entitlementId) {
-        return shorten(frontendBaseUrl + "/report/one-pager?t=" + accessToken + "&e=" + entitlementId,
-                "one_pager");
-    }
-
     public String finalReport(String accessToken, Long entitlementId) {
         // Backend-hosted: token is validated server-side and a PDF is streamed
         // back. No frontend page hop needed.

@@ -10,12 +10,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
-import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.service.b2c.ReportReleaseGate;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.mails.ReportMails;
+import com.kccitm.api.service.email.theme.Mail;
+import com.kccitm.api.service.email.theme.MailLinks;
 
 /**
  * The counsellor's "Send report" button.
@@ -43,6 +46,9 @@ public class CounsellorReportReleaseService {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    @Autowired
+    private MailLinks mailLinks;
 
     /** What the counsellor is told after pressing the button. */
     public static class ReleaseOutcome {
@@ -91,35 +97,9 @@ public class CounsellorReportReleaseService {
         String counsellorName = appointment.getCounsellor() != null
                 ? appointment.getCounsellor().getName() : null;
 
-        String subject = "Your assessment report is ready";
-        String lead = "Your assessment report has been released"
-                + (counsellorName != null && !counsellorName.isBlank() ? " by " + counsellorName : "")
-                + " following your counselling session.";
-        String closing = "Take your time with it, and do come back to your counsellor with anything "
-                + "you would like explained further.";
-
-        String html = CounsellingEmailHtml.page(
-                "Your assessment report has been released.",
-                "Your assessment report is ready",
-                CounsellingEmailHtml.p("Dear " + studentName + ",")
-                + CounsellingEmailHtml.p(lead)
-                + CounsellingEmailHtml.actionBlock(link, "Your report", "Open my report", null)
-                + CounsellingEmailHtml.small(closing)
-                + CounsellingEmailHtml.signature());
-
-        String body = "Dear " + studentName + ",\n\n"
-                + lead + "\n\n"
-                + "  Report: " + link + "\n\n"
-                + closing + "\n\n"
-                + "Regards,\nCareer-9 Team";
-
-        EmailSendRequest req = new EmailSendRequest();
-        req.setEmailType(EmailType.REPORT_READY);
-        req.getTo().add(to);
-        req.setSubject(subject);
-        req.setHtmlContent(html);
-        req.setTextContent(body);
-        EmailSendResult result = emailDispatchService.send(req);
+        Mail mail = ReportMails.reportReleased(AccountMails.firstName(studentName), counsellorName,
+                mailLinks.of(link, "report"));
+        EmailSendResult result = emailDispatchService.sendMail(EmailType.REPORT_READY, to, mail);
         if (result == null || !result.isSuccess()) {
             String failure = result != null ? result.getError() : null;
             throw new IllegalStateException("The email could not be sent: "

@@ -41,6 +41,10 @@ import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentTierRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
 import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
 import com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.mails.ReportMails;
+import com.kccitm.api.service.email.theme.Brand;
+import com.kccitm.api.service.email.theme.Mail;
 
 /**
  * Lifecycle of a StudentEntitlement: pending → active → expired/revoked/refunded.
@@ -67,8 +71,8 @@ public class EntitlementService {
     @Autowired private NotificationDispatcher notificationDispatcher;
     @Autowired private LinkBuilder linkBuilder;
     @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
-    /** Single source of the report-mail body — legacy and resend paths render through it. */
-    @Autowired private com.kccitm.api.service.b2c.report.pipeline.ReportEmailComposer reportEmailComposer;
+    @Autowired private com.kccitm.api.service.email.theme.BrandResolver brandResolver;
+    @Autowired private com.kccitm.api.service.email.theme.MailLinks mailLinks;
     /** Optional: counselling CTA for the report mail; absent where counselling isn't wired. */
     @Autowired(required = false)
     private com.kccitm.api.service.counselling.CounsellingBookingLinkService counsellingBookingLinkService;
@@ -600,31 +604,25 @@ public class EntitlementService {
                 e.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
                 entitlementRepository.save(e);
             }
-            String onePagerLink = linkBuilder.onePager(token, e.getEntitlementId());
-
-            if (Boolean.TRUE.equals(e.getFinalReportActive())) {
-                if (reportPipelineEnabled) {
-                    // The report pipeline (Kafka → report-worker) sends this email once
-                    // the report is generated and stored in Spaces, with the CDN report
-                    // link + PDF attached — the producer stamps this entitlement on the
-                    // generate event (see resolvePipelineReportEmail). Sending here too
-                    // would double-mail the student with a stale viewer-only link.
-                    logger.info("Final report email delegated to report pipeline: student={} assessment={} entitlement={}",
-                            userStudentId, assessmentId, e.getEntitlementId());
-                    return;
-                }
-                // Legacy fallback (pipeline disabled): immediate send with the tokenized
-                // viewer link — no PDF exists yet at completion time.
-                String finalLink = linkBuilder.finalReport(token, e.getEntitlementId());
-                String subject = "Your Career-9 report is ready";
-                String body = reportReadyEmailBody(e, finalLink, null);
-                notificationDispatcher.sendEmail(e, studentEmail, "final_report", subject, body, finalLink);
-            } else {
-                String subject = "Your Career-9 1-pager is ready";
-                String body = simpleHtml("Your free 1-page Career-9 summary is ready.",
-                        "View your summary or unlock the full report from there:", onePagerLink, "Open 1-pager");
-                notificationDispatcher.sendEmail(e, studentEmail, "one_pager", subject, body, onePagerLink);
+            if (!Boolean.TRUE.equals(e.getFinalReportActive())) {
+                // Tier does not include the final report: nothing is sent at completion.
+                return;
             }
+            if (reportPipelineEnabled) {
+                // The report pipeline (Kafka → report-worker) sends this email once
+                // the report is generated and stored in Spaces, with the CDN report
+                // link + PDF attached — the producer stamps this entitlement on the
+                // generate event (see resolvePipelineReportEmail). Sending here too
+                // would double-mail the student with a stale viewer-only link.
+                logger.info("Final report email delegated to report pipeline: student={} assessment={} entitlement={}",
+                        userStudentId, assessmentId, e.getEntitlementId());
+                return;
+            }
+            // Legacy fallback (pipeline disabled): immediate send with the tokenized
+            // viewer link — no PDF exists yet at completion time.
+            String finalLink = linkBuilder.finalReport(token, e.getEntitlementId());
+            Mail mail = reportReadyMail(e, finalLink, null);
+            notificationDispatcher.sendEmail(e, studentEmail, "final_report", mail, finalLink);
             return;
         }
     }
@@ -797,26 +795,22 @@ public class EntitlementService {
                 subject = "Your Career-9 assessment link";
                 body = simpleHtml("Here is your Career-9 assessment link.", "Take the assessment:", link, "Start assessment");
                 break;
-            case "one_pager":
-                link = linkBuilder.onePager(token, eid);
-                subject = "Your Career-9 1-pager";
-                body = simpleHtml("Your 1-pager summary.", "View it:", link, "Open 1-pager");
-                break;
             case "final_report": {
                 if (!Boolean.TRUE.equals(e.getFinalReportActive())) return new ResendResult(false, "Final report not in this tier");
-                subject = "Your Career-9 report is ready";
                 // Prefer the generated report's Spaces CDN links (same delivery as the
                 // report-pipeline email); fall back to the tokenized viewer link when
                 // no generated report exists yet.
                 GeneratedReport gr = latestGeneratedReport(e.getUserStudentId(), e.getAssessmentId());
+                Mail mail;
                 if (gr != null) {
                     link = gr.getReportUrl();
-                    body = reportReadyEmailBody(e, gr.getReportUrl(), gr.getPdfUrl());
+                    mail = reportReadyMail(e, gr.getReportUrl(), gr.getPdfUrl());
                 } else {
                     link = linkBuilder.finalReport(token, eid);
-                    body = reportReadyEmailBody(e, link, null);
+                    mail = reportReadyMail(e, link, null);
                 }
-                break;
+                notificationDispatcher.sendEmail(e, studentEmail, serviceType, mail, link);
+                return new ResendResult(true, "Sent");
             }
             case "dashboard_access":
                 if (!Boolean.TRUE.equals(e.getDashboardActive())) return new ResendResult(false, "Dashboard not in this tier");
@@ -1084,26 +1078,24 @@ public class EntitlementService {
     }
 
     /**
-     * Report-ready body rendered through the pipeline's ReportEmailComposer, so
-     * every path (pipeline, legacy immediate send, admin resend) mails the same
-     * design. linkOnly is always true here — these paths never attach the PDF;
-     * when a CDN pdfUrl exists it is offered as a download link instead.
+     * Report-ready mail built through the theme, so every path (pipeline-disabled immediate
+     * send, admin resend) sends the same design as the pipeline. pdfAttached is always false
+     * here — these paths never attach the PDF; when a CDN pdfUrl exists it is offered as a
+     * download link instead.
      */
-    private String reportReadyEmailBody(StudentEntitlement e, String reportUrl, String pdfUrl) {
-        com.kccitm.api.service.b2c.report.pipeline.ReportEmailEvent ev =
-                new com.kccitm.api.service.b2c.report.pipeline.ReportEmailEvent();
-        ev.userStudentId = e.getUserStudentId();
-        ev.assessmentId = e.getAssessmentId();
-        ev.entitlementId = e.getEntitlementId();
-        ev.reportUrl = reportUrl;
-        ev.pdfUrl = pdfUrl;
-        ev.linkOnly = true;
-        ev.studentName = resolveStudentName(e);
+    private Mail reportReadyMail(StudentEntitlement e, String reportUrl, String pdfUrl) {
+        Brand brand = brandResolver.forUserStudent(e.getUserStudentId());
+        com.kccitm.api.service.email.theme.MailLink booking = null;
         if (counsellingBookingLinkService != null) {
-            ev.bookingUrl = counsellingBookingLinkService.bookingUrlIfEligible(
+            String bookingUrl = counsellingBookingLinkService.bookingUrlIfEligible(
                     e.getUserStudentId(), e.getAssessmentId(), e.getEntitlementId());
+            booking = mailLinks.of(bookingUrl, "counselling_booking");
         }
-        return reportEmailComposer.html(ev);
+        return ReportMails.reportReady(AccountMails.firstName(resolveStudentName(e)), brand.getName(),
+                mailLinks.of(reportUrl, "report"),
+                pdfUrl == null ? null : mailLinks.of(pdfUrl, "report_pdf"),
+                false,
+                booking);
     }
 
     /** Student's name for the email greeting; null when unavailable. */
