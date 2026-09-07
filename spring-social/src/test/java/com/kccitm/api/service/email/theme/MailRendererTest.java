@@ -58,4 +58,21 @@ class MailRendererTest {
         assertFalse(out.contains("<style>"));
         assertTrue(out.contains("<p>Hello</p>"));
     }
+
+    @Test
+    void wrapForeignTreatsNullHtmlAsEmpty() {
+        MailRenderer.Rendered r = new MailRenderer().wrapForeign("s", null, STD);
+        assertTrue(r.html.contains(MailTheme.SHELL_MARKER));
+        assertNotNull(r.text);
+    }
+
+    @Test
+    void wrapForeignOnShelledHtmlKeepsTextConsistent() {
+        String shelledHtml = MailShell.render(MAIL, STD);
+        MailRenderer.Rendered r = new MailRenderer().wrapForeign("s", shelledHtml, STD);
+        assertSame(shelledHtml, r.html);
+        assertFalse(r.text.contains("&#847;"));
+        assertFalse(r.text.contains("͏"));
+        assertTrue(r.text.contains("Hi Aarav,"));
+    }
 }
