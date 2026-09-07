@@ -160,9 +160,21 @@ const CounsellingSlotPicker: React.FC<Props> = ({
   const [parentEmail, setParentEmail] = useState<string>('')
   const [parentPhone, setParentPhone] = useState<string>('')
 
-  // Scroll target: the contact form auto-scrolls into view when a slot is picked,
-  // so the student doesn't have to scroll past the slot grid to fill it in.
-  const contactRef = useRef<HTMLDivElement>(null)
+  // Two steps — pick a time, then fill in details — so the sheet stays short on
+  // phones instead of one long scroll of time chips followed by a five-field form.
+  const [step, setStep] = useState<'slot' | 'details'>('slot')
+  // Parent contacts are optional and rarely used: tucked behind a disclosure.
+  const [showParent, setShowParent] = useState<boolean>(false)
+  // Phones get tighter padding and full-width actions.
+  const [isMobile, setIsMobile] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)')
+    const onChange = () => setIsMobile(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   // Collapse slots that share the same timing (date + start + end) into ONE chip.
   // Different counsellors commonly publish identical time slots; the student should
@@ -284,13 +296,6 @@ const CounsellingSlotPicker: React.FC<Props> = ({
     }
   }, [calendarOpen])
 
-  // Smoothly bring the contact form into view as soon as a slot is selected.
-  useEffect(() => {
-    if (selectedSlotId != null && contactRef.current) {
-      contactRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [selectedSlotId])
-
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -397,7 +402,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '1rem',
+        padding: isMobile ? '0.75rem' : '1rem',
       }}
     >
       <div
@@ -407,7 +412,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           borderRadius: 16,
           width: '100%',
           maxWidth: 560,
-          maxHeight: 'min(90vh, 90dvh)',
+          // Plain vh on purpose: dvh / min() are ignored by older mobile browsers,
+          // which then left the card unbounded and pushed the footer off-screen.
+          maxHeight: '86vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -426,8 +433,11 @@ const CounsellingSlotPicker: React.FC<Props> = ({
           }}
         >
           <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.85, marginBottom: 2 }}>
+              Book a counselling session · step {step === 'slot' ? 1 : 2} of 2
+            </div>
             <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
-              Book a Counselling Session
+              {step === 'slot' ? 'Pick a time' : 'Your details'}
             </h2>
           </div>
           <button
@@ -451,10 +461,11 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         {/* Date navigation + month calendar. The calendar is an inline panel
             rather than a floating popover: the modal card is overflow:hidden and
             can be short, which would clip an absolutely positioned dropdown. */}
+        {step === 'slot' && (
         <div ref={calendarRef}>
           <div
             style={{
-              padding: '0.75rem 1.5rem',
+              padding: isMobile ? '0.6rem 1rem' : '0.75rem 1.5rem',
               borderBottom: calendarOpen ? 'none' : '1px solid #E5E7EB',
               display: 'flex',
               justifyContent: 'space-between',
@@ -467,8 +478,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
               onClick={() => { setDayIndex((i) => Math.max(0, i - 1)); setSelectedSlotId(null) }}
               disabled={safeIndex <= 0}
               style={navBtnStyle(safeIndex <= 0)}
+              aria-label='Earlier day'
             >
-              ← Earlier
+              {isMobile ? '←' : '← Earlier'}
             </button>
 
             {/* The date header doubles as the trigger for the month calendar. */}
@@ -490,8 +502,9 @@ const CounsellingSlotPicker: React.FC<Props> = ({
               onClick={() => { setDayIndex((i) => Math.min(dates.length - 1, i + 1)); setSelectedSlotId(null) }}
               disabled={safeIndex >= dates.length - 1}
               style={navBtnStyle(safeIndex >= dates.length - 1)}
+              aria-label='Later day'
             >
-              Later →
+              {isMobile ? '→' : 'Later →'}
             </button>
           </div>
 
@@ -569,25 +582,26 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             </div>
           )}
         </div>
+        )}
 
         {/* Body — scrollable */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem' }}>
-          {loading && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '0.9rem 1rem' : '1rem 1.5rem' }}>
+          {step === 'slot' && loading && (
             <div style={{ textAlign: 'center', color: '#64748B', padding: '2rem 0' }}>
               Loading available slots…
             </div>
           )}
-          {!loading && loadError && (
+          {step === 'slot' && !loading && loadError && (
             <div style={errorBoxStyle}>{loadError}</div>
           )}
-          {!loading && !loadError && dates.length === 0 && (
+          {step === 'slot' && !loading && !loadError && dates.length === 0 && (
             <div style={{ textAlign: 'center', color: '#64748B', padding: '2rem 0' }}>
               No upcoming counselling slots are available right now. Please check back later.
             </div>
           )}
-          {!loading && currentDate && (
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {step === 'slot' && !loading && currentDate && (
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
                 {daySlots.map((s) => {
                   const isSelected = selectedSlotId === s.slotId
                   const isBooked = !!s.booked
@@ -617,9 +631,26 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Contact details + reason — shown once a slot is picked */}
-          {selectedSlotId != null && (
-            <div ref={contactRef} style={{ marginTop: 8, scrollMarginTop: 8 }}>
+          {/* Step 2 — the chosen time, then contact details + reason */}
+          {step === 'details' && selectedSlot && (
+            <div>
+              <div style={summaryStyle}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#059669', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    Your session
+                  </div>
+                  <div style={{ fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
+                    {formatDateHeader(selectedSlot.date)} · {formatTime(selectedSlot.startTime)} – {formatTime(selectedSlot.endTime)}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: 2 }}>
+                    {selectedSlot.mode === 'OFFLINE' ? 'In-person' : 'Online'}
+                  </div>
+                </div>
+                <button type='button' onClick={() => setStep('slot')} style={linkBtnStyle}>
+                  Change
+                </button>
+              </div>
+
               {/* Mode notice — tells the student how the session will be delivered */}
               <div style={modeNoticeStyle(selectedSlot?.mode === 'OFFLINE')}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
@@ -634,7 +665,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                 Your contact details
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10 }}>
                 <div>
                   <label style={fieldLabelStyle}>
                     Full name <span style={{ color: '#EF4444' }}>*</span>
@@ -659,7 +690,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                     style={inputStyle}
                   />
                 </div>
-                <div>
+                <div style={{ gridColumn: '1 / -1' }}>
                   <label style={fieldLabelStyle}>
                     Email <span style={{ color: '#94A3B8' }}>(optional)</span>
                   </label>
@@ -671,6 +702,15 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                     style={inputStyle}
                   />
                 </div>
+                {!(showParent || parentEmail || parentPhone) && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <button type='button' onClick={() => setShowParent(true)} style={linkBtnStyle}>
+                      + Add a parent's contact (optional)
+                    </button>
+                  </div>
+                )}
+                {(showParent || parentEmail || parentPhone) && (
+                <>
                 <div>
                   <label style={fieldLabelStyle}>
                     Parent's email <span style={{ color: '#94A3B8' }}>(optional)</span>
@@ -695,9 +735,11 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                     style={inputStyle}
                   />
                 </div>
+                </>
+                )}
               </div>
               <div style={{ fontSize: '0.78rem', color: '#94A3B8', marginTop: 8 }}>
-                We'll send the confirmation and reminders by email and WhatsApp to all the numbers/emails above.
+                We'll send the confirmation and reminders by email and WhatsApp to the contacts above.
               </div>
 
               <label
@@ -737,24 +779,42 @@ const CounsellingSlotPicker: React.FC<Props> = ({
         {/* Footer */}
         <div
           style={{
-            padding: '1rem 1.5rem',
+            padding: isMobile ? '0.75rem 1rem' : '1rem 1.5rem',
             borderTop: '1px solid #E5E7EB',
             display: 'flex',
             justifyContent: 'flex-end',
             gap: 10,
           }}
         >
-          <button type='button' onClick={requestClose} style={btnSecondaryStyle}>
-            Cancel
-          </button>
-          <button
-            type='button'
-            onClick={handleConfirm}
-            disabled={selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim()}
-            style={btnPrimaryStyle(selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim())}
-          >
-            {booking ? 'Booking…' : 'Confirm booking'}
-          </button>
+          {step === 'slot' ? (
+            <>
+              <button type='button' onClick={requestClose} style={{ ...btnSecondaryStyle, ...(isMobile ? { flex: '0 0 auto' } : {}) }}>
+                Cancel
+              </button>
+              <button
+                type='button'
+                onClick={() => { setBookError(''); setStep('details') }}
+                disabled={selectedSlot == null || loading}
+                style={{ ...btnPrimaryStyle(selectedSlot == null || loading), ...(isMobile ? { flex: 1 } : {}) }}
+              >
+                {selectedSlot ? `Continue with ${formatTime(selectedSlot.startTime)}` : 'Pick a time to continue'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type='button' onClick={() => setStep('slot')} disabled={booking} style={{ ...btnSecondaryStyle, ...(isMobile ? { flex: '0 0 auto' } : {}) }}>
+                Back
+              </button>
+              <button
+                type='button'
+                onClick={handleConfirm}
+                disabled={selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim()}
+                style={{ ...btnPrimaryStyle(selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim()), ...(isMobile ? { flex: 1 } : {}) }}
+              >
+                {booking ? 'Booking…' : 'Confirm booking'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -762,6 +822,29 @@ const CounsellingSlotPicker: React.FC<Props> = ({
 }
 
 // ── style helpers ──────────────────────────────────────────────────────────
+
+const summaryStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  padding: '0.7rem 0.9rem',
+  borderRadius: 12,
+  border: '1px solid #A7F3D0',
+  background: 'linear-gradient(135deg, #ECFDF5, #F0FDF4)',
+  marginBottom: 10,
+}
+
+const linkBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: '4px 0',
+  color: '#059669',
+  fontWeight: 700,
+  fontSize: '0.85rem',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+}
 
 const errorBoxStyle: React.CSSProperties = {
   background: '#FEF2F2',
@@ -833,7 +916,8 @@ function slotChipStyle(selected: boolean): React.CSSProperties {
     borderRadius: 10,
     fontSize: '0.86rem',
     cursor: 'pointer',
-    minWidth: 130,
+    minWidth: 0,
+    width: '100%',
     textAlign: 'left',
     boxShadow: selected ? '0 6px 18px rgba(16, 185, 129, 0.35)' : 'none',
   }
@@ -849,7 +933,8 @@ function slotChipBookedStyle(): React.CSSProperties {
     borderRadius: 10,
     fontSize: '0.86rem',
     cursor: 'not-allowed',
-    minWidth: 130,
+    minWidth: 0,
+    width: '100%',
     textAlign: 'left',
   }
 }

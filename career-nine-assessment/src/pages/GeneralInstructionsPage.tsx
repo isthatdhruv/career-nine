@@ -160,7 +160,7 @@ const GeneralInstructionsPage: React.FC = () => {
                     }}
                   />
                   <p style={{ margin: 0, color: "#4a5568", fontSize: "0.9rem", fontWeight: "500" }}>
-                    <strong style={{ color: "#2d3748" }}>Ready to begin?</strong> I have read and understood all the instructions.
+                    I have read and understood the above, and I consent to proceed.
                   </p>
                 </label>
                 {ackError && !ackChecked && (

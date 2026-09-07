@@ -88,7 +88,6 @@
 .assessment-card .card-body,
 .assessment-scroll-container,
 .thank-you-card,
-.register-card form,
 .question-area {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
@@ -96,7 +95,6 @@
 .assessment-card .card-body::-webkit-scrollbar,
 .assessment-scroll-container::-webkit-scrollbar,
 .thank-you-card::-webkit-scrollbar,
-.register-card form::-webkit-scrollbar,
 .question-area::-webkit-scrollbar {
   display: none; /* Chrome/Safari/Opera */
 }
@@ -517,10 +515,6 @@
     padding: 1.25rem !important;
   }
 
-  .register-card {
-    max-height: calc(100vh - 2rem);
-    max-height: calc(100dvh - 2rem);
-  }
 
   .thank-you-card {
     max-height: calc(100vh - 2rem);
@@ -818,40 +812,6 @@
   .thank-you-card .success-icon svg {
     width: 32px;
     height: 32px;
-  }
-}
-
-/* Assessment register page */
-.register-card {
-  width: 100%;
-  max-width: 600px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  max-height: calc(100vh - 4rem);
-  max-height: calc(100dvh - 4rem);
-  display: flex;
-  flex-direction: column;
-}
-
-.register-card form {
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-}
-
-@media (max-width: 575.98px) {
-  .register-card {
-    border-radius: 8px;
-  }
-
-  .register-card .card-header-gradient {
-    padding: 1rem 1.25rem;
-  }
-
-  .register-card form {
-    padding: 1.25rem !important;
   }
 }
 
@@ -1195,5 +1155,164 @@
 
   .game-video-card {
     padding: 12px !important;
+  }
+}
+
+/* ========== RANKING QUESTIONS (tap-to-rank) ========== */
+/* The whole card is the control: tap to give it the next rank, tap again to
+   remove. Ranked cards get a green ring + filled badge and are sorted to the
+   top of the grid; once the cap is reached the remaining cards dim. */
+.rank-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.rank-grid.options-grid-2col {
+  gap: 10px 1rem;
+}
+.rank-grid .rank-card {
+  margin-bottom: 0;
+}
+.rank-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+.rank-card:hover {
+  border-color: #a7f3d0;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+.rank-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.35);
+}
+.rank-card:active {
+  box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+.rank-card--ranked {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+.rank-card--capped {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.rank-card--capped:hover {
+  border-color: #e2e8f0;
+  box-shadow: none;
+}
+.rank-badge {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.05rem;
+  border: 2px dashed #cbd5e1;
+  color: #94a3b8;
+  background: #fff;
+  transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+.rank-card--ranked .rank-badge {
+  border: none;
+  background: #10b981;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+
+/* ▲ ▼ on ranked cards only — solid green so they stand out against the tint.
+   The !importants beat the mobile rule that restyles any button inside
+   [data-proctoring-option-id]. */
+.rank-arrows {
+  flex: 0 0 auto;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: 10px;
+}
+.rank-card .rank-arrows__btn {
+  width: 32px !important;
+  height: 26px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none;
+  border-radius: 8px;
+  background: #10b981;
+  color: #fff;
+  font-size: 0.7rem !important;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.rank-card .rank-arrows__btn:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);
+}
+.rank-card .rank-arrows__btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.rank-card .rank-arrows__btn:disabled {
+  background: #cbd5e1;
+  color: #fff;
+  box-shadow: none;
+  cursor: default;
+}
+@media (max-width: 575.98px) {
+  .rank-arrows {
+    flex-direction: row;
+    padding-left: 6px;
+  }
+  .rank-card .rank-arrows__btn {
+    width: 30px !important;
+    height: 30px !important;
+  }
+}
+
+/* One-line status above the grid */
+.rank-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: -4px 0 4px;
+}
+.rank-status__count {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #065f46;
+  background: #d1fae5;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.rank-status__hint {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+@media (max-width: 575.98px) {
+  .rank-card {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .rank-badge {
+    width: 32px;
+    height: 32px;
+    font-size: 0.95rem;
   }
 }

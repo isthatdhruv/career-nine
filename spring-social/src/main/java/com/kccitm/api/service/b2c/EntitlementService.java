@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.SimpleDateFormat;
@@ -646,6 +647,38 @@ public class EntitlementService {
             return Boolean.TRUE.equals(e.getFinalReportActive()) ? e : null;
         }
         return null;
+    }
+
+    /**
+     * Returns an access token that is valid right now for an active/pending
+     * entitlement, extending a lapsed one in place (and minting one if missing).
+     *
+     * Used by the endpoints that hand the token to a student who is already on
+     * the page (upgrade-info, counselling options, student-counselling): the
+     * 30-day deep-link TTL exists to age out emailed links, and must not stop a
+     * student from booking counselling sessions they still hold. The token
+     * string is kept, so links already emailed with it start working again too.
+     *
+     * REQUIRES_NEW so the extension is committed even when the caller runs in a
+     * read-only transaction (a joined read-only transaction would silently drop
+     * the write).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public String ensureLiveAccessToken(StudentEntitlement e) {
+        if (e == null) return null;
+        if (!"active".equals(e.getStatus()) && !"pending".equals(e.getStatus())) return e.getAccessToken();
+        boolean expired = e.getAccessTokenExpiresAt() != null && e.getAccessTokenExpiresAt().before(new Date());
+        if (e.getAccessToken() == null) {
+            e.setAccessToken(generateToken());
+            e.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
+            entitlementRepository.save(e);
+        } else if (expired) {
+            logger.info("Extending lapsed access token for entitlement {} (expired {})",
+                    e.getEntitlementId(), e.getAccessTokenExpiresAt());
+            e.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
+            entitlementRepository.save(e);
+        }
+        return e.getAccessToken();
     }
 
     /**

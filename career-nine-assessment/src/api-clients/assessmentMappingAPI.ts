@@ -76,7 +76,6 @@ export function registerStudentByToken(
     email: string;
     dob: string;
     phone: string;
-    gender: string;
     classId?: number;
     schoolSectionId?: number;
     promoCode?: string;

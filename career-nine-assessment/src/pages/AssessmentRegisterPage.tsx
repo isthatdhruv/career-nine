@@ -10,8 +10,10 @@ import {
 } from "../api-clients/assessmentMappingAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 import { validateReferralCode } from "../api-clients/referralCodeAPI"
-import { TierCard, Tier } from "../components/TierCard"
+import { TierStrip, Tier } from "../components/TierCard"
 import { getInstituteTerms, contactTerms } from "../utils/instituteTerms"
+import RegisterShell, { SignInNote } from "../components/RegisterShell"
+import { rs, inputBlurStyle } from "../styles/registerStyles"
 
 const AssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>()
@@ -447,46 +449,34 @@ const AssessmentRegisterPage = () => {
   // ── Loading State ──
   if (loading) {
     return (
-      <div style={s.page}>
-        <style>{keyframes}</style>
-        <div style={s.bgOrb1} />
-        <div style={s.bgOrb2} />
-        <div style={s.bgOrb3} />
-        <div style={s.glassCard}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "60px 20px", gap: 16 }}>
-            <div style={s.spinner} />
-            <p style={{ color: "#64748b", fontSize: "0.95rem", margin: 0 }}>Loading assessment information...</p>
-          </div>
+      <RegisterShell narrow>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px", gap: 16 }}>
+          <div style={s.spinner} />
+          <p style={{ color: "#64748b", fontSize: "0.95rem", margin: 0 }}>Loading assessment information...</p>
         </div>
-      </div>
+      </RegisterShell>
     )
   }
 
   // ── Error State ──
   if (error) {
     return (
-      <div style={s.page}>
-        <style>{keyframes}</style>
-        <div style={s.bgOrb1} />
-        <div style={s.bgOrb2} />
-        <div style={s.bgOrb3} />
-        <div style={s.glassCard}>
-          <div style={{ textAlign: "center", padding: "48px 32px" }}>
-            <div style={{
-              width: 72, height: 72, borderRadius: "50%", margin: "0 auto 20px",
-              background: "linear-gradient(135deg, #fee2e2, #fecaca)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "2rem",
-            }}>
-              !
-            </div>
-            <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 12 }}>Link Unavailable</h3>
-            <p style={{ color: "#64748b", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
-              {error} Please contact your school administrator for a valid link.
-            </p>
+      <RegisterShell narrow>
+        <div style={{ textAlign: "center", padding: "28px 8px" }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: "50%", margin: "0 auto 20px",
+            background: "linear-gradient(135deg, #fee2e2, #fecaca)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "2rem",
+          }}>
+            !
           </div>
+          <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 12 }}>Link Unavailable</h3>
+          <p style={{ color: "#64748b", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
+            {error} Please contact your school administrator for a valid link.
+          </p>
         </div>
-      </div>
+      </RegisterShell>
     )
   }
 
@@ -495,33 +485,27 @@ const AssessmentRegisterPage = () => {
   // sold-out PAID link used to fall through and render as a free registration.
   if (registrationClosed) {
     return (
-      <div style={s.page}>
-        <style>{keyframes}</style>
-        <div style={s.bgOrb1} />
-        <div style={s.bgOrb2} />
-        <div style={s.bgOrb3} />
-        <div style={s.glassCard}>
-          <div style={{ textAlign: "center", padding: "48px 32px" }}>
-            <div style={{
-              width: 72, height: 72, borderRadius: "50%", margin: "0 auto 20px",
-              background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "2rem", color: "#92400e",
-            }}>
-              ⏳
-            </div>
-            <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 12 }}>
-              Registration Closed
-            </h3>
-            <p style={{ color: "#64748b", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
-              Registrations for{" "}
-              <strong>{mappingInfo?.assessmentName || "this assessment"}</strong>{" "}
-              are currently closed or sold out. Please contact your school
-              administrator for assistance.
-            </p>
+      <RegisterShell narrow>
+        <div style={{ textAlign: "center", padding: "28px 8px" }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: "50%", margin: "0 auto 20px",
+            background: "linear-gradient(135deg, #fef3c7, #fde68a)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "2rem", color: "#92400e",
+          }}>
+            ⏳
           </div>
+          <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 12 }}>
+            Registration Closed
+          </h3>
+          <p style={{ color: "#64748b", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
+            Registrations for{" "}
+            <strong>{mappingInfo?.assessmentName || "this assessment"}</strong>{" "}
+            are currently closed or sold out. Please contact your school
+            administrator for assistance.
+          </p>
         </div>
-      </div>
+      </RegisterShell>
     )
   }
 
@@ -530,304 +514,294 @@ const AssessmentRegisterPage = () => {
   if (result) {
     const isAlreadyRegistered = result.status === "already_registered"
     return (
-      <div style={s.page}>
-        <style>{keyframes}</style>
-        <div style={s.bgOrb1} />
-        <div style={s.bgOrb2} />
-        <div style={s.bgOrb3} />
-        <div style={s.glassCard}>
-          <div style={{ textAlign: "center", padding: "48px 32px" }}>
+      <RegisterShell narrow>
+        <div style={{ textAlign: "center", padding: "28px 8px" }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: "50%", margin: "0 auto 24px",
+            background: isAlreadyRegistered
+              ? "linear-gradient(135deg, #fef3c7, #fde68a)"
+              : "linear-gradient(135deg, #d1fae5, #6ee7b7)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: "2.2rem", color: isAlreadyRegistered ? "#92400e" : "#065f46",
+            boxShadow: isAlreadyRegistered
+              ? "0 8px 32px rgba(251, 191, 36, 0.3)"
+              : "0 8px 32px rgba(16, 185, 129, 0.3)",
+          }}>
+            {isAlreadyRegistered ? "!" : "✓"}
+          </div>
+
+          <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 8 }}>
+            {isAlreadyRegistered ? "Already Registered" : "Registration Successful!"}
+          </h3>
+          <p style={{ color: "#64748b", fontSize: "0.92rem", marginBottom: 24 }}>
+            {result.message}
+          </p>
+
+          {result.username && (
             <div style={{
-              width: 80, height: 80, borderRadius: "50%", margin: "0 auto 24px",
-              background: isAlreadyRegistered
-                ? "linear-gradient(135deg, #fef3c7, #fde68a)"
-                : "linear-gradient(135deg, #d1fae5, #6ee7b7)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "2.2rem", color: isAlreadyRegistered ? "#92400e" : "#065f46",
-              boxShadow: isAlreadyRegistered
-                ? "0 8px 32px rgba(251, 191, 36, 0.3)"
-                : "0 8px 32px rgba(16, 185, 129, 0.3)",
+              background: "linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)",
+              border: "1.5px solid #a7f3d0",
+              borderRadius: 16, padding: "24px 28px", textAlign: "left",
+              marginBottom: 24, maxWidth: 360, marginLeft: "auto", marginRight: "auto",
             }}>
-              {isAlreadyRegistered ? "!" : "✓"}
-            </div>
-
-            <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 8 }}>
-              {isAlreadyRegistered ? "Already Registered" : "Registration Successful!"}
-            </h3>
-            <p style={{ color: "#64748b", fontSize: "0.92rem", marginBottom: 24 }}>
-              {result.message}
-            </p>
-
-            {result.username && (
-              <div style={{
-                background: "linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%)",
-                border: "1.5px solid #a7f3d0",
-                borderRadius: 16, padding: "24px 28px", textAlign: "left",
-                marginBottom: 24, maxWidth: 360, marginLeft: "auto", marginRight: "auto",
-              }}>
-                <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#059669", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>
-                  Your Login Credentials
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div>
-                    <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 4 }}>Username</div>
-                    <div style={{
-                      background: "#fff", borderRadius: 10, padding: "10px 16px",
-                      fontWeight: 700, fontSize: "1rem", color: "#1e293b",
-                      border: "1px solid #d1fae5",
-                      fontFamily: "monospace",
-                    }}>
-                      {result.username}
-                    </div>
+              <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#059669", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>
+                Your Login Credentials
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 4 }}>Username</div>
+                  <div style={{
+                    background: "#fff", borderRadius: 10, padding: "10px 16px",
+                    fontWeight: 700, fontSize: "1rem", color: "#1e293b",
+                    border: "1px solid #d1fae5",
+                    fontFamily: "monospace",
+                  }}>
+                    {result.username}
                   </div>
-                  <div>
-                    <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 4 }}>Password (Date of Birth)</div>
-                    <div style={{
-                      background: "#fff", borderRadius: 10, padding: "10px 16px",
-                      fontWeight: 700, fontSize: "1rem", color: "#1e293b",
-                      border: "1px solid #d1fae5",
-                      fontFamily: "monospace",
-                    }}>
-                      {result.dob}
-                    </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: 4 }}>Password (Date of Birth)</div>
+                  <div style={{
+                    background: "#fff", borderRadius: 10, padding: "10px 16px",
+                    fontWeight: 700, fontSize: "1rem", color: "#1e293b",
+                    border: "1px solid #d1fae5",
+                    fontFamily: "monospace",
+                  }}>
+                    {result.dob}
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            <p style={{ color: "#94a3b8", fontSize: "0.82rem", marginBottom: 24 }}>
-              Please save these credentials. You will need them to log in and take the assessment.
-            </p>
+          <p style={{ color: "#94a3b8", fontSize: "0.82rem", marginBottom: 24 }}>
+            Please save these credentials. You will need them to log in and take the assessment.
+          </p>
 
-            <button
-              onClick={() => navigate("/student-login")}
-              style={s.btnPrimary}
-            >
-              Go to Student Login
-            </button>
-          </div>
+          <button
+            onClick={() => navigate("/student-login")}
+            style={s.btnPrimary}
+          >
+            Go to Student Login
+          </button>
         </div>
-      </div>
+      </RegisterShell>
     )
   }
 
   // ── Registration Form ──
-  return (
-    <div style={s.page}>
-      <style>{keyframes}</style>
-      <div style={s.bgOrb1} />
-      <div style={s.bgOrb2} />
-      <div style={s.bgOrb3} />
+  const submitDisabled = submitting || !selectionComplete
+  const footer = (
+    <>
+      <SignInNote />
+      <button
+        type="submit"
+        form="reg-form"
+        disabled={submitDisabled}
+        className="reg-footer-btn"
+        style={{ ...s.btnPrimary, opacity: submitDisabled ? 0.7 : 1, cursor: submitDisabled ? "not-allowed" : "pointer" }}
+      >
+        {submitting ? (
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            <div style={{ ...s.spinner, width: 18, height: 18, borderWidth: 2 }} />
+            {isPaid && discountedAmountInr > 0 ? "Processing..." : "Registering..."}
+          </span>
+        ) : !selectionComplete ? (
+          `Select your ${unitWord} to continue`
+        ) : isPaid && discountedAmountInr > 0 ? (
+          `Register & Pay INR ${discountedAmountInr}`
+        ) : (
+          "Register"
+        )}
+      </button>
+    </>
+  )
 
-      <div style={s.glassCard}>
-        {/* Header */}
-        <div style={s.header}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-            <div style={{
-              width: 10, height: 10, borderRadius: "50%",
-              background: "#34d399", boxShadow: "0 0 12px rgba(52, 211, 153, 0.5)",
-            }} />
-            <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Assessment Registration
-            </span>
-          </div>
-          {regBranding?.whitelabel && regBranding?.logoUrl && (
-            <img
-              src={regBranding.logoUrl}
-              alt={(regBranding.schoolName || "School") + " logo"}
-              style={{ maxHeight: 56, maxWidth: 180, objectFit: "contain", display: "block", marginBottom: 10 }}
-            />
-          )}
-          <h2 style={{
-            margin: 0, fontWeight: 800, fontSize: "clamp(1.3rem, 4vw, 1.6rem)",
-            color: "#0f172a", lineHeight: 1.2,
-          }}>
-            {mappingInfo?.assessmentName || "Assessment"}
-          </h2>
-          <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "0.88rem" }}>
+  // The class picker is hidden when there is a single option; the resolved
+  // cohort is then spelled out in a chip so the student still sees it.
+  const classPickerHidden =
+    mappingInfo?.mappingLevel === "INSTITUTE"
+      ? !showInstituteClassPicker
+      : mappingInfo?.mappingLevel === "SESSION"
+        ? !showSessionClassPicker
+        : true
+
+  const selectStyle = (value: string) => ({ ...s.input, color: value ? "#1e293b" : "#94a3b8" })
+  const onFocus = (e: React.FocusEvent<HTMLElement>) => Object.assign(e.target.style, s.inputFocus)
+  const onBlur = (e: React.FocusEvent<HTMLElement>) => Object.assign(e.target.style, inputBlurStyle)
+
+  return (
+    <>
+      <RegisterShell
+        eyebrow="Assessment Registration"
+        logoUrl={regBranding?.whitelabel ? regBranding.logoUrl : undefined}
+        title={mappingInfo?.assessmentName || "Assessment"}
+        subtitle={
+          <>
             {mappingInfo?.instituteName || ""}
             {mappingInfo?.className && ` · ${terms.unit} ${mappingInfo.className}`}
             {mappingInfo?.sectionName && ` (${mappingInfo.sectionName})`}
             {mappingInfo?.sessionYear && ` · ${mappingInfo.sessionYear}`}
-          </p>
-
-          {/* Your selection — B2C-style tier card showing the resolved tier,
-              its price, and the included features as bullets. */}
-          {showSelectionCard && selectionTier && (
-            <div style={{ marginTop: 18 }}>
-              <div style={s.selectionLabel}>Your selection</div>
-              <TierCard tier={selectionTier} selected disabled onSelect={() => {}} />
-            </div>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #e2e8f0, transparent)", margin: "0 32px" }} />
+          </>
+        }
+        footer={footer}
+      >
+        {/* Your selection — the resolved tier, its price and inclusions, one row. */}
+        {showSelectionCard && selectionTier && <TierStrip tier={selectionTier} />}
 
         {/* Cohort picker — outside the <form> so the details form appears only
             once the session/class cascade has resolved who is registering. */}
-        <div style={{ padding: "28px 32px 32px", display: "grid", gap: 24 }}>
+        {showPickerSection && (
+          <section>
+            {pickerTitle && <h3 className="reg-section-title">{pickerTitle}</h3>}
 
-          {showPickerSection && (
-            <section>
-              {pickerTitle && <h3 style={s.sectionTitle}>{pickerTitle}</h3>}
+            <div className="reg-grid reg-grid--auto">
+              {/* Session → Class → Section cascade for INSTITUTE level */}
+              {mappingInfo?.mappingLevel === "INSTITUTE" && availableSessions.length > 0 && (
+                <>
+                  {showSessionPicker && (
+                    <div>
+                      <label style={s.label}>
+                        Session <span style={{ color: "#f43f5e" }}>*</span>
+                      </label>
+                      <select
+                        value={selectedSessionId}
+                        onChange={(e) => {
+                          setSelectedSessionId(e.target.value)
+                          setSelectedClassId("")
+                          setSelectedSectionId("")
+                        }}
+                        style={selectStyle(selectedSessionId)}
+                        onFocus={onFocus}
+                        onBlur={onBlur}
+                      >
+                        <option value="">Select Session</option>
+                        {availableSessions.map((sess: any) => (
+                          <option key={sess.id} value={sess.id}>{sess.sessionYear}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {selectedSessionId && instituteClasses.length > 0 && showInstituteClassPicker && (
+                    <div>
+                      <label style={s.label}>
+                        {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
+                      </label>
+                      <select
+                        value={selectedClassId}
+                        onChange={(e) => {
+                          setSelectedClassId(e.target.value)
+                          setSelectedSectionId("")
+                        }}
+                        style={selectStyle(selectedClassId)}
+                        onFocus={onFocus}
+                        onBlur={onBlur}
+                      >
+                        <option value="">{terms.selectUnit}</option>
+                        {instituteClasses.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.className}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {selectedSessionId && instituteClasses.length > 0 && instituteClassSections.length > 0 && (
+                    <div>
+                      <label style={s.label}>Section</label>
+                      <select
+                        value={selectedSectionId}
+                        onChange={(e) => setSelectedSectionId(e.target.value)}
+                        style={selectStyle(selectedSectionId)}
+                        onFocus={onFocus}
+                        onBlur={onBlur}
+                      >
+                        <option value="">Select Section (Optional)</option>
+                        {instituteClassSections.map((sc: any) => (
+                          <option key={sc.id} value={sc.id}>{sc.sectionName}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
 
-              <div style={{ display: "grid", gap: 16 }}>
-                {/* Session → Class → Section cascade for INSTITUTE level */}
-                {mappingInfo?.mappingLevel === "INSTITUTE" && availableSessions.length > 0 && (
-                  <>
-                    {showSessionPicker && (
-                      <div>
-                        <label style={s.label}>
-                          Session <span style={{ color: "#f43f5e" }}>*</span>
-                        </label>
-                        <select
-                          value={selectedSessionId}
-                          onChange={(e) => {
-                            setSelectedSessionId(e.target.value)
-                            setSelectedClassId("")
-                            setSelectedSectionId("")
-                          }}
-                          style={{ ...s.input, color: selectedSessionId ? "#1e293b" : "#94a3b8" }}
-                          onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                          onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                        >
-                          <option value="">Select Session</option>
-                          {availableSessions.map((sess: any) => (
-                            <option key={sess.id} value={sess.id}>{sess.sessionYear}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {selectedSessionId && instituteClasses.length > 0 && (showInstituteClassPicker || instituteClassSections.length > 0) && (
-                      <div style={{ display: "grid", gridTemplateColumns: showInstituteClassPicker && instituteClassSections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
-                        {showInstituteClassPicker && (
-                          <div>
-                            <label style={s.label}>
-                              {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
-                            </label>
-                            <select
-                              value={selectedClassId}
-                              onChange={(e) => {
-                                setSelectedClassId(e.target.value)
-                                setSelectedSectionId("")
-                              }}
-                              style={{ ...s.input, color: selectedClassId ? "#1e293b" : "#94a3b8" }}
-                              onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                              onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                            >
-                              <option value="">{terms.selectUnit}</option>
-                              {instituteClasses.map((c: any) => (
-                                <option key={c.id} value={c.id}>{c.className}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                        {instituteClassSections.length > 0 && (
-                          <div>
-                            <label style={s.label}>Section</label>
-                            <select
-                              value={selectedSectionId}
-                              onChange={(e) => setSelectedSectionId(e.target.value)}
-                              style={{ ...s.input, color: selectedSectionId ? "#1e293b" : "#94a3b8" }}
-                              onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                              onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                            >
-                              <option value="">Select Section (Optional)</option>
-                              {instituteClassSections.map((sc: any) => (
-                                <option key={sc.id} value={sc.id}>{sc.sectionName}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
+              {/* Class (+ Section) dropdowns for SESSION level */}
+              {mappingInfo?.mappingLevel === "SESSION" && availableClasses.length > 0 && (
+                <>
+                  {showSessionClassPicker && (
+                    <div>
+                      <label style={s.label}>
+                        {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
+                      </label>
+                      <select
+                        value={selectedClassId}
+                        onChange={(e) => {
+                          setSelectedClassId(e.target.value)
+                          setSelectedSectionId("")
+                        }}
+                        style={selectStyle(selectedClassId)}
+                        onFocus={onFocus}
+                        onBlur={onBlur}
+                      >
+                        <option value="">{terms.selectUnit}</option>
+                        {availableClasses.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.className}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {selectedClassSections.length > 0 && (
+                    <div>
+                      <label style={s.label}>Section</label>
+                      <select
+                        value={selectedSectionId}
+                        onChange={(e) => setSelectedSectionId(e.target.value)}
+                        style={selectStyle(selectedSectionId)}
+                        onFocus={onFocus}
+                        onBlur={onBlur}
+                      >
+                        <option value="">Select Section (Optional)</option>
+                        {selectedClassSections.map((sc: any) => (
+                          <option key={sc.id} value={sc.id}>{sc.sectionName}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
 
-                {/* Class dropdown for SESSION level */}
-                {mappingInfo?.mappingLevel === "SESSION" && availableClasses.length > 0 && (showSessionClassPicker || selectedClassSections.length > 0) && (
-                  <div style={{ display: "grid", gridTemplateColumns: showSessionClassPicker && selectedClassSections.length > 0 ? "repeat(auto-fit, minmax(180px, 1fr))" : "1fr", gap: 16 }}>
-                    {showSessionClassPicker && (
-                      <div>
-                        <label style={s.label}>
-                          {terms.unit} <span style={{ color: "#f43f5e" }}>*</span>
-                        </label>
-                        <select
-                          value={selectedClassId}
-                          onChange={(e) => {
-                            setSelectedClassId(e.target.value)
-                            setSelectedSectionId("")
-                          }}
-                          style={{ ...s.input, color: selectedClassId ? "#1e293b" : "#94a3b8" }}
-                          onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                          onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                        >
-                          <option value="">{terms.selectUnit}</option>
-                          {availableClasses.map((c: any) => (
-                            <option key={c.id} value={c.id}>{c.className}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    {selectedClassSections.length > 0 && (
-                      <div>
-                        <label style={s.label}>Section</label>
-                        <select
-                          value={selectedSectionId}
-                          onChange={(e) => setSelectedSectionId(e.target.value)}
-                          style={{ ...s.input, color: selectedSectionId ? "#1e293b" : "#94a3b8" }}
-                          onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                          onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                        >
-                          <option value="">Select Section (Optional)</option>
-                          {selectedClassSections.map((sc: any) => (
-                            <option key={sc.id} value={sc.id}>{sc.sectionName}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                )}
+              {/* Section dropdown for CLASS level */}
+              {mappingInfo?.mappingLevel === "CLASS" && availableSections.length > 0 && (
+                <div>
+                  <label style={s.label}>Section</label>
+                  <select
+                    value={selectedSectionId}
+                    onChange={(e) => setSelectedSectionId(e.target.value)}
+                    style={selectStyle(selectedSectionId)}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                  >
+                    <option value="">Select Section (Optional)</option>
+                    {availableSections.map((sc: any) => (
+                      <option key={sc.id} value={sc.id}>{sc.sectionName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-                {/* Section dropdown for CLASS level */}
-                {mappingInfo?.mappingLevel === "CLASS" && availableSections.length > 0 && (
-                  <div>
-                    <label style={s.label}>Section</label>
-                    <select
-                      value={selectedSectionId}
-                      onChange={(e) => setSelectedSectionId(e.target.value)}
-                      style={{ ...s.input, color: selectedSectionId ? "#1e293b" : "#94a3b8" }}
-                      onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                      onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                    >
-                      <option value="">Select Section (Optional)</option>
-                      {availableSections.map((sc: any) => (
-                        <option key={sc.id} value={sc.id}>{sc.sectionName}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Pre-filled info for SECTION level */}
-                {mappingInfo?.mappingLevel === "SECTION" && (
-                  <div style={{
-                    background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
-                    border: "1.5px solid #a7f3d0", borderRadius: 12,
-                    padding: "14px 20px", fontSize: "0.88rem", color: "#065f46",
-                  }}>
+              {/* Pre-filled info for SECTION level */}
+              {mappingInfo?.mappingLevel === "SECTION" && (
+                <div className="reg-strip reg-span2" style={{ padding: "10px 16px" }}>
+                  <div className="reg-strip-sub" style={{ marginTop: 0, fontSize: "0.88rem" }}>
                     {terms.unit}: <strong>{mappingInfo.className}</strong> &middot; Section: <strong>{mappingInfo.sectionName}</strong>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* What was picked — a hidden single-option dropdown still leaves
-                    the resolved cohort visible here. */}
-                {selectedClassName && (
-                  <div style={{
-                    background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
-                    border: "1.5px solid #a7f3d0", borderRadius: 12,
-                    padding: "14px 20px", fontSize: "0.88rem", color: "#065f46",
-                  }}>
+              {/* What was picked — only needed when the class dropdown itself is
+                  hidden (single option), otherwise the dropdown already shows it. */}
+              {selectedClassName && classPickerHidden && (
+                <div className="reg-strip reg-span2" style={{ padding: "10px 16px" }}>
+                  <div className="reg-strip-sub" style={{ marginTop: 0, fontSize: "0.88rem" }}>
                     {terms.unit}: <strong>{selectedClassName}</strong>
                     {mappingInfo?.mappingLevel === "INSTITUTE" && selectedSessionName && (
                       <> &middot; Session <strong>{selectedSessionName}</strong></>
@@ -836,41 +810,46 @@ const AssessmentRegisterPage = () => {
                       <> &middot; Section <strong>{selectedSectionName}</strong></>
                     )}
                   </div>
-                )}
-              </div>
-            </section>
-          )}
-
-          {!selectionComplete && (
-            <p style={s.waiting}>{waitingCopy}</p>
-          )}
-
-          {selectionComplete && (
-            <form
-              onSubmit={handleSubmit}
-              // Enter in a text field must never submit the registration — only the
-              // explicit submit button does. Field-level handlers (promo/referral apply)
-              // still run first, since the event bubbles from the input up to the form.
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault()
-              }}
-            >
-              {formError && (
-                <div style={s.errorBanner}>
-                  <div style={s.errorBannerIcon}>!</div>
-                  <span style={s.errorBannerText}>{formError}</span>
-                  <button
-                    type="button"
-                    aria-label="Dismiss"
-                    onClick={() => setFormError("")}
-                    style={s.errorBannerClose}
-                  >
-                    ×
-                  </button>
                 </div>
               )}
-              <h3 style={s.sectionTitle}>Your details</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
+            </div>
+          </section>
+        )}
+
+        {!selectionComplete && (
+          <p style={s.waiting}>{waitingCopy}</p>
+        )}
+
+        {selectionComplete && (
+          <form
+            id="reg-form"
+            className="reg-form"
+            onSubmit={handleSubmit}
+            // Enter in a text field must never submit the registration — only the
+            // explicit submit button does. Field-level handlers (promo/referral apply)
+            // still run first, since the event bubbles from the input up to the form.
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault()
+            }}
+          >
+            {formError && (
+              <div style={s.errorBanner}>
+                <div style={s.errorBannerIcon}>!</div>
+                <span style={s.errorBannerText}>{formError}</span>
+                <button
+                  type="button"
+                  aria-label="Dismiss"
+                  onClick={() => setFormError("")}
+                  style={s.errorBannerClose}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            <div>
+              <h3 className="reg-section-title">Your details</h3>
+              <div className="reg-grid">
                 {/* Name */}
                 <div>
                   <label style={s.label}>
@@ -883,45 +862,27 @@ const AssessmentRegisterPage = () => {
                     onChange={(e) => setName(e.target.value)}
                     required
                     style={s.input}
-                    onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                    onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
                   />
                 </div>
 
-                {/* Email + DOB row */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-                  <div>
-                    <label style={s.label}>
-                      {emailLabel} <span style={{ color: "#f43f5e" }}>*</span>
-                    </label>
-                    <input
-                      ref={emailRef}
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      style={s.input}
-                      onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                      onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                    />
-                  </div>
-                  <div>
-                    <label style={s.label}>
-                      Date of Birth <span style={{ color: "#f43f5e" }}>*</span>
-                    </label>
-                    <input
-                      ref={dobRef}
-                      type="date"
-                      value={dobToInputValue(dob)}
-                      onChange={(e) => handleDobChange(e.target.value)}
-                      max={new Date().toISOString().split("T")[0]}
-                      required
-                      style={{ ...s.input, color: dob ? "#1e293b" : "#94a3b8" }}
-                      onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                      onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                    />
-                  </div>
+                {/* Email */}
+                <div>
+                  <label style={s.label}>
+                    {emailLabel} <span style={{ color: "#f43f5e" }}>*</span>
+                  </label>
+                  <input
+                    ref={emailRef}
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    style={s.input}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                  />
                 </div>
 
                 {/* Phone */}
@@ -936,19 +897,38 @@ const AssessmentRegisterPage = () => {
                     onChange={(e) => setPhone(e.target.value)}
                     required
                     style={s.input}
-                    onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                    onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
                   />
+                </div>
+
+                {/* DOB */}
+                <div>
+                  <label style={s.label}>
+                    Date of Birth <span style={{ color: "#f43f5e" }}>*</span>
+                  </label>
+                  <input
+                    ref={dobRef}
+                    type="date"
+                    value={dobToInputValue(dob)}
+                    onChange={(e) => handleDobChange(e.target.value)}
+                    max={new Date().toISOString().split("T")[0]}
+                    required
+                    style={selectStyle(dob)}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                  />
+                  <div className="reg-hint">Also your sign-in password — keep it safe.</div>
                 </div>
 
                 {/* Counselling fee itemisation. PAY_FIRST: the fee is added to the
                     registration total and paid upfront. PAY_LATER: only the assessment
                     price is paid now; counselling is paid per slot after the assessment. */}
                 {isPaid && counsellingFeePerSession > 0 && isPayFirst && counsellingFeeTotal > 0 && (
-                  <div style={{
+                  <div className="reg-span2" style={{
                     background: "linear-gradient(135deg, #eef2ff, #f5f3ff)",
                     border: "1.5px solid #c7d2fe", borderRadius: 12,
-                    padding: "14px 18px", fontSize: "0.88rem", color: "#3730a3",
+                    padding: "12px 16px", fontSize: "0.88rem", color: "#3730a3",
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                       <span>Assessment</span><strong>₹{amountInr.toLocaleString("en-IN")}</strong>
@@ -967,90 +947,86 @@ const AssessmentRegisterPage = () => {
                   </div>
                 )}
                 {isPaid && counsellingFeePerSession > 0 && !isPayFirst && (
-                  <div style={{ fontSize: "0.84rem", color: "#64748b", marginTop: -4 }}>
+                  <div className="reg-span2" style={{ fontSize: "0.82rem", color: "#64748b" }}>
                     Counselling is ₹{counsellingFeePerSession.toLocaleString("en-IN")}/session — pay later when you book your slot after the assessment.
                   </div>
                 )}
 
                 {/* Promo Code — hidden behind a toggle until the student asks for it */}
-                {isPaid && !showPromo && !promoApplied && (
-                  <button
-                    type="button"
-                    onClick={() => setShowPromo(true)}
-                    style={{
-                      background: "none", border: "none", padding: "10px 0", textAlign: "left",
-                      color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
-                    }}
-                  >
-                    Do you have a promo code?
-                  </button>
-                )}
-                {isPaid && (showPromo || promoApplied) && (
+                {isPaid && (
                   <div>
-                    <label style={s.label}>Promo Code</label>
-                    {promoApplied ? (
-                      <div style={{
-                        display: "flex", alignItems: "center", gap: 12,
-                        background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
-                        border: "1.5px solid #6ee7b7",
-                        borderRadius: 12, padding: "12px 18px",
-                      }}>
-                        <div style={{
-                          width: 28, height: 28, borderRadius: "50%",
-                          background: "#d1fae5", display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "0.85rem", color: "#059669",
-                        }}>
-                          &#10003;
-                        </div>
-                        <span style={{ color: "#065f46", fontWeight: 700, flex: 1, fontSize: "0.92rem" }}>
-                          {promoApplied.code} &mdash; {promoApplied.discountPercent}% off
-                          {promoApplied.discountPercent === 100 && " (Free!)"}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={handleRemovePromo}
-                          style={{
-                            background: "none", border: "1.5px solid #fca5a5",
-                            borderRadius: 8, padding: "4px 12px", color: "#ef4444",
-                            fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
+                    {!showPromo && !promoApplied ? (
+                      <button type="button" className="reg-inline-link" onClick={() => setShowPromo(true)}>
+                        Do you have a promo code?
+                      </button>
                     ) : (
-                      <div style={{ display: "flex", gap: 10 }}>
-                        <input
-                          type="text"
-                          placeholder="Enter promo code"
-                          value={promoCode}
-                          onChange={(e) => {
-                            setPromoCode(e.target.value.toUpperCase())
-                            setPromoError("")
-                          }}
-                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyPromo())}
-                          style={{ ...s.input, flex: 1, marginBottom: 0 }}
-                          onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                          onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleApplyPromo}
-                          disabled={promoValidating || !promoCode.trim()}
-                          style={{
-                            ...s.btnOutline,
-                            opacity: promoValidating || !promoCode.trim() ? 0.5 : 1,
-                            cursor: promoValidating || !promoCode.trim() ? "not-allowed" : "pointer",
-                          }}
-                        >
-                          {promoValidating ? "..." : "Apply"}
-                        </button>
-                      </div>
-                    )}
-                    {promoError && (
-                      <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: 6 }}>
-                        {promoError}
-                      </div>
+                      <>
+                        <label style={s.label}>Promo Code</label>
+                        {promoApplied ? (
+                          <div style={{
+                            display: "flex", alignItems: "center", gap: 12,
+                            background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
+                            border: "1.5px solid #6ee7b7",
+                            borderRadius: 10, padding: "9px 14px",
+                          }}>
+                            <div style={{
+                              width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                              background: "#d1fae5", display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "0.8rem", color: "#059669",
+                            }}>
+                              &#10003;
+                            </div>
+                            <span style={{ color: "#065f46", fontWeight: 700, flex: 1, fontSize: "0.88rem" }}>
+                              {promoApplied.code} &mdash; {promoApplied.discountPercent}% off
+                              {promoApplied.discountPercent === 100 && " (Free!)"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleRemovePromo}
+                              style={{
+                                background: "none", border: "1.5px solid #fca5a5",
+                                borderRadius: 8, padding: "3px 10px", color: "#ef4444",
+                                fontWeight: 600, fontSize: "0.76rem", cursor: "pointer",
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <input
+                              type="text"
+                              placeholder="Enter promo code"
+                              value={promoCode}
+                              onChange={(e) => {
+                                setPromoCode(e.target.value.toUpperCase())
+                                setPromoError("")
+                              }}
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyPromo())}
+                              style={{ ...s.input, flex: 1, minWidth: 0 }}
+                              onFocus={onFocus}
+                              onBlur={onBlur}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleApplyPromo}
+                              disabled={promoValidating || !promoCode.trim()}
+                              style={{
+                                ...s.btnOutline,
+                                opacity: promoValidating || !promoCode.trim() ? 0.5 : 1,
+                                cursor: promoValidating || !promoCode.trim() ? "not-allowed" : "pointer",
+                              }}
+                            >
+                              {promoValidating ? "..." : "Apply"}
+                            </button>
+                          </div>
+                        )}
+                        {promoError && (
+                          <div style={{ color: "#ef4444", fontSize: "0.78rem", marginTop: 5 }}>
+                            {promoError}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -1058,14 +1034,7 @@ const AssessmentRegisterPage = () => {
                 {/* Referral Code — available for free and paid links */}
                 <div>
                   {!hasReferral && !referralApplied ? (
-                    <button
-                      type="button"
-                      onClick={() => setHasReferral(true)}
-                      style={{
-                        background: "none", border: "none", padding: 0,
-                        color: "#059669", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
-                      }}
-                    >
+                    <button type="button" className="reg-inline-link" onClick={() => setHasReferral(true)}>
                       + Have a referral code?
                     </button>
                   ) : (
@@ -1076,16 +1045,16 @@ const AssessmentRegisterPage = () => {
                           display: "flex", alignItems: "center", gap: 12,
                           background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)",
                           border: "1.5px solid #6ee7b7",
-                          borderRadius: 12, padding: "12px 18px",
+                          borderRadius: 10, padding: "9px 14px",
                         }}>
                           <div style={{
-                            width: 28, height: 28, borderRadius: "50%",
+                            width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
                             background: "#d1fae5", display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "0.85rem", color: "#059669",
+                            fontSize: "0.8rem", color: "#059669",
                           }}>
                             &#10003;
                           </div>
-                          <span style={{ color: "#065f46", fontWeight: 700, flex: 1, fontSize: "0.92rem" }}>
+                          <span style={{ color: "#065f46", fontWeight: 700, flex: 1, fontSize: "0.88rem" }}>
                             {referralApplied.code}{referralApplied.name ? ` — ${referralApplied.name}` : ""}
                           </span>
                           <button
@@ -1093,15 +1062,15 @@ const AssessmentRegisterPage = () => {
                             onClick={handleRemoveReferral}
                             style={{
                               background: "none", border: "1.5px solid #fca5a5",
-                              borderRadius: 8, padding: "4px 12px", color: "#ef4444",
-                              fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
+                              borderRadius: 8, padding: "3px 10px", color: "#ef4444",
+                              fontWeight: 600, fontSize: "0.76rem", cursor: "pointer",
                             }}
                           >
                             Remove
                           </button>
                         </div>
                       ) : (
-                        <div style={{ display: "flex", gap: 10 }}>
+                        <div style={{ display: "flex", gap: 8 }}>
                           <input
                             type="text"
                             placeholder="Enter referral code"
@@ -1111,9 +1080,9 @@ const AssessmentRegisterPage = () => {
                               setReferralError("")
                             }}
                             onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyReferral())}
-                            style={{ ...s.input, flex: 1, marginBottom: 0 }}
-                            onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
-                            onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
+                            style={{ ...s.input, flex: 1, minWidth: 0 }}
+                            onFocus={onFocus}
+                            onBlur={onBlur}
                           />
                           <button
                             type="button"
@@ -1130,7 +1099,7 @@ const AssessmentRegisterPage = () => {
                         </div>
                       )}
                       {referralError && (
-                        <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: 6 }}>
+                        <div style={{ color: "#ef4444", fontSize: "0.78rem", marginTop: 5 }}>
                           {referralError}
                         </div>
                       )}
@@ -1138,53 +1107,19 @@ const AssessmentRegisterPage = () => {
                   )}
                 </div>
               </div>
+            </div>
 
-              <div style={{ marginTop: 20 }}>
-                <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
-              </div>
+            <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
 
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={submitting}
-                style={{
-                  ...s.btnPrimary,
-                  width: "100%",
-                  marginTop: 28,
-                  opacity: submitting ? 0.7 : 1,
-                  cursor: submitting ? "not-allowed" : "pointer",
-                }}
-              >
-                {submitting ? (
-                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                    <div style={{ ...s.spinner, width: 18, height: 18, borderWidth: 2 }} />
-                    {isPaid && discountedAmountInr > 0 ? "Processing..." : "Registering..."}
-                  </span>
-                ) : isPaid && discountedAmountInr > 0 ? (
-                  `Register & Pay INR ${discountedAmountInr}`
-                ) : (
-                  "Register"
-                )}
-              </button>
+            <p className="reg-hint" style={{ margin: 0, textAlign: "center" }}>
+              By registering, I agree to the Career-9's terms and conditions.
+            </p>
+          </form>
+        )}
+      </RegisterShell>
 
-              {/* Footer note */}
-              <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-                By registering, I agree to the Career-9's terms and conditions.
-              </p>
-            </form>
-          )}
-        </div>
-      </div>
-
-      {/* Branding */}
-      <div style={{
-        position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
-        fontSize: "0.72rem", color: "rgba(100, 116, 139, 0.5)", fontWeight: 500,
-        letterSpacing: "0.05em",
-      }}>
-        CAREER-9
-      </div>
-
+      {/* Rendered outside the shell: the card's backdrop-filter would trap a
+          fixed-position overlay inside the card. */}
       <DuplicateEmailDialog
         open={!!duplicateInfo}
         payload={duplicateInfo}
@@ -1201,260 +1136,11 @@ const AssessmentRegisterPage = () => {
         }}
         onClose={() => setDuplicateInfo(null)}
       />
-    </div>
+    </>
   )
 }
 
-// ── Keyframes ──
-const keyframes = `
-  @keyframes float1 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(30px, -40px) scale(1.05); }
-    66% { transform: translate(-20px, 20px) scale(0.95); }
-  }
-  @keyframes float2 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(-40px, 30px) scale(1.08); }
-    66% { transform: translate(25px, -25px) scale(0.92); }
-  }
-  @keyframes float3 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(35px, 35px) scale(1.04); }
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-  @media (max-width: 600px) {
-    .glass-card-responsive {
-      margin: 12px !important;
-      max-width: 100% !important;
-    }
-  }
-`
-
-// ── Styles ──
-const s: { [key: string]: React.CSSProperties } = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "linear-gradient(145deg, #f0fdf4 0%, #ecfeff 30%, #f0f9ff 60%, #faf5ff 100%)",
-    padding: "24px 16px",
-    position: "relative",
-    overflow: "hidden",
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  },
-  bgOrb1: {
-    position: "fixed",
-    width: 500,
-    height: 500,
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(52, 211, 153, 0.15) 0%, transparent 70%)",
-    top: "-10%",
-    right: "-5%",
-    animation: "float1 20s ease-in-out infinite",
-    pointerEvents: "none" as const,
-  },
-  bgOrb2: {
-    position: "fixed",
-    width: 600,
-    height: 600,
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%)",
-    bottom: "-15%",
-    left: "-10%",
-    animation: "float2 25s ease-in-out infinite",
-    pointerEvents: "none" as const,
-  },
-  bgOrb3: {
-    position: "fixed",
-    width: 350,
-    height: 350,
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%)",
-    top: "50%",
-    left: "60%",
-    animation: "float3 18s ease-in-out infinite",
-    pointerEvents: "none" as const,
-  },
-  glassCard: {
-    width: "100%",
-    maxWidth: 560,
-    background: "rgba(255, 255, 255, 0.72)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    borderRadius: 24,
-    border: "1px solid rgba(255, 255, 255, 0.6)",
-    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)",
-    overflow: "hidden",
-    position: "relative",
-    zIndex: 1,
-  },
-  header: {
-    padding: "32px 32px 24px",
-  },
-  priceBadge: {
-    marginTop: 16,
-    display: "inline-flex",
-    alignItems: "center",
-    background: "linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)",
-    color: "#065f46",
-    padding: "8px 20px",
-    borderRadius: 12,
-    fontSize: "0.95rem",
-    fontWeight: 700,
-    border: "1px solid #6ee7b7",
-  },
-  selectionLabel: {
-    fontSize: "0.72rem",
-    fontWeight: 700,
-    color: "#10b981",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    marginBottom: 8,
-  },
-  inclusionsBox: {
-    marginTop: 16,
-    background: "rgba(255, 255, 255, 0.6)",
-    border: "1px solid #e2e8f0",
-    borderRadius: 12,
-    padding: "12px 18px",
-  },
-  inclusionsTitle: {
-    fontSize: "0.72rem",
-    fontWeight: 700,
-    color: "#10b981",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    marginBottom: 6,
-  },
-  inclusionsList: {
-    margin: 0,
-    paddingLeft: 18,
-    color: "#475569",
-    fontSize: "0.84rem",
-    lineHeight: 1.7,
-  },
-  sectionTitle: {
-    fontSize: "0.92rem",
-    fontWeight: 700,
-    color: "#1e293b",
-    margin: "0 0 12px",
-    letterSpacing: "-0.01em",
-  },
-  waiting: {
-    margin: 0,
-    padding: "14px 18px",
-    border: "1.5px dashed #e2e8f0",
-    borderRadius: 12,
-    color: "#64748b",
-    fontSize: "0.86rem",
-  },
-  label: {
-    display: "block",
-    fontSize: "0.82rem",
-    fontWeight: 600,
-    color: "#374151",
-    marginBottom: 6,
-  },
-  input: {
-    width: "100%",
-    padding: "12px 16px",
-    borderRadius: 12,
-    border: "1.5px solid #e2e8f0",
-    background: "rgba(255, 255, 255, 0.8)",
-    fontSize: 16,
-    color: "#1e293b",
-    outline: "none",
-    transition: "border-color 0.2s, box-shadow 0.2s",
-    boxSizing: "border-box" as const,
-  },
-  inputFocus: {
-    borderColor: "#34d399",
-    boxShadow: "0 0 0 3px rgba(52, 211, 153, 0.15)",
-  },
-  btnPrimary: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "14px 32px",
-    borderRadius: 14,
-    border: "none",
-    background: "linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)",
-    color: "#fff",
-    fontSize: "0.95rem",
-    fontWeight: 700,
-    cursor: "pointer",
-    boxShadow: "0 4px 16px rgba(16, 185, 129, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1)",
-    transition: "transform 0.15s, box-shadow 0.15s",
-    letterSpacing: "0.01em",
-  },
-  btnOutline: {
-    padding: "12px 20px",
-    borderRadius: 12,
-    border: "1.5px solid #10b981",
-    background: "transparent",
-    color: "#059669",
-    fontSize: "0.88rem",
-    fontWeight: 700,
-    cursor: "pointer",
-    whiteSpace: "nowrap" as const,
-    transition: "all 0.15s",
-  },
-  spinner: {
-    width: 32,
-    height: 32,
-    border: "3px solid #e2e8f0",
-    borderTopColor: "#10b981",
-    borderRadius: "50%",
-    animation: "spin 0.8s linear infinite",
-  },
-  errorBanner: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 12,
-    padding: "14px 16px",
-    marginBottom: 18,
-    background: "#fff5f5",
-    border: "1px solid #fecaca",
-    borderRadius: 12,
-    borderBottom: "3px solid #fecaca",
-    color: "#374151",
-    fontSize: "0.95rem",
-    lineHeight: 1.5,
-    position: "relative",
-  },
-  errorBannerIcon: {
-    flex: "0 0 auto",
-    width: 28,
-    height: 28,
-    borderRadius: "50%",
-    background: "#ef4444",
-    color: "#fff",
-    fontWeight: 800,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 1,
-  },
-  errorBannerText: {
-    flex: "1 1 auto",
-    paddingRight: 24,
-    color: "#374151",
-  },
-  errorBannerClose: {
-    position: "absolute",
-    top: 6,
-    right: 8,
-    border: "none",
-    background: "transparent",
-    fontSize: "1.4rem",
-    lineHeight: 1,
-    color: "#9ca3af",
-    cursor: "pointer",
-    padding: "4px 8px",
-  },
-}
+// ── Styles (shared with the other registration pages) ──
+const s = rs
 
 export default AssessmentRegisterPage

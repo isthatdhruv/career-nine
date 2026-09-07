@@ -1,5 +1,6 @@
 import React, {
   useEffect,
+  useLayoutEffect,
   useState,
   useMemo,
   useCallback,
@@ -219,6 +220,63 @@ const SectionQuestionPage: React.FC = () => {
   const [rankingAnswers, setRankingAnswers] = useState<
     Record<string, Record<number, Record<number, number>>>
   >({});
+  // Ranking cards are re-sorted (ranked first) on every tap; slide each card
+  // from where it was to where it is now instead of letting it jump (FLIP).
+  // Positions are offsetLeft/offsetTop — layout coordinates that ignore both
+  // ancestor scrolling and the in-flight transform — so a scroll or a timer
+  // re-render never triggers a slide, and a card whose layout changes
+  // mid-slide continues from where it visually is.
+  const rankCardLayout = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const rankGridEl = useRef<HTMLElement | null>(null);
+  const rankCardCleanup = useRef<Map<HTMLElement, () => void>>(new Map());
+  useLayoutEffect(() => {
+    const grid = document.querySelector<HTMLElement>(".rank-grid");
+    if (grid !== rankGridEl.current) {
+      // New question (or none): forget the old positions.
+      rankGridEl.current = grid;
+      rankCardLayout.current = new Map();
+    }
+    if (!grid) return;
+    const prev = rankCardLayout.current;
+    const next = new Map<string, { x: number; y: number }>();
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const currentTranslate = (el: HTMLElement) => {
+      const tf = getComputedStyle(el).transform;
+      const m = tf && tf !== "none" ? tf.match(/matrix(3d)?\(([^)]+)\)/) : null;
+      if (!m) return { x: 0, y: 0 };
+      const v = m[2].split(",").map(Number);
+      return m[1] ? { x: v[12] || 0, y: v[13] || 0 } : { x: v[4] || 0, y: v[5] || 0 };
+    };
+    for (const el of Array.from(grid.querySelectorAll<HTMLElement>(".rank-card"))) {
+      const id = el.dataset.proctoringOptionId || "";
+      const layout = { x: el.offsetLeft, y: el.offsetTop };
+      next.set(id, layout);
+      const was = prev.get(id);
+      if (!was || reduceMotion) continue;
+      if (Math.abs(was.x - layout.x) < 0.5 && Math.abs(was.y - layout.y) < 0.5) continue; // unchanged → leave any running slide alone
+      // Where the card is on screen right now (previous layout + in-flight transform)
+      // relative to where it must end up.
+      const t = currentTranslate(el);
+      const dx = was.x + t.x - layout.x;
+      const dy = was.y + t.y - layout.y;
+      rankCardCleanup.current.get(el)?.();
+      el.style.transition = "none";
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      el.style.willChange = "transform";
+      el.getBoundingClientRect(); // flush so the next transform change transitions
+      el.style.transition = "transform 520ms cubic-bezier(0.22, 0.61, 0.36, 1)";
+      el.style.transform = "";
+      const clear = () => {
+        el.style.transition = "";
+        el.style.willChange = "";
+        el.removeEventListener("transitionend", clear);
+        rankCardCleanup.current.delete(el);
+      };
+      rankCardCleanup.current.set(el, () => el.removeEventListener("transitionend", clear));
+      el.addEventListener("transitionend", clear);
+    }
+    rankCardLayout.current = next;
+  });
   const [savedForLater, setSavedForLater] = useState<
     Record<string, Set<number>>
   >(() => {
@@ -1202,7 +1260,7 @@ const SectionQuestionPage: React.FC = () => {
           );
         }
         // If all questions answered, stay on current question (user can submit)
-      }, 400); // 400ms delay so user can see their selection
+      }, 800); // let the card finish sliding into place (520ms) before moving on
     }
   };
 
@@ -1231,6 +1289,69 @@ const SectionQuestionPage: React.FC = () => {
     }
 
     return availableRanks;
+  };
+
+  // ── Tap-to-rank helpers ──
+  // Number of rank slots for the current question (same derivation as
+  // getAvailableRanks): the cap for "equal"/"max", every option for "min",
+  // legacy maxOptionsAllowed otherwise.
+  const getMaxRanks = (): number => {
+    const totalOptions = (question.question.options || []).length;
+    if (optionsRule === "equal" || optionsRule === "max") return effectiveMax;
+    if (optionsRule === "min") return totalOptions;
+    return question.question.maxOptionsAllowed || totalOptions;
+  };
+  const currentQuestionRankings: Record<number, number> =
+    rankingAnswers[sectionId!]?.[qId] || {};
+  const rankedCount = Object.keys(currentQuestionRankings).length;
+  /** Ranked options of the current question in rank order. */
+  const rankedEntries = Object.entries(currentQuestionRankings)
+    .map(([optId, rank]) => ({ optionId: parseInt(optId), rank }))
+    .sort((a, b) => a.rank - b.rank);
+
+  /** Remove an option's rank and close the gap so ranks stay 1..n. */
+  const removeRankAndCompact = (optionId: number) => {
+    setRankingAnswers((prev) => {
+      const sec = prev[sectionId!] || {};
+      const q = sec[qId] || {};
+      const removed = q[optionId];
+      if (!removed) return prev;
+      const next: Record<number, number> = {};
+      for (const [id, r] of Object.entries(q)) {
+        const oid = parseInt(id);
+        if (oid === optionId) continue;
+        next[oid] = r > removed ? r - 1 : r;
+      }
+      return { ...prev, [sectionId!]: { ...sec, [qId]: next } };
+    });
+  };
+
+  /** Tap on a card: unranked → lowest free rank (auto-advance rules apply); ranked → remove. */
+  const handleRankTap = (optionId: number) => {
+    if (currentQuestionRankings[optionId]) {
+      removeRankAndCompact(optionId);
+      return;
+    }
+    const free = getAvailableRanks(optionId);
+    if (free.length === 0) return; // cap reached — the card is dimmed and the strip says why
+    handleRankChange(optionId, free[0]);
+  };
+
+  /** Swap a ranked option with its neighbour in the order (-1 = up / earlier, +1 = down / later). */
+  const moveRank = (optionId: number, direction: -1 | 1) => {
+    setRankingAnswers((prev) => {
+      const sec = prev[sectionId!] || {};
+      const q = sec[qId] || {};
+      const ordered = Object.entries(q)
+        .map(([id, r]) => ({ id: parseInt(id), r }))
+        .sort((a, b) => a.r - b.r);
+      const idx = ordered.findIndex((e) => e.id === optionId);
+      const swapIdx = idx + direction;
+      if (idx < 0 || swapIdx < 0 || swapIdx >= ordered.length) return prev;
+      const a = ordered[idx];
+      const b = ordered[swapIdx];
+      return { ...prev, [sectionId!]: { ...sec, [qId]: { ...q, [a.id]: b.r, [b.id]: a.r } } };
+    });
   };
 
   const saveForLaterFn = () => {
@@ -2753,6 +2874,27 @@ const SectionQuestionPage: React.FC = () => {
                 })()}
               </small>
             </div>
+            {currentIsRanking &&
+              (() => {
+                const maxRanks = getMaxRanks();
+                const total = (question.question.options || []).length;
+                const capped = maxRanks > 0 && maxRanks < total && rankedCount >= maxRanks;
+                const label =
+                  optionsRule === "min"
+                    ? `${rankedCount} ranked · at least ${effectiveMin} needed`
+                    : `${rankedCount} of ${maxRanks} ranked`;
+                const hint = capped
+                  ? "All picked — tap a ranked option to remove it and choose another."
+                  : rankedCount === 0
+                    ? "Tap the options in order of preference; your first tap becomes 1."
+                    : "Ranked options move to the top — use ▲ ▼ to reorder, tap one again to remove it.";
+                return (
+                  <div className="rank-status" aria-live="polite">
+                    <span className="rank-status__count">{label}</span>
+                    <span className="rank-status__hint">{hint}</span>
+                  </div>
+                );
+              })()}
 
             <div className="mt-4">
               {(() => {
@@ -3122,57 +3264,43 @@ const SectionQuestionPage: React.FC = () => {
                   }
 
                   if (isRankingQuestion) {
-                    // Ranking question UI with dropdown
+                    // Tap-to-rank: the whole card is the control. Unranked →
+                    // tap gives it the lowest free rank; ranked → tap removes
+                    // it and later ranks close the gap. Reordering lives in
+                    // the order strip rendered above the grid.
                     const currentRank =
                       rankingAnswers[sectionId!]?.[qId]?.[opt.optionId];
-                    const availableRanks = getAvailableRanks(opt.optionId);
+                    const capReached =
+                      !currentRank && getAvailableRanks(opt.optionId).length === 0;
+                    const cardClass =
+                      "rank-card" +
+                      (currentRank ? " rank-card--ranked" : "") +
+                      (capReached ? " rank-card--capped" : "");
+                    const isFirst = rankedEntries[0]?.optionId === opt.optionId;
+                    const isLast = rankedEntries[rankedEntries.length - 1]?.optionId === opt.optionId;
 
                     return (
                       <div
                         key={opt.optionId}
                         data-proctoring-option-id={opt.optionId}
-                        className="rounded p-3 d-block mb-2"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "15px",
-                          background: currentRank ? "#f8f9fa" : "#fff",
-                          border: "1px solid #dee2e6",
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={!!currentRank}
+                        aria-disabled={capReached}
+                        className={cardClass}
+                        onClick={() => handleRankTap(opt.optionId)}
+                        onKeyDown={(e) => {
+                          if (e.target !== e.currentTarget) return; // keys inside the ▲ ▼ buttons
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleRankTap(opt.optionId);
+                          }
                         }}
                       >
-                        <div style={{ minWidth: "120px" }}>
-                          <select
-                            className="form-select form-select-sm"
-                            value={currentRank || ""}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              handleRankChange(
-                                opt.optionId,
-                                value ? parseInt(value) : null,
-                              );
-                            }}
-                            style={{
-                              width: "110px",
-                              fontSize: "1rem",
-                              fontWeight: 600,
-                              color: "#2d3748",
-                              background: "#fff",
-                              borderColor: "#dee2e6",
-                            }}
-                          >
-                            <option value="">Rank</option>
-                            {currentRank &&
-                            !availableRanks.includes(currentRank) ? (
-                              <option value={currentRank}>{currentRank}</option>
-                            ) : null}
-                            {availableRanks.map((rank) => (
-                              <option key={rank} value={rank}>
-                                {rank}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div style={{ flex: 1 }}>
+                        <span className="rank-badge" aria-hidden="true">
+                          {currentRank || "+"}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           {hasOptionImage(opt) ? (
                             renderOptionContent(opt)
                           ) : availableLanguages.length > 0 ? (
@@ -3218,6 +3346,31 @@ const SectionQuestionPage: React.FC = () => {
                             </span>
                           )}
                         </div>
+                        {/* ▲ ▼ only on ranked cards: swap with the neighbour in
+                            the order (the grid re-sorts and slides). Clicks here
+                            must not reach the card's tap-to-rank handler. */}
+                        {currentRank && (
+                          <span className="rank-arrows" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="rank-arrows__btn"
+                              aria-label="Move up"
+                              disabled={isFirst}
+                              onClick={() => moveRank(opt.optionId, -1)}
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              className="rank-arrows__btn"
+                              aria-label="Move down"
+                              disabled={isLast}
+                              onClick={() => moveRank(opt.optionId, 1)}
+                            >
+                              ▼
+                            </button>
+                          </span>
+                        )}
                       </div>
                     );
                   }
@@ -3302,6 +3455,24 @@ const SectionQuestionPage: React.FC = () => {
                     </label>
                   );
                 };
+
+                // Ranking: ranked cards first (in rank order), the rest in
+                // their original order, flowing row by row so ranked ones sit
+                // at the top of both columns. The FLIP effect animates moves.
+                if (isRankingQuestion) {
+                  const rankOf = (o: Option): number | undefined =>
+                    rankingAnswers[sectionId!]?.[qId]?.[o.optionId];
+                  const sorted = options
+                    .map((o, i) => ({ o, i, r: rankOf(o) }))
+                    .sort((a, b) =>
+                      a.r && b.r ? a.r - b.r : a.r ? -1 : b.r ? 1 : a.i - b.i,
+                    );
+                  return (
+                    <div className={"rank-grid" + (options.length > 5 ? " options-grid-2col" : "")}>
+                      {sorted.map(({ o, i }) => renderOption(o, i))}
+                    </div>
+                  );
+                }
 
                 // Shared column layout: 2 columns above 5 options, else 1.
                 const optionsLayout =

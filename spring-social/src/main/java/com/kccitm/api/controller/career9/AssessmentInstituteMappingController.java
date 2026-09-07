@@ -1159,8 +1159,12 @@ public class AssessmentInstituteMappingController {
         resp.put("sessionsRemaining", Math.max(0, total - used));
         resp.put("canBookNow", canBookNow);
         // Token the SPA reuses to call the shared counselling slots/book endpoints
-        // (only meaningful once the entitlement is active with counselling).
-        resp.put("accessToken", canBookNow ? ent.getAccessToken() : null);
+        // (only meaningful once the entitlement is active with counselling). A
+        // lapsed token is extended here so a student who still has sessions is
+        // never bounced with 401 by the slots/book endpoints.
+        resp.put("accessToken", canBookNow
+                ? (entitlementService != null ? entitlementService.ensureLiveAccessToken(ent) : ent.getAccessToken())
+                : null);
         assessmentTableRepository.findById(ent.getAssessmentId())
                 .ifPresent(a -> resp.put("assessmentName", a.getAssessmentName()));
 
