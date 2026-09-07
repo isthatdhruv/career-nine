@@ -1,6 +1,5 @@
 package com.kccitm.api.controller.career9.b2c;
 
-import com.kccitm.api.service.counselling.CounsellingEmailHtml;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -95,6 +94,8 @@ public class CampaignPublicController {
     @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
     @Autowired(required = false) private com.kccitm.api.repository.Career9.counselling.CounsellingRequestRepository counsellingRequestRepository;
     @Autowired private com.kccitm.api.service.email.EmailDispatchService emailDispatchService;
+    /** Rule 1: the admin link in the forwarded-request mail is built here, never inlined. */
+    @Autowired private com.kccitm.api.service.email.theme.MailLinks mailLinks;
 
     // Where "forward my counselling request" notices go, and the address shown to
     // students on the thank-you page. Kept configurable; defaults to the canonical
@@ -1300,44 +1301,13 @@ public class CampaignPublicController {
             String studentEmail, String studentPhone, String instituteName) {
         if (supportEmail == null || supportEmail.isEmpty()) return;
         try {
-            String subject = "Counselling request — " + assessmentName;
-            String intro = "A student has requested career counselling, but no counsellor is "
-                    + "mapped to this assessment yet.";
-            String closing = "Assign a counsellor on the Counsellor ↔ Assessment page to let "
-                    + "the student book.";
+            com.kccitm.api.service.email.theme.Mail mail =
+                    com.kccitm.api.service.email.mails.InternalMails.counsellingRequestForwarded(
+                            assessmentName, studentName, studentEmail, studentPhone, instituteName,
+                            mailLinks.of(counsellorMappingUrl(), "admin_counsellors"));
 
-            java.util.List<CounsellingEmailHtml.Row> rows = CounsellingEmailHtml.rows();
-            rows.add(new CounsellingEmailHtml.Row("Assessment", assessmentName));
-            if (studentName != null)   rows.add(new CounsellingEmailHtml.Row("Student", studentName));
-            if (studentEmail != null)  rows.add(new CounsellingEmailHtml.Row("Email", studentEmail));
-            if (studentPhone != null)  rows.add(new CounsellingEmailHtml.Row("Phone", studentPhone));
-            if (instituteName != null) rows.add(new CounsellingEmailHtml.Row("Institute", instituteName));
-
-            String html = CounsellingEmailHtml.page(
-                    intro,
-                    "Counselling request needs a counsellor",
-                    CounsellingEmailHtml.p("Dear Admin,")
-                    + CounsellingEmailHtml.p(intro)
-                    + CounsellingEmailHtml.detailsTable(rows)
-                    + CounsellingEmailHtml.actionBlock(counsellorMappingUrl(),
-                            "Counsellor ↔ Assessment", "Assign a counsellor", null)
-                    + CounsellingEmailHtml.small(closing)
-                    + CounsellingEmailHtml.signature());
-
-            StringBuilder b = new StringBuilder();
-            b.append(intro).append("\n\n");
-            b.append(CounsellingEmailHtml.detailsText(rows));
-            b.append("\n").append("Assign a counsellor: ").append(counsellorMappingUrl()).append("\n\n");
-            b.append(closing);
-
-            com.kccitm.api.model.email.EmailSendRequest req =
-                    new com.kccitm.api.model.email.EmailSendRequest();
-            req.setEmailType(com.kccitm.api.model.email.EmailType.COUNSELLING_REQUEST);
-            req.getTo().add(supportEmail);
-            req.setSubject(subject);
-            req.setHtmlContent(html);
-            req.setTextContent(b.toString());
-            emailDispatchService.send(req);
+            emailDispatchService.send(com.kccitm.api.model.email.EmailSendRequest.mail(
+                    com.kccitm.api.model.email.EmailType.COUNSELLING_REQUEST, supportEmail, mail));
         } catch (Exception ex) {
             // Forwarding email is best-effort — never fail the request on a mail error.
             logger.warn("Failed to email counselling request notice to {}: {}", supportEmail, ex.getMessage());

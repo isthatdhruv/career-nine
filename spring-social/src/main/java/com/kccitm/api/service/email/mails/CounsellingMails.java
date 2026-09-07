@@ -291,4 +291,43 @@ public final class CounsellingMails {
         if (note != null && !note.isEmpty()) m.notice("Note from our team: " + v(note));
         return m.action(sessions, "View my sessions").signature().build();
     }
+
+    // ─── Manage Sessions summaries and counsellor deactivation ──────────────────
+
+    /**
+     * One session's full picture, resent to the student on request. The guidance sentence is
+     * the caller's, because whether there is a report to read — and whether the student may
+     * read it before the session — is the service's question, not this class's.
+     */
+    public static Mail summaryStudent(String firstName, Session s, String guidance) {
+        Mail.Builder m = Mail.builder().subject("Your counselling session details")
+            .preheader(s.date + ", " + s.time + " with " + s.counsellor + ". Join link and report inside.")
+            .title("Your counselling session").p(hi(firstName))
+            .p("Here are the details of your counselling session with " + b(s.counsellor) + ".").details(rows(s, false, true))
+            .action(s.join, "Join the session").links(null, s.report, "Open your assessment report");
+        if (guidance != null && !guidance.isEmpty()) m.small(v(guidance));
+        return m.small("If any of the above is incorrect, write to " + SUPPORT + " before the session so we can put it right.").signature().build();
+    }
+
+    /** The same session, for the counsellor taking it: the student is named, they are not. */
+    public static Mail summaryCounsellor(String counsellorName, Session s, String guidance) {
+        List<Mail.Row> r = new ArrayList<>();
+        for (Mail.Row x : rows(s, true, true)) if (!"Counsellor".equals(x.label)) r.add(x);
+        Mail.Builder m = Mail.builder().subject("Counselling session: " + s.student)
+            .preheader(s.date + ", " + s.time + ". Join link and report inside.")
+            .title("Counselling session: " + v(s.student)).p(hi(counsellorName))
+            .p("Here are the details of your counselling session with " + b(s.student) + ".").details(r)
+            .action(s.join, "Join the session").links(null, s.report, "Open the assessment report");
+        if (guidance != null && !guidance.isEmpty()) m.small(v(guidance));
+        return m.signature().build();
+    }
+
+    /** No button: a deactivated counsellor has nothing left to open. */
+    public static Mail counsellorDeactivated(String counsellorName, String sessionsSentence) {
+        return Mail.builder().subject("Your Career-9 counsellor account has been deactivated")
+            .preheader("You can no longer sign in to the counsellor portal.")
+            .title("Your counsellor account has been deactivated").p(hi(counsellorName))
+            .p("Your Career-9 counsellor account has been deactivated by the team. You will not be able to sign in to the counsellor portal, and no new sessions can be booked with you.")
+            .p(v(sessionsSentence)).small("If you believe this is a mistake, write to " + SUPPORT + ".").signature().build();
+    }
 }

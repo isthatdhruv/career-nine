@@ -87,6 +87,15 @@ public final class MailSamples {
         m.put("counselling-marked-absent-no-changes", CounsellingMails.markedAbsent(FIRST, S, 0, SESSIONS));
         m.put("counselling-dispute-outcome", CounsellingMails.disputeOutcome(FIRST, DATE, false, "The counsellor confirmed you joined at 4:41 PM.", SESSIONS));
         m.put("counselling-dispute-outcome-upheld", CounsellingMails.disputeOutcome(FIRST, DATE, true, null, SESSIONS));
+        m.put("counselling-session-summary-student", CounsellingMails.summaryStudent(FIRST, S, "Read your report before the session so you can bring your questions."));
+        m.put("counselling-session-summary-counsellor", CounsellingMails.summaryCounsellor(COUNSELLOR, S, "Please read the report before the session."));
+        m.put("counsellor-deactivated-notice", CounsellingMails.counsellorDeactivated(COUNSELLOR, "Your 4 upcoming sessions have been reassigned or returned to the students to rebook."));
+        m.put("counsellor-deactivated-admin-alert", InternalMails.counsellorDeactivatedAlert(COUNSELLOR, "priya.iyer@career-9.net", "Admin",
+                java.util.Arrays.asList(new String[]{"Aarav Sharma", "18 Sep, 4:30 PM", "aarav@example.com \u00b7 98765 43210", "Rebooking link sent"},
+                                        new String[]{"Diya Patel", "19 Sep, 11:00 AM", "diya@example.com \u00b7 98111 22334", "Needs follow-up"}),
+                L("https://dashboard.career-9.com/admin/counselling/sessions")));
+        m.put("counselling-request-forwarded", InternalMails.counsellingRequestForwarded(ASSESSMENT, STUDENT, "aarav@example.com", "98765 43210", SCHOOL, L("https://dashboard.career-9.com/admin/counsellors")));
+        m.put("counselling-admin-no-replacement", InternalMails.adminNotice("Counselling", "Session needs a counsellor", "A counsellor cancelled and nobody else is free at that time.", java.util.Arrays.asList(new Mail.Row("Student", STUDENT), new Mail.Row("When", DATE + ", " + TIME)), L("https://dashboard.career-9.com/admin/counselling/sessions"), "Open Manage Sessions"));
         return m;
     }
 }
