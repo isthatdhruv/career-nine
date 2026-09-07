@@ -11,7 +11,6 @@ import static com.kccitm.api.service.email.theme.Mail.b;
 public final class PaymentMails {
     public enum Outcome { FAILED, EXPIRED, CANCELLED }
     private PaymentMails() { }
-    static String rupees(String amount) { return "&#8377;" + Mail.v(amount); }
 
     public static Mail paymentReceived(String firstName, String assessmentName, String username, String password, MailLink start) {
         return Mail.builder().subject("Payment received for " + assessmentName)
@@ -45,7 +44,7 @@ public final class PaymentMails {
         String subject, lead;
         switch (outcome) {
             case EXPIRED:   subject = "Payment link for " + assessmentName + " has expired";
-                            lead = "The payment link for " + b(assessmentName) + " (" + rupees(amount) + ") has expired, so nothing has been charged."; break;
+                            lead = "The payment link for " + b(assessmentName) + " (" + b("₹" + amount) + ") has expired, so nothing has been charged."; break;
             case CANCELLED: subject = "Payment for " + assessmentName + " was cancelled";
                             lead = "Your payment of " + b("₹" + amount) + " for " + b(assessmentName) + " was cancelled, so nothing has been charged."; break;
             default:        subject = "Payment for " + assessmentName + " did not go through";

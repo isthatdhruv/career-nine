@@ -156,15 +156,23 @@ public class PaymentEmailService {
             String dob = txn.getStudentDob() != null
                     ? new SimpleDateFormat("dd-MM-yyyy").format(txn.getStudentDob()) : null;
 
-            // The one-tap magic link only exists when this payment minted an entitlement;
-            // a legacy school/mapping payment has none, so the resend falls back to manual sign-in.
+            // The one-tap magic link only exists when this payment minted a live entitlement;
+            // a legacy school/mapping payment has none, and an entitlement that is neither
+            // active nor pending hands back a stale (possibly null/expired) token from
+            // ensureLiveAccessToken instead of extending it — either way the resend falls
+            // back to manual sign-in rather than carry a dead link.
             MailLink magic = null;
             Optional<StudentEntitlement> entitlementOpt =
                     entitlementRepository.findFirstByPaymentTransactionIdOrderByEntitlementIdDesc(txn.getTransactionId());
             if (entitlementOpt.isPresent()) {
                 StudentEntitlement entitlement = entitlementOpt.get();
-                String token = entitlementService.ensureLiveAccessToken(entitlement);
-                magic = mailLinks.of(linkBuilder.assessmentStart(token, entitlement.getEntitlementId()), "assessment_start");
+                String status = entitlement.getStatus();
+                if ("active".equals(status) || "pending".equals(status)) {
+                    String token = entitlementService.ensureLiveAccessToken(entitlement);
+                    if (token != null && !token.trim().isEmpty()) {
+                        magic = mailLinks.of(linkBuilder.assessmentStart(token, entitlement.getEntitlementId()), "assessment_start");
+                    }
+                }
             }
 
             Mail mail = PaymentMails.welcomeResend(AccountMails.firstName(studentName), assessmentName, username, dob,

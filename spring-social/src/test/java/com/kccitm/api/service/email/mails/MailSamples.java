@@ -24,6 +24,7 @@ public final class MailSamples {
     static final MailLink SESSIONS = L("https://dashboard.career-9.com/counselling/my-sessions");
     static final MailLink PORTAL = L("https://dashboard.career-9.com/counsellor/sessions");
     static final MailLink REPORT = L("https://storage-c9.sgp1.cdn.digitaloceanspaces.com/reports/2026/09/aarav-sharma-career-report.html");
+    static final MailLink PAYMENT_RETRY = L("https://dashboard.career-9.com/payment-register/pay_Q7x9AbC1234567890abcdef");
 
     public static Map<String, Mail> all() {
         Map<String, Mail> m = new LinkedHashMap<>();
@@ -36,9 +37,12 @@ public final class MailSamples {
         m.put("account-activated", AccountMails.accountActivated("Meera", SIGN_IN));
         m.put("payment-success-welcome", PaymentMails.paymentReceived(FIRST, ASSESSMENT, "20260412", "15-05-2010", LOGIN));
         m.put("payment-success-resend", PaymentMails.welcomeResend(FIRST, ASSESSMENT, "20260412", "15-05-2010", MAGIC, LOGIN));
-        m.put("payment-failed-cancelled-expired", PaymentMails.paymentFailed(FIRST, ASSESSMENT, "1,499", PaymentMails.Outcome.FAILED, L("https://dashboard.career-9.com/payment-register/pay_Q7x9AbC1234567890abcdef")));
-        m.put("payment-pending-nudge", PaymentMails.paymentPending(FIRST, ASSESSMENT, "1,499", L("https://dashboard.career-9.com/payment-register/pay_Q7x9AbC1234567890abcdef")));
-        m.put("payment-link", PaymentMails.paymentLink(FIRST, ASSESSMENT, "1,499", L("https://dashboard.career-9.com/payment-register/pay_Q7x9AbC1234567890abcdef")));
+        m.put("payment-success-resend-no-entitlement", PaymentMails.welcomeResend(FIRST, ASSESSMENT, "20260412", "15-05-2010", null, LOGIN));
+        m.put("payment-failed-cancelled-expired", PaymentMails.paymentFailed(FIRST, ASSESSMENT, "1,499", PaymentMails.Outcome.FAILED, PAYMENT_RETRY));
+        m.put("payment-failed-cancelled-expired-expired", PaymentMails.paymentFailed(FIRST, ASSESSMENT, "1,499", PaymentMails.Outcome.EXPIRED, PAYMENT_RETRY));
+        m.put("payment-failed-cancelled-expired-cancelled", PaymentMails.paymentFailed(FIRST, ASSESSMENT, "1,499", PaymentMails.Outcome.CANCELLED, PAYMENT_RETRY));
+        m.put("payment-pending-nudge", PaymentMails.paymentPending(FIRST, ASSESSMENT, "1,499", PAYMENT_RETRY));
+        m.put("payment-link", PaymentMails.paymentLink(FIRST, ASSESSMENT, "1,499", PAYMENT_RETRY));
         return m;
     }
 }
