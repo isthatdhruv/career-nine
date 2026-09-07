@@ -44,6 +44,9 @@ public class EmailSendRequest {
 
     private List<SmtpEmailRequest.EmailAttachment> attachments = new ArrayList<>();
 
+    /** Optional branding decided by the caller (e.g. the report pipeline carries it on the event). */
+    private com.kccitm.api.service.email.theme.Brand brand;
+
     public EmailSendRequest() {
     }
 
@@ -96,4 +99,6 @@ public class EmailSendRequest {
     }
     public List<SmtpEmailRequest.EmailAttachment> getAttachments() { return attachments; }
     public void setAttachments(List<SmtpEmailRequest.EmailAttachment> attachments) { this.attachments = attachments; }
+    public com.kccitm.api.service.email.theme.Brand getBrand() { return brand; }
+    public void setBrand(com.kccitm.api.service.email.theme.Brand brand) { this.brand = brand; }
 }
