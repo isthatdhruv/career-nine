@@ -62,7 +62,8 @@ public final class MailSamples {
         m.put("counselling-assigned-to-counsellor", CounsellingMails.assignedToCounsellor(COUNSELLOR, "Wants help choosing a stream after Class 10", S, PORTAL));
         m.put("counselling-confirmed-to-student", CounsellingMails.confirmedToStudent(FIRST, S));
         m.put("counselling-cancelled-notice", CounsellingMails.cancelledNotice(FIRST, S, "the student", "counsellor unavailable", SESSIONS, "View my sessions"));
-        m.put("counselling-student-cancellation-confirmation", CounsellingMails.studentCancellationConfirmation(FIRST, S, 1, SESSIONS));
+        m.put("counselling-student-cancellation-confirmation", CounsellingMails.studentCancellationConfirmation(FIRST, S, 1, true, SESSIONS));
+        m.put("counselling-student-cancellation-confirmation-not-credited", CounsellingMails.studentCancellationConfirmation(FIRST, S, 0, false, SESSIONS));
         m.put("counselling-admin-cancellation", CounsellingMails.adminCancellationStudent(FIRST, S, SESSIONS));
         m.put("counselling-admin-cancellation-counsellor", CounsellingMails.adminCancellationCounsellor(COUNSELLOR, STUDENT, S, PORTAL));
         m.put("counselling-self-reschedule", CounsellingMails.selfReschedule(FIRST, "Your counsellor was unable to join your session on Tuesday, 16 Sep at 3:00 PM.", "counsellor unavailable", RESCHEDULE));

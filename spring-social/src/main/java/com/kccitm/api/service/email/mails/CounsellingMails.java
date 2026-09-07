@@ -78,12 +78,18 @@ public final class CounsellingMails {
         return m.action(sessions, buttonLabel).small("If you have any questions, write to " + SUPPORT + ".").signature().build();
     }
 
-    public static Mail studentCancellationConfirmation(String firstName, Session s, int changesLeft, MailLink sessions) {
+    public static Mail studentCancellationConfirmation(String firstName, Session s, int changesLeft, boolean creditedBack, MailLink sessions) {
+        String left = " You have " + b(String.valueOf(changesLeft)) + " free change" + (changesLeft == 1 ? "" : "s") + " left.";
+        // A cancellation that was not credited back costs her a session; saying it was returned
+        // when it was not is the one thing this mail must never do.
+        String notice = creditedBack
+                ? "Your session has been returned to your plan, so you can book again." + left
+                : "This cancellation used one of your sessions, so it has not been returned to your plan." + left;
         return Mail.builder().subject("Your counselling session has been cancelled")
             .preheader("Cancelled as you asked. You have " + changesLeft + " free change" + (changesLeft == 1 ? "" : "s") + " left.")
             .title("Your session has been cancelled").p(hi(firstName))
             .p("Your counselling session on " + b(s.date) + " at " + b(s.time) + " has been cancelled as you requested.")
-            .notice("Your session has been returned to your plan, so you can book again. You have " + b(String.valueOf(changesLeft)) + " free change" + (changesLeft == 1 ? "" : "s") + " left.")
+            .notice(notice)
             .p("Ready to pick a new time?").action(sessions, "Book a new time").signature().build();
     }
 

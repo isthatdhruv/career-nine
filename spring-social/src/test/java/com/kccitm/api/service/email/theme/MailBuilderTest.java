@@ -72,4 +72,12 @@ class MailBuilderTest {
                 .build();
         assertEquals("It’s ‘on’", m.getBlocks().get(0).text());
     }
+
+    @Test
+    void decodesNumericCharacterReferences() {
+        Mail m = Mail.builder().subject("s").preheader("p")
+                .p("Done &#10003; and &#127881; &#x2019;")
+                .build();
+        assertEquals("Done ✓ and 🎉 ’", m.getBlocks().get(0).text());
+    }
 }

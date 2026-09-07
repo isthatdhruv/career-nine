@@ -1496,7 +1496,8 @@ public class CounsellingNotificationService {
         try {
             Mail mail = CounsellingMails.studentCancellationConfirmation(
                     AccountMails.firstName(studentName(appointment)), session(appointment),
-                    missesRemaining, mailLinks.of(portalCounsellingUrl(), "counselling_portal"));
+                    missesRemaining, creditedBack,
+                    mailLinks.of(portalCounsellingUrl(), "counselling_portal"));
 
             sendWithCancelledInvite(appointment, mail);
         } catch (Exception e) {
