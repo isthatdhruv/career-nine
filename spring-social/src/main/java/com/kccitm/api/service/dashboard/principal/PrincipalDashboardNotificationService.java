@@ -100,6 +100,10 @@ public class PrincipalDashboardNotificationService {
 
         List<Recipient> all = recipientsFor(instituteCode);
         List<SendOutcome> outcomes = new ArrayList<>();
+        // assessmentName is an optional request param (PrincipalDashboardReleaseController);
+        // the old body() guarded a missing value the same way — keep that fallback at the caller.
+        String assessmentLabel = (assessmentName == null || assessmentName.isBlank())
+                ? "the assessment" : assessmentName;
 
         for (Recipient recipient : all) {
             if (!contactPersonIds.contains(recipient.id)) {
@@ -118,7 +122,7 @@ public class PrincipalDashboardNotificationService {
             }
 
             try {
-                Mail mail = ReportMails.schoolDashboardReady(recipient.name, instituteName, assessmentName,
+                Mail mail = ReportMails.schoolDashboardReady(recipient.name, instituteName, assessmentLabel,
                         mailLinks.of(frontendUrl + "/school-dashboard", "school_dashboard"));
                 EmailSendResult result = emailDispatch.sendMail(
                         EmailType.SCHOOL_DASHBOARD_READY, recipient.email, mail);
