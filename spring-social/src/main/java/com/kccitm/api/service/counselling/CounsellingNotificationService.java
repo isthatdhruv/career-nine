@@ -431,11 +431,12 @@ public class CounsellingNotificationService {
             // read as "Reminder: Counselling Session in in 12 hours".
             CounsellingMails.Session s = session(appointment);
 
-            // Student copy, plus the parent/guardian copy if one was given at booking.
+            // Student copy, plus the parent/guardian copy if one was given at booking. Both read
+            // studentSession: a report held for counsellor release must not ride along on them.
             String studentEmail = studentEmail(appointment);
             String studentName = studentName(appointment);
             Mail studentMail = CounsellingMails.reminderStudent(
-                    AccountMails.firstName(studentName), period, s);
+                    AccountMails.firstName(studentName), period, studentView(s, appointment));
             sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, studentMail);
             String parentEmail = appointment.getParentEmail();
             if (parentEmail != null && !parentEmail.isEmpty()) {
@@ -1792,6 +1793,31 @@ public class CounsellingNotificationService {
         return new CounsellingMails.Session(date, time, duration,
                 a.getCounsellor() != null ? a.getCounsellor().getName() : null, mode,
                 instituteNameFor(a), assessmentNameFor(a), studentName(a), join, report);
+    }
+
+    /**
+     * The same session facts, but safe to put in front of a student.
+     *
+     * <p>A report held for counsellor release is meant to be talked through in the session, not
+     * read beforehand — {@link #sessionDetailRows} has always suppressed it on the student's
+     * copy. {@link #session} cannot: the counsellor's mails need that link. So the student-facing
+     * mails take the session through here, which blanks the report and leaves everything else
+     * alone. Without it a reminder would hand the student a direct link to the very report the
+     * gate is holding back.
+     */
+    CounsellingMails.Session studentSession(CounsellingAppointment a) {
+        return studentView(session(a), a);
+    }
+
+    /**
+     * The same gate applied to a session that has already been built, so a mail sending both a
+     * student and a counsellor copy pays for {@link #session} once rather than twice — it reaches
+     * the report repository, and the reminders run over every appointment four times a session.
+     */
+    private CounsellingMails.Session studentView(CounsellingMails.Session s, CounsellingAppointment a) {
+        if (s.report == null || !isHeldForCounsellorRelease(a)) return s;
+        return new CounsellingMails.Session(s.date, s.time, s.duration, s.counsellor, s.mode,
+                s.school, s.assessment, s.student, s.join, null);
     }
 
     /**

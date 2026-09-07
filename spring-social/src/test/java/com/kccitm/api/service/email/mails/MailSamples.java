@@ -84,6 +84,7 @@ public final class MailSamples {
         m.put("counselling-checkin-prompt-student", CounsellingMails.checkinPromptStudent(FIRST, S, SESSIONS));
         m.put("counselling-checkin-prompt-counsellor", CounsellingMails.checkinPromptCounsellor(COUNSELLOR, STUDENT, TIME, PORTAL));
         m.put("counselling-marked-absent", CounsellingMails.markedAbsent(FIRST, S, 1, SESSIONS));
+        m.put("counselling-marked-absent-no-changes", CounsellingMails.markedAbsent(FIRST, S, 0, SESSIONS));
         m.put("counselling-dispute-outcome", CounsellingMails.disputeOutcome(FIRST, DATE, false, "The counsellor confirmed you joined at 4:41 PM.", SESSIONS));
         m.put("counselling-dispute-outcome-upheld", CounsellingMails.disputeOutcome(FIRST, DATE, true, null, SESSIONS));
         return m;

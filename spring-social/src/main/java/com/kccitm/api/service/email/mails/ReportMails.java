@@ -37,7 +37,7 @@ public final class ReportMails {
         else m.small(pdfAttached ? "Your detailed report is also attached to this email as a PDF." : "Open your full report using the button above.");
         m.p("But remember, the report is just the beginning &#127775;");
         if (booking != null) {
-            m.p(b("&#128640; Your next step.") + " Now it&rsquo;s time to understand what these insights mean for your future. Get your report interpreted by an expert in a 1:1 online session:")
+            m.p("&#128640; " + b("Your next step.") + " Now it&rsquo;s time to understand what these insights mean for your future. Get your report interpreted by an expert in a 1:1 online session:")
              .list("&#10024; Explore career options that fit " + b("you"), "&#10024; Discover your strengths and improvement areas",
                    "&#10024; Get clarity on your next academic step", "&#10024; Ask anything about your future. No question is too small")
              .outline(booking, "Book my counselling session");

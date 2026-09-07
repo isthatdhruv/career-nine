@@ -41,7 +41,7 @@ public final class CounsellingMails {
             .details(rows(s, true, true))
             .action(s.join, "Join the session").outline(calendar, "Add to Google Calendar")
             .small("A calendar invite is also attached so you can add this to any calendar.")
-            .p(b("&#128161; Come curious. Leave clear.") + " This is your session, so bring all your questions:")
+            .p("&#128161; " + b("Come curious. Leave clear.") + " This is your session, so bring all your questions:")
             .list("&#129300; &ldquo;Which career is right for me?&rdquo;", "&#127919; &ldquo;What am I really good at?&rdquo;",
                   "&#128218; &ldquo;Which subjects should I choose?&rdquo;", "&#128640; &ldquo;What options do I have after school or college?&rdquo;")
             .p("Ask. Explore. Challenge. Discover. Your Career-9 report has the insights. Now, let&rsquo;s turn those insights into possibilities. &#128153;")
@@ -207,9 +207,9 @@ public final class CounsellingMails {
             .title("Thank you for being a part of Career-9 &#127775;").p("Hi " + v(firstName) + " &#128075;")
             .p("We hope your counselling session helped you discover new possibilities, understand yourself better, and take a step closer to making confident career choices. &#128640;")
             .p("Remember, your career journey doesn&rsquo;t end with one session. Keep exploring, keep learning, and keep believing in yourself.")
-            .p(b("&#128153; Know someone who needs career clarity?") + " If you found your Career-9 experience valuable, share it with friends, cousins or family members who may also be wondering &ldquo;What should I choose for my future?&rdquo; &#129300;")
+            .p("&#128153; " + b("Know someone who needs career clarity?") + " If you found your Career-9 experience valuable, share it with friends, cousins or family members who may also be wondering &ldquo;What should I choose for my future?&rdquo; &#129300;")
             .action(referral, "Refer a friend or family member")
-            .p(b("&#128260; See you again in 6 months.") + " Your interests, strengths and aspirations evolve as you grow, so we would love to reconnect in 6 months and see what has changed and where you want to go next.")
+            .p("&#128260; " + b("See you again in 6 months.") + " Your interests, strengths and aspirations evolve as you grow, so we would love to reconnect in 6 months and see what has changed and where you want to go next.")
             .p("Your future is a journey. We&rsquo;re happy to be part of it. &#128153;").signature().build();
     }
     public static Mail bookingInvite(String firstName, MailLink booking) {
@@ -260,12 +260,19 @@ public final class CounsellingMails {
             .notice("If neither is recorded before the session ends, it will be logged as your no-show rather than the student&rsquo;s.").signature().build();
     }
     public static Mail markedAbsent(String firstName, Session s, int changesLeft, MailLink sessions) {
+        // With a change left the session comes back and rebooking is free, so "book again" is
+        // the true next step. With none left it does not: the session can no longer be moved and
+        // a fresh booking is chargeable, and inviting her to "book a new time" would spring that
+        // on her at the payment page. Both halves — sentence and button — switch together.
+        boolean canRebook = changesLeft > 0;
         return Mail.builder().subject("You were marked absent from your counselling session").preheader("Here is where you stand and what you can do next.")
             .title("You were marked absent").p(hi(firstName))
             .p("Your counsellor has recorded that you did not attend your session on " + b(s.date) + " at " + b(s.time) + ".")
             .notice("You have " + b(String.valueOf(changesLeft)) + " free change" + (changesLeft == 1 ? "" : "s") + " left.")
-            .p("Your session has been returned to your plan, so you can book again.")
-            .action(sessions, "Book a new time")
+            .p(canRebook
+                    ? "Your session has been returned to your plan, so you can book again."
+                    : "You have no free changes left, so this session can no longer be moved. You can book a new session.")
+            .action(sessions, canRebook ? "Book a new time" : "View my sessions")
             .small("If you were present and believe this is a mistake, raise it from your Career-9 dashboard or write to " + SUPPORT + ". The session will be reviewed and nothing counts against you until it is settled.").signature().build();
     }
     public static Mail disputeOutcome(String firstName, String date, boolean upheld, String note, MailLink sessions) {
