@@ -70,6 +70,8 @@ public final class MailSamples {
         m.put("counselling-rescheduled", CounsellingMails.rescheduledStudent(FIRST, OLD, S));
         m.put("counselling-rescheduled-counsellor", CounsellingMails.rescheduledCounsellor(COUNSELLOR, STUDENT, OLD, S));
         m.put("counselling-counsellor-swapped", CounsellingMails.counsellorSwapped(FIRST, S, "Rohit Verma"));
+        CounsellingMails.Session OFFLINE = new CounsellingMails.Session(DATE, TIME, "30", COUNSELLOR, "In-person · Room 204, Main Block", SCHOOL, ASSESSMENT, STUDENT, null, null);
+        m.put("counselling-counsellor-swapped-in-person", CounsellingMails.counsellorSwapped(FIRST, OFFLINE, "Rohit Verma"));
         m.put("counselling-session-shifted", CounsellingMails.sessionShifted(FIRST, S, "3:00 – 3:30 PM IST", RESCHEDULE));
         m.put("counsellor-deactivated-student", CounsellingMails.counsellorDeactivatedStudent(FIRST, S, RESCHEDULE));
         return m;

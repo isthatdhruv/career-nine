@@ -147,12 +147,20 @@ public final class CounsellingMails {
     }
 
     public static Mail counsellorSwapped(String firstName, Session s, String newCounsellor) {
-        return Mail.builder().subject("Your session is confirmed with updated details")
+        // An in-person session has no join link, so the mail must point at the details panel
+        // instead of promising a link that is never rendered — and the "join early" note, which
+        // is about a meeting room, has no meaning when the student is walking to a venue.
+        Mail.Builder m = Mail.builder().subject("Your session is confirmed with updated details")
             .preheader("Same time, different counsellor. Use the updated join link.")
             .title("Your session is confirmed, with updated details").p(hi(firstName))
             .p("Your counselling session on " + b(s.date) + " at " + b(s.time) + " is going ahead exactly as planned. The time has not changed.")
-            .p("A different counsellor, " + b(newCounsellor) + ", will now be taking it, so please use the updated joining link below.")
-            .action(s.join, "Join the session").small(EARLY).signature().build();
+            .p(s.join != null
+                    ? "A different counsellor, " + b(newCounsellor) + ", will now be taking it, so please use the updated joining link below."
+                    : "A different counsellor, " + b(newCounsellor) + ", will now be taking it. The venue is unchanged; the details are below.")
+            .details(new Mail.Row("Date", s.date), new Mail.Row("Time", s.time),
+                     new Mail.Row("Counsellor", newCounsellor), new Mail.Row("Mode", s.mode));
+        if (s.join != null) m.action(s.join, "Join the session").small(EARLY);
+        return m.signature().build();
     }
 
     public static Mail sessionShifted(String firstName, Session s, String oldTime, MailLink reschedule) {
