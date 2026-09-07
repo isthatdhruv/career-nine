@@ -1,0 +1,33 @@
+package com.kccitm.api.service.email.mails;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import com.kccitm.api.service.email.theme.Mail;
+import com.kccitm.api.service.email.theme.MailLink;
+import com.kccitm.api.service.email.theme.MailLinks;
+
+/** Every live mail with sample values, keyed by catalogue id. Grows one module at a time. */
+public final class MailSamples {
+    public static final String SHORT = "https://api.career-9.com/s/Kx7Pq2M";
+    static final String FIRST = "Aarav", STUDENT = "Aarav Sharma", COUNSELLOR = "Priya Iyer", ASSESSMENT = "Career Discovery Assessment",
+            SCHOOL = "Delhi Public School, Noida", DATE = "Thursday, 18 Sep 2026", TIME = "4:30 – 5:00 PM IST", MODE = "Online (Google Meet)";
+    private MailSamples() { }
+
+    /** What MailLinks.of would produce for this url, without a database. */
+    public static MailLink L(String url) {
+        return MailLinks.isLong(url) ? MailLink.of(SHORT, "api.career-9.com/s/Kx7Pq2M") : MailLink.plain(url);
+    }
+    static final MailLink SIGN_IN = L("https://dashboard.career-9.com/auth");
+    static final MailLink LOGIN = L("https://assessment.career-9.com/student-login");
+    static final MailLink MAGIC = L("https://assessment.career-9.com/assessment/start?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79");
+    static final MailLink JOIN = L("https://meet.google.com/abc-defg-hij");
+    static final MailLink SESSIONS = L("https://dashboard.career-9.com/counselling/my-sessions");
+    static final MailLink PORTAL = L("https://dashboard.career-9.com/counsellor/sessions");
+    static final MailLink REPORT = L("https://storage-c9.sgp1.cdn.digitaloceanspaces.com/reports/2026/09/aarav-sharma-career-report.html");
+
+    public static Map<String, Mail> all() {
+        Map<String, Mail> m = new LinkedHashMap<>();
+        // Task 6 adds: m.put("login-credentials", AccountMails.loginCredentials(...)); …
+        return m;
+    }
+}
