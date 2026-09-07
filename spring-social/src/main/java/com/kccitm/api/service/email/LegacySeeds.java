@@ -10,9 +10,15 @@ package com.kccitm.api.service.email;
 public final class LegacySeeds {
     private LegacySeeds() { }
 
+    /** {@code LoginCredentialsEmailService.defaultSubjectTemplate()} verbatim, before it moved to the theme's subject. */
+    public static final String LOGIN_CREDENTIALS_SUBJECT = "Your {{school_name}} Login Credentials";
+
     /** {@code LoginCredentialsEmailService.renderBody("{{first_name}}", "{{username}}", "{{password}}", "{{dashboard_link}}", "{{email_header}}", "{{email_footer}}")} verbatim. */
     public static final String LOGIN_CREDENTIALS_BODY = renderBody("{{first_name}}", "{{username}}", "{{password}}",
             "{{dashboard_link}}", "{{email_header}}", "{{email_footer}}");
+
+    /** {@code EmailTemplateSeeder.LEAD_ALERT_SUBJECT} verbatim, before the lead alert moved to the theme. */
+    public static final String LEAD_ALERT_SUBJECT = "New {{lead_type}} lead: {{lead_name}}";
 
     /** {@code EmailTemplateSeeder.LEAD_ALERT_BODY} verbatim, before the lead alert moved to the theme. */
     public static final String LEAD_ALERT_BODY =
@@ -30,6 +36,9 @@ public final class LegacySeeds {
             + "recipient list; change it under Email &rsaquo; Notification Recipients.</p>"
             + "</div>";
 
+    /** {@code EmailTemplateSeeder.LEAD_WELCOME_SUBJECT} verbatim, before the lead welcome moved to the theme. */
+    public static final String LEAD_WELCOME_SUBJECT = "Thanks for getting in touch with Career-9";
+
     /** {@code EmailTemplateSeeder.LEAD_WELCOME_BODY} verbatim, before the lead welcome moved to the theme. */
     public static final String LEAD_WELCOME_BODY =
             "{{email_header}}"
@@ -44,20 +53,24 @@ public final class LegacySeeds {
             + "{{email_footer}}";
 
     /**
-     * {@code reminder_config.body_template} seed rows from
+     * {@code reminder_config.subject_template}/{@code body_template} seed rows from
      * {@code V20260525001__reminder_tables.sql} lines 72-83, verbatim (SQL '' unescaped to ').
      * Kept here for the same reason as the mail bodies above: a future upgrader needs "the seed
      * as it used to be" to tell an untouched row from an admin edit.
      */
+    public static final String REMINDER_ASSESSMENT_INVITE_B2C_SUBJECT = "Reminder: complete your career assessment";
     public static final String REMINDER_ASSESSMENT_INVITE_B2C =
             "<p>Hi {{studentName}},</p><p>You have not yet started your career assessment <b>{{assessmentName}}</b>. Click the link below to begin:</p><p><a href=\"{{link}}\">{{link}}</a></p>";
 
+    public static final String REMINDER_COUNSELLING_24H_SUBJECT = "Reminder: your counselling session is tomorrow";
     public static final String REMINDER_COUNSELLING_24H =
             "<p>Hi {{studentName}},</p><p>Your counselling session with <b>{{counsellorName}}</b> is scheduled for <b>{{appointmentTime}}</b>.</p><p>Join here: <a href=\"{{meetingUrl}}\">{{meetingUrl}}</a></p>";
 
+    public static final String REMINDER_COUNSELLING_1H_SUBJECT = "Your counselling session starts in an hour";
     public static final String REMINDER_COUNSELLING_1H =
             "<p>Hi {{studentName}},</p><p>Your counselling session starts at <b>{{appointmentTime}}</b>. Join here: <a href=\"{{meetingUrl}}\">{{meetingUrl}}</a></p>";
 
+    public static final String REMINDER_ASSESSMENT_MAPPING_SUBJECT = "Reminder: complete your assigned assessment";
     public static final String REMINDER_ASSESSMENT_MAPPING =
             "<p>Hi {{studentName}},</p><p>You have an assigned assessment <b>{{assessmentName}}</b> from {{instituteName}} that you have not yet started. Please complete it at your earliest convenience.</p><p><a href=\"{{link}}\">{{link}}</a></p>";
 
