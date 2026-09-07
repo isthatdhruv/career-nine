@@ -14,6 +14,53 @@ public final class LegacySeeds {
     public static final String LOGIN_CREDENTIALS_BODY = renderBody("{{first_name}}", "{{username}}", "{{password}}",
             "{{dashboard_link}}", "{{email_header}}", "{{email_footer}}");
 
+    /** {@code EmailTemplateSeeder.LEAD_ALERT_BODY} verbatim, before the lead alert moved to the theme. */
+    public static final String LEAD_ALERT_BODY =
+            "<div style=\"font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827\">"
+            + "<p style=\"font-size:17px;font-weight:700;margin:0 0 4px\">New enquiry from the website</p>"
+            + "<p style=\"margin:0 0 20px;color:#4b5563;font-size:14px\">"
+            + "{{lead_type}} &middot; {{lead_source}} &middot; received {{lead_received_at}}</p>"
+            + "{{lead_details}}"
+            + "<p style=\"margin:22px 0 0\">"
+            + "<a href=\"mailto:{{lead_email}}\" style=\"display:inline-block;padding:10px 18px;"
+            + "background:#1c5cab;color:#ffffff;border-radius:8px;text-decoration:none;"
+            + "font-weight:600;font-size:14px\">Reply to {{lead_name}}</a></p>"
+            + "<p style=\"margin:16px 0 0;color:#6b7280;font-size:12px\">"
+            + "Career-9 lead #{{lead_id}}. This alert goes to everyone on the New-lead "
+            + "recipient list; change it under Email &rsaquo; Notification Recipients.</p>"
+            + "</div>";
+
+    /** {@code EmailTemplateSeeder.LEAD_WELCOME_BODY} verbatim, before the lead welcome moved to the theme. */
+    public static final String LEAD_WELCOME_BODY =
+            "{{email_header}}"
+            + "<div style=\"font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827\">"
+            + "<p>Hi {{first_name}},</p>"
+            + "<p>Thanks for getting in touch with Career-9. We have your enquiry and someone from "
+            + "our team will be in contact shortly.</p>"
+            + "<p style=\"color:#4b5563;font-size:14px;margin-top:22px\">Here is what you sent us:</p>"
+            + "{{lead_details}}"
+            + "<p style=\"margin-top:22px\">Warm regards,<br>Team Career-9</p>"
+            + "</div>"
+            + "{{email_footer}}";
+
+    /**
+     * {@code reminder_config.body_template} seed rows from
+     * {@code V20260525001__reminder_tables.sql} lines 72-83, verbatim (SQL '' unescaped to ').
+     * Kept here for the same reason as the mail bodies above: a future upgrader needs "the seed
+     * as it used to be" to tell an untouched row from an admin edit.
+     */
+    public static final String REMINDER_ASSESSMENT_INVITE_B2C =
+            "<p>Hi {{studentName}},</p><p>You have not yet started your career assessment <b>{{assessmentName}}</b>. Click the link below to begin:</p><p><a href=\"{{link}}\">{{link}}</a></p>";
+
+    public static final String REMINDER_COUNSELLING_24H =
+            "<p>Hi {{studentName}},</p><p>Your counselling session with <b>{{counsellorName}}</b> is scheduled for <b>{{appointmentTime}}</b>.</p><p>Join here: <a href=\"{{meetingUrl}}\">{{meetingUrl}}</a></p>";
+
+    public static final String REMINDER_COUNSELLING_1H =
+            "<p>Hi {{studentName}},</p><p>Your counselling session starts at <b>{{appointmentTime}}</b>. Join here: <a href=\"{{meetingUrl}}\">{{meetingUrl}}</a></p>";
+
+    public static final String REMINDER_ASSESSMENT_MAPPING =
+            "<p>Hi {{studentName}},</p><p>You have an assigned assessment <b>{{assessmentName}}</b> from {{instituteName}} that you have not yet started. Please complete it at your earliest convenience.</p><p><a href=\"{{link}}\">{{link}}</a></p>";
+
     /**
      * Single source of the credentials-email HTML. All dynamic parts are arguments so the same
      * markup serves both the runtime fallback (real, escaped values) and the seeded template

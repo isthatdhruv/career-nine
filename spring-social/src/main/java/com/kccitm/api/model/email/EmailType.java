@@ -17,27 +17,23 @@ public enum EmailType {
     // ── Auth / account ──────────────────────────────────────────────────────
     PASSWORD_RESET("Password reset link", "Auth", EmailDeliveryMode.SYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.RESET_LINK,
-            EmailPlaceholder.ACTION_LINK, EmailPlaceholder.SCHOOL_NAME,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.ACTION_LINK, EmailPlaceholder.SCHOOL_NAME),
     PASSWORD_RESET_CONFIRM("Password reset confirmation", "Auth", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.DASHBOARD_LINK,
-            EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.SCHOOL_NAME),
     ACCOUNT_WELCOME("Account welcome / under review", "Auth", EmailDeliveryMode.ASYNC,
-            EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.SCHOOL_NAME,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.SCHOOL_NAME),
     ACCOUNT_ACTIVATED("Account activated", "Auth", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.DASHBOARD_LINK,
-            EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.SCHOOL_NAME),
     ADMIN_PASSWORD_RESET("Admin-issued password reset", "Auth", EmailDeliveryMode.SYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.USERNAME,
-            EmailPlaceholder.PASSWORD, EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.SCHOOL_NAME,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.PASSWORD, EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.SCHOOL_NAME),
 
     // ── Credentials / provisioning ──────────────────────────────────────────
     LOGIN_CREDENTIALS("Login credentials", "Credentials", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.USERNAME,
-            EmailPlaceholder.PASSWORD, EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.SCHOOL_NAME,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.PASSWORD, EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.SCHOOL_NAME),
     /**
      * Acknowledgement to the person who filled the enquiry form on career-9.com. Sent from
      * {@code LeadNotificationService} on every capture, whatever the lead type — a school
@@ -48,7 +44,7 @@ public enum EmailType {
             EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.DASHBOARD_LINK,
             EmailPlaceholder.LEAD_NAME, EmailPlaceholder.LEAD_EMAIL, EmailPlaceholder.LEAD_PHONE,
             EmailPlaceholder.LEAD_TYPE, EmailPlaceholder.LEAD_SCHOOL, EmailPlaceholder.LEAD_CITY,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.SITE_LINK),
 
     /**
      * Internal alert: a new enquiry has arrived. Recipients are not passed by the caller —
@@ -61,26 +57,23 @@ public enum EmailType {
             EmailPlaceholder.LEAD_CITY, EmailPlaceholder.LEAD_DESIGNATION,
             EmailPlaceholder.LEAD_DETAILS, EmailPlaceholder.LEAD_RECEIVED_AT,
             EmailPlaceholder.LEAD_ID, EmailPlaceholder.LEAD_CRM_LINK,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.LEAD_ADMIN_LINK),
     STUDENT_ID_EMAIL("Student ID / details", "Credentials", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.USERNAME,
-            EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.DASHBOARD_LINK),
     EMAIL_VERIFICATION_OTP("Email verification OTP", "Verification", EmailDeliveryMode.SYNC,
-            EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.OTP_CODE,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.OTP_CODE),
 
     // ── Assessment / B2C ────────────────────────────────────────────────────
     ASSESSMENT_COMPLETION("Assessment completion", "Assessment", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.ASSESSMENT_NAME,
-            EmailPlaceholder.REPORT_LINK, EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.SCHOOL_NAME,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.REPORT_LINK, EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.SCHOOL_NAME),
     ENTITLEMENT_GRANTED("Assessment access granted", "B2C", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.PLAN_NAME,
-            EmailPlaceholder.ASSESSMENT_NAME, EmailPlaceholder.ACTION_LINK, EmailPlaceholder.DASHBOARD_LINK,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.ASSESSMENT_NAME, EmailPlaceholder.ACTION_LINK, EmailPlaceholder.DASHBOARD_LINK),
     ENTITLEMENT_REMINDER("Assessment access reminder", "B2C", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.ASSESSMENT_NAME,
-            EmailPlaceholder.ACTION_LINK, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.ACTION_LINK),
     COUNSELLING_REQUEST("Counselling request received", "B2C", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.STUDENT_EMAIL, EmailPlaceholder.ACTION_LINK),
 
@@ -89,25 +82,25 @@ public enum EmailType {
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.AMOUNT,
             EmailPlaceholder.PLAN_NAME, EmailPlaceholder.INVOICE_ID, EmailPlaceholder.PAYMENT_DATE,
             EmailPlaceholder.USERNAME, EmailPlaceholder.PASSWORD, EmailPlaceholder.ASSESSMENT_NAME,
-            EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.DASHBOARD_LINK),
     PAYMENT_FAILED("Payment failed / cancelled / expired", "Payment", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.AMOUNT, EmailPlaceholder.ASSESSMENT_NAME,
-            EmailPlaceholder.ACTION_LINK, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.ACTION_LINK),
     PAYMENT_REMINDER("Payment pending reminder", "Payment", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.AMOUNT, EmailPlaceholder.ASSESSMENT_NAME,
-            EmailPlaceholder.ACTION_LINK, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.ACTION_LINK),
     PAYMENT_LINK("Payment link", "Payment", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.AMOUNT, EmailPlaceholder.ASSESSMENT_NAME,
-            EmailPlaceholder.ACTION_LINK, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.ACTION_LINK),
 
     // ── Reports ─────────────────────────────────────────────────────────────
     REPORT_READY("Report ready (automatic)", "Report", EmailDeliveryMode.SYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.REPORT_LINK,
             EmailPlaceholder.REPORT_PDF_LINK, EmailPlaceholder.REPORT_TYPE, EmailPlaceholder.DASHBOARD_LINK,
-            EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.SCHOOL_NAME),
     CONTACT_PERSON_REPORT("Report email to contact person", "Report", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.REPORT_LINK, EmailPlaceholder.REPORT_PDF_LINK, EmailPlaceholder.REPORT_TYPE,
-            EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.SCHOOL_NAME),
 
     /**
      * Sent by an admin after releasing a school's principal dashboard: tells the contact
@@ -116,29 +109,24 @@ public enum EmailType {
      */
     SCHOOL_DASHBOARD_READY("School dashboard released", "Report", EmailDeliveryMode.SYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.SCHOOL_NAME,
-            EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.ASSESSMENT_NAME,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.DASHBOARD_LINK, EmailPlaceholder.ASSESSMENT_NAME),
 
     // ── B2B / school registration ───────────────────────────────────────────
     SCHOOL_REGISTRATION("School registration", "B2B", EmailDeliveryMode.ASYNC,
-            EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.ACTION_LINK,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.ACTION_LINK),
     ASSESSMENT_INSTITUTE_MAPPING("Assessment assigned to institute", "B2B", EmailDeliveryMode.ASYNC,
-            EmailPlaceholder.ASSESSMENT_NAME, EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.ACTION_LINK,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.ASSESSMENT_NAME, EmailPlaceholder.SCHOOL_NAME, EmailPlaceholder.ACTION_LINK),
 
     // ── Reminders ─────────────────────────────────────────────────────────────
     REMINDER("Reminder (assessment / counselling)", "Reminder", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.FIRST_NAME, EmailPlaceholder.ASSESSMENT_NAME,
-            EmailPlaceholder.ACTION_LINK, EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.ACTION_LINK),
 
     // ── Counselling (Phase 5) ───────────────────────────────────────────────
     COUNSELLING_NOTIFICATION("Counselling lifecycle notification", "Counselling", EmailDeliveryMode.ASYNC,
-            EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.FIRST_NAME, EmailPlaceholder.ACTION_LINK,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.FIRST_NAME, EmailPlaceholder.ACTION_LINK),
     COUNSELLING_BOOKING("Counselling booking confirmation (.ics)", "Counselling", EmailDeliveryMode.SYNC,
-            EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.FIRST_NAME, EmailPlaceholder.ACTION_LINK,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.FIRST_NAME, EmailPlaceholder.ACTION_LINK),
 
     /**
      * Internal alert: a counsellor has been deactivated and these students lost a session.
@@ -146,8 +134,7 @@ public enum EmailType {
      * {@code email_notification_recipient}, so the ops list is changed without a deploy.
      */
     COUNSELLOR_DEACTIVATED_ALERT("Counsellor deactivated — affected students (internal)", "Counselling",
-            EmailDeliveryMode.ASYNC,
-            EmailPlaceholder.EMAIL_HEADER, EmailPlaceholder.EMAIL_FOOTER),
+            EmailDeliveryMode.ASYNC),
 
     // ── Legacy KCCITM (Phase 5) ─────────────────────────────────────────────
     KCCITM_NOTIFICATION("Legacy KCCITM email", "KCCITM", EmailDeliveryMode.ASYNC),

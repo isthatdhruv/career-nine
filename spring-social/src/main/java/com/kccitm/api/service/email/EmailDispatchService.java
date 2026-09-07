@@ -1,5 +1,8 @@
 package com.kccitm.api.service.email;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Optional;
@@ -21,6 +24,7 @@ import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.email.EmailAccountRepository;
 import com.kccitm.api.repository.email.EmailSendLogRepository;
 import com.kccitm.api.repository.email.EmailTemplateRepository;
+import com.kccitm.api.service.email.mails.InternalMails;
 
 import java.util.Map;
 
@@ -35,6 +39,10 @@ import java.util.Map;
 public class EmailDispatchService {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailDispatchService.class);
+
+    /** Read by an India-based admin, so the "Sent" timestamp on the test mail is zoned rather than left to the JVM's (UTC) clock. */
+    private static final ZoneId ACCOUNT_TEST_TZ = ZoneId.of("Asia/Kolkata");
+    private static final DateTimeFormatter ACCOUNT_TEST_SENT_AT = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
 
     @Autowired
     private EmailAccountRepository accountRepository;
@@ -353,13 +361,11 @@ public class EmailDispatchService {
         if (to == null || to.trim().isEmpty()) {
             return EmailSendResult.skipped(null, "No recipient");
         }
-        String subject = "Career-9 email test — " + account.getName();
-        String html = "<p>This is a test email from Career-9 confirming the <strong>"
-                + account.getName() + "</strong> account ("
-                + account.getProvider() + (account.getMode() != null ? "/" + account.getMode() : "")
-                + ") can send.</p>";
+        String providerAndMode = account.getProvider() + (account.getMode() != null ? "/" + account.getMode() : "");
+        String now = ACCOUNT_TEST_SENT_AT.format(ZonedDateTime.now(ACCOUNT_TEST_TZ)) + " IST";
 
-        EmailSendRequest req = EmailSendRequest.html(EmailType.ACCOUNT_TEST, to, subject, html);
+        EmailSendRequest req = EmailSendRequest.mail(EmailType.ACCOUNT_TEST, to,
+                InternalMails.accountTest(account.getName(), providerAndMode, now));
         req.setDeliveryModeOverride(EmailDeliveryMode.SYNC);
         SmtpEmailRequest message = buildMessage(req, account, null);
 

@@ -45,4 +45,46 @@ public final class InternalMails {
         return Mail.builder().subject(title).preheader(lead.length() > 90 ? lead.substring(0, 90) : lead)
             .internal(tag).title(v(title)).p(v(lead)).details(facts).action(open, buttonLabel).build();
     }
+
+    public static Mail leadAlert(String leadType, String leadName, String leadSource, String receivedAt, List<Mail.Row> fields, String leadId, MailLink openLead) {
+        return Mail.builder().subject("New " + leadType + " lead: " + leadName)
+            .preheader(leadSource + " · received " + receivedAt)
+            .internal("New lead alert").title("New enquiry from the website")
+            .p(b(leadType) + " &middot; " + v(leadSource) + " &middot; received " + v(receivedAt))
+            .details(fields)
+            .action(openLead, "Open lead #" + leadId)
+            .small("Every field the form submitted is listed above. This alert goes to everyone on the New-lead recipient list; change it under Email &rsaquo; Notification recipients.").build();
+    }
+    public static Mail leadWelcome(String firstName, List<Mail.Row> fields, MailLink site) {
+        return Mail.builder().subject("Thanks for getting in touch with Career-9")
+            .preheader("We have your enquiry and will be in touch shortly.")
+            .title("Thanks for getting in touch").p(AccountMails.hi(firstName))
+            .p("We have your enquiry and someone from our team will contact you shortly.")
+            .p(b("Here is what you sent us:")).details(fields)
+            .action(site, "Explore Career-9").signature().build();
+    }
+    public static Mail accountTest(String accountName, String provider, String sentAt) {
+        return Mail.builder().subject("Career-9 email test: " + accountName)
+            .preheader("If you can read this, the account can send.")
+            .internal("Email account test").title("This account can send")
+            .p("This is a test email from Career-9 confirming that the " + b(accountName) + " account (" + v(provider) + ") can send mail.")
+            .details(new Mail.Row("Account", accountName), new Mail.Row("Provider", provider), new Mail.Row("Sent", sentAt)).build();
+    }
+    /** Seed bodies: same layout with {{tokens}}; button() because the href is a token until send time. */
+    public static Mail leadAlertSeed() {
+        return Mail.builder().subject("New {{lead_type}} lead: {{lead_name}}").preheader("{{lead_source}} · received {{lead_received_at}}")
+            .internal("New lead alert").title("New enquiry from the website")
+            .p("<b>{{lead_type}}</b> &middot; {{lead_source}} &middot; received {{lead_received_at}}")
+            .details(new Mail.Row("Name", "{{lead_name}}"), new Mail.Row("Email", "{{lead_email}}"), new Mail.Row("Phone", "{{lead_phone}}"), new Mail.Row("School", "{{lead_school}}"), new Mail.Row("City", "{{lead_city}}"), new Mail.Row("Designation", "{{lead_designation}}"))
+            .button(MailLink.of("{{lead_admin_link}}", ""), "Open lead #{{lead_id}}")
+            .small("Every field the form submitted is listed above. This alert goes to everyone on the New-lead recipient list; change it under Email &rsaquo; Notification recipients.").build();
+    }
+    public static Mail leadWelcomeSeed() {
+        return Mail.builder().subject("Thanks for getting in touch with Career-9").preheader("We have your enquiry and will be in touch shortly.")
+            .title("Thanks for getting in touch").p("Hi {{first_name}},")
+            .p("We have your enquiry and someone from our team will contact you shortly.")
+            .p("<b>Here is what you sent us:</b>")
+            .details(new Mail.Row("Name", "{{lead_name}}"), new Mail.Row("Email", "{{lead_email}}"), new Mail.Row("Phone", "{{lead_phone}}"), new Mail.Row("Enquiry type", "{{lead_type}}"), new Mail.Row("School", "{{lead_school}}"), new Mail.Row("City", "{{lead_city}}"))
+            .button(MailLink.of("{{site_link}}", ""), "Explore Career-9").signature().build();
+    }
 }

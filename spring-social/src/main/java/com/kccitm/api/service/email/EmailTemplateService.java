@@ -18,7 +18,6 @@ import com.kccitm.api.model.email.EmailTemplateForm;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.email.EmailTemplateRepository;
 import com.kccitm.api.service.branding.BrandingDto;
-import com.kccitm.api.service.branding.InstituteBrandingService;
 
 /**
  * CRUD + single-default-per-type enforcement + preview/test for {@link EmailTemplate}, plus
@@ -35,9 +34,6 @@ public class EmailTemplateService {
 
     @Autowired
     private EmailTemplateRenderer renderer;
-
-    @Autowired
-    private InstituteBrandingService brandingService;
 
     @Autowired
     private com.kccitm.api.service.email.theme.MailRenderer mailRenderer;
@@ -230,8 +226,6 @@ public class EmailTemplateService {
                 ctx.put(p.key(), sampleValue(p, brand));
             }
         }
-        ctx.putIfAbsent(EmailPlaceholder.EMAIL_HEADER.key(), brandingService.emailHeaderHtml(brand));
-        ctx.putIfAbsent(EmailPlaceholder.EMAIL_FOOTER.key(), brandingService.emailFooterHtml(brand));
         ctx.putIfAbsent(EmailPlaceholder.SCHOOL_NAME.key(), "Career-9");
         return ctx;
     }
@@ -248,8 +242,6 @@ public class EmailTemplateService {
             case RESET_LINK:     return "https://app.career-9.net/login";
             case SCHOOL_NAME:    return brand.isWhitelabel() ? brand.getSchoolName() : "Career-9";
             case LOGO_URL:       return "";
-            case EMAIL_HEADER:   return brandingService.emailHeaderHtml(brand);
-            case EMAIL_FOOTER:   return brandingService.emailFooterHtml(brand);
             case REPORT_LINK:    return "https://app.career-9.net/report/sample";
             case REPORT_PDF_LINK:return "https://app.career-9.net/report/sample.pdf";
             case REPORT_TYPE:    return "Career Discovery Report";

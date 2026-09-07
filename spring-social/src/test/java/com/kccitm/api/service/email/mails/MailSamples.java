@@ -1,6 +1,7 @@
 package com.kccitm.api.service.email.mails;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.kccitm.api.service.email.theme.Mail;
 import com.kccitm.api.service.email.theme.MailLink;
@@ -100,6 +101,10 @@ public final class MailSamples {
                 java.util.Collections.emptyList(), L("https://dashboard.career-9.com/admin/counselling/sessions")));
         m.put("counselling-request-forwarded", InternalMails.counsellingRequestForwarded(ASSESSMENT, STUDENT, "aarav@example.com", "98765 43210", SCHOOL, L("https://dashboard.career-9.com/admin/counsellors")));
         m.put("counselling-admin-no-replacement", InternalMails.adminNotice("Counselling", "Session needs a counsellor", "A counsellor cancelled and nobody else is free at that time.", java.util.Arrays.asList(new Mail.Row("Student", STUDENT), new Mail.Row("When", DATE + ", " + TIME)), L("https://dashboard.career-9.com/admin/counselling/sessions"), "Open Manage Sessions"));
+        List<Mail.Row> lead = java.util.Arrays.asList(new Mail.Row("Name", "Rohan Mehta"), new Mail.Row("Email", "rohan@example.com"), new Mail.Row("Phone", "98765 43210"), new Mail.Row("School", SCHOOL), new Mail.Row("City", "Indore"), new Mail.Row("Designation", "Parent"));
+        m.put("lead-notification", InternalMails.leadAlert("Parent", "Rohan Mehta", "Website", "07 Sep 2026, 10:14 AM IST", lead, "1042", L("https://dashboard.career-9.com/leads")));
+        m.put("lead-welcome", InternalMails.leadWelcome("Rohan", lead, L("https://career-9.com")));
+        m.put("email-account-test", InternalMails.accountTest("Notifications (Gmail API)", "GMAIL/API", "07 Sep 2026, 11:20 AM IST"));
         return m;
     }
 }
