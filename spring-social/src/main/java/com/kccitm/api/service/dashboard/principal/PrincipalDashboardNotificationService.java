@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.career9.PrincipalDashboardReleaseLog;
+import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.ContactPersonRepository;
@@ -124,8 +125,12 @@ public class PrincipalDashboardNotificationService {
             try {
                 Mail mail = ReportMails.schoolDashboardReady(recipient.name, instituteName, assessmentLabel,
                         mailLinks.of(frontendUrl + "/school-dashboard", "school_dashboard"));
-                EmailSendResult result = emailDispatch.sendMail(
+                EmailSendRequest req = EmailSendRequest.mail(
                         EmailType.SCHOOL_DASHBOARD_READY, recipient.email, mail);
+                // Rule 11: the shell decides branding, from a hint the caller supplies. This mail
+                // goes to a school's own contacts, so a whitelabel school must see its own header.
+                req.setInstituteCode(instituteCode == null ? null : instituteCode.intValue());
+                EmailSendResult result = emailDispatch.send(req);
                 outcome.sent = result.isSuccess();
                 outcome.error = result.isSuccess() ? null : result.getError();
             } catch (Exception e) {

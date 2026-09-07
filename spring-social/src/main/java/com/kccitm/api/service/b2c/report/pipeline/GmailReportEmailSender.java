@@ -105,20 +105,26 @@ public class GmailReportEmailSender implements EmailSender {
         boolean withPdf = pdfBytes != null && pdfBytes.length > 0 && !event.linkOnly;
 
         Brand brand = brandResolver.of(new BrandingDto(event.whitelabel, event.schoolName, event.logoUrl));
-        Mail mail = ReportMails.reportReady(AccountMails.firstName(event.studentName), brand.getName(),
-                mailLinks.of(event.reportUrl, "report"),
-                event.pdfUrl == null ? null : mailLinks.of(event.pdfUrl, "report_pdf"),
-                withPdf,
-                event.bookingUrl == null ? null : mailLinks.of(event.bookingUrl, "counselling_booking"));
-        MailRenderer.Rendered r = mailRenderer.render(mail, brand);
+        MailRenderer.Rendered r;
         if (template != null) {
+            // The built-in mail is deliberately NOT built on this branch: ReportMails.reportReady
+            // mints up to three short links (report, PDF, booking) and the template body then
+            // replaces the whole thing, so building it would burn link rows on every templated
+            // send. The blank-subject fallback repeats reportReady's own subject verbatim.
             Map<String, String> ctx = reportPlaceholders(event);
             String subject = templateRenderer.render(template.getSubjectTemplate(), ctx);
             if (subject == null || subject.trim().isEmpty()) {
-                subject = mail.getSubject();
+                subject = "Your " + brand.getName() + " report is ready";
             }
             String html = templateRenderer.render(template.getBodyTemplate(), ctx);
             r = mailRenderer.wrapForeign(subject, mailLinks.rewrite(html), brand);
+        } else {
+            Mail mail = ReportMails.reportReady(AccountMails.firstName(event.studentName), brand.getName(),
+                    mailLinks.of(event.reportUrl, "report"),
+                    event.pdfUrl == null ? null : mailLinks.of(event.pdfUrl, "report_pdf"),
+                    withPdf,
+                    event.bookingUrl == null ? null : mailLinks.of(event.bookingUrl, "counselling_booking"));
+            r = mailRenderer.render(mail, brand);
         }
 
         EmailSendLog logRow = newLog(event, account, template, r.subject);

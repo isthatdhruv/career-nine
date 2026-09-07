@@ -5,7 +5,11 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +47,9 @@ public class EmailDispatchService {
     /** Read by an India-based admin, so the "Sent" timestamp on the test mail is zoned rather than left to the JVM's (UTC) clock. */
     private static final ZoneId ACCOUNT_TEST_TZ = ZoneId.of("Asia/Kolkata");
     private static final DateTimeFormatter ACCOUNT_TEST_SENT_AT = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
+
+    /** A {{token}} the template context did not fill. Blanked before send — never shown to a recipient. */
+    private static final Pattern UNRESOLVED_PLACEHOLDER = Pattern.compile("\\{\\{\\s*[A-Za-z0-9_.]+\\s*\\}\\}");
 
     @Autowired
     private EmailAccountRepository accountRepository;
@@ -255,10 +262,19 @@ public class EmailDispatchService {
         if (template != null) {
             Map<String, String> ctx = placeholderResolver.resolve(req);
             String subject = templateRenderer.render(template.getSubjectTemplate(), ctx);
+            String html = mailLinks.rewrite(templateRenderer.render(template.getBodyTemplate(), ctx));
+            // A template an admin edited can name a placeholder this scenario never supplies.
+            // Blank what is left rather than mailing a literal "{{first_name}}", and name the
+            // tokens in the log so whoever owns the template can fix it.
+            Set<String> unresolved = new LinkedHashSet<>();
+            subject = stripUnresolvedPlaceholders(subject, unresolved);
+            html = stripUnresolvedPlaceholders(html, unresolved);
+            if (!unresolved.isEmpty()) {
+                logger.warn("Template {} left unresolved placeholders: {}", template.getId(), unresolved);
+            }
             if (subject == null || subject.trim().isEmpty()) {
                 subject = req.getSubject(); // fall back to a caller-supplied subject if the template's is blank
             }
-            String html = mailLinks.rewrite(templateRenderer.render(template.getBodyTemplate(), ctx));
             r = mailRenderer.wrapForeign(subject, html, brand);
         } else if (req.getMail() != null) {
             r = mailRenderer.render(req.getMail(), brand);
@@ -338,6 +354,26 @@ public class EmailDispatchService {
             return null;
         }
         return s.length() > max ? s.substring(0, max) : s;
+    }
+
+    /** Removes every unfilled {{token}}, collecting the distinct ones into {@code found}. */
+    private static String stripUnresolvedPlaceholders(String value, Set<String> found) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        Matcher m = UNRESOLVED_PLACEHOLDER.matcher(value);
+        StringBuffer out = new StringBuffer();
+        boolean any = false;
+        while (m.find()) {
+            any = true;
+            found.add(m.group());
+            m.appendReplacement(out, "");
+        }
+        if (!any) {
+            return value;
+        }
+        m.appendTail(out);
+        return out.toString();
     }
 
     private static String escapeHtml(String input) {

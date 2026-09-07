@@ -71,7 +71,8 @@ public enum EmailType {
     ENTITLEMENT_GRANTED("Assessment access granted", "B2C", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.PLAN_NAME,
             EmailPlaceholder.ASSESSMENT_NAME, EmailPlaceholder.ACTION_LINK, EmailPlaceholder.DASHBOARD_LINK),
-    ENTITLEMENT_REMINDER("Assessment access reminder", "B2C", EmailDeliveryMode.ASYNC,
+    /** The "you have not started yet" nudge — its own slot, so an ENTITLEMENT_GRANTED template never replaces it. */
+    ENTITLEMENT_REMINDER("Assessment nudge (B2C)", "B2C", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.ASSESSMENT_NAME,
             EmailPlaceholder.ACTION_LINK),
     COUNSELLING_REQUEST("Counselling request received", "B2C", EmailDeliveryMode.ASYNC,

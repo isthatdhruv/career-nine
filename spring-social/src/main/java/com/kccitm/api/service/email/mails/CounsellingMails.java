@@ -151,7 +151,9 @@ public final class CounsellingMails {
         // instead of promising a link that is never rendered — and the "join early" note, which
         // is about a meeting room, has no meaning when the student is walking to a venue.
         Mail.Builder m = Mail.builder().subject("Your session is confirmed with updated details")
-            .preheader("Same time, different counsellor. Use the updated join link.")
+            .preheader(s.join != null
+                    ? "Same time, different counsellor. Use the updated join link."
+                    : "Same time, different counsellor. Venue unchanged; details inside.")
             .title("Your session is confirmed, with updated details").p(hi(firstName))
             .p("Your counselling session on " + b(s.date) + " at " + b(s.time) + " is going ahead exactly as planned. The time has not changed.")
             .p(s.join != null

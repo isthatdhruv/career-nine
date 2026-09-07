@@ -99,7 +99,7 @@ public class PaymentEmailService {
             }
 
             Mail mail = PaymentMails.paymentFailed(AccountMails.firstName(studentName), assessmentName,
-                    String.format("%,d", amountRupees), outcome,
+                    formatAmount(amountRupees), outcome,
                     mailLinks.of(getRegistrationUrl(txn), "payment_retry"));
 
             emailDispatchService.sendMail(EmailType.PAYMENT_FAILED, txn.getStudentEmail(), mail);
@@ -118,7 +118,7 @@ public class PaymentEmailService {
             String studentName = txn.getStudentName() != null ? txn.getStudentName() : "Student";
 
             Mail mail = PaymentMails.paymentPending(AccountMails.firstName(studentName), assessmentName,
-                    String.format("%,d", amountRupees), mailLinks.of(getRegistrationUrl(txn), "payment_pending"));
+                    formatAmount(amountRupees), mailLinks.of(getRegistrationUrl(txn), "payment_pending"));
 
             emailDispatchService.sendMail(EmailType.PAYMENT_REMINDER, txn.getStudentEmail(), mail);
             logger.info("Nudge email sent to: {} for transaction: {}", txn.getStudentEmail(), txn.getTransactionId());
@@ -132,7 +132,7 @@ public class PaymentEmailService {
         long amountRupees = txn.getAmount() != null ? txn.getAmount() : 0L;
 
         Mail mail = PaymentMails.paymentLink(AccountMails.firstName(studentName), assessmentName,
-                String.format("%,d", amountRupees), mailLinks.of(getRegistrationUrl(txn), "payment_link"));
+                formatAmount(amountRupees), mailLinks.of(getRegistrationUrl(txn), "payment_link"));
 
         emailDispatchService.sendMail(EmailType.PAYMENT_LINK, email, mail);
         logger.info("Payment link email sent to: {} for transaction: {}", email, txn.getTransactionId());
@@ -183,5 +183,14 @@ public class PaymentEmailService {
         } catch (Exception e) {
             logger.error("Failed to resend welcome email to: {}", txn.getStudentEmail(), e);
         }
+    }
+
+    /**
+     * The rupee amount with thousands separators, always in the English grouping. The default
+     * locale is the JVM's, which on some hosts groups (or digits) differently from what the
+     * mail's "₹" prefix and the rest of the copy assume.
+     */
+    private static String formatAmount(long amountRupees) {
+        return String.format(java.util.Locale.ENGLISH, "%,d", amountRupees);
     }
 }

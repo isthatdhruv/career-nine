@@ -57,6 +57,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.RazorpayService;
+import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.service.email.mails.AccountMails;
@@ -1070,7 +1071,7 @@ public class AssessmentInstituteMappingController {
         // Send registration email with credentials
         String assessmentName = assessmentTableRepository.findById(assessmentId)
                 .map(a -> a.getAssessmentName()).orElse("Assessment");
-        sendRegistrationEmail(email, name, user.getUsername(), dobStr, assessmentName);
+        sendRegistrationEmail(email, name, user.getUsername(), dobStr, assessmentName, instituteCode);
 
         return ResponseEntity.ok(response);
     }
@@ -1703,7 +1704,7 @@ public class AssessmentInstituteMappingController {
                 String assessmentName = assessmentTableRepository.findById(assessmentId)
                         .map(a -> a.getAssessmentName()).orElse("Assessment");
                 sendRegistrationEmail(existingStudentInfo.getEmail(), existingStudentInfo.getName(),
-                        user.getUsername(), dobFormatted, assessmentName);
+                        user.getUsername(), dobFormatted, assessmentName, instituteCode);
             }
         }
 
@@ -1796,11 +1797,16 @@ public class AssessmentInstituteMappingController {
     /**
      * Send registration confirmation email with login credentials.
      */
-    private void sendRegistrationEmail(String toEmail, String studentName, String username, String dob, String assessmentName) {
+    private void sendRegistrationEmail(String toEmail, String studentName, String username, String dob,
+            String assessmentName, Integer instituteCode) {
         try {
             Mail mail = AccountMails.registrationSuccess(AccountMails.firstName(studentName), assessmentName, username, dob,
                     mailLinks.of(linkBuilder.manualLogin(), "student_login"));
-            emailDispatchService.sendMail(EmailType.ASSESSMENT_INSTITUTE_MAPPING, toEmail, mail);
+            EmailSendRequest req = EmailSendRequest.mail(EmailType.ASSESSMENT_INSTITUTE_MAPPING, toEmail, mail);
+            // Rule 11: the branding hint, so a whitelabel school's student sees the school's
+            // header on the credentials mail rather than the Career-9 one.
+            req.setInstituteCode(instituteCode);
+            emailDispatchService.send(req);
             logger.info("Registration email sent to: {}", toEmail);
         } catch (Exception e) {
             logger.error("Failed to send registration email to: {}. Error: {}", toEmail, e.getMessage(), e);

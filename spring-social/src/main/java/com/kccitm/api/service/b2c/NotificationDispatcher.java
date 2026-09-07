@@ -91,7 +91,9 @@ public class NotificationDispatcher {
         switch (serviceType) {
             case "assessment_invite": return EmailType.ENTITLEMENT_GRANTED;
             case "final_report":      return EmailType.REPORT_READY;
-            case "nudge":             return EmailType.ENTITLEMENT_GRANTED;
+            // Its own type, not ENTITLEMENT_GRANTED: sharing a slot means an admin's
+            // "access granted" template silently replaces the nudge body as well.
+            case "nudge":             return EmailType.ENTITLEMENT_REMINDER;
             default:                  return EmailType.GENERIC;
         }
     }

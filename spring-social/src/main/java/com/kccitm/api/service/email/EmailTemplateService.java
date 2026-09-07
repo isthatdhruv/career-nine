@@ -227,6 +227,11 @@ public class EmailTemplateService {
             }
         }
         ctx.putIfAbsent(EmailPlaceholder.SCHOOL_NAME.key(), "Career-9");
+        // email_header / email_footer are retired (the shell draws both). The real send path
+        // blanks them in PlaceholderResolver; the preview must too, or an old template that
+        // still references them shows the literal token to the admin editing it.
+        ctx.putIfAbsent("email_header", "");
+        ctx.putIfAbsent("email_footer", "");
         return ctx;
     }
 

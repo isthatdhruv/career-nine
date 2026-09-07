@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
+import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
@@ -99,7 +100,12 @@ public class CounsellorReportReleaseService {
 
         Mail mail = ReportMails.reportReleased(AccountMails.firstName(studentName), counsellorName,
                 mailLinks.of(link, "report"));
-        EmailSendResult result = emailDispatchService.sendMail(EmailType.REPORT_READY, to, mail);
+        EmailSendRequest req = EmailSendRequest.mail(EmailType.REPORT_READY, to, mail);
+        // Rule 11: the branding hint. A student of a whitelabel school must see the school's
+        // header on her own report mail, and the student is the only handle this service has.
+        req.setUserStudentId(appointment.getStudent() != null
+                ? appointment.getStudent().getUserStudentId() : null);
+        EmailSendResult result = emailDispatchService.send(req);
         if (result == null || !result.isSuccess()) {
             String failure = result != null ? result.getError() : null;
             throw new IllegalStateException("The email could not be sent: "

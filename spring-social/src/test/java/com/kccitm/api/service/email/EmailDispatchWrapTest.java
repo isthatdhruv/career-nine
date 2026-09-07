@@ -120,6 +120,29 @@ class EmailDispatchWrapTest {
     }
 
     @Test
+    void unresolvedTemplatePlaceholdersAreBlankedNotMailed() throws Exception {
+        EmailTemplate t = new EmailTemplate();
+        t.setId(42L);
+        t.setActive(true);
+        t.setIsDefault(true);
+        t.setSubjectTemplate("Hello {{first_name}}");
+        t.setBodyTemplate("<p>Hi {{first_name}}, your plan is {{never_provided}}.</p>");
+        when(templates.findFirstByEmailTypeAndIsDefaultTrueAndActiveTrue("LOGIN_CREDENTIALS"))
+                .thenReturn(java.util.Optional.of(t));
+        when(placeholderResolver.resolve(any())).thenReturn(java.util.Collections.singletonMap("first_name", "Aarav"));
+
+        EmailSendRequest r = EmailSendRequest.html(EmailType.LOGIN_CREDENTIALS, "a@example.com", "ignored", "<p>caller</p>");
+        r.setDeliveryModeOverride(EmailDeliveryMode.SYNC);
+        dispatch.send(r);
+        SmtpEmailRequest s = sent();
+
+        assertFalse(s.getHtmlContent().contains("{{"));
+        assertFalse(s.getHtmlContent().contains("never_provided"));
+        assertTrue(s.getHtmlContent().contains("Hi Aarav, your plan is ."));
+        assertEquals("Hello Aarav", s.getSubject());
+    }
+
+    @Test
     void emptySendStillGetsATextPart() throws Exception {
         EmailSendRequest r = new EmailSendRequest();
         r.setEmailType(EmailType.GENERIC); r.getTo().add("a@example.com"); r.setSubject("Hi");
