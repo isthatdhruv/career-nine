@@ -1,4 +1,5 @@
 import React from "react"
+import "../styles/register.css"
 
 export type Tier = {
   campaignAssessmentTierId: number
@@ -23,7 +24,8 @@ type Props = {
   disabled?: boolean
 }
 
-export const TierCard: React.FC<Props> = ({ tier, selected, onSelect, disabled }) => {
+/** Human-readable inclusions of a tier, in display order. */
+export function tierFeatures(tier: Tier): string[] {
   const features: string[] = []
   if (tier.includesFinalReport) features.push("Detailed report")
   if (tier.includesCounselling && tier.counsellingSessionCount) {
@@ -45,6 +47,45 @@ export const TierCard: React.FC<Props> = ({ tier, selected, onSelect, disabled }
       tier.lmsValidityDays ? `LMS (${tier.lmsValidityDays} days)` : "LMS access"
     )
   }
+  return features
+}
+
+/**
+ * Compact horizontal summary of a (locked-in) tier: label · name · inclusion
+ * pills on the left, price on the right. Used by the registration pages so the
+ * selection takes one row instead of a tall card. Styled by register.css.
+ */
+export const TierStrip: React.FC<{ tier: Tier; label?: string; sub?: React.ReactNode }> = ({
+  tier,
+  label = "Your selection",
+  sub,
+}) => {
+  const features = tierFeatures(tier)
+  const free = tier.priceInr === 0
+  return (
+    <div className="reg-strip">
+      <div className="reg-strip-main">
+        <div className="reg-strip-label">{label}</div>
+        <div className="reg-strip-title">{tier.name}</div>
+        {sub && <div className="reg-strip-sub">{sub}</div>}
+        {features.length > 0 && (
+          <div className="reg-pills">
+            {features.map((f) => (
+              <span key={f} className="reg-pill">{f}</span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="reg-strip-price">
+        {tier.priceInr !== tier.basePriceInr && <s>INR {tier.basePriceInr}</s>}
+        {free ? "Free" : `INR ${tier.priceInr}`}
+      </div>
+    </div>
+  )
+}
+
+export const TierCard: React.FC<Props> = ({ tier, selected, onSelect, disabled }) => {
+  const features = tierFeatures(tier)
 
   const cardStyle: React.CSSProperties = selected
     ? { ...s.tierCard, ...s.tierCardSelected, cursor: disabled ? "default" : "pointer" }

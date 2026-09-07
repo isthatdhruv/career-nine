@@ -654,7 +654,10 @@ public class CampaignPublicController {
         response.put("activeTier", activeTier);
         response.put("dashboardUrl", dashboardUrl);
         response.put("finalReportUrl", finalReportUrl);
-        response.put("accessToken", e.getAccessToken());
+        // Extended in place if the 30-day deep-link TTL has lapsed: the student is
+        // on the page and must still be able to book counselling / open links.
+        response.put("accessToken", entitlementService != null
+                ? entitlementService.ensureLiveAccessToken(e) : e.getAccessToken());
         response.put("finalReportActive", e.getFinalReportActive());
         // Held for counsellor release: the Thank-You page uses this to withhold the download
         // tile, the "we've emailed it" line and the Add-Report upsell, none of which are true
@@ -1172,7 +1175,9 @@ public class CampaignPublicController {
         int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
         out.put("counsellingActive", true);
         out.put("entitlementId", e.getEntitlementId());
-        out.put("accessToken", e.getAccessToken());
+        // See upgradeInfo: a lapsed token is extended so booking never 401s here.
+        out.put("accessToken", entitlementService != null
+                ? entitlementService.ensureLiveAccessToken(e) : e.getAccessToken());
         out.put("counsellingSessionsTotal", total);
         out.put("counsellingSessionsUsed", used);
         // If the student has already booked a session for this entitlement, tell the

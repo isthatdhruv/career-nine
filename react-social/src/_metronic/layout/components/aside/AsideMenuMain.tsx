@@ -223,6 +223,14 @@ export function AsideMenuMain() {
               </span>
             </div>
           </div>
+          {allowed("/school-dashboard") && (
+            <AsideMenuItem
+              to="/school-dashboard"
+              icon="/media/icons/duotune/graphs/gra008.svg"
+              title="School Dashboard"
+              fontIcon="bi-buildings"
+            />
+          )}
 
           <AsideMenuItemWithSub
             to=""
@@ -618,14 +626,7 @@ export function AsideMenuMain() {
               fontIcon="bi-send-check"
             />
           )}
-          {allowed("/school-dashboard") && (
-            <AsideMenuItem
-              to="/school-dashboard"
-              icon="/media/icons/duotune/graphs/gra008.svg"
-              title="School Dashboard"
-              fontIcon="bi-buildings"
-            />
-          )}
+          
           {/* The admin side of the dashboard above. Gated on the release whitelist so
               a principal who can read their dashboard does not see the controls that
               generate and withdraw it. */}

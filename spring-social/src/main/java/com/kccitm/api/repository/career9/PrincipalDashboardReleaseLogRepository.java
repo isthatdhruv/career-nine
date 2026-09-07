@@ -1,4 +1,4 @@
-package com.kccitm.api.repository.Career9;
+package com.kccitm.api.repository.career9;
 
 import java.util.List;
 
