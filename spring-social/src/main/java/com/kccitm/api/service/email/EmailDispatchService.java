@@ -274,6 +274,13 @@ public class EmailDispatchService {
             r = mailRenderer.wrapForeign(req.getSubject(), html.toString(), brand);
             r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(r.subject, r.html, text);
         }
+        if (r.text == null || r.text.trim().isEmpty()) {
+            // Every outgoing message needs a non-empty text part; when the branch above left it
+            // blank (e.g. a caller with no text and no html at all), derive one from the shelled
+            // html itself — at minimum this picks up the shell's own footer lines.
+            r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(
+                    r.subject, r.html, mailRenderer.wrapForeign(r.subject, r.html, brand).text);
+        }
         m.setSubject(r.subject);
         m.setHtmlContent(r.html);
         m.setTextContent(r.text);

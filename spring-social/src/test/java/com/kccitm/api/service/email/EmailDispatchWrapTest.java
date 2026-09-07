@@ -16,6 +16,9 @@ class EmailDispatchWrapTest {
     private EmailDispatchService dispatch;
     private ConfiguredEmailSender sender;
     private EmailAccount account;
+    private EmailTemplateRepository templates;
+    private MailLinks links;
+    private PlaceholderResolver placeholderResolver;
 
     @BeforeEach
     void setUp() {
@@ -23,7 +26,7 @@ class EmailDispatchWrapTest {
         account = new EmailAccount(); account.setId(1L); account.setActive(true); account.setFromEmail("n@career-9.net"); account.setFromName("Career-9");
         EmailAccountRepository accounts = mock(EmailAccountRepository.class);
         when(accounts.findFirstByIsGlobalDefaultTrueAndActiveTrue()).thenReturn(java.util.Optional.of(account));
-        EmailTemplateRepository templates = mock(EmailTemplateRepository.class);
+        templates = mock(EmailTemplateRepository.class);
         when(templates.findFirstByEmailTypeAndIsDefaultTrueAndActiveTrue(anyString())).thenReturn(java.util.Optional.empty());
         EmailSendLogRepository logs = mock(EmailSendLogRepository.class);
         when(logs.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -32,13 +35,14 @@ class EmailDispatchWrapTest {
         when(factory.forAccount(any())).thenReturn(sender);
         BrandResolver brands = mock(BrandResolver.class);
         when(brands.forRequest(any())).thenReturn(Brand.standard("https://cdn/logo.png", "support@career-9.net", "https://career-9.com", 2026));
-        MailLinks links = mock(MailLinks.class);
+        links = mock(MailLinks.class);
         when(links.rewrite(anyString())).thenAnswer(i -> i.getArgument(0));
+        placeholderResolver = mock(PlaceholderResolver.class);
         ReflectionTestUtils.setField(dispatch, "accountRepository", accounts);
         ReflectionTestUtils.setField(dispatch, "templateRepository", templates);
         ReflectionTestUtils.setField(dispatch, "logRepository", logs);
         ReflectionTestUtils.setField(dispatch, "senderFactory", factory);
-        ReflectionTestUtils.setField(dispatch, "placeholderResolver", mock(PlaceholderResolver.class));
+        ReflectionTestUtils.setField(dispatch, "placeholderResolver", placeholderResolver);
         ReflectionTestUtils.setField(dispatch, "templateRenderer", new EmailTemplateRenderer());
         ReflectionTestUtils.setField(dispatch, "instituteEmailSettingService", mock(InstituteEmailSettingService.class));
         ReflectionTestUtils.setField(dispatch, "brandResolver", brands);
@@ -84,5 +88,46 @@ class EmailDispatchWrapTest {
         SmtpEmailRequest s = sent();
         assertTrue(s.getHtmlContent().contains("Line one &lt;x&gt;"));
         assertEquals("Line one <x>\n\nLine two", s.getTextContent());
+    }
+
+    @Test
+    void templateBodyIsPlaceholderRenderedLinkRewrittenAndWrapped() throws Exception {
+        String longUrl = "https://assessment.career-9.com/assessment/start?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79";
+        String shortUrl = "https://api.career-9.com/s/Kx7Pq2M";
+        EmailTemplate t = new EmailTemplate();
+        t.setActive(true);
+        t.setIsDefault(true);
+        t.setSubjectTemplate("Hello {{first_name}}");
+        t.setBodyTemplate("<p>Hi {{first_name}}, open <a href=\"" + longUrl + "\">this</a></p>");
+        when(templates.findFirstByEmailTypeAndIsDefaultTrueAndActiveTrue("LOGIN_CREDENTIALS"))
+                .thenReturn(java.util.Optional.of(t));
+        when(placeholderResolver.resolve(any())).thenReturn(java.util.Collections.singletonMap("first_name", "Aarav"));
+        when(links.rewrite(anyString())).thenAnswer(i -> ((String) i.getArgument(0)).replace(longUrl, shortUrl));
+
+        EmailSendRequest r = EmailSendRequest.html(EmailType.LOGIN_CREDENTIALS, "a@example.com", "ignored subject", "<p>caller html</p>");
+        r.setDeliveryModeOverride(EmailDeliveryMode.SYNC);
+        dispatch.send(r);
+        SmtpEmailRequest s = sent();
+
+        assertEquals("Hello Aarav", s.getSubject());
+        assertEquals(1, s.getHtmlContent().split(MailTheme.SHELL_MARKER, -1).length - 1);
+        assertTrue(s.getHtmlContent().contains("Hi Aarav,"));
+        assertFalse(s.getHtmlContent().contains("t=Ew-"));
+        assertFalse(s.getHtmlContent().contains("caller html"));
+        assertNotNull(s.getTextContent());
+        assertFalse(s.getTextContent().trim().isEmpty());
+        assertTrue(s.getTextContent().contains("Hi Aarav,"));
+    }
+
+    @Test
+    void emptySendStillGetsATextPart() throws Exception {
+        EmailSendRequest r = new EmailSendRequest();
+        r.setEmailType(EmailType.GENERIC); r.getTo().add("a@example.com"); r.setSubject("Hi");
+        r.setDeliveryModeOverride(EmailDeliveryMode.SYNC);
+        dispatch.send(r);
+        SmtpEmailRequest s = sent();
+        assertNotNull(s.getTextContent());
+        assertFalse(s.getTextContent().trim().isEmpty());
+        assertTrue(s.getHtmlContent().contains(MailTheme.SHELL_MARKER));
     }
 }
