@@ -17,7 +17,8 @@ public final class AccountMails {
         String t = fullName.trim();
         return t.contains(" ") ? t.substring(0, t.indexOf(' ')) : t;
     }
-    static String hi(String firstName) { return "Hi " + v(firstName) + ","; }
+    /** The one greeting line. Public because a couple of one-off mails are built outside this package. */
+    public static String hi(String firstName) { return "Hi " + v(firstName) + ","; }
 
     public static Mail loginCredentials(String brandName, String firstName, String username, String password, MailLink signIn) {
         return Mail.builder()

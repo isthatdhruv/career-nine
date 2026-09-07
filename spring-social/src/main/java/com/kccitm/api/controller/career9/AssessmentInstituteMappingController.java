@@ -176,8 +176,13 @@ public class AssessmentInstituteMappingController {
     @Autowired
     private TokenProvider tokenProvider;
 
-    @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
+    @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
+
+    /** Razorpay's callback host: the explicit setting when there is one, else the configured frontend base. */
+    private String callbackBase() {
+        return (callbackBaseUrl != null && !callbackBaseUrl.isEmpty()) ? callbackBaseUrl : linkBuilder.frontendBase();
+    }
 
     @org.springframework.beans.factory.annotation.Value("${app.auth.assessmentTokenExpirationMsec:14400000}")
     private long assessmentTokenExpirationMsec;
@@ -1318,7 +1323,7 @@ public class AssessmentInstituteMappingController {
         try {
             String assessmentName = assessmentTableRepository.findById(ent.getAssessmentId())
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
-            String callbackUrl = callbackBaseUrl + "/payment-status";
+            String callbackUrl = callbackBase() + "/payment-status";
 
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mapping.getMappingId());
@@ -1442,7 +1447,7 @@ public class AssessmentInstituteMappingController {
         try {
             String assessmentName = assessmentTableRepository.findById(ent.getAssessmentId())
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
-            String callbackUrl = callbackBaseUrl + "/payment-status";
+            String callbackUrl = callbackBase() + "/payment-status";
 
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mapping.getMappingId());
@@ -1502,7 +1507,7 @@ public class AssessmentInstituteMappingController {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
 
-            String callbackUrl = callbackBaseUrl + "/payment-status";
+            String callbackUrl = callbackBase() + "/payment-status";
 
             // PAY1: persist a 'created' txn in its own committed transaction BEFORE
             // the irreversible Razorpay link call, so a recoverable DB record always
@@ -2279,7 +2284,7 @@ public class AssessmentInstituteMappingController {
             Long assessmentId = mapping.getAssessmentId();
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
-            String callbackUrl = callbackBaseUrl + "/payment-status";
+            String callbackUrl = callbackBase() + "/payment-status";
 
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mapping.getMappingId());

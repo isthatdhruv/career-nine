@@ -101,8 +101,13 @@ public class SchoolRegistrationController {
     @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
     @Autowired private InstituteAssessmentService instituteAssessmentService;
 
-    @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
+    @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
+
+    /** Razorpay's callback host: the explicit setting when there is one, else the configured frontend base. */
+    private String callbackBase() {
+        return (callbackBaseUrl != null && !callbackBaseUrl.isEmpty()) ? callbackBaseUrl : linkBuilder.frontendBase();
+    }
 
     // ============ ADMIN ENDPOINTS ============
 
@@ -908,7 +913,7 @@ public class SchoolRegistrationController {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
 
-            String callbackUrl = callbackBaseUrl + "/payment-status";
+            String callbackUrl = callbackBase() + "/payment-status";
 
             // PAY1: commit a 'created' txn in its own transaction BEFORE the irreversible
             // Razorpay link call, so a recoverable DB record always exists first.

@@ -43,7 +43,6 @@ import com.kccitm.api.repository.email.EmailAccountRepository;
 import com.kccitm.api.repository.email.EmailSendLogRepository;
 import com.kccitm.api.repository.email.EmailTemplateRepository;
 import com.kccitm.api.service.branding.BrandingDto;
-import com.kccitm.api.service.branding.InstituteBrandingService;
 import com.kccitm.api.service.email.EmailTemplateRenderer;
 import com.kccitm.api.service.email.SenderFactory;
 import com.kccitm.api.service.email.mails.AccountMails;
@@ -88,7 +87,6 @@ public class GmailReportEmailSender implements EmailSender {
     @Autowired private EmailSendLogRepository logRepository;
     @Autowired private SenderFactory senderFactory;
     @Autowired private EmailTemplateRenderer templateRenderer;
-    @Autowired private InstituteBrandingService brandingService;
     @Autowired private BrandResolver brandResolver;
     @Autowired private MailRenderer mailRenderer;
     @Autowired private MailLinks mailLinks;
@@ -158,14 +156,15 @@ public class GmailReportEmailSender implements EmailSender {
     // ─── placeholders + log ──────────────────────────────────────────────
 
     private Map<String, String> reportPlaceholders(ReportEmailEvent e) {
-        BrandingDto brand = new BrandingDto(e.whitelabel, e.schoolName, e.logoUrl);
         String school = (e.whitelabel && e.schoolName != null && !e.schoolName.isEmpty())
                 ? e.schoolName : "Career-9";
         Map<String, String> ctx = new LinkedHashMap<>();
         ctx.put("school_name", esc(school));
         ctx.put("logo_url", esc(e.logoUrl));
-        ctx.put("email_header", brandingService.emailHeaderHtml(brand)); // raw HTML
-        ctx.put("email_footer", brandingService.emailFooterHtml(brand)); // raw HTML
+        // The theme shell draws the header and footer; templates that still carry the old
+        // placeholders render nothing where they used to sit.
+        ctx.put("email_header", "");
+        ctx.put("email_footer", "");
         ctx.put("student_name", esc(e.studentName));
         if (e.studentName != null && !e.studentName.trim().isEmpty()) {
             String t = e.studentName.trim();

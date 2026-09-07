@@ -28,6 +28,7 @@ import com.kccitm.api.service.email.mails.AccountMails;
 import com.kccitm.api.service.email.mails.InternalMails;
 import com.kccitm.api.service.email.theme.Mail;
 import com.kccitm.api.service.email.theme.MailLinks;
+import com.kccitm.api.service.email.theme.MailShell;
 
 /**
  * Tells people a lead has arrived.
@@ -261,28 +262,12 @@ public class LeadNotificationService {
     }
 
     /**
-     * Every submitted field as a two-column HTML table, for the {@code lead_details}
-     * placeholder an admin-edited template may still reference. Every cell is HTML-escaped
-     * here — the block is marked raw HTML in {@code PlaceholderResolver}, so escaping is this
-     * method's responsibility.
+     * Every submitted field, for the {@code lead_details} placeholder an admin-edited template
+     * may still reference. It is the theme's own details panel, rendered without the shell, so
+     * an old template and a themed mail show the same block; escaping is {@code Mail.Row}'s job.
      */
     private String detailsTable(Lead lead) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("<table style=\"border-collapse:collapse;width:100%;max-width:560px;"
-                + "font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px\">");
-        for (Mail.Row row : fieldRows(lead)) {
-            sb.append("<tr>")
-              .append("<td style=\"padding:7px 12px 7px 0;border-bottom:1px solid #e5e7eb;"
-                      + "color:#4b5563;white-space:nowrap;vertical-align:top\">")
-              .append(escape(row.label))
-              .append("</td>")
-              .append("<td style=\"padding:7px 0;border-bottom:1px solid #e5e7eb;"
-                      + "color:#111827;font-weight:600\">")
-              .append(escape(row.value))
-              .append("</td></tr>");
-        }
-        sb.append("</table>");
-        return sb.toString();
+        return MailShell.bodyHtml(Mail.builder().subject("").preheader("").details(fieldRows(lead)).build());
     }
 
     private static void addField(Map<String, String> fields, String label, String value) {
@@ -335,15 +320,5 @@ public class LeadNotificationService {
             return key;
         }
         return Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1).toLowerCase();
-    }
-
-    private static String escape(String input) {
-        if (input == null) {
-            return "";
-        }
-        return input.replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                    .replace("\"", "&quot;");
     }
 }

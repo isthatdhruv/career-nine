@@ -48,6 +48,8 @@ import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.service.CommunicationLogService;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.theme.Mail;
 
 @RestController
 @RequestMapping("/contact-person")
@@ -362,28 +364,30 @@ public class ContactPersonController {
         }
         studentContactAssignmentRepository.saveAll(assignments);
 
-        // Build student names list for email
-        StringBuilder studentListHtml = new StringBuilder("<ul>");
-        for (Long userStudentId : userStudentIds) {
-            String name = userStudentRepository.getNameByUserID(userStudentId);
-            studentListHtml.append("<li>").append(name != null ? name : "Student #" + userStudentId).append("</li>");
-        }
-        studentListHtml.append("</ul>");
-
         // Send email notification to contact person
         if (cp.getEmail() != null && !cp.getEmail().isEmpty()) {
             String instituteName = (cp.getInstitute() != null) ? cp.getInstitute().getInstituteName() : "your school";
-            String subject = "Students Assigned to You – " + instituteName;
-            String htmlBody = "<p>Dear " + (cp.getName() != null ? cp.getName() : "Contact Person") + ",</p>"
-                    + "<p>The following " + userStudentIds.size() + " student(s) from <strong>" + instituteName
-                    + "</strong> have been assigned to you as their admin:</p>"
-                    + studentListHtml
-                    + "<p>You can now contact these students and send them emails through the Odoo service.</p>"
-                    + "<p>This is an automated notification from Career-9.</p>";
+            int n = userStudentIds.size();
+            List<String> names = new ArrayList<>();
+            for (Long userStudentId : userStudentIds) {
+                String name = userStudentRepository.getNameByUserID(userStudentId);
+                names.add(Mail.v(name != null ? name : "Student #" + userStudentId));
+            }
+            Mail mail = Mail.builder()
+                    .subject("Students assigned to you: " + instituteName)
+                    .preheader(n + " students from " + instituteName + " have been assigned to you.")
+                    .title("Students assigned to you")
+                    .p(AccountMails.hi(AccountMails.firstName(cp.getName())))
+                    .p("The following " + Mail.b(String.valueOf(n)) + " students from " + Mail.b(instituteName)
+                            + " have been assigned to you as their admin:")
+                    .list(names.toArray(new String[0]))
+                    .small("You can now contact these students and send them emails from the admin app.")
+                    .signature()
+                    .build();
             boolean ok = true;
             String err = null;
             try {
-                emailDispatchService.sendHtml(EmailType.GENERIC, cp.getEmail(), subject, htmlBody);
+                emailDispatchService.sendMail(EmailType.GENERIC, cp.getEmail(), mail);
             } catch (Exception e) {
                 ok = false;
                 err = e.getMessage();
