@@ -34,6 +34,11 @@ public final class MailSamples {
         m.put("password-reset-confirm", AccountMails.passwordResetConfirm(FIRST, SIGN_IN));
         m.put("admin-password-reset", AccountMails.adminPasswordReset("Meera", "Tq7#kd2p", SIGN_IN));
         m.put("account-activated", AccountMails.accountActivated("Meera", SIGN_IN));
+        m.put("payment-success-welcome", PaymentMails.paymentReceived(FIRST, ASSESSMENT, "20260412", "15-05-2010", LOGIN));
+        m.put("payment-success-resend", PaymentMails.welcomeResend(FIRST, ASSESSMENT, "20260412", "15-05-2010", MAGIC, LOGIN));
+        m.put("payment-failed-cancelled-expired", PaymentMails.paymentFailed(FIRST, ASSESSMENT, "1,499", PaymentMails.Outcome.FAILED, L("https://dashboard.career-9.com/payment-register/pay_Q7x9AbC1234567890abcdef")));
+        m.put("payment-pending-nudge", PaymentMails.paymentPending(FIRST, ASSESSMENT, "1,499", L("https://dashboard.career-9.com/payment-register/pay_Q7x9AbC1234567890abcdef")));
+        m.put("payment-link", PaymentMails.paymentLink(FIRST, ASSESSMENT, "1,499", L("https://dashboard.career-9.com/payment-register/pay_Q7x9AbC1234567890abcdef")));
         return m;
     }
 }
