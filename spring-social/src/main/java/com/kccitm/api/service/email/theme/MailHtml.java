@@ -18,7 +18,7 @@ final class MailHtml {
         String t = html.replaceAll("(?i)<br\\s*/?>", "\n");
         t = TAGS.matcher(t).replaceAll("");
         t = t.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-             .replace("&quot;", "\"").replace("&#39;", "'").replace("&rsquo;", "'").replace("&lsquo;", "'")
+             .replace("&quot;", "\"").replace("&#39;", "'").replace("&rsquo;", "’").replace("&lsquo;", "‘")
              .replace("&ldquo;", "“").replace("&rdquo;", "”").replace("&ndash;", "–").replace("&mdash;", "—")
              .replace("&middot;", "·").replace("&hellip;", "…").replace("&rarr;", "→").replace("&harr;", "↔")
              .replace("&rsaquo;", "›").replace("&copy;", "©").replace("&#8377;", "₹");

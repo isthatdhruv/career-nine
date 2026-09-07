@@ -64,4 +64,12 @@ class MailBuilderTest {
         assertTrue(m.getBlocks().get(0).html().contains("<th"));
         assertEquals("  Time | Student\n  10:00 | Aarav", m.getBlocks().get(0).text());
     }
+
+    @Test
+    void decodesCommonHtmlEntitiesIncludingCurlyQuotes() {
+        Mail m = Mail.builder().subject("s").preheader("p")
+                .p("It&rsquo;s &lsquo;on&rsquo;")
+                .build();
+        assertEquals("It’s ‘on’", m.getBlocks().get(0).text());
+    }
 }
