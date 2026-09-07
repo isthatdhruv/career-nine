@@ -11,13 +11,16 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.User;
+import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.reminder.ReminderConfig;
 import com.kccitm.api.model.reminder.ReminderServiceType;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.service.b2c.LinkBuilder;
 
 /**
  * Third reminder system: nudges students who have an assigned assessment
@@ -37,6 +40,8 @@ public class AssessmentMappingReminderSchedulerService {
     @Autowired private UserRepository userRepository;
     @Autowired private ReminderConfigService configService;
     @Autowired private ReminderSender sender;
+    @Autowired private AssessmentTableRepository assessmentTableRepository;
+    @Autowired private LinkBuilder linkBuilder;
 
     // Disabled: the "not started" assessment-mapping reminder no longer runs
     // automatically. Re-enable by uncommenting the @Scheduled annotation below.
@@ -80,9 +85,10 @@ public class AssessmentMappingReminderSchedulerService {
             Map<String, Object> vars = new HashMap<>();
             vars.put("studentName", displayName(u));
             vars.put("studentEmail", u.getEmail());
-            vars.put("assessmentName", "Assessment #" + m.getAssessmentId());
+            vars.put("assessmentName", assessmentTableRepository.findById(m.getAssessmentId())
+                    .map(AssessmentTable::getAssessmentName).orElse("your assessment"));
             vars.put("instituteName", inst == null ? "" : inst.getInstituteName());
-            vars.put("link", "");
+            vars.put("link", linkBuilder.manualLogin());
             c.variables = vars;
             sender.send(c);
             sent++;

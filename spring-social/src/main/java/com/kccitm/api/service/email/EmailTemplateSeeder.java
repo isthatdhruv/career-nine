@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import com.kccitm.api.model.email.EmailTemplate;
@@ -19,8 +20,14 @@ import com.kccitm.api.service.email.theme.MailShell;
  * Seeds the flagship default email templates on boot. Idempotent: a type is seeded only when it
  * has no template yet, so admin edits/deletes are never overwritten on restart. Bodies come from
  * the senders' shared HTML builders, tokenised — guaranteeing parity with the inline fallback.
+ *
+ * <p>{@code @Order(Integer.MAX_VALUE - 1)}: without an explicit order this and any other
+ * unordered {@link ApplicationRunner} share the same lowest-precedence bucket, which would leave
+ * the run order against {@link MailSeedUpgrader} (fixed at {@code Integer.MAX_VALUE}, must run
+ * after this one so it sees rows this seeder just created) undefined.
  */
 @Component
+@Order(Integer.MAX_VALUE - 1)
 public class EmailTemplateSeeder implements ApplicationRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailTemplateSeeder.class);

@@ -26,7 +26,7 @@ class MailCatalogueTest {
             String html = MailShell.render(mail, BRAND);
             String text = MailShell.text(mail, BRAND);
             if (!html.contains(MailTheme.SHELL_MARKER)) problems.add(e.getKey() + ": no shell");
-            if (html.contains("{{")) problems.add(e.getKey() + ": unresolved placeholder");
+            if (html.contains("{{") && !e.getKey().startsWith("reminder-")) problems.add(e.getKey() + ": unresolved placeholder");
             if (html.contains("linear-gradient")) problems.add(e.getKey() + ": gradient");
             if (html.contains("&amp;#")) problems.add(e.getKey() + ": double-escaped entity");
             if (text.trim().isEmpty()) problems.add(e.getKey() + ": empty text part");

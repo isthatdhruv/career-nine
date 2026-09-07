@@ -105,6 +105,10 @@ public final class MailSamples {
         m.put("lead-notification", InternalMails.leadAlert("Parent", "Rohan Mehta", "Website", "07 Sep 2026, 10:14 AM IST", lead, "1042", L("https://dashboard.career-9.com/leads")));
         m.put("lead-welcome", InternalMails.leadWelcome("Rohan", lead, L("https://career-9.com")));
         m.put("email-account-test", InternalMails.accountTest("Notifications (Gmail API)", "GMAIL/API", "07 Sep 2026, 11:20 AM IST"));
+        m.put("reminder-assessment-mapping", ReminderMails.assessmentMapping());
+        m.put("reminder-assessment-invite-b2c-template", ReminderMails.assessmentInviteB2c());
+        m.put("reminder-counselling-24h-template", ReminderMails.counselling24h());
+        m.put("reminder-counselling-1h-template", ReminderMails.counselling1h());
         return m;
     }
 }
