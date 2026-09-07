@@ -1,6 +1,8 @@
 package com.kccitm.api.service.email.theme;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,8 +48,10 @@ public class MailLinks {
         Set<String> seen = new LinkedHashSet<>();
         Matcher m = URL.matcher(html);
         while (m.find()) { String u = m.group(); if (isLong(u)) seen.add(u); }
+        List<String> urls = new ArrayList<>(seen);
+        urls.sort((a, b) -> b.length() - a.length());
         String out = html;
-        for (String u : seen) {
+        for (String u : urls) {
             MailLink l = of(u, "foreign_html");
             if (l != null && !l.getHref().equals(u)) out = out.replace(u, l.getHref());
         }
