@@ -55,6 +55,22 @@ public final class MailSamples {
         m.put("b2c-dashboard-access", EntitlementMails.dashboardAccess(FIRST, L("https://dashboard.career-9.com/student/sso?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79")));
         m.put("b2c-lms-access", EntitlementMails.learningAccess(FIRST, L("https://dashboard.career-9.com/lms/launch?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79")));
         m.put("b2c-counselling-book-link", EntitlementMails.bookingLink(FIRST, L("https://dashboard.career-9.com/counselling/book?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79")));
+        CounsellingMails.Session S = new CounsellingMails.Session(DATE, TIME, "30", COUNSELLOR, MODE, SCHOOL, ASSESSMENT, STUDENT, JOIN, REPORT);
+        CounsellingMails.Session OLD = new CounsellingMails.Session("Tuesday, 16 Sep 2026", "3:00 – 3:30 PM IST", "30", COUNSELLOR, MODE, SCHOOL, ASSESSMENT, STUDENT, null, null);
+        MailLink RESCHEDULE = L("https://assessment.career-9.com/counselling-reschedule/eyJhbGciOiJIUzI1NiJ9.eyJhIjoxfQ.sig");
+        m.put("counselling-booking-confirmation", CounsellingMails.bookingConfirmation(FIRST, S, L("https://calendar.google.com/calendar/render?action=TEMPLATE&text=Career-9+Counselling&dates=20260918T110000Z/20260918T113000Z")));
+        m.put("counselling-assigned-to-counsellor", CounsellingMails.assignedToCounsellor(COUNSELLOR, "Wants help choosing a stream after Class 10", S, PORTAL));
+        m.put("counselling-confirmed-to-student", CounsellingMails.confirmedToStudent(FIRST, S));
+        m.put("counselling-cancelled-notice", CounsellingMails.cancelledNotice(FIRST, S, "the student", "counsellor unavailable", SESSIONS, "View my sessions"));
+        m.put("counselling-student-cancellation-confirmation", CounsellingMails.studentCancellationConfirmation(FIRST, S, 1, SESSIONS));
+        m.put("counselling-admin-cancellation", CounsellingMails.adminCancellationStudent(FIRST, S, SESSIONS));
+        m.put("counselling-admin-cancellation-counsellor", CounsellingMails.adminCancellationCounsellor(COUNSELLOR, STUDENT, S, PORTAL));
+        m.put("counselling-self-reschedule", CounsellingMails.selfReschedule(FIRST, "Your counsellor was unable to join your session on Tuesday, 16 Sep at 3:00 PM.", "counsellor unavailable", RESCHEDULE));
+        m.put("counselling-rescheduled", CounsellingMails.rescheduledStudent(FIRST, OLD, S));
+        m.put("counselling-rescheduled-counsellor", CounsellingMails.rescheduledCounsellor(COUNSELLOR, STUDENT, OLD, S));
+        m.put("counselling-counsellor-swapped", CounsellingMails.counsellorSwapped(FIRST, S, "Rohit Verma"));
+        m.put("counselling-session-shifted", CounsellingMails.sessionShifted(FIRST, S, "3:00 – 3:30 PM IST", RESCHEDULE));
+        m.put("counsellor-deactivated-student", CounsellingMails.counsellorDeactivatedStudent(FIRST, S, RESCHEDULE));
         return m;
     }
 }
