@@ -39,6 +39,12 @@ public class EmailTemplateService {
     @Autowired
     private InstituteBrandingService brandingService;
 
+    @Autowired
+    private com.kccitm.api.service.email.theme.MailRenderer mailRenderer;
+
+    @Autowired
+    private com.kccitm.api.service.email.theme.BrandResolver brandResolver;
+
     // ─── CRUD ────────────────────────────────────────────────────────────
 
     public List<Map<String, Object>> list(String emailType) {
@@ -96,7 +102,7 @@ public class EmailTemplateService {
         Map<String, String> ctx = sampleContext(type);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("subject", renderer.render(form.subjectTemplate, ctx));
-        out.put("html", renderer.render(form.bodyTemplate, ctx));
+        out.put("html", mailRenderer.wrapForeign(null, renderer.render(form.bodyTemplate, ctx), brandResolver.standard()).html);
         return out;
     }
 

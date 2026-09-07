@@ -60,6 +60,20 @@ public class EmailDispatchService {
     @Autowired
     private EmailTemplateRenderer templateRenderer;
 
+    @Autowired
+    private com.kccitm.api.service.email.theme.BrandResolver brandResolver;
+
+    @Autowired
+    private com.kccitm.api.service.email.theme.MailRenderer mailRenderer;
+
+    @Autowired
+    private com.kccitm.api.service.email.theme.MailLinks mailLinks;
+
+    /** Convenience for a themed {@link com.kccitm.api.service.email.theme.Mail} send. */
+    public EmailSendResult sendMail(EmailType type, String to, com.kccitm.api.service.email.theme.Mail mail) {
+        return send(EmailSendRequest.mail(type, to, mail));
+    }
+
     /** Convenience for the common single-recipient HTML send. */
     public EmailSendResult sendHtml(EmailType type, String to, String subject, String html) {
         return send(EmailSendRequest.html(type, to, subject, html));
@@ -126,6 +140,9 @@ public class EmailDispatchService {
         EmailTemplate template = resolveTemplate(req);
         EmailDeliveryMode mode = resolveDeliveryMode(req, template);
         SmtpEmailRequest message = buildMessage(req, account, template);
+        if (req.getSubject() == null) {
+            req.setSubject(message.getSubject());
+        }
 
         EmailSendLog row = saveLog(req, account, template, mode, EmailSendStatus.QUEUED, null);
 
@@ -225,19 +242,41 @@ public class EmailDispatchService {
         if (req.getBcc() != null) {
             m.setBcc(new ArrayList<>(req.getBcc()));
         }
+        com.kccitm.api.service.email.theme.Brand brand = brandResolver.forRequest(req);
+        com.kccitm.api.service.email.theme.MailRenderer.Rendered r;
         if (template != null) {
             Map<String, String> ctx = placeholderResolver.resolve(req);
             String subject = templateRenderer.render(template.getSubjectTemplate(), ctx);
             if (subject == null || subject.trim().isEmpty()) {
                 subject = req.getSubject(); // fall back to a caller-supplied subject if the template's is blank
             }
-            m.setSubject(subject);
-            m.setHtmlContent(templateRenderer.render(template.getBodyTemplate(), ctx));
+            String html = mailLinks.rewrite(templateRenderer.render(template.getBodyTemplate(), ctx));
+            r = mailRenderer.wrapForeign(subject, html, brand);
+        } else if (req.getMail() != null) {
+            r = mailRenderer.render(req.getMail(), brand);
+            if (req.getSubject() != null && !req.getSubject().equals(r.subject)) {
+                r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(req.getSubject(), r.html, r.text);
+            }
+            for (String v : com.kccitm.api.service.email.theme.MailRules.violations(req.getMail())) {
+                logger.warn("Mail rule broken for {}: {}", req.getEmailType(), v);
+            }
+        } else if (req.getHtmlContent() != null && !req.getHtmlContent().trim().isEmpty()) {
+            r = mailRenderer.wrapForeign(req.getSubject(), mailLinks.rewrite(req.getHtmlContent()), brand);
+            if (req.getTextContent() != null && !req.getTextContent().isEmpty()) {
+                r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(r.subject, r.html, req.getTextContent());
+            }
         } else {
-            m.setSubject(req.getSubject());
-            m.setHtmlContent(req.getHtmlContent());
-            m.setTextContent(req.getTextContent());
+            String text = req.getTextContent() == null ? "" : req.getTextContent();
+            StringBuilder html = new StringBuilder();
+            for (String para : text.split("\\n\\s*\\n")) {
+                html.append("<p>").append(escapeHtml(para).replace("\n", "<br>")).append("</p>");
+            }
+            r = mailRenderer.wrapForeign(req.getSubject(), html.toString(), brand);
+            r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(r.subject, r.html, text);
         }
+        m.setSubject(r.subject);
+        m.setHtmlContent(r.html);
+        m.setTextContent(r.text);
         if (req.getAttachments() != null && !req.getAttachments().isEmpty()) {
             m.setAttachments(new ArrayList<>(req.getAttachments()));
         }
@@ -284,6 +323,16 @@ public class EmailDispatchService {
             return null;
         }
         return s.length() > max ? s.substring(0, max) : s;
+    }
+
+    private static String escapeHtml(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;");
     }
 
     // ─── send-test (used by the Accounts admin page) ─────────────────────
