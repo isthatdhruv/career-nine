@@ -12,13 +12,22 @@ public final class InternalMails {
 
     public static Mail counsellorDeactivatedAlert(String counsellorName, String counsellorEmail, String adminName, List<String[]> rows, MailLink manageSessions) {
         int n = rows.size();
-        return Mail.builder().subject("Counsellor deactivated: " + counsellorName + " (" + n + (n == 1 ? " session)" : " sessions)"))
-            .preheader(n + (n == 1 ? " session" : " sessions") + " taken off the calendar. Some students may need a follow-up.")
+        // A counsellor with an empty diary is the quiet case, and the reader should see that from
+        // the inbox: no student list to explain, and nothing to chase. The subject still counts
+        // the sessions, because "(0 sessions)" is exactly what happened.
+        Mail.Builder m = Mail.builder().subject("Counsellor deactivated: " + counsellorName + " (" + n + (n == 1 ? " session)" : " sessions)"))
+            .preheader(n == 0
+                    ? "No upcoming sessions were booked with this counsellor."
+                    : n + (n == 1 ? " session" : " sessions") + " taken off the calendar. Some students may need a follow-up.")
             .internal("Counsellor deactivation").title("Counsellor deactivated")
-            .details(new Mail.Row("Counsellor", counsellorName), new Mail.Row("Email", counsellorEmail), new Mail.Row("Deactivated by", adminName), new Mail.Row("Sessions affected", String.valueOf(n)))
-            .p("The students below have had their session taken off the calendar. " + b("Rebooking link sent") + " means they can pick a new time themselves. " + b("Needs follow-up") + " means no other counsellor covers their assessment and they were told the team would be in touch.")
-            .table(new String[]{"Student", "When", "Contact", "Outcome"}, rows)
-            .action(manageSessions, "Open Manage Sessions").build();
+            .details(new Mail.Row("Counsellor", counsellorName), new Mail.Row("Email", counsellorEmail), new Mail.Row("Deactivated by", adminName), new Mail.Row("Sessions affected", String.valueOf(n)));
+        if (n == 0) {
+            m.p("No upcoming sessions were booked with this counsellor, so no students need a follow-up.");
+        } else {
+            m.p("The students below have had their session taken off the calendar. " + b("Rebooking link sent") + " means they can pick a new time themselves. " + b("Needs follow-up") + " means no other counsellor covers their assessment and they were told the team would be in touch.")
+             .table(new String[]{"Student", "When", "Contact", "Outcome"}, rows);
+        }
+        return m.action(manageSessions, "Open Manage Sessions").build();
     }
 
     public static Mail counsellingRequestForwarded(String assessmentName, String studentName, String studentEmail, String studentPhone, String instituteName, MailLink assign) {

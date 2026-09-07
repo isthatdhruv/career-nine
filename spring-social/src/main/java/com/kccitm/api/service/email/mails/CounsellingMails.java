@@ -300,10 +300,15 @@ public final class CounsellingMails {
      * read it before the session — is the service's question, not this class's.
      */
     public static Mail summaryStudent(String firstName, Session s, String guidance) {
+        // An admin can resend this before anyone has been assigned, and naming a counsellor who
+        // does not exist yet reads as "with ." in the mail and "with null." in the inbox preview.
+        boolean named = s.counsellor != null && !s.counsellor.trim().isEmpty();
         Mail.Builder m = Mail.builder().subject("Your counselling session details")
-            .preheader(s.date + ", " + s.time + " with " + s.counsellor + ". Join link and report inside.")
+            .preheader(s.date + ", " + s.time + (named ? " with " + s.counsellor : "") + ". Join link and report inside.")
             .title("Your counselling session").p(hi(firstName))
-            .p("Here are the details of your counselling session with " + b(s.counsellor) + ".").details(rows(s, false, true))
+            .p(named
+                    ? "Here are the details of your counselling session with " + b(s.counsellor) + "."
+                    : "Here are the details of your counselling session.").details(rows(s, false, true))
             .action(s.join, "Join the session").links(null, s.report, "Open your assessment report");
         if (guidance != null && !guidance.isEmpty()) m.small(v(guidance));
         return m.small("If any of the above is incorrect, write to " + SUPPORT + " before the session so we can put it right.").signature().build();
