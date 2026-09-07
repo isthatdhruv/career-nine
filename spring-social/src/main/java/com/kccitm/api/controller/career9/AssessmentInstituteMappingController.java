@@ -59,9 +59,13 @@ import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.theme.Mail;
+import com.kccitm.api.service.email.theme.MailLinks;
 import com.kccitm.api.service.career9.AssessmentMappingTierService;
 import com.kccitm.api.service.career9.ReferralService;
 import com.kccitm.api.service.StudentProvisioningService;
+import com.kccitm.api.service.b2c.LinkBuilder;
 import com.kccitm.api.service.branding.InstituteBrandingService;
 
 @RestController
@@ -105,6 +109,12 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    @Autowired
+    private LinkBuilder linkBuilder;
+
+    @Autowired
+    private MailLinks mailLinks;
 
     @Autowired
     private StudentProvisioningService studentProvisioningService;
@@ -1783,28 +1793,9 @@ public class AssessmentInstituteMappingController {
      */
     private void sendRegistrationEmail(String toEmail, String studentName, String username, String dob, String assessmentName) {
         try {
-            String subject = "Registration Successful - " + assessmentName;
-            String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
-                    + "<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;'>"
-                    + "<h2 style='margin: 0;'>Registration Successful!</h2>"
-                    + "</div>"
-                    + "<div style='padding: 24px; background: #ffffff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;'>"
-                    + "<p>Dear <strong>" + studentName + "</strong>,</p>"
-                    + "<p>You have been successfully registered for <strong>" + assessmentName + "</strong>.</p>"
-                    + "<p>Here are your login credentials:</p>"
-                    + "<div style='background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;'>"
-                    + "<p style='margin: 4px 0;'><strong>Username:</strong> <span style='color: #667eea; font-size: 1.1em;'>" + username + "</span></p>"
-                    + "<p style='margin: 4px 0;'><strong>Password:</strong> <span style='color: #667eea; font-size: 1.1em;'>" + dob + "</span> (Your Date of Birth)</p>"
-                    + "</div>"
-                    + "<p style='color: #666; font-size: 0.9em;'>Please save these credentials. You will need them to log in and take the assessment.</p>"
-                    + "<div style='text-align: center; margin: 24px 0;'>"
-                    + "<a href='https://assessment.career-9.com/' style='display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 1em;'>Go To Assessment</a>"
-                    + "</div>"
-                    + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
-                    + "</div>"
-                    + "</div>";
-
-            emailDispatchService.sendHtml(EmailType.ASSESSMENT_INSTITUTE_MAPPING, toEmail, subject, htmlContent);
+            Mail mail = AccountMails.registrationSuccess(AccountMails.firstName(studentName), assessmentName, username, dob,
+                    mailLinks.of(linkBuilder.manualLogin(), "student_login"));
+            emailDispatchService.sendMail(EmailType.ASSESSMENT_INSTITUTE_MAPPING, toEmail, mail);
             logger.info("Registration email sent to: {}", toEmail);
         } catch (Exception e) {
             logger.error("Failed to send registration email to: {}. Error: {}", toEmail, e.getMessage(), e);

@@ -27,7 +27,13 @@ public final class MailSamples {
 
     public static Map<String, Mail> all() {
         Map<String, Mail> m = new LinkedHashMap<>();
-        // Task 6 adds: m.put("login-credentials", AccountMails.loginCredentials(...)); …
+        m.put("login-credentials", AccountMails.loginCredentials("Career-9", FIRST, "20260412", "15-05-2010", SIGN_IN));
+        m.put("school-registration-success", AccountMails.registrationSuccess(FIRST, ASSESSMENT, "20260412", "15-05-2010", LOGIN));
+        m.put("account-welcome", AccountMails.accountWelcome(FIRST));
+        m.put("password-reset-link", AccountMails.passwordResetLink(FIRST, 60, L("https://dashboard.career-9.com/auth/reset-password/3f9c1c2e-6b1a-4a8e-9a0f-1b2c3d4e5f60")));
+        m.put("password-reset-confirm", AccountMails.passwordResetConfirm(FIRST, SIGN_IN));
+        m.put("admin-password-reset", AccountMails.adminPasswordReset("Meera", "Tq7#kd2p", SIGN_IN));
+        m.put("account-activated", AccountMails.accountActivated("Meera", SIGN_IN));
         return m;
     }
 }
