@@ -6,3 +6,6 @@
 
 /assessment-cache/*
   Cache-Control: public, max-age=86400
+
+/catalogues/*
+  Cache-Control: public, max-age=86400

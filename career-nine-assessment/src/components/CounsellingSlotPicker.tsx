@@ -332,8 +332,12 @@ const CounsellingSlotPicker: React.FC<Props> = ({
 
   const handleConfirm = async () => {
     if (selectedSlotId == null || booking) return
-    if (!contactName.trim() || !contactPhone.trim()) {
-      setBookError('Please enter your name and phone number.')
+    if (!contactName.trim() || !contactPhone.trim() || !contactEmail.trim()) {
+      setBookError('Please enter your name, phone number and email address.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
+      setBookError('Please enter a valid email address.')
       return
     }
     // The chosen time may be offered by several counsellors. Book one of them at
@@ -356,7 +360,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
             reason: reason.trim() || undefined,
             contactName: contactName.trim(),
             contactPhone: contactPhone.trim(),
-            contactEmail: contactEmail.trim() || undefined,
+            contactEmail: contactEmail.trim(),
             parentEmail: parentEmail.trim() || undefined,
             parentPhone: parentPhone.trim() || undefined,
           })
@@ -692,7 +696,7 @@ const CounsellingSlotPicker: React.FC<Props> = ({
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={fieldLabelStyle}>
-                    Email <span style={{ color: '#94A3B8' }}>(optional)</span>
+                    Email <span style={{ color: '#EF4444' }}>*</span>
                   </label>
                   <input
                     type='email'
@@ -808,8 +812,8 @@ const CounsellingSlotPicker: React.FC<Props> = ({
               <button
                 type='button'
                 onClick={handleConfirm}
-                disabled={selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim()}
-                style={{ ...btnPrimaryStyle(selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim()), ...(isMobile ? { flex: 1 } : {}) }}
+                disabled={selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim() || !contactEmail.trim()}
+                style={{ ...btnPrimaryStyle(selectedSlotId == null || booking || !contactName.trim() || !contactPhone.trim() || !contactEmail.trim()), ...(isMobile ? { flex: 1 } : {}) }}
               >
                 {booking ? 'Booking…' : 'Confirm booking'}
               </button>
