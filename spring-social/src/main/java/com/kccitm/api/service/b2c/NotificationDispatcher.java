@@ -1,7 +1,5 @@
 package com.kccitm.api.service.b2c;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 
 import org.slf4j.Logger;
@@ -31,66 +29,10 @@ public class NotificationDispatcher {
     @Autowired private EmailDispatchService emailDispatchService;
     @Autowired private ServiceDeliveryLogRepository serviceDeliveryLogRepository;
 
-    public ServiceDeliveryLog sendEmail(StudentEntitlement entitlement,
-                                        String recipient,
-                                        String serviceType,
-                                        String subject,
-                                        String htmlBody,
-                                        String linkUrl) {
-        ServiceDeliveryLog log = new ServiceDeliveryLog();
-        log.setEntitlementId(entitlement != null ? entitlement.getEntitlementId() : null);
-        log.setUserStudentId(entitlement != null ? entitlement.getUserStudentId() : null);
-        log.setServiceType(serviceType);
-        log.setChannel("email");
-        log.setRecipient(recipient);
-        log.setSubject(subject);
-        // Store a redacted copy of the link: the deep links embed the entitlement
-        // access token as a `t=` query param, and this row is surfaced verbatim by
-        // the admin Tracker (allotment detail + /entitlement/{id}/communications).
-        // Persisting the raw token would let any tracker reader (or DB/log access)
-        // lift a working bearer credential. The real, working link still goes out
-        // in the email body (htmlBody) — only the stored audit copy is masked.
-        log.setLinkUrl(redactToken(linkUrl));
-        log.setTemplateKey(serviceType);
-
-        if (recipient == null || recipient.trim().isEmpty()) {
-            log.setDeliveryStatus("failed");
-            log.setFailureReason("No recipient email");
-            return serviceDeliveryLogRepository.save(log);
-        }
-
-        try {
-            // Route through the central dispatcher (universal email_send_log + account routing).
-            // Forced ASYNC to preserve the original fire-and-forget behaviour; this ServiceDeliveryLog
-            // row remains the B2C-specific audit trail.
-            EmailSendRequest req = new EmailSendRequest();
-            req.setEmailType(mapServiceType(serviceType));
-            req.setTo(new ArrayList<>(Collections.singletonList(recipient)));
-            if (entitlement != null) {
-                req.setUserStudentId(entitlement.getUserStudentId());
-            }
-            req.setDeliveryModeOverride(EmailDeliveryMode.ASYNC);
-            req.setSubject(subject);
-            req.setHtmlContent(htmlBody);
-            EmailSendResult result = emailDispatchService.send(req);
-            if (result != null && result.isSuccess()) {
-                log.setDeliveryStatus("sent");
-                log.setSentAt(new Date());
-            } else {
-                log.setDeliveryStatus("failed");
-                log.setFailureReason(result != null ? result.getError() : "dispatch failed");
-            }
-        } catch (Exception e) {
-            logger.error("Email send failed for serviceType={} to={}", serviceType, recipient, e);
-            log.setDeliveryStatus("failed");
-            log.setFailureReason(e.getMessage());
-        }
-        return serviceDeliveryLogRepository.save(log);
-    }
-
     /**
-     * Sends a themed {@link Mail} rather than raw HTML. Used by the report-ready paths
-     * (pipeline-disabled immediate send, admin resend) that now render through the theme.
+     * Sends a themed {@link Mail} through the central dispatcher (universal
+     * email_send_log + account routing) and writes the B2C-specific
+     * ServiceDeliveryLog audit row for it.
      */
     public ServiceDeliveryLog sendEmail(StudentEntitlement entitlement,
                                         String recipient,
@@ -104,7 +46,12 @@ public class NotificationDispatcher {
         log.setChannel("email");
         log.setRecipient(recipient);
         log.setSubject(mail != null ? mail.getSubject() : null);
-        // See the html overload above: the stored audit copy masks the access token.
+        // Store a redacted copy of the link: the deep links embed the entitlement
+        // access token as a `t=` query param, and this row is surfaced verbatim by
+        // the admin Tracker (allotment detail + /entitlement/{id}/communications).
+        // Persisting the raw token would let any tracker reader (or DB/log access)
+        // lift a working bearer credential. The real, working link still goes out
+        // in the email body — only the stored audit copy is masked.
         log.setLinkUrl(redactToken(linkUrl));
         log.setTemplateKey(serviceType);
 
@@ -144,6 +91,7 @@ public class NotificationDispatcher {
         switch (serviceType) {
             case "assessment_invite": return EmailType.ENTITLEMENT_GRANTED;
             case "final_report":      return EmailType.REPORT_READY;
+            case "nudge":             return EmailType.ENTITLEMENT_GRANTED;
             default:                  return EmailType.GENERIC;
         }
     }

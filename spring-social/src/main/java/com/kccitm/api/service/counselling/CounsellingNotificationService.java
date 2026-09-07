@@ -1516,10 +1516,14 @@ public class CounsellingNotificationService {
     /**
      * "You still have counselling session(s) to book" nudge — WhatsApp primary,
      * email fallback, plus an in-app notification when a userId is available.
+     *
+     * @param bookingUrl the tokenized booking link for this entitlement (may be null when it
+     *                   could not be built); not yet used in the body below — Task 10b rewrites
+     *                   the email fallback to link here instead of the plain portal URL.
      */
     @Async
     public void sendCounsellingBookingNudge(String name, String email, String phone,
-            Long userId, int sessionsRemaining) {
+            Long userId, int sessionsRemaining, String bookingUrl) {
         String safeName = (name != null && !name.isEmpty()) ? name : "there";
         boolean sent = whatsAppService.sendTemplate(phone, whatsAppService.bookingNudgeCampaign(),
                 Arrays.asList(safeName, String.valueOf(sessionsRemaining)));
