@@ -34,6 +34,14 @@ import java.util.Set;
  *
  * <p>If the scope is empty (no institutes), {@link #appendScopePredicate} emits
  * {@code 1 = 0} so the query returns nothing — the deny-by-default branch.
+ *
+ * <p><b>Null target dimensions.</b> A rule's session/class/section clause is
+ * emitted as {@code (<field> IS NULL OR <field> = :param)}. This mirrors
+ * {@link AccessScope#allows(Integer, Integer, Integer, Integer)}, where a
+ * {@code null} on the target side means "this dim wasn't bound" and passes.
+ * Rows are only ever stamped with the institute (student_info.session_id and
+ * course_code are unpopulated by every registration path), so a strict
+ * equality here made every session- or class-scoped login see zero rows.
  */
 public final class AccessScopeJpqlBuilder {
 
@@ -124,17 +132,20 @@ public final class AccessScopeJpqlBuilder {
 
             if (fields.sessionField != null && r.sessionId != null) {
                 String sKey = paramPrefix + "_r" + i + "_sess";
-                jpql.append(" AND ").append(fields.sessionField).append(" = :").append(sKey);
+                jpql.append(" AND (").append(fields.sessionField).append(" IS NULL OR ")
+                    .append(fields.sessionField).append(" = :").append(sKey).append(")");
                 params.put(sKey, r.sessionId);
             }
             if (fields.classField != null && r.classId != null) {
                 String cKey = paramPrefix + "_r" + i + "_cls";
-                jpql.append(" AND ").append(fields.classField).append(" = :").append(cKey);
+                jpql.append(" AND (").append(fields.classField).append(" IS NULL OR ")
+                    .append(fields.classField).append(" = :").append(cKey).append(")");
                 params.put(cKey, r.classId);
             }
             if (fields.sectionField != null && r.sectionId != null) {
                 String xKey = paramPrefix + "_r" + i + "_sec";
-                jpql.append(" AND ").append(fields.sectionField).append(" = :").append(xKey);
+                jpql.append(" AND (").append(fields.sectionField).append(" IS NULL OR ")
+                    .append(fields.sectionField).append(" = :").append(xKey).append(")");
                 params.put(xKey, r.sectionId);
             }
             jpql.append(")");

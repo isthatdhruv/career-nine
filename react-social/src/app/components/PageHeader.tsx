@@ -325,6 +325,22 @@ const PageHeaderStyles: FC = () => (
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: #0f172a;
     }
+    /* Metronic's container padding drops from 30px to 20px below the lg
+       breakpoint. Keep the side bleed in step so the wrapper never overflows
+       the viewport (which made the whole page pan sideways on phones), and
+       clip any stray overflow at the page root — wide tables scroll inside
+       their own .table-responsive instead. */
+    @media (max-width: 991.98px) {
+      .ph-page {
+        margin: 0 -20px -40px;
+        padding: 16px 12px 40px;
+        overflow-x: hidden;
+      }
+      .ph-page .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+    }
     /* Break out of Metronic's max-width container */
     body:has(.ph-page) #kt_app_content,
     body:has(.ph-page) #kt_app_content_container,

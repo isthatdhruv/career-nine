@@ -7,7 +7,7 @@ import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/Them
 import { useAuth } from "../../modules/auth/core/Auth";
 import { Scope } from "../../modules/auth";
 import { getUserCollegeMappings } from "../Users/API/UserMapping_APIs";
-import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
+import { getScopedAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import SearchableSelect from "../../components/SearchableSelect";
 import {
   AdminDashboardSnapshot,
@@ -300,11 +300,14 @@ const DashboardAdminContent: FC = () => {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [ratingSummary, setRatingSummary] = useState<any[]>([]);
   const [rawAssessments, setRawAssessments] = useState<any[]>([]);
-  // The snapshot's `assessments` section is only scope-narrowed by the BE for
-  // users with user_role_scope rows — ContactPerson-fallback users get the
-  // org-wide list, which made the hero "Assessments" count platform-wide.
-  // Mirror the BE rule (DashboardDataService#queryAssessments: assessments
-  // with an active AssessmentInstituteMapping to a scoped institute).
+  // Defense-in-depth narrowing of the snapshot's `assessments` section.
+  // Mirrors the BE rule (DashboardDataService#queryAssessments and
+  // /assessments/get/list-summary-by-institute): assessments with an active
+  // AssessmentInstituteMapping to a scoped institute UNIONED with assessments
+  // that institute's students are allotted to. The union matters for schools
+  // whose assessments were mapped only through the school registration config
+  // (never mirrored into assessment_institute_mapping) — intersecting with the
+  // mapping table alone hid those from the school's own dashboard.
   // null = no restriction (super-admin / wildcard / still resolving).
   const [scopedAssessmentIds, setScopedAssessmentIds] = useState<Set<number> | null>(null);
   useEffect(() => {
@@ -323,11 +326,11 @@ const DashboardAdminContent: FC = () => {
     let cancelled = false;
     Promise.all(
       codes.map((code) =>
-        getAssessmentMappingsByInstitute(code)
+        getScopedAssessmentSummariesByInstitute(code)
           .then((res: any) =>
             (res.data || [])
-              .filter((m: any) => m.isActive !== false)
-              .map((m: any) => Number(m.assessmentId))
+              .map((a: any) => Number(a.id ?? a.assessmentId))
+              .filter((v: number) => Number.isFinite(v))
           )
           .catch(() => [] as number[])
       )

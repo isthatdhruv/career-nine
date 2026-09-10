@@ -60,6 +60,19 @@ export function getAssessmentSummariesByInstitute(instituteCode: number) {
 }
 
 // Lightweight: only id, assessmentName, isActive (no questionnaire cascade)
+/**
+ * Every assessment connected to ONE institute under the backend's scoped rule:
+ * active registration-link mappings unioned with assessments the institute's
+ * students are allotted to. Unlike getAssessmentSummariesByInstitute (mapping
+ * table only) this also surfaces assessments mapped solely through the school
+ * registration config. 403 for institutes outside the caller's ABAC scope.
+ */
+export function getScopedAssessmentSummariesByInstitute(instituteCode: number) {
+  return axios.get<AssessmentSummary[]>(
+    `${API_URL}/assessments/get/list-summary-by-institute/${instituteCode}`
+  );
+}
+
 export function getAssessmentSummaryList() {
   return axios.get(`${API_URL}/assessments/get/list-summary`);
 }

@@ -17,7 +17,13 @@ public interface QuestionnaireRepository extends JpaRepository<Questionnaire, Lo
     @Query("SELECT q FROM Questionnaire q WHERE q.id = :questionnaireId")
     List<Questionnaire> findAllByQuestionnaireId(@Param("questionnaireId") Long questionnaireId);
 
-    @Query("SELECT new com.kccitm.api.model.career9.Questionaire.Questionnaire(q.questionnaireId, q.name, q.modeId, q.type, q.isFree) FROM Questionnaire q")
+    /**
+     * Lightweight projection for the questionnaire list page. Soft-deleted rows
+     * ({@code display = false}) belong to the Recycle Bin ({@link #findByDisplayFalse()})
+     * only, so they are excluded here — same rule as {@link #findByDisplayTrueOrDisplayIsNull()}.
+     */
+    @Query("SELECT new com.kccitm.api.model.career9.Questionaire.Questionnaire(q.questionnaireId, q.name, q.modeId, q.type, q.isFree) "
+         + "FROM Questionnaire q WHERE q.display = TRUE OR q.display IS NULL")
     List<Questionnaire> findQuestionnaireList();
 
     List<Questionnaire> findByDisplayFalse();

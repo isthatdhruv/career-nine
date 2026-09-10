@@ -537,6 +537,43 @@ public class AssessmentTableController {
         return new ArrayList<>(byId.values());
     }
 
+    /**
+     * Every assessment connected to ONE institute, under the same rule as
+     * {@link #getScopedAssessmentSummaryList()}: active registration-link
+     * mappings unioned with assessments the institute's students are allotted
+     * to. Backs the institute selector on Live Tracking (and the per-institute
+     * narrowing hooks), which previously read only assessment_institute_mapping
+     * and therefore hid assessments mapped solely through the school
+     * registration config.
+     *
+     * <p>Non-super-admins may only ask about institutes in their own scope; any
+     * other code is answered with 403 rather than an empty list so the UI can
+     * tell "nothing mapped" apart from "not yours".
+     */
+    @GetMapping("/get/list-summary-by-institute/{instituteCode}")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
+    public ResponseEntity<?> getAssessmentSummaryListByInstitute(@PathVariable Integer instituteCode) {
+        Optional<AccessScope> scope = accessScopeService.forCurrentUser();
+        if (scope.isPresent() && !scope.get().getAllowedInstituteCodes().contains(instituteCode)) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", 403);
+            body.put("error", "Forbidden");
+            body.put("message", "This institute is not in your scope");
+            return ResponseEntity.status(403).body(body);
+        }
+        Set<Integer> codes = Collections.singleton(instituteCode);
+        Map<Long, AssessmentTableRepository.AssessmentSummary> byId = new LinkedHashMap<>();
+        for (AssessmentTableRepository.AssessmentSummary s
+                : assessmentTableRepository.findAssessmentSummariesByInstitutes(codes)) {
+            byId.put(s.getId(), s);
+        }
+        for (AssessmentTableRepository.AssessmentSummary s
+                : assessmentTableRepository.findStudentAssignedAssessmentSummariesByInstitutes(codes)) {
+            byId.putIfAbsent(s.getId(), s);
+        }
+        return ResponseEntity.ok(new ArrayList<>(byId.values()));
+    }
+
     @GetMapping("/get/list-ids")
     @PreAuthorize("@auth.allows('assessment.read.all')")
     public HashMap<Long, String> getAllAssessmentIds() {

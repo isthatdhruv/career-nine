@@ -1190,19 +1190,80 @@ export default function StudentManagementPage() {
           accent-color: #4361ee;
         }
 
+        /* Institute picker styled as the page's primary CTA — it's the one
+           action the page needs before anything else renders. */
         .institute-dropdown-container {
-          max-width: 320px;
+          max-width: 440px;
           margin-bottom: 1rem;
+          padding: 16px 18px;
+          border-radius: 14px;
+          border: 2px solid rgba(67, 97, 238, 0.35);
+          background: linear-gradient(135deg, rgba(67, 97, 238, 0.09), rgba(58, 12, 163, 0.04));
+          box-shadow: 0 6px 18px rgba(67, 97, 238, 0.10);
+          transition: box-shadow .2s ease, border-color .2s ease, transform .2s ease;
+        }
+        .institute-dropdown-container:hover,
+        .institute-dropdown-container:focus-within {
+          border-color: #4361ee;
+          box-shadow: 0 10px 26px rgba(67, 97, 238, 0.20);
+          transform: translateY(-1px);
+        }
+        .institute-dropdown-container [class*="-control"] {
+          min-height: 44px !important;
+          border: 2px solid #cbd5e1 !important;
+          border-radius: 10px !important;
+          font-weight: 600;
+          font-size: 0.95rem !important;
+          background: #fff;
+        }
+        .institute-dropdown-container [class*="-control"]:hover { border-color: #4361ee !important; }
+        .institute-dropdown-container [class*="-control--is-focused"] {
+          border-color: #4361ee !important;
+          box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.15) !important;
+        }
+        .sm-cta-label {
+          font-weight: 800; font-size: 0.8rem; letter-spacing: .06em; text-transform: uppercase; color: #0f172a;
+        }
+        .sm-cta-hint { display: block; margin-top: 6px; color: #64748b; font-size: 0.8rem; line-height: 1.4; }
+
+        /* Per-row "Allotted Assessment" select — the second action on the page. */
+        .sm-assessment-select {
+          border: 2px solid rgba(67, 97, 238, 0.45) !important;
+          background: rgba(67, 97, 238, 0.06) !important;
+          box-shadow: 0 2px 8px rgba(67, 97, 238, 0.10);
+          transition: border-color .15s ease, box-shadow .15s ease;
+        }
+        .sm-assessment-select:hover { border-color: #4361ee !important; }
+        .sm-assessment-select:focus {
+          outline: none;
+          border-color: #4361ee !important;
+          box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.15) !important;
+        }
+
+        /* Wide table keeps its natural width and scrolls inside its wrapper on
+           narrow screens instead of squeezing nine columns into 360px. */
+        .sm-table { min-width: 1100px; }
+        .sm-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        @media (max-width: 991.98px) {
+          .institute-dropdown-container { max-width: none; }
+          .sm-filter-layout { flex-direction: column !important; }
+          .sm-filter-side {
+            width: 100% !important;
+            border-right: none !important;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+          .sm-filter-side > * { flex: 0 0 auto; }
+          .sm-table th, .sm-table td { padding: 8px 10px !important; }
         }
       `}</style>
 
         {/* Institute Dropdown - Always visible at top left */}
         <div className="institute-dropdown-container">
-          <label
-            className="form-label mb-2 d-flex align-items-center gap-2"
-            style={{ fontWeight: 600, color: "#1a1a2e", fontSize: "0.95rem" }}
-          >
-            <i className="bi bi-building" style={{ color: "#4361ee" }}></i>
+          <label className="form-label mb-2 d-flex align-items-center gap-2 sm-cta-label">
+            <i className="bi bi-building" style={{ color: "#4361ee", fontSize: "1rem" }}></i>
             Select Institute
           </label>
           <SearchableSelect
@@ -1223,6 +1284,11 @@ export default function StudentManagementPage() {
             }}
             placeholder="Select Institute"
           />
+          <small className="sm-cta-hint">
+            {selectedInstitute
+              ? `Showing students of ${getSelectedInstituteName()}`
+              : "Start here — pick an institute to load its students and allotted assessments"}
+          </small>
         </div>
 
         {/* Students List Section - Only shown when institute is selected */}
@@ -1406,9 +1472,9 @@ export default function StudentManagementPage() {
                     <ActionIcon type="reject" size="sm" />
                   </button>
                 </div>
-                <div style={{ display: "flex", minHeight: "300px" }}>
+                <div className="sm-filter-layout" style={{ display: "flex", minHeight: "300px" }}>
                   {/* Left panel — filter categories */}
-                  <div style={{ width: "240px", borderRight: "1px solid #e0e0e0", background: "#fafbfc" }}>
+                  <div className="sm-filter-side" style={{ width: "240px", borderRight: "1px solid #e0e0e0", background: "#fafbfc" }}>
                     {[
                       { key: "assessment", label: "Assessment", icon: "bi-clipboard-data" },
                       { key: "session", label: "Session", icon: "bi-calendar3" },
@@ -2013,8 +2079,8 @@ export default function StudentManagementPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="table-responsive">
-                    <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
+                  <div className="table-responsive sm-table-wrap">
+                    <table className="table align-middle mb-0 sm-table" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
                       <thead>
                         <tr style={{ background: "#f8f9fa" }}>
                           <th
@@ -2251,6 +2317,7 @@ export default function StudentManagementPage() {
                               }}
                             >
                               <select
+                                className="sm-assessment-select"
                                 value={student.selectedAssessment}
                                 onChange={(e) =>
                                   handleAssessmentChange(
