@@ -139,8 +139,8 @@ const ConsentModal = ({ adult, onClose }: { adult?: boolean; onClose: () => void
           border: "1px solid #e2e8f0", borderRadius: 10,
           color: "#475569", fontSize: "0.82rem", lineHeight: 1.65,
         }}>
-          <strong style={{ color: "#0f172a" }}>Grievance Officer:</strong> Dhruv Kumar
-          {" · "}support@career-9.com{" · "}+91 81308 83948
+          <strong style={{ color: "#0f172a" }}>Grievance Officer:</strong> Abhas Jha
+          {" · "}support@career-9.com{" · "}+91 92011 14533
           {" · "}Career-9, MIG 16, Mukut Nagar, Durg, Chhattisgarh – 491001
           {" · "}career-9.com
         </div>
