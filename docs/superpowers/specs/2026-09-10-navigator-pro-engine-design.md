@@ -1,16 +1,16 @@
 # Navigator Pro report engine — design
 
-Date: 2026-09-10 · Status: approved in discussion, awaiting written review
-Sources: `navigator-pro/Report_Generator_TechSpec.pdf` (v2, new bank), `Report_Logic_Spec.xlsx`, `Report_Content_Logic.xlsx`, `Final_Item_Bank_Navigator_Pro_2nd_Sept_FIXED.xlsx`, `NavigatorPro_SAMPLE_Report_Priya_Sharma.pdf`
+Date: 2026-09-10 (revised the same day for MQT-based scoring) · Status: approved in discussion, awaiting written review
+Sources: `navigator-pro/Report_Generator_TechSpec.pdf` (v2, new bank), `Report_Logic_Spec.xlsx`, `Report_Content_Logic.xlsx`, `Final_Item_Bank_Navigator_Pro_2nd_Sept_FIXED.xlsx` (psychometric reference only), `NavigatorPro_SAMPLE_Report_Priya_Sharma.pdf`
 
 ## 1. Goal
 
 Add a fourth report engine, `navigator_pro`, to the unified report pipeline. It scores the
-91-item Navigator Pro instrument by bank lookup, applies the generation gates, computes
-cohort norms and bands, and emits the placeholder map that fills a Navigator Pro HTML
-template. Everything downstream (template or default resolution, `force`, calculated-data
-caching, HTML fill, Spaces upload, PDF render, `generated_report` upsert, Kafka worker,
-Generate Queue) is reused unchanged.
+91-item Navigator Pro instrument from the platform's measured-quality-type (MQT) option
+scores, applies the generation gates, computes cohort norms and bands, and emits the
+placeholder map that fills a Navigator Pro HTML template. Everything downstream (template or
+default resolution, `force`, calculated-data caching, HTML fill, Spaces upload, PDF render,
+`generated_report` upsert, Kafka worker, Generate Queue) is reused unchanged.
 
 Phase 1 (this spec) delivers scoring, gates R1–R5, norms, bands, zone, values and every
 non-blend placeholder. The two-tier blend (top-3 specialisations, sectors, tie, R6 Explorer)
@@ -29,15 +29,25 @@ template contract does not change later.
 - The pipeline carries only `force`, `reportTemplateId`, `emailMode`, `batchId` on the
   event; the worker never inspects the engine. Terminal sanity failures mark the row
   `failed` and go to the DLT; routing errors are a benign skip.
+- **Scoring model.** Every `AssessmentQuestionOptions` row carries zero or more
+  `OptionScoreBasedOnMEasuredQualityTypes` rows: an integer score per
+  `MeasuredQualityTypes` (MQT), each MQT grouped under a `MeasuredQualities` block. Reverse-keyed
+  items are entered with inverted scores, so summing is the whole scoring step. On submission
+  `AssessmentSubmissionProcessorService` already sums scores per MQT into `AssessmentRawScore`
+  (ranking rows multiplied by rank order). This engine recomputes from the answer rows instead
+  of reading `AssessmentRawScore`, because it needs per-item rules (validity thresholds,
+  attention, reasoning chips, rank order) and must reflect corrected option scores on `force`.
 - A pilot Navigator Pro questionnaire exists (local id 20; copies 21, 22; assessment 58
-  "Navigator Pro Internal Testing"). Sections and platform headers:
-  Adaptability_1..36 (old block), Navigator_Pro:_Personality_1..37, Fundamental_Skillset_1..27,
-  Specialized_Skillset_1..12, Work_Values_1 (question type `ranking`). Option texts for
-  Personality, Fundamental behavioural, Specialized and all twelve Work Values match the bank
-  exactly. Three reasoning MCQs (F_NUM_1, F_CAU_1, F_SPR_1) do not, and the Adaptability block
-  is the retired 36-item scale. The questionnaire must be re-imported to the September bank
-  before real scoring; this engine detects a stale questionnaire and says so (§8).
-- Apache POI is already a dependency; BET ships its own item-code workbook on the classpath.
+  "Navigator Pro Internal Testing"). Its MQT setup: Personality = Doer, Thinker, Creator,
+  Helper, Persuader, Organizer (six questions each, Yes 1 / No 0) plus "Personality- Validity"
+  for the attention item (No 1 / Yes 0); Fundamental Skills = Numbers & data, Digital &
+  information, Thinking & problem-solving (six questions), Creating & improving, Getting things
+  done (1–4) plus a single "none" type for the five MCQs; Specialized Skills = the twelve domain
+  names (1–5); Work Values = one ranking question whose twelve options each score 1 under a
+  value-orientation type. The Adaptability section is the retired 36-item block (Grit, Growth,
+  Learnability, Proactive, Curiosity, Validity) and three reasoning MCQs carry the pilot's
+  wrong options. The questionnaire must be re-imported to the September bank before real
+  scoring; this engine detects a stale questionnaire and says so (§8).
 
 ## 3. Architecture
 
@@ -45,15 +55,15 @@ New package `com.kccitm.api.service.b2c.navigatorpro`:
 
 | Class | Responsibility | Depends on |
 |---|---|---|
-| `NavigatorProCalculationService` | `PlaceholderCalculator` entry point. Loads answers, resolves items, runs scorer, gates, norms, content binding; returns the placeholder map. The only class with repository access. | repositories, the four below |
-| `NavigatorProItemBank` | Loads `item-bank.xlsx` and `header-map.csv` once at startup into immutable maps; validates the bank; resolves platform header → item code. | classpath resources, POI |
-| `NavigatorProScorer` | Pure functions: `Map<itemCode, Response>` → `NavigatorProScores` (indices, factors, sub-domains, reasoning, domain ratings, families, shape, values, validity flags, attention pass, missing items). No I/O. | `NavigatorProItemBank` |
-| `NavigatorProNorms` | Cohort statistics: percentile rank, medians, n-gates, precision, zone; per-assessment cache. | `NavigatorProScorer` output for cohort members |
+| `NavigatorProCalculationService` | `PlaceholderCalculator` entry point. Runs the schema check, loads answers, builds contribution rows, runs scorer, gates, norms, content binding; returns the placeholder map. The only class with repository access. | repositories, the four below |
+| `NavigatorProConstructMap` | Loads `mqt-map.yml` once: construct → MQT names, expected question count, score range. Resolves an MQT name to its construct. | classpath resource |
+| `NavigatorProScorer` | Pure functions: contribution rows (construct, question id, score, rank order) → `NavigatorProScores` (indices, factors, sub-domains, reasoning chips, domain ratings, families, shape, values, validity flags, attention pass, incomplete list). No I/O. | `NavigatorProConstructMap` |
+| `NavigatorProNorms` | Cohort statistics: percentile rank, medians, n-gates, precision, zone; per-assessment cache. | scorer output for cohort members |
 | `NavigatorProContent` | Verbatim copy from the content workbook: band paragraphs, factor definitions, zone copy, values lookup, banner, static lines. Pure lookups. | nothing |
 
 Supporting changes outside the package: `EngineVersions.NAVIGATOR_PRO_V1`, a line in
 `docs/engine-versions.md`, `ReportSuppressedException`, one migration, a producer gate, a
-`ReportService` catch, a controller mapping, and two small frontend edits (§13).
+`ReportService` catch, a controller mapping, and two small frontend edits (§18).
 
 ## 4. Routing and manual-only generation
 
@@ -67,100 +77,112 @@ Supporting changes outside the package: `EngineVersions.NAVIGATOR_PRO_V1`, a lin
   `enqueueAdmin` (Generate Queue) and the synchronous endpoints are not gated.
   Enabling auto-generation later means removing the engine from the property.
 
-## 5. Item identification
+## 5. Construct identification (by MQT name)
 
-Items are identified by `QuestionnaireQuestion.excelQuestionHeader`. A header resolves when it
-equals a bank item code (`A_ID_1`) or appears in `header-map.csv` (platform header → item
-code). The map is generated from the bank's Code Map sheet (Personality 37, Fundamental 27,
-Specialized 12, Work Values 1) plus 14 Adaptability rows.
+Nothing is identified by item code or `excel_question_header`. A question belongs to a
+construct because its options carry scores under that construct's MQT. The construct map
+(§6) lists, per construct, the MQT names that feed it. Scores an option carries under MQTs the
+map does not mention are ignored.
 
-Assumption A1: the re-imported Adaptability section uses headers `Adaptability_1..14` in the
-bank's administered order (A_ID_1, A_ID_2, A_ID_3, A_V_1, A_ID_4, A_ST_1, A_ST_2, A_V_2,
-A_ST_3, A_AE_1, A_AE_2, A_AE_3, A_V_3, A_AE_4). If the import uses different headers, only
-the CSV changes.
+Constructs and their MQTs (names as they must exist after the re-import):
 
-Family membership derives from the item-code prefix (`P_R`, `P_I`, `P_A`, `P_S`, `P_E`,
-`P_C`), never from the Code Map's construct column (which still labels `P_R_6` as
-Investigative). `P_AC_1` belongs to no family.
+| Construct | MQT name(s) | Questions | Score range |
+|---|---|---|---|
+| Internal Drive (f_id) | Internal Drive | 4 | 1–5 |
+| Sustained Tenacity (f_st) | Sustained Tenacity | 3 | 1–5 |
+| Adaptive Execution (f_ae) | Adaptive Execution | 4 | 1–5 |
+| Drive index | union of the three factor rows | 11 | — |
+| Validity | Validity | 3 | 1–5, oriented: higher = more suspicious |
+| Attention | Personality- Validity | 1 | 0–1, 1 = pass |
+| Families R/I/A/S/E/C | Doer / Thinker / Creator / Helper / Persuader / Organizer | 6 each | 0–1 |
+| Foundation subs ND/DI/TP/CI/GD | Numbers & data / Digital & information / Thinking & problem-solving / Creating & improving / Getting things done | 4/4/6/4/4 | 1–4 |
+| Reasoning checks | Numeracy / Data reading / Causal reasoning / Source judgment / Spreadsheet logic | 1 each | 0–1, 1 = correct |
+| Specialized domains (12) | Software Development … Technical Business & Consulting (bank names) | 1 each | 1–5 |
+| Work Values | the ranking question (identified as the assessment's only `ranking` question) | 1, 12 options | rank order 1–4 |
 
-## 6. Scoring configuration (the bank)
+Reversal is entirely a data-entry matter: A_ID_3, A_ST_2, A_AE_3 are entered with inverted
+scores under their factor MQT; the validity items are entered so the suspicious answer scores
+high (A_V_1 and A_V_3: Strongly agree 5; A_V_2, the infrequency item: Strongly disagree 5).
+The engine has no reverse step anywhere.
 
-- `src/main/resources/navigator-pro/item-bank.xlsx` is a byte-for-byte copy of the FIXED file.
-  Sheet "Final Item Bank" is read with POI; every cell is read as text (`DataFormatter`), so
-  `=A2+B2` is an option string, not a formula. Marks cells parse to integers; the Work Values
-  row's "By rank" marks are ignored (rank-scored, §9).
-- Loaded once into an immutable structure: item code → statement, construct, domain,
-  ordered list of (option text, marks). Option texts are normalised for matching: trim and
-  collapse internal whitespace; matching is otherwise exact and case-sensitive.
-- Startup validation (any failure aborts application start): exactly 91 codes with the
-  expected prefixes; every non-values option has an integer mark; `A_ID_3`, `A_ST_2`, `A_AE_3`
-  carry marks 5..1; each of the five MCQs has exactly one option with mark 1; blank option
-  cells (the known `F_SPR_1` erratum) are skipped.
+## 6. The construct map resource
+
+`src/main/resources/navigator-pro/mqt-map.yml`: for each construct key, the MQT names,
+expected question count and allowed score range from the table in §5, plus family display
+names (Hands-on, Analytical, Creative, Social, Enterprising, Organising) and domain keys
+(`d_sd` … `d_tb`). Loaded once at startup; a malformed file fails startup. Renaming an MQT in
+the admin means editing this file, not code. MQT names are matched after trim and
+case-insensitively.
 
 ## 7. Answer reading
 
-One query loads the student's `AssessmentAnswer` rows for the assessment with question,
-option and header. For each row the header resolves to an item code (unknown headers are
-ignored and counted for diagnostics).
+One query loads the student's `AssessmentAnswer` rows for the assessment with option and
+option scores. For each row and each of its option's scores whose MQT resolves to a mapped
+construct, one contribution (construct, questionnaire question id, score) is produced. The
+ranking question's rows produce (values, option text, rank order). Text-response rows use the
+mapped option when present.
 
-- Single-choice items: the chosen option's text, normalised, looked up in the bank → marks.
-  No row, or no matching option text, marks the item *incomplete* (logged with student,
-  assessment, item code, raw text).
-- `W_V_1` (ranking): rows carry `rankOrder`; ranks 1..4 map to the option text. Fewer than
-  four ranked rows means *values missing*.
-- Validity items `A_V_1..3` record the response marks 1..5; they never enter an index.
-- `P_AC_1`: pass when the chosen option is `No` (marks 1).
+Completeness uses the per-assessment index from the schema check (§8): every question the
+index assigns to a scored construct must have exactly one contribution. Zero contributions
+means the student skipped it; more than one means duplicate rows. Both mark the question
+*incomplete* and are logged with student, assessment, construct and question id.
 
 ## 8. Questionnaire schema check (configuration errors)
 
-Before scoring a student, the engine validates the assessment's questionnaire against the
-bank (cached per assessment id): every one of the 91 codes resolves to exactly one question,
-and every non-values question's option texts are a subset of the bank's option texts for that
-code. Any violation throws `ReportRoutingException` listing the offending codes and texts.
-This distinguishes "questionnaire not on the September bank" (admin problem, benign skip in
-the worker, 400-class in the controller) from "student incomplete" (R5).
+Once per assessment (cached by assessment id), the engine scans the questionnaire's questions
+and options and builds the index question id → construct. It then validates: every construct
+in the map has exactly its expected number of questions; every option of an indexed question
+carries a score for its construct; scores lie in the construct's range; no question is indexed
+to two constructs; exactly one `ranking` question with twelve options exists. Any violation
+throws `ReportRoutingException` listing the construct, the missing MQT or the offending
+question ids. This distinguishes "questionnaire not on the September bank" (admin problem,
+benign skip in the worker, 400-class in the controller) from "student incomplete" (R5). The
+pilot questionnaire fails this check today on the Adaptability and reasoning constructs.
 
 ## 9. Scoring formulas
 
-All sums are integer sums of marks; scaling is exact (double); rounding happens only when a
-display value is emitted. Σ denotes summation over the listed items.
+Σ denotes the sum of a construct's contribution scores (reversal already in the scores).
+Scaling is exact (double); rounding happens only when a display value is emitted.
 
 | Output | Formula |
 |---|---|
-| drive | (Σ marks of the 11 trait items − 11) / 44 × 100 |
-| f_id | (Σ A_ID_1..4 − 4) / 16 × 100 |
-| f_st | (Σ A_ST_1..3 − 3) / 12 × 100 |
-| f_ae | (Σ A_AE_1..4 − 4) / 16 × 100 |
-| foundation | (Σ 22 behavioural items − 22) / 66 × 100 |
+| f_id | (Σ Internal Drive − 4) / 16 × 100 |
+| f_st | (Σ Sustained Tenacity − 3) / 12 × 100 |
+| f_ae | (Σ Adaptive Execution − 4) / 16 × 100 |
+| drive | (Σ all 11 factor rows − 11) / 44 × 100 |
 | fs_nd, fs_di, fs_tp, fs_ci, fs_gd | (Σ sub-domain − k) / (3k) × 100 with k = 4, 4, 6, 4, 4 |
-| reasoning | count of marks = 1 over F_NUM_1, F_DAT_1, F_CAU_1, F_SRC_1, F_SPR_1 (0..5) |
-| skill | (Σ 12 specialized items − 12) / 48 × 100 |
-| d_* (12 domains) | (m − 1) / 4 × 100 |
-| fam_r … fam_c | Yes-count / 6 × 100 |
+| foundation | (Σ all 22 sub-domain rows − 22) / 66 × 100 |
+| reasoning | count of reasoning rows with score 1 (0..5); one chip per reasoning MQT |
+| d_* (12 domains) | (score − 1) / 4 × 100 |
+| skill | (Σ 12 domain rows − 12) / 48 × 100 |
+| fam_r … fam_c | Σ family rows / 6 × 100 |
 | profile_shape | families sorted descending; Flat when top − second < `flat-gap` (10), else Differentiated |
-| value_1..4 | option text at rank 1..4 |
-| validity_flags | count of: A_V_1 ≥ 4, A_V_2 ≥ 4, A_V_3 ≤ 2 (internal only) |
+| value_1..4 | option text at rank order 1..4 |
+| validity_flags | count of Validity rows with score ≥ 4 (internal only, never in the map) |
+| attention | the Personality- Validity row's score is 1 |
 
-The values orientation vector (Growth/Autonomy/Security/Reward/Impact) is not computed in
-phase 1: its option-to-orientation mapping is only needed by the blend.
+Worked example, Internal Drive: Agree 4, Strongly agree 5, Disagree on the reverse item
+(stored 4), Agree 4 → Σ 17 → (17 − 4) / 16 × 100 = 81. Drive is the same eleven rows added
+once across the three factors, never a fourth MQT.
+
+The values orientation vector is not computed in phase 1: it is only needed by the blend.
 
 ## 10. Gates and suppression
 
 Evaluation order and outcomes:
 
-1. R1 attention: `P_AC_1` not "No" → suppress, code `R1`.
-2. R2 validity: never suppresses. 2+ flags → `response_quality_banner` set and
-   `counselling_mandatory` true. 1 flag → logged only. The count is never in the map.
-3. R5 incomplete: any of the 90 non-values items incomplete → suppress, code `R5`. Evaluated
-   before R3/R4 because those need complete family and domain data (spec order otherwise kept).
+1. R1 attention: attention row missing or score ≠ 1 → suppress, code `R1`.
+2. R2 validity: never suppresses. Flags ≥ `banner-flag-count` (2) → `response_quality_banner`
+   set and `counselling_mandatory` true. One flag → logged only.
+3. R5 incomplete: any question in a scored construct incomplete (§7) → suppress, code `R5`.
+   Evaluated before R3/R4 because those need complete family and domain data.
 4. R3 weak peak: Differentiated and max family < `weak-peak` (50) → suppress, code `R3`.
 5. R4 no signal: Flat and max domain rating < `no-signal-domain` (50) and values missing →
    suppress, code `R4`.
 6. R6 Explorer: reserved for phase 2; `explorer` is always false.
 
-Interpretation I1: `W_V_1` is not a scored item for R5; its absence renders the value
-placeholders empty and counts as "values missing" for R4. Without this reading, R4 could never
-fire.
+Interpretation I1: the ranking question is not a scored construct for R5; fewer than four
+ranked rows renders the value placeholders empty and counts as "values missing" for R4.
 
 Suppression mechanics:
 
@@ -181,17 +203,16 @@ Suppression mechanics:
 ## 11. Norms, percentiles, zone
 
 - Cohort: students of the same assessment whose mapping status is `completed` and who pass
-  R1–R5. The engine loads the assessment's answers with the existing export query, scores
-  each member with `NavigatorProScorer`, and keeps the members' drive, f_id, f_st, f_ae,
-  foundation, skill and reasoning values. The student is part of their own cohort.
+  R1–R5. The engine loads the assessment's answers with the existing export query, builds
+  contributions and scores each member with `NavigatorProScorer`, and keeps the members'
+  drive, f_id, f_st, f_ae, foundation, skill and reasoning values. The student is part of
+  their own cohort.
 - Cache: one norm set per assessment, keyed on (assessment id, completed-mapping count),
   time-limited to 60 seconds, so a Generate Queue run shares one norm set and a re-run after
   more completions recomputes.
 - n = cohort size = `batch_n`. Precision `prec` = round(100 / √n).
 - Percentile rank of x within cohort values v: P = 100 × (|{v < x}| + 0.5 × |{v = x}|) / n
   (midrank convention). Bands use the unrounded P; display shows "P" + round(P).
-  Assumption A2: the midrank convention; the spec says "empirical percentile rank" without
-  naming one.
 - n-gates: n < `percentile-min-n` (30) → `percentiles_suppressed` true; every percentile,
   percentile band and band paragraph is emitted empty; top and bottom factor fall back to raw
   factor order and `factor_callout` is empty. n < `norms-min-n` (60) → `norms_provisional`
@@ -209,8 +230,6 @@ Suppression mechanics:
 - Foundation sub-domain bars use the raw thresholds from the display-rules sheet: ≥ 67 Strong
   (green), 34–66 Developing (amber), ≤ 33 Early (red). `lowest_bar` is the sub-domain with the
   lowest raw score (first in ND, DI, TP, CI, GD order on ties).
-  Assumption A3: the split between percentile bands for indices and raw RAG for sub-domain
-  bars resolves a conflict between sheets 4 and 5 and matches the sample report.
 - Student-facing labels are only Strong / Developing / Early. The words low, poor, weak,
   average, below average, least motivated, fail never appear in emitted text.
 
@@ -243,9 +262,7 @@ Skill: `skill`, `skill_p`, `skill_band`, `skill_text`, `d_sd`, `d_da`, `d_si`, `
 `d_ux`, `d_ee`, `d_pe`, `d_md`, `d_cs`, `d_pc`, `d_qt`, `d_tb`.
 
 Interests: `fam_r`, `fam_i`, `fam_a`, `fam_s`, `fam_e`, `fam_c`, `top_family`,
-`second_family` (display names: Hands-on, Analytical, Creative, Social, Enterprising,
-Organising — Assumption A4: these display names come from the sample report and dashboard;
-the workbooks name the families only by Holland letter), `profile_shape`.
+`second_family` (display names from the map), `profile_shape`.
 
 Zone: `zone`, `zone_copy`, `zone_note` ("Drive 73 (above the batch median) — skill 54 (above
 median)…"; below 60 the note says "provisional cut" instead of "batch median"), `drive_median`,
@@ -264,10 +281,10 @@ Reserved for phase 2, emitted now as empty or false: `explorer`, `top1`, `top2`,
 ## 14. Copy binding
 
 `NavigatorProContent` holds verbatim: the 21 band paragraphs, the three factor definitions,
-the precision line, the twelve values rows (icon, title, why), the response-quality banner,
-the cover caption and footer, the ring subtitles, the About and How-to-read blocks, the sector
-caveat, and the zone name for each quadrant. The factor callout is composed from its template
-in content sheet 3.
+the precision line, the twelve values rows (icon, title, why; joined on exact option text),
+the response-quality banner, the cover caption and footer, the ring subtitles, the About and
+How-to-read blocks, the sector caveat, and the zone name for each quadrant. The factor callout
+is composed from its template in content sheet 3.
 
 Copy the workbooks reference but do not contain — go-live inputs to be supplied, rendered
 empty until then: three of the four student-facing zone paragraphs ("Ready to accelerate" is
@@ -286,30 +303,30 @@ No placeholder text is ever printed; an unsupplied text is an empty string.
 
 | Condition | Behaviour |
 |---|---|
-| Bank resource missing or invalid | Application fails to start with the validation message |
-| Questionnaire missing/duplicate codes or option texts off the bank | `ReportRoutingException` naming items; worker skips benignly; controller 400-class |
-| Student item unanswered or unmatched | R5 suppression; item code and raw text logged |
+| Construct map missing or malformed | Application fails to start with the validation message |
+| Questionnaire fails the schema check (missing MQT, wrong counts, unscored option, range) | `ReportRoutingException` naming the gaps; worker skips benignly; controller 400-class |
+| Student question skipped or duplicated in a scored construct | R5 suppression; construct and question id logged |
 | Attention / weak peak / no signal | R1 / R3 / R4 suppression, row `suppressed` with reason |
 | Cohort under 30 | Raw-only report, not an error |
-| Unknown header in answers | Ignored, counted in a DEBUG line |
+| Score under an unmapped MQT | Ignored |
 | Any other exception | Existing worker path (retry then DLT, row `failed`) |
 
 ## 17. Testing
 
-- `NavigatorProItemBankTest`: 91 codes, option counts per block, text cells (the `=A2+B2`
-  key), inverted marks on the three reverse items, MCQ single key, header-map resolution
-  including the Adaptability assumption, unknown header rejection.
-- `NavigatorProScorerTest` golden fixtures from the tech spec: MAX (all 100, reasoning 5/5,
-  no flags), MIN (all zero, reasoning 0/5), REVERSE (Strongly agree on the three reverse items
-  scores 1 each), VALIDITY (A_V_1 Agree + A_V_3 Disagree → 2 flags), ATTENTION (P_AC_1 Yes →
-  R1). Plus: flat vs differentiated shape, R3, R4 with values missing, R5 with one missing
-  item, values ranking.
+- `NavigatorProConstructMapTest`: every construct present with counts and ranges, name
+  matching (trim, case), malformed file rejected.
+- `NavigatorProScorerTest` with contribution-row fixtures from the tech spec: MAX (all 100,
+  reasoning 5/5, no flags), MIN (all zero, reasoning 0/5), REVERSE (a reverse item whose stored
+  score is 1 for Strongly agree contributes 1), VALIDITY (two oriented rows at 4 and 5 → 2
+  flags; A_V_2 Disagree stored as 5 counts as a flag), ATTENTION (attention row 0 → R1). Plus:
+  flat vs differentiated shape, R3, R4 with values missing, R5 on a skipped and on a
+  duplicated question, values ranking order, drive as the union of factor rows.
 - `NavigatorProNormsTest`: percentile midrank on ties, band cut at unrounded 74.9/75,
   precision, cohorts of 29 (suppressed), 30, 59 (provisional 50/50) and 60 (medians), zone
   assignment on the cut.
 - `NavigatorProCalculationServiceTest` (mocked repositories): full key set present, reserved
   keys empty, banner set on two flags, suppression exception on R1, schema-check failure on a
-  stale questionnaire.
+  questionnaire shaped like the pilot (old Adaptability block, single "none" reasoning type).
 - Pipeline: producer skips a manual-only engine on submit but not on admin enqueue;
   consumer acks a `ReportSuppressedException`; `ReportService` upserts the suppressed row.
 - Frontend: `npm run typecheck` (58-error baseline) after the two edits.
@@ -325,29 +342,38 @@ No placeholder text is ever printed; an unsupplied text is an empty string.
   field and accessors.
 - Frontend: `ReportTemplatesPage.tsx` engine list gains `navigator_pro`; Reports Hub shows
   `suppressed` with its reason alongside failed rows.
-- Resources: `navigator-pro/item-bank.xlsx`, `navigator-pro/header-map.csv`.
+- Resource: `navigator-pro/mqt-map.yml`.
 
-## 19. Assumptions to confirm
+## 19. Assumptions and rulings
 
-- A1 Adaptability headers `Adaptability_1..14` in administered order (§5).
-- A2 Midrank percentile convention (§11).
-- A3 Percentile bands for indices, raw RAG for sub-domain bars (§12).
-- A4 Family display names (§13).
-- I1 `W_V_1` missing is not R5; it feeds R4 and empties the value placeholders (§10).
+- R1 (user ruling, 2026-09-10): all reversal is done at score level; the engine sums MQT
+  scores and has no reverse step. The bank workbook is reference only.
+- R2 (user ruling): Adaptability MQTs are factor-level (Internal Drive, Sustained Tenacity,
+  Adaptive Execution) plus one Validity MQT; the five reasoning MCQs get five named MQTs;
+  the pilot names stay for Personality, Fundamental, Specialized and Work Values.
+- A1: validity scores are entered oriented so that the suspicious answer is high, and a flag is
+  a Validity row scoring ≥ 4. The logic workbook's literal rule (A_V_2 ≥ 4, A_V_3 ≤ 2) contradicts
+  those items' wording because the new codes were renumbered against the legacy V1–V3; the
+  orientation is settled at data entry, not in code.
+- A2: midrank percentile convention.
+- A3: percentile bands for indices, raw RAG for sub-domain bars.
+- A4: family display names Hands-on, Analytical, Creative, Social, Enterprising, Organising.
+- I1: the ranking question is not R5-scored; it feeds R4 and empties the value placeholders.
 - From the bank's own "TO CONFIRM" list: agreement-scale wording, the MCQ keys for
   F_SPR_1/F_NUM_1, the rank-scoring rule 4/3/2/1, the attention-item wording.
 
 ## 20. Out of scope
 
-The HTML template; the student insight dashboard for this engine (it will report "not
-available yet"); reading-over-reading deltas; automated counselling queueing; the blend,
-sectors, R6 and their copy; auto-generation on submit (config flip later).
+The HTML template; the questionnaire re-import itself (admin work; the schema check reports
+its readiness); the student insight dashboard for this engine (it will report "not available
+yet"); reading-over-reading deltas; automated counselling queueing; the blend, sectors, R6 and
+their copy; auto-generation on submit (config flip later).
 
 ## 21. Definition of done (phase 1)
 
 All tests in §17 green; the full backend suite green; a Navigator Pro template with engine
 `navigator_pro` can be created in the admin; generating for a student of a re-imported
-questionnaire produces a report with every non-reserved key filled; a stale questionnaire
-yields the schema error; an attention-failed student yields a `suppressed` row visible in the
-Reports Hub; on-submit completion of a Navigator Pro assessment enqueues nothing while the
-Generate Queue still works.
+questionnaire produces a report with every non-reserved key filled; the pilot questionnaire
+yields the schema error naming Adaptability and reasoning; an attention-failed student yields a
+`suppressed` row visible in the Reports Hub; on-submit completion of a Navigator Pro
+assessment enqueues nothing while the Generate Queue still works.
