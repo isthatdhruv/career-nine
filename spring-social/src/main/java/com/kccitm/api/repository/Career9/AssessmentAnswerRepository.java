@@ -83,6 +83,20 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
        List<AssessmentAnswer> findAllByAssessmentIdForExport(
               @Param("assessmentId") Long assessmentId);
 
+       /**
+        * Every answer of an assessment with option, option scores and MQT eagerly
+        * loaded — the Navigator Pro cohort pass runs on the report-worker thread
+        * with no open session, so nothing may be lazy here.
+        */
+       @Query("SELECT DISTINCT aa FROM AssessmentAnswer aa " +
+              "LEFT JOIN FETCH aa.option o " +
+              "LEFT JOIN FETCH o.optionScores os " +
+              "LEFT JOIN FETCH os.measuredQualityType mqt " +
+              "LEFT JOIN FETCH aa.questionnaireQuestion qq " +
+              "LEFT JOIN FETCH aa.userStudent " +
+              "WHERE aa.assessment.id = :assessmentId")
+       List<AssessmentAnswer> findAllByAssessmentIdWithScores(@Param("assessmentId") Long assessmentId);
+
        @Query("SELECT aa FROM AssessmentAnswer aa " +
               "LEFT JOIN FETCH aa.option " +
               "LEFT JOIN FETCH aa.questionnaireQuestion qq " +

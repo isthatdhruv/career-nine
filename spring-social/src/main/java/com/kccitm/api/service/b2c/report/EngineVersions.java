@@ -26,4 +26,7 @@ public final class EngineVersions {
 
     /** Bumped when PagerPlaceholderCalculator's placeholder mapping changes (incl. FourPagerEngineService.buildPlaceholders). */
     public static final String PAGER_V1 = "pager-v3";
+
+    /** Bumped when NavigatorProCalculationService's placeholder mapping or NavigatorProScorer changes. */
+    public static final String NAVIGATOR_PRO_V1 = "navigator_pro-v1";
 }

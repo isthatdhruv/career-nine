@@ -177,6 +177,16 @@ report:
 app:
   googleAPIJSON: classpath:google.json
   fileTempFolder: classpath:temp
+  navigator-pro:
+    # Navigator Pro report engine. Thresholds mirror Report_Logic_Spec.xlsx; the
+    # QR on page 5 targets the Career Library and must be live before a batch ships.
+    career-library-url: ${APP_NAVIGATOR_PRO_CAREER_LIBRARY_URL:}
+    flat-gap: 10
+    weak-peak: 50
+    no-signal-domain: 50
+    banner-flag-count: 2
+    norms-min-n: 60
+    percentile-min-n: 30
   auth:
     tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
     tokenExpirationMsec: 864000000

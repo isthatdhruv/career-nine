@@ -30,3 +30,9 @@ tag forces a cache miss — placeholders are recomputed on the next
 
 - **legacy-v1** (2026-06-01) — initial `LegacyPlaceholderCalculator` mapping
   (flattened NavigatorReportData).
+
+## navigator_pro
+
+- **navigator_pro-v1** (2026-09-10) — initial `NavigatorProCalculationService` mapping
+  (MQT option scores → factors, foundation, reasoning, skill, families, values,
+  cohort percentiles, bands, zone; blend keys reserved).
