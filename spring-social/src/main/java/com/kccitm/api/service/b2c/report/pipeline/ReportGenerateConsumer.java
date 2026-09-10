@@ -6,6 +6,7 @@ import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.service.b2c.report.ReportResult;
 import com.kccitm.api.service.b2c.report.ReportRoutingException;
 import com.kccitm.api.service.b2c.report.ReportService;
+import com.kccitm.api.service.b2c.report.ReportSuppressedException;
 import com.kccitm.api.service.b2c.report.SanityFailedException;
 import com.kccitm.api.service.b2c.report.ScoresNotReadyException;
 import com.kccitm.api.service.b2c.report.pdf.PdfRenderService;
@@ -163,6 +164,13 @@ public class ReportGenerateConsumer {
                     e.getCode(), ev.userStudentId, ev.assessmentId, e.getMessage());
             markRowFailed(ev);
             throw new IllegalStateException("sanity terminal " + e.getCode() + ": " + e.getMessage(), e);
+        } catch (ReportSuppressedException e) {
+            // A gate declined the report on purpose (Navigator Pro R1–R5). The row is
+            // already marked "suppressed" by ReportService; nothing to retry, nothing
+            // for the DLT, no email.
+            logger.warn("Report suppressed ({}) student={} assessment={}: {}",
+                    e.getRuleCode(), ev.userStudentId, ev.assessmentId, e.getReason());
+            return;
         } catch (ReportRoutingException e) {
             // No template / no default mapped → nothing to generate. Now that ALL
             // students flow through this stage, treat it as a benign skip (ack, no

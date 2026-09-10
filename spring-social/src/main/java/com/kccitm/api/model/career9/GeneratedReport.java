@@ -71,7 +71,7 @@ public class GeneratedReport implements Serializable {
         return reportTemplate != null ? reportTemplate.getReportTemplateId() : null;
     }
 
-    // "notGenerated", "generated", "failed"
+    // "notGenerated", "queued", "generated", "failed", "suppressed"
     @Column(name = "report_status", nullable = false, length = 50)
     private String reportStatus = "notGenerated";
 
@@ -84,6 +84,13 @@ public class GeneratedReport implements Serializable {
     // notRequested | pending | rendering | ready | failed
     @Column(name = "pdf_status", nullable = false, length = 50)
     private String pdfStatus = "notRequested";
+
+    // "<rule>: <reason>" when report_status = "suppressed" (Navigator Pro gates); null otherwise.
+    @Column(name = "suppression_reason", length = 500)
+    private String suppressionReason;
+
+    public String getSuppressionReason() { return suppressionReason; }
+    public void setSuppressionReason(String suppressionReason) { this.suppressionReason = suppressionReason; }
 
     @Column(name = "visible_to_student", nullable = false)
     private Boolean visibleToStudent = false;
