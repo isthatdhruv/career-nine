@@ -55,7 +55,7 @@ Tests under `spring-social/src/test/java/com/kccitm/api/service/b2c/navigatorpro
 **Interfaces:**
 - Produces: `NavigatorProConstructMap` (Spring `@Component`, also `new NavigatorProConstructMap()` in tests) with `Optional<String> constructFor(String mqtName)`, `Construct get(String key)`, `Collection<Construct> all()`, `String label(String key)`, `static String normalize(String)`, and the constant lists `FACTOR_KEYS`, `FAMILY_KEYS`, `SUB_KEYS`, `CHECK_KEYS`, `DOMAIN_KEYS`, `VALIDITY`, `ATTENTION`. `Construct` has public final fields `key, label, mqts, questions, min, max`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -121,12 +121,12 @@ class NavigatorProConstructMapTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProConstructMapTest -DfailIfNoTests=false test`
 Expected: compilation FAILURE, `cannot find symbol: class NavigatorProConstructMap`.
 
-- [ ] **Step 3: Write the resource**
+- [x] **Step 3: Write the resource**
 
 Create `spring-social/src/main/resources/navigator-pro/mqt-map.yml`:
 
@@ -172,7 +172,7 @@ constructs:
   d_tb:      { label: "Technical Business & Consulting",   mqts: ["Technical Business & Consulting"],   questions: 1, min: 1, max: 5 }
 ```
 
-- [ ] **Step 4: Write the loader**
+- [x] **Step 4: Write the loader**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -298,12 +298,12 @@ public class NavigatorProConstructMap {
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProConstructMapTest -DfailIfNoTests=false test`
 Expected: PASS (5 tests).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add spring-social/src/main/resources/navigator-pro/mqt-map.yml \
@@ -329,7 +329,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `NavigatorProConstructMap` (Task 1).
 - Produces: `new Contribution(String construct, long questionId, int score)`; `new ValueRank(int rank, String optionText)`; `new NavigatorProScorer(NavigatorProConstructMap map, double flatGap).score(List<Contribution> rows, List<ValueRank> values, Map<String, Set<Long>> expected)` returning `NavigatorProScores` with `double get(String key)` for keys `f_id, f_st, f_ae, drive, foundation, skill, fs_*, d_*, fam_*`, `Map<String,Boolean> checks`, `int reasoning`, `String topFamily, secondFamily`, `boolean flat`, `List<String> values`, `boolean valuesMissing`, `int validityFlags`, `boolean attentionPassed`, `List<String> incomplete`, `double maxFamily()`, `double maxDomain()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -540,12 +540,12 @@ class NavigatorProScorerTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProScorerTest -DfailIfNoTests=false test`
 Expected: compilation FAILURE (`Contribution`, `ValueRank`, `NavigatorProScorer` not found).
 
-- [ ] **Step 3: Write the input rows and output holder**
+- [x] **Step 3: Write the input rows and output holder**
 
 `Contribution.java`:
 
@@ -630,7 +630,7 @@ public final class NavigatorProScores {
 }
 ```
 
-- [ ] **Step 4: Write the scorer**
+- [x] **Step 4: Write the scorer**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -767,12 +767,12 @@ public final class NavigatorProScorer {
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProScorerTest -DfailIfNoTests=false test`
 Expected: PASS (12 tests).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add spring-social/src/main/java/com/kccitm/api/service/b2c/navigatorpro/Contribution.java \
@@ -796,7 +796,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `NavigatorProNorms.Member(long userStudentId, Map<String, Double> metrics)`; `NavigatorProNorms.METRICS` = `drive, f_id, f_st, f_ae, foundation, skill, reasoning`; `static NormSet build(List<Member>, int percentileMinN, int normsMinN)`; `NormSet` fields `n, prec, percentilesSuppressed, provisional, driveCut, skillCut` and `Double percentile(String metric, double x)` (null when suppressed); statics `percentileRank(double[] sorted, double x)`, `median(double[] sorted)`, `band(double p)`, `ragBand(double raw)`, `ragColour(double raw)`, `zone(double drive, double skill, double driveCut, double skillCut)`, `precision(int n)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -910,12 +910,12 @@ class NavigatorProNormsTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProNormsTest -DfailIfNoTests=false test`
 Expected: compilation FAILURE (`NavigatorProNorms` not found).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -1046,12 +1046,12 @@ public final class NavigatorProNorms {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProNormsTest -DfailIfNoTests=false test`
 Expected: PASS (10 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add spring-social/src/main/java/com/kccitm/api/service/b2c/navigatorpro/NavigatorProNorms.java \
@@ -1072,7 +1072,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: static `bandParagraph(String indexKey, String band)` for index keys `drive, f_id, f_st, f_ae, foundation, skill, reasoning` and bands `Strong/Developing/Early`; `factorDefinition(String factorKey)`; `zoneCopy(String zone)`; `firstStep(String subKey)`; `Optional<ValueRow> value(String optionText)` with `ValueRow.icon/title/why`; `String banner()`; `precisionLine(int prec, int n)`; `factorCallout(String topLabel, int topP, String bottomLabel, int bottomP, int prec)`; `howToRead(String firstName)`; constants `COVER_CAPTION, COVER_FOOTER_TEMPLATE, ABOUT_CAREER9, ABOUT_REPORT, SECTOR_CAVEAT, RING_DRIVE, RING_FOUNDATION, RING_SKILL, RING_REASONING`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -1136,12 +1136,12 @@ class NavigatorProContentTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProContentTest -DfailIfNoTests=false test`
 Expected: compilation FAILURE (`NavigatorProContent` not found).
 
-- [ ] **Step 3: Write the content class**
+- [x] **Step 3: Write the content class**
 
 Texts are verbatim from `Report_Content_Logic.xlsx` (sheets 2, 3, 4, 6) and the sample report. Texts the workbook references but does not contain are empty strings on purpose (see spec §14).
 
@@ -1308,12 +1308,12 @@ public final class NavigatorProContent {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProContentTest -DfailIfNoTests=false test`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add spring-social/src/main/java/com/kccitm/api/service/b2c/navigatorpro/NavigatorProContent.java \
@@ -1337,7 +1337,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Produces: `static NavigatorProQuestionnaireIndex build(NavigatorProConstructMap map, long questionnaireId, List<QuestionnaireQuestion> questions, Map<Long, List<OptionScoreBasedOnMEasuredQualityTypes>> scoresByOptionId)` with public final `questionnaireId`, `Map<Long,String> constructByQuestion` (questionnaireQuestionId → construct key), `Map<String,Set<Long>> questionsByConstruct`, `Long rankingQuestionId`, `List<String> problems`, `boolean valid()`.
 - Produces (tests): `NavigatorProFixtures.validQuestionnaire()` with fields `map, questions, scoresByOptionId, byConstruct, ranking`, methods `scoresFor(List<Long> optionIds)`, `answer(UserStudent, QuestionnaireQuestion, int optionIndex)`, `rankingAnswers(UserStudent, int... optionIndexes)`, `completeAnswers(UserStudent, int agreeIdx, int freqIdx, int mcqIdx, int intensityIdx, int yesIdx, int validityIdx, int attentionIdx, int... valueIdx)`.
 
-- [ ] **Step 1: Write the fixtures helper**
+- [x] **Step 1: Write the fixtures helper**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -1493,7 +1493,7 @@ public final class NavigatorProFixtures {
 }
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -1590,12 +1590,12 @@ class NavigatorProQuestionnaireIndexTest {
 }
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProQuestionnaireIndexTest -DfailIfNoTests=false test`
 Expected: compilation FAILURE (`NavigatorProQuestionnaireIndex` not found).
 
-- [ ] **Step 4: Write the index**
+- [x] **Step 4: Write the index**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -1716,12 +1716,12 @@ public final class NavigatorProQuestionnaireIndex {
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProQuestionnaireIndexTest -DfailIfNoTests=false test`
 Expected: PASS (7 tests).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add spring-social/src/main/java/com/kccitm/api/service/b2c/navigatorpro/NavigatorProQuestionnaireIndex.java \
@@ -1749,7 +1749,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `ReportSuppressedException(String ruleCode, String reason)` (unchecked) with `getRuleCode()`, `getReason()`; `GeneratedReport.getSuppressionReason()/setSuppressionReason(String)`; generated_report status value `"suppressed"`.
 
-- [ ] **Step 1: Write the failing consumer test**
+- [x] **Step 1: Write the failing consumer test**
 
 Add to `ReportGenerateConsumerTest` (imports: `com.kccitm.api.service.b2c.report.ReportSuppressedException`, `static org.assertj.core.api.Assertions.assertThatCode`):
 
@@ -1765,7 +1765,7 @@ Add to `ReportGenerateConsumerTest` (imports: `com.kccitm.api.service.b2c.report
     }
 ```
 
-- [ ] **Step 2: Write the failing ReportService test**
+- [x] **Step 2: Write the failing ReportService test**
 
 ```java
 package com.kccitm.api.service.b2c.report;
@@ -1860,12 +1860,12 @@ class ReportServiceSuppressionTest {
 }
 ```
 
-- [ ] **Step 3: Run both tests to verify they fail**
+- [x] **Step 3: Run both tests to verify they fail**
 
 Run: `cd spring-social && mvn -o -q -Dtest='ReportServiceSuppressionTest,ReportGenerateConsumerTest' -DfailIfNoTests=false test`
 Expected: compilation FAILURE (`ReportSuppressedException` not found).
 
-- [ ] **Step 4: Add the exception**
+- [x] **Step 4: Add the exception**
 
 ```java
 package com.kccitm.api.service.b2c.report;
@@ -1891,7 +1891,7 @@ public class ReportSuppressedException extends RuntimeException {
 }
 ```
 
-- [ ] **Step 5: Add the migration and entity column**
+- [x] **Step 5: Add the migration and entity column**
 
 `V20260910001__generated_report_suppression_reason.sql`:
 
@@ -1917,7 +1917,7 @@ In `GeneratedReport.java`, directly after the `pdfStatus` field:
 
 (Update the status comment above `reportStatus` to `// "notGenerated", "queued", "generated", "failed", "suppressed"`.)
 
-- [ ] **Step 6: ReportService — record and rethrow**
+- [x] **Step 6: ReportService — record and rethrow**
 
 Replace in `generate` (the `else` branch of step 4):
 
@@ -1976,7 +1976,7 @@ Add the helper next to `upsertGeneratedReport`:
     }
 ```
 
-- [ ] **Step 7: Worker — acknowledge**
+- [x] **Step 7: Worker — acknowledge**
 
 In `ReportGenerateConsumer.onGenerate`, insert before `} catch (ReportRoutingException e) {`:
 
@@ -1992,7 +1992,7 @@ In `ReportGenerateConsumer.onGenerate`, insert before `} catch (ReportRoutingExc
 
 Add the import `com.kccitm.api.service.b2c.report.ReportSuppressedException`.
 
-- [ ] **Step 8: Controller — 422 and bulk row**
+- [x] **Step 8: Controller — 422 and bulk row**
 
 In `UnifiedReportController.generate`, insert before `} catch (ReportRoutingException ex) {`:
 
@@ -2011,12 +2011,12 @@ In the bulk loop, insert before `} catch (ReportRoutingException ex) {`:
 
 Add the import `com.kccitm.api.service.b2c.report.ReportSuppressedException`.
 
-- [ ] **Step 9: Run the tests**
+- [x] **Step 9: Run the tests**
 
 Run: `cd spring-social && mvn -o -q -Dtest='ReportServiceSuppressionTest,ReportGenerateConsumerTest' -DfailIfNoTests=false test`
 Expected: PASS (all consumer tests plus the new one; 1 ReportService test).
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add spring-social/src/main/java/com/kccitm/api/service/b2c/report/ReportSuppressedException.java \
@@ -2048,7 +2048,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: Tasks 1–6 (`NavigatorProConstructMap`, `NavigatorProScorer`, `NavigatorProScores`, `NavigatorProNorms`, `NavigatorProContent`, `NavigatorProQuestionnaireIndex`, `NavigatorProFixtures`, `ReportSuppressedException`); existing `PlaceholderCalculator`, `IntermediaryScoresPayload`, `ReportRoutingException`; repositories `AssessmentAnswerRepository.findByUserStudentIdAndAssessmentIdWithDetails(Long, Long)`, `AssessmentTableRepository.findById`, `QuestionnaireQuestionRepository.findByQuestionnaireIdWithOptions(Long)`, `OptionScoreBasedOnMeasuredQualityTypesRepository.findByOptionIdIn(List<Long>)`, `StudentAssessmentMappingRepository.findCompletedForAssessment(Long)`, `.findFirstByUserStudentUserStudentIdAndAssessmentId(Long, Long)`, `.findByUserStudentUserStudentId(Long)`, `UserStudentRepository.findByIdWithStudentInfo(Long)`, `AssessmentReportTemplateRepository.findByAssessmentIdAndIsDefaultTrue(Long)`.
 - Produces: `EngineVersions.NAVIGATOR_PRO_V1 = "navigator_pro-v1"`; `AssessmentAnswerRepository.findAllByAssessmentIdWithScores(Long)`; the Spring bean `NavigatorProCalculationService` (type code `navigator_pro`).
 
-- [ ] **Step 1: Engine version, doc line, repository query, properties**
+- [x] **Step 1: Engine version, doc line, repository query, properties**
 
 `EngineVersions.java`, after `PAGER_V1`:
 
@@ -2100,7 +2100,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
     percentile-min-n: 30
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -2351,12 +2351,12 @@ class NavigatorProCalculationServiceTest {
 }
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProCalculationServiceTest -DfailIfNoTests=false test`
 Expected: compilation FAILURE (`NavigatorProCalculationService` not found).
 
-- [ ] **Step 4: Write the service**
+- [x] **Step 4: Write the service**
 
 ```java
 package com.kccitm.api.service.b2c.navigatorpro;
@@ -2763,17 +2763,17 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `cd spring-social && mvn -o -q -Dtest=NavigatorProCalculationServiceTest -DfailIfNoTests=false test`
 Expected: PASS (8 tests). If `foundation` asserts 67 but you get 68, check `NavigatorProFixtures.scaleFor`: freq idx 2 must score 3 on every sub-domain question (Σ = 66 → (66−22)/66 = 66.67 → 67).
 
-- [ ] **Step 6: Boot-wire check**
+- [x] **Step 6: Boot-wire check**
 
 Run: `cd spring-social && mvn -o -q -DskipTests compile`
 Expected: BUILD SUCCESS. Then start nothing; the `ReportService` init log line `ReportService initialized with engines: [..., navigator_pro]` will confirm registration at the next backend start (Task 10).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add spring-social/src/main/java/com/kccitm/api/service/b2c/report/EngineVersions.java docs/engine-versions.md \
@@ -2799,7 +2799,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: `ReportService.resolveTemplate(Long assessmentId, Long reportTemplateId)` (public, existing), `ReportTemplate.getEngineCode()`, `ReportRoutingException`.
 - Produces: property `report.pipeline.manual-only-engines` (default `navigator_pro`); package-private `boolean isManualOnly(Long assessmentId)` on the producer.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `ReportPipelineProducerTest` (imports: `com.kccitm.api.model.career9.ReportTemplate`, `com.kccitm.api.service.b2c.report.ReportService`, `com.kccitm.api.service.b2c.report.ReportRoutingException`, `org.springframework.test.util.ReflectionTestUtils`, `static org.mockito.ArgumentMatchers.anyString`, `static org.mockito.Mockito.never`; add the field `@Mock ReportService reportService;` next to the other mocks):
 
@@ -2860,12 +2860,12 @@ Add to `ReportPipelineProducerTest` (imports: `com.kccitm.api.model.career9.Repo
     }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd spring-social && mvn -o -q -Dtest=ReportPipelineProducerTest -DfailIfNoTests=false test`
 Expected: compilation FAILURE (`manualOnlyEngines` field absent → the `enqueue_skipsOnSubmitForManualOnlyEngine` test fails at `setField`, or the send verification fails).
 
-- [ ] **Step 3: Implement the gate**
+- [x] **Step 3: Implement the gate**
 
 In `ReportPipelineProducer`, add after the `enabled` field:
 
@@ -2922,12 +2922,12 @@ In `application.yml`, inside `report.pipeline` after `email-transport`:
     manual-only-engines: ${REPORT_MANUAL_ONLY_ENGINES:navigator_pro}
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cd spring-social && mvn -o -q -Dtest=ReportPipelineProducerTest -DfailIfNoTests=false test`
 Expected: PASS (existing tests plus 3 new).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add spring-social/src/main/java/com/kccitm/api/service/b2c/report/pipeline/ReportPipelineProducer.java \
@@ -2950,7 +2950,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: backend `GET /generated-reports/by-assessment/{id}` now serialises `suppressionReason` (entity field from Task 6) and `reportStatus === "suppressed"`.
 
-- [ ] **Step 1: Engine list**
+- [x] **Step 1: Engine list**
 
 In `ReportTemplatesPage.tsx` change line 13 to:
 
@@ -2958,7 +2958,7 @@ In `ReportTemplatesPage.tsx` change line 13 to:
 const ENGINES = ["bet", "pager", "legacy", "navigator_pro"];
 ```
 
-- [ ] **Step 2: API type**
+- [x] **Step 2: API type**
 
 In `GeneratedReport_APIs.ts` update the interface:
 
@@ -2969,7 +2969,7 @@ In `GeneratedReport_APIs.ts` update the interface:
   suppressionReason?: string | null; // "<rule>: <reason>" when reportStatus === "suppressed"
 ```
 
-- [ ] **Step 3: Reports Hub**
+- [x] **Step 3: Reports Hub**
 
 In the `ReportData` type add `suppressionReason?: string | null;` after `pdfStatus`.
 
@@ -3004,12 +3004,12 @@ with
                           </td>
 ```
 
-- [ ] **Step 4: Type-check**
+- [x] **Step 4: Type-check**
 
 Run: `cd react-social && npm run typecheck 2>&1 | tail -3`
 Expected: the same 58-error baseline (the count printed must not exceed 58; none of the errors may name the three edited files).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add react-social/src/app/pages/ReportTemplates/ReportTemplatesPage.tsx \
@@ -3026,12 +3026,12 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Files:** none new.
 
-- [ ] **Step 1: Backend suite**
+- [x] **Step 1: Backend suite**
 
 Run: `cd spring-social && mvn -o -q test 2>&1 | tail -15`
 Expected: `BUILD SUCCESS`; the previous baseline was 157 tests, now 157 + 5 + 12 + 10 + 4 + 7 + 1 + 1 + 8 + 3 = 208 tests, 0 failures, 0 errors. Any failure is fixed before continuing.
 
-- [ ] **Step 2: Boot registration**
+- [x] **Step 2: Boot registration**
 
 Run the backend the way the project's `run` skill or `docker-compose.yml` does (dev profile against the local MySQL on port 3306) and grep the startup log:
 
@@ -3041,7 +3041,7 @@ grep -E "ReportService initialized with engines|Flyway|V20260910001" <backend lo
 
 Expected: the engines line lists `navigator_pro`; Flyway applied `V20260910001`. Stop the backend afterwards.
 
-- [ ] **Step 3: Pilot questionnaire yields the schema error**
+- [x] **Step 3: Pilot questionnaire yields the schema error**
 
 With the backend running and an admin token, call the synchronous endpoint for a student who completed assessment 58 ("Navigator Pro Internal Testing") after mapping a `navigator_pro` template to it:
 
@@ -3052,12 +3052,12 @@ curl -s -X POST "$API/generate-report-unified" -H "Authorization: Bearer $TOKEN"
 
 Expected: HTTP 422 with `code: "ROUTING"` and a message naming `Internal Drive`, `Validity`, `Numeracy` and the other missing constructs. Record the exact message in the commit body of Step 5.
 
-- [ ] **Step 4: Typecheck baseline**
+- [x] **Step 4: Typecheck baseline**
 
 Run: `cd react-social && npm run typecheck 2>&1 | tail -3`
 Expected: 58 errors, none in the edited files.
 
-- [ ] **Step 5: Commit any fixes and record the verification**
+- [x] **Step 5: Commit any fixes and record the verification**
 
 ```bash
 git add -A spring-social/src react-social/src docs
