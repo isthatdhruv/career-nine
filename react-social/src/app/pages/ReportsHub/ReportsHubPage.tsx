@@ -77,6 +77,7 @@ type ReportData = {
   reportUrl?: string | null;
   pdfUrl?: string | null;
   pdfStatus?: string; // notRequested | pending | rendering | ready | failed
+  suppressionReason?: string | null;
   eligible?: boolean;
   [key: string]: any;
 };
@@ -370,6 +371,7 @@ const ReportsHubPage: React.FC = () => {
             reportUrl: gr.reportUrl,
             pdfUrl: gr.pdfUrl ?? null,
             pdfStatus: gr.pdfStatus ?? "notRequested",
+            suppressionReason: gr.suppressionReason ?? null,
           });
         }
       }
@@ -1412,7 +1414,10 @@ const ReportsHubPage: React.FC = () => {
                       const asc = asmtStatus === "completed" ? { bg: "#dcfce7", color: "#059669" }
                         : asmtStatus === "ongoing" ? { bg: "#dbeafe", color: "#2563eb" }
                         : { bg: "#fef3c7", color: "#d97706" };
-                      const rsc = hasReport ? { bg: "#dcfce7", color: "#059669" } : { bg: "#fef3c7", color: "#d97706" };
+                      const isSuppressed = reportStatus === "suppressed";
+                      const rsc = hasReport ? { bg: "#dcfce7", color: "#059669" }
+                        : isSuppressed ? { bg: "#fee2e2", color: "#b91c1c" }
+                        : { bg: "#fef3c7", color: "#d97706" };
 
                       return (
                         <tr key={s.userStudentId} style={{
@@ -1447,7 +1452,9 @@ const ReportsHubPage: React.FC = () => {
                           </td>
                           <td style={tdStyle}>{gradeOf(s) || "-"}</td>
                           <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
-                          <td style={tdStyle}>{statusBadge(rsc.bg, rsc.color, hasReport ? "Generated" : "Not Generated")}</td>
+                          <td style={tdStyle} title={isSuppressed ? (rd?.suppressionReason || "Suppressed") : undefined}>
+                            {statusBadge(rsc.bg, rsc.color, hasReport ? "Generated" : isSuppressed ? "Suppressed" : "Not Generated")}
+                          </td>
                           <td style={tdStyle}>
                             {visibilityMap.has(s.userStudentId) ? (
                               <label style={{ position: "relative", display: "inline-block", width: 36, height: 20, cursor: "pointer" }}>

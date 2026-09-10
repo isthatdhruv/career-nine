@@ -10,7 +10,7 @@ import {
 import { getAllAssessments } from "../StudentInformation/StudentInfo_APIs";
 import AssessmentReportTemplateConfig from "./components/AssessmentReportTemplateConfig";
 
-const ENGINES = ["bet", "pager", "legacy"];
+const ENGINES = ["bet", "pager", "legacy", "navigator_pro"];
 
 interface AssessmentOption {
   id: number;
