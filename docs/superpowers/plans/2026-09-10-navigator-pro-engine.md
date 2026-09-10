@@ -2814,7 +2814,8 @@ Add to `ReportPipelineProducerTest` (imports: `com.kccitm.api.model.career9.Repo
     void enqueue_skipsOnSubmitForManualOnlyEngine() {
         ReflectionTestUtils.setField(producer, "enabled", true);
         ReflectionTestUtils.setField(producer, "manualOnlyEngines", "navigator_pro");
-        when(reportService.resolveTemplate(9L, null)).thenReturn(templateWithEngine("navigator_pro"));
+        ReportTemplate t = templateWithEngine("navigator_pro");   // stub the template BEFORE the outer when(): nested stubbing throws
+        when(reportService.resolveTemplate(9L, null)).thenReturn(t);
         UserStudent us = new UserStudent();
         us.setUserStudentId(5L);
 
@@ -2827,7 +2828,8 @@ Add to `ReportPipelineProducerTest` (imports: `com.kccitm.api.model.career9.Repo
     void enqueue_stillPublishesForOtherEngines() throws Exception {
         ReflectionTestUtils.setField(producer, "enabled", true);
         ReflectionTestUtils.setField(producer, "manualOnlyEngines", "navigator_pro");
-        when(reportService.resolveTemplate(9L, null)).thenReturn(templateWithEngine("pager"));
+        ReportTemplate t = templateWithEngine("pager");   // stub the template BEFORE the outer when(): nested stubbing throws
+        when(reportService.resolveTemplate(9L, null)).thenReturn(t);
         UserStudent us = new UserStudent();
         us.setUserStudentId(5L);
         when(userStudentRepository.findByIdWithStudentInfo(5L)).thenReturn(Optional.of(us));

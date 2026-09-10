@@ -173,6 +173,9 @@ report:
     # blocked); "odoo" routes through Odoo's JSON-RPC API instead. See
     # GmailReportEmailSender / OdooEmailSender.
     email-transport: ${REPORT_EMAIL_TRANSPORT:gmail}
+    # Engines generated only from the admin Generate Queue (on-submit skip). Remove an
+    # engine here to turn its auto-generation on. Empty = gate off.
+    manual-only-engines: ${REPORT_MANUAL_ONLY_ENGINES:navigator_pro}
 
 app:
   googleAPIJSON: classpath:google.json
