@@ -9,12 +9,26 @@ import { Scope } from "../../modules/auth";
 import { getUserCollegeMappings } from "../Users/API/UserMapping_APIs";
 import { getScopedAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import SearchableSelect from "../../components/SearchableSelect";
+import SearchableMultiSelect from "../../components/SearchableMultiSelect";
+import * as XLSX from "xlsx";
+import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { showErrorToast } from "../../utils/toast";
 import {
   AdminDashboardSnapshot,
   fetchAdminDashboardSnapshot,
   fetchLogins,
   refreshAdminDashboardSnapshot,
 } from "./dashboard-admin.api";
+import {
+  applyInstituteAssessmentFilter,
+  assessmentIdsAssignedTo,
+  instituteKeysOf,
+} from "./dashboard-admin.filter";
+import {
+  buildSchoolReportWorkbook,
+  schoolReportFileName,
+  SectionLookup,
+} from "./dashboard-admin.export";
 
 /* ============================================================
    THEME
@@ -293,11 +307,11 @@ const DashboardAdminContent: FC = () => {
   // dashboard — platform-wide widgets are hidden below.
   const schoolMode = !isSuperAdmin;
 
-  // raw data
-  const [students, setStudents] = useState<any[]>([]);
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  // raw data (post-ABAC scope, pre view-filter — see `viewFiltered` below)
+  const [rawStudents, setRawStudents] = useState<any[]>([]);
+  const [rawInstitutes, setRawInstitutes] = useState<any[]>([]);
   const [counsellors, setCounsellors] = useState<any[]>([]);
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [rawAppointments, setRawAppointments] = useState<any[]>([]);
   const [ratingSummary, setRatingSummary] = useState<any[]>([]);
   const [rawAssessments, setRawAssessments] = useState<any[]>([]);
   // Defense-in-depth narrowing of the snapshot's `assessments` section.
@@ -345,7 +359,7 @@ const DashboardAdminContent: FC = () => {
     };
   }, [isSuperAdmin, scopeReady, effectiveRules]);
 
-  const assessments = useMemo(
+  const scopedAssessments = useMemo(
     () =>
       scopedAssessmentIds == null
         ? rawAssessments
@@ -356,8 +370,81 @@ const DashboardAdminContent: FC = () => {
   );
   const [logins, setLogins] = useState<any[]>([]);
   const [loginsLoading, setLoginsLoading] = useState(false);
-  const [reports, setReports] = useState<any[]>([]);
-  const [studentMappings, setStudentMappings] = useState<any[]>([]);
+  const [rawReports, setRawReports] = useState<any[]>([]);
+  const [rawStudentMappings, setRawStudentMappings] = useState<any[]>([]);
+
+  // ---- Super-admin view filter: one institute and/or a set of assessments ----
+  // Applied client-side to the loaded snapshot (it already holds every row for
+  // a super-admin), so the KPIs, drill-downs and tables below narrow without
+  // any of their code changing. Hidden for scoped (school) viewers, who are
+  // already narrowed by ABAC.
+  const [viewInstitute, setViewInstitute] = useState<string>("");
+  const [viewAssessmentIds, setViewAssessmentIds] = useState<string[]>([]);
+  const viewInstituteRow = useMemo(
+    () =>
+      viewInstitute
+        ? rawInstitutes.find((i) => String(pick(i, ["instituteCode", "code"]) ?? "") === viewInstitute) ?? null
+        : null,
+    [rawInstitutes, viewInstitute]
+  );
+  const viewInstituteKeys = useMemo(
+    () => (viewInstituteRow ? instituteKeysOf(viewInstituteRow) : null),
+    [viewInstituteRow]
+  );
+  // Assessments offered in the picker: only those assigned to students at the
+  // chosen institute (or every scoped assessment when no institute is chosen).
+  const viewAssessmentOptions = useMemo(() => {
+    let pool = scopedAssessments;
+    if (viewInstituteKeys) {
+      const assigned = assessmentIdsAssignedTo(
+        rawStudentMappings.filter((m) =>
+          viewInstituteKeys.has(String(pick(m, ["instituteId", "institute_id"]) ?? ""))
+        )
+      );
+      pool = pool.filter((a) => assigned.has(String(pick(a, ["id", "assessmentId"]) ?? "")));
+    }
+    return pool
+      .map((a) => ({
+        value: String(pick(a, ["id", "assessmentId"]) ?? ""),
+        label: String(pick(a, ["assessmentName", "name", "title"]) || `Assessment #${pick(a, ["id", "assessmentId"])}`),
+      }))
+      .filter((o) => o.value)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [scopedAssessments, rawStudentMappings, viewInstituteKeys]);
+  // Drop selections that are no longer offered (e.g. after switching institute).
+  useEffect(() => {
+    if (viewAssessmentIds.length === 0) return;
+    const offered = new Set(viewAssessmentOptions.map((o) => o.value));
+    const kept = viewAssessmentIds.filter((id) => offered.has(id));
+    if (kept.length !== viewAssessmentIds.length) setViewAssessmentIds(kept);
+  }, [viewAssessmentOptions, viewAssessmentIds]);
+  const viewFilterActive = isSuperAdmin && (viewInstituteKeys != null || viewAssessmentIds.length > 0);
+
+  const viewFiltered = useMemo(
+    () =>
+      applyInstituteAssessmentFilter(
+        {
+          students: rawStudents,
+          institutes: rawInstitutes,
+          counsellors,
+          appointments: rawAppointments,
+          ratingSummary,
+          assessments: scopedAssessments,
+          reports: rawReports,
+          studentMappings: rawStudentMappings,
+        },
+        {
+          instituteKeys: isSuperAdmin ? viewInstituteKeys : null,
+          assessmentIds: isSuperAdmin && viewAssessmentIds.length > 0 ? new Set(viewAssessmentIds) : null,
+        }
+      ),
+    [
+      rawStudents, rawInstitutes, counsellors, rawAppointments, ratingSummary,
+      scopedAssessments, rawReports, rawStudentMappings,
+      isSuperAdmin, viewInstituteKeys, viewAssessmentIds,
+    ]
+  );
+  const { students, institutes, appointments, assessments, reports, studentMappings } = viewFiltered;
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -375,6 +462,57 @@ const DashboardAdminContent: FC = () => {
     if (refreshing) return;
     setManualRefresh(true);
     setRefreshNonce((n) => n + 1);
+  };
+
+  // "Export for school": two-sheet workbook (Summary + Students) built from
+  // the view-filtered snapshot — lifetime numbers, the date range is ignored.
+  // Class/section names come from the institute hierarchy; if that call
+  // fails we fall back to the flat `studentClass` column on each student.
+  const [exporting, setExporting] = useState(false);
+  const handleExportForSchool = async () => {
+    if (!viewInstituteRow || exporting) return;
+    setExporting(true);
+    try {
+      const instituteName = String(
+        pick(viewInstituteRow, ["instituteName", "name"]) || `Institute ${viewInstitute}`
+      );
+      const sectionLookup: SectionLookup = new Map();
+      try {
+        const res: any = await GetSessionsByInstituteCode(viewInstitute);
+        for (const session of res?.data || []) {
+          for (const cls of session?.schoolClasses || []) {
+            for (const sec of cls?.schoolSections || []) {
+              if (sec?.id != null && !sectionLookup.has(Number(sec.id))) {
+                sectionLookup.set(Number(sec.id), {
+                  className: String(cls?.className ?? ""),
+                  sectionName: String(sec?.sectionName ?? ""),
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // hierarchy unavailable — export still works with the flat class column
+      }
+      const selectedNames = viewAssessmentOptions
+        .filter((o) => viewAssessmentIds.includes(o.value))
+        .map((o) => o.label);
+      const exportedAt = new Date();
+      const wb = buildSchoolReportWorkbook({
+        assessments,
+        studentMappings,
+        reports,
+        sectionLookup,
+        instituteName,
+        exportedAt,
+        assessmentFilterLabel: selectedNames.length ? selectedNames.join(", ") : "All assessments",
+      });
+      XLSX.writeFile(wb, schoolReportFileName(instituteName, exportedAt));
+    } catch (e: any) {
+      showErrorToast(`Export failed: ${e?.message || "unknown error"}`);
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Clear the manual-refresh flag once everything settles
@@ -428,14 +566,14 @@ const DashboardAdminContent: FC = () => {
           : await fetchAdminDashboardSnapshot();
         if (cancelled) return;
         const snap = applyScopeToSnapshot(raw, effectiveRules, isSuperAdmin);
-        setStudents(snap.students);
-        setInstitutes(snap.institutes);
+        setRawStudents(snap.students);
+        setRawInstitutes(snap.institutes);
         setCounsellors(snap.counsellors);
-        setAppointments(snap.appointments);
+        setRawAppointments(snap.appointments);
         setRatingSummary(snap.ratingSummary);
         setRawAssessments(snap.assessments);
-        setReports(snap.reports);
-        setStudentMappings(snap.studentMappings);
+        setRawReports(snap.reports);
+        setRawStudentMappings(snap.studentMappings);
         setComputedAt(snap.computedAt);
         setCacheHit(snap.cacheHit);
         setErrors((prev) => {
@@ -1015,6 +1153,24 @@ const DashboardAdminContent: FC = () => {
           setCustomEnd={setCustomEnd}
         />
 
+        {/* VIEW FILTER + SCHOOL EXPORT — super-admin only */}
+        {isSuperAdmin && (
+          <ViewFilterBar
+            t={t}
+            institutes={rawInstitutes}
+            viewInstitute={viewInstitute}
+            setViewInstitute={setViewInstitute}
+            assessmentOptions={viewAssessmentOptions}
+            viewAssessmentIds={viewAssessmentIds}
+            setViewAssessmentIds={setViewAssessmentIds}
+            active={viewFilterActive}
+            loading={loading}
+            exporting={exporting}
+            onExport={handleExportForSchool}
+            studentCount={studentMappings.length}
+          />
+        )}
+
         {/* KPI GRID */}
         <div className="ds-grid" style={{ marginTop: 24 }}>
           <KpiCard
@@ -1552,6 +1708,122 @@ const DateRangeBar: FC<{
             ({range.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })} – {range.end.toLocaleDateString(undefined, { day: "numeric", month: "short" })})
           </span>
         )}
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================
+   VIEW FILTER BAR (super-admin: institute + assessments + export)
+   ============================================================ */
+const ViewFilterBar: FC<{
+  t: Theme;
+  institutes: any[];
+  viewInstitute: string;
+  setViewInstitute: (code: string) => void;
+  assessmentOptions: { value: string; label: string }[];
+  viewAssessmentIds: string[];
+  setViewAssessmentIds: (ids: string[]) => void;
+  active: boolean;
+  loading: boolean;
+  exporting: boolean;
+  onExport: () => void;
+  studentCount: number;
+}> = ({
+  t,
+  institutes,
+  viewInstitute,
+  setViewInstitute,
+  assessmentOptions,
+  viewAssessmentIds,
+  setViewAssessmentIds,
+  active,
+  loading,
+  exporting,
+  onExport,
+  studentCount,
+}) => {
+  const instituteOptions = useMemo(
+    () =>
+      institutes
+        .map((i) => {
+          const code = pick(i, ["instituteCode", "code"]);
+          return {
+            value: String(code ?? ""),
+            label: String(pick(i, ["instituteName", "name"]) || `Institute #${code ?? "?"}`),
+          };
+        })
+        .filter((o) => o.value)
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [institutes]
+  );
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: "14px 18px",
+        background: t.card,
+        border: `1px solid ${t.border}`,
+        borderRadius: 14,
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: t.textMuted, fontSize: 12, fontWeight: 600 }}>
+        <IconBuilding />
+        <span style={{ letterSpacing: "0.04em", textTransform: "uppercase" }}>View</span>
+      </div>
+
+      <SearchableSelect
+        options={instituteOptions}
+        value={viewInstitute}
+        onChange={setViewInstitute}
+        placeholder={loading ? "Loading…" : "All institutes"}
+        disabled={loading || instituteOptions.length === 0}
+        style={{ minWidth: 260 }}
+      />
+      <SearchableMultiSelect
+        options={assessmentOptions}
+        value={viewAssessmentIds}
+        onChange={setViewAssessmentIds}
+        placeholder={loading ? "Loading…" : "All assessments"}
+        disabled={loading || assessmentOptions.length === 0}
+        style={{ minWidth: 280, flex: 1, maxWidth: 560 }}
+      />
+      {active && (
+        <button
+          className="ds-preset-btn"
+          onClick={() => {
+            setViewInstitute("");
+            setViewAssessmentIds([]);
+          }}
+        >
+          Clear
+        </button>
+      )}
+
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {active && (
+          <Pill t={t} tone="primary">
+            {fmtNum(studentCount)} {studentCount === 1 ? "student" : "students"} in view
+          </Pill>
+        )}
+        <button
+          className="ds-export-btn"
+          disabled={!viewInstitute || loading || exporting}
+          onClick={onExport}
+          title={
+            viewInstitute
+              ? "Download a two-sheet Excel report (summary + per-student rows) for this school"
+              : "Choose an institute to export its report"
+          }
+        >
+          {exporting ? <Spinner color="#fff" size={14} /> : <IconDownload />}
+          {exporting ? "Preparing…" : "Export for school (.xlsx)"}
+        </button>
       </div>
     </div>
   );
@@ -4032,6 +4304,25 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     .ds-date-input:hover { border-color: ${t.borderStrong}; }
     .ds-date-input:focus { outline: none; border-color: ${t.primary}; box-shadow: 0 0 0 3px ${t.primarySoft}; }
 
+    .ds-export-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 9px;
+      border: none;
+      background: ${t.primary};
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 200ms ease;
+    }
+    .ds-export-btn:hover:not(:disabled) { background: ${t.primaryHover}; }
+    .ds-export-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
     .ds-card {
       position: relative;
       transition:
@@ -4234,6 +4525,13 @@ const IconBuilding = () => (
   <svg {...svgBase} width={18} height={18}>
     <rect x="3" y="3" width="18" height="18" rx="2" />
     <path d="M9 21V9h6v12" />
+  </svg>
+);
+const IconDownload = () => (
+  <svg {...svgBase} width={16} height={16}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 const IconClipboard = () => (
