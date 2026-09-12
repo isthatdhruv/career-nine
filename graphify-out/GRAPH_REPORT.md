@@ -1,16 +1,16 @@
-# Graph Report - career-nine-sandbox  (2026-09-11)
+# Graph Report - career-nine-sandbox  (2026-09-12)
 
 ## Corpus Check
-- 1981 files · ~7,121,139 words
+- 2016 files · ~7,134,732 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 24192 nodes · 65309 edges · 790 communities (739 shown, 51 thin omitted)
-- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 9174 edges (avg confidence: 0.8)
+- 24423 nodes · 67268 edges · 778 communities (724 shown, 54 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 10114 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `abe8ad9f`
+- Built from commit: `41289893`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -668,11 +668,11 @@
 - [[_COMMUNITY_ApiResponse|ApiResponse]]
 - [[_COMMUNITY_AuthResponse|AuthResponse]]
 - [[_COMMUNITY_AuthAuditRepository|AuthAuditRepository]]
-- [[_COMMUNITY_CounsellingRequestRepository|CounsellingRequestRepository]]
-- [[_COMMUNITY_ReportAutoGenerationService|ReportAutoGenerationService]]
-- [[_COMMUNITY_.fill|.fill]]
+- [[_COMMUNITY_ToolMeasuredQualitiesMappingRepository.java|ToolMeasuredQualitiesMappingRepository.java]]
+- [[_COMMUNITY_CodeBlock.tsx|CodeBlock.tsx]]
+- [[_COMMUNITY_EngageWidget2.tsx|EngageWidget2.tsx]]
 - [[_COMMUNITY_PsychometricExportLocalIT|PsychometricExportLocalIT]]
-- [[_COMMUNITY_webglGetUniformLocation|webglGetUniformLocation]]
+- [[_COMMUNITY_TilesWidget4.tsx|TilesWidget4.tsx]]
 - [[_COMMUNITY_webglGetUniformLocation|webglGetUniformLocation]]
 - [[_COMMUNITY_🔴 CRITICAL (14 findings → 6 root causes)|🔴 CRITICAL (14 findings → 6 root causes)]]
 - [[_COMMUNITY_Admin CRUD correctness|Admin CRUD correctness]]
@@ -685,9 +685,6 @@
 - [[_COMMUNITY_StudentDashboard.tsx|StudentDashboard.tsx]]
 - [[_COMMUNITY_GotenbergConfig.java|GotenbergConfig.java]]
 - [[_COMMUNITY_StudentLog.java|StudentLog.java]]
-- [[_COMMUNITY_UniMarksScrapping|UniMarksScrapping]]
-- [[_COMMUNITY_AvailabilityTemplateRepository|AvailabilityTemplateRepository]]
-- [[_COMMUNITY_Navigator360CareerData|Navigator360CareerData]]
 - [[_COMMUNITY_.everyEmailMustBeSentThroughTheDispatcher|.everyEmailMustBeSentThroughTheDispatcher]]
 - [[_COMMUNITY_manifest.json|manifest.json]]
 - [[_COMMUNITY_Career-9 Assessment Autofill (Chrome extension, dev tool)|Career-9 Assessment Autofill (Chrome extension, dev tool)]]
@@ -703,10 +700,7 @@
 - [[_COMMUNITY_Engine version changelog|Engine version changelog]]
 - [[_COMMUNITY_15.1 Student Dashboard|15.1 Student Dashboard]]
 - [[_COMMUNITY_4.2 Contact Person|4.2 Contact Person]]
-- [[_COMMUNITY_8.1 Assessments|8.1 Assessments]]
 - [[_COMMUNITY_sanitizeText.ts|sanitizeText.ts]]
-- [[_COMMUNITY_Boolean|Boolean]]
-- [[_COMMUNITY_MeasuredQualitiesRepository|MeasuredQualitiesRepository]]
 - [[_COMMUNITY_.getAbbreviation|.getAbbreviation]]
 - [[_COMMUNITY_CsvReader|CsvReader]]
 - [[_COMMUNITY_ReportGenerateEventTest|ReportGenerateEventTest]]
@@ -725,11 +719,8 @@
 - [[_COMMUNITY_Account.tsx|Account.tsx]]
 - [[_COMMUNITY_Settings.tsx|Settings.tsx]]
 - [[_COMMUNITY_BatchGoogle.tsx|BatchGoogle.tsx]]
-- [[_COMMUNITY_SectionMappingStep.tsx|SectionMappingStep.tsx]]
 - [[_COMMUNITY_getDashboardDataFromCache|getDashboardDataFromCache]]
 - [[_COMMUNITY_NavigatorRadarChart.tsx|NavigatorRadarChart.tsx]]
-- [[_COMMUNITY_Long|Long]]
-- [[_COMMUNITY_.recordDeny|.recordDeny]]
 - [[_COMMUNITY_React + TypeScript + Vite|React + TypeScript + Vite]]
 - [[_COMMUNITY_cache-assessment.sh|cache-assessment.sh]]
 - [[_COMMUNITY_QuestionNavigationGrid.tsx|QuestionNavigationGrid.tsx]]
@@ -741,13 +732,11 @@
 - [[_COMMUNITY_career-navigator-school-dashboard.js|career-navigator-school-dashboard.js]]
 - [[_COMMUNITY_career-navigator-school-navigator-dashboard.js|career-navigator-school-navigator-dashboard.js]]
 - [[_COMMUNITY_SearchableMultiSelect.tsx|SearchableMultiSelect.tsx]]
-- [[_COMMUNITY_firebase.ts|firebase.ts]]
 - [[_COMMUNITY_AssignCounsellorDropdown.tsx|AssignCounsellorDropdown.tsx]]
 - [[_COMMUNITY_StudentProfileCard.tsx|StudentProfileCard.tsx]]
 - [[_COMMUNITY_PaymentStatusPageOld.tsx|PaymentStatusPageOld.tsx]]
 - [[_COMMUNITY_tsconfig.typecheck.json|tsconfig.typecheck.json]]
 - [[_COMMUNITY_HtmlToPdfConverter|HtmlToPdfConverter]]
-- [[_COMMUNITY_from|from]]
 - [[_COMMUNITY_EngineVersions|EngineVersions]]
 - [[_COMMUNITY_branchData|branchData]]
 - [[_COMMUNITY_tsconfig.json|tsconfig.json]]
@@ -766,7 +755,6 @@
 - [[_COMMUNITY_merge-dump.sh|merge-dump.sh]]
 - [[_COMMUNITY_db-backup.sh|db-backup.sh]]
 - [[_COMMUNITY_mysql-backup.sh|mysql-backup.sh]]
-- [[_COMMUNITY_.getPasswordHash|.getPasswordHash]]
 - [[_COMMUNITY_UserTempData.java|UserTempData.java]]
 - [[_COMMUNITY_RoleRoleGroupMappingRespositoryImpl.java|RoleRoleGroupMappingRespositoryImpl.java]]
 - [[_COMMUNITY_sync-master-to-staging.sh|sync-master-to-staging.sh]]
@@ -775,16 +763,16 @@
 - [[_COMMUNITY_isTeamsLink|isTeamsLink]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `CounsellingAppointment` - 274 edges
-2. `NavigatorReportData` - 246 edges
-3. `Student` - 236 edges
-4. `ResourceNotFoundException` - 182 edges
-5. `toAbsoluteUrl()` - 163 edges
-6. `UserPrincipal` - 159 edges
-7. `PaymentTransaction` - 152 edges
-8. `UserStudentRepository` - 148 edges
-9. `CheckRegistrationFeild` - 143 edges
-10. `showErrorToast()` - 137 edges
+1. `Table` - 332 edges
+2. `CounsellingAppointment` - 269 edges
+3. `NavigatorReportData` - 246 edges
+4. `Student` - 236 edges
+5. `ResourceNotFoundException` - 182 edges
+6. `toAbsoluteUrl()` - 163 edges
+7. `UserPrincipal` - 159 edges
+8. `PaymentTransaction` - 152 edges
+9. `UserStudentRepository` - 150 edges
+10. `CheckRegistrationFeild` - 143 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `wa()` --calls--> `c()`  [INFERRED]
@@ -795,38 +783,37 @@
   career-nine-assessment/autofill-extension/content.js → react-social/src/app/pages/StudentDashboard/student-portal/StudentNavigator360Page.tsx
 - `b()` --indirect_call--> `g()`  [INFERRED]
   career-nine-assessment/public/mediapipe/face_mesh/face_mesh.js → react-social/public/chart.umd.min.js
-- `draw()` --indirect_call--> `b()`  [INFERRED]
+- `Ai()` --indirect_call--> `c()`  [INFERRED]
   react-social/public/chart.umd.min.js → career-nine-assessment/public/mediapipe/face_mesh/face_mesh.js
 
 ## Import Cycles
-- 3-file cycle: `career-nine-assessment/src/App.tsx -> career-nine-assessment/src/contexts/DataContext.tsx -> career-nine-assessment/src/firebase.ts -> career-nine-assessment/src/App.tsx`
-- 5-file cycle: `career-nine-assessment/src/App.tsx -> career-nine-assessment/src/pages/SectionQuestionPage.tsx -> career-nine-assessment/src/games/AssessmentGameWrapper.tsx -> career-nine-assessment/src/contexts/DataContext.tsx -> career-nine-assessment/src/firebase.ts -> career-nine-assessment/src/App.tsx`
+- None detected.
 
-## Communities (790 total, 51 thin omitted)
+## Communities (778 total, 54 thin omitted)
 
 ### Community 0 - "index.ts"
 Cohesion: 0.02
-Nodes (158): AccountHeader(), accountBreadCrumbs, Overview(), Settings(), chatBreadCrumbs, Drawer(), Group(), Private() (+150 more)
+Nodes (125): AccountHeader(), Group(), Private(), Error401(), Error404(), Error500(), ProfileHeader(), CounsellorAuthPage() (+117 more)
 
 ### Community 1 - "lookups.ts"
 Cohesion: 0.02
-Nodes (120): lookupKeys, LookupOptions, useMeasuredQualityTypes(), useQuestionSections(), useTools(), CreateQuestionData(), DeleteQuestionData(), ExportQuestionsToExcel() (+112 more)
+Nodes (115): lookupKeys, LookupOptions, useMeasuredQualityTypes(), useQuestionSections(), useTools(), CreateQuestionData(), DeleteQuestionData(), ExportQuestionsToExcel() (+107 more)
 
 ### Community 2 - "Student"
 Cohesion: 0.02
-Nodes (8): ArrayList, Boolean, Category, Entity, Integer, String, Table, Student
+Nodes (7): ArrayList, Boolean, Category, Entity, Integer, String, Student
 
 ### Community 3 - "StudentInfo_APIs.ts"
 Cohesion: 0.02
-Nodes (143): ActionIcon(), SearchableSelect(), SearchableSelectProps, useAssessmentsForInstitute(), useInstitutes(), getAssessmentSummariesByInstitute(), getScopedAssessmentSummariesByInstitute(), CampaignEditPage() (+135 more)
+Nodes (144): ActionIcon(), ActionIconButton(), BtnProps, ICON_MAP, IconSpec, mapToBootstrapVariant(), Props, SIZE_MAP (+136 more)
 
 ### Community 4 - "chart.umd.min.js"
 Cohesion: 0.02
-Nodes (114): M(), __webgl_enable_ANGLE_instanced_arrays(), __webgl_enable_ANGLE_instanced_arrays(), Aa(), add(), addBox(), addControllers(), addElements() (+106 more)
+Nodes (107): M(), __webgl_enable_ANGLE_instanced_arrays(), __webgl_enable_ANGLE_instanced_arrays(), Aa(), add(), addBox(), addControllers(), addElements() (+99 more)
 
 ### Community 5 - "Faculty"
-Cohesion: 0.02
-Nodes (36): FacultyContoller, ArrayList, Boolean, GetMapping, HttpServletResponse, Map, PostMapping, PreAuthorize (+28 more)
+Cohesion: 0.04
+Nodes (27): FacultyContoller, ArrayList, Boolean, GetMapping, HttpServletResponse, Map, PostMapping, PreAuthorize (+19 more)
 
 ### Community 6 - "face_mesh_solution_simd_wasm_bin.js"
 Cohesion: 0.02
@@ -838,243 +825,243 @@ Nodes (62): _atexit(), callUserCallback(), ___cxa_atexit(), ___cxa_thread_atexit
 
 ### Community 8 - "index.ts"
 Cohesion: 0.03
-Nodes (71): CookieComponent, defaultDrawerOptions, DrawerOptions, defaultFeedbackOptions, FeedbackOptions, defaultImageInputOptions, defaultImageInputQueires, IImageInputOptions (+63 more)
+Nodes (69): CookieComponent, defaultDrawerOptions, DrawerOptions, defaultFeedbackOptions, FeedbackOptions, defaultImageInputOptions, defaultImageInputQueires, IImageInputOptions (+61 more)
 
 ### Community 9 - "CheckRegistrationFeild"
 Cohesion: 0.01
-Nodes (8): CheckRegistrationFeild, ArrayList, Entity, String, Table, CheckRegistrationFeildRepository, Integer, Repository
+Nodes (7): CheckRegistrationFeild, ArrayList, Entity, String, CheckRegistrationFeildRepository, Integer, Repository
 
 ### Community 10 - "CounsellingAppointment"
-Cohesion: 0.03
-Nodes (30): CounsellingAppointment, Boolean, CounsellingSlot, Counsellor, Entity, Integer, JsonIgnoreProperties, LocalDateTime (+22 more)
+Cohesion: 0.07
+Nodes (24): Override, CounsellingNotificationService, AffectedSession, Async, Counsellor, DateTimeFormatter, Logger, Service (+16 more)
 
 ### Community 11 - "CounsellingSlot"
-Cohesion: 0.04
-Nodes (62): CounsellingSlotController, CounsellingSlot, DeleteMapping, GetMapping, Integer, LocalDate, LocalTime, Logger (+54 more)
+Cohesion: 0.07
+Nodes (39): CounsellingSlotController, CounsellingSlot, DeleteMapping, GetMapping, Integer, LocalDate, Logger, Long (+31 more)
 
 ### Community 12 - ".get"
-Cohesion: 0.05
-Nodes (42): Caching, AssessmentTableController, AssessmentSummary, Cacheable, DeleteMapping, GetMapping, HashMap, Integer (+34 more)
+Cohesion: 0.15
+Nodes (22): AssessmentTableController, Cacheable, DeleteMapping, GetMapping, HashMap, Integer, Logger, Long (+14 more)
 
 ### Community 13 - "NavigatorReportData"
-Cohesion: 0.04
-Nodes (3): String, NavigatorReportData, NavigatorReportData
+Cohesion: 0.03
+Nodes (6): NavigatorReportData, Long, String, NavigatorReportData, NavigatorReportData, NavigatorReportData
 
 ### Community 14 - ".equals"
-Cohesion: 0.04
-Nodes (52): BadRequestException, String, Throwable, Object, String, ResourceNotFoundException, Long, BookingContact (+44 more)
+Cohesion: 0.03
+Nodes (59): RuntimeException, BadRequestException, String, Throwable, DuplicateResourceException, String, Throwable, Object (+51 more)
 
 ### Community 15 - ".isEmpty"
-Cohesion: 0.10
-Nodes (15): CounsellingEmailHtml, String, Row, CounsellingNotificationService, AffectedSession, Async, Counsellor, Row (+7 more)
+Cohesion: 0.13
+Nodes (25): AccountMails, String, CounsellingMails, Row, String, Session, EntitlementMails, String (+17 more)
 
 ### Community 16 - "AssessmentMapping_APIs.ts"
 Cohesion: 0.03
 Nodes (88): AssessmentInstituteMapping, AssessmentMappingTier, AssessmentStudentInvite, createAssessmentMapping(), createStudentInvite(), createTier(), deleteAssessmentMapping(), deleteCatalog() (+80 more)
 
 ### Community 17 - "zs"
-Cohesion: 0.03
-Nodes (31): apply(), buildTicks(), _calculateBarValuePixels(), configure(), ct(), d(), determineDataLimits(), Es() (+23 more)
+Cohesion: 0.05
+Nodes (13): ct(), d(), Es(), _exec(), getPixelForTick(), Is(), L(), ln() (+5 more)
 
 ### Community 18 - "StudentEntitlement"
-Cohesion: 0.06
-Nodes (18): Transactional, Boolean, Date, Integer, Long, StudentEntitlement, String, Transactional (+10 more)
+Cohesion: 0.12
+Nodes (12): Boolean, Transactional, EntitlementService, Date, GeneratedReport, Logger, Long, SecureRandom (+4 more)
 
 ### Community 19 - "useThemeMode"
 Cohesion: 0.03
-Nodes (83): Charts(), Mixed(), Statistics(), widgetsBreadCrumbs, DashboardAdminContent(), cssColor(), DashboardAdminContent(), DashboardRole (+75 more)
+Nodes (88): Charts(), Feeds(), Lists(), Mixed(), Statistics(), Tables(), widgetsBreadCrumbs, DashboardAdminContent() (+80 more)
 
 ### Community 20 - "face_mesh.js"
 Cohesion: 0.06
 Nodes (67): aa(), Ab(), ac(), b(), bb(), bc(), c(), cb() (+59 more)
 
 ### Community 21 - "toast.ts"
-Cohesion: 0.03
-Nodes (75): CreateSessionData(), DeleteClassData(), DeleteCollegeData(), DeleteSectionData(), DeleteSessionData(), GetDeletedInstitutes(), GetInstituteMappings(), MapContactsAndBoards() (+67 more)
+Cohesion: 0.02
+Nodes (97): CreateClassData(), CreateSectionData(), CreateSessionData(), DeleteClassData(), DeleteCollegeData(), DeleteSectionData(), DeleteSessionData(), GetDeletedInstitutes() (+89 more)
 
 ### Community 22 - "UserPrincipal"
 Cohesion: 0.05
-Nodes (37): OAuth2User, GoogleGroup, String, User, Collection, GrantedAuthority, Long, Map (+29 more)
+Nodes (36): OAuth2User, GoogleGroup, String, Collection, GrantedAuthority, Long, Map, Object (+28 more)
 
 ### Community 23 - "QueryResponseProvider.tsx"
 Cohesion: 0.05
 Nodes (78): UsersListToolbar(), UsersListFilter(), UsersListGrouping(), UsersListHeader(), UsersListSearchComponent(), UsersListLoading(), UsersListPagination(), ListViewContext (+70 more)
 
-### Community 24 - "String"
-Cohesion: 0.04
-Nodes (15): OptionData, AnswerDetail, AssessmentData, Boolean, Integer, Long, MQTScore, String (+7 more)
+### Community 25 - ".fillTemplate"
+Cohesion: 0.06
+Nodes (10): Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate, String (+2 more)
 
 ### Community 26 - "PaymentTransaction"
-Cohesion: 0.05
-Nodes (11): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+3 more)
+Cohesion: 0.03
+Nodes (51): GetMapping, Integer, Logger, Long, Map, Object, PostMapping, PreAuthorize (+43 more)
 
 ### Community 27 - "ActionIcon.tsx"
-Cohesion: 0.03
-Nodes (54): ActionIconButton(), ActionType, BtnProps, ICON_MAP, IconSpec, mapToBootstrapVariant(), Props, SIZE_MAP (+46 more)
+Cohesion: 0.02
+Nodes (75): ReadQuestionsData(), buildGroups(), OptionScore, Question, QuestionOption, similarity(), SimilarityGroup, trigrams() (+67 more)
 
 ### Community 28 - ".ok"
-Cohesion: 0.08
-Nodes (31): AssessmentInstituteMappingController, AssessmentInstituteMapping, AssessmentMappingTier, AssessmentStudentInvite, AssessmentSummary, Boolean, Date, DeleteMapping (+23 more)
+Cohesion: 0.04
+Nodes (53): AssessmentInstituteMappingController, AssessmentInstituteMapping, AssessmentMappingTier, AssessmentStudentInvite, AssessmentSummary, Boolean, Date, DeleteMapping (+45 more)
 
 ### Community 29 - ".add"
-Cohesion: 0.07
-Nodes (36): FirebaseDataMappingController, Date, DeleteMapping, EntityManager, GetMapping, Integer, Long, Map (+28 more)
+Cohesion: 0.05
+Nodes (57): JpaRepository, ApplicationArguments, Component, Logger, Order, Override, StudentProvisioningBackfillRunner, FirebaseDataMappingController (+49 more)
 
 ### Community 30 - "AssessmentProctoringQuestionLog"
-Cohesion: 0.05
-Nodes (38): AssessmentProctoringController, Cell, GetMapping, HttpServletResponse, Logger, Long, Map, Object (+30 more)
+Cohesion: 0.10
+Nodes (13): Map, PostMapping, AssessmentProctoringQuestionLog, Double, Entity, Integer, JsonIgnoreProperties, LocalDateTime (+5 more)
 
 ### Community 31 - "ReportsHubPage.tsx"
-Cohesion: 0.04
-Nodes (72): badge, downloadNavigatorReport(), exportAssessmentDataExcel(), exportGeneralAssessmentExcel(), exportGeneralAssessmentExcelForStudent(), exportNavigatorReportExcel(), exportPsychometricProperties(), generateNavigatorHtmlReports() (+64 more)
+Cohesion: 0.02
+Nodes (105): getAssessmentSummariesByInstitute(), Institute, ManageStudentsPage(), badge, getStudentsByInstitute(), ManagedStudent, sendBookingLink(), setCounsellingAllowed() (+97 more)
 
 ### Community 32 - "useAuth"
-Cohesion: 0.04
-Nodes (64): Cta, ctaFor(), inferPersona(), PermissionDeniedPage(), Persona, Can(), CanProps, DOB_DAYS (+56 more)
+Cohesion: 0.03
+Nodes (85): Cta, ctaFor(), inferPersona(), PermissionDeniedPage(), Persona, Can(), CanProps, DOB_DAYS (+77 more)
 
 ### Community 33 - "ReportCenterPage.tsx"
-Cohesion: 0.03
-Nodes (59): getCatalogAssessmentSummaries(), Institute, ManageStudentsPage(), getStudentsByInstitute(), ManagedStudent, sendBookingLink(), setCounsellingAllowed(), ReportCenterPage() (+51 more)
+Cohesion: 0.04
+Nodes (58): getCatalogAssessmentSummaries(), ReportCenterPage(), Row, SectionInfo, StudentRow, getGeneratedReportsByAssessment(), ZipItem, ZipPart (+50 more)
 
 ### Community 34 - "PromoCode"
-Cohesion: 0.05
-Nodes (41): DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize, PutMapping (+33 more)
+Cohesion: 0.10
+Nodes (12): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, String (+4 more)
 
 ### Community 35 - "SchoolRegistrationController"
 Cohesion: 0.06
-Nodes (35): Date, DeleteMapping, GetMapping, Integer, Logger, Long, Map, Object (+27 more)
+Nodes (45): Date, DeleteMapping, GetMapping, Integer, Logger, Long, Map, Object (+37 more)
 
 ### Community 36 - "SchoolSession"
-Cohesion: 0.05
-Nodes (44): ArrayList, DeleteMapping, GetMapping, Integer, Map, Object, PostMapping, PreAuthorize (+36 more)
+Cohesion: 0.08
+Nodes (27): ArrayList, DeleteMapping, GetMapping, Integer, Map, Object, PostMapping, PreAuthorize (+19 more)
 
 ### Community 37 - "MenuComponent"
 Cohesion: 0.05
 Nodes (5): ImageInputComponent, MenuComponent, ToggleComponent, slide(), slideDown()
 
 ### Community 38 - "AppointmentAPI.ts"
-Cohesion: 0.04
-Nodes (57): Pending, Props, RowNotice, notifyBoth(), adminCancelAppointment(), assignCounsellor(), cancelAppointment(), confirmAppointment() (+49 more)
+Cohesion: 0.03
+Nodes (60): Pending, Props, RowNotice, notifyBoth(), adminCancelAppointment(), assignCounsellor(), cancelAppointment(), confirmAppointment() (+52 more)
 
 ### Community 39 - "os"
 Cohesion: 0.04
-Nodes (28): T(), as(), _calculateBarIndexPixels(), getLabelAndValue(), getLabelForValue(), getMaxOverflow(), _getRuler(), _getStackCount() (+20 more)
+Nodes (21): _calculateBarIndexPixels(), getLabelAndValue(), getLabelForValue(), _getRuler(), _getStackCount(), _getStackIndex(), _getStacks(), ks() (+13 more)
 
 ### Community 40 - "index.ts"
-Cohesion: 0.05
-Nodes (52): UsersListWrapper(), usersBreadcrumbs, profileSubmenu, BuilderPage(), KTCard(), Props, KTCardBody(), Props (+44 more)
+Cohesion: 0.03
+Nodes (82): chatBreadCrumbs, Drawer(), UsersListWrapper(), usersBreadcrumbs, profileSubmenu, BuilderPage(), KTCard(), Props (+74 more)
 
 ### Community 41 - "UserRoleScope"
-Cohesion: 0.06
-Nodes (37): AssignmentDto, Boolean, GetMapping, Integer, Long, Map, PostMapping, PreAuthorize (+29 more)
+Cohesion: 0.15
+Nodes (19): AssignmentDto, Boolean, GetMapping, Integer, Long, Map, PostMapping, PreAuthorize (+11 more)
 
 ### Community 42 - "UserRoleGroupMapping"
-Cohesion: 0.05
-Nodes (40): Boolean, Entity, Long, String, Table, RoleGroup, ArrayList, Boolean (+32 more)
+Cohesion: 0.08
+Nodes (21): GetMapping, Long, Map, Optional, PostMapping, PreAuthorize, RestController, String (+13 more)
 
 ### Community 43 - "SendReportsPage.tsx"
 Cohesion: 0.03
-Nodes (54): useRoles(), Role, crudApiModal, DeleteRoleData(), readRoleData(), upsertRoleData(), RolePage(), roleValidation (+46 more)
+Nodes (56): useRoles(), Role, crudApiModal, DeleteRoleData(), readRoleData(), upsertRoleData(), RolePage(), roleValidation (+48 more)
 
 ### Community 44 - "CodingQuestion"
-Cohesion: 0.05
-Nodes (32): CodingQuestionController, CrossOrigin, GetMapping, PostMapping, PreAuthorize, RequestMapping, RestController, CodingAttempts (+24 more)
+Cohesion: 0.13
+Nodes (4): CodingQuestion, Entity, String, Topic
 
 ### Community 45 - "GeneralAssessmentResult"
-Cohesion: 0.05
-Nodes (8): GeneralAssessmentResult, Entity, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, String, Table
+Cohesion: 0.06
+Nodes (3): GeneralAssessmentResult, Long, String
 
 ### Community 46 - "CounsellorAvailabilityPanel.tsx"
-Cohesion: 0.04
-Nodes (52): CounsellingNotificationsPage(), DEFAULT_CONFIG, TYPE_CONFIG, bookSlot(), rescheduleAppointment(), approveBlockRequest(), BlockDateRequest, getBlockRequestsByCounsellor() (+44 more)
+Cohesion: 0.05
+Nodes (48): CounsellingNotificationsPage(), DEFAULT_CONFIG, TYPE_CONFIG, Counsellor, CounsellorManagementPage(), getCounsellorId(), SlotData, SlotsSection() (+40 more)
 
 ### Community 47 - "EmailDispatchService"
-Cohesion: 0.06
-Nodes (33): EmailController, MultipartFile, PostMapping, PreAuthorize, ResponseEntity, RestController, String, EmailSendRequest (+25 more)
+Cohesion: 0.04
+Nodes (39): EmailController, MultipartFile, PostMapping, PreAuthorize, ResponseEntity, RestController, String, EmailDeliveryMode (+31 more)
 
 ### Community 48 - ".findFirstByUserStudentUserStudentIdAndAssessmentId"
-Cohesion: 0.10
-Nodes (22): AssessmentAnswerController, Date, GetMapping, HttpServletRequest, Integer, Logger, Long, Map (+14 more)
+Cohesion: 0.04
+Nodes (73): SuppressWarnings, Map, String, CounsellorAssessmentAssignmentController, DeleteMapping, GetMapping, Logger, Long (+65 more)
 
 ### Community 49 - "ShortLink"
 Cohesion: 0.06
-Nodes (35): GetMapping, Logger, ResponseEntity, RestController, String, ShortLinkController, Entity, Integer (+27 more)
+Nodes (34): GetMapping, Logger, ResponseEntity, RestController, String, ShortLinkController, Entity, Integer (+26 more)
 
 ### Community 50 - "AssessmentSubmissionFailure"
-Cohesion: 0.06
-Nodes (31): EventListener, AssessmentSubmissionFailure, Boolean, Entity, Instant, Integer, Long, PrePersist (+23 more)
+Cohesion: 0.02
+Nodes (88): EventListener, AssessmentAnswerController, Date, GetMapping, HttpServletRequest, Integer, Logger, Long (+80 more)
 
 ### Community 51 - ".body"
-Cohesion: 0.11
-Nodes (33): CounsellingAppointmentController, GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize (+25 more)
+Cohesion: 0.21
+Nodes (14): CounsellingAppointmentController, GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize (+6 more)
 
 ### Community 52 - "SmtpEmailRequest"
-Cohesion: 0.06
-Nodes (28): Message, MimeMessage, EmailSendException, String, Throwable, EmailAttachment, String, SmtpEmailRequest (+20 more)
+Cohesion: 0.10
+Nodes (22): MimeMessage, EmailSendException, String, Throwable, GmailApiEmailServiceImpl, Async, Gmail, Logger (+14 more)
 
 ### Community 53 - "I"
 Cohesion: 0.05
 Nodes (17): afterDatasetsUpdate(), Ce(), ea(), fs(), getController(), _getRegistryForType(), I(), ia() (+9 more)
 
 ### Community 54 - "FeedbackComponent"
-Cohesion: 0.04
-Nodes (4): FeedbackComponent, SwapperComponent, SwapperStore, ThemeMode
+Cohesion: 0.03
+Nodes (5): FeedbackComponent, StickyComponent, SwapperComponent, SwapperStore, ThemeMode
 
 ### Community 55 - "UserStudentInstituteHistory"
-Cohesion: 0.07
-Nodes (34): GetMapping, Integer, Long, Map, Object, PostMapping, PreAuthorize, ResponseEntity (+26 more)
+Cohesion: 0.08
+Nodes (33): GetMapping, Integer, Long, Map, Object, PostMapping, PreAuthorize, ResponseEntity (+25 more)
 
 ### Community 56 - "EmailSendLog"
-Cohesion: 0.05
-Nodes (35): EmailSendLogController, GetMapping, Long, Map, Object, PreAuthorize, RequestMapping, ResponseEntity (+27 more)
+Cohesion: 0.06
+Nodes (30): EmailSendLogController, GetMapping, Long, Map, Object, PreAuthorize, RequestMapping, ResponseEntity (+22 more)
 
 ### Community 57 - "PrivateRoutes.tsx"
 Cohesion: 0.03
-Nodes (45): LoginLog, getLoginLogs(), getUrlAccessLogs(), UrlAccessLog, UrlAccessModalProps, AssessmentUploadFile(), CLUSTERS, KPI_DATA (+37 more)
+Nodes (55): AssessmentUploadFile(), CLUSTERS, KPI_DATA, LEARNING_STYLES, NAV_ITEMS, NavId, NEP_ITEMS, PILLARS (+47 more)
 
 ### Community 58 - "dependencies"
 Cohesion: 0.03
 Nodes (75): dependencies, ajv, animate.css, apexcharts, axios, bootstrap-icons, chart.js, clsx (+67 more)
 
 ### Community 59 - "AssessmentSessionService"
-Cohesion: 0.08
-Nodes (27): AssessmentSessionService, Logger, Long, Map, Object, ObjectMapper, RedisTemplate, Service (+19 more)
+Cohesion: 0.11
+Nodes (17): AssessmentSessionService, Logger, Long, Map, Object, ObjectMapper, RedisTemplate, Service (+9 more)
 
 ### Community 60 - "StudentController"
 Cohesion: 0.08
-Nodes (24): ArrayList, Boolean, Category, GetMapping, HttpServletResponse, Map, Optional, PostMapping (+16 more)
+Nodes (23): ArrayList, Boolean, Category, GetMapping, HttpServletResponse, Map, Optional, PostMapping (+15 more)
 
 ### Community 61 - "AuthController.java"
-Cohesion: 0.06
-Nodes (30): AuthenticationPrincipal, Documented, AuthController, AuthenticationManager, Date, GetMapping, HttpServletRequest, HttpServletResponse (+22 more)
+Cohesion: 0.07
+Nodes (24): AuthController, AuthenticationManager, Date, GetMapping, HttpServletRequest, HttpServletResponse, Logger, Map (+16 more)
 
 ### Community 62 - "BulkCounsellingAllotmentPage.tsx"
 Cohesion: 0.04
-Nodes (48): AssessmentSummary, card, CounsellorOption, errBox, resultRow, sel, statTile, tableStyle (+40 more)
+Nodes (47): AssessmentSummary, card, CounsellorOption, errBox, resultRow, sel, statTile, tableStyle (+39 more)
 
 ### Community 63 - "RefreshToken"
 Cohesion: 0.07
-Nodes (28): Entity, LocalDateTime, Long, String, Table, RefreshToken, LocalDateTime, Long (+20 more)
+Nodes (28): Entity, LocalDateTime, Long, String, RefreshToken, LocalDateTime, Long, Modifying (+20 more)
 
 ### Community 64 - "Tracker_APIs.ts"
 Cohesion: 0.05
 Nodes (42): AdminAnswersResponse, AllotmentRow, AnsweredQuestion, AnswerSelection, assignStudentInstitute(), buildParams(), checkPaymentStatus(), CheckPaymentStatusResponse (+34 more)
 
 ### Community 65 - "ReferralCodeController"
-Cohesion: 0.07
-Nodes (26): DeleteMapping, GetMapping, Integer, Long, Map, Object, PostMapping, PreAuthorize (+18 more)
+Cohesion: 0.20
+Nodes (14): DeleteMapping, GetMapping, Integer, Long, Map, Object, PostMapping, PreAuthorize (+6 more)
 
 ### Community 66 - "showErrorToast"
 Cohesion: 0.05
-Nodes (44): ReadCollegeData(), CheckLockedByQuestion(), CreateAssessmentData(), GetDeletedAssessments(), LockAssessment(), PermanentDeleteAssessment(), ReadAssessmentByIdData(), ReadAssessmentList() (+36 more)
+Nodes (38): CreateAssessmentData(), GetDeletedAssessments(), LockAssessment(), PermanentDeleteAssessment(), ReadAssessmentByIdData(), ReadAssessmentList(), ReadQuestionnaireByAssessmentId(), RestoreAssessment() (+30 more)
 
 ### Community 67 - "AssessmentAnswer"
 Cohesion: 0.07
-Nodes (29): AssessmentAnswer, Entity, Integer, JsonIgnoreProperties, Long, String, Table, AssessmentAnswerRepository (+21 more)
+Nodes (30): AssessmentAnswer, Entity, Integer, JsonIgnoreProperties, Long, String, AssessmentAnswerRepository, ArrayList (+22 more)
 
 ### Community 68 - "OAuth2UserInfo"
-Cohesion: 0.05
-Nodes (34): AuthenticationException, DefaultOAuth2UserService, OAuth2UserRequest, String, Throwable, OAuth2AuthenticationProcessingException, CustomOAuth2UserService, OAuth2User (+26 more)
+Cohesion: 0.13
+Nodes (15): AuthenticationException, DefaultOAuth2UserService, OAuth2UserRequest, String, Throwable, OAuth2AuthenticationProcessingException, CustomOAuth2UserService, OAuth2User (+7 more)
 
 ### Community 69 - "CampaignEditPage.tsx"
 Cohesion: 0.05
@@ -1093,36 +1080,36 @@ Cohesion: 0.11
 Nodes (17): BetReportDataController, BiFunction, DeleteMapping, GetMapping, Integer, Long, Map, Object (+9 more)
 
 ### Community 74 - ".compare"
-Cohesion: 0.07
-Nodes (29): CareerSuggestionController, GetMapping, Long, Map, Object, PreAuthorize, RequestMapping, ResponseEntity (+21 more)
+Cohesion: 0.05
+Nodes (37): CareerSuggestionController, GetMapping, Long, Map, Object, PreAuthorize, RequestMapping, ResponseEntity (+29 more)
 
 ### Community 75 - "PermissionRepository"
-Cohesion: 0.06
-Nodes (39): GetMapping, Permission, PreAuthorize, ResponseEntity, RestController, PermissionController, DeleteMapping, GetMapping (+31 more)
+Cohesion: 0.14
+Nodes (21): DeleteMapping, GetMapping, Integer, Map, Optional, PreAuthorize, PutMapping, ResponseEntity (+13 more)
 
 ### Community 76 - "Counsellor"
-Cohesion: 0.07
-Nodes (6): Counsellor, Integer, LocalDateTime, Long, String, User
+Cohesion: 0.05
+Nodes (19): Counsellor, Boolean, Entity, Integer, JsonIgnore, JsonIgnoreProperties, JsonProperty, LocalDateTime (+11 more)
 
 ### Community 77 - "SchoolReport"
-Cohesion: 0.06
-Nodes (18): Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate, String (+10 more)
+Cohesion: 0.10
+Nodes (8): Date, Entity, JsonIgnoreProperties, Long, PrePersist, PreUpdate, String, SchoolReport
 
 ### Community 78 - "FileMetadata"
-Cohesion: 0.06
-Nodes (30): FileMetadata, Entity, Long, String, Table, FileDataModal, Object, String (+22 more)
+Cohesion: 0.07
+Nodes (29): ByteArrayResource, GetMapping, Map, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController (+21 more)
 
 ### Community 79 - "CampaignPublicController"
-Cohesion: 0.10
-Nodes (28): CampaignPublicController, Campaign, CampaignAssessmentTier, Date, GetMapping, HttpServletResponse, Integer, Logger (+20 more)
+Cohesion: 0.05
+Nodes (48): CampaignPublicController, Campaign, CampaignAssessmentTier, Date, GetMapping, HttpServletResponse, Integer, Logger (+40 more)
 
 ### Community 80 - "CounsellorRepository"
-Cohesion: 0.07
-Nodes (38): BlockDateRequestController, BlockDateRequest, GetMapping, Logger, Long, Map, Object, PostMapping (+30 more)
+Cohesion: 0.09
+Nodes (30): BlockDateRequestController, BlockDateRequest, GetMapping, Logger, Long, Map, Object, PostMapping (+22 more)
 
 ### Community 81 - "InstituteBatchGoogleGroup"
-Cohesion: 0.06
-Nodes (31): GoogleGroupsController, GetMapping, Map, PostMapping, PreAuthorize, RestController, String, InstituteBatchGoogleGroup (+23 more)
+Cohesion: 0.04
+Nodes (43): GoogleGroupsController, GetMapping, Map, PostMapping, PreAuthorize, RestController, String, InstituteBatchGoogleGroup (+35 more)
 
 ### Community 82 - "SchoolReportService"
 Cohesion: 0.11
@@ -1130,95 +1117,95 @@ Nodes (24): ClusterRow, IntelligenceRow, Predicate, CareerGapSheet, LearningStyl
 
 ### Community 83 - "PrincipalDashboardData"
 Cohesion: 0.06
-Nodes (11): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+3 more)
+Nodes (10): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+2 more)
 
 ### Community 84 - "DashboardDataService"
-Cohesion: 0.09
-Nodes (27): AccessScope, Integer, Set, Rule, AccessScopeJpqlBuilder, Fields, Map, Object (+19 more)
+Cohesion: 0.14
+Nodes (20): Object, CallableSafe, DashboardDataService, Class, Counsellor, Duration, EntityManager, GeneratedReport (+12 more)
 
 ### Community 85 - ".put"
-Cohesion: 0.13
-Nodes (17): DashboardService, Long, Map, Object, Service, String, Long, Map (+9 more)
+Cohesion: 0.31
+Nodes (6): DashboardService, Long, Map, Object, Service, String
 
 ### Community 86 - "AppRoutes.tsx"
-Cohesion: 0.04
-Nodes (37): App(), Error404(), Error500(), ErrorBoundary, Props, State, ErrorsPage(), ThankYouPage() (+29 more)
+Cohesion: 0.05
+Nodes (32): App(), AuthInit(), ErrorsPage(), ThankYouPage(), studnetSchema, UniRollNoUpdate(), ClassRoomPage, FacultyReFillFormPage (+24 more)
 
 ### Community 87 - "ReportGenerationLog"
 Cohesion: 0.07
-Nodes (18): Date, Entity, Long, PrePersist, String, Table, ReportGenerationLog, Collection (+10 more)
+Nodes (17): Date, Entity, Long, PrePersist, String, ReportGenerationLog, Collection, Long (+9 more)
 
 ### Community 88 - "ServiceDeliveryLog"
-Cohesion: 0.06
-Nodes (17): Date, Entity, JsonIgnoreProperties, Long, PrePersist, String, Table, ServiceDeliveryLog (+9 more)
+Cohesion: 0.07
+Nodes (11): Date, Entity, JsonIgnoreProperties, Long, PrePersist, String, ServiceDeliveryLog, Long (+3 more)
 
 ### Community 89 - "assessmentMappingAPI.ts"
-Cohesion: 0.06
-Nodes (41): getInviteInfoByToken(), getMappingInfoByToken(), getUpgradeInfo(), InviteInfo, MappingClass, MappingInclusions, MappingInfo, MappingSection (+33 more)
+Cohesion: 0.05
+Nodes (50): getInviteInfoByToken(), InviteInfo, MappingInfo, registerInviteByToken(), bookCounsellingSlot(), getCampaignInfoByAssessment(), getCampaignInfoBySlug(), getCampaignInfoByTier() (+42 more)
 
 ### Community 90 - "CommunicationLog"
 Cohesion: 0.07
-Nodes (28): CommunicationLogController, GetMapping, LocalDateTime, Page, PreAuthorize, RequestMapping, ResponseEntity, RestController (+20 more)
+Nodes (27): CommunicationLogController, GetMapping, LocalDateTime, Page, PreAuthorize, RequestMapping, ResponseEntity, RestController (+19 more)
 
 ### Community 91 - "ReferralCode"
-Cohesion: 0.06
-Nodes (24): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, String (+16 more)
+Cohesion: 0.10
+Nodes (9): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, String (+1 more)
 
 ### Community 92 - "SessionSummary"
-Cohesion: 0.08
-Nodes (17): Long, Notification, CounsellorSessionAdminService, LocalDate, LocalTime, Long, Service, String (+9 more)
+Cohesion: 0.09
+Nodes (15): CounsellorSessionAdminService, LocalDate, LocalTime, Long, Service, String, Transactional, MailOutcome (+7 more)
 
 ### Community 93 - "throwBindingError"
 Cohesion: 0.08
 Nodes (59): $a(), constNoSmartPtrRawPointerToWireType(), craftInvokerFunction(), createNamedFunction(), __embind_create_inheriting_constructor(), __embind_finalize_value_object(), __embind_register_bool(), __embind_register_class() (+51 more)
 
 ### Community 94 - "TokenProvider"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (22): Claims, Jws, Key, Authentication, Integer, Logger, Long, Object (+14 more)
 
 ### Community 95 - "BetReportData"
-Cohesion: 0.10
-Nodes (10): BetReportData, BetReportData, Date, Entity, JsonIgnoreProperties, Long, PrePersist, String (+2 more)
+Cohesion: 0.08
+Nodes (16): BetReportData, BetReportData, Date, Entity, JsonIgnoreProperties, Long, PrePersist, String (+8 more)
 
 ### Community 96 - "StudentCounsellorMapping"
-Cohesion: 0.07
-Nodes (29): GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize, PutMapping (+21 more)
+Cohesion: 0.06
+Nodes (32): GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize, PutMapping (+24 more)
 
 ### Community 97 - "StudentAssessmentMappingRepository"
-Cohesion: 0.07
-Nodes (23): Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, String, Table (+15 more)
+Cohesion: 0.11
+Nodes (20): Date, GetMapping, Integer, Long, Optional, PreAuthorize, RequestMapping, ResponseEntity (+12 more)
 
 ### Community 98 - "RoleRoleGroupMapping"
-Cohesion: 0.06
-Nodes (31): GetMapping, Long, Map, Optional, PostMapping, PreAuthorize, RestController, String (+23 more)
+Cohesion: 0.08
+Nodes (21): GetMapping, Long, Map, PostMapping, PreAuthorize, RestController, String, RoleRoleGroupMappingController (+13 more)
 
 ### Community 99 - "AssessmentMappingTier"
-Cohesion: 0.06
-Nodes (11): AssessmentMappingTier, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+3 more)
+Cohesion: 0.05
+Nodes (16): AssessmentMappingTier, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+8 more)
 
 ### Community 100 - "JwtTokenAudit"
-Cohesion: 0.07
-Nodes (18): Entity, LocalDateTime, Long, String, Table, JwtTokenAudit, TokenType, Collection (+10 more)
+Cohesion: 0.09
+Nodes (33): JwtTokenAudit, GetMapping, Long, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController (+25 more)
 
 ### Community 101 - "StudentDashboardDataService.java"
-Cohesion: 0.08
-Nodes (19): CareerMatchResult, PillarScore, String, PillarScore, StudentPortalComputedData, CareerRepository, Career, Long (+11 more)
+Cohesion: 0.09
+Nodes (14): CareerMatchResult, PillarScore, String, PillarScore, StudentPortalComputedData, Career, Long, Map (+6 more)
 
 ### Community 102 - "ReportPipelineProducer"
-Cohesion: 0.08
-Nodes (32): EmailAccountRepository, EmailAccount, Long, Optional, InstituteEmailSettingRepository, InstituteEmailSetting, Integer, Long (+24 more)
+Cohesion: 0.12
+Nodes (18): EmailAccountRepository, EmailAccount, Long, Optional, Component, Integer, KafkaTemplate, Logger (+10 more)
 
 ### Community 103 - "throwBindingError"
-Cohesion: 0.08
-Nodes (57): constNoSmartPtrRawPointerToWireType(), craftInvokerFunction(), createNamedFunction(), __embind_create_inheriting_constructor(), __embind_finalize_value_object(), __embind_register_bool(), __embind_register_class(), __embind_register_class_class_function() (+49 more)
+Cohesion: 0.10
+Nodes (40): craftInvokerFunction(), createNamedFunction(), __embind_finalize_value_object(), __embind_register_bool(), __embind_register_class(), __embind_register_class_class_function(), __embind_register_class_constructor(), __embind_register_class_function() (+32 more)
 
 ### Community 104 - "showSuccessToast"
-Cohesion: 0.08
-Nodes (40): addReminderSuppression(), getReminderConfig(), getReminderLog(), getReminderStats(), getTemplateTokens(), listReminderConfigs(), listReminderSuppressions(), previewManualReminder() (+32 more)
+Cohesion: 0.06
+Nodes (44): ErrorBoundary, Props, State, renderPage(), addReminderSuppression(), getReminderConfig(), getReminderLog(), getReminderStats() (+36 more)
 
 ### Community 105 - "CounsellingActivityLog"
-Cohesion: 0.07
-Nodes (29): CounsellingActivityLogController, GetMapping, Long, Map, PreAuthorize, PutMapping, RequestMapping, ResponseEntity (+21 more)
+Cohesion: 0.06
+Nodes (30): CounsellingActivityLogController, GetMapping, Long, Map, PreAuthorize, PutMapping, RequestMapping, ResponseEntity (+22 more)
 
 ### Community 106 - ".fix"
 Cohesion: 0.07
@@ -1233,140 +1220,140 @@ Cohesion: 0.04
 Nodes (21): AssessmentBreakdownCard(), AssessmentReportDrilldown(), COUNSELLING_ACTIVE_STATUSES, CounsellingDrillDownCard(), CounsellorLeaderboardCard(), darkTheme, DashboardAdminContent(), DateRangeBar() (+13 more)
 
 ### Community 109 - "CounsellingAppointmentRepository"
-Cohesion: 0.09
-Nodes (19): CounsellingAppointmentRepository, LocalDate, LocalTime, Long, Query, Repository, String, CounsellingBookingLinkService (+11 more)
+Cohesion: 0.07
+Nodes (28): CounsellingPublicBookingController, GetMapping, RequestMapping, ResponseEntity, RestController, String, CounsellingAppointmentRepository, LocalDate (+20 more)
 
 ### Community 110 - "CounsellingPayment"
-Cohesion: 0.07
-Nodes (15): CounsellingPayment, Entity, Integer, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, PreUpdate (+7 more)
+Cohesion: 0.08
+Nodes (9): CounsellingPayment, Entity, Integer, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, PreUpdate (+1 more)
 
 ### Community 111 - "List"
-Cohesion: 0.09
-Nodes (19): CohortDimension, Integer, String, List, Date, Integer, Long, Query (+11 more)
+Cohesion: 0.11
+Nodes (20): DeleteMapping, EntityManager, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, Questionnaire (+12 more)
 
 ### Community 112 - "A"
-Cohesion: 0.06
-Nodes (17): $(), A(), bs, getPlugin(), H(), j(), ki(), ks() (+9 more)
+Cohesion: 0.13
+Nodes (8): bs, getPlugin(), ki(), removeBox(), stop(), vs(), Xi(), xs
 
 ### Community 113 - "PaymentWebhookController"
-Cohesion: 0.09
-Nodes (22): Date, GetMapping, HttpServletResponse, Integer, JSONObject, Logger, Long, Map (+14 more)
+Cohesion: 0.05
+Nodes (42): AssessmentCompletionEmailService, Logger, Service, EmailSender, GmailReportEmailSender, Component, ConditionalOnProperty, EmailAccount (+34 more)
 
 ### Community 114 - "SchoolAssessmentTier"
 Cohesion: 0.07
-Nodes (11): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+3 more)
+Nodes (10): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+2 more)
 
 ### Community 115 - "CodingPlatformProblem"
 Cohesion: 0.06
-Nodes (23): CodingPlatformProblem, Entity, String, Table, CodingProblemDiffcultyCodingProblemMapping, Entity, Table, CodingProblemDifficulty (+15 more)
+Nodes (20): CodingPlatformProblem, Entity, String, CodingProblemDiffcultyCodingProblemMapping, Entity, CodingProblemDifficulty, Entity, String (+12 more)
 
 ### Community 116 - "EmailAccountCredentials"
-Cohesion: 0.07
-Nodes (20): JavaMailSenderImpl, Bean, ConditionalOnProperty, Configuration, JavaMailSender, String, SmtpMailConfig, EmailAccountCredentials (+12 more)
+Cohesion: 0.09
+Nodes (14): JavaMailSenderImpl, EmailAccountCredentials, Boolean, Integer, JsonIgnoreProperties, ObjectMapper, String, EmailAccountCredentials (+6 more)
 
 ### Community 117 - "SessionNotes"
-Cohesion: 0.08
-Nodes (24): GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize, PutMapping (+16 more)
+Cohesion: 0.06
+Nodes (35): GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize, PutMapping (+27 more)
 
 ### Community 118 - "EmailAccountService"
-Cohesion: 0.10
-Nodes (27): EmailAccountController, DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize (+19 more)
+Cohesion: 0.18
+Nodes (14): EmailAccountForm, Boolean, EmailAccountCredentials, EmailMode, EmailProvider, String, EmailAccountService, EmailAccount (+6 more)
 
 ### Community 119 - "UserRepository"
-Cohesion: 0.08
-Nodes (26): AuthProvider, Boolean, Date, Integer, Long, Optional, Query, Repository (+18 more)
+Cohesion: 0.38
+Nodes (5): Map, Service, String, User, UserService
 
 ### Community 120 - "InstituteDetail"
-Cohesion: 0.06
-Nodes (10): InstituteDetail, Boolean, ContactPerson, Entity, Filter, Integer, PrePersist, Set (+2 more)
+Cohesion: 0.07
+Nodes (11): InstituteDetail, Boolean, ContactPerson, Entity, Filter, Integer, PrePersist, Set (+3 more)
 
 ### Community 121 - "User"
 Cohesion: 0.07
-Nodes (12): Boolean, Date, Entity, GrantedAuthority, Group, Long, Set, String (+4 more)
+Nodes (11): Boolean, Date, Entity, GrantedAuthority, Group, Long, Set, String (+3 more)
 
 ### Community 122 - "N"
 Cohesion: 0.08
 Nodes (14): afterDraw(), afterEvent(), afterUpdate(), beforeLayout(), Ci(), cn(), Di(), Fn() (+6 more)
 
 ### Community 123 - "UpcomingSessionCard.tsx"
-Cohesion: 0.06
-Nodes (41): disputeAttendance(), getSessionReportLink(), getStudentCancellationInfo(), studentCancelAppointment(), createSessionNotes(), getSessionNotes(), formatWait(), msUntilStart() (+33 more)
+Cohesion: 0.16
+Nodes (16): studentCancelAppointment(), computeTimeLeft(), CountdownTimer(), CountdownTimerProps, toEpoch(), Appointment, buildSlotDateTime(), CANCEL_REASONS (+8 more)
 
 ### Community 124 - "CounsellorInstituteMapping"
-Cohesion: 0.07
-Nodes (27): CounsellorInstituteMappingController, CounsellorInstituteMapping, DeleteMapping, GetMapping, Integer, Logger, Long, Map (+19 more)
+Cohesion: 0.11
+Nodes (11): CounsellorInstituteMapping, Boolean, Counsellor, Entity, JsonIgnoreProperties, JsonProperty, LocalDateTime, Long (+3 more)
 
 ### Community 125 - "GoogleAdminController.java"
-Cohesion: 0.08
-Nodes (17): GoogleAdminController, GetMapping, Group, Map, PostMapping, PreAuthorize, RequestMapping, RestController (+9 more)
+Cohesion: 0.11
+Nodes (15): GoogleAdminController, GetMapping, Group, Map, PostMapping, PreAuthorize, RequestMapping, RestController (+7 more)
 
 ### Community 126 - ".get"
-Cohesion: 0.15
-Nodes (16): DeleteMapping, GetMapping, Integer, Logger, Long, Map, Object, PostMapping (+8 more)
+Cohesion: 0.04
+Nodes (7): CheckFacultyRegistrationField, ArrayList, Entity, String, CheckFacultyRegistrationFieldRepository, Integer, Repository
 
 ### Community 127 - "InstituteBrandingService"
-Cohesion: 0.10
-Nodes (20): AssessmentCompletionEmailService, Logger, Service, String, Component, BrandingDto, String, InstituteBrandingService (+12 more)
+Cohesion: 0.14
+Nodes (9): BrandingDto, String, InstituteBrandingService, Integer, Long, Service, String, String (+1 more)
 
 ### Community 128 - "StudentInfo"
-Cohesion: 0.07
-Nodes (12): FilterDef, StudentInfo, Date, Entity, Filter, Integer, JsonIgnoreProperties, Long (+4 more)
+Cohesion: 0.06
+Nodes (28): FilterDef, String, StudentInfo, DeleteMapping, GetMapping, Integer, Logger, Long (+20 more)
 
 ### Community 129 - "AssessmentQuestionOptions"
 Cohesion: 0.08
-Nodes (20): AssessmentQuestionOptionsController, DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, RequestMapping (+12 more)
+Nodes (19): AssessmentQuestionOptionsController, DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, RequestMapping (+11 more)
 
 ### Community 130 - "CounsellingPlan"
-Cohesion: 0.07
-Nodes (18): CounsellingPlan, Entity, Integer, JsonIgnoreProperties, LocalDate, LocalDateTime, Long, PrePersist (+10 more)
+Cohesion: 0.09
+Nodes (10): CounsellingPlan, Entity, Integer, JsonIgnoreProperties, LocalDate, LocalDateTime, Long, PrePersist (+2 more)
 
 ### Community 131 - "UserStudentRepository"
-Cohesion: 0.07
-Nodes (30): ApplicationArguments, Component, Logger, Order, Override, StudentProvisioningBackfillRunner, Map, MultipartFile (+22 more)
+Cohesion: 0.25
+Nodes (12): Map, MultipartFile, Object, Path, PostMapping, PreAuthorize, RequestMapping, ResponseEntity (+4 more)
 
 ### Community 132 - "InstituteBranch"
-Cohesion: 0.08
-Nodes (17): InstituteBranchController, GetMapping, Map, PostMapping, PreAuthorize, RestController, String, InstituteBranch (+9 more)
+Cohesion: 0.07
+Nodes (16): InstituteBranchController, GetMapping, Map, PostMapping, PreAuthorize, RestController, String, InstituteBranch (+8 more)
 
 ### Community 133 - "OmrColumnMapping"
-Cohesion: 0.09
-Nodes (21): DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize, RequestMapping (+13 more)
+Cohesion: 0.11
+Nodes (12): Map, Object, PostMapping, String, Entity, Long, String, OmrColumnMapping (+4 more)
 
 ### Community 134 - "OAuth2AuthenticationSuccessHandler.java"
-Cohesion: 0.08
-Nodes (31): AuthorizationRequestRepository, OAuth2AuthorizationRequest, SimpleUrlAuthenticationFailureHandler, SimpleUrlAuthenticationSuccessHandler, HttpCookieOAuth2AuthorizationRequestRepository, Component, HttpServletRequest, HttpServletResponse (+23 more)
+Cohesion: 0.11
+Nodes (22): AuthorizationRequestRepository, OAuth2AuthorizationRequest, SimpleUrlAuthenticationFailureHandler, HttpCookieOAuth2AuthorizationRequestRepository, Component, HttpServletRequest, HttpServletResponse, Override (+14 more)
 
 ### Community 135 - "CampaignController"
-Cohesion: 0.15
-Nodes (18): CampaignController, Boolean, Campaign, Date, DeleteMapping, GetMapping, Integer, Long (+10 more)
+Cohesion: 0.03
+Nodes (68): CampaignController, Boolean, Campaign, Date, DeleteMapping, GetMapping, Integer, Long (+60 more)
 
 ### Community 136 - "Notification"
 Cohesion: 0.08
-Nodes (24): GetMapping, Logger, Long, Map, Notification, PreAuthorize, PutMapping, RequestMapping (+16 more)
+Nodes (23): GetMapping, Logger, Long, Map, Notification, PreAuthorize, PutMapping, RequestMapping (+15 more)
 
 ### Community 137 - "PricingTier"
 Cohesion: 0.07
-Nodes (11): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+3 more)
+Nodes (10): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+2 more)
 
 ### Community 138 - "EmailTemplateService"
-Cohesion: 0.10
-Nodes (27): EmailPlaceholder, group(), String, key(), label(), EmailTemplateForm, Boolean, EmailDeliveryMode (+19 more)
+Cohesion: 0.07
+Nodes (30): EmailPlaceholder, group(), String, key(), label(), EmailTemplateForm, Boolean, EmailDeliveryMode (+22 more)
 
 ### Community 139 - "qa"
 Cohesion: 0.06
-Nodes (12): Ya(), dt(), fa(), Fe(), ga(), label(), lt(), ma (+4 more)
+Nodes (22): Ya(), bn(), _calculateBarValuePixels(), Fe(), getBasePixel(), getPixelForValue(), getValueForPixel(), He() (+14 more)
 
 ### Community 140 - "StepperComponent"
 Cohesion: 0.07
 Nodes (12): createAccountSchemas, ICreateAccount, inits, Horizontal(), Step1(), Step2(), Step3(), Step4() (+4 more)
 
 ### Community 141 - "AssessmentRawScoreRepository"
-Cohesion: 0.09
-Nodes (16): AssessmentAdminAction, Entity, Instant, Long, String, Table, AssessmentAdminActionRepository, Long (+8 more)
+Cohesion: 0.12
+Nodes (13): Map, Service, Set, String, PlaceholderResolver, Brand, String, BrandResolver (+5 more)
 
 ### Community 142 - "SecurityConfig.java"
-Cohesion: 0.09
-Nodes (28): AntPathMatcher, AuthenticationEntryPoint, AuthenticationManagerBuilder, CorsConfigurationSource, EnableGlobalMethodSecurity, EnableWebSecurity, HeaderWriter, HttpFirewall (+20 more)
+Cohesion: 0.07
+Nodes (32): AntPathMatcher, AuthenticationEntryPoint, AuthenticationManagerBuilder, CookieCsrfTokenRepository, CorsConfigurationSource, CsrfToken, CsrfTokenRepository, EnableGlobalMethodSecurity (+24 more)
 
 ### Community 143 - "SectionQuestionPage.tsx"
 Cohesion: 0.09
@@ -1377,12 +1364,12 @@ Cohesion: 0.04
 Nodes (47): Appendix — verification method & confidence, Career9 B2B Flow — Functional Issues (Audit), Compact flow context (for a cold start), [CONFIRMED] A1 · MED — Promo `currentUses` consumed before payment/dedupe outcome and never refunded → `maxUses` exhausted with zero redemptions, [CONFIRMED] A2 · MED — Promo `currentUses` increment is a non-atomic read-modify-write → lost update lets `maxUses` be exceeded, [CONFIRMED] A4 · HIGH — Public register never cancels prior `created` links → multiple simultaneously-payable, stale-price links, [CONFIRMED] B1 · MED — `verify-details` matches by phone OR email but `register` dedups by email-then-(DOB+class+name), [CONFIRMED] B2 · MED — `parseClassNumber` NPEs on null `className` and falls back to the raw PK as the class number (+39 more)
 
 ### Community 145 - "Cookie"
-Cohesion: 0.07
-Nodes (16): bootstrap, AppProperties, Auth, Bootstrap, Cookie, ConfigurationProperties, String, OAuth2 (+8 more)
+Cohesion: 0.06
+Nodes (25): bootstrap, SimpleUrlAuthenticationSuccessHandler, AppProperties, Auth, Bootstrap, Cookie, ConfigurationProperties, String (+17 more)
 
 ### Community 146 - "CohortInsightGenerationService"
-Cohesion: 0.07
-Nodes (31): CohortInsightController, GetMapping, Integer, Long, PostMapping, PreAuthorize, RequestMapping, ResponseEntity (+23 more)
+Cohesion: 0.12
+Nodes (16): CohortInsightAggregator, CohortInsightPayload, Long, Navigator360Result, String, CohortInsightGenerationService, Async, Logger (+8 more)
 
 ### Community 147 - "ApiErrorResponse"
 Cohesion: 0.12
@@ -1390,162 +1377,162 @@ Nodes (19): AccessDeniedException, ClientAbortException, HttpMessageNotReadableE
 
 ### Community 148 - "PrincipalDashboardReleaseLog"
 Cohesion: 0.09
-Nodes (21): uniqueBy(), dedupeScopes(), Date, Entity, Long, String, Table, PrincipalDashboardReleaseLog (+13 more)
+Nodes (20): uniqueBy(), dedupeScopes(), Date, Entity, Long, String, PrincipalDashboardReleaseLog, Long (+12 more)
 
 ### Community 149 - "InstituteSession"
 Cohesion: 0.08
-Nodes (18): InstituteSessionController, GetMapping, Map, Optional, PostMapping, PreAuthorize, RestController, String (+10 more)
+Nodes (17): InstituteSessionController, GetMapping, Map, Optional, PostMapping, PreAuthorize, RestController, String (+9 more)
 
 ### Community 150 - "CampaignAssessmentMapping"
-Cohesion: 0.08
-Nodes (15): CampaignAssessmentMapping, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+7 more)
+Cohesion: 0.09
+Nodes (10): CampaignAssessmentMapping, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+2 more)
 
 ### Community 151 - "AppointmentAuditLog"
 Cohesion: 0.08
-Nodes (22): AppointmentAuditLog, Entity, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, String, Table (+14 more)
+Nodes (21): AppointmentAuditLog, Entity, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, String, User (+13 more)
 
 ### Community 152 - "ReminderDeliveryLog"
 Cohesion: 0.08
-Nodes (11): Date, Entity, Integer, Long, PrePersist, ReminderDeliveryStatus, ReminderServiceType, ReminderTriggerSource (+3 more)
+Nodes (10): Date, Entity, Integer, Long, PrePersist, ReminderDeliveryStatus, ReminderServiceType, ReminderTriggerSource (+2 more)
 
 ### Community 153 - "AssessmentMappingTierRepository"
 Cohesion: 0.09
-Nodes (23): AssessmentMappingTierRepository, AssessmentMappingTier, Boolean, Long, Modifying, Optional, Query, Repository (+15 more)
+Nodes (9): Caching, AssessmentTable, Boolean, Entity, Filter, Integer, Long, Questionnaire (+1 more)
 
 ### Community 154 - "http.ts"
-Cohesion: 0.08
-Nodes (27): PUBLIC_ENDPOINT_PATTERNS, resetAuthState(), setCookieAuthRuntimeActive(), useAssessment(), HeartbeatOptions, useHeartbeat(), usePreventReload(), AllottedAssessmentPage() (+19 more)
+Cohesion: 0.06
+Nodes (41): PUBLIC_ENDPOINT_PATTERNS, resetAuthState(), setCookieAuthRuntimeActive(), getActiveCacheName(), AssessmentContext, AssessmentContextType, AssessmentProvider(), loadAssessmentById() (+33 more)
 
 ### Community 155 - "QuestionnaireQuestionRepository"
-Cohesion: 0.08
-Nodes (21): Date, GetMapping, Integer, Long, Optional, PreAuthorize, RequestMapping, ResponseEntity (+13 more)
+Cohesion: 0.18
+Nodes (10): AssessmentProctoringQuestionLogRepository, Long, Query, Async, Logger, ObjectMapper, Scheduled, Service (+2 more)
 
 ### Community 156 - "Group"
-Cohesion: 0.08
-Nodes (23): GroupController, GetMapping, Group, PreAuthorize, RestController, Group, Entity, Set (+15 more)
+Cohesion: 0.23
+Nodes (8): GoogleGroupHandler, Directory, String, GoogleGroupHandlerImpl, Directory, Override, Service, String
 
 ### Community 157 - "InstituteBatch"
-Cohesion: 0.08
-Nodes (17): InstituteBatchController, GetMapping, Map, PostMapping, PreAuthorize, RestController, String, InstituteBatch (+9 more)
+Cohesion: 0.07
+Nodes (18): T(), $(), A(), as(), ca(), da(), getMaxOverflow(), H() (+10 more)
 
 ### Community 158 - "InstituteCourse"
 Cohesion: 0.08
-Nodes (18): InstituteCourseController, GetMapping, Map, Optional, PostMapping, PreAuthorize, RestController, String (+10 more)
+Nodes (17): InstituteCourseController, GetMapping, Map, Optional, PostMapping, PreAuthorize, RestController, String (+9 more)
 
 ### Community 159 - "StudentGroupController"
-Cohesion: 0.16
-Nodes (20): BulkResult, Boolean, ContactPerson, DeleteMapping, ExceptionHandler, GetMapping, Integer, Logger (+12 more)
+Cohesion: 0.17
+Nodes (19): BulkResult, Boolean, ContactPerson, DeleteMapping, ExceptionHandler, GetMapping, Integer, Logger (+11 more)
 
 ### Community 160 - "JpaRepository"
-Cohesion: 0.07
-Nodes (27): JpaRepository, ListController, InstituteBranchGoogleGroup, Entity, String, Table, Long, Modifying (+19 more)
+Cohesion: 0.31
+Nodes (7): InstituteAssessmentRepository, Boolean, InstituteAssessment, Integer, Long, Optional, Repository
 
 ### Community 161 - "NavigatorReportDataController"
 Cohesion: 0.17
 Nodes (14): BiFunction, DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize (+6 more)
 
 ### Community 162 - "CustomUserDetailsService"
-Cohesion: 0.09
-Nodes (27): ImpersonationController, HttpServletRequest, Long, PostMapping, PreAuthorize, ResponseEntity, RestController, CustomUserDetailsService (+19 more)
+Cohesion: 0.08
+Nodes (26): MockHttpServletRequest, HttpServletRequest, ImpersonationController, HttpServletRequest, Long, PostMapping, PreAuthorize, ResponseEntity (+18 more)
 
 ### Community 163 - "CampaignClassAssessment"
 Cohesion: 0.08
-Nodes (15): CampaignClassAssessment, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+7 more)
+Nodes (14): CampaignClassAssessment, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+6 more)
 
 ### Community 164 - "Lead"
 Cohesion: 0.08
-Nodes (9): Date, Entity, JsonIgnoreProperties, Long, PrePersist, PreUpdate, String, Table (+1 more)
+Nodes (8): Date, Entity, JsonIgnoreProperties, Long, PrePersist, PreUpdate, String, Lead
 
 ### Community 165 - ".sendReportEmail"
-Cohesion: 0.07
-Nodes (23): EmailRateLimiter, Component, PostConstruct, EmailSender, Override, Override, String, ReportEmailComposer (+15 more)
+Cohesion: 0.10
+Nodes (19): EmailRateLimiter, Component, PostConstruct, Component, DltHandler, KafkaListener, Logger, ObjectMapper (+11 more)
 
 ### Community 166 - "index.d.ts"
 Cohesion: 0.05
 Nodes (20): DefaultCameraParams, FaceGeometry, FaceMesh, FaceMeshConfig, FaceMeshInterface, GpuBuffer, InputImage, InputMap (+12 more)
 
 ### Community 167 - "InsightDashboardService"
-Cohesion: 0.09
-Nodes (21): InsightDashboard, RuntimeException, RefreshTokenReuseException, String, Throwable, RetryablePipelineException, String, ReportRoutingException (+13 more)
+Cohesion: 0.08
+Nodes (24): InsightDashboard, BetReportDataRepository, BetReportData, Long, Optional, Repository, IntermediaryScores, Logger (+16 more)
 
 ### Community 168 - "WeeklyScheduleForm.tsx"
 Cohesion: 0.06
-Nodes (28): fmtWhen(), CounsellorData, CounsellorFormProps, EMPTY_FORM, createTemplate(), deleteTemplate(), deleteTemplates(), getTemplatesByCounsellor() (+20 more)
+Nodes (29): fmtWhen(), CounsellorData, CounsellorFormProps, EMPTY_FORM, createTemplate(), deleteTemplate(), deleteTemplates(), getTemplatesByCounsellor() (+21 more)
 
 ### Community 169 - "CounsellorManagementPage.tsx"
-Cohesion: 0.08
-Nodes (31): Counsellor, CounsellorManagementPage(), getCounsellorId(), SlotData, SlotsSection(), AffectedSession, createCounsellor(), deactivateCounsellor() (+23 more)
+Cohesion: 0.07
+Nodes (34): counsellorCancelAppointment(), markStudentAbsent(), releaseReportToStudent(), getCounsellorByUserId(), absentWindow(), buildSlotDate(), checkinWindow(), COUNSELLOR_CANCEL_REASONS (+26 more)
 
 ### Community 170 - "InstituteDetailRepository"
-Cohesion: 0.08
-Nodes (23): AssessmentCookieAuthBackfillRunner, ApplicationArguments, Component, Logger, Order, Override, Transactional, InstituteDetailRepository (+15 more)
+Cohesion: 0.15
+Nodes (12): AssessmentCookieAuthBackfillRunner, ApplicationArguments, Component, Logger, Order, Override, Transactional, Map (+4 more)
 
 ### Community 171 - "AssessmentDemographicMapping"
 Cohesion: 0.09
-Nodes (25): AssessmentDemographicMappingController, DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize (+17 more)
+Nodes (24): AssessmentDemographicMappingController, DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize (+16 more)
 
 ### Community 172 - "PaymentTransactionRepository"
-Cohesion: 0.09
-Nodes (24): Ctx, GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize (+16 more)
+Cohesion: 0.08
+Nodes (20): ArrayList, Boolean, Entity, Integer, Long, User, UserRoleGroupMapping, Boolean (+12 more)
 
 ### Community 173 - "CompilerQuestionLog"
 Cohesion: 0.08
-Nodes (17): CompilerQuestionLogController, Map, PostMapping, PreAuthorize, RestController, String, CompilerQuestionLog, BigInteger (+9 more)
+Nodes (16): CompilerQuestionLogController, Map, PostMapping, PreAuthorize, RestController, String, CompilerQuestionLog, BigInteger (+8 more)
 
 ### Community 174 - "ContactPersonController"
-Cohesion: 0.18
-Nodes (17): ContactPersonController, ContactPerson, DeleteMapping, GetMapping, Integer, Long, Map, Object (+9 more)
+Cohesion: 0.40
+Nodes (5): ContactPersonRepository, ContactPerson, Long, Optional, Repository
 
 ### Community 175 - "AvailabilityTemplate"
-Cohesion: 0.08
-Nodes (15): AvailabilityTemplate, Boolean, Counsellor, Entity, Integer, JsonIgnoreProperties, JsonProperty, LocalDate (+7 more)
+Cohesion: 0.06
+Nodes (28): AvailabilityTemplateController, DeleteMapping, GetMapping, Logger, Long, PostMapping, PreAuthorize, PutMapping (+20 more)
 
 ### Community 176 - "GeneratedReport"
-Cohesion: 0.08
-Nodes (13): GeneratedReport, Boolean, Date, Entity, JsonIgnoreProperties, JsonProperty, Long, PrePersist (+5 more)
+Cohesion: 0.05
+Nodes (31): GeneratedReport, Boolean, Date, Entity, JsonIgnoreProperties, JsonProperty, Long, PrePersist (+23 more)
 
 ### Community 177 - "EmailTemplate"
-Cohesion: 0.08
-Nodes (16): EmailTemplate, Boolean, Date, EmailDeliveryMode, Entity, Long, PrePersist, PreUpdate (+8 more)
+Cohesion: 0.11
+Nodes (9): EmailTemplate, Boolean, Date, EmailDeliveryMode, Entity, Long, PrePersist, PreUpdate (+1 more)
 
 ### Community 178 - "ScopeKey"
-Cohesion: 0.13
-Nodes (9): Collection, Long, Set, ScopeExpansion, Selection, Long, Override, String (+1 more)
+Cohesion: 0.24
+Nodes (4): Long, Override, String, ScopeKey
 
 ### Community 179 - "NavigatorCoreAnalysis"
 Cohesion: 0.15
 Nodes (13): CoreAnalysisResult, Component, Double, Integer, JsonNode, Logger, Map, ObjectMapper (+5 more)
 
 ### Community 180 - "ThankYouPage.tsx"
-Cohesion: 0.07
-Nodes (33): CounsellingOptions, CounsellingTierOption, getCounsellingOptionsByStudent(), forwardCounsellingRequest(), getStudentCounselling(), FEATURE_COPY, Props, UpsellFeature (+25 more)
+Cohesion: 0.06
+Nodes (37): forwardCounsellingRequest(), getUpgradeInfo(), payForReport(), prepareReport(), FEATURE_COPY, Props, UpsellFeature, Props (+29 more)
 
 ### Community 181 - "Navigator360EngineService"
-Cohesion: 0.11
-Nodes (18): PotentialScoreResult, PreferenceScoreResult, AbsoluteLevel, fromStanine(), CareerDefinition, CareerMatch, Double, FlagInfo (+10 more)
+Cohesion: 0.10
+Nodes (22): PotentialScoreResult, PreferenceScoreResult, AbsoluteLevel, fromStanine(), CareerDefinition, CareerMatch, Double, FlagInfo (+14 more)
 
 ### Community 182 - "LayoutProvider.tsx"
-Cohesion: 0.11
-Nodes (23): DefaultLayoutConfig, IAside, IContent, IFooter, IHeader, ILayout, ILayoutCSSClasses, ILayoutCSSVariables (+15 more)
+Cohesion: 0.08
+Nodes (16): InstituteBatchController, GetMapping, Map, PostMapping, PreAuthorize, RestController, String, InstituteBatch (+8 more)
 
 ### Community 183 - "AssessmentQuestions"
-Cohesion: 0.10
-Nodes (10): AssessmentQuestions, Boolean, Entity, Integer, LanguageQuestion, Long, Override, QuestionSection (+2 more)
+Cohesion: 0.08
+Nodes (14): AssessmentQuestions, Boolean, Entity, Integer, LanguageQuestion, Long, Override, QuestionSection (+6 more)
 
 ### Community 184 - "OptionScoreBasedOnMEasuredQualityTypes"
-Cohesion: 0.10
-Nodes (21): DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, RequestMapping, ResponseEntity (+13 more)
+Cohesion: 0.12
+Nodes (21): DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize, PutMapping (+13 more)
 
 ### Community 185 - "StudentService"
-Cohesion: 0.08
-Nodes (13): Student, EmailService, Map, Object, Service, String, User, ArrayList (+5 more)
+Cohesion: 0.10
+Nodes (12): EmailService, Map, Object, Service, String, User, ArrayList, Map (+4 more)
 
 ### Community 186 - "AssessmentInstituteMapping"
-Cohesion: 0.09
-Nodes (10): AssessmentInstituteMapping, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+2 more)
+Cohesion: 0.11
+Nodes (6): Message, EmailAttachment, String, SmtpEmailRequest, Override, Override
 
 ### Community 187 - "PrincipalDashboardReleaseService"
-Cohesion: 0.10
+Cohesion: 0.11
 Nodes (19): Async, Date, Exception, Integer, Logger, Long, Map, Number (+11 more)
 
 ### Community 188 - "Report Delivery & Access/Entitlement Redesign"
@@ -1553,8 +1540,8 @@ Cohesion: 0.05
 Nodes (41): 10. Audit gaps (found via full-codebase re-read, 2026-06-18), 11. Open decisions (must lock before execution-ready), 12. Phased implementation plan, 13. Key file anchors, 1. Executive summary, 2.1 Report emailing — a double-emailer with two different gates, 2.2 Report access — three different truths, 2.3 Report generation — already universal (good) (+33 more)
 
 ### Community 189 - "Serializable"
-Cohesion: 0.07
-Nodes (19): Serializable, Category, Boolean, Entity, String, Table, InstituteGoogleGroup, Entity (+11 more)
+Cohesion: 0.24
+Nodes (4): Category, Boolean, Entity, String
 
 ### Community 190 - "UnifiedEnqueueRequest"
 Cohesion: 0.13
@@ -1565,64 +1552,64 @@ Cohesion: 0.16
 Nodes (18): DateTimeFormatter, DeleteMapping, GetMapping, Long, Map, MultipartFile, Object, ObjectMapper (+10 more)
 
 ### Community 192 - "Campaign"
-Cohesion: 0.09
-Nodes (12): Campaign, Boolean, Date, Entity, Filter, Integer, JsonIgnoreProperties, Long (+4 more)
+Cohesion: 0.33
+Nodes (5): FacebookOAuth2UserInfo, Map, Object, Override, String
 
 ### Community 193 - ".onGenerate"
-Cohesion: 0.10
-Nodes (23): Component, DltHandler, KafkaListener, KafkaTemplate, Logger, ObjectMapper, Profile, RetryableTopic (+15 more)
+Cohesion: 0.09
+Nodes (26): Component, DltHandler, KafkaListener, KafkaTemplate, Logger, ObjectMapper, Profile, RetryableTopic (+18 more)
 
 ### Community 194 - "AssessmentQuestionController.java"
-Cohesion: 0.12
-Nodes (24): ApplicationListener, ApplicationReadyEvent, CacheWarmingConfig, Configuration, Logger, Override, AssessmentQuestionController, Cacheable (+16 more)
+Cohesion: 0.09
+Nodes (14): InstituteBranchBatchMappingController, GetMapping, Map, PostMapping, PreAuthorize, RestController, String, InstituteBranchBatchMapping (+6 more)
 
 ### Community 195 - "RateLimitConfig"
 Cohesion: 0.09
 Nodes (18): Bucket, ConcurrentMap, BucketRegistry, Category, Component, String, Configuration, ConfigurationProperties (+10 more)
 
 ### Community 196 - "en"
-Cohesion: 0.08
-Nodes (21): bn(), buildLookupTable(), diff(), en, endOf(), format(), formats(), _generate() (+13 more)
+Cohesion: 0.05
+Nodes (24): buildLookupTable(), buildTicks(), determineDataLimits(), diff(), en, endOf(), format(), formats() (+16 more)
 
 ### Community 197 - "StoredDashboard.ts"
 Cohesion: 0.09
 Nodes (37): AbilitiesSheet, AbilityRow, AssessmentParticipation, ByClassSheet, ClassCount, ClassFilter, ClusterRow, IntelligenceRow (+29 more)
 
 ### Community 198 - "NavigatorReportGenerationService"
-Cohesion: 0.15
-Nodes (19): IntermediaryScores, Logger, Long, Service, PagerScoreSource, AssessmentScoringContext, IntermediaryScores, ItemLevelMarks (+11 more)
+Cohesion: 0.09
+Nodes (21): EmailTemplateSeeder, ApplicationArguments, Component, Logger, Order, Override, String, ApplicationArguments (+13 more)
 
 ### Community 199 - "CounsellingSlotPicker.tsx"
 Cohesion: 0.06
-Nodes (28): bookCounsellingSlot(), bookedBadgeStyle, BookingResult, btnPrimaryStyle(), btnSecondaryStyle, calendarPanelStyle, calGridStyle, calHeadStyle (+20 more)
+Nodes (28): listCounsellingSlots(), bookedBadgeStyle, BookingResult, btnPrimaryStyle(), btnSecondaryStyle, calendarPanelStyle, calGridStyle, calHeadStyle (+20 more)
 
 ### Community 200 - "Redis Implementation Guide — Career-Nine v2.0"
 Cohesion: 0.05
 Nodes (39): 10. Key Decisions & Rationale, 11. Requirements Traceability, 1. Architecture Overview, 2.1 Docker Setup, 2.2 Maven Dependencies, 2.3 Application Configuration (YAML), 2.4 RedisConfig — Template Beans, 2.5 CacheErrorConfig — Graceful Degradation (+31 more)
 
 ### Community 201 - "GeneratedReportController"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (18): GeneratedReportController, DeleteMapping, GeneratedReport, GetMapping, Integer, Long, Map, Object (+10 more)
 
 ### Community 202 - "TestCase"
-Cohesion: 0.10
-Nodes (16): CompilerController, GetMapping, Integer, Map, PostMapping, PreAuthorize, RestController, String (+8 more)
+Cohesion: 0.12
+Nodes (8): CodingLanguage, Entity, String, CodingLanguageRepository, Integer, Optional, Repository, String
 
 ### Community 203 - "InstituteBranchBatchMapping"
-Cohesion: 0.08
-Nodes (15): InstituteBranchBatchMappingController, GetMapping, Map, PostMapping, PreAuthorize, RestController, String, InstituteBranchBatchMapping (+7 more)
+Cohesion: 0.12
+Nodes (14): FileMetadata, Entity, Long, String, FileMetadataRepository, Integer, Repository, String (+6 more)
 
 ### Community 204 - "SchoolRegistrationLink"
-Cohesion: 0.09
-Nodes (18): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, String (+10 more)
+Cohesion: 0.12
+Nodes (9): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, String (+1 more)
 
 ### Community 205 - "SchoolDashboardWorkbookWriter"
 Cohesion: 0.21
 Nodes (13): CellStyle, AbilitiesSheet, ByClassSheet, ClassFilter, PersonalitySheet, SummarySheet, SchoolDashboard, Integer (+5 more)
 
 ### Community 206 - "AdminCounsellingBookingService"
-Cohesion: 0.15
-Nodes (18): Deque, Entity, JsonIgnoreProperties, PrePersist, PreUpdate, Table, AdminCounsellingBookingService, CounsellingSlot (+10 more)
+Cohesion: 0.12
+Nodes (20): Deque, AdminCounsellingBookingService, CounsellingSlot, Logger, Long, Map, Object, Service (+12 more)
 
 ### Community 207 - "B2B Unified Assessment-Mapping — Redesign Spec"
 Cohesion: 0.05
@@ -1632,17 +1619,13 @@ Nodes (38): 10. Out of scope / deferred, 11. Build sequence & verification, 1. I
 Cohesion: 0.05
 Nodes (38): 400 Bad Request - Missing userStudentId, 500 Internal Server Error - General Error, 500 Internal Server Error - Student Not Found, AnswerDetail, AssessmentData, Changelog, Data Flow, Database Tables Accessed (+30 more)
 
-### Community 209 - "PasswordMeterComponent"
-Cohesion: 0.07
-Nodes (15): AuthLayout(), AuthPage(), ForgotPassword(), forgotPasswordSchema, Status, initialValues, Registration(), registrationSchema (+7 more)
-
 ### Community 210 - "Dashboard_APIs.ts"
 Cohesion: 0.05
 Nodes (33): AttentionData, CognitiveData, CognitiveFlexibilityData, DashboardApiAnswerDetail, DashboardApiAssessmentData, DashboardApiMQData, DashboardApiMQTData, DashboardApiMQTScore (+25 more)
 
 ### Community 211 - "Career"
-Cohesion: 0.11
-Nodes (18): CareerController, Career, DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping (+10 more)
+Cohesion: 0.09
+Nodes (22): CareerController, Career, DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping (+14 more)
 
 ### Community 212 - "PrincipalDashboardReleaseController"
 Cohesion: 0.18
@@ -1650,35 +1633,35 @@ Nodes (15): CohortInsightView, GetMapping, Long, Map, Object, ObjectMapper, Post
 
 ### Community 213 - "ReminderSuppression"
 Cohesion: 0.09
-Nodes (21): DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize, ReminderSuppression (+13 more)
+Nodes (20): DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize, ReminderSuppression (+12 more)
 
 ### Community 214 - "StudentCounsellingPage.tsx"
 Cohesion: 0.07
 Nodes (24): getStudentAppointments(), getMyNotifications(), getUnreadCount(), markAllNotificationsRead(), markNotificationRead(), createRating(), getPendingRatingsForStudent(), PendingRatingAppointment (+16 more)
 
 ### Community 215 - "MeasuredQualityTypesController"
-Cohesion: 0.14
-Nodes (20): Cacheable, CacheEvict, Career, DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize (+12 more)
+Cohesion: 0.15
+Nodes (22): ApplicationListener, ApplicationReadyEvent, CreateMeasuredQualityTypesData(), CacheWarmingConfig, Configuration, Logger, Override, Cacheable (+14 more)
 
 ### Community 216 - ".duplicate"
-Cohesion: 0.15
-Nodes (17): DeleteMapping, EntityManager, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, Questionnaire (+9 more)
+Cohesion: 0.12
+Nodes (8): Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, SchoolAssessmentConfig
 
 ### Community 217 - "PaymentNotificationLog"
 Cohesion: 0.10
-Nodes (12): Date, Entity, JsonIgnoreProperties, Long, PrePersist, String, Table, PaymentNotificationLog (+4 more)
+Nodes (11): Date, Entity, JsonIgnoreProperties, Long, PrePersist, String, PaymentNotificationLog, Long (+3 more)
 
 ### Community 218 - "StudentDemographicResponse"
 Cohesion: 0.10
-Nodes (15): Date, Entity, JsonIgnoreProperties, Long, PrePersist, String, Table, StudentDemographicResponse (+7 more)
+Nodes (14): Date, Entity, JsonIgnoreProperties, Long, PrePersist, String, StudentDemographicResponse, Long (+6 more)
 
 ### Community 219 - "StudentEntitlementRepository"
-Cohesion: 0.09
-Nodes (21): Date, Long, Optional, Query, Repository, String, StudentEntitlementRepository, EntitlementSchedulerService (+13 more)
+Cohesion: 0.10
+Nodes (17): Entity, Date, Long, Optional, Query, Repository, String, StudentEntitlementRepository (+9 more)
 
 ### Community 220 - "ReportService"
-Cohesion: 0.12
-Nodes (19): IntermediaryScoresPayload, Integer, IntermediaryScores, Map, String, Logger, Long, Map (+11 more)
+Cohesion: 0.46
+Nodes (5): Component, Map, Object, String, TemplateRenderer
 
 ### Community 221 - "GeneralAssessmentJsonDataLoader"
 Cohesion: 0.18
@@ -1689,36 +1672,36 @@ Cohesion: 0.15
 Nodes (17): BeforeAll, ConcurrentLinkedQueue, DataFormatter, AssessmentLoadTest, HttpResult, Cell, JsonNode, Long (+9 more)
 
 ### Community 223 - "CampaignRegisterPage.tsx"
-Cohesion: 0.07
-Nodes (26): getCampaignInfoByAssessment(), getCampaignInfoBySlug(), getCampaignInfoByTier(), getUpgradeInfo(), listCounsellingSlots(), payForReport(), prepareReport(), redeemAssessmentStartToken() (+18 more)
+Cohesion: 0.13
+Nodes (9): Entity, Integer, LocalDateTime, Long, UserRoleScope, Long, Query, Repository (+1 more)
 
 ### Community 224 - "App.tsx"
-Cohesion: 0.08
-Nodes (24): App(), finishProgress(), getActiveCacheName(), getUncachedResources(), hidePreloader(), Manifest, PREFETCH_PRIORITIES, pushRealProgress() (+16 more)
+Cohesion: 0.20
+Nodes (10): App(), finishProgress(), getUncachedResources(), hidePreloader(), Manifest, PREFETCH_PRIORITIES, pushRealProgress(), ResourcePreloader() (+2 more)
 
 ### Community 225 - "JwtTokenAuditRepository"
-Cohesion: 0.13
-Nodes (21): JwtTokenAudit, GetMapping, Long, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController (+13 more)
+Cohesion: 0.20
+Nodes (12): BetTemplateExcelExportService, Cell, Integer, Logger, Long, Map, Object, Service (+4 more)
 
 ### Community 226 - "3. Master Endpoint Table (frontend → backend)"
 Cohesion: 0.05
 Nodes (36): 1.1 Axios / token plumbing (the single most important fact), 1.2 Auth model (RBAC + ABAC + URL whitelist), 1.3 Route registration & guard status, 1.4 Menu gating (`_metronic/.../aside/AsideMenuMain.tsx`), 1. Global Architecture — Routing, Axios & Auth, 2.10 Student portal, 2.11 Other admin pages, 2.12 Public registration & university result (+28 more)
 
 ### Community 227 - "DemographicFieldDefinition"
-Cohesion: 0.12
-Nodes (10): DemographicFieldDefinition, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+2 more)
+Cohesion: 0.13
+Nodes (9): DemographicFieldDefinition, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+1 more)
 
 ### Community 228 - "UserController.java"
-Cohesion: 0.18
-Nodes (16): GetMapping, HashMap, Logger, Long, Map, Object, Optional, PasswordEncoder (+8 more)
+Cohesion: 0.07
+Nodes (36): GetMapping, HashMap, Logger, Long, Map, Object, Optional, PasswordEncoder (+28 more)
 
 ### Community 229 - "OdooEmailService"
-Cohesion: 0.16
-Nodes (18): String, Throwable, ServiceException, Component, ConditionalOnProperty, OdooEmailSender, Async, Integer (+10 more)
+Cohesion: 0.19
+Nodes (15): String, Throwable, ServiceException, Async, Integer, JsonNode, Logger, Long (+7 more)
 
 ### Community 230 - "AssessmentStudentInvite"
 Cohesion: 0.10
-Nodes (10): AssessmentStudentInvite, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+2 more)
+Nodes (9): AssessmentStudentInvite, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+1 more)
 
 ### Community 231 - "assert"
 Cohesion: 0.07
@@ -1733,40 +1716,40 @@ Cohesion: 0.06
 Nodes (35): 1. Executive Summary, 2. Discrepancy Table, 3. Per-Finding Detail (every non-✅), 4. Fixture Results (32 records via the verified execution proxy), 5. Worked Example — "Aarav Sharma" (Tech Spec §2.3, Career stage), 6. Open Conflicts (doc-vs-doc — for a human to decide), 7. Appendix — Audit Method, BAR-1 — No cell-position formula · 🚫 MISSING · 🟠 MAJOR (+27 more)
 
 ### Community 234 - "SchoolAssessmentMappingPanel.tsx"
-Cohesion: 0.08
-Nodes (22): Props, Props, ToggleSwitchProps, emptyForm, Props, batchSaveSchoolConfigs(), createSchoolTier(), deleteSchoolTier() (+14 more)
+Cohesion: 0.10
+Nodes (5): Entity, LocalDateTime, Long, String, JwtTokenAudit
 
 ### Community 235 - "TrackerController"
-Cohesion: 0.22
-Nodes (14): Date, EntityManager, GetMapping, JSONObject, Long, Map, Object, PostMapping (+6 more)
+Cohesion: 0.20
+Nodes (15): Date, EntityManager, GetMapping, JSONObject, Long, Map, Object, PostMapping (+7 more)
 
 ### Community 236 - "CounsellorController"
-Cohesion: 0.18
-Nodes (16): CounsellorController, AffectedSession, Counsellor, DeleteMapping, GetMapping, Logger, Long, Map (+8 more)
+Cohesion: 0.16
+Nodes (18): AssessmentQuestionController, Cacheable, CacheEvict, Cell, DeleteMapping, GetMapping, Logger, Long (+10 more)
 
 ### Community 237 - "UserStudent"
 Cohesion: 0.08
-Nodes (9): Boolean, Entity, Filter, JsonIgnoreProperties, Long, StudentInfo, Table, User (+1 more)
+Nodes (9): Boolean, Entity, Filter, JsonIgnoreProperties, Long, StudentInfo, User, UserStudent (+1 more)
 
 ### Community 238 - "SlotConfiguration"
-Cohesion: 0.10
-Nodes (12): Boolean, Entity, Integer, JsonIgnoreProperties, LocalDate, LocalDateTime, LocalTime, Long (+4 more)
+Cohesion: 0.05
+Nodes (47): DeleteMapping, GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize (+39 more)
 
 ### Community 239 - "ReportTemplate"
-Cohesion: 0.10
-Nodes (7): Date, Entity, JsonIgnoreProperties, Long, String, Table, ReportTemplate
+Cohesion: 0.06
+Nodes (14): ReportTemplate, String, ReportTemplateCreateRequest, Date, Long, ReportTemplate, String, ReportTemplateDto (+6 more)
 
 ### Community 240 - "ReminderDeliveryLogService"
 Cohesion: 0.12
-Nodes (21): ReminderDeliveryStatus, Date, Long, Object, Page, Pageable, Query, ReminderDeliveryStatus (+13 more)
+Nodes (20): Date, Long, Object, Page, Pageable, Query, ReminderDeliveryStatus, ReminderServiceType (+12 more)
 
 ### Community 241 - "Topic"
-Cohesion: 0.09
-Nodes (15): Entity, Long, String, Table, SubTopic, Entity, Long, String (+7 more)
+Cohesion: 0.04
+Nodes (35): Serializable, CreateQuestion, Entity, String, Group, Entity, Set, String (+27 more)
 
 ### Community 242 - "GeneralAssessmentProcessingService"
-Cohesion: 0.16
-Nodes (11): GeneralAssessmentProcessingService, Double, Integer, Logger, Map, Object, ObjectMapper, Service (+3 more)
+Cohesion: 0.17
+Nodes (8): GeneralAssessmentProcessingService, Double, Integer, Long, Map, Object, Set, String
 
 ### Community 243 - "SchoolDashboard.java"
 Cohesion: 0.11
@@ -1781,48 +1764,48 @@ Cohesion: 0.10
 Nodes (28): buildSchoolReportWorkbook(), buildStudentRows(), BY_CLASS_HEADER, byClassThenSection(), classSectionOf(), computeSchoolSummary(), entryAssessmentId(), formatDob() (+20 more)
 
 ### Community 246 - "CounsellingRescheduleService"
-Cohesion: 0.13
-Nodes (19): CounsellingPublicRescheduleController, GetMapping, Logger, Map, Object, PostMapping, RequestMapping, ResponseEntity (+11 more)
+Cohesion: 0.27
+Nodes (10): CounsellingPublicRescheduleController, GetMapping, Logger, Map, Object, PostMapping, RequestMapping, ResponseEntity (+2 more)
 
 ### Community 247 - "AssessmentReportTemplate"
 Cohesion: 0.10
-Nodes (14): Long, ReportTemplateDto, TemplateMappingDto, AssessmentReportTemplate, Boolean, Entity, JsonIgnoreProperties, Long (+6 more)
+Nodes (13): Long, ReportTemplateDto, TemplateMappingDto, AssessmentReportTemplate, Boolean, Entity, JsonIgnoreProperties, Long (+5 more)
 
 ### Community 248 - "UserUrlAccessLog"
-Cohesion: 0.11
-Nodes (18): GetMapping, LocalDate, Long, PreAuthorize, RequestMapping, ResponseEntity, RestController, UserActivityLogController (+10 more)
+Cohesion: 0.05
+Nodes (33): GetMapping, LocalDate, Long, PreAuthorize, RequestMapping, ResponseEntity, RestController, UserActivityLogController (+25 more)
 
 ### Community 249 - "StudentRepository"
-Cohesion: 0.11
-Nodes (18): DataController, GetMapping, PreAuthorize, RestController, String, GetMapping, Map, PostMapping (+10 more)
+Cohesion: 0.09
+Nodes (23): AuthenticationPrincipal, Documented, DataController, GetMapping, PreAuthorize, RestController, String, GetMapping (+15 more)
 
 ### Community 250 - ".send"
 Cohesion: 0.14
-Nodes (23): Long, Map, Object, PostMapping, PreAuthorize, Recipient, RequestMapping, ResponseEntity (+15 more)
+Nodes (23): Map, Object, PostMapping, PreAuthorize, Recipient, RequestMapping, ResponseEntity, RestController (+15 more)
 
 ### Community 251 - "EmailAccount"
 Cohesion: 0.10
-Nodes (11): EmailAccount, Boolean, Date, EmailMode, EmailProvider, Entity, Long, PrePersist (+3 more)
+Nodes (10): EmailAccount, Boolean, Date, EmailMode, EmailProvider, Entity, Long, PrePersist (+2 more)
 
 ### Community 252 - "ReminderConfigService"
 Cohesion: 0.13
 Nodes (19): AtomicReference, AssessmentMappingReminderSchedulerService, Date, Logger, Object, Service, String, User (+11 more)
 
 ### Community 253 - "Questionnaire"
-Cohesion: 0.11
-Nodes (11): BigDecimal, Boolean, Entity, Integer, JsonIgnoreProperties, Long, QuestionnaireLanguage, String (+3 more)
+Cohesion: 0.12
+Nodes (10): BigDecimal, Boolean, Entity, Integer, JsonIgnoreProperties, Long, QuestionnaireLanguage, String (+2 more)
 
 ### Community 254 - "abort"
-Cohesion: 0.06
-Nodes (34): abort(), alignMemory(), _clock_gettime(), demangle(), demangleAll(), _dlopen(), _dlsym(), _emscripten_asm_const_int() (+26 more)
+Cohesion: 0.07
+Nodes (30): abort(), alignMemory(), _clock_gettime(), _dlopen(), _dlsym(), _emscripten_asm_const_int(), _emscripten_generate_pc(), _emscripten_pc_get_function() (+22 more)
 
 ### Community 255 - "AppointCounsellorModal.tsx"
 Cohesion: 0.08
 Nodes (21): ExistingAssignment, Institute, Props, STEP_LABELS, WizardStep, assignCounsellor(), CounsellorAssessmentDetail, deleteAssignment() (+13 more)
 
 ### Community 256 - "AssessmentDemographicConfig.tsx"
-Cohesion: 0.08
-Nodes (20): getDemographicsByAssessment(), saveDemographicMapping(), FieldDefinition, MappedField, Props, createDemographicField(), deleteDemographicField(), getActiveDemographicFields() (+12 more)
+Cohesion: 0.14
+Nodes (10): AssessmentSummary, AssessmentSummary, AssessmentTableRepository, Boolean, Collection, Integer, Long, Query (+2 more)
 
 ### Community 257 - "SchoolDashboardPage.tsx"
 Cohesion: 0.07
@@ -1837,28 +1820,28 @@ Cohesion: 0.16
 Nodes (16): SchoolDashboardView, ClassFilter, Integer, IntermediaryScores, Logger, Long, Map, Number (+8 more)
 
 ### Community 260 - "MeasuredQualityTypes"
-Cohesion: 0.12
-Nodes (11): Boolean, Career, Entity, Long, Set, String, Table, MeasuredQualityTypes (+3 more)
+Cohesion: 0.08
+Nodes (14): Boolean, Career, Entity, Long, Set, String, MeasuredQualityTypes, Entity (+6 more)
 
 ### Community 261 - "StudentGroup"
 Cohesion: 0.10
-Nodes (11): Boolean, Entity, Integer, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, PreUpdate (+3 more)
+Nodes (10): Boolean, Entity, Integer, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, PreUpdate (+2 more)
 
 ### Community 262 - "EmailNotificationRecipient"
-Cohesion: 0.11
-Nodes (9): EmailNotificationRecipient, Boolean, Date, Entity, Long, PrePersist, PreUpdate, String (+1 more)
+Cohesion: 0.10
+Nodes (9): RecipientKind, EmailNotificationRecipient, Boolean, Date, Entity, Long, PrePersist, PreUpdate (+1 more)
 
 ### Community 263 - "PasswordResetToken"
-Cohesion: 0.11
-Nodes (15): Entity, Instant, Long, String, Table, PasswordResetToken, Instant, Long (+7 more)
+Cohesion: 0.12
+Nodes (14): Entity, Instant, Long, String, PasswordResetToken, Instant, Long, Modifying (+6 more)
 
 ### Community 264 - "StudentGroupService"
-Cohesion: 0.19
-Nodes (13): String, BulkResult, Boolean, ContactPerson, Integer, Logger, Long, Map (+5 more)
+Cohesion: 0.18
+Nodes (13): BulkResult, GroupException, Boolean, ContactPerson, Integer, Logger, Long, Map (+5 more)
 
 ### Community 265 - "ReleaseSnapshot"
-Cohesion: 0.15
-Nodes (9): Cohort, Dim, InstituteProfile, Integer, Long, Map, Set, String (+1 more)
+Cohesion: 0.11
+Nodes (16): Logger, Map, Object, Service, String, PrincipalDashboardScopeCalculator, ScopeResult, Cohort (+8 more)
 
 ### Community 266 - "PsychometricStats"
 Cohesion: 0.14
@@ -1874,19 +1857,19 @@ Nodes (22): getFlaggedStudents(), logChartData(), ScopeParams, scopeQuery(), Act
 
 ### Community 269 - "LanguagesSupported"
 Cohesion: 0.11
-Nodes (17): GetMapping, Long, PostMapping, PreAuthorize, RequestMapping, RestController, LanguagesSupportedController, Entity (+9 more)
+Nodes (16): GetMapping, Long, PostMapping, PreAuthorize, RequestMapping, RestController, LanguagesSupportedController, Entity (+8 more)
 
 ### Community 270 - "FirebaseQuestionMapping"
 Cohesion: 0.11
-Nodes (11): FirebaseQuestionMapping, Entity, LocalDateTime, Long, PrePersist, String, Table, FirebaseQuestionMappingRepository (+3 more)
+Nodes (10): FirebaseQuestionMapping, Entity, LocalDateTime, Long, PrePersist, String, FirebaseQuestionMappingRepository, Long (+2 more)
 
 ### Community 271 - "BatchBranchOption"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (7): BatchBranchOption, Boolean, String, BatchOption, String, BranchOption, String
 
 ### Community 272 - "UserActivityLog"
-Cohesion: 0.11
-Nodes (10): Entity, LocalDateTime, Long, String, Table, UserActivityLog, LocalDateTime, Long (+2 more)
+Cohesion: 0.17
+Nodes (14): InstituteEmailSettingRepository, InstituteEmailSetting, Integer, Long, Optional, InstituteEmailSettingService, InstituteEmailSetting, Integer (+6 more)
 
 ### Community 273 - "PsychometricAdvancedSheets"
 Cohesion: 0.16
@@ -1897,32 +1880,32 @@ Cohesion: 0.12
 Nodes (12): CatchInfo(), ___cxa_begin_catch(), ___cxa_end_catch(), ___cxa_find_matching_catch_2(), ___cxa_find_matching_catch_3(), ___cxa_free_exception(), ___cxa_rethrow(), ___cxa_throw() (+4 more)
 
 ### Community 275 - "UTF8ToString"
-Cohesion: 0.07
-Nodes (32): __addDays(), __arraySum(), checkUnflushedContent(), _emscripten_set_main_loop_timing(), _emscripten_webgl_create_context(), _emscripten_webgl_do_create_context(), emscriptenWebGLGet(), _exit() (+24 more)
+Cohesion: 0.14
+Nodes (17): __addDays(), __arraySum(), _emscripten_webgl_create_context(), _emscripten_webgl_do_create_context(), findCanvasEventTarget(), findEventTarget(), _glBindAttribLocation(), _glGetAttribLocation() (+9 more)
 
 ### Community 276 - "ExceptionInfo"
 Cohesion: 0.12
 Nodes (12): CatchInfo(), ___cxa_begin_catch(), ___cxa_end_catch(), ___cxa_find_matching_catch_2(), ___cxa_find_matching_catch_3(), ___cxa_free_exception(), ___cxa_rethrow(), ___cxa_throw() (+4 more)
 
 ### Community 277 - "SettingsModel.ts"
-Cohesion: 0.11
-Nodes (24): ConnectedAccounts(), DeactivateAccount(), deactivateAccountSchema, EmailPreferences(), Notifications(), ProfileDetails(), profileDetailsSchema, emailFormValidationSchema (+16 more)
+Cohesion: 0.09
+Nodes (27): accountBreadCrumbs, Overview(), ConnectedAccounts(), DeactivateAccount(), deactivateAccountSchema, EmailPreferences(), Notifications(), ProfileDetails() (+19 more)
 
 ### Community 278 - "ReportPreparationService"
-Cohesion: 0.13
-Nodes (19): Long, PostMapping, RequestMapping, ResponseEntity, RestController, String, ReportPreparationController, Entity (+11 more)
+Cohesion: 0.20
+Nodes (14): Long, PostMapping, RequestMapping, ResponseEntity, RestController, String, ReportPreparationController, Long (+6 more)
 
 ### Community 279 - "GameTable"
 Cohesion: 0.11
-Nodes (18): GameTableController, DeleteMapping, GameTable, GetMapping, Long, PostMapping, PreAuthorize, RequestMapping (+10 more)
+Nodes (17): GameTableController, DeleteMapping, GameTable, GetMapping, Long, PostMapping, PreAuthorize, RequestMapping (+9 more)
 
 ### Community 280 - "QuestionSectionController.java"
 Cohesion: 0.16
 Nodes (17): DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, QuestionSection, RequestMapping (+9 more)
 
 ### Community 281 - ".buildPlaceholders"
-Cohesion: 0.16
-Nodes (11): FourPagerEngineService, AbsoluteLevel, CareerMatch, Map, Navigator360Result, ScoredDimension, String, StudentMeta (+3 more)
+Cohesion: 0.20
+Nodes (8): FourPagerEngineService, AbsoluteLevel, CareerMatch, Map, Navigator360Result, ScoredDimension, String, StudentMeta
 
 ### Community 282 - "🟡 MEDIUM (38 findings → 30 distinct issues)"
 Cohesion: 0.06
@@ -1937,12 +1920,12 @@ Cohesion: 0.10
 Nodes (15): RoleUserCreateInput, crudApiModal, deleteRoleUserData(), findemail(), readRegisteredUserData(), readRoleGroupData(), readUserData(), resetpassword() (+7 more)
 
 ### Community 285 - "InstituteDetailController.java"
-Cohesion: 0.16
-Nodes (15): InstituteDetailController, GetMapping, Integer, Logger, Map, Object, Optional, PostMapping (+7 more)
+Cohesion: 0.11
+Nodes (21): AssessmentSessionController, AssessmentSessionRequest, Date, Environment, HttpServletRequest, HttpServletResponse, Logger, Long (+13 more)
 
 ### Community 286 - "ReminderConfig"
-Cohesion: 0.11
-Nodes (10): Boolean, Date, Entity, Integer, Long, PreUpdate, ReminderServiceType, String (+2 more)
+Cohesion: 0.12
+Nodes (9): Boolean, Date, Entity, Integer, Long, PreUpdate, ReminderServiceType, String (+1 more)
 
 ### Community 287 - "QuestionOptionID"
 Cohesion: 0.13
@@ -1957,7 +1940,7 @@ Cohesion: 0.12
 Nodes (27): b_action(), b_button(), b_code(), b_credentials(), b_details(), b_internal(), b_linkline(), b_list() (+19 more)
 
 ### Community 290 - "HttpHeaders"
-Cohesion: 0.22
+Cohesion: 0.21
 Nodes (15): HttpHeaders, GeneralAssessmentController, ClassFilter, GetMapping, Integer, Logger, Long, Map (+7 more)
 
 ### Community 291 - "Navigator360Engine.ts"
@@ -1966,15 +1949,15 @@ Nodes (21): ASPIRATION_RIASEC, ASPIRATION_TO_CAREER, CAREER_DEFINITIONS, SUBJECT
 
 ### Community 293 - "BlockDateRequest"
 Cohesion: 0.12
-Nodes (11): BlockDateRequest, Counsellor, Entity, JsonIgnoreProperties, LocalDate, LocalDateTime, Long, PrePersist (+3 more)
+Nodes (10): BlockDateRequest, Counsellor, Entity, JsonIgnoreProperties, LocalDate, LocalDateTime, Long, PrePersist (+2 more)
 
 ### Community 294 - "CounsellingCheckinOtp"
-Cohesion: 0.12
-Nodes (12): CounsellingCheckinOtp, Entity, Integer, LocalDateTime, Long, PrePersist, String, Table (+4 more)
+Cohesion: 0.09
+Nodes (17): CounsellingCheckinOtp, Entity, Integer, LocalDateTime, Long, PrePersist, String, CounsellingCheckinOtpRepository (+9 more)
 
 ### Community 295 - "CalculatedReportData"
 Cohesion: 0.12
-Nodes (12): CalculatedReportData, Date, Entity, JsonIgnoreProperties, Long, ReportTemplate, String, Table (+4 more)
+Nodes (11): CalculatedReportData, Date, Entity, JsonIgnoreProperties, Long, ReportTemplate, String, CalculatedReportDataRepository (+3 more)
 
 ### Community 296 - "PsychometricPropertiesExportService"
 Cohesion: 0.15
@@ -1985,8 +1968,8 @@ Cohesion: 0.13
 Nodes (17): Cta, Access, Axis, Career, Cta, Flag, InsightDashboard, Integer (+9 more)
 
 ### Community 298 - "JsonFormat"
-Cohesion: 0.12
-Nodes (11): JsonFormat, Date, Entity, Integer, Long, PrePersist, Table, StudentReferral (+3 more)
+Cohesion: 0.16
+Nodes (7): JsonFormat, Date, Entity, Integer, Long, PrePersist, StudentReferral
 
 ### Community 299 - "PdfRenderService"
 Cohesion: 0.14
@@ -2001,40 +1984,40 @@ Cohesion: 0.08
 Nodes (19): AssessmentRow(), assessmentStatusKind(), DetailPanel(), fieldLabelStyle, fieldValueStyle, FlatReport, fmtDate(), GlobalSearchRow (+11 more)
 
 ### Community 302 - "ReportTemplateCatalogController"
-Cohesion: 0.18
-Nodes (17): DeleteMapping, GetMapping, Logger, Long, Map, MultipartFile, Object, PostMapping (+9 more)
+Cohesion: 0.13
+Nodes (22): DeleteMapping, GetMapping, Logger, Long, Map, MultipartFile, Object, PostMapping (+14 more)
 
 ### Community 303 - ".submit"
-Cohesion: 0.22
-Nodes (12): GetMapping, Long, Map, Object, PostMapping, PreAuthorize, RequestMapping, ResponseEntity (+4 more)
+Cohesion: 0.23
+Nodes (11): GetMapping, Long, Map, Object, PostMapping, PreAuthorize, RequestMapping, ResponseEntity (+3 more)
 
 ### Community 304 - ".putUniMarks"
-Cohesion: 0.16
-Nodes (3): ArrayList, String, Result
+Cohesion: 0.05
+Nodes (24): Result, GetMapping, Long, PostMapping, PreAuthorize, RestController, UniversityMarkController, Entity (+16 more)
 
 ### Community 305 - "CounsellorAssessmentAssignment"
-Cohesion: 0.12
-Nodes (11): CounsellorAssessmentAssignment, Boolean, Counsellor, Entity, JsonIgnoreProperties, JsonProperty, LocalDateTime, Long (+3 more)
+Cohesion: 0.10
+Nodes (13): CounsellorAssessmentAssignment, Boolean, Counsellor, Entity, JsonIgnoreProperties, JsonProperty, LocalDateTime, Long (+5 more)
 
 ### Community 306 - "GameRenderer.tsx"
-Cohesion: 0.09
+Cohesion: 0.08
 Nodes (15): AppErrorBoundary, Props, State, useGameData(), AssessmentGameWrapper(), AssessmentGameWrapperProps, GameLoadBoundary, GameRenderer() (+7 more)
 
 ### Community 307 - "Measured_Qualities_APIs.ts"
-Cohesion: 0.11
-Nodes (15): AssignToolToQuality(), CreateMeasuredQualitiesData(), DeleteMeasuredQualitiesData(), GetDeletedMeasuredQualities(), GetToolsForQuality(), PermanentDeleteMeasuredQuality(), ReadMeasuredQualitiesData(), ReadToolsData() (+7 more)
+Cohesion: 0.14
+Nodes (6): String, String, Test, MailCatalogueTest, Test, MailBuilderTest
 
 ### Community 308 - "AuthAudit"
-Cohesion: 0.15
-Nodes (7): AuthAudit, Decision, Entity, LocalDateTime, Long, String, Table
+Cohesion: 0.09
+Nodes (20): AuthAudit, Decision, Entity, LocalDateTime, Long, String, AuthAuditRepository, Decision (+12 more)
 
 ### Community 309 - "CampaignAssessmentTier"
-Cohesion: 0.13
-Nodes (9): CampaignAssessmentTier, Boolean, Date, Entity, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+1 more)
+Cohesion: 0.14
+Nodes (8): CampaignAssessmentTier, Boolean, Date, Entity, JsonIgnoreProperties, Long, PrePersist, PreUpdate
 
 ### Community 310 - "CounsellingRequest"
-Cohesion: 0.12
-Nodes (10): CounsellingRequest, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+2 more)
+Cohesion: 0.10
+Nodes (13): CounsellingRequest, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist, PreUpdate (+5 more)
 
 ### Community 311 - "MeResponse"
 Cohesion: 0.14
@@ -2045,48 +2028,48 @@ Cohesion: 0.24
 Nodes (12): CompactDashboardJson, AbilitiesSheet, ByClassSheet, Function, Integer, LabeledSeries, Map, Object (+4 more)
 
 ### Community 313 - "Navigator360EngineService.java"
-Cohesion: 0.17
-Nodes (19): Comparator, Service, Service, CareerDefinition, CareerMatch, CciResult, FlagInfo, AbsoluteLevel (+11 more)
+Cohesion: 0.23
+Nodes (14): Service, CareerDefinition, CareerMatch, CciResult, FlagInfo, AbsoluteLevel, Integer, String (+6 more)
 
 ### Community 314 - "TokenAuthenticationFilter"
 Cohesion: 0.14
 Nodes (19): OncePerRequestFilter, Component, FilterChain, HttpServletRequest, HttpServletResponse, Order, Override, String (+11 more)
 
 ### Community 315 - "OnlineMappingWizard.tsx"
-Cohesion: 0.09
-Nodes (20): createInstitute(), createSession(), getSessionsByInstitute(), saveBatchMappings(), saveMapping(), FirebaseGrade, FirebaseSchool, FirebaseSection (+12 more)
+Cohesion: 0.03
+Nodes (94): clearFirebaseFetchCache(), createInstitute(), createSession(), deleteFirebaseStudents(), deleteMappingByName(), deleteQuestionMappings(), detectUnmappedQuestions(), FB_CACHE_KEYS (+86 more)
 
 ### Community 316 - "EmailNotificationRecipientService"
-Cohesion: 0.17
-Nodes (11): RecipientKind, EmailNotificationRecipientRepository, Long, String, EmailNotificationRecipientService, Long, Map, Object (+3 more)
+Cohesion: 0.05
+Nodes (23): Block, String, Action, Blocks, BulletList, Button, Code, Credentials (+15 more)
 
 ### Community 317 - "SlotConfigurationController.java"
-Cohesion: 0.14
-Nodes (19): DeleteMapping, GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize (+11 more)
+Cohesion: 0.24
+Nodes (13): EmailAccountController, DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize (+5 more)
 
 ### Community 318 - "MeasuredQualitiesController.java"
 Cohesion: 0.20
 Nodes (13): DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, RequestMapping, ResponseEntity (+5 more)
 
 ### Community 319 - "ToolController.java"
-Cohesion: 0.17
+Cohesion: 0.16
 Nodes (17): DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, RequestMapping, ResponseEntity (+9 more)
 
 ### Community 320 - "BoardName"
 Cohesion: 0.12
-Nodes (12): BoardName, Boolean, Entity, NamedQuery, String, Table, BoardNameRepository, Boolean (+4 more)
+Nodes (11): BoardName, Boolean, Entity, NamedQuery, String, BoardNameRepository, Boolean, Integer (+3 more)
 
 ### Community 321 - "CounsellingRating"
 Cohesion: 0.12
-Nodes (10): CounsellingRating, Counsellor, Entity, Integer, JsonIgnoreProperties, LocalDateTime, Long, PrePersist (+2 more)
+Nodes (9): CounsellingRating, Counsellor, Entity, Integer, JsonIgnoreProperties, LocalDateTime, Long, PrePersist (+1 more)
 
 ### Community 322 - "IntermediaryScoresRow"
-Cohesion: 0.13
-Nodes (11): IntermediaryScoresRow, Date, Entity, JsonIgnoreProperties, Long, String, Table, IntermediaryScoresRepository (+3 more)
+Cohesion: 0.14
+Nodes (10): IntermediaryScoresRow, Date, Entity, JsonIgnoreProperties, Long, String, IntermediaryScoresRepository, Long (+2 more)
 
 ### Community 323 - "EmailSendResult"
-Cohesion: 0.14
-Nodes (11): EmailSendResult, Long, String, EmailSendStatus, AsyncEmailExecutor, Async, Component, EmailAccount (+3 more)
+Cohesion: 0.15
+Nodes (9): Date, Entity, Long, PrePersist, ReferralCodeAssessment, Long, Repository, Transactional (+1 more)
 
 ### Community 324 - "EmailMessage"
 Cohesion: 0.13
@@ -2101,48 +2084,48 @@ Cohesion: 0.11
 Nodes (18): createLanguageQuestionAndOptionData(), readLanguageData(), matchTextToOption(), matchTextToOptionsBulk(), translateAll(), translateOption(), translateQuestion(), QuestionLanguageModalProps (+10 more)
 
 ### Community 327 - "GroupManagerPanel.tsx"
-Cohesion: 0.12
-Nodes (20): addContactPersons(), addMembers(), BulkResult, createGroup(), deactivateGroup(), getGroup(), GroupContactRow, groupErrorMessage() (+12 more)
+Cohesion: 0.11
+Nodes (23): useCan(), addContactPersons(), addMembers(), BulkResult, createGroup(), deactivateGroup(), getGroup(), GroupContactRow (+15 more)
 
 ### Community 328 - "DynamicDemographicForm.tsx"
 Cohesion: 0.14
 Nodes (17): AllottedAssessmentPage(), Assessment, assessmentApi, getErrorMessage(), getFieldsForAssessment(), submitDemographics(), AssessmentContext, AssessmentContextType (+9 more)
 
 ### Community 329 - "PaymentController"
-Cohesion: 0.24
-Nodes (13): GetMapping, Integer, Logger, Long, Map, Object, PostMapping, PreAuthorize (+5 more)
+Cohesion: 0.16
+Nodes (6): Integer, CohortInsightView, CohortInsightGenerationServiceTest, BeforeEach, GeneratedReport, Test
 
 ### Community 330 - "TopicRepository"
 Cohesion: 0.14
 Nodes (16): GetMapping, Map, Optional, PreAuthorize, PutMapping, RestController, String, Topic (+8 more)
 
 ### Community 331 - "MeasuredQualities"
-Cohesion: 0.13
-Nodes (8): Boolean, Entity, Long, Set, String, Table, Tool, MeasuredQualities
+Cohesion: 0.16
+Nodes (7): Boolean, Entity, Long, Set, String, Tool, MeasuredQualities
 
 ### Community 332 - "CounsellingReminderSent"
-Cohesion: 0.14
-Nodes (11): CounsellingReminderSent, Entity, LocalDateTime, Long, PrePersist, String, Table, CounsellingReminderSentRepository (+3 more)
+Cohesion: 0.19
+Nodes (6): CounsellingReminderSent, Entity, LocalDateTime, Long, PrePersist, String
 
 ### Community 333 - "InstituteAssessment"
 Cohesion: 0.14
-Nodes (10): InstituteAssessment, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+2 more)
+Nodes (9): InstituteAssessment, Boolean, Date, Entity, Integer, JsonIgnoreProperties, Long, PrePersist (+1 more)
 
 ### Community 334 - "LeadNotificationService"
-Cohesion: 0.24
-Nodes (9): Async, Lead, Logger, Map, ObjectMapper, Service, String, LeadNotificationService (+1 more)
+Cohesion: 0.23
+Nodes (10): Async, Lead, Logger, Map, ObjectMapper, Row, Service, String (+2 more)
 
 ### Community 335 - "OdooLeadService"
 Cohesion: 0.18
 Nodes (13): Async, Integer, JsonNode, Lead, Logger, Long, Map, Object (+5 more)
 
 ### Community 336 - "CodingLanguage"
-Cohesion: 0.12
-Nodes (9): CodingLanguage, Entity, String, Table, CodingLanguageRepository, Integer, Optional, Repository (+1 more)
+Cohesion: 0.25
+Nodes (8): Integer, Transactional, BeforeEach, DisplayName, Integer, Long, Test, UserRoleGroupMappingScopeTest
 
 ### Community 337 - "StudentContactAssignment"
 Cohesion: 0.15
-Nodes (9): Date, Entity, Integer, Long, Table, StudentContactAssignment, Long, Repository (+1 more)
+Nodes (8): Date, Entity, Integer, Long, StudentContactAssignment, Long, Repository, StudentContactAssignmentRepository
 
 ### Community 338 - "ReminderSuppressionRepository"
 Cohesion: 0.15
@@ -2150,15 +2133,15 @@ Nodes (15): Long, Optional, Page, Pageable, Query, ReminderServiceType, Reminder
 
 ### Community 339 - ".buildRawAnswerSheet"
 Cohesion: 0.22
-Nodes (13): GeneralAssessmentExportService, Integer, Logger, Long, Map, Row, Service, String (+5 more)
+Nodes (13): Object, GeneralAssessmentExportService, Integer, Logger, Long, Map, Row, Service (+5 more)
 
 ### Community 340 - "8.2 Assessment Questions"
-Cohesion: 0.08
-Nodes (25): 8.2 Assessment Questions, 8.3 Assessment Sections, 8.4 Demographic Fields, 8.5 Offline Upload, 8.6 Text Response Mapping, 8. Assessment Section, Bulk Upload from Excel, [DEV] Technical Reference (+17 more)
+Cohesion: 0.09
+Nodes (23): 8.1 Assessments, 8.3 Assessment Sections, 8.4 Demographic Fields, 8.5 Offline Upload, 8.6 Text Response Mapping, 8. Assessment Section, Creating an Assessment, Demographic Fields Configuration (+15 more)
 
 ### Community 341 - "CounsellorAssessmentAssignmentController.java"
-Cohesion: 0.23
-Nodes (14): CounsellorAssessmentAssignmentController, DeleteMapping, GetMapping, Logger, Long, Map, Object, PostMapping (+6 more)
+Cohesion: 0.18
+Nodes (19): EntitlementController, GetMapping, HttpServletResponse, Long, Map, Object, PostMapping, PreAuthorize (+11 more)
 
 ### Community 342 - "EmailTemplateController"
 Cohesion: 0.23
@@ -2170,31 +2153,31 @@ Nodes (15): GetMapping, Map, PostMapping, PreAuthorize, RestController, Section,
 
 ### Community 344 - "DemographicFieldOption"
 Cohesion: 0.13
-Nodes (10): DemographicFieldOption, Entity, Integer, JsonIgnoreProperties, Long, String, Table, DemographicFieldOptionRepository (+2 more)
+Nodes (9): DemographicFieldOption, Entity, Integer, JsonIgnoreProperties, Long, String, DemographicFieldOptionRepository, Long (+1 more)
 
 ### Community 345 - "QuestionnaireSection"
-Cohesion: 0.14
-Nodes (11): Entity, Long, Questionnaire, QuestionSection, Set, String, Table, QuestionnaireSection (+3 more)
+Cohesion: 0.08
+Nodes (14): Entity, Long, String, QuestionnaireQuestion, Entity, Long, Questionnaire, QuestionSection (+6 more)
 
 ### Community 346 - "QuestionSection"
 Cohesion: 0.14
-Nodes (9): Boolean, Entity, JsonIgnore, JsonProperty, Long, Override, String, Table (+1 more)
+Nodes (8): Boolean, Entity, JsonIgnore, JsonProperty, Long, Override, String, QuestionSection
 
 ### Community 347 - "FirebaseStudentExtraData"
-Cohesion: 0.15
-Nodes (9): FirebaseStudentExtraData, Entity, Long, String, Table, FirebaseStudentExtraDataRepository, Long, Repository (+1 more)
+Cohesion: 0.19
+Nodes (5): FirebaseStudentExtraData, Entity, Long, String, String
 
 ### Community 348 - "ContactPersonAccessLevel"
-Cohesion: 0.14
-Nodes (10): ContactPersonAccessLevel, Entity, Integer, JsonIgnoreProperties, Long, Table, ContactPersonAccessLevelRepository, Long (+2 more)
+Cohesion: 0.15
+Nodes (9): ContactPersonAccessLevel, Entity, Integer, JsonIgnoreProperties, Long, ContactPersonAccessLevelRepository, Long, Repository (+1 more)
 
 ### Community 349 - "InstitueAcademic"
 Cohesion: 0.14
-Nodes (10): InstitueAcademic, Entity, NamedQuery, String, Table, InstitueAcademicRepository, Integer, Optional (+2 more)
+Nodes (9): InstitueAcademic, Entity, NamedQuery, String, InstitueAcademicRepository, Integer, Optional, Repository (+1 more)
 
 ### Community 350 - "CareerSuggestionService"
-Cohesion: 0.20
-Nodes (9): CareerSuggestionService, Career, Integer, Map, Service, String, CareerSuggestionTables, Map (+1 more)
+Cohesion: 0.17
+Nodes (13): from(), String, RecipientKind, EmailNotificationRecipientRepository, Long, String, EmailNotificationRecipientService, Long (+5 more)
 
 ### Community 351 - "Resource"
 Cohesion: 0.14
@@ -2205,12 +2188,12 @@ Cohesion: 0.08
 Nodes (23): 0. Positioning — the one sentence, 1. HERO METRICS — the "how robust is it" wall, 2. SLIDE-BY-SLIDE DECK CONTENT, 3. APPENDIX A — Metric Provenance (for Q&A / technical due diligence), 4. APPENDIX B — Design Direction (for the design step), 5. `[YOU FILL IN]` — business metrics the deck needs (not in the codebase), Career-9 — Technical Prowess & Roadmap, Design Brief for the Investor Presentation (+15 more)
 
 ### Community 353 - "LanguageQuestion"
-Cohesion: 0.16
-Nodes (9): JsonSetter, Entity, LanguageOption, Long, Map, Object, String, Table (+1 more)
+Cohesion: 0.20
+Nodes (15): CounsellorInstituteMappingController, CounsellorInstituteMapping, DeleteMapping, GetMapping, Integer, Logger, Long, Map (+7 more)
 
 ### Community 354 - "ae"
-Cohesion: 0.12
-Nodes (8): ae, color(), ee(), ie(), ne(), oe(), re(), te()
+Cohesion: 0.10
+Nodes (9): ae, color(), ee(), ie(), It(), ne(), oe(), re() (+1 more)
 
 ### Community 355 - "EmailTemplate_APIs.ts"
 Cohesion: 0.14
@@ -2221,35 +2204,35 @@ Cohesion: 0.14
 Nodes (16): studnetSchema, studnetSchema, emailChecker(), ReadBatchData(), ReadBoardData(), ReadBranchData(), ReadCategoryData(), ReadCollegeCourseData() (+8 more)
 
 ### Community 357 - "PricingTierController.java"
-Cohesion: 0.19
-Nodes (15): DeleteMapping, GetMapping, Integer, Long, Map, Object, PostMapping, PreAuthorize (+7 more)
+Cohesion: 0.18
+Nodes (14): InstituteDetailController, GetMapping, Integer, Logger, Map, Object, Optional, PostMapping (+6 more)
 
 ### Community 358 - "QuestionnaireLanguageController.java"
-Cohesion: 0.17
-Nodes (17): CrossOrigin, DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, QuestionnaireLanguage (+9 more)
+Cohesion: 0.10
+Nodes (22): CrossOrigin, DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, QuestionnaireLanguage (+14 more)
 
 ### Community 359 - ".cancelAndReplace"
-Cohesion: 0.19
-Nodes (13): CounsellorCancellationService, CounsellingSlot, DateTimeFormatter, LocalDate, Logger, Long, Map, Object (+5 more)
+Cohesion: 0.07
+Nodes (23): CounsellingLifecycleController, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController, CounsellingSlot, Boolean (+15 more)
 
 ### Community 360 - "ContactPerson"
 Cohesion: 0.15
-Nodes (5): ContactPerson, Entity, Long, String, Table
+Nodes (4): ContactPerson, Entity, Long, String
 
 ### Community 361 - "Gender"
 Cohesion: 0.13
-Nodes (9): Gender, Entity, String, Table, GenderRepository, Integer, Optional, Repository (+1 more)
+Nodes (8): Gender, Entity, String, GenderRepository, Integer, Optional, Repository, String
 
 ### Community 362 - "BetReportDataRepository"
 Cohesion: 0.16
-Nodes (12): BetReportDataRepository, BetReportData, Long, Optional, Repository, BetPlaceholderCalculator, Component, Long (+4 more)
+Nodes (8): JsonSetter, Entity, LanguageOption, Long, Map, Object, String, LanguageQuestion
 
 ### Community 363 - "PsychometricDataset"
 Cohesion: 0.19
 Nodes (8): Sheet, Workbook, Instrument, itemsOf(), Integer, String, PsychometricDataset, StudentRecord
 
 ### Community 364 - "ApplicationRunner"
-Cohesion: 0.14
+Cohesion: 0.13
 Nodes (16): ApplicationRunner, ApplicationArguments, Component, JdbcTemplate, Logger, Order, Override, RoleGroupIdTypeMigration (+8 more)
 
 ### Community 365 - "UTF8ToString"
@@ -2257,8 +2240,8 @@ Cohesion: 0.10
 Nodes (23): demangle(), demangleAll(), _emscripten_webgl_create_context(), _emscripten_webgl_do_create_context(), emscriptenWebGLGet(), findCanvasEventTarget(), findEventTarget(), _glBindAttribLocation() (+15 more)
 
 ### Community 366 - "DuplicateTolerantCsrfTokenRepository"
-Cohesion: 0.17
-Nodes (9): CookieCsrfTokenRepository, CsrfToken, CsrfTokenRepository, CsrfTokenRepository, DuplicateTolerantCsrfTokenRepository, HttpServletRequest, HttpServletResponse, Override (+1 more)
+Cohesion: 0.13
+Nodes (8): Boolean, Entity, String, TestCase, Integer, Optional, Repository, TestCaseRepository
 
 ### Community 367 - "Counselling Flow & Functionality — Change Log"
 Cohesion: 0.09
@@ -2277,8 +2260,8 @@ Cohesion: 0.09
 Nodes (21): abilitiesCareerImpact, abilitiesData, areaWiseGapsRadar, assessmentSummary, careerClarityData, careerMismatchData, careerTrendsData, challengesSolutionsData (+13 more)
 
 ### Community 371 - "SchoolReportModal.tsx"
-Cohesion: 0.09
-Nodes (13): getSavedSchoolReport(), getSchoolReport(), saveSchoolReport(), SchoolReportData, SchoolReportMqGroup, INTELLIGENCE_INSIGHTS, pdfTdStyle, pdfThStyle (+5 more)
+Cohesion: 0.19
+Nodes (12): AssessmentProctoringController, Cell, GetMapping, HttpServletResponse, Logger, Long, ObjectMapper, PreAuthorize (+4 more)
 
 ### Community 372 - "FourPagerAPI.ts"
 Cohesion: 0.16
@@ -2293,27 +2276,27 @@ Cohesion: 0.33
 Nodes (6): AuthCookieService, HttpServletRequest, HttpServletResponse, Optional, Service, String
 
 ### Community 376 - "EntitlementController.java"
-Cohesion: 0.29
-Nodes (13): EntitlementController, GetMapping, HttpServletResponse, Long, Map, Object, PostMapping, PreAuthorize (+5 more)
-
-### Community 377 - "PagerReportDataController.java"
 Cohesion: 0.17
 Nodes (14): Logger, Long, Map, Navigator360Result, Object, PostMapping, PreAuthorize, RequestMapping (+6 more)
 
+### Community 377 - "PagerReportDataController.java"
+Cohesion: 0.21
+Nodes (6): Date, Entity, JsonIgnoreProperties, Long, PrePersist, PromoCodeCampaign
+
 ### Community 378 - "SlotMaterializationConfigTest"
-Cohesion: 0.26
-Nodes (9): Counsellor, BeforeEach, CounsellingSlot, Counsellor, DisplayName, LocalDate, String, Test (+1 more)
+Cohesion: 0.23
+Nodes (9): Date, Integer, Long, Query, Repository, String, StudentInfo, User (+1 more)
 
 ### Community 379 - "InstituteEmailSetting"
-Cohesion: 0.15
-Nodes (8): InstituteEmailSetting, Date, Entity, Integer, Long, PrePersist, PreUpdate, Table
+Cohesion: 0.16
+Nodes (7): InstituteEmailSetting, Date, Entity, Integer, Long, PrePersist, PreUpdate
 
 ### Community 380 - "GeneratedReportRepository"
 Cohesion: 0.23
 Nodes (8): GeneratedReportRepository, Boolean, GeneratedReport, Long, Optional, Query, Repository, String
 
 ### Community 381 - ".exportStudentData"
-Cohesion: 0.21
+Cohesion: 0.19
 Nodes (12): AssessmentDataExcelExportService, Integer, Logger, Long, Map, Object, Service, Set (+4 more)
 
 ### Community 382 - "package.json"
@@ -2321,20 +2304,20 @@ Cohesion: 0.09
 Nodes (21): author, browser, crypto, node-fetch, util, dependencies, description, devDependencies (+13 more)
 
 ### Community 383 - ".numericGradeOrNull"
-Cohesion: 0.16
-Nodes (9): HydroTubeGameProps, Pattern, patterns, GradeParser, Integer, Map, String, GradeParserTest (+1 more)
+Cohesion: 0.22
+Nodes (7): Comparator, GradeParser, Integer, Map, String, GradeParserTest, Test
 
 ### Community 384 - "B2B Bridge — Implementation Plan (Phase 1 of the path to the target design)"
 Cohesion: 0.09
 Nodes (20): B2B Bridge — Implementation Plan (Phase 1 of the path to the target design), Design decision: the shared entitlement seam, Explicitly NOT in this phase (target-design, later), Phase 1A — Frontend: restore the two-area page  *(independent, low-risk)*, Phase 1B — Backend: school feeds the SSOT  *(small)*, Phase 1C — Backend: school entitlements  *(the core change — touches money/access)*, Phase 1D — School tier inclusions UI + security, Phase 1E — Verify (+12 more)
 
 ### Community 385 - ".buildReport"
-Cohesion: 0.24
-Nodes (9): Method, Annotation, ApplicationContext, Class, Map, Service, Set, String (+1 more)
+Cohesion: 0.12
+Nodes (25): Method, GetMapping, Map, Object, PostMapping, PreAuthorize, ResponseEntity, RestController (+17 more)
 
 ### Community 386 - "UnmappedQuestionsTool.tsx"
-Cohesion: 0.10
-Nodes (18): detectUnmappedQuestions(), getAllMappedAssessments(), getAssessmentQuestionnaire(), getQuestionMappings(), AnswerMapping, AssessmentSummary, CATEGORY_COLORS, CATEGORY_LABELS (+10 more)
+Cohesion: 0.22
+Nodes (8): StudentBrandingDto, BeforeEach, Boolean, DisplayName, Object, String, Test, StudentBrandingEmailToggleTest
 
 ### Community 387 - "Navigator360Report.tsx"
 Cohesion: 0.09
@@ -2345,8 +2328,8 @@ Cohesion: 0.18
 Nodes (13): AssessmentReportTemplateController, DeleteMapping, GetMapping, Logger, Long, PostMapping, PreAuthorize, PutMapping (+5 more)
 
 ### Community 390 - "Batch"
-Cohesion: 0.14
-Nodes (10): Batch, Entity, NamedQuery, String, Table, BatchRepository, Integer, Optional (+2 more)
+Cohesion: 0.15
+Nodes (9): Batch, Entity, NamedQuery, String, BatchRepository, Integer, Optional, Repository (+1 more)
 
 ### Community 391 - "PrincipalDashboardDataRepository"
 Cohesion: 0.24
@@ -2377,24 +2360,24 @@ Cohesion: 0.10
 Nodes (20): Email Theme and Rules Implementation Plan, File structure, Global Constraints, Self-review, Task 10a: Counselling mails — lifecycle (11 mails), Task 10b: Counselling mails — reminders, check-in, follow-ups (12 mails), Task 10c: Counselling mails — summaries, deactivation, internal alerts; delete the old house style, Task 11: Lead mails, account test, placeholder retirement, seeds (+12 more)
 
 ### Community 398 - "Career_APIs.ts"
-Cohesion: 0.14
-Nodes (10): AssignMeasuredQualityTypeToCareer(), CreateCareerData(), DeleteCareerData(), GetMeasuredQualityTypesForCareer(), ReadCareersData(), RemoveMeasuredQualityTypeFromCareer(), UpdateCareerData(), validationSchema (+2 more)
+Cohesion: 0.23
+Nodes (9): GroupController, GetMapping, Group, PreAuthorize, RestController, GroupRepository, Group, Integer (+1 more)
 
 ### Community 399 - "Faculty_APIs.ts"
 Cohesion: 0.17
 Nodes (12): crudApiModal, emailChecker(), fileUpload(), ReadCategoryData(), ReadFacultyByIdData(), readFacultyData(), ReadGenderData(), sendFacultyIdEmail() (+4 more)
 
 ### Community 400 - "QuestionMappingStep.tsx"
-Cohesion: 0.11
-Nodes (14): forceCompleteStatus(), importMappedAnswers(), importStudents(), DetailedResponse, StudentAssignment, AnswerOptionMapping, AssessmentQuestionMapping, PartialStudentInfo (+6 more)
+Cohesion: 0.15
+Nodes (12): CodingQuestionController, CrossOrigin, GetMapping, PostMapping, PreAuthorize, RequestMapping, RestController, CodingQuestionRepository (+4 more)
 
 ### Community 401 - "StudentPortalDashboard.tsx"
 Cohesion: 0.11
 Nodes (14): CheckoutLinkResponse, CheckoutStatusResponse, createDashboardCheckoutLink(), DashboardOptionsResponse, DashboardTierOption, getCheckoutStatus(), getDashboardCheckoutOptions(), Phase (+6 more)
 
 ### Community 402 - "CreateAppModal.tsx"
-Cohesion: 0.17
-Nodes (14): CreateAppModal(), Props, defaultCreateAppData, IAppBasic, IAppDatabase, ICreateAppData, StepProps, TAppFramework (+6 more)
+Cohesion: 0.20
+Nodes (12): Props, defaultCreateAppData, IAppBasic, IAppDatabase, ICreateAppData, StepProps, TAppFramework, TAppStorage (+4 more)
 
 ### Community 403 - "WebGazer"
 Cohesion: 0.10
@@ -2405,36 +2388,32 @@ Cohesion: 0.10
 Nodes (20): compilerOptions, allowJs, allowSyntheticDefaultImports, esModuleInterop, forceConsistentCasingInFileNames, ignoreDeprecations, isolatedModules, jsx (+12 more)
 
 ### Community 405 - "SignUpRequest"
-Cohesion: 0.18
-Nodes (3): Boolean, String, SignUpRequest
+Cohesion: 0.17
+Nodes (4): User, Boolean, String, SignUpRequest
 
 ### Community 406 - "AvailabilityTemplateController.java"
-Cohesion: 0.22
-Nodes (13): AvailabilityTemplateController, DeleteMapping, GetMapping, Logger, Long, Map, PostMapping, PreAuthorize (+5 more)
+Cohesion: 0.24
+Nodes (13): EmailNotificationRecipientController, DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize (+5 more)
 
 ### Community 407 - "LeadController.java"
 Cohesion: 0.19
 Nodes (16): Date, GetMapping, HttpServletRequest, Lead, Logger, Map, MultipartFile, Object (+8 more)
 
-### Community 408 - "ContactPersonRepository"
-Cohesion: 0.19
-Nodes (9): ContactPersonRepository, ContactPerson, Long, Optional, Repository, AccessScopeService, Long, Optional (+1 more)
-
 ### Community 409 - "EmailNotificationRecipientController.java"
-Cohesion: 0.24
-Nodes (13): EmailNotificationRecipientController, DeleteMapping, GetMapping, Long, Map, Object, PostMapping, PreAuthorize (+5 more)
+Cohesion: 0.15
+Nodes (3): Boolean, MQTScore, OptionData
 
 ### Community 410 - ".clear"
 Cohesion: 0.22
 Nodes (13): InstituteEmailSettingController, DeleteMapping, GetMapping, Integer, Long, Map, Object, PreAuthorize (+5 more)
 
 ### Community 411 - "CampaignRepository"
-Cohesion: 0.16
-Nodes (13): CampaignRepository, Campaign, Long, Optional, Repository, String, Long, PricingTier (+5 more)
+Cohesion: 0.39
+Nodes (5): Long, Map, Object, String, PrincipalDashboardService
 
 ### Community 412 - "CounsellorReportNotificationService"
-Cohesion: 0.27
-Nodes (8): CounsellorReportNotificationService, DateTimeFormatter, GeneratedReport, Logger, Long, Optional, Service, String
+Cohesion: 0.25
+Nodes (9): CounsellorReportNotificationService, DateTimeFormatter, GeneratedReport, Logger, Long, Map, Optional, Service (+1 more)
 
 ### Community 413 - "PrincipalDashboardRequestBuilder"
 Cohesion: 0.35
@@ -2449,8 +2428,8 @@ Cohesion: 0.22
 Nodes (7): Sheet, Cell, Integer, Sheet, String, Workbook, Xl
 
 ### Community 416 - "DigitalOceanSpacesService"
-Cohesion: 0.20
-Nodes (8): AmazonS3, CORSRule, DigitalOceanSpacesService, Logger, PostConstruct, Service, String, PresignedUpload
+Cohesion: 0.09
+Nodes (29): AmazonS3, CORSRule, DeleteMapping, Map, PostMapping, PreAuthorize, RequestMapping, ResponseEntity (+21 more)
 
 ### Community 417 - "compilerOptions"
 Cohesion: 0.10
@@ -2461,23 +2440,23 @@ Cohesion: 0.10
 Nodes (19): API Endpoints, Backend Components, Complete User Flow, Database Tables, Flow 1: Admin Creates a Paid Assessment Mapping, Flow 2: Student Registers via Public Link (Paid Path), Flow 3: Student Completes Payment on Razorpay, Flow 4: Payment Failure/Expiry/Cancellation (+11 more)
 
 ### Community 419 - "Payment_APIs.ts"
-Cohesion: 0.14
-Nodes (11): GeneratedLink, PaymentLinkModalProps, generatePaymentLink(), getPaymentTransactions(), resendWelcomeEmail(), sendNudgeEmail(), sendPaymentLinkEmail(), sendPaymentLinkWhatsApp() (+3 more)
+Cohesion: 0.23
+Nodes (10): Async, Date, Integer, Lead, Logger, ObjectMapper, Service, String (+2 more)
 
 ### Community 420 - "JwtTokensPage.tsx"
-Cohesion: 0.14
-Nodes (13): getJwtTokenStats(), JwtTokenAudit, JwtTokenListResponse, JwtTokenStats, JwtTokenStatus, JwtTokenType, ListFilters, listJwtTokens() (+5 more)
+Cohesion: 0.13
+Nodes (14): Block, getJwtTokenStats(), JwtTokenAudit, JwtTokenListResponse, JwtTokenStats, JwtTokenStatus, JwtTokenType, ListFilters (+6 more)
 
 ### Community 421 - "AdminCounsellingBookingController.java"
 Cohesion: 0.28
 Nodes (13): AdminCounsellingBookingController, GetMapping, Logger, Long, Map, Object, PostMapping, PreAuthorize (+5 more)
 
 ### Community 422 - "CounsellingRatingController.java"
-Cohesion: 0.23
+Cohesion: 0.22
 Nodes (14): CounsellingRatingController, CreateRatingRequest, GetMapping, Integer, Logger, Long, Map, Object (+6 more)
 
 ### Community 423 - "LanguageQuestionController.java"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (13): GetMapping, LanguageQuestion, Long, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController (+5 more)
 
 ### Community 424 - ".getOne"
@@ -2485,16 +2464,16 @@ Cohesion: 0.29
 Nodes (12): GetMapping, Map, Object, PostMapping, PreAuthorize, PutMapping, ReminderConfig, RequestMapping (+4 more)
 
 ### Community 425 - "DashboardSnapshot"
-Cohesion: 0.19
-Nodes (8): DashboardSnapshot, Entity, Instant, Long, String, Table, Optional, String
+Cohesion: 0.20
+Nodes (7): DashboardSnapshot, Entity, Instant, Long, String, Optional, String
 
 ### Community 426 - "StudentGroupContact"
-Cohesion: 0.17
-Nodes (7): Entity, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, Table, StudentGroupContact
+Cohesion: 0.18
+Nodes (6): Entity, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, StudentGroupContact
 
 ### Community 427 - "StudentGroupMember"
-Cohesion: 0.17
-Nodes (7): Entity, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, Table, StudentGroupMember
+Cohesion: 0.18
+Nodes (6): Entity, JsonIgnoreProperties, LocalDateTime, Long, PrePersist, StudentGroupMember
 
 ### Community 428 - "_strftime"
 Cohesion: 0.13
@@ -2517,8 +2496,8 @@ Cohesion: 0.11
 Nodes (18): 10. Risks & Open Items, 11. Out of Scope / Future, 1. Context & Problem, 2. Goals / Non-Goals, 3. Existing Foundation: `SchoolReport`, 4. Confirmed Decisions, 5.1 Page & UX, 5.2 Generation unit & source (+10 more)
 
 ### Community 433 - "Projects.tsx"
-Cohesion: 0.15
-Nodes (15): Projects(), users1, users2, users3, users4, users5, users6, users7 (+7 more)
+Cohesion: 0.08
+Nodes (24): Campaigns(), Connections(), Documents(), Overview(), Projects(), users1, users2, users3 (+16 more)
 
 ### Community 434 - "Question_Section_APIs.ts"
 Cohesion: 0.14
@@ -2537,36 +2516,36 @@ Cohesion: 0.25
 Nodes (14): GetMapping, Integer, Logger, Long, Map, Object, PostMapping, PreAuthorize (+6 more)
 
 ### Community 438 - "ReminderLogController.java"
-Cohesion: 0.23
-Nodes (11): Date, GetMapping, Map, Object, PreAuthorize, ReminderDeliveryStatus, RequestMapping, ResponseEntity (+3 more)
+Cohesion: 0.22
+Nodes (12): Date, GetMapping, Long, Map, Object, PreAuthorize, ReminderDeliveryStatus, RequestMapping (+4 more)
 
 ### Community 439 - "StudentRoleGroupController.java"
-Cohesion: 0.25
-Nodes (13): GetMapping, Long, Map, Object, PreAuthorize, PutMapping, RequestMapping, ResponseEntity (+5 more)
+Cohesion: 0.19
+Nodes (15): GetMapping, Long, Map, Object, PreAuthorize, PutMapping, RequestMapping, ResponseEntity (+7 more)
 
 ### Community 440 - "LinkBuilder"
-Cohesion: 0.28
-Nodes (4): Long, Service, String, LinkBuilder
+Cohesion: 0.15
+Nodes (9): Long, Service, String, LinkBuilder, Async, Logger, Service, String (+1 more)
 
 ### Community 441 - "ReportEmailIdempotency"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (11): Claim, Component, String, StringRedisTemplate, ReportEmailIdempotency, ExtendWith, String, StringRedisTemplate (+3 more)
 
 ### Community 442 - "RazorpayService"
-Cohesion: 0.20
-Nodes (9): Environment, JSONObject, Logger, Map, PostConstruct, RestTemplate, Service, String (+1 more)
+Cohesion: 0.19
+Nodes (11): CounsellingReminderSentRepository, Long, Repository, String, Logger, Long, Map, Scheduled (+3 more)
 
 ### Community 443 - "AssessmentInstituteMappingUpdateTest"
-Cohesion: 0.25
-Nodes (9): AssessmentInstituteMappingUpdateTest, AssessmentInstituteMapping, BeforeEach, DisplayName, Long, Map, Object, String (+1 more)
+Cohesion: 0.28
+Nodes (7): AssessmentInstituteMappingUpdateTest, AssessmentInstituteMapping, BeforeEach, DisplayName, Long, Map, Test
 
 ### Community 444 - "EncryptedStringConverter"
 Cohesion: 0.20
 Nodes (11): AttributeConverter, Converter, EmailCryptoKeyConfigurer, Configuration, PostConstruct, String, EncryptedStringConverter, Logger (+3 more)
 
 ### Community 445 - "DataContext.tsx"
-Cohesion: 0.14
-Nodes (15): AnimalReactionData, buildWriteBody(), clearPending(), DataContext, DataContextType, DataProvider(), GameData, GameKey (+7 more)
+Cohesion: 0.08
+Nodes (24): firebase, AnimalReactionData, buildWriteBody(), clearPending(), DataContext, DataContextType, DataProvider(), GameData (+16 more)
 
 ### Community 446 - "Named Student Groups with Multiple Contact Persons — Design"
 Cohesion: 0.11
@@ -2581,8 +2560,8 @@ Cohesion: 0.11
 Nodes (18): 5.1 Create Questionnaire, 5.2 Questionnaire List, 5.3 Tools, 5.4 Game List, 5. Questionnaire Management, [DEV] Technical Reference, [DEV] Technical Reference, [DEV] Technical Reference (+10 more)
 
 ### Community 449 - "EmailRecipientsPage.tsx"
-Cohesion: 0.22
-Nodes (13): createEmailRecipient(), deleteEmailRecipient(), EmailRecipient, EmailRecipientPayload, getEmailRecipients(), getRecipientOptions(), RecipientKind, RecipientOptions (+5 more)
+Cohesion: 0.05
+Nodes (32): ActionType, ICON_CLASS_TO_ACTION, PageHeaderAction, LoginLog, getLoginLogs(), getUrlAccessLogs(), UrlAccessLog, UrlAccessModalProps (+24 more)
 
 ### Community 450 - ".initialize"
 Cohesion: 0.21
@@ -2593,12 +2572,16 @@ Cohesion: 0.44
 Nodes (10): GetMapping, Long, Map, Object, PreAuthorize, RequestMapping, ResponseEntity, RestController (+2 more)
 
 ### Community 452 - "SectionGoogleGroup"
-Cohesion: 0.16
-Nodes (9): Entity, Section, String, Table, SectionGoogleGroup, Integer, Repository, String (+1 more)
+Cohesion: 0.30
+Nodes (10): EntityManager, Integer, Logger, Long, Map, Service, String, Transactional (+2 more)
 
 ### Community 453 - "UniversityMark"
+Cohesion: 0.45
+Nodes (5): ClassTeacherDashboardService, Long, Map, Object, String
+
+### Community 454 - "Marks"
 Cohesion: 0.18
-Nodes (8): Entity, LocalDateTime, String, Table, UniversityMark, Long, Repository, UniversityMarkRepository
+Nodes (3): OptionData, AnswerDetail, Long
 
 ### Community 455 - "PagerPlaceholderCalculator.java"
 Cohesion: 0.23
@@ -2609,20 +2592,20 @@ Cohesion: 0.25
 Nodes (10): Integer, Logger, Long, Map, Service, String, SanityCheckService, SanityResult (+2 more)
 
 ### Community 457 - "UtilController.java"
-Cohesion: 0.26
-Nodes (11): ByteArrayResource, GetMapping, Map, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController (+3 more)
+Cohesion: 0.20
+Nodes (8): AccessScope, Integer, Set, Rule, AccessScopeService, Long, Optional, Service
 
 ### Community 458 - "scripts"
-Cohesion: 0.12
-Nodes (16): name, private, scripts, build, build:production, build:staging, dev, dev:production (+8 more)
+Cohesion: 0.15
+Nodes (13): scripts, build, build:production, build:staging, dev, dev:production, dev:production:local, dev:staging (+5 more)
 
 ### Community 459 - "dependencies"
 Cohesion: 0.12
-Nodes (16): dependencies, axios, bootstrap, firebase, html2canvas, jspdf, @mediapipe/tasks-vision, react (+8 more)
+Nodes (15): dependencies, axios, bootstrap, html2canvas, jspdf, @mediapipe/tasks-vision, react, react-dom (+7 more)
 
 ### Community 460 - "FirebaseService"
-Cohesion: 0.31
-Nodes (9): Firestore, FirebaseService, Cacheable, CacheEvict, Logger, Map, Object, Service (+1 more)
+Cohesion: 0.33
+Nodes (8): FirebaseService, Cacheable, CacheEvict, Logger, Map, Object, Service, String
 
 ### Community 461 - "10. Teacher"
 Cohesion: 0.12
@@ -2633,72 +2616,72 @@ Cohesion: 0.12
 Nodes (17): 11.1 Role, 11.2 Users (Team Members), 11.3 Role - Role Group, 11.4 Role - User, 11. Roles & Users, [DEV] Technical Reference, [DEV] Technical Reference, [DEV] Technical Reference (+9 more)
 
 ### Community 463 - "scripts"
-Cohesion: 0.12
-Nodes (17): scripts, build, build:production, build:stage, eject, format, gen:perms, lint (+9 more)
+Cohesion: 0.07
+Nodes (27): browserslist, development, production, eslintConfig, extends, eslintIgnore, homepage, name (+19 more)
+
+### Community 464 - "pa"
+Cohesion: 0.14
+Nodes (11): GeneratedLink, PaymentLinkModalProps, generatePaymentLink(), getPaymentTransactions(), resendWelcomeEmail(), sendNudgeEmail(), sendPaymentLinkEmail(), sendPaymentLinkWhatsApp() (+3 more)
 
 ### Community 465 - "index.ts"
 Cohesion: 0.33
 Nodes (8): AssessmentQuestion, AssessmentQuestionOption, GameTable, MeasuredQuality, MeasuredQualityType, OptionScore, QuestionSection, Tool
 
 ### Community 466 - "AssessmentMappingStep.tsx"
-Cohesion: 0.15
-Nodes (14): clearFirebaseFetchCache(), deleteMappingByName(), getAllAssessments(), getAssessmentsByInstitute(), getMappingsByType(), invalidateFirebaseBackendCache(), AssessmentMappingStep(), FirebaseGrade (+6 more)
+Cohesion: 0.12
+Nodes (14): AuthLayout(), AuthPage(), ForgotPassword(), forgotPasswordSchema, Status, initialValues, Registration(), registrationSchema (+6 more)
 
 ### Community 467 - "StudentRoutes.tsx"
-Cohesion: 0.12
-Nodes (14): InsightDashboard, PermissionDeniedPage, SlotBookingPage, StudentAssessments, StudentAuthGuard(), StudentCounsellingPage, StudentDashboardLogin, StudentInfoForm (+6 more)
+Cohesion: 0.14
+Nodes (11): Entity, Integer, Long, String, RoleUrl, Long, Modifying, Query (+3 more)
 
 ### Community 468 - "AssessmentSessionController.java"
-Cohesion: 0.22
-Nodes (13): AssessmentSessionController, AssessmentSessionRequest, Date, Environment, HttpServletRequest, HttpServletResponse, Logger, Long (+5 more)
+Cohesion: 0.29
+Nodes (8): AlertModel, defaultMessages, defaultUserInfos, LogModel, messageFromClient, MessageModel, UserInfoModel, Props
 
 ### Community 469 - "CounsellingLifecycleService"
-Cohesion: 0.21
-Nodes (10): CounsellingLifecycleController, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController, CounsellingLifecycleService, Logger (+2 more)
+Cohesion: 0.17
+Nodes (9): Difficulty, Boolean, Entity, String, DifficultyRepository, Integer, Optional, Repository (+1 more)
 
 ### Community 470 - "DemographicFieldController.java"
 Cohesion: 0.24
 Nodes (11): DemographicFieldController, DeleteMapping, GetMapping, Long, PostMapping, PreAuthorize, PutMapping, RequestMapping (+3 more)
 
 ### Community 471 - "LanguageOptionsController.java"
-Cohesion: 0.21
-Nodes (12): GetMapping, LanguageOption, Long, PostMapping, PreAuthorize, RequestMapping, RestController, LanguageOptionsController (+4 more)
+Cohesion: 0.10
+Nodes (17): GetMapping, LanguageOption, Long, PostMapping, PreAuthorize, RequestMapping, RestController, LanguageOptionsController (+9 more)
 
 ### Community 472 - "InsightDashboardController.java"
 Cohesion: 0.23
 Nodes (11): InsightDashboardController, GetMapping, Logger, Long, PreAuthorize, RequestMapping, ResponseEntity, RestController (+3 more)
 
 ### Community 473 - "LanguageOption"
-Cohesion: 0.18
-Nodes (6): Entity, LanguageQuestion, Long, String, Table, LanguageOption
+Cohesion: 0.32
+Nodes (8): DeleteMapping, GetMapping, Long, PreAuthorize, RequestMapping, ResponseEntity, RestController, OmrColumnMappingController
 
 ### Community 474 - "Tool"
-Cohesion: 0.19
-Nodes (7): Double, Entity, Long, Set, String, Table, Tool
-
-### Community 475 - "StudentGroupMemberRepository"
-Cohesion: 0.26
-Nodes (6): Long, Modifying, Object, Query, Repository, StudentGroupMemberRepository
+Cohesion: 0.20
+Nodes (6): Double, Entity, Long, Set, String, Tool
 
 ### Community 476 - "ScopeFilterInterceptor"
-Cohesion: 0.19
-Nodes (13): Component, EntityManager, Exception, HttpServletRequest, HttpServletResponse, Integer, Logger, Long (+5 more)
+Cohesion: 0.20
+Nodes (12): Component, EntityManager, Exception, HttpServletRequest, HttpServletResponse, Integer, Logger, Long (+4 more)
 
 ### Community 477 - "PlaceholderCohortInsightAggregator"
 Cohesion: 0.18
 Nodes (10): CohortInsightPayload, Component, Long, Navigator360Result, Override, String, PlaceholderCohortInsightAggregator, Navigator360Result (+2 more)
 
 ### Community 478 - ".compute"
-Cohesion: 0.33
-Nodes (7): Logger, Map, Object, Service, String, PrincipalDashboardScopeCalculator, ScopeResult
+Cohesion: 0.25
+Nodes (5): Collection, Long, Set, ScopeExpansion, Selection
 
 ### Community 479 - "CoreTechnicalNavigatorDataService"
 Cohesion: 0.24
 Nodes (10): CoreTechnicalNavigatorDataService, Integer, IntermediaryScores, Logger, Long, Map, Service, String (+2 more)
 
 ### Community 480 - "SensitiveOpAspect"
-Cohesion: 0.22
-Nodes (10): Around, Aspect, ProceedingJoinPoint, Component, Logger, Long, Object, String (+2 more)
+Cohesion: 0.25
+Nodes (9): Around, Aspect, ProceedingJoinPoint, Component, Logger, Long, Object, String (+1 more)
 
 ### Community 481 - "devDependencies"
 Cohesion: 0.12
@@ -2709,8 +2692,8 @@ Cohesion: 0.13
 Nodes (16): attachFinalizer(), ClassHandle_clone(), ClassHandle_delete(), ClassHandle_deleteLater(), detachFinalizer(), downcastPointer(), flushPendingDeletes(), getInheritedInstance() (+8 more)
 
 ### Community 483 - "attachFinalizer"
-Cohesion: 0.13
-Nodes (16): attachFinalizer(), ClassHandle_clone(), ClassHandle_delete(), ClassHandle_deleteLater(), detachFinalizer(), downcastPointer(), flushPendingDeletes(), getInheritedInstance() (+8 more)
+Cohesion: 0.10
+Nodes (33): attachFinalizer(), ClassHandle_clone(), ClassHandle_delete(), ClassHandle_deleteLater(), constNoSmartPtrRawPointerToWireType(), detachFinalizer(), downcastPointer(), __embind_create_inheriting_constructor() (+25 more)
 
 ### Community 484 - "Admin "Log in as student" from Data Download"
 Cohesion: 0.12
@@ -2737,8 +2720,8 @@ Cohesion: 0.12
 Nodes (15): Architecture, Backend, Career-Nine, Changing Sync Schedule, Connecting to Staging DB, Database Sync (Master → Staging), Development, Environment (+7 more)
 
 ### Community 490 - "InstituteBatchGoogle"
-Cohesion: 0.17
-Nodes (4): InstituteBatchGoogle, Entity, String, Table
+Cohesion: 0.18
+Nodes (3): InstituteBatchGoogle, Entity, String
 
 ### Community 491 - "OptionMeasuredQualityRow"
 Cohesion: 0.23
@@ -2753,16 +2736,16 @@ Cohesion: 0.26
 Nodes (11): AssessmentScopeOwnershipInterceptor, Component, HttpServletRequest, HttpServletResponse, Logger, Long, Map, Object (+3 more)
 
 ### Community 494 - "AuthorizationService"
-Cohesion: 0.28
-Nodes (6): AuthorizationService, Integer, Logger, Long, Service, String
+Cohesion: 0.20
+Nodes (10): AuthorizationService, Integer, Logger, Long, Service, String, AuthAuditService, Integer (+2 more)
 
 ### Community 495 - ".enumDescriptions"
-Cohesion: 0.23
-Nodes (10): code(), description(), fromCode(), String, PermissionCode, Path, Set, String (+2 more)
+Cohesion: 0.10
+Nodes (15): HydroTubeGameProps, Pattern, patterns, Service, String, MailRenderer, Rendered, MailRules (+7 more)
 
 ### Community 496 - ".sendHtml"
-Cohesion: 0.38
-Nodes (5): Async, Logger, Service, String, PaymentEmailService
+Cohesion: 0.24
+Nodes (8): Boolean, Long, Modifying, Optional, Query, Repository, String, ReferralCodeRepository
 
 ### Community 497 - "package.json"
 Cohesion: 0.12
@@ -2817,43 +2800,35 @@ Cohesion: 0.28
 Nodes (8): DashboardSnapshotController, GetMapping, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController, String
 
 ### Community 511 - "QuestionnaireSectionInstruction"
-Cohesion: 0.22
-Nodes (5): Entity, Long, String, Table, QuestionnaireSectionInstruction
+Cohesion: 0.27
+Nodes (6): DuplicateEmailResponse, Integer, Map, Object, String, StudentInfo
 
 ### Community 512 - "PermissionRefreshController.java"
-Cohesion: 0.29
-Nodes (11): GetMapping, Map, Object, PostMapping, PreAuthorize, ResponseEntity, RestController, Set (+3 more)
-
-### Community 513 - "StudentCounsellorMappingService"
-Cohesion: 0.19
-Nodes (8): DuplicateResourceException, String, Throwable, Logger, Long, Service, String, StudentCounsellorMappingService
+Cohesion: 0.28
+Nodes (8): CompilerController, GetMapping, Integer, Map, PostMapping, PreAuthorize, RestController, String
 
 ### Community 514 - "AssessmentRawScore"
-Cohesion: 0.20
-Nodes (6): AssessmentRawScore, Entity, Integer, JsonIgnoreProperties, Long, Table
+Cohesion: 0.06
+Nodes (27): CohortDimension, Integer, String, List, BlockDateRequestRepository, BlockDateRequest, LocalDate, Long (+19 more)
 
 ### Community 515 - "Context"
-Cohesion: 0.16
-Nodes (11): ReminderTriggerSource, Context, Integer, Long, Map, Object, ReminderServiceType, ReminderTriggerSource (+3 more)
+Cohesion: 0.15
+Nodes (12): ReminderDeliveryStatus, ReminderTriggerSource, Context, Integer, Long, Map, Object, ReminderServiceType (+4 more)
 
 ### Community 516 - "Role"
-Cohesion: 0.21
-Nodes (5): Boolean, Entity, String, Table, Role
-
-### Community 517 - "RoleRepository"
-Cohesion: 0.22
-Nodes (8): Boolean, Integer, Optional, Query, Repository, Role, String, RoleRepository
+Cohesion: 0.24
+Nodes (4): Boolean, Entity, String, Section
 
 ### Community 518 - "ReminderSchedulerService"
-Cohesion: 0.29
-Nodes (7): Logger, Long, Map, Scheduled, Service, String, ReminderSchedulerService
+Cohesion: 0.25
+Nodes (7): CounsellingPlanRepository, Integer, LocalDate, Long, Query, Repository, String
 
 ### Community 519 - "WhatsAppService"
-Cohesion: 0.30
-Nodes (5): Logger, RestTemplate, Service, String, WhatsAppService
+Cohesion: 0.23
+Nodes (8): EntitlementSchedulerService, Date, Logger, Scheduled, Service, Long, String, NotificationDispatcher
 
 ### Community 520 - "PrincipalDashboardChartLogger"
-Cohesion: 0.29
+Cohesion: 0.28
 Nodes (7): Component, JsonNode, Map, Object, ObjectMapper, String, PrincipalDashboardChartLogger
 
 ### Community 521 - "Controller @PreAuthorize Coverage Test"
@@ -2861,8 +2836,8 @@ Cohesion: 0.13
 Nodes (14): Adding new endpoints, Controller @PreAuthorize Coverage Test, Current state: ENABLED, Email Dispatch Routing Test, Exclusions, Exclusions, Not covered: grant coverage (needs live data — Phase 6 soak), Not covered: WhatsApp (+6 more)
 
 ### Community 522 - "DashboardSnapshotService"
-Cohesion: 0.24
-Nodes (11): Callable, DashboardSnapshotRepository, Long, DashboardSnapshotService, Duration, Instant, JsonGenerator, Logger (+3 more)
+Cohesion: 0.22
+Nodes (12): Callable, DashboardSnapshotRepository, Long, DashboardSnapshotService, Duration, Instant, JsonGenerator, Logger (+4 more)
 
 ### Community 523 - "AuthAuditServiceJdbcDefault"
 Cohesion: 0.29
@@ -2873,8 +2848,8 @@ Cohesion: 0.14
 Nodes (13): 10. Legacy KCCITM (separate college product), 11. Summary by transport (current state), 12. Dead code & risks, 1. Transports (the senders), 2. Account / Auth, 3. Credentials & report distribution, 4. Assessment & B2C entitlement, 5. Report PDF pipeline (Kafka) (+5 more)
 
 ### Community 525 - "Role_RoleGroup.tsx"
-Cohesion: 0.24
-Nodes (8): Role_RoleGroupCreateInput, crudApiModal, deleteRole_RoleGroupData(), readRole_RoleGroupData(), upsertRole_RoleGroupData(), role_roleGroupValidation, Role_RoleGroupTable(), role_roleGroupValidation
+Cohesion: 0.22
+Nodes (8): Boolean, Integer, Optional, Query, Repository, Role, String, RoleRepository
 
 ### Community 526 - "ClassTeacherDashboard_APIs.ts"
 Cohesion: 0.18
@@ -2889,8 +2864,8 @@ Cohesion: 0.23
 Nodes (6): DeleteSectionData(), ReadSectionData(), UpdateSectionData(), validationSchema, validationSchema, SectionTable()
 
 ### Community 529 - "CounsellorRoutes.tsx"
-Cohesion: 0.14
-Nodes (9): CounsellorAppointmentsPage, CounsellorAuthGuard(), CounsellorAuthPage, CounsellorAvailabilityPage, CounsellorImpersonationLanding, CounsellorNotesPage, CounsellorPortalDashboard, CounsellorProfilePage (+1 more)
+Cohesion: 0.35
+Nodes (5): PagerVariant, AbsoluteLevel, Map, String, PagerInterpretations
 
 ### Community 530 - ".heartbeat"
 Cohesion: 0.23
@@ -2901,24 +2876,24 @@ Cohesion: 0.45
 Nodes (7): ClassTeacherDashboardController, GetMapping, Long, PreAuthorize, RequestMapping, ResponseEntity, RestController
 
 ### Community 532 - "AssessmentSession"
-Cohesion: 0.26
-Nodes (4): AssessmentSession, JsonIgnoreProperties, Long, String
+Cohesion: 0.14
+Nodes (12): HandlerInterceptor, AssessmentSessionInterceptor, Component, HttpServletRequest, HttpServletResponse, Logger, Object, Override (+4 more)
 
 ### Community 533 - "LeadRepository"
 Cohesion: 0.20
 Nodes (6): LeadType, OdooSyncStatus, Lead, Long, Repository, LeadRepository
 
 ### Community 534 - "CreateQuestion"
-Cohesion: 0.21
-Nodes (7): CreateQuestion, Entity, String, Table, CreateQuestionRepository, Integer, Repository
+Cohesion: 0.15
+Nodes (6): beforeUpdate(), configure(), fa(), ga(), initialize(), reset()
 
 ### Community 535 - "StudentGroupContactRepository"
-Cohesion: 0.27
+Cohesion: 0.28
 Nodes (6): Long, Modifying, Object, Query, Repository, StudentGroupContactRepository
 
 ### Community 536 - "InstituteAssessmentService"
-Cohesion: 0.34
-Nodes (6): InstituteAssessmentService, InstituteAssessment, Integer, Long, Service, Transactional
+Cohesion: 0.27
+Nodes (7): CounsellingEligibilityService, Logger, Long, Map, Object, Service, String
 
 ### Community 537 - "MemberToGoogleGroupHandler"
 Cohesion: 0.23
@@ -2933,8 +2908,8 @@ Cohesion: 0.15
 Nodes (13): M10 — Option images are base64-decoded and pinned in a module-level array, M11 — No error boundary around `Suspense`; lazy-chunk failure relies on a one-shot reload, M12 — Inconsistent timeouts/error-handling between axios and the raw-`fetch` calls, M1 — `goBack` only moves within the current section and keeps two sources of truth for the index, M2 — Game results are written to Firestore from the client, keyed by a client-controlled id, M3 — `ThankYouPage` bootstraps identity from URL query params (IDOR surface), M4 — Client-side PDF generation can OOM/crash low-end devices, M5 — Dead "Desktop Required" mobile-block modal; messaging contradicts the mobile UI (+5 more)
 
 ### Community 540 - "MappingPayLaterBooking.tsx"
-Cohesion: 0.18
-Nodes (10): CounsellingSlot, getPayLaterSlots(), payLaterBook(), bookedBadgeStyle, bookedChipStyle, formatDateHeader(), inputStyle, MappingPayLaterBooking() (+2 more)
+Cohesion: 0.08
+Nodes (27): CounsellingOptions, CounsellingSlot, CounsellingTierOption, getCounsellingOptionsByStudent(), getMappingInfoByToken(), getPayLaterSlots(), getUpgradeInfo(), MappingClass (+19 more)
 
 ### Community 541 - "WebMvcConfig"
 Cohesion: 0.24
@@ -2969,28 +2944,28 @@ Cohesion: 0.47
 Nodes (7): DashboardController, GetMapping, Long, PreAuthorize, RequestMapping, ResponseEntity, RestController
 
 ### Community 549 - "Permission"
-Cohesion: 0.26
-Nodes (5): Entity, Long, String, Table, Permission
+Cohesion: 0.16
+Nodes (10): GetMapping, Permission, PreAuthorize, ResponseEntity, RestController, PermissionController, Entity, Long (+2 more)
 
 ### Community 551 - "CounsellingRatingRepository"
 Cohesion: 0.27
 Nodes (7): CounsellingRatingRepository, Double, Long, Object, Optional, Query, Repository
 
 ### Community 552 - "InstituteAssessmentRepository"
-Cohesion: 0.31
-Nodes (7): InstituteAssessmentRepository, Boolean, InstituteAssessment, Integer, Long, Optional, Repository
+Cohesion: 0.36
+Nodes (5): CounsellingPaymentRepository, Long, Optional, Repository, String
 
 ### Community 553 - "NavigatorReportDataRepository"
 Cohesion: 0.32
 Nodes (5): Long, NavigatorReportData, Optional, Repository, NavigatorReportDataRepository
 
 ### Community 554 - ".recordDeny"
-Cohesion: 0.26
-Nodes (9): AuthAuditServiceImpl, Async, Decision, Integer, Logger, Long, Override, Service (+1 more)
+Cohesion: 0.24
+Nodes (9): CohortInsightController, GetMapping, Integer, Long, PostMapping, PreAuthorize, RequestMapping, ResponseEntity (+1 more)
 
 ### Community 555 - "PagerVariant"
-Cohesion: 0.38
-Nodes (5): PagerVariant, AbsoluteLevel, Map, String, PagerInterpretations
+Cohesion: 0.31
+Nodes (6): Long, Modifying, Notification, Query, Repository, NotificationRepository
 
 ### Community 556 - "LegacyPlaceholderCalculator"
 Cohesion: 0.27
@@ -3009,20 +2984,20 @@ Cohesion: 0.17
 Nodes (11): Appendix — method & confidence, Career9 B2C Flow — Functional & Security Issues (Audit), Compact flow context (for a cold start), [CONFIRMED] EXPOSE1 · MED — Tracker returns the full `PaymentTransaction` entity; no tenant scoping, Count table (area × severity), Data exposure, Recommended fix order, Refuted (no action — checked and cleared) (+3 more)
 
 ### Community 560 - "OldDataMapping_APIs.ts"
-Cohesion: 0.26
-Nodes (9): CreateClassData(), createClass(), deleteFirebaseStudents(), FB_CACHE_KEYS, fetchFirebaseSchoolData(), fetchFirebaseUserData(), fetchUniqueQuestions(), readCache() (+1 more)
+Cohesion: 0.23
+Nodes (7): CareerDefinition, Map, String, Navigator360CareerData, String, label(), RiasecType
 
 ### Community 561 - "CommunicationLogsPage.tsx"
-Cohesion: 0.24
-Nodes (8): CommunicationLogEntry, CommunicationLogFilters, CommunicationLogPage, getCommunicationLogs(), CommunicationLogsPage(), formatDate(), formatMessageType(), MESSAGE_TYPES
+Cohesion: 0.27
+Nodes (4): CodingAttempts, Entity, Long, User
 
 ### Community 562 - "ForgotPassword.tsx"
 Cohesion: 0.21
 Nodes (5): crudApiModal, findemail(), resetpassword(), serchSchema, validationSchema
 
 ### Community 563 - "ExistingMappingView.tsx"
-Cohesion: 0.17
-Nodes (9): deleteQuestionMappings(), findAssessmentsBySameQuestionnaire(), getAllAssessmentQuestions(), categoryLabels, GroupedMapping, Props, SavedMapping, SystemOption (+1 more)
+Cohesion: 0.29
+Nodes (7): AssessmentStudentInviteRepository, AssessmentStudentInvite, Integer, Long, Optional, Repository, String
 
 ### Community 564 - "PaymentRegisterPage.tsx"
 Cohesion: 0.17
@@ -3033,16 +3008,16 @@ Cohesion: 0.17
 Nodes (9): fetchGeneralDashboardData(), ParsedGeneralAssessmentData, parseGeneralAssessmentData(), PersonalityScore, processGeneralAssessment(), safeJsonParse(), Props, RANK_COLORS (+1 more)
 
 ### Community 566 - ".uploadMedia"
-Cohesion: 0.33
-Nodes (9): DeleteMapping, Map, PostMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController, String (+1 more)
+Cohesion: 0.31
+Nodes (5): Long, Repository, StudentReferralRepository, Logger, Service
 
 ### Community 567 - "QuestionnaireLanguage"
-Cohesion: 0.26
-Nodes (5): Entity, Long, Questionnaire, Table, QuestionnaireLanguage
+Cohesion: 0.25
+Nodes (8): 8.2 Assessment Questions, Bulk Upload from Excel, [DEV] Technical Reference, How to Create a Question, Recycle Bin, Translation, What It Is, What You See on Screen
 
 ### Community 568 - "BlockDateRequestRepository"
 Cohesion: 0.33
-Nodes (7): BlockDateRequestRepository, BlockDateRequest, LocalDate, Long, Query, Repository, String
+Nodes (5): GithubOAuth2UserInfo, Map, Object, Override, String
 
 ### Community 569 - "CounsellorInstituteMappingRepository"
 Cohesion: 0.35
@@ -3053,16 +3028,16 @@ Cohesion: 0.32
 Nodes (5): CurrentScopes, Integer, Long, String, ScopeRow
 
 ### Community 571 - "PrincipalDashboardNotificationService"
-Cohesion: 0.39
-Nodes (7): Logger, Long, Service, String, PrincipalDashboardNotificationService, Recipient, SendOutcome
+Cohesion: 0.33
+Nodes (5): GoogleOAuth2UserInfo, Map, Object, Override, String
 
 ### Community 572 - "🔴 Critical"
 Cohesion: 0.18
 Nodes (11): C10 — `restorePartialAnswers` resolves late and **replaces** (not merges) answers the student already typed, C1 — A background heartbeat can throw the student onto `/permission-denied` mid-assessment, C2 — Final submit retries non-retryable errors and blocks the UI with `alert()`, C3 — "Your answers are saved locally" is false, and the last section's answers can be lost, C4 — A new tab / lost `sessionStorage` leaves the student stuck on an infinite "Loading…" spinner, C5 — Out-of-range `questionIndex` in the URL crashes the page (white screen), C6 — In-progress answers within a section are never persisted until the section boundary, C7 — The axios retry interceptor replays **non-idempotent POSTs** → double Razorpay charge + wiped answers *(corrects the first-pass "payment is robust" note)* (+3 more)
 
 ### Community 573 - "checkStackCookie"
-Cohesion: 0.22
-Nodes (11): addOnPostRun(), addOnPreRun(), callRuntimeCallbacks(), checkStackCookie(), exitRuntime(), initRuntime(), postRun(), preRun() (+3 more)
+Cohesion: 0.08
+Nodes (30): addOnPostRun(), addOnPreRun(), callRuntimeCallbacks(), checkStackCookie(), checkUnflushedContent(), demangle(), demangleAll(), _emscripten_set_main_loop_timing() (+22 more)
 
 ### Community 574 - "ASSESSMENT_EVENT_AUDIT.md"
 Cohesion: 0.18
@@ -3086,15 +3061,15 @@ Nodes (10): Admin "Log in as student" from Data Download — Implementation Plan
 
 ### Community 579 - "ControllerPreAuthorizeCoverageTest"
 Cohesion: 0.31
-Nodes (7): JavaClass, ControllerPreAuthorizeCoverageTest, Annotation, Class, Set, String, Test
+Nodes (7): ControllerPreAuthorizeCoverageTest, Annotation, Class, JavaClass, Set, String, Test
 
 ### Community 580 - "package.json"
-Cohesion: 0.18
-Nodes (10): browserslist, development, production, eslintConfig, extends, eslintIgnore, homepage, name (+2 more)
+Cohesion: 0.38
+Nodes (4): Map, Object, String, OAuth2UserInfo
 
 ### Community 581 - "QuestionMappingWizard.tsx"
-Cohesion: 0.18
-Nodes (10): getStudentsByInstitute(), saveQuestionMappings(), DBStudent, FirebaseResponse, Institute, Props, QuestionMapping, QuestionMappingWizard() (+2 more)
+Cohesion: 0.22
+Nodes (9): AssessmentParticipation, Participation, SortedSet, AssessmentParticipation, Integer, Long, String, Participation (+1 more)
 
 ### Community 582 - "CohortInsightsPage.tsx"
 Cohesion: 0.25
@@ -3105,40 +3080,40 @@ Cohesion: 0.31
 Nodes (8): Bean, Configuration, Object, RedisConnectionFactory, RedisTemplate, String, StringRedisTemplate, RedisConfig
 
 ### Community 584 - "GameResultsController"
-Cohesion: 0.36
-Nodes (7): GameResultsController, GetMapping, PreAuthorize, RequestMapping, ResponseEntity, RestController, String
+Cohesion: 0.38
+Nodes (5): Long, Query, Questionnaire, Repository, QuestionnaireRepository
 
 ### Community 585 - "ReminderServiceType"
 Cohesion: 0.24
 Nodes (8): from(), String, ReminderServiceType, Long, Optional, ReminderConfig, ReminderServiceType, ReminderConfigRepository
 
 ### Community 586 - "AssessmentStudentInviteRepository"
-Cohesion: 0.29
-Nodes (7): AssessmentStudentInviteRepository, AssessmentStudentInvite, Integer, Long, Optional, Repository, String
+Cohesion: 0.39
+Nodes (6): Bean, ConditionalOnProperty, Configuration, JavaMailSender, String, SmtpMailConfig
 
 ### Community 587 - "DemographicFieldDefinitionRepository"
 Cohesion: 0.27
 Nodes (6): DemographicFieldDefinitionRepository, Long, Optional, Query, Repository, String
 
 ### Community 588 - "StudentGroupRepository"
-Cohesion: 0.29
-Nodes (6): Integer, Long, Optional, Query, Repository, StudentGroupRepository
+Cohesion: 0.26
+Nodes (7): Integer, Long, Optional, Query, Repository, String, StudentGroupRepository
 
 ### Community 589 - "CategoryRepository"
 Cohesion: 0.29
 Nodes (6): CategoryRepository, Category, Integer, Optional, Repository, String
 
 ### Community 590 - "IcsService"
-Cohesion: 0.31
-Nodes (5): IcsService, DateTimeFormatter, LocalDateTime, Service, String
+Cohesion: 0.33
+Nodes (7): Cache, Component, Date, Logger, PostConstruct, String, TemplateCache
 
 ### Community 591 - ".sendPurchase"
 Cohesion: 0.27
 Nodes (8): GoogleAnalyticsService, Double, HttpClient, Logger, Map, Object, Service, String
 
 ### Community 592 - "SchoolDashboardView"
-Cohesion: 0.22
-Nodes (9): AssessmentParticipation, Participation, SortedSet, AssessmentParticipation, Integer, Long, String, Participation (+1 more)
+Cohesion: 0.29
+Nodes (7): FirebaseDataCacheService, Cacheable, CacheEvict, Map, Object, Service, String
 
 ### Community 593 - "Appendix A — All 88 independently-verified findings (adversarial multi-agent pass)"
 Cohesion: 0.20
@@ -3161,8 +3136,8 @@ Cohesion: 0.20
 Nodes (9): 0. Start the stack, 1. Verify the migrations applied (fastest sanity check), 2. Phase 1 — counsellor auth linkage, 3. Phase 2 — lifecycle (auto COMPLETED / MISSED at slot end), 4. Phase 3a — soft-hold auto-release, Counselling Phases 1–3a — Testing Guide, Easiest: through the UI, Notes (+1 more)
 
 ### Community 598 - "AssessmentSessionInterceptor.java"
-Cohesion: 0.31
-Nodes (8): HandlerInterceptor, AssessmentSessionInterceptor, Component, HttpServletRequest, HttpServletResponse, Logger, Object, Override
+Cohesion: 0.39
+Nodes (6): EnableAsync, EnableCaching, EnableConfigurationProperties, String, SpringSocialApplication, SpringBootApplication
 
 ### Community 599 - "6.1 Measured Qualities"
 Cohesion: 0.20
@@ -3181,12 +3156,12 @@ Cohesion: 0.27
 Nodes (4): AllStudnetUniversityResultTable(), DataBoxes(), SubjectUniversityResultTable(), Basic()
 
 ### Community 605 - "CampaignAssessmentTierRepository"
-Cohesion: 0.40
-Nodes (5): CampaignAssessmentTierRepository, CampaignAssessmentTier, Long, Optional, Repository
+Cohesion: 0.52
+Nodes (5): CodeToRoutes, deriveUrlsForPerms(), nextUrlsAfterPermissionChange(), splitCustomPaths(), MANIFEST
 
 ### Community 606 - "QuestionnaireRepository"
-Cohesion: 0.38
-Nodes (5): Long, Query, Questionnaire, Repository, QuestionnaireRepository
+Cohesion: 0.39
+Nodes (6): FourPagerTemplateController, PostMapping, RequestMapping, ResponseEntity, RestController, String
 
 ### Community 607 - "StudentLogRepository"
 Cohesion: 0.24
@@ -3196,17 +3171,13 @@ Nodes (5): Integer, Optional, Repository, String, StudentLogRepository
 Cohesion: 0.27
 Nodes (5): Long, Map, Object, String, PlaceholderCalculator
 
-### Community 609 - "TemplateCache"
-Cohesion: 0.33
-Nodes (7): Cache, Component, Date, Logger, PostConstruct, String, TemplateCache
-
 ### Community 610 - "SessionNotesService.java"
-Cohesion: 0.33
-Nodes (7): Logger, Long, Optional, Service, SessionNotes, Transactional, SessionNotesService
+Cohesion: 0.03
+Nodes (39): CounsellingAppointment, Boolean, CounsellingSlot, Counsellor, Entity, Integer, JsonIgnoreProperties, LocalDateTime (+31 more)
 
 ### Community 611 - "ReminderScopeFilter"
-Cohesion: 0.36
-Nodes (4): Integer, Long, Service, ReminderScopeFilter
+Cohesion: 0.46
+Nodes (3): Integer, Service, ReminderScopeFilter
 
 ### Community 612 - "Career-Nine Assessment App — Functional, Logical & Performance Audit"
 Cohesion: 0.22
@@ -3245,32 +3216,36 @@ Cohesion: 0.22
 Nodes (8): background_color, description, display, icons, name, short_name, start_url, theme_color
 
 ### Community 623 - "UniversityMarkController.java"
-Cohesion: 0.39
-Nodes (6): GetMapping, Long, PostMapping, PreAuthorize, RestController, UniversityMarkController
+Cohesion: 0.48
+Nodes (3): Long, Optional, SchoolReportRepository
+
+### Community 624 - "String"
+Cohesion: 0.62
+Nodes (3): Long, String, Result
 
 ### Community 625 - "NavigatorReportData.java"
-Cohesion: 0.22
-Nodes (5): Date, Entity, JsonIgnoreProperties, PrePersist, Table
+Cohesion: 0.25
+Nodes (4): Date, Entity, JsonIgnoreProperties, PrePersist
 
 ### Community 626 - "CounsellorAssessmentAssignmentRepository"
-Cohesion: 0.42
-Nodes (3): CounsellorAssessmentAssignmentRepository, Long, Query
+Cohesion: 0.33
+Nodes (6): CohortInsightView, CohortInsightPayload, Date, Integer, Long, String
 
 ### Community 627 - "GeneralAssessmentResultRepository"
-Cohesion: 0.39
-Nodes (3): GeneralAssessmentResultRepository, Long, Optional
+Cohesion: 0.21
+Nodes (7): GeneralAssessmentResultRepository, Long, Optional, Logger, ObjectMapper, Service, Transactional
 
 ### Community 628 - "ReportTemplateRepository"
-Cohesion: 0.36
-Nodes (6): Long, Optional, ReportTemplate, Repository, String, ReportTemplateRepository
+Cohesion: 0.25
+Nodes (4): Entity, JsonIgnoreProperties, LocalDateTime, PrePersist
 
 ### Community 629 - ".applyMappingTierSnapshot"
 Cohesion: 0.39
 Nodes (4): AssessmentMappingTier, Integer, SchoolAssessmentTier, ServiceInclusions
 
 ### Community 630 - "ReminderTemplateRenderer"
-Cohesion: 0.42
-Nodes (5): Map, ReminderServiceType, Service, String, ReminderTemplateRenderer
+Cohesion: 0.20
+Nodes (7): Map, ReminderServiceType, Service, String, ReminderTemplateRenderer, Test, ReminderTemplateRendererTest
 
 ### Community 631 - "CacheErrorConfig.java"
 Cohesion: 0.39
@@ -3297,8 +3272,8 @@ Cohesion: 0.25
 Nodes (7): 1. Booking confirmation  ← the one the post-assessment flow uses, 2. Session reminder (student & counsellor), 3. Check-in OTP, 4. Booking nudge / no-show ("you still have a session to book"), 5. Counsellor daily digest, Counselling Notification Templates, Setup checklist
 
 ### Community 637 - "SpringSocialApplication.java"
-Cohesion: 0.39
-Nodes (6): EnableAsync, EnableCaching, EnableConfigurationProperties, String, SpringSocialApplication, SpringBootApplication
+Cohesion: 0.36
+Nodes (4): AccessScopeJpqlBuilder, Fields, Map, String
 
 ### Community 638 - "ReportPipelineConfig"
 Cohesion: 0.43
@@ -3313,8 +3288,8 @@ Cohesion: 0.25
 Nodes (7): Available Scripts, Getting Started with Create React App, Learn More, `yarn build`, `yarn eject`, `yarn start`, `yarn test`
 
 ### Community 641 - "SlotGrid.tsx"
-Cohesion: 0.29
-Nodes (5): DAY_NAMES, getWeekDates(), Slot, SlotGrid(), SlotGridProps
+Cohesion: 0.06
+Nodes (28): bookSlot(), getStudentCancellationInfo(), rescheduleAppointment(), EligibilityPayload, EligibilityResponse, getStudentEligibility(), AvailabilityManagerPage(), CounsellorDashboardPage() (+20 more)
 
 ### Community 642 - "OldStudentEmail.tsx"
 Cohesion: 0.32
@@ -3329,48 +3304,32 @@ Cohesion: 0.25
 Nodes (6): del, entries, MiniCssExtractPlugin, path, rootPath, RtlCssPlugin
 
 ### Community 645 - "ResultClass"
-Cohesion: 0.54
-Nodes (4): Result, ArrayList, String, ResultClass
+Cohesion: 0.29
+Nodes (7): _glUniform1f(), _glUniform1i(), _glUniform2fv(), _glUniform4fv(), _glUniform4iv(), _glUniformMatrix4fv(), webglGetUniformLocation()
 
 ### Community 646 - ".jtiDenyList"
 Cohesion: 0.36
 Nodes (6): Bean, Boolean, Cache, Configuration, String, JtiDenyListConfig
 
-### Community 647 - "FourPagerTemplateController.java"
-Cohesion: 0.39
-Nodes (6): FourPagerTemplateController, PostMapping, RequestMapping, ResponseEntity, RestController, String
-
-### Community 648 - "ReportTemplateDto"
-Cohesion: 0.32
-Nodes (5): Date, Long, ReportTemplate, String, ReportTemplateDto
-
 ### Community 649 - "UnifiedReportResponse"
 Cohesion: 0.43
 Nodes (4): Boolean, Date, String, UnifiedReportResponse
 
+### Community 651 - "AuthResponse"
+Cohesion: 0.40
+Nodes (3): Long, Repository, MeasuredQualitiesRepository
+
 ### Community 652 - "AuthAuditRepository"
-Cohesion: 0.39
-Nodes (5): AuthAuditRepository, Decision, LocalDateTime, Long, Repository
+Cohesion: 0.40
+Nodes (3): CareerMatch, rankConfig, TopCareerMatchesProps
 
-### Community 653 - "CounsellingRequestRepository"
-Cohesion: 0.43
-Nodes (4): CounsellingRequestRepository, Long, Optional, String
-
-### Community 654 - "ReportAutoGenerationService"
-Cohesion: 0.39
-Nodes (5): Async, Logger, Long, Service, ReportAutoGenerationService
-
-### Community 655 - ".fill"
-Cohesion: 0.46
-Nodes (5): Component, Map, Object, String, TemplateRenderer
+### Community 653 - "ToolMeasuredQualitiesMappingRepository.java"
+Cohesion: 0.50
+Nodes (4): Long, Repository, Tool, ToolMeasuredQualitiesMappingRepository
 
 ### Community 656 - "PsychometricExportLocalIT"
 Cohesion: 0.48
 Nodes (5): ActiveProfiles, EnabledIfSystemProperty, Test, PsychometricExportLocalIT, SpringBootTest
-
-### Community 657 - "webglGetUniformLocation"
-Cohesion: 0.29
-Nodes (7): _glUniform1f(), _glUniform1i(), _glUniform2fv(), _glUniform4fv(), _glUniform4iv(), _glUniformMatrix4fv(), webglGetUniformLocation()
 
 ### Community 658 - "webglGetUniformLocation"
 Cohesion: 0.29
@@ -3417,16 +3376,8 @@ Cohesion: 0.48
 Nodes (5): RestTemplateBuilder, GotenbergConfig, Bean, Configuration, RestTemplate
 
 ### Community 670 - "StudentLog.java"
-Cohesion: 0.29
-Nodes (4): BigInteger, Entity, NamedQuery, Table
-
-### Community 672 - "AvailabilityTemplateRepository"
-Cohesion: 0.43
-Nodes (3): AvailabilityTemplateRepository, Long, Repository
-
-### Community 673 - "Navigator360CareerData"
-Cohesion: 0.43
-Nodes (4): CareerDefinition, Map, String, Navigator360CareerData
+Cohesion: 0.33
+Nodes (3): BigInteger, Entity, NamedQuery
 
 ### Community 674 - ".everyEmailMustBeSentThroughTheDispatcher"
 Cohesion: 0.48
@@ -3484,17 +3435,9 @@ Nodes (6): 15.1 Student Dashboard, 15.2 Institute Dashboard, 15. Related Pages, 
 Cohesion: 0.33
 Nodes (6): 4.2 Contact Person, [DEV] Technical Reference, How to Add Contact Person(s), How to Edit a Contact Person, What It Is, What You See on Screen
 
-### Community 689 - "8.1 Assessments"
-Cohesion: 0.33
-Nodes (6): 8.1 Assessments, Creating an Assessment, Demographic Fields Configuration, [DEV] Technical Reference, What It Is, What You See on Screen
-
 ### Community 691 - "sanitizeText.ts"
 Cohesion: 0.53
 Nodes (5): CP1252_TO_BYTE, encodeCp1252(), hasNonAscii(), sanitizePayload(), sanitizeText()
-
-### Community 693 - "MeasuredQualitiesRepository"
-Cohesion: 0.40
-Nodes (3): Long, Repository, MeasuredQualitiesRepository
 
 ### Community 694 - ".getAbbreviation"
 Cohesion: 0.40
@@ -3552,10 +3495,6 @@ Nodes (5): 1. Application Overview, [DEV] Architecture, How the Sidebar Menu is 
 Cohesion: 0.40
 Nodes (5): 4.9 Student's List & Profile, [DEV] Technical Reference, How to Add a New Student, What It Is, What You See on Screen
 
-### Community 712 - "SectionMappingStep.tsx"
-Cohesion: 0.40
-Nodes (3): CreateSectionData(), createSection(), Props
-
 ### Community 713 - "getDashboardDataFromCache"
 Cohesion: 0.40
 Nodes (5): fetchGameResults(), getDashboardDataFromCache(), getEnvironmentalCategory(), getSocialInsightFullData(), processBetAssessmentData()
@@ -3563,10 +3502,6 @@ Nodes (5): fetchGameResults(), getDashboardDataFromCache(), getEnvironmentalCate
 ### Community 714 - "NavigatorRadarChart.tsx"
 Cohesion: 0.40
 Nodes (3): NavigatorRadarChartProps, PILLAR_COLORS, PillarScore
-
-### Community 716 - ".recordDeny"
-Cohesion: 0.50
-Nodes (3): Integer, Long, String
 
 ### Community 718 - "React + TypeScript + Vite"
 Cohesion: 0.50
@@ -3608,17 +3543,9 @@ Nodes (3): disposeOrphanedCharts(), __docOn(), init()
 Cohesion: 0.67
 Nodes (3): SearchableMultiSelect(), SearchableMultiSelectProps, SearchableOption
 
-### Community 729 - "firebase.ts"
-Cohesion: 0.50
-Nodes (3): app, db, firebaseConfig
-
 ### Community 733 - "tsconfig.typecheck.json"
 Cohesion: 0.50
 Nodes (3): compilerOptions, ignoreDeprecations, extends
-
-### Community 735 - "from"
-Cohesion: 0.67
-Nodes (3): from(), String, RecipientKind
 
 ### Community 739 - "Public-endpoint IDOR / PII (exploitable now, independent of enforce-mode)"
 Cohesion: 0.67
@@ -3633,24 +3560,24 @@ Cohesion: 0.67
 Nodes (3): Funnel / path logic, [LIKELY] DUP-SAM · LOW — Duplicate `StudentAssessmentMapping`/entitlement under concurrent registration, [LIKELY] PATH1 · MED — Paid `/register` doesn't validate `purchasePath` → a Path-B-only assessment can be force-charged pay-first
 
 ## Knowledge Gaps
-- **2576 isolated node(s):** `manifest_version`, `name`, `version`, `description`, `content_scripts` (+2571 more)
+- **2580 isolated node(s):** `manifest_version`, `name`, `version`, `description`, `content_scripts` (+2575 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **51 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **54 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `List` connect `List` to `StudentCounsellorMappingService`, `chart.umd.min.js`, `Faculty`, `RoleRepository`, `WhatsAppService`, `PrincipalDashboardChartLogger`, `CheckRegistrationFeild`, `CounsellingAppointment`, `CounsellingSlot`, `.get`, `.equals`, `.isEmpty`, `StudentEntitlement`, `LeadRepository`, `UserPrincipal`, `StudentGroupContactRepository`, `String`, `InstituteAssessmentService`, `PaymentTransaction`, `.ok`, `.add`, `AssessmentProctoringQuestionLog`, `PromoCode`, `UnifiedBulkRequest`, `SchoolRegistrationController`, `SchoolSession`, `CounsellingRatingRepository`, `InstituteAssessmentRepository`, `UserRoleScope`, `UserRoleGroupMapping`, `NavigatorReportDataRepository`, `CodingQuestion`, `EmailDispatchService`, `.findFirstByUserStudentUserStudentIdAndAssessmentId`, `ShortLink`, `AssessmentSubmissionFailure`, `.body`, `SmtpEmailRequest`, `UserStudentInstituteHistory`, `BlockDateRequestRepository`, `CounsellorInstituteMappingRepository`, `ScopeRow`, `AssessmentSessionService`, `StudentController`, `AuthController.java`, `PrincipalDashboardNotificationService`, `RefreshToken`, `ReferralCodeController`, `AssessmentAnswer`, `ControllerPreAuthorizeCoverageTest`, `BetReportDataController`, `.compare`, `PermissionRepository`, `AssessmentStudentInviteRepository`, `DemographicFieldDefinitionRepository`, `SchoolReport`, `CampaignPublicController`, `CounsellorRepository`, `InstituteBatchGoogleGroup`, `StudentGroupRepository`, `CategoryRepository`, `FileMetadata`, `DashboardDataService`, `.put`, `ReportGenerationLog`, `ServiceDeliveryLog`, `SchoolReportService`, `ReferralCode`, `SessionSummary`, `CampaignAssessmentTierRepository`, `QuestionnaireRepository`, `StudentLogRepository`, `StudentCounsellorMapping`, `StudentAssessmentMappingRepository`, `RoleRoleGroupMapping`, `TokenProvider`, `ReminderScopeFilter`, `StudentDashboardDataService.java`, `ReportPipelineProducer`, `CounsellingActivityLog`, `CounsellingAppointmentRepository`, `CounsellingPayment`, `UniversityMarkController.java`, `PaymentWebhookController`, `CounsellorAssessmentAssignmentRepository`, `GeneralAssessmentResultRepository`, `ReportTemplateRepository`, `CodingPlatformProblem`, `EmailAccountService`, `UserRepository`, `InstituteDetail`, `User`, `ReminderTemplateRenderer`, `CounsellorInstituteMapping`, `GoogleAdminController.java`, `.get`, `AssessmentQuestionOptions`, `CounsellingPlan`, `UserStudentRepository`, `InstituteBranch`, `OmrColumnMapping`, `CampaignController`, `Notification`, `EmailTemplateService`, `AuthAuditRepository`, `AssessmentRawScoreRepository`, `CounsellingRequestRepository`, `Cookie`, `CohortInsightGenerationService`, `PrincipalDashboardReleaseLog`, `InstituteSession`, `CampaignAssessmentMapping`, `AppointmentAuditLog`, `AssessmentMappingTierRepository`, `QuestionnaireQuestionRepository`, `Group`, `InstituteBatch`, `InstituteCourse`, `StudentGroupController`, `AvailabilityTemplateRepository`, `JpaRepository`, `CustomUserDetailsService`, `CampaignClassAssessment`, `Navigator360CareerData`, `InsightDashboardService`, `InstituteDetailRepository`, `AssessmentDemographicMapping`, `PaymentTransactionRepository`, `CompilerQuestionLog`, `ContactPersonController`, `ScopeKey`, `NavigatorCoreAnalysis`, `MeasuredQualitiesRepository`, `Navigator360EngineService`, `AssessmentQuestions`, `OptionScoreBasedOnMEasuredQualityTypes`, `StudentService`, `PrincipalDashboardReleaseService`, `UnifiedEnqueueRequest`, `ReportTemplateController`, `AssessmentQuestionController.java`, `NavigatorReportGenerationService`, `GeneratedReportController`, `TestCase`, `InstituteBranchBatchMapping`, `SchoolDashboardWorkbookWriter`, `AdminCounsellingBookingService`, `Career`, `PrincipalDashboardReleaseController`, `MeasuredQualityTypesController`, `.duplicate`, `PaymentNotificationLog`, `StudentDemographicResponse`, `StudentEntitlementRepository`, `ReportService`, `GeneralAssessmentJsonDataLoader`, `AssessmentLoadTest`, `JwtTokenAuditRepository`, `DemographicFieldDefinition`, `UserController.java`, `OdooEmailService`, `CounsellorController`, `UserStudent`, `ReminderDeliveryLogService`, `Topic`, `GeneralAssessmentProcessingService`, `SchoolDashboard.java`, `CounsellingRescheduleService`, `AssessmentReportTemplate`, `UserUrlAccessLog`, `StudentRepository`, `.send`, `ReminderConfigService`, `Questionnaire`, `SchoolDashboardDataService`, `MeasuredQualityTypes`, `StudentGroupService`, `ReleaseSnapshot`, `PsychometricStats`, `LanguagesSupported`, `FirebaseQuestionMapping`, `BatchBranchOption`, `UserActivityLog`, `PsychometricAdvancedSheets`, `GameTable`, `QuestionSectionController.java`, `.buildPlaceholders`, `InstituteDetailController.java`, `PsychometricPropertiesExportService`, `String`, `JsonFormat`, `ReportTemplateCatalogController`, `.submit`, `MeResponse`, `CompactDashboardJson`, `Navigator360EngineService.java`, `TokenAuthenticationFilter`, `EmailNotificationRecipientService`, `SlotConfigurationController.java`, `MeasuredQualitiesController.java`, `ToolController.java`, `BoardName`, `EmailMessage`, `PaymentController`, `TopicRepository`, `MeasuredQualities`, `LeadNotificationService`, `CodingLanguage`, `StudentContactAssignment`, `ReminderSuppressionRepository`, `.buildRawAnswerSheet`, `CounsellorAssessmentAssignmentController.java`, `SectionRepository`, `DemographicFieldOption`, `QuestionnaireSection`, `QuestionSection`, `FirebaseStudentExtraData`, `ContactPersonAccessLevel`, `InstitueAcademic`, `CareerSuggestionService`, `LanguageQuestion`, `PricingTierController.java`, `QuestionnaireLanguageController.java`, `.cancelAndReplace`, `Gender`, `BetReportDataRepository`, `PsychometricDataset`, `EntitlementController.java`, `SlotMaterializationConfigTest`, `GeneratedReportRepository`, `.exportStudentData`, `.buildReport`, `AssessmentReportTemplateController.java`, `Batch`, `PrincipalDashboardDataRepository`, `AvailabilityTemplateController.java`, `LeadController.java`, `ContactPersonRepository`, `CampaignRepository`, `CounsellorReportNotificationService`, `PrincipalDashboardRequestBuilder`, `OdooSender`, `DigitalOceanSpacesService`, `SchoolDashboardView`, `AdminCounsellingBookingController.java`, `CounsellingRatingController.java`, `LanguageQuestionController.java`, `StudentManagementController.java`, `StudentRoleGroupController.java`, `.getDashboardData`, `SectionGoogleGroup`, `UniversityMark`, `SanityCheckService.java`, `FirebaseService`, `DemographicFieldController.java`, `LanguageOptionsController.java`, `StudentGroupMemberRepository`, `PlaceholderCohortInsightAggregator`, `.compute`, `CoreTechnicalNavigatorDataService`, `AssessmentInstituteMappingRepository`, `AssessmentScopeOwnershipInterceptor`, `AuthorizationService`?**
-  _High betweenness centrality (0.302) - this node is a cross-community bridge._
-- **Why does `showErrorToast()` connect `showErrorToast` to `AssessmentDemographicConfig.tsx`, `lookups.ts`, `SchoolDashboardPage.tsx`, `StudentInfo_APIs.ts`, `index.ts`, `Career_APIs.ts`, `AssessmentMapping_APIs.ts`, `toast.ts`, `ActionIcon.tsx`, `ReportsHubPage.tsx`, `useAuth`, `ReportCenterPage.tsx`, `Payment_APIs.ts`, `AppointmentAPI.ts`, `SendReportsPage.tsx`, `CounsellorAvailabilityPanel.tsx`, `CommunicationLogsPage.tsx`, `Measured_Qualities_APIs.ts`, `ReferralCodePage.tsx`, `PrivateRoutes.tsx`, `Tracker_APIs.ts`, `EmailRecipientsPage.tsx`, `CampaignEditPage.tsx`, `QuestionLanguageModal.tsx`, `GroupManagerPanel.tsx`, `StudentNavigator360Page.tsx`, `DynamicDemographicForm.tsx`, `PasswordMeterComponent`, `EmailTemplate_APIs.ts`, `EmailLogPage.tsx`, `showSuccessToast`, `SchoolAssessmentMappingPanel.tsx`, `SchoolDashboardReleasePage.tsx`, `dashboard-admin.tsx`, `SchoolReportModal.tsx`, `LiveTrackingPage.tsx`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
-- **Why does `getBinaryPromise()` connect `abort` to `CounsellorRepository`, `face_mesh_solution_wasm_bin.js`?**
-  _High betweenness centrality (0.040) - this node is a cross-community bridge._
+- **Why does `List` connect `AssessmentRawScore` to `PermissionRefreshController.java`, `chart.umd.min.js`, `Faculty`, `RoleRepository`, `ReminderSchedulerService`, `PrincipalDashboardChartLogger`, `CheckRegistrationFeild`, `CounsellingAppointment`, `CounsellingSlot`, `.get`, `Role_RoleGroup.tsx`, `.equals`, `.isEmpty`, `StudentEntitlement`, `LeadRepository`, `UserPrincipal`, `StudentGroupContactRepository`, `String`, `PaymentTransaction`, `.ok`, `.add`, `AssessmentProctoringQuestionLog`, `UnifiedBulkRequest`, `SchoolRegistrationController`, `SchoolSession`, `Permission`, `CounsellingRatingRepository`, `InstituteAssessmentRepository`, `UserRoleScope`, `UserRoleGroupMapping`, `PagerVariant`, `CodingQuestion`, `NavigatorReportDataRepository`, `EmailDispatchService`, `.findFirstByUserStudentUserStudentIdAndAssessmentId`, `ShortLink`, `AssessmentSubmissionFailure`, `.body`, `ExistingMappingView.tsx`, `OldDataMapping_APIs.ts`, `.uploadMedia`, `UserStudentInstituteHistory`, `CounsellorInstituteMappingRepository`, `ScopeRow`, `AssessmentSessionService`, `StudentController`, `AuthController.java`, `RefreshToken`, `ReferralCodeController`, `AssessmentAnswer`, `ControllerPreAuthorizeCoverageTest`, `QuestionMappingWizard.tsx`, `GameResultsController`, `BetReportDataController`, `.compare`, `PermissionRepository`, `DemographicFieldDefinitionRepository`, `StudentGroupRepository`, `CategoryRepository`, `CampaignPublicController`, `CounsellorRepository`, `InstituteBatchGoogleGroup`, `Counsellor`, `SchoolDashboardView`, `DashboardDataService`, `.put`, `SchoolReportService`, `ReportGenerationLog`, `ServiceDeliveryLog`, `SessionSummary`, `TokenProvider`, `BetReportData`, `StudentCounsellorMapping`, `StudentAssessmentMappingRepository`, `RoleRoleGroupMapping`, `StudentLogRepository`, `JwtTokenAudit`, `StudentDashboardDataService.java`, `ReportPipelineProducer`, `AssessmentMappingTier`, `SessionNotesService.java`, `CounsellingActivityLog`, `ReminderScopeFilter`, `CounsellingAppointmentRepository`, `List`, `UniversityMarkController.java`, `PaymentWebhookController`, `GeneralAssessmentResultRepository`, `CodingPlatformProblem`, `EmailAccountService`, `ReminderTemplateRenderer`, `InstituteDetail`, `User`, `UserRepository`, `GoogleAdminController.java`, `.get`, `StudentInfo`, `AssessmentQuestionOptions`, `InstituteBranch`, `OmrColumnMapping`, `CampaignController`, `Notification`, `EmailTemplateService`, `AuthResponse`, `Cookie`, `CohortInsightGenerationService`, `PrincipalDashboardReleaseLog`, `InstituteSession`, `AppointmentAuditLog`, `QuestionnaireQuestionRepository`, `InstituteCourse`, `StudentGroupController`, `JpaRepository`, `CustomUserDetailsService`, `CampaignClassAssessment`, `InsightDashboardService`, `InstituteDetailRepository`, `AssessmentDemographicMapping`, `PaymentTransactionRepository`, `CompilerQuestionLog`, `ContactPersonController`, `AvailabilityTemplate`, `GeneratedReport`, `ScopeKey`, `NavigatorCoreAnalysis`, `Navigator360EngineService`, `LayoutProvider.tsx`, `AssessmentQuestions`, `OptionScoreBasedOnMEasuredQualityTypes`, `StudentService`, `AssessmentInstituteMapping`, `PrincipalDashboardReleaseService`, `UnifiedEnqueueRequest`, `ReportTemplateController`, `AssessmentQuestionController.java`, `NavigatorReportGenerationService`, `GeneratedReportController`, `TestCase`, `InstituteBranchBatchMapping`, `SchoolDashboardWorkbookWriter`, `AdminCounsellingBookingService`, `Career`, `PrincipalDashboardReleaseController`, `MeasuredQualityTypesController`, `PaymentNotificationLog`, `StudentDemographicResponse`, `StudentEntitlementRepository`, `GeneralAssessmentJsonDataLoader`, `AssessmentLoadTest`, `CampaignRegisterPage.tsx`, `JwtTokenAuditRepository`, `DemographicFieldDefinition`, `UserController.java`, `OdooEmailService`, `CounsellorController`, `UserStudent`, `SlotConfiguration`, `ReminderDeliveryLogService`, `Topic`, `GeneralAssessmentProcessingService`, `SchoolDashboard.java`, `AssessmentReportTemplate`, `UserUrlAccessLog`, `StudentRepository`, `.send`, `ReminderConfigService`, `Questionnaire`, `AssessmentDemographicConfig.tsx`, `SchoolDashboardDataService`, `MeasuredQualityTypes`, `EmailNotificationRecipient`, `StudentGroupService`, `ReleaseSnapshot`, `PsychometricStats`, `LanguagesSupported`, `FirebaseQuestionMapping`, `BatchBranchOption`, `UserActivityLog`, `PsychometricAdvancedSheets`, `GameTable`, `QuestionSectionController.java`, `.buildPlaceholders`, `InstituteDetailController.java`, `CounsellingCheckinOtp`, `PsychometricPropertiesExportService`, `String`, `ReportTemplateCatalogController`, `.submit`, `.putUniMarks`, `CounsellorAssessmentAssignment`, `Measured_Qualities_APIs.ts`, `AuthAudit`, `CounsellingRequest`, `MeResponse`, `CompactDashboardJson`, `Navigator360EngineService.java`, `TokenAuthenticationFilter`, `EmailNotificationRecipientService`, `MeasuredQualitiesController.java`, `ToolController.java`, `BoardName`, `EmailSendResult`, `EmailMessage`, `TopicRepository`, `MeasuredQualities`, `LeadNotificationService`, `StudentContactAssignment`, `ReminderSuppressionRepository`, `.buildRawAnswerSheet`, `CounsellorAssessmentAssignmentController.java`, `SectionRepository`, `DemographicFieldOption`, `QuestionnaireSection`, `QuestionSection`, `FirebaseStudentExtraData`, `ContactPersonAccessLevel`, `InstitueAcademic`, `CareerSuggestionService`, `LanguageQuestion`, `PricingTierController.java`, `QuestionnaireLanguageController.java`, `Gender`, `BetReportDataRepository`, `PsychometricDataset`, `DuplicateTolerantCsrfTokenRepository`, `SchoolReportModal.tsx`, `SlotMaterializationConfigTest`, `GeneratedReportRepository`, `.exportStudentData`, `.buildReport`, `AssessmentReportTemplateController.java`, `Batch`, `PrincipalDashboardDataRepository`, `Career_APIs.ts`, `QuestionMappingStep.tsx`, `LeadController.java`, `EmailNotificationRecipientController.java`, `CampaignRepository`, `CounsellorReportNotificationService`, `PrincipalDashboardRequestBuilder`, `OdooSender`, `DigitalOceanSpacesService`, `AdminCounsellingBookingController.java`, `CounsellingRatingController.java`, `LanguageQuestionController.java`, `StudentManagementController.java`, `StudentRoleGroupController.java`, `.getDashboardData`, `UniversityMark`, `Marks`, `SanityCheckService.java`, `UtilController.java`, `FirebaseService`, `StudentRoutes.tsx`, `DemographicFieldController.java`, `LanguageOptionsController.java`, `LanguageOption`, `StudentGroupMemberRepository`, `ScopeFilterInterceptor`, `PlaceholderCohortInsightAggregator`, `.compute`, `CoreTechnicalNavigatorDataService`, `AssessmentInstituteMappingRepository`, `AssessmentScopeOwnershipInterceptor`, `.enumDescriptions`, `.sendHtml`?**
+  _High betweenness centrality (0.289) - this node is a cross-community bridge._
+- **Why does `Table` connect `Topic` to `AssessmentRawScore`, `Student`, `Role`, `Faculty`, `CheckRegistrationFeild`, `NavigatorReportData`, `.fillTemplate`, `PaymentTransaction`, `.ok`, `.add`, `AssessmentProctoringQuestionLog`, `PromoCode`, `SchoolSession`, `Permission`, `UserRoleGroupMapping`, `CodingQuestion`, `GeneralAssessmentResult`, `ShortLink`, `AssessmentSubmissionFailure`, `CommunicationLogsPage.tsx`, `UserStudentInstituteHistory`, `EmailSendLog`, `StudentController`, `RefreshToken`, `AssessmentAnswer`, `StudentLog`, `Counsellor`, `SchoolReport`, `InstituteBatchGoogleGroup`, `PrincipalDashboardData`, `ReportGenerationLog`, `ServiceDeliveryLog`, `CommunicationLog`, `ReferralCode`, `BetReportData`, `StudentCounsellorMapping`, `SessionNotesService.java`, `AssessmentMappingTier`, `RoleRoleGroupMapping`, `CounsellingActivityLog`, `CounsellingPayment`, `List`, `NavigatorReportData.java`, `SchoolAssessmentTier`, `CodingPlatformProblem`, `ReportTemplateRepository`, `SessionNotes`, `InstituteDetail`, `User`, `CounsellorInstituteMapping`, `.get`, `StudentInfo`, `AssessmentQuestionOptions`, `CounsellingPlan`, `InstituteBranch`, `OmrColumnMapping`, `CampaignController`, `Notification`, `PricingTier`, `PrincipalDashboardReleaseLog`, `InstituteSession`, `CampaignAssessmentMapping`, `AppointmentAuditLog`, `ReminderDeliveryLog`, `AssessmentMappingTierRepository`, `InstituteCourse`, `StudentLog.java`, `CampaignClassAssessment`, `Lead`, `AssessmentDemographicMapping`, `PaymentTransactionRepository`, `CompilerQuestionLog`, `AvailabilityTemplate`, `GeneratedReport`, `EmailTemplate`, `LayoutProvider.tsx`, `AssessmentQuestions`, `Serializable`, `AssessmentQuestionController.java`, `TestCase`, `InstituteBranchBatchMapping`, `SchoolRegistrationLink`, `Career`, `ReminderSuppression`, `.duplicate`, `PaymentNotificationLog`, `StudentDemographicResponse`, `StudentEntitlementRepository`, `CampaignRegisterPage.tsx`, `DemographicFieldDefinition`, `AssessmentStudentInvite`, `SchoolAssessmentMappingPanel.tsx`, `UserStudent`, `SlotConfiguration`, `ReportTemplate`, `AssessmentReportTemplate`, `UserUrlAccessLog`, `EmailAccount`, `Questionnaire`, `MeasuredQualityTypes`, `StudentGroup`, `EmailNotificationRecipient`, `PasswordResetToken`, `LanguagesSupported`, `FirebaseQuestionMapping`, `GameTable`, `ReminderConfig`, `BlockDateRequest`, `CounsellingCheckinOtp`, `CalculatedReportData`, `JsonFormat`, `.putUniMarks`, `CounsellorAssessmentAssignment`, `AuthAudit`, `CampaignAssessmentTier`, `CounsellingRequest`, `EmailNotificationRecipientService`, `BoardName`, `CounsellingRating`, `IntermediaryScoresRow`, `EmailSendResult`, `MeasuredQualities`, `CounsellingReminderSent`, `InstituteAssessment`, `StudentContactAssignment`, `DemographicFieldOption`, `QuestionnaireSection`, `QuestionSection`, `FirebaseStudentExtraData`, `ContactPersonAccessLevel`, `InstitueAcademic`, `QuestionnaireLanguageController.java`, `.cancelAndReplace`, `ContactPerson`, `Gender`, `BetReportDataRepository`, `PagerReportDataController.java`, `InstituteEmailSetting`, `Batch`, `DashboardSnapshot`, `StudentGroupContact`, `StudentGroupMember`, `StudentRoutes.tsx`, `CounsellingLifecycleService`, `LanguageOptionsController.java`, `Tool`, `InstituteBatchGoogle`?**
+  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+- **Why does `showErrorToast()` connect `ActionIcon.tsx` to `lookups.ts`, `SlotGrid.tsx`, `StudentInfo_APIs.ts`, `SchoolDashboardPage.tsx`, `AssessmentMapping_APIs.ts`, `toast.ts`, `ReportsHubPage.tsx`, `useAuth`, `ReportCenterPage.tsx`, `AppointmentAPI.ts`, `CounsellorAvailabilityPanel.tsx`, `ReferralCodePage.tsx`, `PrivateRoutes.tsx`, `Tracker_APIs.ts`, `EmailRecipientsPage.tsx`, `showErrorToast`, `CampaignEditPage.tsx`, `QuestionLanguageModal.tsx`, `GroupManagerPanel.tsx`, `StudentNavigator360Page.tsx`, `DynamicDemographicForm.tsx`, `pa`, `AssessmentMappingStep.tsx`, `EmailTemplate_APIs.ts`, `EmailLogPage.tsx`, `showSuccessToast`, `SchoolDashboardReleasePage.tsx`, `dashboard-admin.tsx`, `LiveTrackingPage.tsx`?**
+  _High betweenness centrality (0.069) - this node is a cross-community bridge._
 - **What connects `manifest_version`, `name`, `version` to the rest of the system?**
-  _2581 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2585 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.01627640652030896 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.02153322480390706 - nodes in this community are weakly interconnected._
 - **Should `lookups.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.018972833243915525 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.019734797472288408 - nodes in this community are weakly interconnected._
 - **Should `Student` be split into smaller, more focused modules?**
-  _Cohesion score 0.01646766169154229 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.016532663316582916 - nodes in this community are weakly interconnected._

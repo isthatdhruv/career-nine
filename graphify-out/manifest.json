@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "career-nine-assessment/package.json": {
-    "mtime": 1789021499.723627,
-    "ast_hash": "8741ee9e9ef44d6d555a8be134f77c3f",
+    "mtime": 1789192533.5331216,
+    "ast_hash": "215554974d95d6a6a55f3b12342dd0f9",
     "semantic_hash": ""
   },
   "career-nine-assessment/public/catalogues/india-cities.json": {
@@ -280,8 +280,8 @@
     "semantic_hash": ""
   },
   "career-nine-assessment/src/hooks/useStudentBranding.ts": {
-    "mtime": 1789021499.7326272,
-    "ast_hash": "9a1b7c169610cfba0773417ddbe6fb6c",
+    "mtime": 1789192533.5326662,
+    "ast_hash": "b4b204c2427efdc1cf077f57e6ac2260",
     "semantic_hash": ""
   },
   "career-nine-assessment/src/main.tsx": {
@@ -375,8 +375,8 @@
     "semantic_hash": ""
   },
   "career-nine-assessment/src/pages/ThankYouPage.tsx": {
-    "mtime": 1789021499.7436273,
-    "ast_hash": "954133fce6950cb85d0fe06131a88c9f",
+    "mtime": 1789192874.5647557,
+    "ast_hash": "715289cef56f053d47f3b054e516dd13",
     "semantic_hash": ""
   },
   "career-nine-assessment/src/styles/registerStyles.ts": {
@@ -2320,8 +2320,8 @@
     "semantic_hash": ""
   },
   "react-social/src/app/pages/B2C/Tracker/components/EntitlementDrawer.tsx": {
-    "mtime": 1789021500.9896307,
-    "ast_hash": "a401798347ac827c670b506fbe7ab8d5",
+    "mtime": 1789191489.2878554,
+    "ast_hash": "c71f0fc7c4b4adb43d68f4454308c2db",
     "semantic_hash": ""
   },
   "react-social/src/app/pages/B2C/Tracker/components/KpiHeader.tsx": {
@@ -4820,7 +4820,7 @@
     "semantic_hash": ""
   },
   "react-social/src/app/permissions-manifest.json": {
-    "mtime": 1789022225.0017102,
+    "mtime": 1789114372.2853997,
     "ast_hash": "d036d779f467f059588abe1866f9de64",
     "semantic_hash": ""
   },
@@ -5070,8 +5070,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/AuthController.java": {
-    "mtime": 1789021501.1816313,
-    "ast_hash": "5bf67b293099fc832fadfb84a848ed1c",
+    "mtime": 1789191489.2882357,
+    "ast_hash": "417911e6c10f915815c3658eaeb53f65",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/CodingQuestionController.java": {
@@ -5090,8 +5090,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/ContactPersonController.java": {
-    "mtime": 1789021501.1876314,
-    "ast_hash": "ad97603eec9c8b78dfd7fd19785b2685",
+    "mtime": 1789191489.2884731,
+    "ast_hash": "16279448f11256d9b16dfff58beda2b1",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/DataController.java": {
@@ -5230,8 +5230,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/UserController.java": {
-    "mtime": 1789021501.1996315,
-    "ast_hash": "5de8f86d393f753d18209a428a9d0893",
+    "mtime": 1789191489.2886796,
+    "ast_hash": "570e470eb6f9fed52a8a36e8d13ac623",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/UserRoleGroupMappingController.java": {
@@ -5255,8 +5255,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/AssessmentInstituteMappingController.java": {
-    "mtime": 1789021501.2106314,
-    "ast_hash": "d37d71e1df69bd3fc2cfeac72214d72d",
+    "mtime": 1789191489.289355,
+    "ast_hash": "4352bb9dde16ce9a2b509ee90fcdb0e6",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/AssessmentProctoringController.java": {
@@ -5275,8 +5275,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/AssessmentTableController.java": {
-    "mtime": 1789021501.2156315,
-    "ast_hash": "8a96c144f595fdb82c49dfb6254711ed",
+    "mtime": 1789192360.2736704,
+    "ast_hash": "fd0b5b50a9fb2614adb4700b7c88f3f2",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/BetReportDataController.java": {
@@ -5405,8 +5405,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/PaymentController.java": {
-    "mtime": 1789021501.2366314,
-    "ast_hash": "38404febe70e61e07a2cddd00640783b",
+    "mtime": 1789191489.2895977,
+    "ast_hash": "40755f135af034d9974d830440341ad0",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/PaymentWebhookController.java": {
@@ -5455,8 +5455,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/SchoolRegistrationController.java": {
-    "mtime": 1789021501.2496314,
-    "ast_hash": "90d5d3f74e8f6b1ff8318114864b1a0c",
+    "mtime": 1789191489.2898233,
+    "ast_hash": "a6d6f60732bb79431c63cbab63738039",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/SchoolSessionController.java": {
@@ -5500,8 +5500,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/b2c/CampaignPublicController.java": {
-    "mtime": 1789021501.2521825,
-    "ast_hash": "7f912c40de2fa8e07d7064e8c5d1f8c4",
+    "mtime": 1789191489.29032,
+    "ast_hash": "e76a656e01b5aa8c2bd1f4f5615e2ccf",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/career9/b2c/EntitlementController.java": {
@@ -6670,8 +6670,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/model/email/EmailPlaceholder.java": {
-    "mtime": 1789021501.282293,
-    "ast_hash": "f35a3d19bc3de219cf170d6cb1fbbafc",
+    "mtime": 1789191489.2904396,
+    "ast_hash": "9c9ea2f1145e4979b21fe38a804c2e92",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/model/email/EmailProvider.java": {
@@ -6685,8 +6685,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/model/email/EmailSendRequest.java": {
-    "mtime": 1789021501.2826061,
-    "ast_hash": "2c20199d1be26c26e0f5ce457a7022c0",
+    "mtime": 1789191489.29054,
+    "ast_hash": "b11638f317daa6fa46b235487f8c02c2",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/model/email/EmailSendResult.java": {
@@ -6710,8 +6710,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/model/email/EmailType.java": {
-    "mtime": 1789021501.2826061,
-    "ast_hash": "07d3c20337ded8b7839e6db96f21882d",
+    "mtime": 1789191489.2907288,
+    "ast_hash": "e1c6232926680165ae77f60f7452c7c9",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/model/email/InstituteEmailSetting.java": {
@@ -7300,8 +7300,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/repository/Career9/b2c/StudentEntitlementRepository.java": {
-    "mtime": 1789021501.2946317,
-    "ast_hash": "1aa2579917e12fec3dc6922f2eb831ce",
+    "mtime": 1789191489.2908225,
+    "ast_hash": "08bc6cb2e25484cbb82b39890a5acdc8",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/repository/Career9/counselling/AppointmentAuditLogRepository.java": {
@@ -7895,8 +7895,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/AssessmentCompletionEmailService.java": {
-    "mtime": 1789021501.341548,
-    "ast_hash": "6ae6f97604254c97a9bbbcb4282f7280",
+    "mtime": 1789191489.290913,
+    "ast_hash": "04835c623fff8b1693f9a661121c5eef",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/AssessmentCompletionService.java": {
@@ -8060,8 +8060,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/LeadNotificationService.java": {
-    "mtime": 1789021501.3496318,
-    "ast_hash": "d88746c8764776a6aec79fc24959d66b",
+    "mtime": 1789191489.2911186,
+    "ast_hash": "49c06d894ca1a98cd55b24f3130c04dd",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/LeadStudentService.java": {
@@ -8070,8 +8070,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/LoginCredentialsEmailService.java": {
-    "mtime": 1789021501.3506317,
-    "ast_hash": "e5776a8db10aa2e0fcf710d1f5a298a4",
+    "mtime": 1789191489.2912123,
+    "ast_hash": "3a6487bf40587a543476ecc3ee2f9b30",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/MemberToGoogleGroupHandler.java": {
@@ -8120,8 +8120,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/PaymentEmailService.java": {
-    "mtime": 1789021501.3516319,
-    "ast_hash": "85ce644ad8950859478e3fbe572c6390",
+    "mtime": 1789191489.291312,
+    "ast_hash": "8710582aebb1393b95082dd00b77d92a",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/PaymentTransactionWriter.java": {
@@ -8220,23 +8220,23 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/EntitlementSchedulerService.java": {
-    "mtime": 1789021501.3726318,
-    "ast_hash": "142cb4af00536e06967965db3c66ddc6",
+    "mtime": 1789191489.291494,
+    "ast_hash": "29adc20b51144114bec1c5c9bf3a2b4b",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/EntitlementService.java": {
-    "mtime": 1789021501.3726318,
-    "ast_hash": "4161259a8d73a7479806cd4d710c2765",
+    "mtime": 1789191489.291946,
+    "ast_hash": "81c39d93f98cc174391ea49f0c898c88",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/LinkBuilder.java": {
-    "mtime": 1789021501.3726318,
-    "ast_hash": "05cc850bb81311f132f12f393ca1ae4b",
+    "mtime": 1789191489.292059,
+    "ast_hash": "6505e1e3a91ddaad3012352d443c8704",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/NotificationDispatcher.java": {
-    "mtime": 1789021501.3726318,
-    "ast_hash": "06d3611e201fb601e94b68d860da38ae",
+    "mtime": 1789191489.2922072,
+    "ast_hash": "3cb60bc82aff4afdebdf41301047ba8a",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/ReportGenerationLogService.java": {
@@ -8400,13 +8400,13 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/report/pipeline/GmailReportEmailSender.java": {
-    "mtime": 1789021501.380845,
-    "ast_hash": "f4fdb6f03631b1f576c6f903c7db7d6c",
+    "mtime": 1789191489.2923765,
+    "ast_hash": "5ee8d1ee437b0d4cd04633a9557a14dd",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/report/pipeline/OdooEmailSender.java": {
-    "mtime": 1789021501.380845,
-    "ast_hash": "d43147d611fb18ab25681890c369d0b4",
+    "mtime": 1789191489.2925184,
+    "ast_hash": "7deea1a760164df6373fb2afc1b33709",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/report/pipeline/ReportBatchLifecycle.java": {
@@ -8414,14 +8414,9 @@
     "ast_hash": "7fd628cfc1fc377097000d6885df3869",
     "semantic_hash": ""
   },
-  "spring-social/src/main/java/com/kccitm/api/service/b2c/report/pipeline/ReportEmailComposer.java": {
-    "mtime": 1789021501.380845,
-    "ast_hash": "c96502fca01a3adb94479fdadbd2d996",
-    "semantic_hash": ""
-  },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/report/pipeline/ReportEmailConsumer.java": {
-    "mtime": 1789021501.380845,
-    "ast_hash": "d73efab46d3d3eca572bbe6855b1d23b",
+    "mtime": 1789191489.2926815,
+    "ast_hash": "f9c1b0a03f6ab42b5de7e6355b16e89d",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/report/pipeline/ReportEmailEvent.java": {
@@ -8470,8 +8465,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/branding/InstituteBrandingService.java": {
-    "mtime": 1789021501.3828087,
-    "ast_hash": "5cae70775bf687d96eee78bc377a8dee",
+    "mtime": 1789191489.2927673,
+    "ast_hash": "83018280cb2ce234ef04817ca8b9d784",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/career9/AssessmentMappingTierService.java": {
@@ -8569,19 +8564,14 @@
     "ast_hash": "28c7b34c78fc1f428f4beb843d02048c",
     "semantic_hash": ""
   },
-  "spring-social/src/main/java/com/kccitm/api/service/counselling/CounsellingEmailHtml.java": {
-    "mtime": 1789021501.3859692,
-    "ast_hash": "80fd3f872145c74e880725ee854f0b46",
-    "semantic_hash": ""
-  },
   "spring-social/src/main/java/com/kccitm/api/service/counselling/CounsellingLifecycleService.java": {
     "mtime": 1789021501.3859692,
     "ast_hash": "4355b681a9101930024f5d2e2d0acfac",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/counselling/CounsellingNotificationService.java": {
-    "mtime": 1789021501.388088,
-    "ast_hash": "e7392511edb1e45c2ffa8118fbfceabc",
+    "mtime": 1789191489.2934892,
+    "ast_hash": "23419fb092366642f3201797d8f25aa9",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/counselling/CounsellingOtpService.java": {
@@ -8615,13 +8605,13 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/counselling/CounsellorReportNotificationService.java": {
-    "mtime": 1789021501.3887224,
-    "ast_hash": "722a2bd35e4e42cc037879bd7429cbda",
+    "mtime": 1789191489.2937863,
+    "ast_hash": "f278c4b3af02272689560e7b88a5bb79",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/counselling/CounsellorReportReleaseService.java": {
-    "mtime": 1789021501.3887224,
-    "ast_hash": "2b4f89bd5c3e68b6cc9cb9f5333238f4",
+    "mtime": 1789191489.293933,
+    "ast_hash": "0dd80f6da3cf2846b0683e84ce7e2703",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/counselling/CounsellorService.java": {
@@ -8645,8 +8635,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/counselling/ReminderSchedulerService.java": {
-    "mtime": 1789021501.3887224,
-    "ast_hash": "e49be864abed42b4a1838d1822bf47b7",
+    "mtime": 1789191489.2940464,
+    "ast_hash": "2bf55ca86074dc38a4780ce71a4fd949",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/counselling/SessionNotesService.java": {
@@ -8740,8 +8730,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardNotificationService.java": {
-    "mtime": 1789021501.3984082,
-    "ast_hash": "0ce5f324335fdfe21a0f99358fac5c90",
+    "mtime": 1789191489.294283,
+    "ast_hash": "5e37766ba032d207af33673d6c6229a6",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardReleaseLogger.java": {
@@ -8795,8 +8785,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/email/EmailDispatchService.java": {
-    "mtime": 1789021501.4003272,
-    "ast_hash": "acb2b5a19fac1eea4f0bbb161e491ec5",
+    "mtime": 1789191489.2944293,
+    "ast_hash": "341f3600eb4cf1dc75e7d857ce962f3b",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/email/EmailNotificationRecipientService.java": {
@@ -8810,13 +8800,13 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/email/EmailTemplateSeeder.java": {
-    "mtime": 1789021501.4003272,
-    "ast_hash": "94e2e7e9ba1562db817396405aadd6be",
+    "mtime": 1789191489.2945786,
+    "ast_hash": "de63ca20a1558674fef9e59389e8b277",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/email/EmailTemplateService.java": {
-    "mtime": 1789021501.4003272,
-    "ast_hash": "3d212526ea54bf5e4b8d9374f2c76987",
+    "mtime": 1789191489.2947757,
+    "ast_hash": "a13aa5e4349189143b7542bdb2ebccc8",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/email/GmailApiSender.java": {
@@ -8840,8 +8830,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/email/PlaceholderResolver.java": {
-    "mtime": 1789021501.400632,
-    "ast_hash": "2a431ddbf10884faaef1756da4c6300c",
+    "mtime": 1789191489.2950237,
+    "ast_hash": "97e96e64f4dbf4d98dd5f456e2ae3703",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/email/SenderFactory.java": {
@@ -8885,13 +8875,13 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/reminder/AssessmentMappingReminderSchedulerService.java": {
-    "mtime": 1789021501.4024298,
-    "ast_hash": "639fa3703509be4651bfd6cd60d3486e",
+    "mtime": 1789191489.296495,
+    "ast_hash": "f80d963dbd96e5accea3e46f02e77f15",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/reminder/ManualReminderService.java": {
-    "mtime": 1789021501.4026113,
-    "ast_hash": "09be96ded8b3b5170c407d42ace291b1",
+    "mtime": 1789191489.2965806,
+    "ast_hash": "5e1756bbba20603b3d6bcf1613e3ff6e",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/reminder/ReminderConfigService.java": {
@@ -8920,8 +8910,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/reminder/ReminderTemplateRenderer.java": {
-    "mtime": 1789021501.403677,
-    "ast_hash": "4873dbf5f24578146e9986b388df58c9",
+    "mtime": 1789191489.2966552,
+    "ast_hash": "8c7cb427efb1e3786b5120e096096d6a",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/schoolgroup/StudentGroupService.java": {
@@ -19767,6 +19757,196 @@
   "react-social/public/game-scenes/2nd/gamerule.mp4": {
     "mtime": 1777635196.424411,
     "ast_hash": "7342fa2aba4718ede64737261eaa40ec",
+    "semantic_hash": ""
+  },
+  "career-nine-assessment/src/utils/reportEmailedNotice.ts": {
+    "mtime": 1789192864.7817316,
+    "ast_hash": "12b95e0c30e4aa85c7234a887d953c11",
+    "semantic_hash": ""
+  },
+  "career-nine-assessment/tests/reportEmailedNotice.test.ts": {
+    "mtime": 1789192851.5186396,
+    "ast_hash": "2a6d3178a420ed5761732c7d69d6cb1c",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/branding/StudentBrandingDto.java": {
+    "mtime": 1789192348.7904618,
+    "ast_hash": "abd3cbbd991ed2c234934eb37dd988aa",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/LegacySeeds.java": {
+    "mtime": 1789191489.2948694,
+    "ast_hash": "a9c7557c5ebb35dc10f3633e4b159789",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/MailSeedUpgrader.java": {
+    "mtime": 1789191489.2949367,
+    "ast_hash": "c9c9e5642836d1f554fed5df43b65710",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/mails/AccountMails.java": {
+    "mtime": 1789191489.2950237,
+    "ast_hash": "fb45b1704f21f46e1df75fe37f413c64",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/mails/CounsellingMails.java": {
+    "mtime": 1789191489.2951608,
+    "ast_hash": "1785096f27dce9f3f1847f15b88474e1",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/mails/EntitlementMails.java": {
+    "mtime": 1789191489.2953563,
+    "ast_hash": "9866fa98d7e148acedcc961098ccadfd",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/mails/InternalMails.java": {
+    "mtime": 1789191489.2954519,
+    "ast_hash": "1844c2d9617ff002eb6a56e1036e3674",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/mails/PaymentMails.java": {
+    "mtime": 1789191489.2954519,
+    "ast_hash": "01576de3c5ac4df1d5be8d38e6c2c54c",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/mails/ReminderMails.java": {
+    "mtime": 1789191489.2955503,
+    "ast_hash": "ac49dad766b3983aa87cd14fc2a7a5c6",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/mails/ReportMails.java": {
+    "mtime": 1789191489.2956665,
+    "ast_hash": "8938089ebb4ff1a6c734506c8c5eb822",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/Block.java": {
+    "mtime": 1789191489.2956665,
+    "ast_hash": "e9b599fea6cb083b977bd2cc805809dd",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/Blocks.java": {
+    "mtime": 1789191489.295797,
+    "ast_hash": "78becc1ab580914b7d9336be74490ebb",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/Brand.java": {
+    "mtime": 1789191489.295934,
+    "ast_hash": "b69dc410a1ab76f2d34624f30e8f2cd5",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/BrandResolver.java": {
+    "mtime": 1789191489.2959814,
+    "ast_hash": "4ef52eefa277ded8e1675444f2bdd2d4",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/Mail.java": {
+    "mtime": 1789191489.2960384,
+    "ast_hash": "034096d4f478ed98abad2f13889177df",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/MailHtml.java": {
+    "mtime": 1789191489.2961113,
+    "ast_hash": "5342930e10612165b5e2d7a458b6dab1",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/MailLink.java": {
+    "mtime": 1789191489.2961538,
+    "ast_hash": "892eee7acd5c443cd28228ef0b157238",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/MailLinks.java": {
+    "mtime": 1789191489.296203,
+    "ast_hash": "bd16d663d274aa2b5bc3ab682b36b3f1",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/MailRenderer.java": {
+    "mtime": 1789191489.2962487,
+    "ast_hash": "114053313bd17a8583f83ca1b9616aba",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/MailRules.java": {
+    "mtime": 1789191489.2962964,
+    "ast_hash": "8460409be6abe69cb4b5e18841b51be1",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/MailShell.java": {
+    "mtime": 1789191489.2963574,
+    "ast_hash": "8a1efe7fa957db372b6c3a4b2a1245fe",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/email/theme/MailTheme.java": {
+    "mtime": 1789191489.2964022,
+    "ast_hash": "c0c4ef9a3cbdbf8ee74d5676a8d245e1",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/archtest/ConstantPool.java": {
+    "mtime": 1789191489.2970362,
+    "ast_hash": "0340158b8b5881bd97c923a74950ca6c",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/archtest/MailMarkupArchTest.java": {
+    "mtime": 1789191489.2971165,
+    "ast_hash": "f13b8311a240b41ae04a8bc5c2c1c043",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/controller/career9/StudentBrandingEmailToggleTest.java": {
+    "mtime": 1789192221.4211485,
+    "ast_hash": "317ea8619bed0007e8767d874901fc59",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/email/EmailDispatchWrapTest.java": {
+    "mtime": 1789191489.2971842,
+    "ast_hash": "0c6b16e1f47d61245a2ebda129dfb301",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/email/MailSeedUpgraderTest.java": {
+    "mtime": 1789191489.2972605,
+    "ast_hash": "b4c00d9f90f6dd0c56d43d8959982800",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/email/mails/MailCatalogueTest.java": {
+    "mtime": 1789191489.2973468,
+    "ast_hash": "40477b8737b91b2a949a527926ba3837",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/email/mails/MailSamples.java": {
+    "mtime": 1789191489.2974033,
+    "ast_hash": "800c751448991e36fe0975d8a4ead6ec",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/email/theme/MailBuilderTest.java": {
+    "mtime": 1789191489.2975326,
+    "ast_hash": "bed0ac6c6753ce75b02495970067c2fe",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/email/theme/MailLinksTest.java": {
+    "mtime": 1789191489.297587,
+    "ast_hash": "1f2233afbc7e9ffd4dcdb9d2f6fcdbcb",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/email/theme/MailRendererTest.java": {
+    "mtime": 1789191489.2976735,
+    "ast_hash": "55fef4f351dc6229932080e32a861478",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/email/theme/MailRulesTest.java": {
+    "mtime": 1789191489.2977202,
+    "ast_hash": "a9d41a0036eaf7762a4730f1a89cb69c",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/reminder/ReminderTemplateRendererTest.java": {
+    "mtime": 1789191489.2977657,
+    "ast_hash": "c50a03bc3af0681d6edad6c922d69224",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/email-theme-reference/README.md": {
+    "mtime": 1789191489.0836494,
+    "ast_hash": "b155204995896dd746d71133843f00cb",
+    "semantic_hash": ""
+  },
+  "react-social/public/media/logos/kcc.webp": {
+    "mtime": 1789114365.0943727,
+    "ast_hash": "0f2b515aae9aede253a2bb8806cef718",
     "semantic_hash": ""
   }
 }
