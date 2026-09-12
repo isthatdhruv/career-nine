@@ -1,6 +1,7 @@
 package com.kccitm.api.service;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -23,6 +24,11 @@ import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.service.email.EmailNotificationRecipientService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.mails.InternalMails;
+import com.kccitm.api.service.email.theme.Mail;
+import com.kccitm.api.service.email.theme.MailLinks;
+import com.kccitm.api.service.email.theme.MailShell;
 
 /**
  * Tells people a lead has arrived.
@@ -69,11 +75,22 @@ public class LeadNotificationService {
     @Value("${app.odoo.url:}")
     private String odooUrl;
 
+    /** Used to build the "Open lead" button in the internal alert. */
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+
+    /** Used for the "Explore Career-9" button in the acknowledgement. */
+    @Value("${app.mail.site-url:https://career-9.com}")
+    private String siteUrl;
+
     @Autowired
     private EmailDispatchService emailDispatchService;
 
     @Autowired
     private EmailNotificationRecipientService recipientService;
+
+    @Autowired
+    private MailLinks mailLinks;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -113,13 +130,12 @@ public class LeadNotificationService {
         req.setTo(who.to);
         req.setCc(who.cc);
         req.setBcc(who.bcc);
+        // Kept alongside the themed mail below: an admin-edited LEAD_NOTIFICATION template
+        // still renders from this context map (e.g. {{lead_details}}), so the two must not drift.
         req.setTemplateContext(context(lead));
-
-        // Fallback content, used only until a LEAD_NOTIFICATION template exists. The seeder
-        // creates one on boot, so in practice this is the safety net for a deployment where
-        // the template was deleted rather than the normal path.
-        req.setSubject(fallbackAlertSubject(lead));
-        req.setHtmlContent(fallbackAlertBody(lead));
+        req.setMail(InternalMails.leadAlert(leadTypeLabel(lead), lead.getFullName(), lead.getSource(),
+                receivedAt(lead), fieldRows(lead), String.valueOf(lead.getId()),
+                mailLinks.of(frontendUrl + "/leads", "leads")));
 
         emailDispatchService.send(req);
         logger.info("Lead {}: new-lead alert queued to {} recipient(s)", lead.getId(), who.size());
@@ -139,9 +155,9 @@ public class LeadNotificationService {
         EmailSendRequest req = new EmailSendRequest();
         req.setEmailType(EmailType.LEAD_WELCOME);
         req.getTo().add(to);
+        // Kept alongside the themed mail below, for the same reason as the internal alert.
         req.setTemplateContext(context(lead));
-        req.setSubject("Thanks for getting in touch with Career-9");
-        req.setHtmlContent(fallbackAcknowledgementBody(lead));
+        req.setMail(InternalMails.leadWelcome(AccountMails.firstName(lead.getFullName()), fieldRows(lead), mailLinks.of(siteUrl, "site")));
 
         emailDispatchService.send(req);
         logger.info("Lead {}: acknowledgement queued to {}", lead.getId(), to);
@@ -170,6 +186,7 @@ public class LeadNotificationService {
         put(ctx, EmailPlaceholder.LEAD_RECEIVED_AT, receivedAt(lead));
         put(ctx, EmailPlaceholder.LEAD_CRM_LINK, crmLink(lead));
         put(ctx, EmailPlaceholder.LEAD_DETAILS, detailsTable(lead));
+        put(ctx, EmailPlaceholder.LEAD_ADMIN_LINK, frontendUrl + "/leads");
 
         // Shared greeting placeholders, so the branded templates work unchanged.
         put(ctx, EmailPlaceholder.STUDENT_NAME, lead.getFullName());
@@ -185,6 +202,15 @@ public class LeadNotificationService {
         SimpleDateFormat fmt = new SimpleDateFormat(RECEIVED_AT_PATTERN);
         fmt.setTimeZone(LEAD_TZ);
         return fmt.format(when) + " IST";
+    }
+
+    /** "PARENT" → "Parent"; null (the column is non-nullable in practice) → "New". */
+    private static String leadTypeLabel(Lead lead) {
+        if (lead.getLeadType() == null) {
+            return "New";
+        }
+        String name = lead.getLeadType().name();
+        return name.isEmpty() ? name : Character.toUpperCase(name.charAt(0)) + name.substring(1).toLowerCase();
     }
 
     /**
@@ -205,15 +231,13 @@ public class LeadNotificationService {
     }
 
     /**
-     * Every submitted field as a two-column table, including whatever the form put in
-     * {@code extras}.
-     *
-     * <p>This is the reason the alert is worth reading: the columns on {@code leads} are the
-     * fields we thought of, and the interesting part of an enquiry is usually in the free
-     * text beside them. Every cell is HTML-escaped here — the block is marked raw HTML in
-     * {@code PlaceholderResolver}, so escaping is this method's responsibility.
+     * Every submitted field, including whatever the form put in {@code extras}, as label/value
+     * pairs — in submission order. The single source both {@link #detailsTable} (the
+     * {@code lead_details} placeholder, for an edited admin template) and the themed
+     * {@code InternalMails.leadAlert}/{@code leadWelcome} details block build from, so the two
+     * can never drift apart.
      */
-    private String detailsTable(Lead lead) {
+    private List<Mail.Row> fieldRows(Lead lead) {
         Map<String, String> fields = new LinkedHashMap<>();
         addField(fields, "Name", lead.getFullName());
         addField(fields, "Email", lead.getEmail());
@@ -230,22 +254,20 @@ public class LeadNotificationService {
                 ? null : new SimpleDateFormat("dd-MM-yyyy").format(lead.getDob()));
         addExtras(fields, lead.getExtras());
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("<table style=\"border-collapse:collapse;width:100%;max-width:560px;"
-                + "font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px\">");
+        List<Mail.Row> rows = new ArrayList<>();
         for (Map.Entry<String, String> e : fields.entrySet()) {
-            sb.append("<tr>")
-              .append("<td style=\"padding:7px 12px 7px 0;border-bottom:1px solid #e5e7eb;"
-                      + "color:#4b5563;white-space:nowrap;vertical-align:top\">")
-              .append(escape(e.getKey()))
-              .append("</td>")
-              .append("<td style=\"padding:7px 0;border-bottom:1px solid #e5e7eb;"
-                      + "color:#111827;font-weight:600\">")
-              .append(escape(e.getValue()))
-              .append("</td></tr>");
+            rows.add(new Mail.Row(e.getKey(), e.getValue()));
         }
-        sb.append("</table>");
-        return sb.toString();
+        return rows;
+    }
+
+    /**
+     * Every submitted field, for the {@code lead_details} placeholder an admin-edited template
+     * may still reference. It is the theme's own details panel, rendered without the shell, so
+     * an old template and a themed mail show the same block; escaping is {@code Mail.Row}'s job.
+     */
+    private String detailsTable(Lead lead) {
+        return MailShell.bodyHtml(Mail.builder().subject("").preheader("").details(fieldRows(lead)).build());
     }
 
     private static void addField(Map<String, String> fields, String label, String value) {
@@ -298,48 +320,5 @@ public class LeadNotificationService {
             return key;
         }
         return Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1).toLowerCase();
-    }
-
-    // ─── fallback content (used until a template is configured) ──────────
-
-    private String fallbackAlertSubject(Lead lead) {
-        String type = lead.getLeadType() != null ? lead.getLeadType().name() : "NEW";
-        return "New " + type.toLowerCase() + " lead: " + safe(lead.getFullName());
-    }
-
-    private String fallbackAlertBody(Lead lead) {
-        return "<div style=\"font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827\">"
-                + "<p style=\"font-size:16px;font-weight:700;margin:0 0 4px\">New enquiry from the website</p>"
-                + "<p style=\"margin:0 0 18px;color:#4b5563;font-size:14px\">Received " + escape(receivedAt(lead))
-                + "</p>"
-                + detailsTable(lead)
-                + "</div>";
-    }
-
-    private String fallbackAcknowledgementBody(Lead lead) {
-        String name = safe(lead.getFullName());
-        String first = name.contains(" ") ? name.substring(0, name.indexOf(' ')) : name;
-        return "<div style=\"font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#111827\">"
-                + "<p>Hi " + escape(first) + ",</p>"
-                + "<p>Thanks for getting in touch with Career-9. We have your enquiry and someone "
-                + "from our team will be in contact shortly.</p>"
-                + "<p style=\"color:#4b5563;font-size:14px\">Here is what you sent us:</p>"
-                + detailsTable(lead)
-                + "<p style=\"margin-top:18px\">Warm regards,<br>Team Career-9</p>"
-                + "</div>";
-    }
-
-    private static String safe(String s) {
-        return s == null ? "" : s;
-    }
-
-    private static String escape(String input) {
-        if (input == null) {
-            return "";
-        }
-        return input.replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                    .replace("\"", "&quot;");
     }
 }

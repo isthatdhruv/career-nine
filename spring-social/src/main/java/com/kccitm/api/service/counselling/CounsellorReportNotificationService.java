@@ -3,7 +3,9 @@ package com.kccitm.api.service.counselling;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -16,7 +18,6 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.model.career9.counselling.CounsellorAssessmentAssignment;
-import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.GeneratedReportRepository;
@@ -24,6 +25,11 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorAssessmentAssignmentRepository;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.mails.ReportMails;
+import com.kccitm.api.service.email.theme.Mail;
+import com.kccitm.api.service.email.theme.MailLink;
+import com.kccitm.api.service.email.theme.MailLinks;
 
 /**
  * Puts a student's finished report in front of the counsellor who will discuss it.
@@ -70,6 +76,9 @@ public class CounsellorReportNotificationService {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    @Autowired
+    private MailLinks mailLinks;
 
     /** Optional so this still starts where the B2C entitlement stack is not wired. */
     @Autowired(required = false)
@@ -195,40 +204,24 @@ public class CounsellorReportNotificationService {
 
     /** "A student you counsel for has finished" — to everyone appointed to this assessment. */
     private void notifyAppointedCounsellors(Long userStudentId, Long assessmentId, String link) {
-        List<String> recipients = counsellorEmailsFor(assessmentId);
+        Map<String, String> recipients = counsellorEmailsFor(assessmentId);
         if (recipients.isEmpty()) {
             logger.debug("Report ready but no counsellor appointed to assessment {}", assessmentId);
             return;
         }
 
         String studentName = studentName(userStudentId);
-        String subject = "Report ready — " + studentName;
-        String lead = studentName + " has completed " + assessmentName(assessmentId)
-                + ", and the report is ready.";
-        String closing = "Please look through it before your session so you can go straight to "
-                + "what matters.";
+        String assessment = assessmentName(assessmentId);
+        MailLink report = mailLinks.of(link, "report");
 
-        String html = CounsellingEmailHtml.page(
-                studentName + "'s report is ready to read before the session.",
-                "Report ready — " + studentName,
-                CounsellingEmailHtml.p("Hello,")
-                + CounsellingEmailHtml.p(lead)
-                + CounsellingEmailHtml.actionBlock(link, "Assessment report", "Open report", null)
-                + CounsellingEmailHtml.small(closing)
-                + CounsellingEmailHtml.signature());
-
-        String body = "Hello,\n\n"
-                + lead + "\n\n"
-                + "  Report: " + link + "\n\n"
-                + closing + "\n\n"
-                + "Regards,\nCareer-9 Team";
-
-        for (String to : recipients) {
+        for (Map.Entry<String, String> recipient : recipients.entrySet()) {
             try {
-                sendRich(to, subject, html, body);
+                Mail mail = ReportMails.counsellorReportReady(
+                        AccountMails.firstName(recipient.getValue()), studentName, assessment, report);
+                sendRich(recipient.getKey(), mail);
             } catch (Exception e) {
                 logger.warn("Report-ready email to counsellor {} failed for student={} assessment={}: {}",
-                        to, userStudentId, assessmentId, e.getMessage());
+                        recipient.getKey(), userStudentId, assessmentId, e.getMessage());
             }
         }
         logger.info("Report-ready emailed to {} counsellor(s) student={} assessment={}",
@@ -260,6 +253,8 @@ public class CounsellorReportNotificationService {
             return;
         }
 
+        MailLink report = mailLinks.of(link, "report");
+        String studentName = studentName(userStudentId);
         for (CounsellingAppointment a : appointments) {
             try {
                 List<String> to = new ArrayList<>();
@@ -273,30 +268,10 @@ public class CounsellorReportNotificationService {
                 if (to.isEmpty()) continue;
 
                 String when = sessionWhen(a);
-                String subject = "Assessment report ready for your counselling session";
-                String lead = "The assessment report for " + studentName(userStudentId)
-                        + " is now ready, ahead of the counselling session"
-                        + (when != null ? " on " + when : "") + ".";
-                String closing = "Please read it before the session so the time can be spent on "
-                        + "what matters most.";
-
-                String html = CounsellingEmailHtml.page(
-                        "The report is ready ahead of the counselling session.",
-                        "Assessment report ready",
-                        CounsellingEmailHtml.p("Hello,")
-                        + CounsellingEmailHtml.p(lead)
-                        + CounsellingEmailHtml.actionBlock(link, "Assessment report", "Open report", null)
-                        + CounsellingEmailHtml.small(closing)
-                        + CounsellingEmailHtml.signature());
-
-                String body = "Hello,\n\n"
-                        + lead + "\n\n"
-                        + "  Report: " + link + "\n\n"
-                        + closing + "\n\n"
-                        + "Regards,\nCareer-9 Team";
+                Mail mail = ReportMails.bookedSessionReportReady(studentName, when, report);
 
                 for (String addr : to) {
-                    sendRich(addr, subject, html, body);
+                    sendRich(addr, mail);
                 }
                 logger.info("Report link delivered to {} recipient(s) for booked session {}", to.size(), a.getId());
             } catch (Exception e) {
@@ -307,17 +282,11 @@ public class CounsellorReportNotificationService {
     }
 
     /**
-     * A branded mail with its plain-text alternative, through the same dispatcher the rest of
-     * this class uses. Best-effort like everything here: a failure is the caller's to log.
+     * A themed mail, through the same dispatcher the rest of this class uses. Best-effort
+     * like everything here: a failure is the caller's to log.
      */
-    private void sendRich(String to, String subject, String html, String text) {
-        EmailSendRequest req = new EmailSendRequest();
-        req.setEmailType(EmailType.REPORT_READY);
-        req.getTo().add(to);
-        req.setSubject(subject);
-        req.setHtmlContent(html);
-        req.setTextContent(text);
-        emailDispatchService.send(req);
+    private void sendRich(String to, Mail mail) {
+        emailDispatchService.sendMail(EmailType.REPORT_READY, to, mail);
     }
 
     /** The address the student gave when booking, falling back to their profile. */
@@ -345,17 +314,17 @@ public class CounsellorReportNotificationService {
         }
     }
 
-    /** Active counsellor addresses for an assessment, de-duplicated. */
-    public List<String> counsellorEmailsFor(Long assessmentId) {
-        List<String> out = new ArrayList<>();
+    /** Active counsellor email → name for an assessment, de-duplicated by email. */
+    public Map<String, String> counsellorEmailsFor(Long assessmentId) {
+        Map<String, String> out = new LinkedHashMap<>();
         if (assessmentId == null) return out;
         for (CounsellorAssessmentAssignment a : assignmentRepository.findByAssessmentId(assessmentId)) {
             if (!Boolean.TRUE.equals(a.getIsActive())) continue;
             Counsellor c = a.getCounsellor();
             if (c == null || !Boolean.TRUE.equals(c.getIsActive())) continue;
             String email = c.getEmail();
-            if (email != null && !email.isBlank() && !out.contains(email.trim())) {
-                out.add(email.trim());
+            if (email != null && !email.isBlank()) {
+                out.putIfAbsent(email.trim(), c.getName());
             }
         }
         return out;

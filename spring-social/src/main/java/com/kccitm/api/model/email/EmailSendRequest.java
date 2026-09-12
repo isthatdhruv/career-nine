@@ -44,6 +44,12 @@ public class EmailSendRequest {
 
     private List<SmtpEmailRequest.EmailAttachment> attachments = new ArrayList<>();
 
+    /** Optional branding decided by the caller (e.g. the report pipeline carries it on the event). */
+    private com.kccitm.api.service.email.theme.Brand brand;
+
+    /** A themed mail; when set, subject/html/text are rendered from it (a DB template still wins). */
+    private com.kccitm.api.service.email.theme.Mail mail;
+
     public EmailSendRequest() {
     }
 
@@ -56,6 +62,18 @@ public class EmailSendRequest {
         }
         r.subject = subject;
         r.htmlContent = htmlContent;
+        return r;
+    }
+
+    /** Convenience for a themed {@link com.kccitm.api.service.email.theme.Mail} send. */
+    public static EmailSendRequest mail(EmailType type, String to, com.kccitm.api.service.email.theme.Mail mail) {
+        EmailSendRequest r = new EmailSendRequest();
+        r.emailType = type;
+        if (to != null) {
+            r.to.add(to);
+        }
+        r.mail = mail;
+        r.subject = mail != null ? mail.getSubject() : null;
         return r;
     }
 
@@ -96,4 +114,8 @@ public class EmailSendRequest {
     }
     public List<SmtpEmailRequest.EmailAttachment> getAttachments() { return attachments; }
     public void setAttachments(List<SmtpEmailRequest.EmailAttachment> attachments) { this.attachments = attachments; }
+    public com.kccitm.api.service.email.theme.Brand getBrand() { return brand; }
+    public void setBrand(com.kccitm.api.service.email.theme.Brand brand) { this.brand = brand; }
+    public com.kccitm.api.service.email.theme.Mail getMail() { return mail; }
+    public void setMail(com.kccitm.api.service.email.theme.Mail mail) { this.mail = mail; }
 }

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.email.EmailPlaceholder;
@@ -17,9 +18,9 @@ import com.kccitm.api.service.branding.InstituteBrandingService;
 
 /**
  * Turns a send's context into a {{key}} → value map for template rendering. Branding
- * placeholders (header/footer/school_name/logo_url) and the dashboard link are derived
- * (whitelabel-aware) from the institute or student; per-send values (username, password,
- * amount, …) come from the request's {@code templateContext} and take precedence.
+ * placeholders (school_name/logo_url) and the dashboard link are derived (whitelabel-aware)
+ * from the institute or student; per-send values (username, password, amount, …) come from
+ * the request's {@code templateContext} and take precedence.
  */
 @Service
 public class PlaceholderResolver {
@@ -30,6 +31,10 @@ public class PlaceholderResolver {
     @Autowired
     private LinkBuilder linkBuilder;
 
+    /** Same property the theme's {@code BrandResolver} reads; used for the {@code site_link} placeholder. */
+    @Value("${app.mail.site-url:https://career-9.com}")
+    private String siteUrl;
+
     public Map<String, String> resolve(EmailSendRequest req) {
         Map<String, String> ctx = new LinkedHashMap<>();
 
@@ -37,11 +42,16 @@ public class PlaceholderResolver {
         BrandingDto brand = resolveBranding(req);
         ctx.put(EmailPlaceholder.SCHOOL_NAME.key(), brand.isWhitelabel() ? brand.getSchoolName() : "Career-9");
         ctx.put(EmailPlaceholder.LOGO_URL.key(), brand.getLogoUrl() != null ? brand.getLogoUrl() : "");
-        ctx.put(EmailPlaceholder.EMAIL_HEADER.key(), brandingService.emailHeaderHtml(brand));
-        ctx.put(EmailPlaceholder.EMAIL_FOOTER.key(), brandingService.emailFooterHtml(brand));
+        // email_header / email_footer are retired: the shell now supplies branding directly.
+        // Left as empty strings (rather than removed) so an old, unedited template that still
+        // references {{email_header}}/{{email_footer}} renders nothing there instead of leaving
+        // a literal token visible in the sent mail.
+        ctx.put("email_header", "");
+        ctx.put("email_footer", "");
 
         // 2. Common links.
         ctx.put(EmailPlaceholder.DASHBOARD_LINK.key(), safe(linkBuilder.studentLogin()));
+        ctx.put(EmailPlaceholder.SITE_LINK.key(), safe(siteUrl));
 
         // 3. Caller-supplied per-send values win over the derived defaults.
         if (req.getTemplateContext() != null) {
@@ -82,7 +92,6 @@ public class PlaceholderResolver {
      * internal inbox.
      */
     private static final Set<String> RAW_HTML_KEYS = new HashSet<>(Arrays.asList(
-            EmailPlaceholder.EMAIL_HEADER.key(), EmailPlaceholder.EMAIL_FOOTER.key(),
             EmailPlaceholder.LEAD_DETAILS.key()));
 
     private static String escapeHtml(String input) {
