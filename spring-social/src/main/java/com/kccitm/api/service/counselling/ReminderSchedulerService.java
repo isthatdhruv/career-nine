@@ -88,10 +88,15 @@ public class ReminderSchedulerService {
     @Autowired
     private UserStudentRepository userStudentRepository;
 
-    // Phase 3b: used to email the tokenized counselling booking link alongside the
-    // WhatsApp/in-app nudge (the "slot selection link sent to the assessment email").
+    // Phase 3b: used to mint/extend the entitlement's access token for the tokenized
+    // counselling booking link handed to sendCounsellingBookingNudge.
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+
+    // Builds the booking link itself (counselling_book / counselling_my_sessions),
+    // mirroring EntitlementService#resendServiceLink's "counselling_book" case.
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.LinkBuilder linkBuilder;
 
     /**
      * Runs every 5 minutes. Sends any due student/counsellor reminders that
@@ -192,17 +197,23 @@ public class ReminderSchedulerService {
                     }
                 }
 
-                notificationService.sendCounsellingBookingNudge(name, email, phone, userId, remaining);
-                // Phase 3b: also email the tokenized slot-selection link to the address the
-                // student used for the assessment (resendServiceLink resolves it internally).
-                if (entitlementService != null && email != null) {
+                // Phase 3b: the fallback mail sendCounsellingBookingNudge sends when WhatsApp
+                // doesn't land now carries the tokenized slot-selection link itself, so this
+                // builds it once per entitlement instead of the separate resendServiceLink
+                // email that used to go out right after (two mails, same nudge, every run).
+                String bookingUrl = null;
+                if (entitlementService != null && linkBuilder != null) {
                     try {
-                        entitlementService.resendServiceLink(e.getEntitlementId(), "counselling_book", email);
-                    } catch (Exception mailEx) {
-                        logger.warn("Counselling booking-link email failed for entitlement {}: {}",
-                                e.getEntitlementId(), mailEx.getMessage());
+                        String token = entitlementService.ensureLiveAccessToken(e);
+                        bookingUrl = "1".equals(e.getCounsellingModel())
+                                ? linkBuilder.counsellingBook(token, e.getEntitlementId())
+                                : linkBuilder.counsellingMySessions(token, e.getEntitlementId());
+                    } catch (Exception linkEx) {
+                        logger.warn("Counselling booking-link build failed for entitlement {}: {}",
+                                e.getEntitlementId(), linkEx.getMessage());
                     }
                 }
+                notificationService.sendCounsellingBookingNudge(name, email, phone, userId, remaining, bookingUrl);
                 e.setCounsellingNudgeSentAt(new Date());
                 entitlementRepository.save(e);
                 sent++;

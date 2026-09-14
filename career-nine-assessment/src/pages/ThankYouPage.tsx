@@ -9,6 +9,7 @@ import MappingCounsellingSection from '../components/MappingCounsellingSection';
 import FeatureUpsellModal, { UpsellFeature } from '../components/FeatureUpsellModal';
 import { downloadHtmlAsPdf } from '../utils/htmlToPdf';
 import { apiUrl } from '../utils/apiUrl';
+import { shouldShowReportEmailedNotice } from '../utils/reportEmailedNotice';
 
 type UpgradeInfo = {
     entitlementId: number;
@@ -419,6 +420,19 @@ const ThankYouPage: React.FC = () => {
     const showDownloadReportButton =
         showActiveButtons && !!upgradeInfo?.finalReportUrl && reportState === 'ready'
         && !reportHeldForCounsellor;
+    // "Report sent to your registered email" — only when the pipeline will in fact mail it
+    // (whitelabel school or the assessment's "Email report" toggle), never while the report
+    // is held for the counsellor, and never on the paid B2C report path: that flow already
+    // says "we've also sent it to your email" on its report-ready line below, so the card
+    // yields to it rather than saying the same thing twice. Waits for both branding and
+    // upgrade-info so the card doesn't flash in or out. Rule lives in reportEmailedNotice.ts.
+    const showReportEmailedNotice = shouldShowReportEmailedNotice({
+        loaded: branding.loaded && upgradeInfoLoaded,
+        whitelabel: branding.whitelabel,
+        emailReportEnabled: !!branding.emailReportEnabled,
+        paidFinalReport: showActiveButtons && !!upgradeInfo?.finalReportActive,
+        heldForCounsellor: reportHeldForCounsellor,
+    });
 
     // Counselling: gated on the entitlement flag AND on having unused sessions
     // remaining. The server gates the slot endpoints the same way, but checking
@@ -636,47 +650,49 @@ const ThankYouPage: React.FC = () => {
                                     Now explore your personalized insights and career possibilities!
                                 </p>
 
-                                {/* Report-emailed notice */}
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        gap: '12px',
-                                        textAlign: 'left',
-                                        background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
-                                        border: '1px solid #A7F3D0',
-                                        borderRadius: '14px',
-                                        padding: '1rem 1.25rem',
-                                        marginBottom: '1.5rem',
-                                    }}
-                                >
+                                {/* Report-emailed notice — gated by showReportEmailedNotice */}
+                                {showReportEmailedNotice && (
                                     <div
                                         style={{
-                                            width: '38px',
-                                            height: '38px',
-                                            borderRadius: '10px',
-                                            background: 'linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)',
                                             display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            flexShrink: 0,
+                                            alignItems: 'flex-start',
+                                            gap: '12px',
+                                            textAlign: 'left',
+                                            background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
+                                            border: '1px solid #A7F3D0',
+                                            borderRadius: '14px',
+                                            padding: '1rem 1.25rem',
+                                            marginBottom: '1.5rem',
                                         }}
                                     >
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <rect x="2" y="4" width="20" height="16" rx="2" />
-                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                                        </svg>
+                                        <div
+                                            style={{
+                                                width: '38px',
+                                                height: '38px',
+                                                borderRadius: '10px',
+                                                background: 'linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="2" y="4" width="20" height="16" rx="2" />
+                                                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <p style={{ margin: '0 0 2px', fontSize: '0.92rem', fontWeight: 700, color: '#065F46' }}>
+                                                Report sent to your registered email
+                                            </p>
+                                            <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.55, color: '#047857' }}>
+                                                A copy of your assessment report has also been shared on your registered
+                                                email address. Kindly check your inbox — and the spam folder, just in case.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p style={{ margin: '0 0 2px', fontSize: '0.92rem', fontWeight: 700, color: '#065F46' }}>
-                                            Report sent to your registered email
-                                        </p>
-                                        <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.55, color: '#047857' }}>
-                                            A copy of your assessment report has also been shared on your registered
-                                            email address. Kindly check your inbox — and the spam folder, just in case.
-                                        </p>
-                                    </div>
-                                </div>
+                                )}
 
                                 {/* 5-star feedback rating */}
                                 <div

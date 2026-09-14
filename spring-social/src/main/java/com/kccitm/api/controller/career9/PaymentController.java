@@ -77,9 +77,12 @@ public class PaymentController {
     @Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
 
+    @Autowired
+    private com.kccitm.api.service.b2c.LinkBuilder linkBuilder;
+
     private String getRegistrationUrl(PaymentTransaction txn) {
         String base = (callbackBaseUrl != null && !callbackBaseUrl.isEmpty())
-                ? callbackBaseUrl : "https://dashboard.career-9.com";
+                ? callbackBaseUrl : linkBuilder.frontendBase();
         return base + "/payment-register/" + txn.getTransactionId();
     }
 

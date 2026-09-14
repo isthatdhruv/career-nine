@@ -38,6 +38,7 @@ public class AsyncExecutorsConfig {
 
     public static final String SUBMISSION_EXECUTOR = "submissionExecutor";
     public static final String PROCTORING_EXECUTOR = "proctoringExecutor";
+    public static final String DASHBOARD_EXECUTOR = "dashboardExecutor";
 
     @Bean(SUBMISSION_EXECUTOR)
     public ThreadPoolTaskExecutor submissionExecutor() {
@@ -62,6 +63,26 @@ public class AsyncExecutorsConfig {
         executor.setThreadNamePrefix("proctoring-");
         // Rejected proctoring jobs are NOT lost: the payload stays in Redis as
         // "pending" and the 5-minute retry scheduler re-enqueues it.
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
+
+    // Admin overview dashboard: every card is its own endpoint and its own
+    // COUNT query, fanned out onto this pool (AdminOverviewService) so a slow
+    // counselling query never delays the sign-ups card, and so the HTTP thread
+    // is released while the DB works (the controller returns CompletableFuture).
+    // Kept separate from applicationTaskExecutor so a burst of dashboard opens
+    // cannot delay emails/audit, and vice versa. The queue is small on purpose:
+    // when saturated, CallerRunsPolicy runs the count on the request thread
+    // instead of parking a dashboard card behind 2000 other jobs.
+    @Bean(DASHBOARD_EXECUTOR)
+    public ThreadPoolTaskExecutor dashboardExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(8);
+        executor.setMaxPoolSize(16);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("dashboard-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;

@@ -1,7 +1,6 @@
-import { FC, ReactNode, useEffect, useMemo, useState } from "react";
+import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import Chart from "react-apexcharts";
-import { ApexOptions } from "apexcharts";
+import { createPortal } from "react-dom";
 import { PageTitle } from "../../../_metronic/layout/core";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
 import { useAuth } from "../../modules/auth/core/Auth";
@@ -9,12 +8,35 @@ import { Scope } from "../../modules/auth";
 import { getUserCollegeMappings } from "../Users/API/UserMapping_APIs";
 import { getScopedAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import SearchableSelect from "../../components/SearchableSelect";
+import SearchableMultiSelect from "../../components/SearchableMultiSelect";
+import * as XLSX from "xlsx";
+import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { showErrorToast } from "../../utils/toast";
 import {
   AdminDashboardSnapshot,
   fetchAdminDashboardSnapshot,
-  fetchLogins,
   refreshAdminDashboardSnapshot,
 } from "./dashboard-admin.api";
+import {
+  OVERVIEW_CARD_KEYS,
+  OverviewCard,
+  OverviewCardKey,
+  OverviewDetail,
+  OverviewDetailColumn,
+  OverviewQuery,
+  fetchOverviewCard,
+  fetchOverviewStudents,
+} from "./dashboard-admin.overview.api";
+import {
+  applyInstituteAssessmentFilter,
+  assessmentIdsAssignedTo,
+  instituteKeysOf,
+} from "./dashboard-admin.filter";
+import {
+  buildSchoolReportWorkbook,
+  schoolReportFileName,
+  SectionLookup,
+} from "./dashboard-admin.export";
 
 /* ============================================================
    THEME
@@ -96,35 +118,6 @@ const pick = (obj: any, keys: string[]): any => {
 const fmtNum = (n: number | undefined) =>
   n == null || Number.isNaN(n) ? "—" : n.toLocaleString();
 
-const toISODate = (d: Date) => d.toISOString().slice(0, 10);
-
-const initials = (s: string) =>
-  s
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("") || "?";
-
-// ABAC scope filter for the admin dashboard payload. The backend already
-// runs the scoped JPQL query (see DashboardDataService#fillScoped), but we
-// re-apply the same predicate client-side as defense-in-depth so legacy/
-// unscoped responses, stale caches, or future controller changes can't leak
-// institutes/sessions/classes/sections the user isn't mapped to. Mirrors the
-// dim-by-dim match used in ReportsHubPage.
-const matchesScope = (
-  rules: Scope[],
-  dims: { i?: number | null; s?: number | null; c?: number | null; x?: number | null }
-): boolean => {
-  if (!rules.length) return true; // no rules = unscoped session, don't restrict
-  return rules.some((r) => {
-    if (r.i != null && dims.i != null && r.i !== dims.i) return false;
-    if (r.s != null && dims.s != null && r.s !== dims.s) return false;
-    if (r.c != null && dims.c != null && r.c !== dims.c) return false;
-    if (r.x != null && dims.x != null && r.x !== dims.x) return false;
-    return true;
-  });
-};
 
 const toNum = (v: any): number | null => {
   if (v == null || v === "") return null;
@@ -293,11 +286,11 @@ const DashboardAdminContent: FC = () => {
   // dashboard — platform-wide widgets are hidden below.
   const schoolMode = !isSuperAdmin;
 
-  // raw data
-  const [students, setStudents] = useState<any[]>([]);
-  const [institutes, setInstitutes] = useState<any[]>([]);
+  // raw data (post-ABAC scope, pre view-filter — see `viewFiltered` below)
+  const [rawStudents, setRawStudents] = useState<any[]>([]);
+  const [rawInstitutes, setRawInstitutes] = useState<any[]>([]);
   const [counsellors, setCounsellors] = useState<any[]>([]);
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [rawAppointments, setRawAppointments] = useState<any[]>([]);
   const [ratingSummary, setRatingSummary] = useState<any[]>([]);
   const [rawAssessments, setRawAssessments] = useState<any[]>([]);
   // Defense-in-depth narrowing of the snapshot's `assessments` section.
@@ -345,7 +338,7 @@ const DashboardAdminContent: FC = () => {
     };
   }, [isSuperAdmin, scopeReady, effectiveRules]);
 
-  const assessments = useMemo(
+  const scopedAssessments = useMemo(
     () =>
       scopedAssessmentIds == null
         ? rawAssessments
@@ -354,10 +347,97 @@ const DashboardAdminContent: FC = () => {
           ),
     [rawAssessments, scopedAssessmentIds]
   );
-  const [logins, setLogins] = useState<any[]>([]);
-  const [loginsLoading, setLoginsLoading] = useState(false);
-  const [reports, setReports] = useState<any[]>([]);
-  const [studentMappings, setStudentMappings] = useState<any[]>([]);
+  const [rawReports, setRawReports] = useState<any[]>([]);
+  const [rawStudentMappings, setRawStudentMappings] = useState<any[]>([]);
+
+  // ---- Super-admin view filter: one institute and/or a set of assessments ----
+  // `viewInstitute`/`viewAssessmentIds` are the APPLIED values (set on Search);
+  // the pickers edit `draftInstitute`/`draftAssessmentIds` below.
+  // Applied client-side to the loaded snapshot (it already holds every row for
+  // a super-admin), so the KPIs, drill-downs and tables below narrow without
+  // any of their code changing. Hidden for scoped (school) viewers, who are
+  // already narrowed by ABAC.
+  const [viewInstitute, setViewInstitute] = useState<string>("");
+  const [viewAssessmentIds, setViewAssessmentIds] = useState<string[]>([]);
+  // Draft picker values — copied into viewInstitute/viewAssessmentIds on Search.
+  const [draftInstitute, setDraftInstitute] = useState<string>("");
+  const [draftAssessmentIds, setDraftAssessmentIds] = useState<string[]>([]);
+  const draftInstituteRow = useMemo(
+    () =>
+      draftInstitute
+        ? rawInstitutes.find((i) => String(pick(i, ["instituteCode", "code"]) ?? "") === draftInstitute) ?? null
+        : null,
+    [rawInstitutes, draftInstitute]
+  );
+  const draftInstituteKeys = useMemo(
+    () => (draftInstituteRow ? instituteKeysOf(draftInstituteRow) : null),
+    [draftInstituteRow]
+  );
+  const viewInstituteRow = useMemo(
+    () =>
+      viewInstitute
+        ? rawInstitutes.find((i) => String(pick(i, ["instituteCode", "code"]) ?? "") === viewInstitute) ?? null
+        : null,
+    [rawInstitutes, viewInstitute]
+  );
+  const viewInstituteKeys = useMemo(
+    () => (viewInstituteRow ? instituteKeysOf(viewInstituteRow) : null),
+    [viewInstituteRow]
+  );
+  // Assessments offered in the picker: only those assigned to students at the
+  // chosen institute (or every scoped assessment when no institute is chosen).
+  const viewAssessmentOptions = useMemo(() => {
+    let pool = scopedAssessments;
+    if (draftInstituteKeys) {
+      const assigned = assessmentIdsAssignedTo(
+        rawStudentMappings.filter((m) =>
+          draftInstituteKeys.has(String(pick(m, ["instituteId", "institute_id"]) ?? ""))
+        )
+      );
+      pool = pool.filter((a) => assigned.has(String(pick(a, ["id", "assessmentId"]) ?? "")));
+    }
+    return pool
+      .map((a) => ({
+        value: String(pick(a, ["id", "assessmentId"]) ?? ""),
+        label: String(pick(a, ["assessmentName", "name", "title"]) || `Assessment #${pick(a, ["id", "assessmentId"])}`),
+      }))
+      .filter((o) => o.value)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [scopedAssessments, rawStudentMappings, draftInstituteKeys]);
+  // Drop selections that are no longer offered (e.g. after switching institute).
+  useEffect(() => {
+    if (draftAssessmentIds.length === 0) return;
+    const offered = new Set(viewAssessmentOptions.map((o) => o.value));
+    const kept = draftAssessmentIds.filter((id) => offered.has(id));
+    if (kept.length !== draftAssessmentIds.length) setDraftAssessmentIds(kept);
+  }, [viewAssessmentOptions, draftAssessmentIds]);
+  const viewFilterActive = isSuperAdmin && (viewInstituteKeys != null || viewAssessmentIds.length > 0);
+
+  const viewFiltered = useMemo(
+    () =>
+      applyInstituteAssessmentFilter(
+        {
+          students: rawStudents,
+          institutes: rawInstitutes,
+          counsellors,
+          appointments: rawAppointments,
+          ratingSummary,
+          assessments: scopedAssessments,
+          reports: rawReports,
+          studentMappings: rawStudentMappings,
+        },
+        {
+          instituteKeys: isSuperAdmin ? viewInstituteKeys : null,
+          assessmentIds: isSuperAdmin && viewAssessmentIds.length > 0 ? new Set(viewAssessmentIds) : null,
+        }
+      ),
+    [
+      rawStudents, rawInstitutes, counsellors, rawAppointments, ratingSummary,
+      scopedAssessments, rawReports, rawStudentMappings,
+      isSuperAdmin, viewInstituteKeys, viewAssessmentIds,
+    ]
+  );
+  const { students, institutes, assessments, reports, studentMappings } = viewFiltered;
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -367,14 +447,117 @@ const DashboardAdminContent: FC = () => {
   const [computedAt, setComputedAt] = useState<string | undefined>(undefined);
   const [cacheHit, setCacheHit] = useState<boolean | undefined>(undefined);
 
-  const mappingsLoading = false;
-  const refreshing = loading || loginsLoading;
+  // ---- Filters: DRAFT (what the pickers show) vs APPLIED (what the cards use) ----
+  // Nothing below the filter bars reacts to a click until Search is pressed.
+  const [rangeKey, setRangeKey] = useState<RangeKey>("30d");
+  const [customStart, setCustomStart] = useState<string>("");
+  const [customEnd, setCustomEnd] = useState<string>("");
+  const draftRange = useMemo(
+    () => computeRange(rangeKey, customStart, customEnd),
+    [rangeKey, customStart, customEnd]
+  );
+
+  const [applied, setApplied] = useState<AppliedFilters>(() => ({
+    rangeKey: "30d",
+    customStart: "",
+    customEnd: "",
+    range: computeRange("30d", "", ""),
+    nonce: 0,
+  }));
+
+  const customIncomplete = rangeKey === "custom" && (!customStart || !customEnd);
+  const filtersDirty =
+    rangeKey !== applied.rangeKey ||
+    (rangeKey === "custom" &&
+      (customStart !== applied.customStart || customEnd !== applied.customEnd)) ||
+    draftInstitute !== viewInstitute ||
+    draftAssessmentIds.join(",") !== viewAssessmentIds.join(",");
+
+  const handleSearch = () => {
+    if (customIncomplete) return;
+    setViewInstitute(draftInstitute);
+    setViewAssessmentIds(draftAssessmentIds);
+    setApplied((prev) => ({
+      rangeKey,
+      customStart,
+      customEnd,
+      range: computeRange(rangeKey, customStart, customEnd),
+      // bumps even when nothing changed, so Search always re-queries
+      nonce: prev.nonce + 1,
+    }));
+  };
+
+  // The query every overview card is fetched with. Memoised on the APPLIED
+  // values only, so the cards ignore the pickers until Search. null = hold
+  // (scope still resolving, or the viewer is mapped to nothing).
+  const overviewQuery = useMemo<OverviewQuery | null>(() => {
+    if (!scopeReady || scopeDenied) return null;
+    return {
+      from: applied.range.start ? toLocalISODate(applied.range.start) : null,
+      to: applied.range.end ? toLocalISODate(applied.range.end) : null,
+      instituteCode: isSuperAdmin && viewInstitute ? viewInstitute : null,
+      assessmentIds: isSuperAdmin ? viewAssessmentIds : [],
+    };
+  }, [scopeReady, scopeDenied, applied, isSuperAdmin, viewInstitute, viewAssessmentIds]);
+  const overview = useOverviewCards(overviewQuery, refreshNonce);
+  const refreshing = loading || overview.busy;
   const [manualRefresh, setManualRefresh] = useState(false);
 
   const handleRefresh = () => {
     if (refreshing) return;
     setManualRefresh(true);
     setRefreshNonce((n) => n + 1);
+  };
+
+  // "Export for school": two-sheet workbook (Summary + Students) built from
+  // the view-filtered snapshot — lifetime numbers, the date range is ignored.
+  // Class/section names come from the institute hierarchy; if that call
+  // fails we fall back to the flat `studentClass` column on each student.
+  const [exporting, setExporting] = useState(false);
+  const handleExportForSchool = async () => {
+    if (!viewInstituteRow || exporting) return;
+    setExporting(true);
+    try {
+      const instituteName = String(
+        pick(viewInstituteRow, ["instituteName", "name"]) || `Institute ${viewInstitute}`
+      );
+      const sectionLookup: SectionLookup = new Map();
+      try {
+        const res: any = await GetSessionsByInstituteCode(viewInstitute);
+        for (const session of res?.data || []) {
+          for (const cls of session?.schoolClasses || []) {
+            for (const sec of cls?.schoolSections || []) {
+              if (sec?.id != null && !sectionLookup.has(Number(sec.id))) {
+                sectionLookup.set(Number(sec.id), {
+                  className: String(cls?.className ?? ""),
+                  sectionName: String(sec?.sectionName ?? ""),
+                });
+              }
+            }
+          }
+        }
+      } catch {
+        // hierarchy unavailable — export still works with the flat class column
+      }
+      const selectedNames = viewAssessmentOptions
+        .filter((o) => viewAssessmentIds.includes(o.value))
+        .map((o) => o.label);
+      const exportedAt = new Date();
+      const wb = buildSchoolReportWorkbook({
+        assessments,
+        studentMappings,
+        reports,
+        sectionLookup,
+        instituteName,
+        exportedAt,
+        assessmentFilterLabel: selectedNames.length ? selectedNames.join(", ") : "All assessments",
+      });
+      XLSX.writeFile(wb, schoolReportFileName(instituteName, exportedAt));
+    } catch (e: any) {
+      showErrorToast(`Export failed: ${e?.message || "unknown error"}`);
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Clear the manual-refresh flag once everything settles
@@ -385,30 +568,6 @@ const DashboardAdminContent: FC = () => {
     }
   }, [manualRefresh, refreshing]);
 
-  // ---- Date range filter ----
-  type RangeKey = "7d" | "30d" | "90d" | "all" | "custom";
-  const [rangeKey, setRangeKey] = useState<RangeKey>("30d");
-  const [customStart, setCustomStart] = useState<string>("");
-  const [customEnd, setCustomEnd] = useState<string>("");
-
-  const range = useMemo<{ start: Date | null; end: Date | null }>(() => {
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-    if (rangeKey === "all") return { start: null, end: null };
-    if (rangeKey === "custom") {
-      if (!customStart || !customEnd) return { start: null, end: null };
-      const s = new Date(customStart);
-      s.setHours(0, 0, 0, 0);
-      const e = new Date(customEnd);
-      e.setHours(23, 59, 59, 999);
-      return { start: s, end: e };
-    }
-    const days = rangeKey === "7d" ? 7 : rangeKey === "30d" ? 30 : 90;
-    const start = new Date();
-    start.setDate(start.getDate() - (days - 1));
-    start.setHours(0, 0, 0, 0);
-    return { start, end };
-  }, [rangeKey, customStart, customEnd]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
@@ -428,14 +587,14 @@ const DashboardAdminContent: FC = () => {
           : await fetchAdminDashboardSnapshot();
         if (cancelled) return;
         const snap = applyScopeToSnapshot(raw, effectiveRules, isSuperAdmin);
-        setStudents(snap.students);
-        setInstitutes(snap.institutes);
+        setRawStudents(snap.students);
+        setRawInstitutes(snap.institutes);
         setCounsellors(snap.counsellors);
-        setAppointments(snap.appointments);
+        setRawAppointments(snap.appointments);
         setRatingSummary(snap.ratingSummary);
         setRawAssessments(snap.assessments);
-        setReports(snap.reports);
-        setStudentMappings(snap.studentMappings);
+        setRawReports(snap.reports);
+        setRawStudentMappings(snap.studentMappings);
         setComputedAt(snap.computedAt);
         setCacheHit(snap.cacheHit);
         setErrors((prev) => {
@@ -458,54 +617,6 @@ const DashboardAdminContent: FC = () => {
     };
   }, [refreshNonce, effectiveRules, isSuperAdmin, scopeReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Logins: re-fetch whenever the date range changes
-  useEffect(() => {
-    let cancelled = false;
-    setLoginsLoading(true);
-    (async () => {
-      // Backend requires startDate + endDate. For "All time" fall back to a wide window.
-      const end = range.end || new Date();
-      const start =
-        range.start ||
-        (() => {
-          const d = new Date(end);
-          d.setFullYear(d.getFullYear() - 5);
-          return d;
-        })();
-      try {
-        const data = await fetchLogins(toISODate(start), toISODate(end));
-        if (!cancelled) {
-          setLogins(data);
-          setErrors((prev) => {
-            const { logins: _omit, ...rest } = prev;
-            return rest;
-          });
-        }
-      } catch (e: any) {
-        const status = e?.response?.status;
-        const msg = status ? `HTTP ${status}` : e?.message || "request failed";
-        if (!cancelled) setErrors((prev) => ({ ...prev, logins: msg }));
-        // eslint-disable-next-line no-console
-        console.error("[admin dashboard] logins failed:", e);
-      } finally {
-        if (!cancelled) setLoginsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [range, refreshNonce]);
-
-  const tone = (k: Tone) => {
-    switch (k) {
-      case "primary": return { solid: t.primary, soft: t.primarySoft };
-      case "success": return { solid: t.success, soft: t.successSoft };
-      case "warning": return { solid: t.warning, soft: t.warningSoft };
-      case "danger": return { solid: t.danger, soft: t.dangerSoft };
-      case "info": return { solid: t.info, soft: t.infoSoft };
-      case "purple": return { solid: t.purple, soft: t.purpleSoft };
-    }
-  };
 
   const greeting = useMemo(() => {
     const h = now.getHours();
@@ -523,300 +634,6 @@ const DashboardAdminContent: FC = () => {
   });
 
   /* Derived series ------------------------------------------- */
-  const loginsByDay = useMemo(() => {
-    const map = new Map<string, number>();
-    const end = range.end || new Date();
-    const start =
-      range.start ||
-      (logins.length > 0
-        ? new Date(
-            Math.min(
-              ...logins
-                .map((l) => new Date(pick(l, ["loginTime", "createdAt", "accessTime"]) || 0).getTime())
-                .filter((t) => !Number.isNaN(t) && t > 0)
-            )
-          )
-        : (() => {
-            const d = new Date(end);
-            d.setDate(d.getDate() - 29);
-            return d;
-          })());
-    const dayMs = 86400000;
-    const startDay = new Date(start);
-    startDay.setHours(0, 0, 0, 0);
-    const endDay = new Date(end);
-    endDay.setHours(0, 0, 0, 0);
-    // Cap buckets at ~180 to avoid huge x-axis on "All time"
-    const totalDays = Math.round((endDay.getTime() - startDay.getTime()) / dayMs);
-    const bucketSize = totalDays > 180 ? Math.ceil(totalDays / 180) : 1;
-    for (let t = startDay.getTime(); t <= endDay.getTime(); t += dayMs * bucketSize) {
-      map.set(toISODate(new Date(t)), 0);
-    }
-    logins.forEach((l) => {
-      const raw = pick(l, ["loginTime", "createdAt", "accessTime"]);
-      if (!raw) return;
-      const day = String(raw).slice(0, 10);
-      if (bucketSize === 1) {
-        if (map.has(day)) map.set(day, (map.get(day) || 0) + 1);
-      } else {
-        const rowTime = new Date(day).getTime();
-        if (Number.isNaN(rowTime)) return;
-        const offsetDays = Math.floor((rowTime - startDay.getTime()) / dayMs);
-        const bucketIdx = Math.floor(offsetDays / bucketSize);
-        const bucketDay = new Date(startDay.getTime() + bucketIdx * bucketSize * dayMs);
-        const key = toISODate(bucketDay);
-        if (map.has(key)) map.set(key, (map.get(key) || 0) + 1);
-      }
-    });
-    return Array.from(map.entries());
-  }, [logins, range]);
-
-  // Reports filtered by date range (client-side — GeneratedReport.createdAt)
-  const reportsInRange = useMemo(() => {
-    if (!range.start || !range.end) return reports;
-    const s = range.start.getTime();
-    const e = range.end.getTime();
-    return reports.filter((r) => {
-      const raw = pick(r, ["createdAt", "created_at", "updatedAt"]);
-      if (!raw) return false;
-      const t = new Date(raw).getTime();
-      return !Number.isNaN(t) && t >= s && t <= e;
-    });
-  }, [reports, range]);
-
-  const rangeActive = rangeKey !== "all";
-
-  // Student → institute lookup (authoritative from mappings)
-  const studentToInstitute = useMemo(() => {
-    const m = new Map<string, string>();
-    studentMappings.forEach((s) => {
-      const sid = String(pick(s, ["userStudentId", "user_student_id", "id"]) ?? "");
-      const iid = String(pick(s, ["instituteId", "institute_id"]) ?? "");
-      if (sid && iid) m.set(sid, iid);
-    });
-    return m;
-  }, [studentMappings]);
-
-  // -----------------------------------------------------------
-  // Window-based: "active in range" via AssessmentTable.starDate/endDate
-  // This is what "assessment is running during X" actually means.
-  // -----------------------------------------------------------
-  const activeAssessmentIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (!rangeActive || !range.start || !range.end) {
-      assessments.forEach((a) => {
-        const id = pick(a, ["id", "assessmentId"]);
-        if (id != null) ids.add(String(id));
-      });
-      return ids;
-    }
-    const rStart = range.start.getTime();
-    const rEnd = range.end.getTime();
-    assessments.forEach((a) => {
-      const id = pick(a, ["id", "assessmentId"]);
-      if (id == null) return;
-      const startStr = pick(a, ["starDate", "startDate"]);
-      const endStr = pick(a, ["endDate"]);
-      const aStartDate = startStr ? new Date(String(startStr)) : null;
-      const aEndDate = endStr ? new Date(String(endStr)) : null;
-      // Assessments with no declared window are excluded when a range is active —
-      // they have no schedule, so we can't claim they're running in the range.
-      if (!aStartDate && !aEndDate) return;
-      const aStart =
-        aStartDate && !Number.isNaN(aStartDate.getTime()) ? aStartDate.getTime() : -Infinity;
-      const aEnd =
-        aEndDate && !Number.isNaN(aEndDate.getTime())
-          ? aEndDate.getTime() + 86400000 - 1
-          : Infinity;
-      if (aEnd >= rStart && aStart <= rEnd) ids.add(String(id));
-    });
-    return ids;
-  }, [assessments, rangeActive, range]);
-
-  // Data health: students with reports in range but no current institute mapping
-  // (graduated, transferred, or their institute no longer in getAll). Their
-  // activity gets silently dropped from institute-level metrics.
-  const dataHealth = useMemo(() => {
-    const sidsWithReports = new Set<string>();
-    reportsInRange.forEach((r) => {
-      const nested = r?.userStudent;
-      const sid = String(
-        (nested && (nested.userStudentId ?? nested.id ?? nested.studentId)) ??
-          pick(r, ["userStudentId", "user_student_id"]) ??
-          ""
-      );
-      if (sid) sidsWithReports.add(sid);
-    });
-    let orphaned = 0;
-    sidsWithReports.forEach((sid) => {
-      if (!studentToInstitute.has(sid)) orphaned++;
-    });
-    // Reports in range with missing assessment id
-    const reportsWithoutAid = reportsInRange.filter(
-      (r) => pick(r, ["assessmentId", "assessment_id"]) == null
-    ).length;
-    return {
-      reportedStudents: sidsWithReports.size,
-      orphanedStudents: orphaned,
-      reportsWithoutAid,
-    };
-  }, [reportsInRange, studentToInstitute]);
-
-  // Assessments that have BOTH window overlap AND reports in range.
-  // Difference vs activeAssessmentIds shows "scheduled but no report activity".
-  const activeWithReportsCount = useMemo(() => {
-    const reportedIds = new Set<string>();
-    reportsInRange.forEach((r) => {
-      const aid = pick(r, ["assessmentId", "assessment_id"]);
-      if (aid != null) reportedIds.add(String(aid));
-    });
-    let count = 0;
-    activeAssessmentIds.forEach((aid) => {
-      if (reportedIds.has(aid)) count++;
-    });
-    return count;
-  }, [reportsInRange, activeAssessmentIds]);
-
-  // Students who completed any assessment whose window overlaps the range.
-  // Mapping rows lack a timestamp, so we infer "in range" via the assessment's
-  // scheduled window — honest, accurate when windows are short.
-  const completedInRangeStudents = useMemo(() => {
-    const ids = new Set<string>();
-    if (!rangeActive) return ids;
-    studentMappings.forEach((s) => {
-      const sid = String(pick(s, ["userStudentId", "user_student_id", "id"]) ?? "");
-      if (!sid) return;
-      const assigned = Array.isArray(s.assessments) ? s.assessments : [];
-      for (const m of assigned) {
-        const aid = String(pick(m, ["assessmentId", "assessment_id"]) ?? "");
-        if (!aid || !activeAssessmentIds.has(aid)) continue;
-        const st = String(pick(m, ["status"]) || "").toLowerCase();
-        if (st === "completed" || st === "submitted") {
-          ids.add(sid);
-          break;
-        }
-      }
-    });
-    return ids;
-  }, [studentMappings, activeAssessmentIds, rangeActive]);
-
-  // -----------------------------------------------------------
-  // Report-based sets (precise via GeneratedReport.createdAt)
-  // -----------------------------------------------------------
-  const reportStudentIds = useMemo(() => {
-    const ids = new Set<string>();
-    reportsInRange.forEach((r) => {
-      const nested = r?.userStudent;
-      const sid =
-        (nested && (nested.userStudentId ?? nested.id ?? nested.studentId)) ??
-        pick(r, ["userStudentId", "user_student_id", "studentId", "student_id"]);
-      if (sid != null) ids.add(String(sid));
-    });
-    return ids;
-  }, [reportsInRange]);
-
-  const generatedStudentIds = useMemo(() => {
-    const ids = new Set<string>();
-    reportsInRange.forEach((r) => {
-      const status = String(pick(r, ["reportStatus", "status"]) || "").toLowerCase();
-      if (status !== "generated") return;
-      const nested = r?.userStudent;
-      const sid =
-        (nested && (nested.userStudentId ?? nested.id ?? nested.studentId)) ??
-        pick(r, ["userStudentId", "user_student_id", "studentId", "student_id"]);
-      if (sid != null) ids.add(String(sid));
-    });
-    return ids;
-  }, [reportsInRange]);
-
-  // Union: student is "active in range" if they either completed an
-  // assessment whose window overlaps the range OR have a report in range.
-  const activeStudentIds = useMemo(() => {
-    const ids = new Set<string>();
-    completedInRangeStudents.forEach((id) => ids.add(id));
-    reportStudentIds.forEach((id) => ids.add(id));
-    return ids;
-  }, [completedInRangeStudents, reportStudentIds]);
-
-  const activeInstituteIds = useMemo(() => {
-    const ids = new Set<string>();
-    activeStudentIds.forEach((sid) => {
-      const iid = studentToInstitute.get(sid);
-      if (iid) ids.add(iid);
-    });
-    return ids;
-  }, [activeStudentIds, studentToInstitute]);
-
-  // Does any active assessment have a window wider than 2× the range?
-  // If yes, KPIs that depend on completedInRangeStudents are approximate.
-  const hasWindowOvershoot = useMemo(() => {
-    if (!rangeActive || !range.start || !range.end) return false;
-    const dayMs = 86400000;
-    const rangeDays = Math.max(
-      Math.round((range.end.getTime() - range.start.getTime()) / dayMs) + 1,
-      1
-    );
-    for (const id of activeAssessmentIds) {
-      const a = assessments.find(
-        (x) => String(pick(x, ["id", "assessmentId"])) === id
-      );
-      if (!a) continue;
-      const startStr = pick(a, ["starDate", "startDate"]);
-      const endStr = pick(a, ["endDate"]);
-      if (!startStr || !endStr) continue;
-      const aStart = new Date(String(startStr)).getTime();
-      const aEnd = new Date(String(endStr)).getTime();
-      if (Number.isNaN(aStart) || Number.isNaN(aEnd)) continue;
-      const windowDays = Math.round((aEnd - aStart) / dayMs) + 1;
-      if (windowDays > rangeDays * 2) return true;
-    }
-    return false;
-  }, [rangeActive, range, activeAssessmentIds, assessments]);
-
-  const overshootTooltip =
-    "Some active assessments have scheduling windows wider than your selected range. " +
-    "Because the mapping data has no per-student completion timestamp, completions " +
-    "spanning the full window are included — this number may overcount versus your exact range.";
-
-  // Per-institute activity summary (used by the institutes table).
-  // Combines: window-based completions + report-based generation.
-  const institutesActivity = useMemo(() => {
-    type Agg = { activeStudents: Set<string>; reportsGenerated: number };
-    const m = new Map<string, Agg>();
-    const ensure = (iid: string): Agg => {
-      let e = m.get(iid);
-      if (!e) {
-        e = { activeStudents: new Set(), reportsGenerated: 0 };
-        m.set(iid, e);
-      }
-      return e;
-    };
-
-    // 1. From completions on assessments active in range
-    completedInRangeStudents.forEach((sid) => {
-      const iid = studentToInstitute.get(sid);
-      if (iid) ensure(iid).activeStudents.add(sid);
-    });
-
-    // 2. From GeneratedReport in range (adds reports + active students)
-    reportsInRange.forEach((r) => {
-      const nested = r?.userStudent;
-      const sid = String(
-        (nested && (nested.userStudentId ?? nested.id ?? nested.studentId)) ??
-          pick(r, ["userStudentId", "user_student_id"]) ??
-          ""
-      );
-      if (!sid) return;
-      const iid = studentToInstitute.get(sid);
-      if (!iid) return;
-      const entry = ensure(iid);
-      entry.activeStudents.add(sid);
-      const status = String(pick(r, ["reportStatus", "status"]) || "").toLowerCase();
-      if (status === "generated") entry.reportsGenerated++;
-    });
-    return m;
-  }, [completedInRangeStudents, reportsInRange, studentToInstitute]);
-
   const validStudents = useMemo(() => {
     const instituteIds = new Set<string>();
     institutes.forEach((i) => {
@@ -831,102 +648,6 @@ const DashboardAdminContent: FC = () => {
       return sid != null && instituteIds.has(String(sid));
     });
   }, [students, institutes]);
-
-  const assessmentStatus = useMemo(() => {
-    let active = 0, inactive = 0;
-    assessments.forEach((a) => {
-      if (pick(a, ["isActive", "active"]) === true) active++;
-      else inactive++;
-    });
-    return { active, inactive };
-  }, [assessments]);
-
-  const completionMetrics = useMemo(() => {
-    const students = new Set<string>();
-    const assessmentsCovered = new Set<string>();
-    let totalCompletions = 0;
-    studentMappings.forEach((s) => {
-      const sid = pick(s, ["userStudentId", "user_student_id", "id"]);
-      const assigned = Array.isArray(s.assessments) ? s.assessments : [];
-      assigned.forEach((a: any) => {
-        const status = String(pick(a, ["status"]) || "").toLowerCase();
-        if (status === "completed" || status === "submitted") {
-          totalCompletions++;
-          if (sid != null) students.add(String(sid));
-          const aid = pick(a, ["assessmentId", "assessment_id"]);
-          if (aid != null) assessmentsCovered.add(String(aid));
-        }
-      });
-    });
-    return {
-      students: students.size,
-      totalCompletions,
-      assessmentsCovered: assessmentsCovered.size,
-    };
-  }, [studentMappings]);
-
-  const reportMetrics = useMemo(() => {
-    let generated = 0;
-    let failed = 0;
-    let notGenerated = 0;
-    const perAssessment = new Map<string | number, { total: number; generated: number }>();
-
-    reportsInRange.forEach((r) => {
-      const status = String(pick(r, ["reportStatus", "status"]) || "").toLowerCase();
-      if (status === "generated") generated++;
-      else if (status === "failed") failed++;
-      else notGenerated++;
-
-      const aid = pick(r, ["assessmentId", "assessment_id"]);
-      if (aid != null) {
-        const entry = perAssessment.get(aid) || { total: 0, generated: 0 };
-        entry.total++;
-        if (status === "generated") entry.generated++;
-        perAssessment.set(aid, entry);
-      }
-    });
-
-    const nameById = new Map<any, string>();
-    assessments.forEach((a) => {
-      const id = pick(a, ["id", "assessmentId"]);
-      const name =
-        pick(a, ["assessmentName", "name", "title"]) || `Assessment #${id ?? "?"}`;
-      if (id != null) nameById.set(id, name);
-    });
-
-    const rows = Array.from(perAssessment.entries())
-      .map(([aid, v]) => ({
-        assessmentId: aid,
-        name: nameById.get(aid) || `Assessment #${aid}`,
-        total: v.total,
-        generated: v.generated,
-      }))
-      .sort((a, b) => b.generated - a.generated);
-
-    return {
-      totalConducted: reportsInRange.length,
-      generated,
-      failed,
-      notGenerated,
-      rows,
-    };
-  }, [reportsInRange, assessments]);
-
-  const topInstitutes = useMemo(() => {
-    return institutes
-      .slice()
-      .sort((a, b) => (pick(b, ["id"]) ?? 0) - (pick(a, ["id"]) ?? 0))
-      .map((i) => ({
-        id: pick(i, ["id"]),
-        name:
-          pick(i, ["instituteName", "name", "schoolName", "collegeName"]) ||
-          "Unnamed institute",
-        city: pick(i, ["city", "instituteCity", "location", "state"]) || "—",
-        address: pick(i, ["instituteAddress", "address"]) || "",
-        active: pick(i, ["isActive", "active", "status"]) !== false,
-        branches: Array.isArray(pick(i, ["branches"])) ? pick(i, ["branches"]).length : null,
-      }));
-  }, [institutes]);
 
   return (
     <>
@@ -1008,266 +729,50 @@ const DashboardAdminContent: FC = () => {
           t={t}
           rangeKey={rangeKey}
           setRangeKey={setRangeKey}
-          range={range}
+          range={draftRange}
           customStart={customStart}
           customEnd={customEnd}
           setCustomStart={setCustomStart}
           setCustomEnd={setCustomEnd}
+          appliedLabel={rangeLabel(applied.rangeKey, applied.range)}
+          appliedRange={applied.range}
+          dirty={filtersDirty}
+          canSearch={!customIncomplete && scopeReady && !scopeDenied}
+          searching={overview.busy}
+          onSearch={handleSearch}
         />
 
-        {/* KPI GRID */}
-        <div className="ds-grid" style={{ marginTop: 24 }}>
-          <KpiCard
+        {/* VIEW FILTER + SCHOOL EXPORT — super-admin only; draft until Search */}
+        {isSuperAdmin && (
+          <ViewFilterBar
             t={t}
-            tone={tone("primary")}
-            icon={<IconUsers />}
-            title={rangeActive ? "Students with report" : "Total students"}
+            institutes={rawInstitutes}
+            draftInstitute={draftInstitute}
+            setDraftInstitute={setDraftInstitute}
+            assessmentOptions={viewAssessmentOptions}
+            draftAssessmentIds={draftAssessmentIds}
+            setDraftAssessmentIds={setDraftAssessmentIds}
+            appliedActive={viewFilterActive}
+            exportEnabled={!!viewInstitute}
             loading={loading}
-            value={
-              rangeActive
-                ? errors.reports
-                  ? "—"
-                  : fmtNum(generatedStudentIds.size)
-                : errors.students
-                ? "—"
-                : fmtNum(validStudents.length)
-            }
-            caption={
-              loading
-                ? "Loading…"
-                : rangeActive
-                ? errors.reports
-                  ? `Failed: ${errors.reports}`
-                  : `Distinct students whose report generated in ${rangeLabel(rangeKey, range).toLowerCase()}`
-                : errors.students
-                ? `Failed: ${errors.students}`
-                : schoolMode && institutes.length === 1
-                ? `At ${institutes[0]?.instituteName || "your institute"}`
-                : `Across ${institutes.length} active institutes`
-            }
-            errored={rangeActive ? !!errors.reports : !!errors.students}
-            dateFiltered={rangeActive}
+            exporting={exporting}
+            onExport={handleExportForSchool}
+            studentCount={studentMappings.length}
           />
-          {!(schoolMode && institutes.length <= 1) && (
-          <KpiCard
-            t={t}
-            tone={tone("success")}
-            icon={<IconBuilding />}
-            title={rangeActive ? "Institutes active" : "Active institutes"}
-            loading={loading || (rangeActive && mappingsLoading)}
-            value={
-              rangeActive
-                ? fmtNum(activeInstituteIds.size)
-                : errors.institutes
-                ? "—"
-                : fmtNum(institutes.length)
-            }
-            caption={
-              loading
-                ? "Loading…"
-                : rangeActive && mappingsLoading
-                ? "Loading mappings…"
-                : rangeActive
-                ? `Institutes with completions or in-range reports`
-                : errors.institutes
-                ? `Failed: ${errors.institutes}`
-                : "Schools & colleges onboarded"
-            }
-            errored={rangeActive ? false : !!errors.institutes}
-            dateFiltered={rangeActive}
-            warn={rangeActive && hasWindowOvershoot ? overshootTooltip : undefined}
-          />
-          )}
-          <KpiCard
-            t={t}
-            tone={tone("info")}
-            icon={<IconClipboard />}
-            title={rangeActive ? "Assessments scheduled" : "Assessments"}
-            loading={loading}
-            value={
-              rangeActive
-                ? fmtNum(activeAssessmentIds.size)
-                : errors.assessments
-                ? "—"
-                : fmtNum(assessments.length)
-            }
-            caption={
-              loading
-                ? "Loading…"
-                : rangeActive
-                ? `Scheduled window overlaps ${rangeLabel(rangeKey, range).toLowerCase()}`
-                : errors.assessments
-                ? `Failed: ${errors.assessments}`
-                : `${assessmentStatus.active} active · ${assessmentStatus.inactive} inactive`
-            }
-            errored={rangeActive ? false : !!errors.assessments}
-            dateFiltered={rangeActive}
-          />
-          {/* Counsellor roster is platform-wide (not row-filtered by scope) —
-              only meaningful to super-admins. */}
-          {!schoolMode && (
-          <KpiCard
-            t={t}
-            tone={tone("warning")}
-            icon={<IconHeadset />}
-            title="Counsellors"
-            loading={loading}
-            value={errors.counsellors ? "—" : fmtNum(counsellors.length)}
-            caption={
-              loading
-                ? "Loading…"
-                : errors.counsellors
-                ? `Failed: ${errors.counsellors}`
-                : "Available for student guidance · lifetime"
-            }
-            errored={!!errors.counsellors}
-          />
-          )}
-          <KpiCard
-            t={t}
-            tone={tone("purple")}
-            icon={<IconActivity />}
-            title="Assessments conducted"
-            loading={loading}
-            value={errors.reports ? "—" : fmtNum(reportMetrics.totalConducted)}
-            caption={
-              loading
-                ? "Loading…"
-                : errors.reports
-                ? `Failed: ${errors.reports}`
-                : rangeActive
-                ? `Reports generated in ${rangeLabel(rangeKey, range).toLowerCase()} · ${reportMetrics.rows.length} distinct assessments`
-                : `All time · across ${reportMetrics.rows.length} assessments`
-            }
-            errored={!!errors.reports}
-            dateFiltered={rangeActive}
-          />
-          <KpiCard
-            t={t}
-            tone={tone("success")}
-            icon={<IconFileCheck />}
-            title="Students completed"
-            loading={loading || mappingsLoading}
-            value={
-              rangeActive
-                ? fmtNum(completedInRangeStudents.size)
-                : errors.mappings
-                ? "—"
-                : fmtNum(completionMetrics.students)
-            }
-            caption={
-              loading
-                ? "Loading…"
-                : mappingsLoading
-                ? "Loading mappings…"
-                : rangeActive
-                ? `Lifetime per active assessment · ${fmtNum(generatedStudentIds.size)} got report in range`
-                : errors.mappings
-                ? `Failed: ${errors.mappings}`
-                : `${fmtNum(completionMetrics.totalCompletions)} completions · ${completionMetrics.assessmentsCovered} assessments`
-            }
-            errored={rangeActive ? false : !!errors.mappings}
-            dateFiltered={rangeActive}
-            warn={rangeActive && hasWindowOvershoot ? overshootTooltip : undefined}
-          />
-        </div>
-
-        {/* ENGAGEMENT + ASSESSMENTS DONUT */}
-        <div className="ds-two-col" style={{ marginTop: 24 }}>
-          <EngagementCard
-            t={t}
-            series={loginsByDay}
-            loading={loading || loginsLoading}
-            rangeLabel={rangeLabel(rangeKey, range)}
-          />
-          <AssessmentBreakdownCard
-            t={t}
-            rangeActive={rangeActive}
-            rangeLabelText={rangeLabel(rangeKey, range)}
-            total={assessments.length}
-            activeWithReports={rangeActive ? activeWithReportsCount : 0}
-            activeWithoutReports={
-              rangeActive ? Math.max(activeAssessmentIds.size - activeWithReportsCount, 0) : 0
-            }
-            dormant={
-              rangeActive
-                ? Math.max(assessments.length - activeAssessmentIds.size, 0)
-                : assessmentStatus.inactive
-            }
-            lifetimeActive={assessmentStatus.active}
-            loading={loading}
-          />
-        </div>
-
-        {/* ASSESSMENT REPORT DRILL-DOWN */}
-        <div style={{ marginTop: 24 }}>
-          <AssessmentReportDrilldown
-            t={t}
-            assessments={assessments}
-            institutes={institutes}
-            reports={reportsInRange}
-            studentMappings={studentMappings}
-            mappingsLoading={mappingsLoading}
-            loading={loading}
-            rangeActive={rangeActive}
-            rangeLabelText={rangeLabel(rangeKey, range)}
-            rangeStart={range.start}
-            rangeEnd={range.end}
-            activeAssessmentIds={activeAssessmentIds}
-            errored={!!errors.reports || !!errors.assessments}
-          />
-        </div>
-
-        {/* COUNSELLING DRILL-DOWN */}
-        <div style={{ marginTop: 24 }}>
-          <CounsellingDrillDownCard
-            t={t}
-            institutes={institutes}
-            studentMappings={studentMappings}
-            appointments={appointments}
-            mappingsLoading={mappingsLoading}
-            loading={loading}
-            errored={!!errors.appointments}
-          />
-        </div>
-
-        {/* COUNSELLOR LEADERBOARD — platform-wide ratings, super-admin only */}
-        {!schoolMode && (
-          <div style={{ marginTop: 24 }}>
-            <CounsellorLeaderboardCard
-              t={t}
-              counsellors={counsellors}
-              appointments={appointments}
-              ratingSummary={ratingSummary}
-              loading={loading}
-              errored={!!errors.counsellors || !!errors.appointments}
-            />
-          </div>
         )}
 
-        {/* DATA HEALTH — ops diagnostics, super-admin only */}
-        {!schoolMode &&
-          rangeActive &&
-          (dataHealth.orphanedStudents > 0 || dataHealth.reportsWithoutAid > 0) && (
-          <div style={{ marginTop: 24 }}>
-            <DataHealthRow t={t} health={dataHealth} />
-          </div>
-        )}
-
-        {/* INSTITUTES TABLE — cross-institute comparison; pointless when the
-            viewer is scoped to a single institute */}
-        {!(schoolMode && institutes.length <= 1) && (
-          <div style={{ marginTop: 24 }}>
-            <InstitutesTable
-              t={t}
-              data={topInstitutes}
-              loading={loading}
-              rangeActive={rangeActive}
-              rangeLabelText={rangeLabel(rangeKey, range)}
-              activity={institutesActivity}
-            />
-          </div>
-        )}
+        {/* OVERVIEW CARDS — one API call per card, all in flight at once; each
+            tile paints the moment its own number lands. Nothing here reacts to
+            the pickers until Search is pressed (see `applied`). */}
+        <OverviewSection
+          t={t}
+          states={overview.states}
+          retry={overview.retry}
+          appliedRangeKey={applied.rangeKey}
+          appliedRange={applied.range}
+          denied={scopeDenied}
+          query={overviewQuery}
+        />
       </div>
     </>
   );
@@ -1299,7 +804,7 @@ const Hero: FC<{
 
     <div className="ds-hero-content">
       <div style={{ flex: 1, minWidth: 280 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
           {error ? (
             <span className="ds-hero-pill" style={{ background: "rgba(251,191,36,0.18)", color: "#fde68a" }}>
               <IconAlert /> {error}
@@ -1325,28 +830,28 @@ const Hero: FC<{
         </div>
         <h1
           style={{
-            fontSize: 44,
+            fontSize: 28,
             fontWeight: 700,
-            letterSpacing: "-0.035em",
+            letterSpacing: "-0.03em",
             color: "#ffffff",
-            margin: "4px 0 0",
-            lineHeight: 1.05,
+            margin: "2px 0 0",
+            lineHeight: 1.1,
           }}
         >
           {name}
         </h1>
         <p
           style={{
-            fontSize: 15,
-            color: "rgba(255,255,255,0.7)",
-            margin: "10px 0 0",
-            maxWidth: 520,
+            fontSize: 13,
+            color: "rgba(255,255,255,0.65)",
+            margin: "6px 0 0",
+            maxWidth: 560,
           }}
         >
           Here's what's happening across your network — institutes, assessments, and students in one place.
         </p>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
           <button
             className="ds-btn ds-btn-hero-primary"
             onClick={onRefresh}
@@ -1367,8 +872,6 @@ const Hero: FC<{
           <button className="ds-btn ds-btn-hero-ghost" onClick={onLogout}>
             <IconLogout /> Logout
           </button>
-        </div>
-
         {computedAt && (
           <div
             title={
@@ -1377,7 +880,7 @@ const Hero: FC<{
                 : `Fresh compute: ${new Date(computedAt).toLocaleString()}`
             }
             style={{
-              marginTop: 12,
+              marginLeft: 4,
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
@@ -1404,6 +907,7 @@ const Hero: FC<{
             {cacheHit ? "cached" : "fresh"} · updated {relativeTime(computedAt)}
           </div>
         )}
+        </div>
       </div>
 
       <div className="ds-hero-stats">
@@ -1422,11 +926,11 @@ const Hero: FC<{
             </div>
             <div
               style={{
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: 700,
                 color: "#ffffff",
                 fontVariantNumeric: "tabular-nums",
-                marginTop: 6,
+                marginTop: 2,
                 letterSpacing: "-0.02em",
               }}
             >
@@ -1440,43 +944,266 @@ const Hero: FC<{
 );
 
 /* ============================================================
-   DATE RANGE BAR
+   DATE RANGE (draft → Search → applied)
    ============================================================ */
-const rangeLabel = (
-  key: "7d" | "30d" | "90d" | "all" | "custom",
-  range: { start: Date | null; end: Date | null }
-): string => {
-  if (key === "all") return "All time";
-  if (key === "7d") return "Last 7 days";
-  if (key === "30d") return "Last 30 days";
-  if (key === "90d") return "Last 90 days";
+type RangeKey = "today" | "yesterday" | "7d" | "30d" | "90d" | "all" | "custom";
+type DateRange = { start: Date | null; end: Date | null };
+type AppliedFilters = {
+  rangeKey: RangeKey;
+  customStart: string;
+  customEnd: string;
+  range: DateRange;
+  /** Bumped on every Search so identical filters still re-query. */
+  nonce: number;
+};
+
+const RANGE_PRESETS: { key: Exclude<RangeKey, "custom">; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "90d", label: "Last 90 days" },
+  { key: "all", label: "All time" },
+];
+
+const startOfDay = (d: Date) => {
+  const s = new Date(d);
+  s.setHours(0, 0, 0, 0);
+  return s;
+};
+const endOfDay = (d: Date) => {
+  const e = new Date(d);
+  e.setHours(23, 59, 59, 999);
+  return e;
+};
+
+/** Local-calendar yyyy-mm-dd. (toISOString() would roll "today 00:00" back a day east of UTC.) */
+const toLocalISODate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const computeRange = (key: RangeKey, customStart: string, customEnd: string): DateRange => {
+  const today = new Date();
+  if (key === "all") return { start: null, end: null };
+  if (key === "custom") {
+    if (!customStart || !customEnd) return { start: null, end: null };
+    // "T00:00:00" forces local-time parsing; a bare date parses as UTC midnight.
+    return {
+      start: startOfDay(new Date(`${customStart}T00:00:00`)),
+      end: endOfDay(new Date(`${customEnd}T00:00:00`)),
+    };
+  }
+  if (key === "today") return { start: startOfDay(today), end: endOfDay(today) };
+  if (key === "yesterday") {
+    const y = new Date(today);
+    y.setDate(y.getDate() - 1);
+    return { start: startOfDay(y), end: endOfDay(y) };
+  }
+  const days = key === "7d" ? 7 : key === "30d" ? 30 : 90;
+  const start = new Date(today);
+  start.setDate(start.getDate() - (days - 1));
+  return { start: startOfDay(start), end: endOfDay(today) };
+};
+
+const fmtShortDate = (d: Date) =>
+  d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+const rangeLabel = (key: RangeKey, range: DateRange): string => {
+  const preset = RANGE_PRESETS.find((p) => p.key === key);
+  if (preset) return preset.label;
   if (!range.start || !range.end) return "Custom";
-  const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-  return `${fmt(range.start)} – ${fmt(range.end)}`;
+  return `${fmtShortDate(range.start)} – ${fmtShortDate(range.end)}`;
 };
 
 const DateRangeBar: FC<{
   t: Theme;
-  rangeKey: "7d" | "30d" | "90d" | "all" | "custom";
-  setRangeKey: (k: "7d" | "30d" | "90d" | "all" | "custom") => void;
-  range: { start: Date | null; end: Date | null };
+  rangeKey: RangeKey;
+  setRangeKey: (k: RangeKey) => void;
+  range: DateRange;
   customStart: string;
   customEnd: string;
   setCustomStart: (s: string) => void;
   setCustomEnd: (s: string) => void;
-}> = ({ t, rangeKey, setRangeKey, range, customStart, customEnd, setCustomStart, setCustomEnd }) => {
-  const presets: { key: "7d" | "30d" | "90d" | "all"; label: string }[] = [
-    { key: "7d", label: "Last 7 days" },
-    { key: "30d", label: "Last 30 days" },
-    { key: "90d", label: "Last 90 days" },
-    { key: "all", label: "All time" },
-  ];
+  appliedLabel: string;
+  appliedRange: DateRange;
+  dirty: boolean;
+  canSearch: boolean;
+  searching: boolean;
+  onSearch: () => void;
+}> = ({
+  t,
+  rangeKey,
+  setRangeKey,
+  range,
+  customStart,
+  customEnd,
+  setCustomStart,
+  setCustomEnd,
+  appliedLabel,
+  appliedRange,
+  dirty,
+  canSearch,
+  searching,
+  onSearch,
+}) => (
+  <div
+    style={{
+      marginTop: 12,
+      padding: "12px 18px",
+      background: t.card,
+      border: `1px solid ${t.border}`,
+      borderRadius: 14,
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      flexWrap: "wrap",
+    }}
+  >
+    <div style={{ display: "flex", alignItems: "center", gap: 8, color: t.textMuted, fontSize: 12, fontWeight: 600 }}>
+      <IconCalendar />
+      <span style={{ letterSpacing: "0.04em", textTransform: "uppercase" }}>Date range</span>
+    </div>
+
+    <div className="ds-preset-group" role="tablist">
+      {RANGE_PRESETS.map((p) => (
+        <button
+          key={p.key}
+          role="tab"
+          aria-selected={rangeKey === p.key}
+          className={`ds-preset-btn ${rangeKey === p.key ? "active" : ""}`}
+          onClick={() => setRangeKey(p.key)}
+        >
+          {p.label}
+        </button>
+      ))}
+      <button
+        role="tab"
+        aria-selected={rangeKey === "custom"}
+        className={`ds-preset-btn ${rangeKey === "custom" ? "active" : ""}`}
+        onClick={() => setRangeKey("custom")}
+      >
+        Custom
+      </button>
+    </div>
+
+    {rangeKey === "custom" && (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input
+          type="date"
+          className="ds-date-input"
+          value={customStart}
+          max={customEnd || toLocalISODate(new Date())}
+          onChange={(e) => setCustomStart(e.target.value)}
+        />
+        <span style={{ color: t.textMuted, fontSize: 12 }}>to</span>
+        <input
+          type="date"
+          className="ds-date-input"
+          value={customEnd}
+          min={customStart || undefined}
+          max={toLocalISODate(new Date())}
+          onChange={(e) => setCustomEnd(e.target.value)}
+        />
+      </div>
+    )}
+    {rangeKey !== "custom" && range.start && range.end && (
+      <span style={{ fontSize: 12, color: t.textSubtle }}>
+        {range.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })} –{" "}
+        {range.end.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+      </span>
+    )}
+
+    <div
+      style={{
+        marginLeft: "auto",
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ fontSize: 12, color: t.textMuted, display: "flex", alignItems: "center", gap: 6 }}>
+        <span>Showing:</span>
+        <span style={{ fontWeight: 700, color: t.text }}>{appliedLabel}</span>
+        {appliedRange.start && appliedRange.end && (
+          <span style={{ color: t.textSubtle }}>
+            ({appliedRange.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })} –{" "}
+            {appliedRange.end.toLocaleDateString(undefined, { day: "numeric", month: "short" })})
+          </span>
+        )}
+        {dirty && <span className="ds-dirty-pill">Unapplied</span>}
+      </div>
+      <button
+        className={`ds-search-btn ${dirty ? "dirty" : ""}`}
+        disabled={!canSearch || searching}
+        onClick={onSearch}
+        title={
+          !canSearch
+            ? "Pick both custom dates first"
+            : dirty
+            ? "Apply the selected date range and view filters"
+            : "Re-run every card with the current filters"
+        }
+      >
+        {searching ? <Spinner color="#fff" size={14} /> : <IconSearch />}
+        Search
+      </button>
+    </div>
+  </div>
+);
+
+/* ============================================================
+   VIEW FILTER BAR (super-admin: institute + assessments + export)
+   Selections here are DRAFT until Search is pressed.
+   ============================================================ */
+const ViewFilterBar: FC<{
+  t: Theme;
+  institutes: any[];
+  draftInstitute: string;
+  setDraftInstitute: (code: string) => void;
+  assessmentOptions: { value: string; label: string }[];
+  draftAssessmentIds: string[];
+  setDraftAssessmentIds: (ids: string[]) => void;
+  appliedActive: boolean;
+  exportEnabled: boolean;
+  loading: boolean;
+  exporting: boolean;
+  onExport: () => void;
+  studentCount: number;
+}> = ({
+  t,
+  institutes,
+  draftInstitute,
+  setDraftInstitute,
+  assessmentOptions,
+  draftAssessmentIds,
+  setDraftAssessmentIds,
+  appliedActive,
+  exportEnabled,
+  loading,
+  exporting,
+  onExport,
+  studentCount,
+}) => {
+  const instituteOptions = useMemo(
+    () =>
+      institutes
+        .map((i) => {
+          const code = pick(i, ["instituteCode", "code"]);
+          return {
+            value: String(code ?? ""),
+            label: String(pick(i, ["instituteName", "name"]) || `Institute #${code ?? "?"}`),
+          };
+        })
+        .filter((o) => o.value)
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [institutes]
+  );
+  const draftActive = !!draftInstitute || draftAssessmentIds.length > 0;
 
   return (
     <div
       style={{
-        marginTop: 16,
+        marginTop: 12,
         padding: "14px 18px",
         background: t.card,
         border: `1px solid ${t.border}`,
@@ -1488,74 +1215,69 @@ const DateRangeBar: FC<{
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8, color: t.textMuted, fontSize: 12, fontWeight: 600 }}>
-        <IconCalendar />
-        <span style={{ letterSpacing: "0.04em", textTransform: "uppercase" }}>Date range</span>
+        <IconBuilding />
+        <span style={{ letterSpacing: "0.04em", textTransform: "uppercase" }}>View</span>
       </div>
 
-      <div className="ds-preset-group" role="tablist">
-        {presets.map((p) => (
-          <button
-            key={p.key}
-            role="tab"
-            aria-selected={rangeKey === p.key}
-            className={`ds-preset-btn ${rangeKey === p.key ? "active" : ""}`}
-            onClick={() => setRangeKey(p.key)}
-          >
-            {p.label}
-          </button>
-        ))}
+      <SearchableSelect
+        options={instituteOptions}
+        value={draftInstitute}
+        onChange={setDraftInstitute}
+        placeholder={loading ? "Loading…" : "All institutes"}
+        disabled={loading || instituteOptions.length === 0}
+        style={{ minWidth: 260 }}
+      />
+      <SearchableMultiSelect
+        options={assessmentOptions}
+        value={draftAssessmentIds}
+        onChange={setDraftAssessmentIds}
+        placeholder={loading ? "Loading…" : "All assessments"}
+        disabled={loading || assessmentOptions.length === 0}
+        style={{ minWidth: 280, flex: 1, maxWidth: 560 }}
+      />
+      {draftActive && (
         <button
-          role="tab"
-          aria-selected={rangeKey === "custom"}
-          className={`ds-preset-btn ${rangeKey === "custom" ? "active" : ""}`}
-          onClick={() => setRangeKey("custom")}
+          className="ds-preset-btn"
+          onClick={() => {
+            setDraftInstitute("");
+            setDraftAssessmentIds([]);
+          }}
+          title="Clear the pickers (press Search to apply)"
         >
-          Custom
+          Clear
         </button>
-      </div>
-
-      {rangeKey === "custom" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input
-            type="date"
-            className="ds-date-input"
-            value={customStart}
-            max={customEnd || undefined}
-            onChange={(e) => setCustomStart(e.target.value)}
-          />
-          <span style={{ color: t.textMuted, fontSize: 12 }}>to</span>
-          <input
-            type="date"
-            className="ds-date-input"
-            value={customEnd}
-            min={customStart || undefined}
-            max={toISODate(new Date())}
-            onChange={(e) => setCustomEnd(e.target.value)}
-          />
-        </div>
       )}
 
-      <div
-        style={{
-          marginLeft: "auto",
-          fontSize: 12,
-          color: t.textMuted,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <span>Showing:</span>
-        <span style={{ fontWeight: 700, color: t.text }}>{rangeLabel(rangeKey, range)}</span>
-        {range.start && range.end && rangeKey !== "custom" && (
-          <span style={{ color: t.textSubtle }}>
-            ({range.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })} – {range.end.toLocaleDateString(undefined, { day: "numeric", month: "short" })})
-          </span>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {appliedActive && (
+          <Pill t={t} tone="primary">
+            {fmtNum(studentCount)} {studentCount === 1 ? "student" : "students"} in view
+          </Pill>
         )}
+        <button
+          className="ds-export-btn"
+          disabled={!exportEnabled || loading || exporting}
+          onClick={onExport}
+          title={
+            exportEnabled
+              ? "Download a two-sheet Excel report (summary + per-student rows) for this school"
+              : "Choose an institute and press Search to export its report"
+          }
+        >
+          {exporting ? <Spinner color="#fff" size={14} /> : <IconDownload />}
+          {exporting ? "Preparing…" : "Export for school (.xlsx)"}
+        </button>
       </div>
     </div>
   );
 };
+
+const IconSearch = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="7" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
 
 /* ============================================================
    KPI CARD
@@ -1572,2180 +1294,1036 @@ const Spinner: FC<{ color: string; size?: number }> = ({ color, size = 22 }) => 
   />
 );
 
+const toneColors = (t: Theme, k: Tone): { solid: string; soft: string } => {
+  switch (k) {
+    case "primary": return { solid: t.primary, soft: t.primarySoft };
+    case "success": return { solid: t.success, soft: t.successSoft };
+    case "warning": return { solid: t.warning, soft: t.warningSoft };
+    case "danger": return { solid: t.danger, soft: t.dangerSoft };
+    case "info": return { solid: t.info, soft: t.infoSoft };
+    case "purple": return { solid: t.purple, soft: t.purpleSoft };
+  }
+};
+
+type Fact = { label: string; value: string; tone?: Tone };
+type MeterSeg = { label: string; value: number; tone: Tone };
+
 const KpiCard: FC<{
   t: Theme;
   tone: { solid: string; soft: string };
   icon: ReactNode;
   title: string;
   value: string;
-  caption: string;
+  /** One short line saying what the number is. */
+  note?: string;
+  /** Secondary numbers, shown as labelled chips. */
+  facts?: Fact[];
+  /** Composition of the headline number, shown as a thin stacked meter with a legend. */
+  meter?: MeterSeg[];
+  /** Error / placeholder text (replaces note, facts and meter). */
+  caption?: string;
   loading?: boolean;
   errored?: boolean;
+  /** Shows the "IN RANGE" chip — the number honoured the applied date window. */
   dateFiltered?: boolean;
+  /** Extra chip, e.g. LIVE, for cards that do not follow the date window. */
+  badge?: { label: string; tone: Tone; title?: string; icon?: ReactNode };
   warn?: string;
-}> = ({ t, tone, icon, title, value, caption, loading, errored, dateFiltered, warn }) => (
-  <div
-    className="ds-card ds-kpi-card"
-    style={{
-      background: t.card,
-      border: `1px solid ${errored ? t.dangerSoft : t.border}`,
-      borderRadius: 16,
-      padding: "22px 22px 20px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 16,
-      minHeight: 148,
-      position: "relative",
-      overflow: "hidden",
-      // @ts-ignore — CSS custom prop for hover glow
-      ["--kpi-tone" as any]: tone.solid,
-    }}
-  >
-    <span
-      aria-hidden
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 2,
-        background: `linear-gradient(90deg, ${tone.solid}, ${tone.solid}00 80%)`,
-        opacity: errored ? 0 : 0.9,
-      }}
-    />
-    {(dateFiltered || warn) && (
-      <div
-        style={{
-          position: "absolute",
-          top: 14,
-          right: 14,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        {warn && (
-          <span
-            title={warn}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 10,
-              fontWeight: 600,
-              color: t.warning,
-              background: t.warningSoft,
-              padding: "2px 7px",
-              borderRadius: 100,
-              letterSpacing: "0.02em",
-              cursor: "help",
-            }}
-          >
-            <IconAlert />
-            APPROX
-          </span>
-        )}
-        {dateFiltered && (
-          <span
-            title="Affected by date range filter"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 10,
-              fontWeight: 600,
-              color: t.primary,
-              background: t.primarySoft,
-              padding: "2px 7px",
-              borderRadius: 100,
-              letterSpacing: "0.02em",
-            }}
-          >
-            <IconClock />
-            IN RANGE
-          </span>
-        )}
-      </div>
-    )}
-    <div
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        background: errored
-          ? t.dangerSoft
-          : `linear-gradient(135deg, ${tone.soft}, ${tone.soft}66)`,
-        color: errored ? t.danger : tone.solid,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: errored ? "none" : `inset 0 0 0 1px ${tone.solid}1a`,
-      }}
-    >
-      {errored ? <IconAlert /> : icon}
-    </div>
-    <div>
-      <div
-        style={{
-          fontSize: 11,
-          color: t.textMuted,
-          fontWeight: 600,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-        }}
-      >
-        {title}
-      </div>
-      <div
-        style={{
-          fontSize: 36,
-          fontWeight: 700,
-          letterSpacing: "-0.03em",
-          color: t.text,
-          marginTop: 6,
-          fontVariantNumeric: "tabular-nums",
-          lineHeight: 1.05,
-          minHeight: 40,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        {loading ? <Spinner color={tone.solid} size={24} /> : value}
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: errored ? t.danger : t.textMuted,
-          marginTop: 8,
-          lineHeight: 1.4,
-        }}
-      >
-        {caption}
-      </div>
-    </div>
-  </div>
-);
-
-/* ============================================================
-   ENGAGEMENT CHART
-   ============================================================ */
-const EngagementCard: FC<{
-  t: Theme;
-  series: [string, number][];
-  loading: boolean;
-  rangeLabel: string;
-}> = ({ t, series, loading, rangeLabel }) => {
-  const totalLogins = series.reduce((sum, [, v]) => sum + v, 0);
-  const peak = series.reduce((max, [, v]) => Math.max(max, v), 0);
-
-  const opts: ApexOptions = {
-    chart: {
-      type: "area",
-      fontFamily: "inherit",
-      toolbar: { show: false },
-      zoom: { enabled: false },
-      animations: { easing: "easeinout", speed: 400 },
-    },
-    colors: [t.primary],
-    stroke: { curve: "smooth", width: 2.5 },
-    dataLabels: { enabled: false },
-    fill: {
-      type: "gradient",
-      gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 100] },
-    },
-    grid: { borderColor: t.gridLine, strokeDashArray: 4, padding: { left: 0, right: 0 } },
-    xaxis: {
-      categories: series.map(([d]) => {
-        const dt = new Date(d);
-        return dt.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-      }),
-      labels: {
-        style: { colors: t.textMuted, fontSize: "11px" },
-        rotate: 0,
-        hideOverlappingLabels: true,
-      },
-      axisBorder: { show: false },
-      axisTicks: { show: false },
-      tickAmount: 6,
-    },
-    yaxis: {
-      labels: {
-        style: { colors: t.textMuted, fontSize: "11px" },
-        formatter: (v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`),
-      },
-    },
-    legend: { show: false },
-    tooltip: {
-      theme: t.name,
-      y: { formatter: (v) => `${v} logins` },
-    },
-    markers: { size: 0, hover: { size: 5 } },
-  };
-
-  return (
-    <Card t={t}>
-      <CardHeader
-        t={t}
-        title="Daily login activity"
-        subtitle={`User logins across the platform — ${rangeLabel}`}
-        right={<Pill t={t} tone="info">{rangeLabel}</Pill>}
-      />
-      <div style={{ display: "flex", gap: 24, padding: "4px 24px 0", flexWrap: "wrap" }}>
-        <Stat t={t} label="Total logins" value={fmtNum(totalLogins)} />
-        <Stat t={t} label="Peak day" value={fmtNum(peak)} />
-        <Stat
-          t={t}
-          label="Daily average"
-          value={fmtNum(Math.round(totalLogins / Math.max(series.length, 1)))}
-        />
-      </div>
-      <div style={{ padding: "8px 12px 16px", minHeight: 340 }}>
-        {loading ? (
-          <Skeleton t={t} height={300} />
-        ) : (
-          <Chart
-            key={`eng-${t.name}`}
-            options={opts}
-            series={[{ name: "Logins", data: series.map(([, v]) => v) }]}
-            type="area"
-            height={320}
-          />
-        )}
-      </div>
-    </Card>
-  );
-};
-
-const Stat: FC<{ t: Theme; label: string; value: string }> = ({ t, label, value }) => (
-  <div>
-    <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 500 }}>{label}</div>
-    <div
-      style={{
-        fontSize: 20,
-        fontWeight: 700,
-        color: t.text,
-        fontVariantNumeric: "tabular-nums",
-        marginTop: 2,
-      }}
-    >
-      {value}
-    </div>
-  </div>
-);
-
-/* ============================================================
-   ASSESSMENT BREAKDOWN
-   ============================================================ */
-const AssessmentBreakdownCard: FC<{
-  t: Theme;
-  rangeActive: boolean;
-  rangeLabelText: string;
-  total: number;
-  activeWithReports: number;
-  activeWithoutReports: number;
-  dormant: number;
-  lifetimeActive: number;
-  loading: boolean;
-}> = ({
-  t,
-  rangeActive,
-  rangeLabelText,
-  total,
-  activeWithReports,
-  activeWithoutReports,
-  dormant,
-  lifetimeActive,
-  loading,
-}) => {
-  const series = rangeActive
-    ? [activeWithReports, activeWithoutReports, dormant]
-    : [lifetimeActive, dormant];
-  const labels = rangeActive
-    ? ["Active with reports", "Active · no reports yet", "Dormant"]
-    : ["Active", "Inactive"];
-  const colors = rangeActive ? [t.success, t.warning, t.textSubtle] : [t.success, t.textSubtle];
-
-  const opts: ApexOptions = {
-    chart: { type: "donut", fontFamily: "inherit" },
-    labels,
-    colors,
-    stroke: { width: 0 },
-    legend: { show: false },
-    dataLabels: { enabled: false },
-    plotOptions: {
-      pie: {
-        donut: {
-          size: "78%",
-          labels: {
-            show: true,
-            name: { show: true, color: t.textMuted, fontSize: "12px", offsetY: 16 },
-            value: {
-              show: true,
-              color: t.text,
-              fontSize: "28px",
-              fontWeight: 700,
-              offsetY: -16,
-              formatter: (val) => `${val}`,
-            },
-            total: {
-              show: true,
-              label: "Assessments",
-              color: t.textMuted,
-              formatter: () => `${total}`,
-            },
-          },
-        },
-      },
-    },
-    tooltip: { theme: t.name },
-  };
-
-  return (
-    <Card t={t}>
-      <CardHeader
-        t={t}
-        title="Assessments"
-        subtitle={
-          rangeActive
-            ? `Active in ${rangeLabelText.toLowerCase()} — with vs without report activity`
-            : "Active vs inactive on the platform"
-        }
-        right={rangeActive ? <Pill t={t} tone="primary">{rangeLabelText}</Pill> : undefined}
-      />
-      <div style={{ padding: "0 12px", minHeight: 260 }}>
-        {loading ? (
-          <Skeleton t={t} height={240} />
-        ) : total === 0 ? (
-          <EmptyState t={t} label="No assessments yet" />
-        ) : (
-          <Chart
-            key={`ass-${t.name}-${rangeActive ? "r" : "l"}`}
-            options={opts}
-            series={series}
-            type="donut"
-            height={240}
-          />
-        )}
-      </div>
-      <div style={{ padding: "0 24px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-        {rangeActive ? (
-          <>
-            <Row t={t} color={t.success} label="Active · with reports" value={fmtNum(activeWithReports)} />
-            <Row t={t} color={t.warning} label="Active · no reports yet" value={fmtNum(activeWithoutReports)} />
-            <Row t={t} color={t.textSubtle} label="Dormant (not in range)" value={fmtNum(dormant)} />
-          </>
-        ) : (
-          <>
-            <Row t={t} color={t.success} label="Active" value={fmtNum(lifetimeActive)} />
-            <Row t={t} color={t.textSubtle} label="Inactive" value={fmtNum(dormant)} />
-          </>
-        )}
-      </div>
-    </Card>
-  );
-};
-
-const Row: FC<{ t: Theme; color: string; label: string; value: string }> = ({ t, color, label, value }) => (
-  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-      <span style={{ color: t.text, fontSize: 13, fontWeight: 500 }}>{label}</span>
-    </div>
-    <span style={{ color: t.textMuted, fontSize: 13, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-      {value}
-    </span>
-  </div>
-);
-
-/* ============================================================
-   DATA HEALTH
-   ============================================================ */
-const DataHealthRow: FC<{
-  t: Theme;
-  health: {
-    reportedStudents: number;
-    orphanedStudents: number;
-    reportsWithoutAid: number;
-  };
-}> = ({ t, health }) => {
-  const orphanPct =
-    health.reportedStudents > 0
-      ? Math.round((health.orphanedStudents / health.reportedStudents) * 100)
-      : 0;
+  /** Tiny footer text (server timing / thread). */
+  meta?: string;
+  /** When set, an inline "Retry" appears next to the caption. */
+  onRetry?: () => void;
+  /** When set, the whole card is a button (opens the drill-down). */
+  onClick?: () => void;
+}> = ({ t, tone, icon, title, value, note, facts, meter, caption, loading, errored, dateFiltered, badge, warn, meta, onRetry, onClick }) => {
+  const meterTotal = meter ? meter.reduce((a, s) => a + Math.max(0, s.value), 0) : 0;
   return (
     <div
+      className={`ds-card ds-kpi-card ${onClick ? "clickable" : ""}`}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      title={onClick ? "Click to see the students behind this number" : undefined}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
       style={{
         background: t.card,
-        border: `1px solid ${t.border}`,
-        borderRadius: 14,
-        padding: "14px 18px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        flexWrap: "wrap",
+        border: `1px solid ${errored ? t.dangerSoft : t.border}`,
+        // @ts-ignore — CSS custom props drive the tint, glow and link colour
+        ["--kpi-tone" as any]: tone.solid,
+        ["--kpi-soft" as any]: tone.soft,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 8,
-            background: t.warningSoft,
-            color: t.warning,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <IconAlert />
-        </span>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: t.text, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            Data health
-          </div>
-          <div style={{ fontSize: 11, color: t.textMuted }}>
-            Silent undercounts that may affect institute-level numbers
-          </div>
+      <span className="ds-kpi-wash" aria-hidden />
+      <span className="ds-kpi-topline" aria-hidden style={{ opacity: errored ? 0 : 1 }} />
+
+      <div className="ds-kpi-top">
+        <div className="ds-kpi-icon" style={errored ? { background: t.dangerSoft, color: t.danger, boxShadow: "none" } : undefined}>
+          {errored ? <IconAlert /> : icon}
+        </div>
+        <div className="ds-kpi-chips">
+          {warn && (
+            <span className="ds-chip" title={warn} style={{ color: t.warning, background: t.warningSoft, cursor: "help" }}>
+              <IconAlert /> APPROX
+            </span>
+          )}
+          {badge && (
+            <span
+              className="ds-chip"
+              title={badge.title}
+              style={{ color: toneColors(t, badge.tone).solid, background: toneColors(t, badge.tone).soft, cursor: badge.title ? "help" : "default" }}
+            >
+              {badge.icon}
+              {badge.label}
+            </span>
+          )}
+          {dateFiltered && (
+            <span className="ds-chip" title="Narrowed by the applied date range" style={{ color: t.primary, background: t.primarySoft }}>
+              <IconClock /> IN RANGE
+            </span>
+          )}
         </div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "flex-end" }}>
-        {health.orphanedStudents > 0 && (
-          <HealthMetric
-            t={t}
-            label="Students not linked to any institute"
-            value={`${health.orphanedStudents} / ${health.reportedStudents}`}
-            sub={`${orphanPct}% of students with reports in range · institute bucket dropped`}
-            tone={orphanPct > 20 ? t.danger : t.warning}
-          />
+      <div className="ds-kpi-title">{title}</div>
+      <div className="ds-kpi-value" style={{ color: t.text }}>
+        {loading ? <Spinner color={tone.solid} size={24} /> : value}
+      </div>
+
+      {errored || (!note && !facts?.length && !meter?.length) ? (
+        <div className="ds-kpi-note" style={{ color: errored ? t.danger : t.textMuted }}>
+          {caption}
+          {onRetry && (
+            <button className="ds-retry-link" onClick={(e) => { e.stopPropagation(); onRetry(); }}>
+              Retry
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          {note && <div className="ds-kpi-note" style={{ color: t.textMuted }}>{note}</div>}
+          {meter && meterTotal > 0 && (
+            <div className="ds-kpi-meter">
+              <div className="ds-kpi-meter-bar" style={{ background: t.bgSubtle }}>
+                {meter.filter((s) => s.value > 0).map((s) => (
+                  <span
+                    key={s.label}
+                    title={`${s.label}: ${fmtNum(s.value)}`}
+                    style={{ width: `${(s.value / meterTotal) * 100}%`, background: toneColors(t, s.tone).solid }}
+                  />
+                ))}
+              </div>
+              <div className="ds-kpi-meter-legend">
+                {meter.map((s) => (
+                  <span key={s.label} style={{ color: t.textMuted }}>
+                    <i style={{ background: toneColors(t, s.tone).solid }} />
+                    <b style={{ color: t.text }}>{fmtNum(s.value)}</b> {s.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {facts && facts.length > 0 && (
+            <div className="ds-kpi-facts">
+              {facts.map((f) => {
+                const c = f.tone ? toneColors(t, f.tone) : null;
+                return (
+                  <span
+                    key={f.label}
+                    className="ds-fact"
+                    style={c ? { color: c.solid, background: c.soft } : { color: t.text, background: t.bgSubtle }}
+                  >
+                    <b>{f.value}</b> {f.label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      <div className="ds-kpi-foot">
+        {onClick ? (
+          <span className="ds-kpi-link">
+            View students <IconArrow />
+          </span>
+        ) : (
+          <span />
         )}
-        {health.reportsWithoutAid > 0 && (
-          <HealthMetric
-            t={t}
-            label="Reports missing assessment link"
-            value={`${health.reportsWithoutAid}`}
-            sub="excluded from per-assessment breakdown"
-            tone={t.danger}
-          />
-        )}
+        {meta && !loading && <span className="ds-kpi-meta" style={{ color: t.textSubtle }}>{meta}</span>}
       </div>
     </div>
   );
 };
 
-const HealthMetric: FC<{ t: Theme; label: string; value: string; sub: string; tone: string }> = ({
-  t,
-  label,
-  value,
-  sub,
-  tone,
-}) => (
-  <div style={{ minWidth: 200 }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: tone }} />
-      <span style={{ fontSize: 11, color: t.textMuted, fontWeight: 600, letterSpacing: "0.02em" }}>
-        {label.toUpperCase()}
-      </span>
-    </div>
-    <div
-      style={{
-        fontSize: 18,
-        fontWeight: 700,
-        color: t.text,
-        fontVariantNumeric: "tabular-nums",
-        marginTop: 4,
-        lineHeight: 1.1,
-      }}
-    >
-      {value}
-    </div>
-    <div style={{ fontSize: 11, color: t.textSubtle, marginTop: 2 }}>{sub}</div>
-  </div>
+/* ============================================================
+   OVERVIEW CARDS — async, one endpoint per card
+   ============================================================ */
+type CardState = { loading: boolean; error: string | null; data: OverviewCard | null };
+type CardStates = Record<OverviewCardKey, CardState>;
+
+const emptyCardStates = (loading: boolean): CardStates =>
+  OVERVIEW_CARD_KEYS.reduce((acc, k) => {
+    acc[k] = { loading, error: null, data: null };
+    return acc;
+  }, {} as CardStates);
+
+const errMessage = (e: any): string => {
+  const status = e?.response?.status;
+  return status ? `HTTP ${status}` : e?.message || "request failed";
+};
+
+/**
+ * Fires one request per card (all at once) and tracks each card's own
+ * loading / error / data. A new query or a bumped nonce aborts whatever is
+ * still in flight and starts over; a single card can be retried on its own.
+ */
+function useOverviewCards(query: OverviewQuery | null, nonce: number) {
+  const [states, setStates] = useState<CardStates>(() => emptyCardStates(false));
+  const controllerRef = useRef<AbortController | null>(null);
+
+  const load = useCallback((key: OverviewCardKey, q: OverviewQuery, signal: AbortSignal) => {
+    setStates((s) => ({ ...s, [key]: { ...s[key], loading: true, error: null } }));
+    fetchOverviewCard(key, q, signal)
+      .then((data) => {
+        if (signal.aborted) return;
+        setStates((s) => ({ ...s, [key]: { loading: false, error: null, data } }));
+      })
+      .catch((e: any) => {
+        if (signal.aborted) return;
+        setStates((s) => ({ ...s, [key]: { loading: false, error: errMessage(e), data: s[key].data } }));
+        // eslint-disable-next-line no-console
+        console.error(`[admin dashboard] overview card "${key}" failed:`, e?.response?.status, e?.response?.data || e);
+      });
+  }, []);
+
+  useEffect(() => {
+    controllerRef.current?.abort();
+    if (!query) {
+      setStates(emptyCardStates(false));
+      return;
+    }
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    OVERVIEW_CARD_KEYS.forEach((key) => load(key, query, controller.signal));
+    return () => controller.abort();
+  }, [query, nonce, load]);
+
+  const retry = useCallback(
+    (key: OverviewCardKey) => {
+      if (!query) return;
+      let controller = controllerRef.current;
+      if (!controller || controller.signal.aborted) {
+        controller = new AbortController();
+        controllerRef.current = controller;
+      }
+      load(key, query, controller.signal);
+    },
+    [query, load]
+  );
+
+  const busy = useMemo(() => OVERVIEW_CARD_KEYS.some((k) => states[k]?.loading), [states]);
+  return { states, busy, retry };
+}
+
+const num = (v: any) => fmtNum(v == null ? undefined : Number(v));
+const n = (v: any) => (v == null ? 0 : Number(v));
+const fact = (value: any, label: string, tone?: Tone): Fact => ({ label, value: num(value), tone });
+const rupees = (v: any) => `₹${n(v).toLocaleString()}`;
+
+/* ============================================================
+   ICONS
+   ============================================================ */
+const svgBase = {
+  width: 16,
+  height: 16,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+const IconUsers = () => (
+  <svg {...svgBase} width={18} height={18}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+const IconBuilding = () => (
+  <svg {...svgBase} width={18} height={18}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M9 21V9h6v12" />
+  </svg>
+);
+const IconDownload = () => (
+  <svg {...svgBase} width={16} height={16}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+const IconClipboard = () => (
+  <svg {...svgBase} width={18} height={18}>
+    <rect x="8" y="2" width="8" height="4" rx="1" />
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    <path d="m9 14 2 2 4-4" />
+  </svg>
+);
+const IconHeadset = () => (
+  <svg {...svgBase} width={18} height={18}>
+    <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+    <path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z" />
+  </svg>
+);
+const IconActivity = () => (
+  <svg {...svgBase} width={18} height={18}>
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </svg>
+);
+const IconFileCheck = () => (
+  <svg {...svgBase} width={18} height={18}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <polyline points="9 15 11 17 15 13" />
+  </svg>
+);
+const IconClock = () => (
+  <svg {...svgBase} width={10} height={10}>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+const IconCalendar = () => (
+  <svg {...svgBase} width={14} height={14}>
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+const IconLogout = () => (
+  <svg {...svgBase}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+const IconRefresh = () => (
+  <svg {...svgBase}>
+    <polyline points="23 4 23 10 17 10" />
+    <polyline points="1 20 1 14 7 14" />
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+  </svg>
+);
+const IconAlert = () => (
+  <svg {...svgBase} width={12} height={12}>
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
 );
 
-/* ============================================================
-   INSTITUTES TABLE
-   ============================================================ */
-const InstitutesTable: FC<{
-  t: Theme;
-  data: {
-    id: any;
-    name: string;
-    city: string;
-    address: string;
-    active: boolean;
-    branches: number | null;
-  }[];
-  loading: boolean;
-  rangeActive: boolean;
-  rangeLabelText: string;
-  activity: Map<string, { activeStudents: Set<string>; reportsGenerated: number }>;
-}> = ({ t, data, loading, rangeActive, rangeLabelText, activity }) => {
-  const enriched = useMemo(() => {
-    const rows = data.map((s) => {
-      const act = activity.get(String(s.id));
-      return {
-        ...s,
-        activeStudents: act?.activeStudents.size ?? 0,
-        reportsGenerated: act?.reportsGenerated ?? 0,
-      };
-    });
-    if (rangeActive) {
-      // Consider every institute; keep ones with any activity; sort by activity.
-      return rows
-        .filter((r) => r.activeStudents > 0 || r.reportsGenerated > 0)
-        .sort(
-          (a, b) =>
-            b.activeStudents - a.activeStudents ||
-            b.reportsGenerated - a.reportsGenerated ||
-            a.name.localeCompare(b.name)
-        );
-    }
-    // Lifetime view: just the 8 most recently created institutes
-    return rows.slice(0, 8);
-  }, [data, activity, rangeActive]);
+const IconCreditCard = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <line x1="2" y1="10" x2="22" y2="10" />
+    <line x1="6" y1="15" x2="10" y2="15" />
+  </svg>
+);
 
-  return (
-    <Card t={t}>
-      <CardHeader
-        t={t}
-        title={rangeActive ? "Institutes active in range" : "Newest institutes"}
-        subtitle={
-          rangeActive
-            ? `${enriched.length} ${
-                enriched.length === 1 ? "institute had" : "institutes had"
-              } student activity in ${rangeLabelText.toLowerCase()}`
-            : `${enriched.length} shown · most recent first`
-        }
-        right={rangeActive ? <Pill t={t} tone="primary">{rangeLabelText}</Pill> : undefined}
-      />
-      <div style={{ padding: "0 8px 8px", overflowX: "auto" }}>
-        {loading ? (
-          <div style={{ padding: "0 16px 16px" }}>
-            <Skeleton t={t} height={220} />
-          </div>
-        ) : enriched.length === 0 ? (
-          <EmptyState
-            t={t}
-            label={
-              rangeActive
-                ? `No institute had recorded activity in ${rangeLabelText.toLowerCase()}`
-                : "No institutes found"
-            }
-          />
-        ) : (
-          <table
-            className="ds-table"
-            style={{
-              width: "100%",
-              borderCollapse: "separate",
-              borderSpacing: 0,
-              fontSize: 13,
-              color: t.text,
-            }}
-          >
-            <thead>
-              <tr>
-                {(rangeActive
-                  ? ["#", "Institute", "Active students", "Reports generated", "Status"]
-                  : ["#", "Institute", "Status"]
-                ).map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign:
-                        h === "Status" ||
-                        h === "Active students" ||
-                        h === "Reports generated"
-                          ? "right"
-                          : "left",
-                      padding: "12px 16px",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: t.textMuted,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      borderBottom: `1px solid ${t.border}`,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {enriched.map((s, i) => (
-                <tr key={s.id ?? i} className="ds-row">
-                  <td
-                    style={{
-                      padding: "14px 16px",
-                      borderBottom: `1px solid ${t.border}`,
-                      color: t.textMuted,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {String(i + 1).padStart(2, "0")}
-                  </td>
-                  <td style={{ padding: "14px 16px", borderBottom: `1px solid ${t.border}` }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
-                          background: t.primarySoft,
-                          color: t.primary,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontWeight: 700,
-                          fontSize: 12,
-                        }}
-                      >
-                        {initials(s.name)}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600, color: t.text }}>{s.name}</div>
-                        {s.address && (
-                          <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                            {s.address}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  {rangeActive && (
-                    <>
-                      <td
-                        style={{
-                          padding: "14px 16px",
-                          borderBottom: `1px solid ${t.border}`,
-                          textAlign: "right",
-                          fontVariantNumeric: "tabular-nums",
-                          fontWeight: 700,
-                          color: s.activeStudents > 0 ? t.primary : t.textMuted,
-                        }}
-                      >
-                        {fmtNum(s.activeStudents)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "14px 16px",
-                          borderBottom: `1px solid ${t.border}`,
-                          textAlign: "right",
-                          fontVariantNumeric: "tabular-nums",
-                          fontWeight: 700,
-                          color: s.reportsGenerated > 0 ? t.success : t.textMuted,
-                        }}
-                      >
-                        {fmtNum(s.reportsGenerated)}
-                      </td>
-                    </>
-                  )}
-                  <td
-                    style={{
-                      padding: "14px 16px",
-                      borderBottom: `1px solid ${t.border}`,
-                      textAlign: "right",
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 5,
-                        padding: "3px 10px",
-                        borderRadius: 100,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: s.active ? t.successSoft : t.bgSubtle,
-                        color: s.active ? t.success : t.textMuted,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          background: s.active ? t.success : t.textSubtle,
-                        }}
-                      />
-                      {s.active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </Card>
-  );
+const IconGlobe = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+const IconClose = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
+const IconArrow = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12" />
+    <polyline points="12 5 19 12 12 19" />
+  </svg>
+);
+
+type CardDef = {
+  key: OverviewCardKey;
+  title: string;
+  tone: Tone;
+  icon: ReactNode;
+  /** "range" honours the date filter; "state" is a live snapshot of current status. */
+  mode: "range" | "state";
+  /** What the headline number is, in one short line. */
+  note?: (c: OverviewCard) => string;
+  /** Secondary numbers for the fact chips. */
+  facts?: (c: OverviewCard) => Fact[];
+  /** Composition of the headline number for the stacked meter. */
+  meter?: (c: OverviewCard) => MeterSeg[];
 };
 
+type CardSection = {
+  title: string;
+  subtitle: string;
+  tone: Tone;
+  rangeInTitle?: boolean;
+  /** auto-fill grid: a lone card keeps normal width instead of stretching. */
+  compact?: boolean;
+  cards: CardDef[];
+};
+
+const CARD_SECTIONS: CardSection[] = [
+  {
+    title: "Registrations & assessments",
+    subtitle: "Who joined, what was taken, and how far students got.",
+    tone: "primary",
+    cards: [
+      {
+        key: "signups",
+        title: "New sign-ups / registrations",
+        tone: "primary",
+        icon: <IconUsers />,
+        mode: "range",
+        note: (c) => c.basis,
+      },
+      {
+        key: "assessments-conducted",
+        title: "Assessments conducted",
+        tone: "purple",
+        icon: <IconClipboard />,
+        mode: "range",
+        note: () => "distinct assessments with at least one completion",
+        facts: (c) => [fact(c.extra.completions, "completions", "purple")],
+      },
+      {
+        key: "assessments-completed",
+        title: "Completed fully",
+        tone: "success",
+        icon: <IconFileCheck />,
+        mode: "range",
+        note: () => "attempts submitted in full",
+        facts: (c) => [fact(c.extra.students, "students", "success")],
+      },
+      {
+        key: "assessments-in-progress",
+        title: "Partially completed / in progress",
+        tone: "warning",
+        icon: <IconActivity />,
+        mode: "state",
+        note: () => "attempts opened but not yet submitted",
+        facts: (c) => [fact(c.extra.students, "students mid-way", "warning")],
+      },
+      {
+        key: "assessments-not-started",
+        title: "Not started",
+        tone: "info",
+        icon: <IconClock />,
+        mode: "state",
+        note: () => "assigned attempts never opened",
+        facts: (c) => [fact(c.extra.students, "students yet to begin", "info")],
+      },
+      {
+        key: "reports-generated",
+        title: "Reports generated",
+        tone: "success",
+        icon: <IconFileCheck />,
+        mode: "range",
+        note: () => "students holding a generated report",
+        facts: (c) => [
+          fact(c.extra.reports, "reports", "success"),
+          ...(n(c.extra.failed) > 0 ? [fact(c.extra.failed, "failed", "danger")] : []),
+        ],
+        meter: (c) => [
+          { label: "generated", value: n(c.extra.reports), tone: "success" },
+          { label: "failed", value: n(c.extra.failed), tone: "danger" },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Counselling",
+    subtitle: "Bookings made and sessions on the calendar in the selected range.",
+    tone: "purple",
+    rangeInTitle: true,
+    cards: [
+      {
+        key: "counselling-booked",
+        title: "Scheduled by students",
+        tone: "primary",
+        icon: <IconCalendar />,
+        mode: "range",
+        note: () => "sessions booked by students",
+        facts: (c) => [fact(c.extra.students, "students", "primary"), fact(c.extra.forFuture, "upcoming sessions", "info")],
+      },
+      {
+        key: "counselling-sessions",
+        title: "Sessions to be conducted",
+        tone: "purple",
+        icon: <IconHeadset />,
+        mode: "range",
+        note: (c) => `${num(c.extra.counsellors)} counsellors on the calendar`,
+        meter: (c) => [
+          { label: "done", value: n(c.extra.completed), tone: "success" },
+          { label: "live", value: n(c.extra.inProgress), tone: "warning" },
+          { label: "scheduled", value: n(c.extra.scheduled), tone: "purple" },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Counselling outcomes",
+    subtitle: "By session date. Absences are the attributed no-shows.",
+    tone: "danger",
+    cards: [
+      {
+        key: "counselling-completed",
+        title: "Sessions completed",
+        tone: "success",
+        icon: <IconHeadset />,
+        mode: "range",
+        note: () => "sessions marked completed",
+        facts: (c) => [fact(c.extra.students, "students", "success"), fact(c.extra.counsellors, "counsellors", "info")],
+      },
+      {
+        key: "students-absent",
+        title: "Students absent",
+        tone: "danger",
+        icon: <IconUsers />,
+        mode: "range",
+        note: () => "sessions the student did not attend",
+        facts: (c) => [
+          fact(c.extra.students, "students", "danger"),
+          ...(n(c.extra.disputed) > 0 ? [fact(c.extra.disputed, "under dispute", "warning")] : []),
+        ],
+      },
+      {
+        key: "counsellors-absent",
+        title: "Counsellors absent",
+        tone: "warning",
+        icon: <IconAlert />,
+        mode: "range",
+        note: () => "sessions the counsellor did not attend",
+        facts: (c) => [fact(c.extra.counsellors, "counsellors", "warning"), fact(c.extra.awaitingReschedule, "awaiting reschedule", "danger")],
+      },
+    ],
+  },
+  {
+    title: "Payments",
+    subtitle: "Successful assessment and counselling payments in the selected range.",
+    tone: "success",
+    compact: true,
+    cards: [
+      {
+        key: "payments-completed",
+        title: "Payments completed",
+        tone: "success",
+        icon: <IconCreditCard />,
+        mode: "range",
+        note: (c) => `${rupees(c.extra.amount)} collected`,
+        meter: (c) => [
+          { label: "assessment", value: n(c.extra.assessmentPayments), tone: "success" },
+          { label: "counselling", value: n(c.extra.counsellingPayments), tone: "purple" },
+        ],
+      },
+    ],
+  },
+  {
+    title: "Website",
+    subtitle: "Registrations captured on career-9.com (Login / Register form and the pop-up) — these also land in Leads.",
+    tone: "info",
+    compact: true,
+    cards: [
+      {
+        key: "website-registrations",
+        title: "Website registrations",
+        tone: "purple",
+        icon: <IconGlobe />,
+        mode: "range",
+        note: () => "sign-ups captured on the website",
+        meter: (c) => [
+          { label: "students", value: n(c.extra.students), tone: "primary" },
+          { label: "parents", value: n(c.extra.parents), tone: "purple" },
+          { label: "schools", value: n(c.extra.schools), tone: "success" },
+        ],
+        facts: (c) => [fact(c.extra.signupForm, "via sign-up form", "info"), fact(c.extra.popup, "via pop-up", "warning")],
+      },
+    ],
+  },
+];
+
 /* ============================================================
-   ASSESSMENT REPORT DRILL-DOWN
+   DRILL-DOWN MODAL — the students behind a card
    ============================================================ */
-const AssessmentReportDrilldown: FC<{
+/** Everything in one scrollable list; the server caps a page at 5000 rows. */
+const DETAIL_PAGE_SIZE = 5000;
+
+const fmtCell = (key: string, value: any): string => {
+  if (value == null || value === "") return "—";
+  const s = String(value);
+  // ISO date-times from the API ("2026-09-14T10:15:30" / "...Z")
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    }
+  }
+  // Plain dates ("2026-09-14")
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const d = new Date(`${s}T00:00:00`);
+    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  }
+  // Times ("10:15" / "10:15:00")
+  if (key.toLowerCase().includes("time") && /^\d{2}:\d{2}/.test(s)) return s.slice(0, 5);
+  if (key === "status" || key === "reportStatus" || key === "leadType") return s.replace(/_/g, " ").toLowerCase();
+  if (key === "amount" && /^-?\d+(\.\d+)?$/.test(s)) return `₹${Number(s).toLocaleString()}`;
+  return s;
+};
+
+/** Which colour a status-like value wears in the table. */
+const statusTone = (value: any): Tone => {
+  const v = String(value ?? "").toLowerCase();
+  if (/completed|generated|paid|confirmed|synced|attended/.test(v)) return "success";
+  if (/ongoing|pending|assigned|in_progress|in progress|created|scheduled/.test(v)) return "warning";
+  if (/missed|failed|cancel|absent|awaiting|under_review|under review|declined|disput/.test(v)) return "danger";
+  if (/notstarted|not started/.test(v)) return "info";
+  return "info";
+};
+
+/** Colour for identity-like chips (who registered, where it came from, what was paid for). */
+const chipTone = (key: string, value: any): Tone => {
+  const v = String(value ?? "").toLowerCase();
+  if (key === "leadType") return v === "student" ? "primary" : v === "parent" ? "purple" : "success";
+  if (key === "purpose") return v.startsWith("counselling") ? "purple" : "success";
+  if (key === "source") return v.includes("popup") ? "warning" : "info";
+  if (key === "mode") return v === "online" ? "primary" : "info";
+  return "info";
+};
+
+const CHIP_COLUMNS = new Set(["status", "reportStatus", "leadType", "purpose", "source", "mode", "typeOfReport"]);
+
+const AVATAR_TONES: Tone[] = ["primary", "purple", "success", "warning", "info", "danger"];
+const avatarTone = (name: string): Tone => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_TONES[h % AVATAR_TONES.length];
+};
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("") || "?";
+
+const OverviewDetailModal: FC<{
   t: Theme;
-  assessments: any[];
-  institutes: any[];
-  reports: any[];
-  studentMappings: any[];
-  mappingsLoading: boolean;
-  loading: boolean;
-  rangeActive: boolean;
-  rangeLabelText: string;
-  rangeStart: Date | null;
-  rangeEnd: Date | null;
-  activeAssessmentIds: Set<string>;
-  errored: boolean;
-}> = ({
-  t,
-  assessments,
-  institutes,
-  reports,
-  studentMappings,
-  mappingsLoading,
-  loading,
-  rangeActive,
-  rangeLabelText,
-  rangeStart,
-  rangeEnd,
-  activeAssessmentIds,
-  errored,
-}) => {
-  // Build per-assessment data from TWO sources:
-  // 1. studentMappings → source of truth for "assigned / started / completed"
-  // 2. reports (GeneratedReport) → source of truth for "report generated / failed"
-  const byAssessment = useMemo(() => {
-    type Agg = {
-      studentsAssigned: Set<string>;    // anyone with a mapping for this assessment
-      studentsCompleted: Set<string>;   // mapping status completed/submitted
-      studentsStarted: Set<string>;     // mapping status ongoing
-      studentsGenerated: Set<string>;   // has a GeneratedReport row with status=generated
-      studentsFailed: Set<string>;      // has a GeneratedReport row with status=failed
-      rowsGenerated: number;
-      rowsTotal: number;
-    };
-    const ensure = (m: Map<string, Agg>, aid: string): Agg => {
-      let e = m.get(aid);
-      if (!e) {
-        e = {
-          studentsAssigned: new Set<string>(),
-          studentsCompleted: new Set<string>(),
-          studentsStarted: new Set<string>(),
-          studentsGenerated: new Set<string>(),
-          studentsFailed: new Set<string>(),
-          rowsGenerated: 0,
-          rowsTotal: 0,
-        };
-        m.set(aid, e);
-      }
-      return e;
-    };
+  def: CardDef;
+  card: OverviewCard | null;
+  query: OverviewQuery;
+  rangeText: string;
+  onClose: () => void;
+}> = ({ t, def, card, query, rangeText, onClose }) => {
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [detail, setDetail] = useState<OverviewDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const m = new Map<string, Agg>();
-
-    // 1. Walk student mappings (authoritative for assigned/completed)
-    studentMappings.forEach((s) => {
-      const sid = String(
-        pick(s, ["userStudentId", "user_student_id", "id"]) ?? ""
-      );
-      if (!sid) return;
-      const assigned = Array.isArray(s.assessments) ? s.assessments : [];
-      assigned.forEach((a: any) => {
-        const aid = String(pick(a, ["assessmentId", "assessment_id"]) ?? "");
-        if (!aid) return;
-        const status = String(pick(a, ["status"]) || "").toLowerCase();
-        const entry = ensure(m, aid);
-        entry.studentsAssigned.add(sid);
-        if (status === "completed" || status === "submitted") entry.studentsCompleted.add(sid);
-        else if (status === "ongoing") entry.studentsStarted.add(sid);
-      });
-    });
-
-    // 2. Walk GeneratedReport rows (authoritative for report generation)
-    reports.forEach((r: any) => {
-      const aid = String(pick(r, ["assessmentId", "assessment_id"]) ?? "");
-      if (!aid) return;
-      const status = String(pick(r, ["reportStatus", "status"]) || "").toLowerCase();
-      const nested = r?.userStudent;
-      const sidRaw =
-        (nested && (nested.userStudentId ?? nested.id ?? nested.studentId)) ??
-        pick(r, ["userStudentId", "user_student_id", "studentId", "student_id"]);
-      const sid = sidRaw != null ? String(sidRaw) : "";
-
-      const entry = ensure(m, aid);
-      entry.rowsTotal++;
-      if (status === "generated") {
-        entry.rowsGenerated++;
-        if (sid) entry.studentsGenerated.add(sid);
-      } else if (status === "failed") {
-        if (sid) entry.studentsFailed.add(sid);
-      }
-    });
-
-    return m;
-  }, [studentMappings, reports]);
-
-  const assessmentOptions = useMemo(() => {
-    const all = assessments
-      .map((a) => {
-        const id = pick(a, ["id", "assessmentId"]);
-        const name =
-          pick(a, ["assessmentName", "name", "title"]) || `Assessment #${id ?? "?"}`;
-        const stats = byAssessment.get(String(id));
-        return {
-          id: String(id ?? ""),
-          name: String(name),
-          studentsCompleted: stats?.studentsCompleted.size ?? 0,
-          studentsGenerated: stats?.studentsGenerated.size ?? 0,
-          studentsAssigned: stats?.studentsAssigned.size ?? 0,
-        };
-      })
-      .filter((a) => a.id);
-
-    // When a date range is active, only show assessments whose scheduled window
-    // overlaps the range (window-based active set from parent).
-    const visible = rangeActive
-      ? all.filter((a) => activeAssessmentIds.has(a.id))
-      : all;
-
-    return visible.sort(
-      (a, b) =>
-        b.studentsCompleted - a.studentsCompleted ||
-        b.studentsAssigned - a.studentsAssigned ||
-        a.name.localeCompare(b.name)
-    );
-  }, [assessments, byAssessment, rangeActive, activeAssessmentIds]);
-
-  const [selectedId, setSelectedId] = useState<string>("");
-
-  // Default select top assessment; also re-pick if current selection becomes
-  // invisible after range change.
+  // Debounce the search box so we don't fire a request per keystroke.
   useEffect(() => {
-    if (assessmentOptions.length === 0) return;
-    const stillVisible = assessmentOptions.some((a) => a.id === selectedId);
-    if (!selectedId || !stillVisible) {
-      const withCompletions = assessmentOptions.find((a) => a.studentsCompleted > 0);
-      setSelectedId((withCompletions || assessmentOptions[0]).id);
-    }
-  }, [assessmentOptions, selectedId]);
+    const h = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(h);
+  }, [search]);
 
-  const selected = byAssessment.get(selectedId);
-  const selectedMeta = assessmentOptions.find((a) => a.id === selectedId);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    fetchOverviewStudents(def.key, query, { page: 0, size: DETAIL_PAGE_SIZE, search: debounced }, controller.signal)
+      .then((d) => {
+        if (controller.signal.aborted) return;
+        setDetail(d);
+      })
+      .catch((e: any) => {
+        if (controller.signal.aborted) return;
+        setError(errMessage(e));
+        // eslint-disable-next-line no-console
+        console.error(`[admin dashboard] students for "${def.key}" failed:`, e?.response?.status, e?.response?.data || e);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [def.key, query, debounced]);
 
-  // Warn when the selected assessment's window is much wider than the user's range
-  // (completions below include activity outside the range).
-  const windowOvershoot = useMemo(() => {
-    if (!rangeActive || !rangeStart || !rangeEnd || !selectedId) return null;
-    const a = assessments.find((x) => String(pick(x, ["id", "assessmentId"])) === selectedId);
-    if (!a) return null;
-    const startStr = pick(a, ["starDate", "startDate"]);
-    const endStr = pick(a, ["endDate"]);
-    if (!startStr || !endStr) return null;
-    const aStart = new Date(String(startStr)).getTime();
-    const aEnd = new Date(String(endStr)).getTime();
-    if (Number.isNaN(aStart) || Number.isNaN(aEnd)) return null;
-    const dayMs = 86400000;
-    const windowDays = Math.max(Math.round((aEnd - aStart) / dayMs) + 1, 1);
-    const rangeDays = Math.max(Math.round((rangeEnd.getTime() - rangeStart.getTime()) / dayMs) + 1, 1);
-    if (windowDays > rangeDays * 2) {
-      return { windowDays, rangeDays };
-    }
-    return null;
-  }, [rangeActive, rangeStart, rangeEnd, selectedId, assessments]);
-
-  // Student → institute + institute → name lookups (scoped to drilldown)
-  const studentToInstitute = useMemo(() => {
-    const m = new Map<string, string>();
-    studentMappings.forEach((s: any) => {
-      const sid = String(pick(s, ["userStudentId", "user_student_id", "id"]) ?? "");
-      const iid = String(pick(s, ["instituteId", "institute_id"]) ?? "");
-      if (sid && iid) m.set(sid, iid);
-    });
-    return m;
-  }, [studentMappings]);
-
-  const instituteNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    institutes.forEach((i: any) => {
-      const id = pick(i, ["id", "instituteId", "instituteCode"]);
-      const altId = pick(i, ["instituteCode", "code"]);
-      const name =
-        pick(i, ["instituteName", "name", "schoolName", "collegeName"]) ||
-        `Institute #${id ?? altId ?? "?"}`;
-      if (id != null) m.set(String(id), String(name));
-      if (altId != null) m.set(String(altId), String(name));
-    });
-    return m;
-  }, [institutes]);
-
-  // Per-institute breakdown for the currently selected assessment
-  const perInstitute = useMemo(() => {
-    if (!selectedId) return [] as {
-      instituteId: string;
-      name: string;
-      students: number;
-      completed: number;
-      reports: number;
-    }[];
-    type Agg = {
-      students: Set<string>;
-      completed: Set<string>;
-      reports: Set<string>;
+  // Esc closes; lock body scroll while open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
     };
-    const m = new Map<string, Agg>();
-    const ensure = (iid: string): Agg => {
-      let e = m.get(iid);
-      if (!e) {
-        e = { students: new Set(), completed: new Set(), reports: new Set() };
-        m.set(iid, e);
-      }
-      return e;
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
     };
+  }, [onClose]);
 
-    // 1. Walk mappings: assigned + completed, per institute
-    studentMappings.forEach((s) => {
-      const sid = String(pick(s, ["userStudentId", "user_student_id", "id"]) ?? "");
-      const iid = String(pick(s, ["instituteId", "institute_id"]) ?? "");
-      if (!sid || !iid) return;
-      const assigned = Array.isArray(s.assessments) ? s.assessments : [];
-      const mapping = assigned.find(
-        (a: any) => String(pick(a, ["assessmentId", "assessment_id"]) ?? "") === selectedId
+  const total = detail?.total ?? 0;
+  const shown = detail?.rows.length ?? 0;
+  const tone = toneColors(t, def.tone);
+  const columns = detail?.columns ?? [];
+  const facts = card && def.facts ? def.facts(card) : [];
+  const meter = card && def.meter ? def.meter(card) : [];
+  const meterTotal = meter.reduce((a, s) => a + Math.max(0, s.value), 0);
+
+  const scopeBits: string[] = [rangeText];
+  if (query.instituteCode) scopeBits.push(`Institute ${query.instituteCode}`);
+  if (query.assessmentIds.length > 0) scopeBits.push(`${query.assessmentIds.length} ${query.assessmentIds.length === 1 ? "assessment" : "assessments"}`);
+
+  // Excel of every row currently in the list (the modal loads the whole list),
+  // using the same columns and the same date/status formatting as the table.
+  const canExport = !!detail && detail.rows.length > 0 && !loading;
+  const handleExport = () => {
+    if (!detail || detail.rows.length === 0) return;
+    const cols: OverviewDetailColumn[] = [...detail.columns];
+    if (!cols.some((c) => c.key === "phone") && detail.rows.some((r) => r.phone != null)) {
+      cols.splice(Math.min(2, cols.length), 0, { key: "phone", label: "Phone" });
+    }
+    const header = ["#", ...cols.map((c) => c.label)];
+    const body = detail.rows.map((row, i) => [
+      i + 1,
+      ...cols.map((c) => {
+        const v = row[c.key];
+        if (v == null || v === "") return "";
+        if (typeof v === "number") return v;
+        return fmtCell(c.key, v);
+      }),
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      [def.title],
+      [`Filters: ${scopeBits.join(" · ")}${debounced ? ` · search "${debounced}"` : ""}`],
+      [`Exported ${new Date().toLocaleString()} · ${detail.rows.length} rows`],
+      [],
+      header,
+      ...body,
+    ]);
+    ws["!cols"] = header.map((h, i) => ({
+      wch: Math.min(60, Math.max(String(h).length, ...body.map((r) => String(r[i] ?? "").length)) + 2),
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, def.title.slice(0, 31));
+    const stamp = toLocalISODate(new Date());
+    const slug = def.key.replace(/[^a-z0-9]+/gi, "-");
+    XLSX.writeFile(wb, `${slug}-${stamp}.xlsx`);
+  };
+
+  const renderCell = (c: OverviewDetailColumn, row: Record<string, any>) => {
+    const v = row[c.key];
+    if (c.key === "name") {
+      const name = v == null || v === "" ? "" : String(v);
+      const at = toneColors(t, avatarTone(name || String(row.email ?? "")));
+      return (
+        <span className="ds-cell-name">
+          <span className="ds-avatar" style={{ background: at.soft, color: at.solid }}>{initialsOf(name || String(row.email ?? "?"))}</span>
+          <span style={{ fontWeight: 600, color: t.text }}>{name || "—"}</span>
+        </span>
       );
-      if (!mapping) return;
-      const entry = ensure(iid);
-      entry.students.add(sid);
-      const st = String(pick(mapping, ["status"]) || "").toLowerCase();
-      if (st === "completed" || st === "submitted") entry.completed.add(sid);
-    });
-
-    // 2. Walk (date-filtered) reports for this assessment
-    reports.forEach((r: any) => {
-      if (String(pick(r, ["assessmentId", "assessment_id"]) ?? "") !== selectedId) return;
-      const status = String(pick(r, ["reportStatus", "status"]) || "").toLowerCase();
-      if (status !== "generated") return;
-      const nested = r?.userStudent;
-      const sid = String(
-        (nested && (nested.userStudentId ?? nested.id ?? nested.studentId)) ??
-          pick(r, ["userStudentId", "user_student_id", "studentId", "student_id"]) ??
-          ""
+    }
+    if (CHIP_COLUMNS.has(c.key) && v != null && v !== "") {
+      const ct = toneColors(t, c.key === "status" || c.key === "reportStatus" ? statusTone(v) : chipTone(c.key, v));
+      return (
+        <span className="ds-chip ds-chip-cell" style={{ color: ct.solid, background: ct.soft }}>
+          {fmtCell(c.key, v)}
+        </span>
       );
-      if (!sid) return;
-      const iid = studentToInstitute.get(sid);
-      if (!iid) return;
-      const entry = ensure(iid);
-      entry.reports.add(sid);
-    });
+    }
+    if (c.key === "amount" && v != null) {
+      return <span style={{ fontWeight: 600, color: t.text, fontVariantNumeric: "tabular-nums" }}>{fmtCell(c.key, v)}</span>;
+    }
+    return fmtCell(c.key, v);
+  };
 
-    return Array.from(m.entries())
-      .map(([iid, v]) => ({
-        instituteId: iid,
-        name: instituteNameById.get(iid) || `Institute #${iid}`,
-        students: v.students.size,
-        completed: v.completed.size,
-        reports: v.reports.size,
-      }))
-      .sort((a, b) => b.students - a.students || a.name.localeCompare(b.name));
-  }, [selectedId, studentMappings, reports, studentToInstitute, instituteNameById]);
-
-  const studentsGenerated = selected?.studentsGenerated.size ?? 0;
-  const studentsCompleted = selected?.studentsCompleted.size ?? 0;
-  const studentsAssigned = selected?.studentsAssigned.size ?? 0;
-  const studentsStarted = selected?.studentsStarted.size ?? 0;
-  // completed but no generated report yet
-  const completedIds = selected?.studentsCompleted ?? new Set<string>();
-  const generatedIds = selected?.studentsGenerated ?? new Set<string>();
-  let studentsWaitingForReport = 0;
-  completedIds.forEach((id) => {
-    if (!generatedIds.has(id)) studentsWaitingForReport++;
-  });
-  const studentsNotStarted = Math.max(
-    studentsAssigned - studentsCompleted - studentsStarted,
-    0
-  );
-
-  const donutOpts: ApexOptions = useMemo(
-    () => ({
-      chart: { type: "donut", fontFamily: "inherit" },
-      labels: ["Report generated", "Completed · awaiting report", "In progress", "Not started"],
-      colors: [t.success, t.warning, t.info, t.textSubtle],
-      stroke: { width: 0 },
-      legend: { show: false },
-      dataLabels: { enabled: false },
-      plotOptions: {
-        pie: {
-          donut: {
-            size: "76%",
-            labels: {
-              show: true,
-              name: { show: true, color: t.textMuted, fontSize: "12px", offsetY: 16 },
-              value: {
-                show: true,
-                color: t.text,
-                fontSize: "32px",
-                fontWeight: 700,
-                offsetY: -14,
-                formatter: (val) => `${val}`,
-              },
-              total: {
-                show: true,
-                label: "Students with report",
-                color: t.textMuted,
-                formatter: () => `${studentsGenerated}`,
-              },
-            },
-          },
-        },
-      },
-      tooltip: {
-        theme: t.name,
-        y: { formatter: (v) => `${v} ${v === 1 ? "student" : "students"}` },
-      },
-    }),
-    [t, studentsGenerated]
-  );
-
-  return (
-    <Card t={t}>
-      <CardHeader
-        t={t}
-        title="Assessment drill-down"
-        subtitle={
-          errored
-            ? "Could not load assessments or reports"
-            : rangeActive
-            ? `${assessmentOptions.length} ${
-                assessmentOptions.length === 1 ? "assessment" : "assessments"
-              } active in ${rangeLabelText.toLowerCase()} · completions shown are lifetime per assessment`
-            : `${assessmentOptions.length} assessments · completions & students are lifetime per assessment`
-        }
-        right={
-          <select
-            className="ds-select"
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            disabled={loading || assessmentOptions.length === 0}
-          >
-            <option value="" disabled>
-              {loading ? "Loading assessments…" : "Select assessment"}
-            </option>
-            {assessmentOptions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-                {a.studentsAssigned > 0
-                  ? ` · ${a.studentsCompleted} completed / ${a.studentsGenerated} got report`
-                  : ""}
-              </option>
-            ))}
-          </select>
-        }
-      />
-      <div style={{ padding: "0 24px 24px" }}>
-        {windowOvershoot && (
-          <div
-            style={{
-              marginBottom: 16,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: `1px solid ${t.warning}44`,
-              background: t.warningSoft,
-              color: t.warning,
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 10,
-              fontSize: 12,
-              fontWeight: 500,
-            }}
-          >
-            <span style={{ flexShrink: 0, marginTop: 1 }}>
-              <IconAlert />
-            </span>
-            <div>
-              <strong>Heads up:</strong> this assessment's window is{" "}
-              <strong>{windowOvershoot.windowDays} days</strong>, but your selected range
-              is <strong>{windowOvershoot.rangeDays} days</strong>. The "Students completed"
-              count below includes completions across the full window, not just your range
-              — mapping data has no per-student completion timestamp to filter precisely.
+  return createPortal(
+    <div className="ds-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div
+        className="ds-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={def.title}
+        style={{
+          background: t.card,
+          border: `1px solid ${t.border}`,
+          color: t.text,
+          // @ts-ignore — CSS custom props for the tint
+          ["--modal-tone" as any]: tone.solid,
+          ["--modal-soft" as any]: tone.soft,
+        }}
+      >
+        <div className="ds-modal-head" style={{ borderBottom: `1px solid ${t.border}` }}>
+          <div className="ds-modal-head-wash" aria-hidden />
+          <div style={{ display: "flex", alignItems: "center", gap: 16, minWidth: 0 }}>
+            <div className="ds-modal-icon">{def.icon}</div>
+            <div style={{ minWidth: 0 }}>
+              <div className="ds-modal-eyebrow" style={{ color: tone.solid }}>Students behind this number</div>
+              <div className="ds-modal-title" style={{ color: t.text }}>{def.title}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                {scopeBits.map((b) => (
+                  <Pill key={b} t={t} tone="info">{b}</Pill>
+                ))}
+                {debounced && <Pill t={t} tone="warning">search: {debounced}</Pill>}
+              </div>
             </div>
           </div>
-        )}
-        {loading ? (
-          <Skeleton t={t} height={280} />
-        ) : !selected || !selectedMeta ? (
-          <EmptyState
-            t={t}
-            label={
-              assessmentOptions.length === 0
-                ? "No assessments available"
-                : "No data for this assessment yet"
-            }
-          />
-        ) : (
-          <div className="ds-drilldown">
-            <div className="ds-drilldown-chart">
-              {studentsAssigned === 0 ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minHeight: 260,
-                    color: t.textMuted,
-                    fontSize: 13,
-                    textAlign: "center",
-                    padding: 20,
-                  }}
-                >
-                  {mappingsLoading
-                    ? "Loading student mappings across institutes…"
-                    : "No students assigned to this assessment yet"}
-                </div>
-              ) : (
-                <Chart
-                  key={`drill-${selectedId}-${t.name}`}
-                  options={donutOpts}
-                  series={[
-                    studentsGenerated,
-                    studentsWaitingForReport,
-                    studentsStarted,
-                    studentsNotStarted,
-                  ]}
-                  type="donut"
-                  height={260}
-                />
-              )}
+          <div className="ds-modal-head-right">
+            <div className="ds-modal-hero">
+              <div className="ds-modal-hero-value" style={{ color: tone.solid }}>
+                {loading && !detail ? <Spinner color={tone.solid} size={22} /> : fmtNum(total)}
+              </div>
+              <div className="ds-modal-hero-label" style={{ color: t.textMuted }}>{total === 1 ? "row" : "rows"}</div>
             </div>
+            <div className="ds-search-wrap">
+              <IconSearch />
+              <input
+                className="ds-search-input"
+                placeholder="Search name, email, roll no."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <button className="ds-icon-btn" onClick={onClose} aria-label="Close" title="Close (Esc)">
+              <IconClose />
+            </button>
+          </div>
+        </div>
 
-            <div className="ds-drilldown-stats">
-              <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>
-                {selectedMeta.name}
+        {(facts.length > 0 || meterTotal > 0 || card) && (
+          <div className="ds-modal-stats" style={{ borderBottom: `1px solid ${t.border}`, background: t.bgSubtle }}>
+            {card && def.note && <span className="ds-modal-stat-note" style={{ color: t.textMuted }}>{def.note(card)}</span>}
+            {meterTotal > 0 && (
+              <div className="ds-kpi-meter" style={{ margin: 0, minWidth: 220, flex: "1 1 260px" }}>
+                <div className="ds-kpi-meter-bar" style={{ background: t.card }}>
+                  {meter.filter((s) => s.value > 0).map((s) => (
+                    <span key={s.label} title={`${s.label}: ${fmtNum(s.value)}`} style={{ width: `${(s.value / meterTotal) * 100}%`, background: toneColors(t, s.tone).solid }} />
+                  ))}
+                </div>
+                <div className="ds-kpi-meter-legend">
+                  {meter.map((s) => (
+                    <span key={s.label} style={{ color: t.textMuted }}>
+                      <i style={{ background: toneColors(t, s.tone).solid }} />
+                      <b style={{ color: t.text }}>{fmtNum(s.value)}</b> {s.label}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 16 }}>
-                {mappingsLoading
-                  ? "Loading student mappings…"
-                  : `${fmtNum(studentsAssigned)} ${
-                      studentsAssigned === 1 ? "student" : "students"
-                    } assigned · ${fmtNum(studentsCompleted)} completed`}
-              </div>
-
-              <StatTile
-                t={t}
-                color={t.success}
-                label="Students with generated report"
-                value={studentsGenerated}
-                helper={
-                  studentsCompleted > 0
-                    ? `${pct(studentsGenerated, studentsCompleted)}% of students who completed`
-                    : "—"
-                }
-              />
-              <StatTile
-                t={t}
-                color={t.warning}
-                label="Completed · awaiting report"
-                value={studentsWaitingForReport}
-                helper="finished assessment, no report yet"
-              />
-              <StatTile
-                t={t}
-                color={t.info}
-                label="In progress"
-                value={studentsStarted}
-                helper="started but not submitted"
-              />
-              <StatTile
-                t={t}
-                color={t.textSubtle}
-                label="Not started"
-                value={studentsNotStarted}
-                helper="assigned but never opened"
-              />
-              <div
-                style={{
-                  marginTop: 12,
-                  paddingTop: 12,
-                  borderTop: `1px dashed ${t.border}`,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: 12,
-                  color: t.textMuted,
-                }}
-              >
-                <span>Report records on file (bet + navigator)</span>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    color: t.text,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {fmtNum(selected.rowsGenerated)} / {fmtNum(selected.rowsTotal)}
+            )}
+            {facts.map((f) => {
+              const c = f.tone ? toneColors(t, f.tone) : null;
+              return (
+                <span key={f.label} className="ds-fact" style={c ? { color: c.solid, background: c.soft } : { color: t.text, background: t.card }}>
+                  <b>{f.value}</b> {f.label}
                 </span>
-              </div>
-            </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Per-institute breakdown */}
-        {!loading && selected && perInstitute.length > 0 && (
-          <div style={{ marginTop: 24, paddingTop: 20, borderTop: `1px solid ${t.border}` }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>
-                  Conducted across {perInstitute.length}{" "}
-                  {perInstitute.length === 1 ? "institute" : "institutes"}
-                </div>
-                <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                  {rangeActive
-                    ? "Students & completions via assessment window · reports by createdAt"
-                    : "Lifetime totals per institute"}
-                </div>
-              </div>
-              {rangeActive && <Pill t={t} tone="info">{rangeLabelText}</Pill>}
+        <div className="ds-modal-body">
+          {error ? (
+            <div style={{ padding: 40, textAlign: "center", color: t.danger, fontSize: 13 }}>
+              Failed to load: {error}
+              <button className="ds-retry-link" onClick={() => setDebounced((s) => s + "")}>Retry</button>
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <table
-                className="ds-table"
-                style={{
-                  width: "100%",
-                  borderCollapse: "separate",
-                  borderSpacing: 0,
-                  fontSize: 13,
-                  color: t.text,
-                }}
-              >
+          ) : loading && !detail ? (
+            <div style={{ padding: 60, display: "flex", justifyContent: "center" }}>
+              <Spinner color={tone.solid} size={28} />
+            </div>
+          ) : total === 0 ? (
+            <div className="ds-modal-empty" style={{ color: t.textMuted }}>
+              <span className="ds-modal-empty-icon" style={{ background: tone.soft, color: tone.solid }}>{def.icon}</span>
+              {debounced ? `No students match “${debounced}”.` : "No students behind this number for the applied filters."}
+            </div>
+          ) : (
+            <div className="ds-table-wrap" style={{ opacity: loading ? 0.55 : 1 }}>
+              <table className="ds-table">
                 <thead>
                   <tr>
-                    {[
-                      { label: "Institute", align: "left" as const },
-                      { label: "Students (lifetime)", align: "right" as const },
-                      { label: "Completed (lifetime)", align: "right" as const },
-                      {
-                        label: rangeActive ? "Reports in range" : "Reports (lifetime)",
-                        align: "right" as const,
-                      },
-                      { label: "Completion", align: "right" as const },
-                      { label: "Report rate", align: "right" as const },
-                    ].map((h) => (
-                      <th
-                        key={h.label}
-                        style={{
-                          textAlign: h.align,
-                          padding: "10px 14px",
-                          fontSize: 10,
-                          fontWeight: 600,
-                          color: t.textMuted,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                          borderBottom: `1px solid ${t.border}`,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {h.label}
-                      </th>
+                    <th style={{ width: 44 }}>#</th>
+                    {columns.map((c) => (
+                      <th key={c.key}>{c.label}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {perInstitute.map((row) => {
-                    const completionPct = pct(row.completed, Math.max(row.students, 1));
-                    const reportPct = pct(row.reports, Math.max(row.completed, 1));
-                    return (
-                      <tr key={row.instituteId} className="ds-row">
-                        <td style={{ padding: "12px 14px", borderBottom: `1px solid ${t.border}` }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div
-                              style={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: 8,
-                                background: t.primarySoft,
-                                color: t.primary,
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontWeight: 700,
-                                fontSize: 11,
-                                flexShrink: 0,
-                              }}
-                            >
-                              {initials(row.name)}
-                            </div>
-                            <span style={{ fontWeight: 600 }}>{row.name}</span>
-                          </div>
+                  {(detail?.rows ?? []).map((row, i) => (
+                    <tr key={String(row.appointmentId ?? row.leadId ?? row.userStudentId ?? i) + "-" + i} className="ds-row">
+                      <td className="ds-td-index">{i + 1}</td>
+                      {columns.map((c) => (
+                        <td key={c.key} title={row[c.key] == null ? undefined : String(row[c.key])}>
+                          {renderCell(c, row)}
                         </td>
-                        <td
-                          style={{
-                            padding: "12px 14px",
-                            borderBottom: `1px solid ${t.border}`,
-                            textAlign: "right",
-                            fontWeight: 600,
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {fmtNum(row.students)}
-                        </td>
-                        <td
-                          style={{
-                            padding: "12px 14px",
-                            borderBottom: `1px solid ${t.border}`,
-                            textAlign: "right",
-                            fontVariantNumeric: "tabular-nums",
-                            color: row.completed > 0 ? t.text : t.textMuted,
-                          }}
-                        >
-                          {fmtNum(row.completed)}
-                        </td>
-                        <td
-                          style={{
-                            padding: "12px 14px",
-                            borderBottom: `1px solid ${t.border}`,
-                            textAlign: "right",
-                            fontVariantNumeric: "tabular-nums",
-                            color: row.reports > 0 ? t.success : t.textMuted,
-                            fontWeight: row.reports > 0 ? 700 : 500,
-                          }}
-                        >
-                          {fmtNum(row.reports)}
-                        </td>
-                        <td
-                          style={{
-                            padding: "12px 14px",
-                            borderBottom: `1px solid ${t.border}`,
-                            textAlign: "right",
-                          }}
-                        >
-                          <PercentBar t={t} value={completionPct} color={t.info} />
-                        </td>
-                        <td
-                          style={{
-                            padding: "12px 14px",
-                            borderBottom: `1px solid ${t.border}`,
-                            textAlign: "right",
-                          }}
-                        >
-                          <PercentBar t={t} value={reportPct} color={t.success} />
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      ))}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-      </div>
-    </Card>
-  );
-};
+          )}
+        </div>
 
-/* ============================================================
-   COUNSELLOR LEADERBOARD
-   ============================================================ */
-const COUNSELLING_ACTIVE_STATUSES = new Set([
-  "PENDING",
-  "ASSIGNED",
-  "CONFIRMED",
-  "COMPLETED",
-]);
-
-const apptSessionTime = (appt: any): number => {
-  const date = appt?.slot?.date;
-  const time = appt?.slot?.startTime;
-  if (!date) return NaN;
-  const iso = time ? `${date}T${time}` : `${date}T00:00:00`;
-  const t = new Date(iso).getTime();
-  return Number.isNaN(t) ? NaN : t;
-};
-
-const RatingCell: FC<{ t: Theme; average: number; count: number }> = ({
-  t,
-  average,
-  count,
-}) => {
-  if (!count || !average) {
-    return (
-      <span style={{ fontSize: 12, color: t.textSubtle }}>No ratings yet</span>
-    );
-  }
-  const fillPct = Math.max(0, Math.min(100, (average / 5) * 100));
-  return (
-    <div
-      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-      title={`${average.toFixed(2)} from ${count} ${count === 1 ? "review" : "reviews"}`}
-    >
-      <div
-        style={{ position: "relative", lineHeight: 1, fontSize: 13, letterSpacing: 1 }}
-        aria-label={`${average.toFixed(2)} out of 5`}
-      >
-        <span style={{ color: t.textSubtle, opacity: 0.35 }}>★★★★★</span>
-        <span
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: `${fillPct}%`,
-            overflow: "hidden",
-            color: t.warning,
-            whiteSpace: "nowrap",
-          }}
-        >
-          ★★★★★
-        </span>
-      </div>
-      <span
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          color: t.text,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {average.toFixed(2)}
-      </span>
-      <span
-        style={{ fontSize: 11, color: t.textMuted, fontVariantNumeric: "tabular-nums" }}
-      >
-        ({count})
-      </span>
-    </div>
-  );
-};
-
-const CounsellorLeaderboardCard: FC<{
-  t: Theme;
-  counsellors: any[];
-  appointments: any[];
-  ratingSummary: any[];
-  loading: boolean;
-  errored: boolean;
-}> = ({ t, counsellors, appointments, ratingSummary, loading, errored }) => {
-  const rows = useMemo(() => {
-    const byCounsellor = new Map<
-      string,
-      { completed: number; upcoming: number; cancelled: number }
-    >();
-    const ensure = (id: string) => {
-      let e = byCounsellor.get(id);
-      if (!e) {
-        e = { completed: 0, upcoming: 0, cancelled: 0 };
-        byCounsellor.set(id, e);
-      }
-      return e;
-    };
-    const now = Date.now();
-    appointments.forEach((a) => {
-      const cid = String(pick(a?.counsellor || {}, ["id"]) ?? "");
-      if (!cid) return;
-      const status = String(a?.status || "").toUpperCase();
-      const st = apptSessionTime(a);
-      const entry = ensure(cid);
-      if (status === "CANCELLED") {
-        entry.cancelled += 1;
-      } else if (status === "RESCHEDULED") {
-        // rescheduled rows are replaced by a new CONFIRMED row; don't double-count
-      } else if (status === "COMPLETED") {
-        // Set by SessionNotesService when the counsellor files notes — authoritative
-        entry.completed += 1;
-      } else if (status === "CONFIRMED") {
-        // Proxy: confirmed session with a slot in the past ran; notes may not be filed yet
-        if (!Number.isNaN(st) && st < now) entry.completed += 1;
-        else entry.upcoming += 1;
-      } else if (status === "ASSIGNED" || status === "PENDING") {
-        entry.upcoming += 1;
-      }
-    });
-
-    const ratingById = new Map<string, { average: number; count: number }>();
-    ratingSummary.forEach((r) => {
-      const id = String(pick(r, ["counsellorId", "id"]) ?? "");
-      if (!id) return;
-      const average = Number(pick(r, ["average", "avg"]) ?? 0);
-      const count = Number(pick(r, ["count", "total"]) ?? 0);
-      ratingById.set(id, { average, count });
-    });
-
-    return counsellors
-      .map((c) => {
-        const id = String(pick(c, ["id", "counsellorId"]) ?? "");
-        const stats = byCounsellor.get(id) || { completed: 0, upcoming: 0, cancelled: 0 };
-        const rating = ratingById.get(id) || { average: 0, count: 0 };
-        return {
-          id,
-          name: pick(c, ["name", "fullName"]) || "Counsellor",
-          email: pick(c, ["email"]) || "",
-          isActive: c?.isActive !== false,
-          profileImageUrl: pick(c, ["profileImageUrl"]) || "",
-          ...stats,
-          avgRating: rating.average,
-          ratingCount: rating.count,
-        };
-      })
-      .sort(
-        (a, b) =>
-          b.completed - a.completed ||
-          b.avgRating - a.avgRating ||
-          b.upcoming - a.upcoming ||
-          a.name.localeCompare(b.name)
-      );
-  }, [counsellors, appointments, ratingSummary]);
-
-  const totalCompleted = rows.reduce((sum, r) => sum + r.completed, 0);
-  const activeCounsellors = rows.filter((r) => r.isActive).length;
-  const maxCompleted = rows.reduce((m, r) => Math.max(m, r.completed), 0);
-  const networkRating = useMemo(() => {
-    let total = 0;
-    let count = 0;
-    rows.forEach((r) => {
-      if (r.ratingCount > 0) {
-        total += r.avgRating * r.ratingCount;
-        count += r.ratingCount;
-      }
-    });
-    return { average: count > 0 ? total / count : 0, count };
-  }, [rows]);
-
-  return (
-    <Card t={t}>
-      <CardHeader
-        t={t}
-        title="Counsellor sessions & ratings"
-        subtitle={
-          errored
-            ? "Could not load counsellor data"
-            : networkRating.count > 0
-            ? `${fmtNum(totalCompleted)} sessions completed · network rating ${networkRating.average.toFixed(
-                2
-              )} ★ from ${fmtNum(networkRating.count)} ${
-                networkRating.count === 1 ? "review" : "reviews"
-              }`
-            : `${fmtNum(totalCompleted)} sessions completed across ${activeCounsellors} active ${
-                activeCounsellors === 1 ? "counsellor" : "counsellors"
-              }`
-        }
-        right={
-          networkRating.count > 0 ? (
-            <Pill t={t} tone="warning">
-              {networkRating.average.toFixed(2)} ★ · {fmtNum(networkRating.count)}
-            </Pill>
-          ) : totalCompleted > 0 ? (
-            <Pill t={t} tone="success">{fmtNum(totalCompleted)} completed</Pill>
-          ) : undefined
-        }
-      />
-      <div style={{ padding: "0 20px 20px", minHeight: 240 }}>
-        {loading ? (
-          <Skeleton t={t} height={240} />
-        ) : rows.length === 0 ? (
-          <EmptyState t={t} label="No counsellors configured yet" />
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table
-              className="ds-table"
-              style={{
-                width: "100%",
-                borderCollapse: "separate",
-                borderSpacing: 0,
-                fontSize: 13,
-                color: t.text,
-              }}
+        <div className="ds-modal-foot" style={{ borderTop: `1px solid ${t.border}` }}>
+          <span style={{ fontSize: 12, color: t.textMuted }}>
+            {total > 0
+              ? shown < total
+                ? `Showing the first ${fmtNum(shown)} of ${fmtNum(total)} rows — narrow with search to see the rest`
+                : `${fmtNum(total)} ${total === 1 ? "row" : "rows"} · scroll to see all`
+              : ""}
+            {detail && !loading ? ` · ${detail.tookMs} ms · ${detail.thread}` : ""}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
+            <button
+              className="ds-export-btn"
+              style={{ background: tone.solid }}
+              disabled={!canExport}
+              onClick={handleExport}
+              title={canExport ? `Download all ${fmtNum(shown)} rows as an Excel file` : "Nothing to download yet"}
             >
-              <thead>
-                <tr>
-                  {[
-                    { label: "#", align: "left" as const },
-                    { label: "Counsellor", align: "left" as const },
-                    { label: "Rating", align: "left" as const },
-                    { label: "Completed", align: "right" as const },
-                    { label: "Upcoming", align: "right" as const },
-                    { label: "Share", align: "right" as const },
-                  ].map((h) => (
-                    <th
-                      key={h.label}
-                      style={{
-                        textAlign: h.align,
-                        padding: "10px 12px",
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: t.textMuted,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                        borderBottom: `1px solid ${t.border}`,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {h.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => (
-                  <tr key={r.id || i} className="ds-row">
-                    <td
-                      style={{
-                        padding: "12px 12px",
-                        borderBottom: `1px solid ${t.border}`,
-                        color: t.textMuted,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </td>
-                    <td style={{ padding: "12px 12px", borderBottom: `1px solid ${t.border}` }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 10,
-                            background: r.profileImageUrl
-                              ? `center/cover no-repeat url(${r.profileImageUrl})`
-                              : t.primarySoft,
-                            color: t.primary,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: 700,
-                            fontSize: 11,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {!r.profileImageUrl && initials(r.name)}
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontWeight: 600,
-                              color: t.text,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {r.name}
-                            </span>
-                            {!r.isActive && (
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  color: t.textSubtle,
-                                  fontWeight: 500,
-                                }}
-                              >
-                                · inactive
-                              </span>
-                            )}
-                          </div>
-                          {r.email && (
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: t.textMuted,
-                                marginTop: 1,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                maxWidth: 240,
-                              }}
-                            >
-                              {r.email}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td
-                      style={{
-                        padding: "12px 12px",
-                        borderBottom: `1px solid ${t.border}`,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      <RatingCell
-                        t={t}
-                        average={r.avgRating}
-                        count={r.ratingCount}
-                      />
-                    </td>
-                    <td
-                      style={{
-                        padding: "12px 12px",
-                        borderBottom: `1px solid ${t.border}`,
-                        textAlign: "right",
-                        fontVariantNumeric: "tabular-nums",
-                        fontWeight: 700,
-                        color: r.completed > 0 ? t.success : t.textMuted,
-                      }}
-                    >
-                      {fmtNum(r.completed)}
-                    </td>
-                    <td
-                      style={{
-                        padding: "12px 12px",
-                        borderBottom: `1px solid ${t.border}`,
-                        textAlign: "right",
-                        fontVariantNumeric: "tabular-nums",
-                        color: r.upcoming > 0 ? t.text : t.textMuted,
-                      }}
-                    >
-                      {fmtNum(r.upcoming)}
-                    </td>
-                    <td
-                      style={{
-                        padding: "12px 12px",
-                        borderBottom: `1px solid ${t.border}`,
-                        textAlign: "right",
-                      }}
-                    >
-                      <PercentBar
-                        t={t}
-                        value={pct(r.completed, Math.max(maxCompleted, 1))}
-                        color={t.success}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              <IconDownload />
+              Download Excel
+            </button>
           </div>
-        )}
+        </div>
       </div>
-    </Card>
+    </div>,
+    document.body
   );
 };
 
-/* ============================================================
-   COUNSELLING DRILL-DOWN (per institute)
-   ============================================================ */
-const CounsellingDrillDownCard: FC<{
+const OverviewSection: FC<{
   t: Theme;
-  institutes: any[];
-  studentMappings: any[];
-  appointments: any[];
-  mappingsLoading: boolean;
-  loading: boolean;
-  errored: boolean;
-}> = ({ t, institutes, studentMappings, appointments, mappingsLoading, loading, errored }) => {
-  // Students who have at least one non-cancelled/non-rescheduled counselling appointment
-  const studentsWithCounselling = useMemo(() => {
-    const s = new Set<string>();
-    appointments.forEach((a) => {
-      const status = String(a?.status || "").toUpperCase();
-      if (!COUNSELLING_ACTIVE_STATUSES.has(status)) return;
-      const sid =
-        pick(a?.student || {}, ["userStudentId", "id", "studentId"]) ??
-        pick(a, ["studentId", "userStudentId"]);
-      if (sid != null) s.add(String(sid));
-    });
-    return s;
-  }, [appointments]);
-
-  // Build: instituteId → { students, completedAssessment, counselled }
-  const perInstitute = useMemo(() => {
-    type Agg = {
-      id: string;
-      name: string;
-      totalStudents: number;
-      completedAssessment: Set<string>;
-      counselled: Set<string>;
-    };
-    const byInstitute = new Map<string, Agg>();
-
-    const nameById = new Map<string, string>();
-    institutes.forEach((i: any) => {
-      const primaryId = pick(i, ["id", "instituteId", "instituteCode"]);
-      const altId = pick(i, ["instituteCode", "code"]);
-      const resolvedName = pick(i, [
-        "instituteName",
-        "name",
-        "schoolName",
-        "collegeName",
-      ]);
-      const name =
-        resolvedName || `Institute #${primaryId ?? altId ?? "?"}`;
-      if (primaryId != null) nameById.set(String(primaryId), String(name));
-      if (altId != null) nameById.set(String(altId), String(name));
-    });
-
-    studentMappings.forEach((s: any) => {
-      const sid = String(pick(s, ["userStudentId", "user_student_id", "id"]) ?? "");
-      const iid = String(pick(s, ["instituteId", "institute_id"]) ?? "");
-      if (!sid || !iid) return;
-      let agg = byInstitute.get(iid);
-      if (!agg) {
-        agg = {
-          id: iid,
-          name: nameById.get(iid) || `Institute #${iid}`,
-          totalStudents: 0,
-          completedAssessment: new Set(),
-          counselled: new Set(),
-        };
-        byInstitute.set(iid, agg);
-      }
-      agg.totalStudents += 1;
-
-      const assigned = Array.isArray(s.assessments) ? s.assessments : [];
-      const completedAny = assigned.some((a: any) => {
-        const st = String(pick(a, ["status"]) || "").toLowerCase();
-        return st === "completed" || st === "submitted";
-      });
-      if (completedAny) agg.completedAssessment.add(sid);
-      if (studentsWithCounselling.has(sid)) agg.counselled.add(sid);
-    });
-
-    return Array.from(byInstitute.values())
-      .map((v) => ({
-        id: v.id,
-        name: v.name,
-        totalStudents: v.totalStudents,
-        completedAssessment: v.completedAssessment.size,
-        counselled: Array.from(v.completedAssessment).filter((sid) =>
-          v.counselled.has(sid)
-        ).length,
-      }))
-      .sort((a, b) =>
-        a.name.trim().localeCompare(b.name.trim(), undefined, { sensitivity: "base" })
-      );
-  }, [institutes, studentMappings, studentsWithCounselling]);
-
-  const [selectedId, setSelectedId] = useState<string>("");
-  useEffect(() => {
-    if (perInstitute.length === 0) return;
-    const stillVisible = perInstitute.some((i) => i.id === selectedId);
-    if (!selectedId || !stillVisible) {
-      const withAny = perInstitute.find((i) => i.completedAssessment > 0);
-      setSelectedId((withAny || perInstitute[0]).id);
-    }
-  }, [perInstitute, selectedId]);
-
-  const selected = perInstitute.find((i) => i.id === selectedId);
-  const completedAssessment = selected?.completedAssessment ?? 0;
-  const counselled = selected?.counselled ?? 0;
-  const notCounselled = Math.max(completedAssessment - counselled, 0);
-
-  const donutOpts: ApexOptions = useMemo(
-    () => ({
-      chart: { type: "donut", fontFamily: "inherit" },
-      labels: ["Took counselling", "Did not take counselling"],
-      colors: [t.success, t.textSubtle],
-      stroke: { width: 0 },
-      legend: { show: false },
-      dataLabels: { enabled: false },
-      plotOptions: {
-        pie: {
-          donut: {
-            size: "76%",
-            labels: {
-              show: true,
-              name: { show: true, color: t.textMuted, fontSize: "12px", offsetY: 16 },
-              value: {
-                show: true,
-                color: t.text,
-                fontSize: "32px",
-                fontWeight: 700,
-                offsetY: -14,
-                formatter: (val) => `${val}`,
-              },
-              total: {
-                show: true,
-                label: "Assessment completed",
-                color: t.textMuted,
-                formatter: () => `${completedAssessment}`,
-              },
-            },
-          },
-        },
-      },
-      tooltip: {
-        theme: t.name,
-        y: { formatter: (v) => `${v} ${v === 1 ? "student" : "students"}` },
-      },
-    }),
-    [t, completedAssessment]
-  );
+  states: CardStates;
+  retry: (key: OverviewCardKey) => void;
+  appliedRangeKey: RangeKey;
+  appliedRange: DateRange;
+  denied: boolean;
+  /** The applied query (null while scope resolves) — reused verbatim by the drill-down. */
+  query: OverviewQuery | null;
+}> = ({ t, states, retry, appliedRangeKey, appliedRange, denied, query }) => {
+  const rangeText = rangeLabel(appliedRangeKey, appliedRange);
+  const [openCard, setOpenCard] = useState<CardDef | null>(null);
+  const closeModal = useCallback(() => setOpenCard(null), []);
+  const rangeBounded = !!(appliedRange.start && appliedRange.end);
 
   return (
-    <Card t={t}>
-      <CardHeader
-        t={t}
-        title="Counselling drill-down"
-        subtitle={
-          errored
-            ? "Could not load counselling appointments"
-            : `${perInstitute.length} ${
-                perInstitute.length === 1 ? "institute" : "institutes"
-              } · of students who completed assessment, how many took counselling`
-        }
-        right={
-          <SearchableSelect
-            options={perInstitute.map((i) => ({
-              value: String(i.id),
-              label:
-                i.name +
-                (i.completedAssessment > 0
-                  ? ` · ${i.counselled}/${i.completedAssessment} counselled`
-                  : ""),
-            }))}
-            value={selectedId}
-            onChange={(v) => { if (v) setSelectedId(v) }}
-            placeholder={loading || mappingsLoading ? "Loading…" : "Select institute"}
-            disabled={loading || mappingsLoading || perInstitute.length === 0}
-            isClearable={false}
-            style={{ minWidth: 260 }}
-          />
-        }
-      />
-      <div style={{ padding: "0 24px 24px" }}>
-        {loading || mappingsLoading ? (
-          <Skeleton t={t} height={280} />
-        ) : !selected ? (
-          <EmptyState
-            t={t}
-            label={
-              perInstitute.length === 0
-                ? "No institutes with students yet"
-                : "No data for this institute yet"
-            }
-          />
-        ) : completedAssessment === 0 ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              minHeight: 240,
-              color: t.textMuted,
-              fontSize: 13,
-              textAlign: "center",
-              padding: 20,
-            }}
-          >
-            No students from {selected.name} have completed an assessment yet.
-          </div>
-        ) : (
-          <div className="ds-drilldown">
-            <div className="ds-drilldown-chart">
-              <Chart
-                key={`counsel-drill-${selectedId}-${t.name}`}
-                options={donutOpts}
-                series={[counselled, notCounselled]}
-                type="donut"
-                height={260}
-              />
+    <>
+      {CARD_SECTIONS.map((section) => {
+        const st = toneColors(t, section.tone);
+        const loaded = section.cards.filter((d) => states[d.key].data && !states[d.key].loading).length;
+        const failed = section.cards.filter((d) => states[d.key].error).length;
+        return (
+          <div key={section.title} style={{ marginTop: 28 }}>
+            <div className="ds-section-head">
+              <span className="ds-section-accent" style={{ background: st.solid }} />
+              <div style={{ minWidth: 0 }}>
+                <div className="ds-section-title" style={{ color: t.text }}>
+                  {section.rangeInTitle ? `${section.title} · ${rangeText}` : section.title}
+                </div>
+                <div className="ds-section-sub" style={{ color: t.textMuted }}>{section.subtitle}</div>
+              </div>
+              <div className="ds-section-right">
+                {failed > 0 ? (
+                  <Pill t={t} tone="danger">{failed} failed</Pill>
+                ) : loaded < section.cards.length ? (
+                  <Pill t={t} tone="info">{loaded}/{section.cards.length} loaded</Pill>
+                ) : (
+                  <span className="ds-section-count" style={{ color: st.solid, background: st.soft }}>
+                    {section.cards.length} {section.cards.length === 1 ? "card" : "cards"}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="ds-drilldown-stats">
-              <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>
-                {selected.name}
-              </div>
-              <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 16 }}>
-                {fmtNum(selected.totalStudents)}{" "}
-                {selected.totalStudents === 1 ? "student" : "students"} on roster ·{" "}
-                {fmtNum(completedAssessment)} finished an assessment
-              </div>
+            <div className={`ds-grid ${section.compact ? "ds-grid-compact" : ""}`}>
+              {section.cards.map((def) => {
+                const s = states[def.key];
+                const data = s.data;
+                return (
+                  <KpiCard
+                    key={def.key}
+                    t={t}
+                    tone={toneColors(t, def.tone)}
+                    icon={def.icon}
+                    title={def.title}
+                    value={denied ? "0" : data ? fmtNum(data.value) : "—"}
+                    note={data && !denied && def.note ? def.note(data) : undefined}
+                    facts={data && !denied && def.facts ? def.facts(data) : undefined}
+                    meter={data && !denied && def.meter ? def.meter(data) : undefined}
+                    caption={
+                      s.error
+                        ? `Failed: ${s.error}`
+                        : denied
+                        ? "No institute mapped to your account"
+                        : data
+                        ? undefined
+                        : s.loading
+                        ? "Counting…"
+                        : "Press Search to load"
+                    }
+                    loading={s.loading}
+                    errored={!!s.error}
+                    dateFiltered={def.mode === "range" && rangeBounded && !!data?.rangeApplied}
+                    badge={
+                      def.mode === "state"
+                        ? { label: "LIVE", tone: "info", title: "Current state — nothing records when an attempt began, so the date range does not apply", icon: <IconActivity /> }
+                        : undefined
+                    }
+                    meta={data ? `${data.tookMs} ms · ${data.thread}` : undefined}
+                    onRetry={s.error ? () => retry(def.key) : undefined}
+                    onClick={query && data && !s.error ? () => setOpenCard(def) : undefined}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
 
-              <StatTile
-                t={t}
-                color={t.success}
-                label="Took counselling"
-                value={counselled}
-                helper={
-                  completedAssessment > 0
-                    ? `${pct(counselled, completedAssessment)}% of assessment-completers`
-                    : "—"
-                }
-              />
-              <StatTile
-                t={t}
-                color={t.textSubtle}
-                label="Have not taken counselling"
-                value={notCounselled}
-                helper="completed assessment · no booking yet"
-              />
-              <div
-                style={{
-                  marginTop: 12,
-                  paddingTop: 12,
-                  borderTop: `1px dashed ${t.border}`,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontSize: 12,
-                  color: t.textMuted,
-                }}
-              >
-                <span>Conversion (counselling / assessment)</span>
-                <span
-                  style={{
-                    fontWeight: 700,
-                    color: t.text,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {pct(counselled, Math.max(completedAssessment, 1))}%
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </Card>
+      {openCard && query && (
+        <OverviewDetailModal
+          t={t}
+          def={openCard}
+          card={states[openCard.key].data}
+          query={query}
+          rangeText={rangeText}
+          onClose={closeModal}
+        />
+      )}
+    </>
   );
 };
-
-const PercentBar: FC<{ t: Theme; value: number; color: string }> = ({ t, value, color }) => (
-  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 110 }}>
-    <div
-      style={{
-        flex: 1,
-        height: 5,
-        background: t.bgSubtle,
-        borderRadius: 100,
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          width: `${Math.min(value, 100)}%`,
-          height: "100%",
-          borderRadius: 100,
-          background: color,
-          transition: "width 400ms ease",
-        }}
-      />
-    </div>
-    <span
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        color: t.text,
-        fontVariantNumeric: "tabular-nums",
-        minWidth: 38,
-        textAlign: "right",
-      }}
-    >
-      {value}%
-    </span>
-  </div>
-);
-
-const pct = (n: number, d: number) => (d === 0 ? 0 : Math.round((n / d) * 100));
-
-const StatTile: FC<{ t: Theme; color: string; label: string; value: number; helper: string }> = ({
-  t, color, label, value, helper,
-}) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "12px 14px",
-      borderRadius: 10,
-      border: `1px solid ${t.border}`,
-      background: t.bg,
-      marginBottom: 8,
-      gap: 12,
-    }}
-  >
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{label}</div>
-        <div style={{ fontSize: 11, color: t.textMuted, marginTop: 1 }}>{helper}</div>
-      </div>
-    </div>
-    <div
-      style={{
-        fontSize: 20,
-        fontWeight: 700,
-        color: t.text,
-        fontVariantNumeric: "tabular-nums",
-      }}
-    >
-      {fmtNum(value)}
-    </div>
-  </div>
-);
 
 /* ============================================================
    PRIMITIVES
    ============================================================ */
-const Card: FC<{ t: Theme; children: ReactNode }> = ({ t, children }) => (
-  <div
-    className="ds-card"
-    style={{
-      background: t.card,
-      border: `1px solid ${t.border}`,
-      borderRadius: 14,
-      overflow: "hidden",
-      height: "100%",
-    }}
-  >
-    {children}
-  </div>
-);
 
-const CardHeader: FC<{ t: Theme; title: string; subtitle?: string; right?: ReactNode }> = ({
-  t, title, subtitle, right,
-}) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-      padding: "22px 26px 14px",
-      flexWrap: "wrap",
-    }}
-  >
-    <div>
-      <div
-        style={{
-          fontSize: 17,
-          fontWeight: 600,
-          letterSpacing: "-0.015em",
-          color: t.text,
-          lineHeight: 1.3,
-        }}
-      >
-        {title}
-      </div>
-      {subtitle && (
-        <div
-          style={{
-            fontSize: 13,
-            color: t.textMuted,
-            marginTop: 4,
-            lineHeight: 1.5,
-          }}
-        >
-          {subtitle}
-        </div>
-      )}
-    </div>
-    {right && <div>{right}</div>}
-  </div>
-);
 
 const Pill: FC<{ t: Theme; tone: Tone; children: ReactNode }> = ({ t, tone, children }) => {
   const map: Record<Tone, { solid: string; soft: string }> = {
@@ -3776,32 +2354,7 @@ const Pill: FC<{ t: Theme; tone: Tone; children: ReactNode }> = ({ t, tone, chil
   );
 };
 
-const Skeleton: FC<{ t: Theme; height: number }> = ({ t, height }) => (
-  <div
-    className="ds-skeleton"
-    style={{
-      width: "100%",
-      height,
-      borderRadius: 10,
-      background: t.bgSubtle,
-    }}
-  />
-);
 
-const EmptyState: FC<{ t: Theme; label: string }> = ({ t, label }) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: 180,
-      color: t.textMuted,
-      fontSize: 13,
-    }}
-  >
-    {label}
-  </div>
-);
 
 /* ============================================================
    STYLES
@@ -3828,7 +2381,7 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
       position: relative;
       border-radius: 20px;
       overflow: hidden;
-      padding: 48px 56px;
+      padding: 22px 30px;
       background:
         radial-gradient(1200px 500px at 85% -15%, rgba(244,63,94,0.14), transparent 60%),
         radial-gradient(800px 400px at -5% 115%, rgba(244,63,94,0.08), transparent 55%),
@@ -3868,7 +2421,7 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     .ds-hero-content {
       position: relative;
       display: flex;
-      gap: 40px;
+      gap: 24px;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
@@ -3886,14 +2439,14 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     }
     .ds-hero-stats {
       display: grid;
-      grid-template-columns: repeat(3, minmax(110px, 1fr));
-      gap: 12px;
-      min-width: 380px;
+      grid-template-columns: repeat(3, minmax(104px, 1fr));
+      gap: 10px;
+      min-width: 340px;
     }
     @media (max-width: 900px) { .ds-hero-stats { min-width: 0; grid-template-columns: repeat(3, 1fr); width: 100%; } }
     .ds-hero-stat {
-      padding: 16px 18px;
-      border-radius: 14px;
+      padding: 10px 14px;
+      border-radius: 12px;
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.1);
       backdrop-filter: blur(12px);
@@ -3948,6 +2501,10 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 20px !important;
+    }
+
+    .ds-grid-compact {
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     }
 
     .ds-two-col {
@@ -4032,6 +2589,474 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     .ds-date-input:hover { border-color: ${t.borderStrong}; }
     .ds-date-input:focus { outline: none; border-color: ${t.primary}; box-shadow: 0 0 0 3px ${t.primarySoft}; }
 
+    .ds-export-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 9px;
+      border: none;
+      background: ${t.primary};
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 200ms ease;
+    }
+    .ds-export-btn:hover:not(:disabled) { background: ${t.primaryHover}; }
+    .ds-export-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* --------------------- SEARCH / APPLY --------------------- */
+    .ds-search-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border-radius: 9px;
+      border: none;
+      background: ${t.primary};
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 200ms ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+    .ds-search-btn:hover:not(:disabled) { background: ${t.primaryHover}; transform: translateY(-1px); }
+    .ds-search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ds-search-btn.dirty { box-shadow: 0 0 0 3px ${t.primarySoft}, 0 1px 2px rgba(0,0,0,0.08); }
+
+    .ds-dirty-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 100px;
+      background: ${t.warningSoft};
+      color: ${t.warning};
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .ds-dirty-pill::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: ${t.warning};
+      animation: ds-dirty-blink 1.4s ease-in-out infinite;
+    }
+    @keyframes ds-dirty-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
+
+    /* --------------------- OVERVIEW SECTIONS --------------------- */
+    /* --------------------- SECTION HEADS --------------------- */
+    .ds-section-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .ds-section-accent {
+      width: 5px;
+      height: 34px;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+    .ds-section-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+    .ds-section-sub { font-size: 12px; margin-top: 3px; }
+    .ds-section-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .ds-section-count {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    /* --------------------- KPI CARD --------------------- */
+    .ds-kpi-card {
+      border-radius: 18px;
+      padding: 20px 22px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 200px;
+      position: relative;
+      overflow: hidden;
+    }
+    .ds-kpi-card.clickable { cursor: pointer; }
+    .ds-kpi-card.clickable:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--kpi-soft, ${t.primarySoft}); }
+    .ds-kpi-wash {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(420px 220px at 100% -10%, var(--kpi-soft, transparent) 0%, transparent 65%),
+        radial-gradient(260px 160px at -10% 110%, var(--kpi-soft, transparent) 0%, transparent 60%);
+      opacity: ${t.name === "dark" ? 0.9 : 0.75};
+    }
+    .ds-kpi-topline {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--kpi-tone), transparent 85%);
+    }
+    .ds-kpi-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      position: relative;
+    }
+    .ds-kpi-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      background: var(--kpi-tone);
+      background: linear-gradient(135deg, color-mix(in srgb, var(--kpi-tone) 100%, #fff 10%), color-mix(in srgb, var(--kpi-tone) 82%, #000 18%));
+      box-shadow: 0 8px 18px -8px var(--kpi-tone), inset 0 1px 0 rgba(255,255,255,0.25);
+      transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ds-kpi-card:hover .ds-kpi-icon { transform: translateY(-2px) scale(1.04); }
+    .ds-kpi-chips { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .ds-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 100px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .ds-chip svg { width: 11px; height: 11px; }
+    .ds-chip-cell { font-size: 11px; letter-spacing: 0.01em; text-transform: capitalize; padding: 3px 9px; }
+    .ds-kpi-title {
+      position: relative;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: ${t.textMuted};
+      margin-top: 2px;
+    }
+    .ds-kpi-value {
+      position: relative;
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      font-variant-numeric: proportional-nums;
+    }
+    .ds-kpi-note { position: relative; font-size: 12.5px; line-height: 1.45; }
+    .ds-kpi-meter { position: relative; display: flex; flex-direction: column; gap: 7px; margin-top: 2px; }
+    .ds-kpi-meter-bar {
+      display: flex;
+      gap: 2px;
+      height: 8px;
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    .ds-kpi-meter-bar > span { display: block; height: 100%; min-width: 3px; border-radius: 100px; transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1); }
+    .ds-kpi-meter-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; }
+    .ds-kpi-meter-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+    .ds-kpi-meter-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .ds-kpi-meter-legend b { font-weight: 700; }
+    .ds-kpi-facts { position: relative; display: flex; flex-wrap: wrap; gap: 6px; }
+    .ds-fact {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 9px;
+      font-size: 11.5px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .ds-fact b { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ds-kpi-foot {
+      position: relative;
+      margin-top: auto;
+      padding-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-top: 1px dashed ${t.border};
+    }
+    .ds-kpi-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--kpi-tone);
+      transition: gap 200ms ease;
+    }
+    .ds-kpi-card.clickable:hover .ds-kpi-link { gap: 9px; }
+    .ds-kpi-meta { font-size: 10.5px; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; white-space: nowrap; }
+
+    /* --------------------- DRILL-DOWN MODAL --------------------- */
+    .ds-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1090;
+      box-sizing: border-box;
+      background: rgba(15, 23, 42, ${t.name === "dark" ? "0.72" : "0.48"});
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      animation: ds-fade-in 160ms ease both;
+    }
+    @keyframes ds-fade-in { from { opacity: 0; } to { opacity: 1; } }
+    .ds-modal {
+      /* Grows with the table, never past the viewport; a narrow list gets a
+         compact dialog, a wide one uses the full width and scrolls inside. */
+      width: fit-content;
+      min-width: min(820px, calc(100vw - 48px));
+      max-width: calc(100vw - 48px);
+      max-height: calc(100vh - 48px);
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 40px 90px -24px rgba(0,0,0,0.5), 0 0 0 1px var(--modal-soft);
+      animation: ds-fade-up 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      box-sizing: border-box;
+    }
+    .ds-modal * { box-sizing: border-box; }
+    .ds-modal-head {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 22px 26px 18px;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .ds-modal-head-wash {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(600px 240px at 0% 0%, var(--modal-soft) 0%, transparent 70%),
+        radial-gradient(400px 200px at 100% 100%, var(--modal-soft) 0%, transparent 65%);
+      opacity: ${t.name === "dark" ? 0.9 : 0.8};
+    }
+    .ds-modal-head > * { position: relative; }
+    .ds-modal-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      background: var(--modal-tone);
+      box-shadow: 0 10px 22px -10px var(--modal-tone), inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    .ds-modal-icon svg { width: 24px; height: 24px; }
+    .ds-modal-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+    .ds-modal-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin-top: 3px; }
+    .ds-modal-head-right { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-wrap: wrap; }
+    .ds-modal-hero { display: flex; flex-direction: column; align-items: flex-end; padding-right: 14px; margin-right: 2px; border-right: 1px solid ${t.border}; }
+    .ds-modal-hero-value { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+    .ds-modal-hero-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 4px; }
+    .ds-modal-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px 14px;
+      flex-wrap: wrap;
+      padding: 12px 26px;
+      min-width: 0;
+    }
+    .ds-modal-stat-note { font-size: 12.5px; font-weight: 500; margin-right: 6px; }
+    .ds-modal-body {
+      flex: 1;
+      min-height: 240px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ds-modal-foot { min-width: 0; }
+    .ds-modal-empty {
+      padding: 56px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      text-align: center;
+      font-size: 13px;
+    }
+    .ds-modal-empty-icon { width: 56px; height: 56px; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; }
+    .ds-modal-empty-icon svg { width: 26px; height: 26px; }
+    .ds-modal-foot {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px 26px;
+    }
+    .ds-search-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid ${t.border};
+      background: ${t.card};
+      color: ${t.textMuted};
+      transition: all 200ms ease;
+    }
+    .ds-search-wrap:focus-within { border-color: var(--modal-tone); box-shadow: 0 0 0 3px var(--modal-soft); }
+    .ds-search-input {
+      border: none;
+      background: transparent;
+      outline: none;
+      color: ${t.text};
+      font-size: 13px;
+      font-family: inherit;
+      min-width: 220px;
+    }
+    .ds-search-input::placeholder { color: ${t.textSubtle}; }
+    .ds-icon-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid ${t.border};
+      background: ${t.card};
+      color: ${t.textMuted};
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 200ms ease;
+    }
+    .ds-icon-btn:hover { color: ${t.text}; border-color: ${t.borderStrong}; background: ${t.bgSubtle}; }
+    .ds-table-wrap {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+      transition: opacity 200ms ease;
+    }
+    .ds-table {
+      min-width: 100%;
+      width: max-content;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+      color: ${t.text};
+    }
+    .ds-table th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      text-align: left;
+      padding: 11px 16px;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--modal-tone);
+      background: ${t.card};
+      border-bottom: 2px solid var(--modal-soft);
+      white-space: nowrap;
+    }
+    .ds-table td {
+      padding: 9px 16px;
+      border-bottom: 1px solid ${t.border};
+      white-space: nowrap;
+      overflow: visible;
+      color: ${t.textMuted};
+      vertical-align: middle;
+    }
+    .ds-table tbody tr:nth-child(even) td { background: ${t.name === "dark" ? "rgba(255,255,255,0.025)" : "rgba(15,23,42,0.02)"}; }
+    .ds-table tbody tr:hover td { background: var(--modal-soft); }
+    .ds-td-index { color: ${t.textSubtle}; font-variant-numeric: tabular-nums; font-size: 11.5px; }
+    .ds-cell-name { display: inline-flex; align-items: center; gap: 10px; }
+    .ds-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+    .ds-status-chip {
+      display: inline-flex;
+      padding: 2px 9px;
+      border-radius: 100px;
+      background: ${t.infoSoft};
+      color: ${t.text};
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .ds-page-btn {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid ${t.border};
+      background: ${t.card};
+      color: ${t.text};
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 200ms ease;
+    }
+    .ds-page-btn:hover:not(:disabled) { border-color: ${t.borderStrong}; background: ${t.bgSubtle}; }
+    .ds-page-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .ds-retry-link {
+      border: none;
+      background: transparent;
+      color: ${t.primary};
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0;
+      margin-left: 6px;
+      font-family: inherit;
+      text-decoration: underline;
+    }
+
     .ds-card {
       position: relative;
       transition:
@@ -4075,7 +3100,7 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
       mix-blend-mode: ${t.name === "dark" ? "screen" : "multiply"};
     }
     .ds-kpi-card:hover::after {
-      opacity: ${t.name === "dark" ? 0.12 : 0.08};
+      opacity: ${t.name === "dark" ? 0.16 : 0.1};
     }
 
     .ds-row { transition: background 150ms ease; }
@@ -4207,94 +3232,6 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
       font-size: 11px !important;
     }
   `}</style>
-);
-
-/* ============================================================
-   ICONS
-   ============================================================ */
-const svgBase = {
-  width: 16,
-  height: 16,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
-const IconUsers = () => (
-  <svg {...svgBase} width={18} height={18}>
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-const IconBuilding = () => (
-  <svg {...svgBase} width={18} height={18}>
-    <rect x="3" y="3" width="18" height="18" rx="2" />
-    <path d="M9 21V9h6v12" />
-  </svg>
-);
-const IconClipboard = () => (
-  <svg {...svgBase} width={18} height={18}>
-    <rect x="8" y="2" width="8" height="4" rx="1" />
-    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-    <path d="m9 14 2 2 4-4" />
-  </svg>
-);
-const IconHeadset = () => (
-  <svg {...svgBase} width={18} height={18}>
-    <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-    <path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z" />
-  </svg>
-);
-const IconActivity = () => (
-  <svg {...svgBase} width={18} height={18}>
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-  </svg>
-);
-const IconFileCheck = () => (
-  <svg {...svgBase} width={18} height={18}>
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <polyline points="9 15 11 17 15 13" />
-  </svg>
-);
-const IconClock = () => (
-  <svg {...svgBase} width={10} height={10}>
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-const IconCalendar = () => (
-  <svg {...svgBase} width={14} height={14}>
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-    <line x1="16" y1="2" x2="16" y2="6" />
-    <line x1="8" y1="2" x2="8" y2="6" />
-    <line x1="3" y1="10" x2="21" y2="10" />
-  </svg>
-);
-const IconLogout = () => (
-  <svg {...svgBase}>
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
-const IconRefresh = () => (
-  <svg {...svgBase}>
-    <polyline points="23 4 23 10 17 10" />
-    <polyline points="1 20 1 14 7 14" />
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-  </svg>
-);
-const IconAlert = () => (
-  <svg {...svgBase} width={12} height={12}>
-    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-    <line x1="12" y1="9" x2="12" y2="13" />
-    <line x1="12" y1="17" x2="12.01" y2="17" />
-  </svg>
 );
 
 /* ============================================================

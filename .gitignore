@@ -13,6 +13,9 @@ yarn.lock
 /.claude
 /.planning
 /backups
+# On-demand DB dumps written by backup-db.sh (script + output are local-only)
+/backup/
+/backup-db.sh
 **/target/
 
 # Project Documentation

@@ -74,8 +74,7 @@ public class EntitlementSchedulerService {
                 String email = resolveStudentEmail(e);
                 if (email == null) continue;
 
-                EntitlementService.ResendResult r = entitlementService.resendServiceLink(
-                        e.getEntitlementId(), "assessment_invite", email);
+                EntitlementService.ResendResult r = entitlementService.sendNudge(e);
                 if (!r.ok) {
                     logger.warn("Nudge skipped for entitlement {}: {}", e.getEntitlementId(), r.message);
                 }
