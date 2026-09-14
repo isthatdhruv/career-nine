@@ -48,6 +48,8 @@ import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.service.CommunicationLogService;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.theme.Mail;
 
 @RestController
 @RequestMapping("/contact-person")
@@ -88,6 +90,12 @@ public class ContactPersonController {
 
     @Autowired
     private AssessmentTableRepository assessmentTableRepository;
+
+    @Autowired
+    private com.kccitm.api.service.email.theme.MailRenderer mailRenderer;
+
+    @Autowired
+    private com.kccitm.api.service.email.theme.BrandResolver brandResolver;
 
     // ============ EXISTING ENDPOINTS ============
 
@@ -356,28 +364,30 @@ public class ContactPersonController {
         }
         studentContactAssignmentRepository.saveAll(assignments);
 
-        // Build student names list for email
-        StringBuilder studentListHtml = new StringBuilder("<ul>");
-        for (Long userStudentId : userStudentIds) {
-            String name = userStudentRepository.getNameByUserID(userStudentId);
-            studentListHtml.append("<li>").append(name != null ? name : "Student #" + userStudentId).append("</li>");
-        }
-        studentListHtml.append("</ul>");
-
         // Send email notification to contact person
         if (cp.getEmail() != null && !cp.getEmail().isEmpty()) {
             String instituteName = (cp.getInstitute() != null) ? cp.getInstitute().getInstituteName() : "your school";
-            String subject = "Students Assigned to You – " + instituteName;
-            String htmlBody = "<p>Dear " + (cp.getName() != null ? cp.getName() : "Contact Person") + ",</p>"
-                    + "<p>The following " + userStudentIds.size() + " student(s) from <strong>" + instituteName
-                    + "</strong> have been assigned to you as their admin:</p>"
-                    + studentListHtml
-                    + "<p>You can now contact these students and send them emails through the Odoo service.</p>"
-                    + "<p>This is an automated notification from Career-9.</p>";
+            int n = userStudentIds.size();
+            List<String> names = new ArrayList<>();
+            for (Long userStudentId : userStudentIds) {
+                String name = userStudentRepository.getNameByUserID(userStudentId);
+                names.add(Mail.v(name != null ? name : "Student #" + userStudentId));
+            }
+            Mail mail = Mail.builder()
+                    .subject("Students assigned to you: " + instituteName)
+                    .preheader(n + " students from " + instituteName + " have been assigned to you.")
+                    .title("Students assigned to you")
+                    .p(AccountMails.hi(AccountMails.firstName(cp.getName())))
+                    .p("The following " + Mail.b(String.valueOf(n)) + " students from " + Mail.b(instituteName)
+                            + " have been assigned to you as their admin:")
+                    .list(names.toArray(new String[0]))
+                    .small("You can now contact these students and send them emails from the admin app.")
+                    .signature()
+                    .build();
             boolean ok = true;
             String err = null;
             try {
-                emailDispatchService.sendHtml(EmailType.GENERIC, cp.getEmail(), subject, htmlBody);
+                emailDispatchService.sendMail(EmailType.GENERIC, cp.getEmail(), mail);
             } catch (Exception e) {
                 ok = false;
                 err = e.getMessage();
@@ -686,6 +696,7 @@ public class ContactPersonController {
 
         String reportTypeLabel = "navigator".equalsIgnoreCase(reportType) ? "Navigator" : "BET";
         String instituteName = (cp.getInstitute() != null) ? cp.getInstitute().getInstituteName() : "your school";
+        Integer instituteCodeForBrand = cp.getInstitute() != null ? cp.getInstitute().getInstituteCode() : null;
 
         // Download each report from DO Spaces and build a ZIP in memory
         ByteArrayOutputStream zipBaos = new ByteArrayOutputStream();
@@ -733,19 +744,25 @@ public class ContactPersonController {
 
         // Build email body
         String contactName = cp.getName() != null ? cp.getName() : "Contact Person";
-        String htmlContent = buildReportEmailHtml(
-                contactName, instituteName, assessmentName, reportTypeLabel,
-                downloadedCount, noReportCount, reportEntries, failedDownloads
-        );
+        List<String> includedNames = new ArrayList<>();
+        for (Map<String, String> entry : reportEntries) {
+            if (!failedDownloads.contains(entry.get("studentName"))) {
+                includedNames.add(entry.get("studentName"));
+            }
+        }
+        com.kccitm.api.service.email.theme.Mail mail = com.kccitm.api.service.email.mails.ReportMails.reportsZip(
+                contactName, instituteName, assessmentName, reportTypeLabel, includedNames, noReportCount, failedDownloads);
+        com.kccitm.api.service.email.theme.MailRenderer.Rendered r =
+                mailRenderer.render(mail, brandResolver.forInstituteCode(instituteCodeForBrand));
 
         // Send email with ZIP attachment
-        String subject = reportTypeLabel + " Reports | " + assessmentName + " | " + instituteName + " – Career-9";
         String zipFileName = reportTypeLabel + "_Reports_" + instituteName.replaceAll("[^a-zA-Z0-9]", "_") + ".zip";
 
         SmtpEmailRequest emailRequest = new SmtpEmailRequest();
         emailRequest.setTo(Arrays.asList(cp.getEmail()));
-        emailRequest.setSubject(subject);
-        emailRequest.setHtmlContent(htmlContent);
+        emailRequest.setSubject(r.subject);
+        emailRequest.setHtmlContent(r.html);
+        emailRequest.setTextContent(r.text);
         emailRequest.setAttachments(Arrays.asList(
                 new SmtpEmailRequest.EmailAttachment(zipFileName, zipBaos.toByteArray(), "application/zip")
         ));
@@ -1050,18 +1067,24 @@ public class ContactPersonController {
 
         // Build email
         String contactName = cp.getName() != null ? cp.getName() : "Contact Person";
-        String htmlContent = buildReportEmailHtml(
-                contactName, instituteName, assessmentName, reportTypeLabel,
-                downloadedCount, noReportCount, reportEntries, failedDownloads
-        );
+        List<String> includedNames = new ArrayList<>();
+        for (Map<String, String> entry : reportEntries) {
+            if (!failedDownloads.contains(entry.get("studentName"))) {
+                includedNames.add(entry.get("studentName"));
+            }
+        }
+        com.kccitm.api.service.email.theme.Mail mail = com.kccitm.api.service.email.mails.ReportMails.reportsZip(
+                contactName, instituteName, assessmentName, reportTypeLabel, includedNames, noReportCount, failedDownloads);
+        com.kccitm.api.service.email.theme.MailRenderer.Rendered r =
+                mailRenderer.render(mail, brandResolver.forInstituteCode(instituteCode));
 
-        String subject = reportTypeLabel + " Reports | " + assessmentName + " | " + instituteName + " – Career-9";
         String zipFileName = reportTypeLabel + "_Reports_" + instituteName.replaceAll("[^a-zA-Z0-9]", "_") + ".zip";
 
         SmtpEmailRequest emailRequest = new SmtpEmailRequest();
         emailRequest.setTo(Arrays.asList(cp.getEmail()));
-        emailRequest.setSubject(subject);
-        emailRequest.setHtmlContent(htmlContent);
+        emailRequest.setSubject(r.subject);
+        emailRequest.setHtmlContent(r.html);
+        emailRequest.setTextContent(r.text);
         emailRequest.setAttachments(Arrays.asList(
                 new SmtpEmailRequest.EmailAttachment(zipFileName, zipBaos.toByteArray(), "application/zip")
         ));
@@ -1088,122 +1111,6 @@ public class ContactPersonController {
         response.put("contactPersonName", cp.getName());
         response.put("contactPersonEmail", cp.getEmail());
         return ResponseEntity.ok(response);
-    }
-
-    // ============ EMAIL TEMPLATE ============
-
-    private String buildReportEmailHtml(
-            String contactName, String instituteName, String assessmentName,
-            String reportTypeLabel, int downloadedCount, int noReportCount,
-            List<Map<String, String>> reportEntries, List<String> failedDownloads) {
-
-        StringBuilder sb = new StringBuilder();
-
-        // Email wrapper
-        sb.append("<!DOCTYPE html><html><head><meta charset='UTF-8'></head>");
-        sb.append("<body style='margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,Helvetica,sans-serif;'>");
-        sb.append("<table width='100%' cellpadding='0' cellspacing='0' style='background-color:#f4f6f9;padding:32px 0;'>");
-        sb.append("<tr><td align='center'>");
-
-        // Main card
-        sb.append("<table width='600' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);'>");
-
-        // Header banner
-        sb.append("<tr><td style='background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:32px 40px;text-align:center;'>");
-        sb.append("<h1 style='margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:0.5px;'>Career-9</h1>");
-        sb.append("<p style='margin:6px 0 0;color:#a8b5cc;font-size:13px;'>Ensuring Career Success</p>");
-        sb.append("</td></tr>");
-
-        // Body content
-        sb.append("<tr><td style='padding:36px 40px;'>");
-
-        // Greeting
-        sb.append("<p style='margin:0 0 20px;font-size:16px;color:#1a1a2e;'>Dear <strong>").append(contactName).append("</strong>,</p>");
-        sb.append("<p style='margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;'>Greetings from Career-9!</p>");
-
-        // Report details card
-        sb.append("<div style='background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 24px;margin-bottom:24px;'>");
-        sb.append("<p style='margin:0 0 12px;font-size:14px;color:#6b7280;'>Report Details</p>");
-        sb.append("<table cellpadding='4' cellspacing='0' style='font-size:14px;color:#1a1a2e;'>");
-        sb.append("<tr><td style='padding:4px 16px 4px 0;color:#6b7280;font-weight:600;'>School / Institute:</td><td style='font-weight:600;'>").append(instituteName).append("</td></tr>");
-        sb.append("<tr><td style='padding:4px 16px 4px 0;color:#6b7280;font-weight:600;'>Assessment:</td><td style='font-weight:600;'>").append(assessmentName).append("</td></tr>");
-        sb.append("<tr><td style='padding:4px 16px 4px 0;color:#6b7280;font-weight:600;'>Report Type:</td><td style='font-weight:600;'>").append(reportTypeLabel).append("</td></tr>");
-        sb.append("<tr><td style='padding:4px 16px 4px 0;color:#6b7280;font-weight:600;'>Reports Included:</td><td style='font-weight:600;'>").append(downloadedCount).append(" student(s)</td></tr>");
-        sb.append("</table>");
-        sb.append("</div>");
-
-        // Instructions
-        sb.append("<p style='margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;'>");
-        sb.append("Please find the <strong>").append(reportTypeLabel).append("</strong> assessment reports attached as a ZIP file. ");
-        sb.append("You can download and extract the ZIP to access individual student reports.");
-        sb.append("</p>");
-
-        // Student list
-        sb.append("<div style='margin-bottom:24px;'>");
-        sb.append("<p style='margin:0 0 8px;font-size:14px;font-weight:700;color:#1a1a2e;'>Students Included:</p>");
-        sb.append("<table width='100%' cellpadding='0' cellspacing='0' style='border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;font-size:13px;'>");
-        sb.append("<tr style='background:#f1f5f9;'><th style='padding:8px 14px;text-align:left;color:#374151;border-bottom:1px solid #e5e7eb;'>#</th>");
-        sb.append("<th style='padding:8px 14px;text-align:left;color:#374151;border-bottom:1px solid #e5e7eb;'>Student Name</th></tr>");
-        int idx = 1;
-        for (Map<String, String> entry : reportEntries) {
-            if (!failedDownloads.contains(entry.get("studentName"))) {
-                String bg = idx % 2 == 0 ? "#f9fafb" : "#ffffff";
-                sb.append("<tr style='background:").append(bg).append(";'>");
-                sb.append("<td style='padding:6px 14px;border-bottom:1px solid #f0f0f0;color:#6b7280;'>").append(idx).append("</td>");
-                sb.append("<td style='padding:6px 14px;border-bottom:1px solid #f0f0f0;color:#1a1a2e;font-weight:500;'>").append(entry.get("studentName")).append("</td>");
-                sb.append("</tr>");
-                idx++;
-            }
-        }
-        sb.append("</table>");
-        sb.append("</div>");
-
-        // Warnings
-        if (!failedDownloads.isEmpty()) {
-            sb.append("<p style='margin:0 0 8px;font-size:13px;color:#d97706;background:#fffbeb;padding:10px 14px;border-radius:6px;border:1px solid #fde68a;'>");
-            sb.append("Note: Could not download reports for: ").append(String.join(", ", failedDownloads));
-            sb.append("</p>");
-        }
-        if (noReportCount > 0) {
-            sb.append("<p style='margin:0 0 8px;font-size:13px;color:#6b7280;background:#f9fafb;padding:10px 14px;border-radius:6px;border:1px solid #e5e7eb;'>");
-            sb.append(noReportCount).append(" student(s) do not have a generated report yet and are not included.");
-            sb.append("</p>");
-        }
-
-        // Divider
-        sb.append("<hr style='border:none;border-top:1px solid #e5e7eb;margin:28px 0;'>");
-
-        // Contact section
-        sb.append("<p style='margin:0 0 12px;font-size:14px;color:#374151;line-height:1.6;'>");
-        sb.append("For any queries or assistance, feel free to reach us:");
-        sb.append("</p>");
-        sb.append("<table cellpadding='2' cellspacing='0' style='font-size:14px;color:#374151;'>");
-        sb.append("<tr><td style='padding:2px 12px 2px 0;color:#6b7280;'>Email:</td>");
-        sb.append("<td><a href='mailto:support@career-9.com' style='color:#4361ee;text-decoration:none;font-weight:500;'>support@career-9.com</a></td></tr>");
-        sb.append("<tr><td style='padding:2px 12px 2px 0;color:#6b7280;'>Phone:</td>");
-        sb.append("<td style='font-weight:500;'>+91 70000 70256</td></tr>");
-        sb.append("</table>");
-
-        // Sign-off
-        sb.append("<div style='margin-top:28px;'>");
-        sb.append("<p style='margin:0 0 4px;font-size:14px;color:#374151;'>Warm Regards,</p>");
-        sb.append("<p style='margin:0 0 2px;font-size:15px;font-weight:700;color:#1a1a2e;'>Career-9 Team</p>");
-        sb.append("<p style='margin:0;font-size:13px;color:#6b7280;font-style:italic;'>Ensuring Career Success</p>");
-        sb.append("</div>");
-
-        sb.append("</td></tr>");
-
-        // Footer
-        sb.append("<tr><td style='background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb;'>");
-        sb.append("<p style='margin:0 0 4px;font-size:12px;color:#9ca3af;'>This is an automated email from Career-9.</p>");
-        sb.append("<p style='margin:0;font-size:12px;color:#9ca3af;'>Please do not reply directly to this email.</p>");
-        sb.append("</td></tr>");
-
-        sb.append("</table>");
-        sb.append("</td></tr></table>");
-        sb.append("</body></html>");
-
-        return sb.toString();
     }
 
     // ============ HELPERS ============

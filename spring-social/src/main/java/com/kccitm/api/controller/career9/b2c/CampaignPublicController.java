@@ -94,6 +94,8 @@ public class CampaignPublicController {
     @Autowired(required = false) private com.kccitm.api.service.counselling.BookingService bookingService;
     @Autowired(required = false) private com.kccitm.api.repository.Career9.counselling.CounsellingRequestRepository counsellingRequestRepository;
     @Autowired private com.kccitm.api.service.email.EmailDispatchService emailDispatchService;
+    /** Rule 1: the admin link in the forwarded-request mail is built here, never inlined. */
+    @Autowired private com.kccitm.api.service.email.theme.MailLinks mailLinks;
 
     // Where "forward my counselling request" notices go, and the address shown to
     // students on the thank-you page. Kept configurable; defaults to the canonical
@@ -653,7 +655,10 @@ public class CampaignPublicController {
         response.put("activeTier", activeTier);
         response.put("dashboardUrl", dashboardUrl);
         response.put("finalReportUrl", finalReportUrl);
-        response.put("accessToken", e.getAccessToken());
+        // Extended in place if the 30-day deep-link TTL has lapsed: the student is
+        // on the page and must still be able to book counselling / open links.
+        response.put("accessToken", entitlementService != null
+                ? entitlementService.ensureLiveAccessToken(e) : e.getAccessToken());
         response.put("finalReportActive", e.getFinalReportActive());
         // Held for counsellor release: the Thank-You page uses this to withhold the download
         // tile, the "we've emailed it" line and the Add-Report upsell, none of which are true
@@ -1171,7 +1176,9 @@ public class CampaignPublicController {
         int used  = e.getCounsellingSessionsUsed()  == null ? 0 : e.getCounsellingSessionsUsed();
         out.put("counsellingActive", true);
         out.put("entitlementId", e.getEntitlementId());
-        out.put("accessToken", e.getAccessToken());
+        // See upgradeInfo: a lapsed token is extended so booking never 401s here.
+        out.put("accessToken", entitlementService != null
+                ? entitlementService.ensureLiveAccessToken(e) : e.getAccessToken());
         out.put("counsellingSessionsTotal", total);
         out.put("counsellingSessionsUsed", used);
         // If the student has already booked a session for this entitlement, tell the
@@ -1277,21 +1284,30 @@ public class CampaignPublicController {
         return ResponseEntity.ok(out);
     }
 
+    /**
+     * Where an admin actually resolves this: the Counsellor ↔ Assessment mapping screen.
+     * Built from the same frontend base the rest of the app's links use.
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.frontend.url:http://localhost:3000}")
+    private String adminFrontendUrl;
+
+    private String counsellorMappingUrl() {
+        String base = adminFrontendUrl == null ? "" : adminFrontendUrl.replaceAll("/+$", "");
+        return base + "/admin/counsellors";
+    }
+
     /** Best-effort email to the Career-9 team; the DB row is the source of truth. */
     private void notifyCounsellingForwarded(String assessmentName, String studentName,
             String studentEmail, String studentPhone, String instituteName) {
         if (supportEmail == null || supportEmail.isEmpty()) return;
         try {
-            String subject = "Counselling request — " + assessmentName;
-            StringBuilder b = new StringBuilder();
-            b.append("A student has requested career counselling, but no counsellor is mapped to this assessment yet.\n\n");
-            b.append("Assessment: ").append(assessmentName).append('\n');
-            if (studentName != null)  b.append("Student: ").append(studentName).append('\n');
-            if (studentEmail != null) b.append("Email: ").append(studentEmail).append('\n');
-            if (studentPhone != null) b.append("Phone: ").append(studentPhone).append('\n');
-            if (instituteName != null) b.append("Institute: ").append(instituteName).append('\n');
-            b.append("\nAssign a counsellor on the Counsellor ↔ Assessment page to let the student book.");
-            emailDispatchService.sendText(com.kccitm.api.model.email.EmailType.COUNSELLING_REQUEST, supportEmail, subject, b.toString());
+            com.kccitm.api.service.email.theme.Mail mail =
+                    com.kccitm.api.service.email.mails.InternalMails.counsellingRequestForwarded(
+                            assessmentName, studentName, studentEmail, studentPhone, instituteName,
+                            mailLinks.of(counsellorMappingUrl(), "admin_counsellors"));
+
+            emailDispatchService.send(com.kccitm.api.model.email.EmailSendRequest.mail(
+                    com.kccitm.api.model.email.EmailType.COUNSELLING_REQUEST, supportEmail, mail));
         } catch (Exception ex) {
             // Forwarding email is best-effort — never fail the request on a mail error.
             logger.warn("Failed to email counselling request notice to {}: {}", supportEmail, ex.getMessage());

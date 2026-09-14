@@ -12,9 +12,16 @@ import com.kccitm.api.model.reminder.ReminderServiceType;
 /**
  * Lightweight {{token}} interpolation for reminder subjects and HTML bodies.
  *
- * Intentionally minimal — no conditionals, no loops, no HTML escaping of
- * surrounding text. Tokens are looked up in a context map and substituted
- * verbatim. Unknown tokens are left in place so they're visible during preview.
+ * Intentionally minimal — no conditionals, no loops. Tokens are looked up in a
+ * context map and substituted; unknown tokens are left in place so they're
+ * visible during preview.
+ *
+ * <p>Values ARE HTML-escaped before substitution. No reminder token is meant to
+ * carry markup — they are names, assessment titles, times and URLs — and the
+ * seeded bodies drop them inside {@code <b>} and {@code href}, where a stray
+ * {@code &}, quote or angle bracket would break the markup or inject into it.
+ * The template text around the token is left untouched, since that is authored
+ * HTML written by an admin.
  */
 @Service
 public class ReminderTemplateRenderer {
@@ -59,8 +66,19 @@ public class ReminderTemplateRenderer {
         for (Map.Entry<String, ?> e : context.entrySet()) {
             String key = e.getKey();
             Object val = e.getValue();
-            out = out.replace("{{" + key + "}}", val == null ? "" : val.toString());
+            out = out.replace("{{" + key + "}}", val == null ? "" : escapeHtml(val.toString()));
         }
         return out;
+    }
+
+    /** The same four replacements {@code PlaceholderResolver} applies to template values. */
+    private static String escapeHtml(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;");
     }
 }

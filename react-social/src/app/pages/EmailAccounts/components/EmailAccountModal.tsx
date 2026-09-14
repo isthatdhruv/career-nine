@@ -327,7 +327,7 @@ const EmailAccountModal = ({ show, onHide, account, onSaved }: Props) => {
                 style={inputStyle}
                 value={fromName}
                 onChange={(e) => setFromName(e.target.value)}
-                placeholder="Career Nine"
+                placeholder="Career-9"
               />
             </div>
 

@@ -59,6 +59,8 @@ import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.theme.MailLinks;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.UserActivityLogService;
@@ -83,6 +85,9 @@ public class AuthController {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    @Autowired
+    private MailLinks mailLinks;
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -652,9 +657,7 @@ public class AuthController {
 
     // Send welcome email asynchronously (fire-and-forget)
     try {
-        String subject = "Welcome to Career-9";
-        String body = "Hello " + fullName + ",\n\nThank you for registering.\nYour account is under review.We will get back to you soon.\n\nRegards,\nCareer-9 Team";
-        emailDispatchService.sendText(EmailType.ACCOUNT_WELCOME, user.getEmail(), subject, body);
+        emailDispatchService.sendMail(EmailType.ACCOUNT_WELCOME, user.getEmail(), AccountMails.accountWelcome(AccountMails.firstName(fullName)));
     } catch (Exception e) {
         // log and continue - do not fail registration because of email
     }
@@ -693,10 +696,9 @@ public class AuthController {
 
         String resetLink = buildResetLink(token);
         try {
-            emailDispatchService.sendHtml(EmailType.PASSWORD_RESET,
-                    user.getEmail(),
-                    "Reset your Career-9 password",
-                    buildResetEmailHtml(user.getName(), resetLink));
+            emailDispatchService.sendMail(EmailType.PASSWORD_RESET, user.getEmail(),
+                    AccountMails.passwordResetLink(AccountMails.firstName(user.getName()), (int) RESET_TOKEN_TTL_MINUTES,
+                            mailLinks.of(resetLink, "password_reset")));
         } catch (Exception e) {
             // Email send is best-effort — log only; the token is still persisted.
         }
@@ -757,10 +759,9 @@ public class AuthController {
         refreshTokenService.revokeAllForUser(user.getId());
 
         try {
-            emailDispatchService.sendHtml(EmailType.PASSWORD_RESET_CONFIRM,
-                    user.getEmail(),
-                    "Your Career-9 password was reset",
-                    buildResetConfirmationHtml(user.getName()));
+            emailDispatchService.sendMail(EmailType.PASSWORD_RESET_CONFIRM, user.getEmail(),
+                    AccountMails.passwordResetConfirm(AccountMails.firstName(user.getName()),
+                            mailLinks.of(frontendUrl.replaceAll("/+$", "") + "/auth", "dashboard_login")));
         } catch (Exception e) {
             // Best-effort confirmation — reset itself already succeeded.
         }
@@ -775,48 +776,5 @@ public class AuthController {
             base = base.substring(0, base.length() - 1);
         }
         return base + "/auth/reset-password/" + token;
-    }
-
-    private String buildResetEmailHtml(String displayName, String resetLink) {
-        String greeting = (displayName != null && !displayName.trim().isEmpty())
-                ? "Hi " + escapeHtml(displayName) + ","
-                : "Hi,";
-        return "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2937; max-width: 560px; margin: 0 auto; padding: 32px;\">"
-             + "<h2 style=\"color: #111827; margin-bottom: 16px;\">Reset your password</h2>"
-             + "<p>" + greeting + "</p>"
-             + "<p>We received a request to reset your Career-9 password. Click the button below to set a new password. This link is valid for "
-             + RESET_TOKEN_TTL_MINUTES + " minutes and can be used only once.</p>"
-             + "<p style=\"text-align: center; margin: 32px 0;\">"
-             + "<a href=\"" + resetLink + "\" style=\"display: inline-block; background: #009ef7; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600;\">Reset Password</a>"
-             + "</p>"
-             + "<p style=\"color: #6b7280; font-size: 14px;\">If the button doesn't work, copy and paste this URL into your browser:</p>"
-             + "<p style=\"color: #4b5563; font-size: 13px; word-break: break-all;\">" + resetLink + "</p>"
-             + "<hr style=\"border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;\"/>"
-             + "<p style=\"color: #6b7280; font-size: 13px;\">If you did not request this, you can safely ignore this email — your password will remain unchanged.</p>"
-             + "<p style=\"color: #6b7280; font-size: 13px;\">— The Career-9 Team</p>"
-             + "</div>";
-    }
-
-    private String buildResetConfirmationHtml(String displayName) {
-        String greeting = (displayName != null && !displayName.trim().isEmpty())
-                ? "Hi " + escapeHtml(displayName) + ","
-                : "Hi,";
-        return "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1f2937; max-width: 560px; margin: 0 auto; padding: 32px;\">"
-             + "<h2 style=\"color: #111827; margin-bottom: 16px;\">Your password was reset</h2>"
-             + "<p>" + greeting + "</p>"
-             + "<p>This is a confirmation that the password for your Career-9 account was just changed.</p>"
-             + "<p>If this wasn't you, please contact support immediately and reset your password again.</p>"
-             + "<hr style=\"border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;\"/>"
-             + "<p style=\"color: #6b7280; font-size: 13px;\">— The Career-9 Team</p>"
-             + "</div>";
-    }
-
-    private static String escapeHtml(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#39;");
     }
 }

@@ -9,14 +9,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.User;
+import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.reminder.ReminderDeliveryLog;
 import com.kccitm.api.model.reminder.ReminderServiceType;
 import com.kccitm.api.model.reminder.ReminderTriggerSource;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.service.b2c.LinkBuilder;
 
 /**
  * Orchestrates manual (admin-triggered) reminder sends and recipient previews.
@@ -32,6 +35,8 @@ public class ManualReminderService {
     @Autowired private UserRepository userRepository;
     @Autowired private ReminderSender sender;
     @Autowired private ReminderScopeFilter scope;
+    @Autowired private AssessmentTableRepository assessmentTableRepository;
+    @Autowired private LinkBuilder linkBuilder;
 
     public static class Recipient {
         public Long userStudentId;
@@ -87,9 +92,10 @@ public class ManualReminderService {
             r.assessmentId = m.getAssessmentId();
             r.variables.put("studentName", r.name);
             r.variables.put("studentEmail", r.email);
-            r.variables.put("assessmentName", "Assessment #" + m.getAssessmentId());
+            r.variables.put("assessmentName", assessmentTableRepository.findById(m.getAssessmentId())
+                    .map(AssessmentTable::getAssessmentName).orElse("your assessment"));
             r.variables.put("instituteName", r.instituteName == null ? "" : r.instituteName);
-            r.variables.put("link", "");
+            r.variables.put("link", linkBuilder.manualLogin());
             out.add(r);
         }
         return out;

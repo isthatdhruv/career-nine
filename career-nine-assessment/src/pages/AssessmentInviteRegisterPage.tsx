@@ -6,8 +6,10 @@ import {
   registerInviteByToken,
   InviteInfo,
 } from "../api-clients/assessmentMappingAPI"
-import { TierCard, Tier } from "../components/TierCard"
+import { TierStrip, Tier } from "../components/TierCard"
 import ParentalConsentSection from "../components/ParentalConsent"
+import RegisterShell, { SignInNote } from "../components/RegisterShell"
+import { rs } from "../styles/registerStyles"
 import { contactTerms } from "../utils/instituteTerms"
 
 /**
@@ -117,15 +119,12 @@ const AssessmentInviteRegisterPage = () => {
   // ── Loading ──
   if (loading) {
     return (
-      <div style={s.page}>
-        <style>{keyframes}</style>
-        <div style={s.glassCard}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "60px 20px", gap: 16 }}>
-            <div style={s.spinner} />
-            <p style={{ color: "#64748b", fontSize: "0.95rem", margin: 0 }}>Loading assessment information...</p>
-          </div>
+      <RegisterShell narrow>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 20px", gap: 16 }}>
+          <div style={s.spinner} />
+          <p style={{ color: "#64748b", fontSize: "0.95rem", margin: 0 }}>Loading assessment information...</p>
         </div>
-      </div>
+      </RegisterShell>
     )
   }
 
@@ -133,85 +132,76 @@ const AssessmentInviteRegisterPage = () => {
   if (error || registrationClosed) {
     const closed = registrationClosed && !error
     return (
-      <div style={s.page}>
-        <style>{keyframes}</style>
-        <div style={s.glassCard}>
-          <div style={{ textAlign: "center", padding: "48px 32px" }}>
-            <div style={{
-              width: 72, height: 72, borderRadius: "50%", margin: "0 auto 20px",
-              background: closed ? "linear-gradient(135deg, #fef3c7, #fde68a)" : "linear-gradient(135deg, #fee2e2, #fecaca)",
-              display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem",
-              color: closed ? "#92400e" : "#b91c1c",
-            }}>
-              {closed ? "⏳" : "!"}
-            </div>
-            <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 12 }}>
-              {closed ? "Link No Longer Active" : "Link Unavailable"}
-            </h3>
-            <p style={{ color: "#64748b", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
-              {closed
-                ? "This invite link has been closed or revoked. Please contact your administrator for a new link."
-                : `${error} Please contact your administrator for a valid link.`}
-            </p>
+      <RegisterShell narrow>
+        <div style={{ textAlign: "center", padding: "28px 8px" }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: "50%", margin: "0 auto 20px",
+            background: closed ? "linear-gradient(135deg, #fef3c7, #fde68a)" : "linear-gradient(135deg, #fee2e2, #fecaca)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem",
+            color: closed ? "#92400e" : "#b91c1c",
+          }}>
+            {closed ? "⏳" : "!"}
           </div>
+          <h3 style={{ color: "#1e293b", fontWeight: 700, marginBottom: 12 }}>
+            {closed ? "Link No Longer Active" : "Link Unavailable"}
+          </h3>
+          <p style={{ color: "#64748b", fontSize: "0.92rem", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
+            {closed
+              ? "This invite link has been closed or revoked. Please contact your administrator for a new link."
+              : `${error} Please contact your administrator for a valid link.`}
+          </p>
         </div>
-      </div>
+      </RegisterShell>
     )
   }
 
   const alreadyRegistered = info?.alreadyRegistered === true
 
   // ── Invite card ──
+  const footer = (
+    <>
+      {!alreadyRegistered && <SignInNote />}
+      <button
+        onClick={handleSubmit}
+        disabled={submitting}
+        className="reg-footer-btn"
+        style={{ ...s.btnPrimary, opacity: submitting ? 0.7 : 1, cursor: submitting ? "not-allowed" : "pointer" }}
+      >
+        {submitting
+          ? "Processing..."
+          : alreadyRegistered
+            ? "Continue to Assessment"
+            : payableInr > 0
+              ? `Register & Pay ₹${payableInr.toLocaleString("en-IN")}`
+              : "Register & Start"}
+      </button>
+    </>
+  )
+
   return (
-    <div style={s.page}>
-      <style>{keyframes}</style>
-      <div style={s.glassCard}>
-        {/* Header */}
-        <div style={s.header}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 12px rgba(52, 211, 153, 0.5)" }} />
-            <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Assessment Registration
-            </span>
-          </div>
-          {branding?.whitelabel && branding?.logoUrl && (
-            <img src={branding.logoUrl} alt={(branding.schoolName || "School") + " logo"}
-              style={{ maxHeight: 56, maxWidth: 180, objectFit: "contain", display: "block", marginBottom: 10 }} />
-          )}
-          <h2 style={{ margin: 0, fontWeight: 800, fontSize: "clamp(1.3rem, 4vw, 1.6rem)", color: "#0f172a", lineHeight: 1.2 }}>
-            {info?.assessmentName || "Assessment"}
-          </h2>
-          <p style={{ margin: "8px 0 0", color: "#64748b", fontSize: "0.88rem" }}>
-            {info?.instituteName || ""}
-          </p>
+    <RegisterShell
+      eyebrow="Assessment Registration"
+      logoUrl={branding?.whitelabel ? branding.logoUrl : undefined}
+      title={info?.assessmentName || "Assessment"}
+      subtitle={info?.instituteName || undefined}
+      footer={footer}
+    >
+      {selectionTier && <TierStrip tier={selectionTier} />}
 
-          {selectionTier && (
-            <div style={{ marginTop: 18 }}>
-              <div style={s.selectionLabel}>Your selection</div>
-              <TierCard tier={selectionTier} selected disabled onSelect={() => {}} />
-            </div>
-          )}
-        </div>
-
-        <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #e2e8f0, transparent)", margin: "0 32px" }} />
-
-        {/* Pre-filled details (read-only) */}
-        <div style={{ padding: "28px 32px 32px" }}>
-          <div style={s.selectionLabel}>Your details</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginTop: 12 }}>
-            <Field label="Full Name" value={info?.student?.name} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-              <Field label={emailLabel} value={info?.student?.email} />
-              <Field label="Date of Birth" value={info?.student?.dob} />
-            </div>
-            <Field label={phoneLabel} value={info?.student?.phone} />
-          </div>
+      {/* Pre-filled details (read-only) */}
+      <div>
+        <div className="reg-section-title">Your details</div>
+        <div className="reg-grid">
+          <Field label="Full Name" value={info?.student?.name} />
+          <Field label={emailLabel} value={info?.student?.email} />
+          <Field label={phoneLabel} value={info?.student?.phone} />
+          <Field label="Date of Birth" value={info?.student?.dob} />
 
           {/* PAY_FIRST counselling itemisation */}
           {isPayFirst && counsellingFeePerSession > 0 && counsellingFeeTotal > 0 && (
-            <div style={{
+            <div className="reg-span2" style={{
               background: "linear-gradient(135deg, #eef2ff, #f5f3ff)", border: "1.5px solid #c7d2fe",
-              borderRadius: 12, padding: "14px 18px", fontSize: "0.88rem", color: "#3730a3", marginTop: 20,
+              borderRadius: 12, padding: "12px 16px", fontSize: "0.88rem", color: "#3730a3",
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <span>Assessment</span><strong>₹{(info?.amount || 0).toLocaleString("en-IN")}</strong>
@@ -228,47 +218,24 @@ const AssessmentInviteRegisterPage = () => {
           )}
 
           {alreadyRegistered && (
-            <div style={{
+            <div className="reg-span2" style={{
               background: "linear-gradient(135deg, #ecfdf5, #f0fdf4)", border: "1.5px solid #a7f3d0",
-              borderRadius: 12, padding: "12px 18px", fontSize: "0.88rem", color: "#065f46", marginTop: 20,
+              borderRadius: 12, padding: "10px 16px", fontSize: "0.88rem", color: "#065f46",
             }}>
               You are already enrolled in this assessment — continue to start.
             </div>
           )}
-
-          {!alreadyRegistered && (
-            <div style={{ marginTop: 20 }}>
-              <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
-            </div>
-          )}
-
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            style={{ ...s.btnPrimary, width: "100%", marginTop: 24, opacity: submitting ? 0.7 : 1, cursor: submitting ? "not-allowed" : "pointer" }}
-          >
-            {submitting
-              ? "Processing..."
-              : alreadyRegistered
-                ? "Continue to Assessment"
-                : payableInr > 0
-                  ? `Register & Pay ₹${payableInr.toLocaleString("en-IN")}`
-                  : "Register & Start"}
-          </button>
-
-          <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
-            By registering, I agree to the Career-9's terms and conditions.
-          </p>
         </div>
       </div>
 
-      <div style={{
-        position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
-        fontSize: "0.72rem", color: "rgba(100, 116, 139, 0.5)", fontWeight: 500, letterSpacing: "0.05em",
-      }}>
-        CAREER-9
-      </div>
-    </div>
+      {!alreadyRegistered && (
+        <ParentalConsentSection checked={dpdpConsent} onChange={setDpdpConsent} adult={adult} />
+      )}
+
+      <p className="reg-hint" style={{ margin: 0, textAlign: "center" }}>
+        By registering, I agree to the Career-9's terms and conditions.
+      </p>
+    </RegisterShell>
   )
 }
 
@@ -279,46 +246,7 @@ const Field = ({ label, value }: { label: string; value?: string | null }) => (
   </div>
 )
 
-const keyframes = `
-  @keyframes spin { to { transform: rotate(360deg); } }
-`
-
-const s: { [key: string]: React.CSSProperties } = {
-  page: {
-    minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-    background: "linear-gradient(145deg, #f0fdf4 0%, #ecfeff 30%, #f0f9ff 60%, #faf5ff 100%)",
-    padding: "24px 16px", position: "relative", overflow: "hidden",
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-  },
-  glassCard: {
-    width: "100%", maxWidth: 560, background: "rgba(255, 255, 255, 0.72)",
-    backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: 24,
-    border: "1px solid rgba(255, 255, 255, 0.6)",
-    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)",
-    overflow: "hidden", position: "relative", zIndex: 1,
-  },
-  header: { padding: "32px 32px 24px" },
-  selectionLabel: {
-    fontSize: "0.72rem", fontWeight: 700, color: "#10b981", textTransform: "uppercase",
-    letterSpacing: "0.06em", marginBottom: 8,
-  },
-  label: { display: "block", fontSize: "0.82rem", fontWeight: 600, color: "#374151", marginBottom: 6 },
-  readonlyValue: {
-    width: "100%", padding: "12px 16px", borderRadius: 12, border: "1.5px solid #e2e8f0",
-    background: "rgba(241, 245, 249, 0.7)", fontSize: "0.92rem", color: "#1e293b",
-    boxSizing: "border-box" as const, fontWeight: 600,
-  },
-  btnPrimary: {
-    display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "14px 32px",
-    borderRadius: 14, border: "none",
-    background: "linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%)",
-    color: "#fff", fontSize: "0.95rem", fontWeight: 700, cursor: "pointer",
-    boxShadow: "0 4px 16px rgba(16, 185, 129, 0.35)", letterSpacing: "0.01em",
-  },
-  spinner: {
-    width: 32, height: 32, border: "3px solid #e2e8f0", borderTopColor: "#10b981",
-    borderRadius: "50%", animation: "spin 0.8s linear infinite",
-  },
-}
+// ── Styles (shared with the other registration pages) ──
+const s = rs
 
 export default AssessmentInviteRegisterPage

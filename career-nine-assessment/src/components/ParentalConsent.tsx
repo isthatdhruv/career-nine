@@ -179,7 +179,7 @@ const ParentalConsentSection = ({ checked, onChange, adult }: Props) => {
   return (
     <div style={{
       background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 12,
-      padding: "14px 16px",
+      padding: "10px 14px",
     }}>
       <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", margin: 0 }}>
         <input
@@ -188,21 +188,23 @@ const ParentalConsentSection = ({ checked, onChange, adult }: Props) => {
           onChange={(e) => onChange(e.target.checked)}
           style={{ width: 16, height: 16, marginTop: 3, flexShrink: 0, accentColor: "#059669", cursor: "pointer" }}
         />
-        <span style={{ fontSize: "0.8rem", color: "#475569", lineHeight: 1.6 }}>
-          {adult ? ADULT_CONSENT_LABEL : PARENTAL_CONSENT_LABEL}
+        <span style={{ fontSize: "0.78rem", color: "#475569", lineHeight: 1.55 }}>
+          {adult ? ADULT_CONSENT_LABEL : PARENTAL_CONSENT_LABEL}{" "}
+          {/* The notice link sits inline after the sentence so the block stays
+              three lines tall instead of adding a row of its own. A button (not
+              part of the label) so opening the notice never toggles the box. */}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowModal(true) }}
+            style={{
+              background: "none", border: "none", padding: 0, margin: 0, font: "inherit",
+              color: "#059669", fontWeight: 700, cursor: "pointer", textDecoration: "underline",
+            }}
+          >
+            {adult ? "Read the full consent notice" : "Read the full parental consent notice"}
+          </button>
         </span>
       </label>
-      <button
-        type="button"
-        onClick={() => setShowModal(true)}
-        style={{
-          background: "none", border: "none", padding: "12px 8px", margin: "-4px 0 -12px 18px",
-          color: "#059669", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer",
-          textDecoration: "underline",
-        }}
-      >
-        {adult ? "Read the full consent notice" : "Read the full parental consent notice"}
-      </button>
       {showModal && <ConsentModal adult={adult} onClose={() => setShowModal(false)} />}
     </div>
   )

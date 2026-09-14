@@ -3,6 +3,8 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import http from '../api/http';
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
+import CityTypeahead from '../components/CityTypeahead';
+import { isCityField } from '../utils/cityCatalogue';
 
 type DemographicField = {
   mappingId: number;
@@ -347,33 +349,49 @@ const DemographicDetailsPage: React.FC = () => {
     const isTouched = touched[field.fieldId];
 
     switch (field.dataType) {
-      case 'TEXT':
+      case 'TEXT': {
+        const textStyle: React.CSSProperties = {
+          borderRadius: '10px',
+          padding: '0.75rem',
+          border: `2px solid ${error && isTouched ? '#e53e3e' : '#e2e8f0'}`,
+          fontSize: '0.95rem',
+          backgroundColor: '#ffffff',
+          color: '#2d3748',
+        };
         return (
           <div className="mb-3" key={field.fieldId}>
             <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
               <span dangerouslySetInnerHTML={{ __html: label }} /> {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
             </label>
-            <input
-              type="text"
-              className={`form-control ${error && isTouched ? 'is-invalid' : ''}`}
-              placeholder={field.placeholder || ''}
-              value={values[field.fieldId] || ''}
-              onChange={(e) => handleChange(field.fieldId, e.target.value)}
-              onBlur={() => handleBlur(field.fieldId)}
-              style={{
-                borderRadius: '10px',
-                padding: '0.75rem',
-                border: `2px solid ${error && isTouched ? '#e53e3e' : '#e2e8f0'}`,
-                fontSize: '0.95rem',
-                backgroundColor: '#ffffff',
-                color: '#2d3748',
-              }}
-            />
+            {isCityField(field) ? (
+              // City fields get suggestions from the static India catalogue; the
+              // pick is stored as plain text like any other TEXT answer.
+              <CityTypeahead
+                className={`form-control ${error && isTouched ? 'is-invalid' : ''}`}
+                placeholder={field.placeholder || 'Start typing your city'}
+                value={values[field.fieldId] || ''}
+                onChange={(v) => handleChange(field.fieldId, v)}
+                onBlur={() => handleBlur(field.fieldId)}
+                invalid={!!(error && isTouched)}
+                style={textStyle}
+              />
+            ) : (
+              <input
+                type="text"
+                className={`form-control ${error && isTouched ? 'is-invalid' : ''}`}
+                placeholder={field.placeholder || ''}
+                value={values[field.fieldId] || ''}
+                onChange={(e) => handleChange(field.fieldId, e.target.value)}
+                onBlur={() => handleBlur(field.fieldId)}
+                style={textStyle}
+              />
+            )}
             {error && isTouched && (
               <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
+      }
 
       case 'NUMBER':
         return (

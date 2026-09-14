@@ -1,8 +1,15 @@
 package com.kccitm.api.service.email;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +28,7 @@ import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 import com.kccitm.api.repository.email.EmailAccountRepository;
 import com.kccitm.api.repository.email.EmailSendLogRepository;
 import com.kccitm.api.repository.email.EmailTemplateRepository;
+import com.kccitm.api.service.email.mails.InternalMails;
 
 import java.util.Map;
 
@@ -35,6 +43,13 @@ import java.util.Map;
 public class EmailDispatchService {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailDispatchService.class);
+
+    /** Read by an India-based admin, so the "Sent" timestamp on the test mail is zoned rather than left to the JVM's (UTC) clock. */
+    private static final ZoneId ACCOUNT_TEST_TZ = ZoneId.of("Asia/Kolkata");
+    private static final DateTimeFormatter ACCOUNT_TEST_SENT_AT = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
+
+    /** A {{token}} the template context did not fill. Blanked before send — never shown to a recipient. */
+    private static final Pattern UNRESOLVED_PLACEHOLDER = Pattern.compile("\\{\\{\\s*[A-Za-z0-9_.]+\\s*\\}\\}");
 
     @Autowired
     private EmailAccountRepository accountRepository;
@@ -59,6 +74,20 @@ public class EmailDispatchService {
 
     @Autowired
     private EmailTemplateRenderer templateRenderer;
+
+    @Autowired
+    private com.kccitm.api.service.email.theme.BrandResolver brandResolver;
+
+    @Autowired
+    private com.kccitm.api.service.email.theme.MailRenderer mailRenderer;
+
+    @Autowired
+    private com.kccitm.api.service.email.theme.MailLinks mailLinks;
+
+    /** Convenience for a themed {@link com.kccitm.api.service.email.theme.Mail} send. */
+    public EmailSendResult sendMail(EmailType type, String to, com.kccitm.api.service.email.theme.Mail mail) {
+        return send(EmailSendRequest.mail(type, to, mail));
+    }
 
     /** Convenience for the common single-recipient HTML send. */
     public EmailSendResult sendHtml(EmailType type, String to, String subject, String html) {
@@ -126,6 +155,9 @@ public class EmailDispatchService {
         EmailTemplate template = resolveTemplate(req);
         EmailDeliveryMode mode = resolveDeliveryMode(req, template);
         SmtpEmailRequest message = buildMessage(req, account, template);
+        if (req.getSubject() == null) {
+            req.setSubject(message.getSubject());
+        }
 
         EmailSendLog row = saveLog(req, account, template, mode, EmailSendStatus.QUEUED, null);
 
@@ -225,19 +257,57 @@ public class EmailDispatchService {
         if (req.getBcc() != null) {
             m.setBcc(new ArrayList<>(req.getBcc()));
         }
+        com.kccitm.api.service.email.theme.Brand brand = brandResolver.forRequest(req);
+        com.kccitm.api.service.email.theme.MailRenderer.Rendered r;
         if (template != null) {
             Map<String, String> ctx = placeholderResolver.resolve(req);
             String subject = templateRenderer.render(template.getSubjectTemplate(), ctx);
+            String html = mailLinks.rewrite(templateRenderer.render(template.getBodyTemplate(), ctx));
+            // A template an admin edited can name a placeholder this scenario never supplies.
+            // Blank what is left rather than mailing a literal "{{first_name}}", and name the
+            // tokens in the log so whoever owns the template can fix it.
+            Set<String> unresolved = new LinkedHashSet<>();
+            subject = stripUnresolvedPlaceholders(subject, unresolved);
+            html = stripUnresolvedPlaceholders(html, unresolved);
+            if (!unresolved.isEmpty()) {
+                logger.warn("Template {} left unresolved placeholders: {}", template.getId(), unresolved);
+            }
             if (subject == null || subject.trim().isEmpty()) {
                 subject = req.getSubject(); // fall back to a caller-supplied subject if the template's is blank
             }
-            m.setSubject(subject);
-            m.setHtmlContent(templateRenderer.render(template.getBodyTemplate(), ctx));
+            r = mailRenderer.wrapForeign(subject, html, brand);
+        } else if (req.getMail() != null) {
+            r = mailRenderer.render(req.getMail(), brand);
+            if (req.getSubject() != null && !req.getSubject().equals(r.subject)) {
+                r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(req.getSubject(), r.html, r.text);
+            }
+            for (String v : com.kccitm.api.service.email.theme.MailRules.violations(req.getMail())) {
+                logger.warn("Mail rule broken for {}: {}", req.getEmailType(), v);
+            }
+        } else if (req.getHtmlContent() != null && !req.getHtmlContent().trim().isEmpty()) {
+            r = mailRenderer.wrapForeign(req.getSubject(), mailLinks.rewrite(req.getHtmlContent()), brand);
+            if (req.getTextContent() != null && !req.getTextContent().isEmpty()) {
+                r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(r.subject, r.html, req.getTextContent());
+            }
         } else {
-            m.setSubject(req.getSubject());
-            m.setHtmlContent(req.getHtmlContent());
-            m.setTextContent(req.getTextContent());
+            String text = req.getTextContent() == null ? "" : req.getTextContent();
+            StringBuilder html = new StringBuilder();
+            for (String para : text.split("\\n\\s*\\n")) {
+                html.append("<p>").append(escapeHtml(para).replace("\n", "<br>")).append("</p>");
+            }
+            r = mailRenderer.wrapForeign(req.getSubject(), html.toString(), brand);
+            r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(r.subject, r.html, text);
         }
+        if (r.text == null || r.text.trim().isEmpty()) {
+            // Every outgoing message needs a non-empty text part; when the branch above left it
+            // blank (e.g. a caller with no text and no html at all), derive one from the shelled
+            // html itself — at minimum this picks up the shell's own footer lines.
+            r = new com.kccitm.api.service.email.theme.MailRenderer.Rendered(
+                    r.subject, r.html, mailRenderer.wrapForeign(r.subject, r.html, brand).text);
+        }
+        m.setSubject(r.subject);
+        m.setHtmlContent(r.html);
+        m.setTextContent(r.text);
         if (req.getAttachments() != null && !req.getAttachments().isEmpty()) {
             m.setAttachments(new ArrayList<>(req.getAttachments()));
         }
@@ -286,6 +356,36 @@ public class EmailDispatchService {
         return s.length() > max ? s.substring(0, max) : s;
     }
 
+    /** Removes every unfilled {{token}}, collecting the distinct ones into {@code found}. */
+    private static String stripUnresolvedPlaceholders(String value, Set<String> found) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        Matcher m = UNRESOLVED_PLACEHOLDER.matcher(value);
+        StringBuffer out = new StringBuffer();
+        boolean any = false;
+        while (m.find()) {
+            any = true;
+            found.add(m.group());
+            m.appendReplacement(out, "");
+        }
+        if (!any) {
+            return value;
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    private static String escapeHtml(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;");
+    }
+
     // ─── send-test (used by the Accounts admin page) ─────────────────────
 
     /**
@@ -297,13 +397,11 @@ public class EmailDispatchService {
         if (to == null || to.trim().isEmpty()) {
             return EmailSendResult.skipped(null, "No recipient");
         }
-        String subject = "Career-9 email test — " + account.getName();
-        String html = "<p>This is a test email from Career-9 confirming the <strong>"
-                + account.getName() + "</strong> account ("
-                + account.getProvider() + (account.getMode() != null ? "/" + account.getMode() : "")
-                + ") can send.</p>";
+        String providerAndMode = account.getProvider() + (account.getMode() != null ? "/" + account.getMode() : "");
+        String now = ACCOUNT_TEST_SENT_AT.format(ZonedDateTime.now(ACCOUNT_TEST_TZ)) + " IST";
 
-        EmailSendRequest req = EmailSendRequest.html(EmailType.ACCOUNT_TEST, to, subject, html);
+        EmailSendRequest req = EmailSendRequest.mail(EmailType.ACCOUNT_TEST, to,
+                InternalMails.accountTest(account.getName(), providerAndMode, now));
         req.setDeliveryModeOverride(EmailDeliveryMode.SYNC);
         SmtpEmailRequest message = buildMessage(req, account, null);
 

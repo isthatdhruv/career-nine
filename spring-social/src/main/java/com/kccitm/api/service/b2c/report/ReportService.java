@@ -140,7 +140,13 @@ public class ReportService {
             calcRow = existing.get();
             reusedCalc = true;
         } else {
-            Map<String, Object> placeholders = strategy.calculate(userStudentId, assessmentId, intermediary);
+            Map<String, Object> placeholders;
+            try {
+                placeholders = strategy.calculate(userStudentId, assessmentId, intermediary);
+            } catch (ReportSuppressedException e) {
+                markSuppressed(userStudentId, assessmentId, template, e);
+                throw e;
+            }
             calcRow = upsertCalculatedReportData(
                     existing.orElse(null), userStudentId, assessmentId,
                     template, placeholders, strategy.engineVersion());
@@ -356,11 +362,45 @@ public class ReportService {
         gr.setTypeOfReport(template.getEngineCode());
         gr.setReportTemplate(template);
         gr.setReportStatus("generated");
+        gr.setSuppressionReason(null);
         gr.setReportUrl(reportUrl);
         gr.setPdfUrl(pdfUrl);         // synchronously rendered above (null if render failed)
         gr.setPdfStatus(pdfStatus);   // "ready" on success, "failed" otherwise
         gr.setUpdatedAt(new Date());
         return generatedReportRepository.save(gr);
+    }
+
+    /**
+     * A strategy gate declined to generate (Navigator Pro R1–R5). Keep a row so the
+     * Reports Hub can show the reason; never write calculated_report_data. Best-effort:
+     * a persistence failure here must not mask the suppression itself.
+     */
+    private void markSuppressed(Long userStudentId, Long assessmentId, ReportTemplate template,
+                                ReportSuppressedException e) {
+        try {
+            GeneratedReport gr = generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndReportTemplate_Id(
+                            userStudentId, assessmentId, template.getReportTemplateId())
+                    .orElseGet(() -> {
+                        GeneratedReport n = new GeneratedReport();
+                        n.setUserStudent(userStudentRepository.findById(userStudentId).orElse(null));
+                        n.setAssessmentId(assessmentId);
+                        n.setCreatedAt(new Date());
+                        return n;
+                    });
+            gr.setTypeOfReport(template.getEngineCode());
+            gr.setReportTemplate(template);
+            gr.setReportStatus("suppressed");
+            String reason = e.getRuleCode() + ": " + e.getReason();
+            gr.setSuppressionReason(reason.length() > 500 ? reason.substring(0, 500) : reason);
+            gr.setUpdatedAt(new Date());
+            generatedReportRepository.save(gr);
+            logger.info("Report suppressed ({}) student={} assessment={} template={}",
+                    e.getRuleCode(), userStudentId, assessmentId, template.getReportTemplateId());
+        } catch (Exception ex) {
+            logger.warn("Could not record suppression student={} assessment={}: {}",
+                    userStudentId, assessmentId, ex.getMessage());
+        }
     }
 
     private static String renderedFileName(Long userStudentId, ReportTemplate template) {

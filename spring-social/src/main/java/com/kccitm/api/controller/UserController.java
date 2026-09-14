@@ -10,6 +10,7 @@ import javax.servlet.http.HttpSession;
 
 import org.apache.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -39,6 +40,8 @@ import com.kccitm.api.security.RefreshTokenService;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.theme.MailLinks;
 import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.dashboard.StudentDashboardDataService;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
@@ -51,6 +54,12 @@ public class UserController {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    @Autowired
+    private MailLinks mailLinks;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     @Autowired
     private RefreshTokenService refreshTokenService;
@@ -508,19 +517,12 @@ public class UserController {
                 emailError = "User has no email on file";
             } else {
                 try {
-                    String subject = "Your Career-9 password has been reset";
-                    String text =
-                            "Hello " + (user.getName() != null ? user.getName() : "") + ",\n\n" +
-                            "An administrator has reset your Career-9 password.\n\n" +
-                            "Your new password is: " + newPassword + "\n\n" +
-                            "Please log in at https://dashboard.career-9.com using your registered email " +
-                            "and the password above, and change it immediately from your profile.\n\n" +
-                            "If you did not request this change, contact your administrator.\n\n" +
-                            "— Career-9 Team";
                     // Gmail path is @Async fire-and-forget — returns immediately and the
                     // actual send happens on a worker thread. We only know the request
                     // was queued; the dispatcher records the eventual status in email_send_log.
-                    emailDispatchService.sendText(EmailType.ADMIN_PASSWORD_RESET, user.getEmail(), subject, text);
+                    emailDispatchService.sendMail(EmailType.ADMIN_PASSWORD_RESET, user.getEmail(),
+                            AccountMails.adminPasswordReset(AccountMails.firstName(user.getName()), newPassword,
+                                    mailLinks.of(frontendUrl + "/auth", "dashboard_login")));
                     emailQueued = true;
                 } catch (Exception e) {
                     emailError = e.getMessage();
@@ -561,10 +563,13 @@ public class UserController {
 
         try {
             userRepository.save(user);
-            String subject = "Congratulations! Account Activated";
-            // Send email notification
-            emailDispatchService.sendText(EmailType.ACCOUNT_ACTIVATED, user.getEmail(), subject,
-                    "Your Dashboard account has been activated.\nYou can login at https://dashboard.career-9.com using your registered email and password.\n\nBest regards,\nCareer-9 Team");
+            // Behaviour fix: this used to fire on deactivation too. Only activation has
+            // anything for the user to do, so only activation gets an email.
+            if (newStatus) {
+                emailDispatchService.sendMail(EmailType.ACCOUNT_ACTIVATED, user.getEmail(),
+                        AccountMails.accountActivated(AccountMails.firstName(user.getName()),
+                                mailLinks.of(frontendUrl + "/auth", "dashboard_login")));
+            }
         } catch (Exception e) {
         }
 

@@ -16,6 +16,10 @@ import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.service.b2c.ReportReleaseGate;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.mails.ReportMails;
+import com.kccitm.api.service.email.theme.Mail;
+import com.kccitm.api.service.email.theme.MailLinks;
 
 /**
  * The counsellor's "Send report" button.
@@ -43,6 +47,9 @@ public class CounsellorReportReleaseService {
 
     @Autowired
     private EmailDispatchService emailDispatchService;
+
+    @Autowired
+    private MailLinks mailLinks;
 
     /** What the counsellor is told after pressing the button. */
     public static class ReleaseOutcome {
@@ -91,34 +98,13 @@ public class CounsellorReportReleaseService {
         String counsellorName = appointment.getCounsellor() != null
                 ? appointment.getCounsellor().getName() : null;
 
-        String subject = "Your assessment report is ready";
-        String lead = "Your assessment report has been released"
-                + (counsellorName != null && !counsellorName.isBlank() ? " by " + counsellorName : "")
-                + " following your counselling session.";
-        String closing = "Take your time with it, and do come back to your counsellor with anything "
-                + "you would like explained further.";
-
-        String html = CounsellingEmailHtml.page(
-                "Your assessment report has been released.",
-                "Your assessment report is ready",
-                CounsellingEmailHtml.p("Dear " + studentName + ",")
-                + CounsellingEmailHtml.p(lead)
-                + CounsellingEmailHtml.actionBlock(link, "Your report", "Open my report", null)
-                + CounsellingEmailHtml.small(closing)
-                + CounsellingEmailHtml.signature());
-
-        String body = "Dear " + studentName + ",\n\n"
-                + lead + "\n\n"
-                + "  Report: " + link + "\n\n"
-                + closing + "\n\n"
-                + "Regards,\nCareer-9 Team";
-
-        EmailSendRequest req = new EmailSendRequest();
-        req.setEmailType(EmailType.REPORT_READY);
-        req.getTo().add(to);
-        req.setSubject(subject);
-        req.setHtmlContent(html);
-        req.setTextContent(body);
+        Mail mail = ReportMails.reportReleased(AccountMails.firstName(studentName), counsellorName,
+                mailLinks.of(link, "report"));
+        EmailSendRequest req = EmailSendRequest.mail(EmailType.REPORT_READY, to, mail);
+        // Rule 11: the branding hint. A student of a whitelabel school must see the school's
+        // header on her own report mail, and the student is the only handle this service has.
+        req.setUserStudentId(appointment.getStudent() != null
+                ? appointment.getStudent().getUserStudentId() : null);
         EmailSendResult result = emailDispatchService.send(req);
         if (result == null || !result.isSuccess()) {
             String failure = result != null ? result.getError() : null;

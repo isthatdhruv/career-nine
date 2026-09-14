@@ -21,7 +21,6 @@ export function registerForCampaignTier(
     email: string
     dob: string
     phone?: string
-    gender?: string
     promoCode?: string
     // Set for class-based campaigns so the backend records the student's grade.
     classId?: number
@@ -43,7 +42,6 @@ export function registerTrial(
     email: string
     dob: string
     phone: string
-    gender?: string
     classId?: number
     /** DPDP parental consent given on the form; the backend stamps dpdp_consent_at from it. */
     dpdpConsent?: boolean

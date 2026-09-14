@@ -1,7 +1,5 @@
 package com.kccitm.api.service.b2c;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 
 import org.slf4j.Logger;
@@ -17,6 +15,7 @@ import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.theme.Mail;
 
 /**
  * Wraps the Gmail email service and writes a ServiceDeliveryLog row
@@ -30,11 +29,15 @@ public class NotificationDispatcher {
     @Autowired private EmailDispatchService emailDispatchService;
     @Autowired private ServiceDeliveryLogRepository serviceDeliveryLogRepository;
 
+    /**
+     * Sends a themed {@link Mail} through the central dispatcher (universal
+     * email_send_log + account routing) and writes the B2C-specific
+     * ServiceDeliveryLog audit row for it.
+     */
     public ServiceDeliveryLog sendEmail(StudentEntitlement entitlement,
                                         String recipient,
                                         String serviceType,
-                                        String subject,
-                                        String htmlBody,
+                                        Mail mail,
                                         String linkUrl) {
         ServiceDeliveryLog log = new ServiceDeliveryLog();
         log.setEntitlementId(entitlement != null ? entitlement.getEntitlementId() : null);
@@ -42,13 +45,13 @@ public class NotificationDispatcher {
         log.setServiceType(serviceType);
         log.setChannel("email");
         log.setRecipient(recipient);
-        log.setSubject(subject);
+        log.setSubject(mail != null ? mail.getSubject() : null);
         // Store a redacted copy of the link: the deep links embed the entitlement
         // access token as a `t=` query param, and this row is surfaced verbatim by
         // the admin Tracker (allotment detail + /entitlement/{id}/communications).
         // Persisting the raw token would let any tracker reader (or DB/log access)
         // lift a working bearer credential. The real, working link still goes out
-        // in the email body (htmlBody) — only the stored audit copy is masked.
+        // in the email body — only the stored audit copy is masked.
         log.setLinkUrl(redactToken(linkUrl));
         log.setTemplateKey(serviceType);
 
@@ -59,18 +62,11 @@ public class NotificationDispatcher {
         }
 
         try {
-            // Route through the central dispatcher (universal email_send_log + account routing).
-            // Forced ASYNC to preserve the original fire-and-forget behaviour; this ServiceDeliveryLog
-            // row remains the B2C-specific audit trail.
-            EmailSendRequest req = new EmailSendRequest();
-            req.setEmailType(mapServiceType(serviceType));
-            req.setTo(new ArrayList<>(Collections.singletonList(recipient)));
+            EmailSendRequest req = EmailSendRequest.mail(mapServiceType(serviceType), recipient, mail);
             if (entitlement != null) {
                 req.setUserStudentId(entitlement.getUserStudentId());
             }
             req.setDeliveryModeOverride(EmailDeliveryMode.ASYNC);
-            req.setSubject(subject);
-            req.setHtmlContent(htmlBody);
             EmailSendResult result = emailDispatchService.send(req);
             if (result != null && result.isSuccess()) {
                 log.setDeliveryStatus("sent");
@@ -94,8 +90,10 @@ public class NotificationDispatcher {
         }
         switch (serviceType) {
             case "assessment_invite": return EmailType.ENTITLEMENT_GRANTED;
-            case "final_report":
-            case "one_pager":         return EmailType.REPORT_READY;
+            case "final_report":      return EmailType.REPORT_READY;
+            // Its own type, not ENTITLEMENT_GRANTED: sharing a slot means an admin's
+            // "access granted" template silently replaces the nudge body as well.
+            case "nudge":             return EmailType.ENTITLEMENT_REMINDER;
             default:                  return EmailType.GENERIC;
         }
     }
