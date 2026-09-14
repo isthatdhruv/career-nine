@@ -1,6 +1,7 @@
 package com.kccitm.api.model.career9;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -72,6 +73,16 @@ public class UserStudent implements Serializable {
     @Column(name = "reports_visible")
     private Boolean reportsVisible = false;
 
+    /**
+     * Registration timestamp (V20260914001). Stamped by the database default
+     * ({@code CURRENT_TIMESTAMP}) on insert — hence {@code insertable = false} — so
+     * every registration path gets it without touching their save code. Read by
+     * the admin overview "sign-ups" card; may be null for pre-migration accounts
+     * that left no back-fill evidence.
+     */
+    @Column(name = "created_at", insertable = false, updatable = false)
+    private LocalDateTime createdAt;
+
     public UserStudent(com.kccitm.api.model.User user, StudentInfo studentInfo2, InstituteDetail institue_id) {
         // TODO Auto-generated constructor stub
         this.userId = user.getId();
@@ -133,4 +144,8 @@ public class UserStudent implements Serializable {
 
     public Boolean getReportsVisible() { return reportsVisible; }
     public void setReportsVisible(Boolean reportsVisible) { this.reportsVisible = reportsVisible; }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 }
