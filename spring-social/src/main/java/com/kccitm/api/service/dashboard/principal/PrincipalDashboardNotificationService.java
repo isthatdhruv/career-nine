@@ -11,10 +11,14 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.career9.PrincipalDashboardReleaseLog;
+import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.ContactPersonRepository;
 import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.ReportMails;
+import com.kccitm.api.service.email.theme.Mail;
+import com.kccitm.api.service.email.theme.MailLinks;
 
 /**
  * Tells a school its dashboard is live, and how to use it.
@@ -41,6 +45,9 @@ public class PrincipalDashboardNotificationService {
 
     @Autowired
     private PrincipalDashboardReleaseLogger trace;
+
+    @Autowired
+    private MailLinks mailLinks;
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
@@ -94,6 +101,10 @@ public class PrincipalDashboardNotificationService {
 
         List<Recipient> all = recipientsFor(instituteCode);
         List<SendOutcome> outcomes = new ArrayList<>();
+        // assessmentName is an optional request param (PrincipalDashboardReleaseController);
+        // the old body() guarded a missing value the same way — keep that fallback at the caller.
+        String assessmentLabel = (assessmentName == null || assessmentName.isBlank())
+                ? "the assessment" : assessmentName;
 
         for (Recipient recipient : all) {
             if (!contactPersonIds.contains(recipient.id)) {
@@ -112,12 +123,14 @@ public class PrincipalDashboardNotificationService {
             }
 
             try {
-                String subject = "Your Career-9 school dashboard is ready — " + instituteName;
-                EmailSendResult result = emailDispatch.sendHtml(
-                        EmailType.SCHOOL_DASHBOARD_READY,
-                        recipient.email,
-                        subject,
-                        body(recipient.name, instituteName, assessmentName));
+                Mail mail = ReportMails.schoolDashboardReady(recipient.name, instituteName, assessmentLabel,
+                        mailLinks.of(frontendUrl + "/school-dashboard", "school_dashboard"));
+                EmailSendRequest req = EmailSendRequest.mail(
+                        EmailType.SCHOOL_DASHBOARD_READY, recipient.email, mail);
+                // Rule 11: the shell decides branding, from a hint the caller supplies. This mail
+                // goes to a school's own contacts, so a whitelabel school must see its own header.
+                req.setInstituteCode(instituteCode == null ? null : instituteCode.intValue());
+                EmailSendResult result = emailDispatch.send(req);
                 outcome.sent = result.isSuccess();
                 outcome.error = result.isSuccess() ? null : result.getError();
             } catch (Exception e) {
@@ -149,75 +162,5 @@ public class PrincipalDashboardNotificationService {
             }
         }
         return sb.toString();
-    }
-
-    /**
-     * The message itself.
-     *
-     * Written for a principal rather than an operator: what it is, how to open it, what
-     * the filters do, and who to tell when something looks wrong. Inline styles because
-     * mail clients strip stylesheets.
-     */
-    private String body(String name, String instituteName, String assessmentName) {
-        String dashboardLink = frontendUrl + "/school-dashboard";
-        String greeting = (name == null || name.isBlank()) ? "Hello," : "Dear " + name + ",";
-
-        return "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;"
-                + "line-height:1.6;color:#0d1b2e;max-width:600px\">"
-
-                + "<p>" + escape(greeting) + "</p>"
-
-                + "<p>The Career-9 school dashboard for <b>" + escape(instituteName)
-                + "</b> is now live. It summarises what "
-                + escape(assessmentName == null ? "the assessment" : assessmentName)
-                + " found across your students — where they are heading, where they will "
-                + "need support, and what the school can do about it.</p>"
-
-                + "<p style=\"margin:24px 0\">"
-                + "<a href=\"" + escape(dashboardLink) + "\" "
-                + "style=\"background:#1c5cab;color:#ffffff;text-decoration:none;"
-                + "padding:12px 22px;border-radius:8px;display:inline-block;font-weight:bold\">"
-                + "Open your dashboard</a></p>"
-
-                + "<h3 style=\"font-size:15px;margin:22px 0 6px\">How to use it</h3>"
-                + "<ol style=\"padding-left:20px;margin:0\">"
-                + "<li style=\"margin-bottom:6px\">Sign in to Career-9 with the account we set "
-                + "up for you, then choose <b>Reports &rarr; School Dashboard</b> from the menu "
-                + "on the left.</li>"
-                + "<li style=\"margin-bottom:6px\">The page opens on the whole school. The "
-                + "filters at the top narrow it to a single grade, section or group — figures "
-                + "and written analysis both change to match.</li>"
-                + "<li style=\"margin-bottom:6px\">Start with the statement at the top and the "
-                + "three cards under it: those are the findings we think need action first.</li>"
-                + "<li style=\"margin-bottom:6px\">Below them, <b>the full analysis</b> explains "
-                + "each finding in detail, with the figures it is based on.</li>"
-                + "</ol>"
-
-                + "<h3 style=\"font-size:15px;margin:22px 0 6px\">A note on the numbers</h3>"
-                + "<p style=\"margin:0\">Every figure is drawn from students who completed and "
-                + "were scored on the assessment, and each section states the group it is "
-                + "counting. Cohorts too small to describe safely are left without written "
-                + "analysis on purpose &mdash; percentages over a handful of students say more "
-                + "about the handful than about the group.</p>"
-
-                + "<h3 style=\"font-size:15px;margin:22px 0 6px\">If something looks wrong</h3>"
-                + "<p style=\"margin:0\">If a figure looks off, a class is missing, or the page "
-                + "will not open, reply to this email and the Career-9 team will look into it. "
-                + "Please mention the school name and which grade or section you were "
-                + "viewing.</p>"
-
-                + "<p style=\"margin-top:26px\">Warm regards,<br><b>The Career-9 Team</b></p>"
-                + "</div>";
-    }
-
-    /** Contact names and school names are user-entered; they are not markup. */
-    private static String escape(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;");
     }
 }

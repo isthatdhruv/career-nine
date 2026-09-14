@@ -41,6 +41,11 @@ import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentTierRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
 import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
 import com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository;
+import com.kccitm.api.service.email.mails.AccountMails;
+import com.kccitm.api.service.email.mails.EntitlementMails;
+import com.kccitm.api.service.email.mails.ReportMails;
+import com.kccitm.api.service.email.theme.Brand;
+import com.kccitm.api.service.email.theme.Mail;
 
 /**
  * Lifecycle of a StudentEntitlement: pending → active → expired/revoked/refunded.
@@ -67,8 +72,8 @@ public class EntitlementService {
     @Autowired private NotificationDispatcher notificationDispatcher;
     @Autowired private LinkBuilder linkBuilder;
     @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
-    /** Single source of the report-mail body — legacy and resend paths render through it. */
-    @Autowired private com.kccitm.api.service.b2c.report.pipeline.ReportEmailComposer reportEmailComposer;
+    @Autowired private com.kccitm.api.service.email.theme.BrandResolver brandResolver;
+    @Autowired private com.kccitm.api.service.email.theme.MailLinks mailLinks;
     /** Optional: counselling CTA for the report mail; absent where counselling isn't wired. */
     @Autowired(required = false)
     private com.kccitm.api.service.counselling.CounsellingBookingLinkService counsellingBookingLinkService;
@@ -600,31 +605,25 @@ public class EntitlementService {
                 e.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
                 entitlementRepository.save(e);
             }
-            String onePagerLink = linkBuilder.onePager(token, e.getEntitlementId());
-
-            if (Boolean.TRUE.equals(e.getFinalReportActive())) {
-                if (reportPipelineEnabled) {
-                    // The report pipeline (Kafka → report-worker) sends this email once
-                    // the report is generated and stored in Spaces, with the CDN report
-                    // link + PDF attached — the producer stamps this entitlement on the
-                    // generate event (see resolvePipelineReportEmail). Sending here too
-                    // would double-mail the student with a stale viewer-only link.
-                    logger.info("Final report email delegated to report pipeline: student={} assessment={} entitlement={}",
-                            userStudentId, assessmentId, e.getEntitlementId());
-                    return;
-                }
-                // Legacy fallback (pipeline disabled): immediate send with the tokenized
-                // viewer link — no PDF exists yet at completion time.
-                String finalLink = linkBuilder.finalReport(token, e.getEntitlementId());
-                String subject = "Your Career-9 report is ready";
-                String body = reportReadyEmailBody(e, finalLink, null);
-                notificationDispatcher.sendEmail(e, studentEmail, "final_report", subject, body, finalLink);
-            } else {
-                String subject = "Your Career-9 1-pager is ready";
-                String body = simpleHtml("Your free 1-page Career-9 summary is ready.",
-                        "View your summary or unlock the full report from there:", onePagerLink, "Open 1-pager");
-                notificationDispatcher.sendEmail(e, studentEmail, "one_pager", subject, body, onePagerLink);
+            if (!Boolean.TRUE.equals(e.getFinalReportActive())) {
+                // Tier does not include the final report: nothing is sent at completion.
+                return;
             }
+            if (reportPipelineEnabled) {
+                // The report pipeline (Kafka → report-worker) sends this email once
+                // the report is generated and stored in Spaces, with the CDN report
+                // link + PDF attached — the producer stamps this entitlement on the
+                // generate event (see resolvePipelineReportEmail). Sending here too
+                // would double-mail the student with a stale viewer-only link.
+                logger.info("Final report email delegated to report pipeline: student={} assessment={} entitlement={}",
+                        userStudentId, assessmentId, e.getEntitlementId());
+                return;
+            }
+            // Legacy fallback (pipeline disabled): immediate send with the tokenized
+            // viewer link — no PDF exists yet at completion time.
+            String finalLink = linkBuilder.finalReport(token, e.getEntitlementId());
+            Mail mail = reportReadyMail(e, finalLink, null);
+            notificationDispatcher.sendEmail(e, studentEmail, "final_report", mail, finalLink);
             return;
         }
     }
@@ -789,59 +788,81 @@ public class EntitlementService {
             entitlementRepository.save(e);
         }
         Long eid = e.getEntitlementId();
+        String firstName = AccountMails.firstName(resolveStudentName(e));
 
-        String link, subject, body;
+        String link;
+        Mail mail;
         switch (serviceType) {
             case "assessment_invite":
                 link = linkBuilder.assessmentStart(token, eid);
-                subject = "Your Career-9 assessment link";
-                body = simpleHtml("Here is your Career-9 assessment link.", "Take the assessment:", link, "Start assessment");
-                break;
-            case "one_pager":
-                link = linkBuilder.onePager(token, eid);
-                subject = "Your Career-9 1-pager";
-                body = simpleHtml("Your 1-pager summary.", "View it:", link, "Open 1-pager");
+                mail = EntitlementMails.assessmentLink(firstName, assessmentName(e), mailLinks.of(link, "assessment_start"));
                 break;
             case "final_report": {
                 if (!Boolean.TRUE.equals(e.getFinalReportActive())) return new ResendResult(false, "Final report not in this tier");
-                subject = "Your Career-9 report is ready";
                 // Prefer the generated report's Spaces CDN links (same delivery as the
                 // report-pipeline email); fall back to the tokenized viewer link when
                 // no generated report exists yet.
                 GeneratedReport gr = latestGeneratedReport(e.getUserStudentId(), e.getAssessmentId());
                 if (gr != null) {
                     link = gr.getReportUrl();
-                    body = reportReadyEmailBody(e, gr.getReportUrl(), gr.getPdfUrl());
+                    mail = reportReadyMail(e, gr.getReportUrl(), gr.getPdfUrl());
                 } else {
                     link = linkBuilder.finalReport(token, eid);
-                    body = reportReadyEmailBody(e, link, null);
+                    mail = reportReadyMail(e, link, null);
                 }
-                break;
+                notificationDispatcher.sendEmail(e, studentEmail, serviceType, mail, link);
+                return new ResendResult(true, "Sent");
             }
             case "dashboard_access":
                 if (!Boolean.TRUE.equals(e.getDashboardActive())) return new ResendResult(false, "Dashboard not in this tier");
                 link = linkBuilder.dashboard(token, eid);
-                subject = "Your Career-9 dashboard access";
-                body = simpleHtml("Open your dashboard.", "Click below:", link, "Open dashboard");
+                mail = EntitlementMails.dashboardAccess(firstName, mailLinks.of(link, "dashboard"));
                 break;
             case "counselling_book":
                 if (!Boolean.TRUE.equals(e.getCounsellingActive())) return new ResendResult(false, "Counselling not in this tier");
-                link = "1".equals(e.getCounsellingModel())
-                        ? linkBuilder.counsellingBook(token, eid)
-                        : linkBuilder.counsellingMySessions(token, eid);
-                subject = "Book your Career-9 counselling session";
-                body = simpleHtml("Book your counselling session.", "Pick a slot:", link, "Book session");
+                boolean bookingModel = "1".equals(e.getCounsellingModel());
+                link = bookingModel ? linkBuilder.counsellingBook(token, eid) : linkBuilder.counsellingMySessions(token, eid);
+                mail = EntitlementMails.bookingLink(firstName,
+                        mailLinks.of(link, bookingModel ? "counselling_book" : "counselling_my_sessions"));
                 break;
             case "lms_access":
                 if (!Boolean.TRUE.equals(e.getLmsActive())) return new ResendResult(false, "LMS not in this tier");
                 link = linkBuilder.lmsLaunch(token, eid);
-                subject = "Your Career-9 LMS access";
-                body = simpleHtml("Your LMS is ready.", "Launch it:", link, "Open LMS");
+                mail = EntitlementMails.learningAccess(firstName, mailLinks.of(link, "lms_launch"));
                 break;
             default:
                 return new ResendResult(false, "Unknown service type: " + serviceType);
         }
-        notificationDispatcher.sendEmail(e, studentEmail, serviceType, subject, body, link);
+        notificationDispatcher.sendEmail(e, studentEmail, serviceType, mail, link);
+        return new ResendResult(true, "Sent");
+    }
+
+    /**
+     * Sends the assessment-invite nudge as its own service type ("nudge") instead of
+     * "assessment_invite", so {@link NotificationDispatcher#countSent} actually counts it
+     * against the scheduler's cap. Before this existed, the nudge sweep sent through
+     * {@link #resendServiceLink} which logged the delivery as "assessment_invite" — the same
+     * type the welcome/resend mails use — so the cap check always saw zero and never tripped.
+     */
+    @Transactional
+    public ResendResult sendNudge(StudentEntitlement e) {
+        if (e == null) return new ResendResult(false, "Entitlement not found");
+        if (!"active".equals(e.getStatus())) return new ResendResult(false, "Entitlement not active");
+
+        String email = resolveStudentEmail(e);
+        if (email == null) return new ResendResult(false, "Student has no email on file");
+
+        String token = e.getAccessToken();
+        if (token == null) {
+            token = generateToken();
+            e.setAccessToken(token);
+            e.setAccessTokenExpiresAt(daysFromNow(DEFAULT_TOKEN_TTL_DAYS));
+            entitlementRepository.save(e);
+        }
+        String link = linkBuilder.assessmentStart(token, e.getEntitlementId());
+        Mail mail = EntitlementMails.assessmentLink(AccountMails.firstName(resolveStudentName(e)), assessmentName(e),
+                mailLinks.of(link, "assessment_start"));
+        notificationDispatcher.sendEmail(e, email, "nudge", mail, link);
         return new ResendResult(true, "Sent");
     }
 
@@ -851,6 +872,15 @@ public class EntitlementService {
         UserStudent us = userStudentRepository.findById(e.getUserStudentId()).orElse(null);
         if (us == null || us.getStudentInfo() == null) return null;
         return us.getStudentInfo().getEmail();
+    }
+
+    /** Assessment display name for the invite/nudge mails; falls back when the lookup fails or the name is blank. */
+    private String assessmentName(StudentEntitlement e) {
+        if (e.getAssessmentId() == null) return "your assessment";
+        return assessmentTableRepository.findById(e.getAssessmentId())
+                .map(AssessmentTable::getAssessmentName)
+                .filter(n -> n != null && !n.trim().isEmpty())
+                .orElse("your assessment");
     }
 
     private StudentEntitlement findOrCreateForUpgrade(PaymentTransaction txn) {
@@ -955,114 +985,11 @@ public class EntitlementService {
 
         String magicLink = linkBuilder.assessmentStart(entitlement.getAccessToken(), entitlement.getEntitlementId());
         String manualLoginUrl = linkBuilder.manualLogin();
-        String subject = "Welcome to Career-9 — start your assessment";
-        String body = welcomeEmailHtml(displayName, username, dobStr, magicLink, manualLoginUrl);
-        notificationDispatcher.sendEmail(entitlement, to, "assessment_invite", subject, body, magicLink);
+        Mail mail = EntitlementMails.welcome(AccountMails.firstName(displayName), username, dobStr,
+                mailLinks.of(magicLink, "assessment_start"), mailLinks.of(manualLoginUrl, "student_login"));
+        notificationDispatcher.sendEmail(entitlement, to, "assessment_invite", mail, magicLink);
     }
 
-    /**
-     * Flat green welcome email (approved design): white card on a neutral ground,
-     * one green accent, primary magic-link button, then a quiet manual-login
-     * credentials panel. Inline styles only; emoji/dashes as HTML entities so the
-     * source and every mail client stay ASCII-safe.
-     */
-    private static String welcomeEmailHtml(String displayName, String username, String dobStr,
-                                           String magicLink, String manualLoginUrl) {
-        String credentialsBlock;
-        if (username != null && dobStr != null) {
-            credentialsBlock =
-                "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;font-size:13.5px;\">"
-                + "<tr><td style=\"padding:4px 0;color:#5f6f67;width:110px;\">Username</td>"
-                + "<td style=\"padding:4px 0;color:#0f1f18;font-family:Consolas,'Courier New',monospace;font-weight:700;\">"
-                +     username + "</td></tr>"
-                + "<tr><td style=\"padding:4px 0;color:#5f6f67;\">Password</td>"
-                + "<td style=\"padding:4px 0;color:#0f1f18;font-family:Consolas,'Courier New',monospace;font-weight:700;\">"
-                +     dobStr
-                + " <span style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;"
-                +     "color:#8a978f;font-weight:400;\">(your date of birth)</span></td></tr>"
-                + "</table>";
-        } else {
-            credentialsBlock =
-                "<p style=\"margin:0;font-size:13.5px;line-height:1.6;color:#3d4a44;\">"
-                + "Use the user ID and date of birth you provided at registration to sign in."
-                + "</p>";
-        }
-
-        return ""
-            + "<div style=\"background:#f3f5f4;padding:40px 16px;"
-            +     "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;\">"
-            + "<div style=\"max-width:560px;margin:0 auto;\">"
-
-            // Wordmark above the card
-            + "<div style=\"padding:0 6px 12px;\">"
-            + "<span style=\"font-size:14px;font-weight:800;letter-spacing:2px;color:#059669;\">CAREER&#8209;9</span>"
-            + "</div>"
-
-            // Card, single green accent line
-            + "<div style=\"background:#ffffff;border:1px solid #e3e8e5;border-radius:14px;overflow:hidden;\">"
-            + "<div style=\"height:4px;background:#059669;\"></div>"
-            + "<div style=\"padding:32px 32px 8px;\">"
-
-            + "<h1 style=\"margin:0 0 8px;font-size:22px;line-height:1.3;font-weight:700;color:#0f1f18;\">"
-            +     "Welcome aboard, " + escape(displayName) + "!</h1>"
-            + "<p style=\"margin:0 0 24px;font-size:15px;line-height:1.6;color:#5f6f67;\">"
-            +     "Your purchase is confirmed. Your assessment is ready when you are &mdash; "
-            +     "you can pause and resume anytime.</p>"
-
-            // Primary action: magic link
-            + "<p style=\"margin:0 0 14px;font-size:14px;line-height:1.6;color:#0f1f18;\">"
-            +     "One click signs you in and takes you straight to your assessment:</p>"
-            + "<div style=\"text-align:center;margin:0 0 26px;\">"
-            + "<a href=\"" + magicLink + "\" style=\"display:inline-block;padding:14px 36px;background:#059669;"
-            +     "color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;\">"
-            +     "Start Assessment &rarr;</a>"
-            + "</div>"
-
-            // Divider
-            + "<div style=\"border-top:1px solid #e3e8e5;text-align:center;margin:0 0 20px;\">"
-            + "<span style=\"position:relative;top:-9px;background:#ffffff;padding:0 12px;"
-            +     "font-size:11px;font-weight:700;letter-spacing:1.2px;color:#8a978f;\">OR SIGN IN MANUALLY</span>"
-            + "</div>"
-
-            // Credentials panel
-            + "<div style=\"background:#f6f8f7;border:1px solid #e3e8e5;border-radius:10px;padding:18px 20px;margin:0 0 22px;\">"
-            + "<p style=\"margin:0 0 12px;font-size:13.5px;line-height:1.6;color:#3d4a44;\">Visit "
-            + "<a href=\"" + manualLoginUrl + "\" style=\"color:#059669;font-weight:700;text-decoration:none;\">"
-            +     manualLoginUrl + "</a> and use:</p>"
-            + credentialsBlock
-            + "<p style=\"margin:12px 0 0;font-size:12px;line-height:1.6;color:#8a978f;\">"
-            +     "Keep these safe &mdash; you&rsquo;ll need them to resume your assessment or open your report later.</p>"
-            + "</div>"
-
-            // Fallback raw link
-            + "<p style=\"margin:0 0 28px;font-size:12px;line-height:1.6;color:#8a978f;text-align:center;\">"
-            +     "If the button doesn&rsquo;t work, paste this link into your browser:<br>"
-            + "<span style=\"word-break:break-all;color:#5f6f67;\">" + magicLink + "</span></p>"
-
-            + "</div>"
-
-            // Footer
-            + "<div style=\"background:#f6f8f7;border-top:1px solid #e3e8e5;padding:14px 32px;\">"
-            + "<p style=\"margin:0;font-size:11px;line-height:1.6;color:#8a978f;\">"
-            +     "This is an automated message from Career&#8209;9 &mdash; please don&rsquo;t reply to this address.<br>"
-            +     "&copy; Career&#8209;9. All rights reserved.</p>"
-            + "</div>"
-
-            + "</div></div></div>";
-    }
-
-    /** Minimal HTML escape for values interpolated into the email body. */
-    private static String escape(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                .replace("\"", "&quot;").replace("'", "&#39;");
-    }
-
-    /**
-     * Compact template used by post-completion notifications (1-pager, final
-     * report, resend flows). The welcome email uses {@link #welcomeEmailHtml}
-     * because it surfaces credentials and a manual-login fallback.
-     */
     /** Newest generated report with a stored Spaces URL for this student+assessment, or null. */
     private GeneratedReport latestGeneratedReport(Long userStudentId, Long assessmentId) {
         try {
@@ -1084,26 +1011,24 @@ public class EntitlementService {
     }
 
     /**
-     * Report-ready body rendered through the pipeline's ReportEmailComposer, so
-     * every path (pipeline, legacy immediate send, admin resend) mails the same
-     * design. linkOnly is always true here — these paths never attach the PDF;
-     * when a CDN pdfUrl exists it is offered as a download link instead.
+     * Report-ready mail built through the theme, so every path (pipeline-disabled immediate
+     * send, admin resend) sends the same design as the pipeline. pdfAttached is always false
+     * here — these paths never attach the PDF; when a CDN pdfUrl exists it is offered as a
+     * download link instead.
      */
-    private String reportReadyEmailBody(StudentEntitlement e, String reportUrl, String pdfUrl) {
-        com.kccitm.api.service.b2c.report.pipeline.ReportEmailEvent ev =
-                new com.kccitm.api.service.b2c.report.pipeline.ReportEmailEvent();
-        ev.userStudentId = e.getUserStudentId();
-        ev.assessmentId = e.getAssessmentId();
-        ev.entitlementId = e.getEntitlementId();
-        ev.reportUrl = reportUrl;
-        ev.pdfUrl = pdfUrl;
-        ev.linkOnly = true;
-        ev.studentName = resolveStudentName(e);
+    private Mail reportReadyMail(StudentEntitlement e, String reportUrl, String pdfUrl) {
+        Brand brand = brandResolver.forUserStudent(e.getUserStudentId());
+        com.kccitm.api.service.email.theme.MailLink booking = null;
         if (counsellingBookingLinkService != null) {
-            ev.bookingUrl = counsellingBookingLinkService.bookingUrlIfEligible(
+            String bookingUrl = counsellingBookingLinkService.bookingUrlIfEligible(
                     e.getUserStudentId(), e.getAssessmentId(), e.getEntitlementId());
+            booking = mailLinks.of(bookingUrl, "counselling_booking");
         }
-        return reportEmailComposer.html(ev);
+        return ReportMails.reportReady(AccountMails.firstName(resolveStudentName(e)), brand.getName(),
+                mailLinks.of(reportUrl, "report"),
+                pdfUrl == null ? null : mailLinks.of(pdfUrl, "report_pdf"),
+                false,
+                booking);
     }
 
     /** Student's name for the email greeting; null when unavailable. */
@@ -1116,19 +1041,6 @@ public class EntitlementService {
         } catch (Exception ex) {
             return null;
         }
-    }
-
-    private static String simpleHtml(String greeting, String preLink, String link, String cta) {
-        return "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;'>"
-                + "<div style='background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:24px;border-radius:12px 12px 0 0;color:white;'>"
-                + "<h2 style='margin:0;'>" + greeting + "</h2></div>"
-                + "<div style='padding:24px;background:#fff;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 12px 12px;'>"
-                + "<p>" + preLink + "</p>"
-                + "<div style='text-align:center;margin:24px 0;'>"
-                + "<a href='" + link + "' style='display:inline-block;padding:14px 32px;background:#059669;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;'>" + cta + "</a>"
-                + "</div>"
-                + "<p style='color:#64748b;font-size:0.85em;margin-top:24px;'>If the button doesn't work, copy this link: " + link + "</p>"
-                + "</div></div>";
     }
 
     private static String generateToken() {

@@ -41,6 +41,11 @@ public class LinkBuilder {
     @Value("${app.b2c.apiBaseUrl:https://api.career-9.com}")
     private String apiBaseUrl;
 
+    /** The configured frontend base ({@code app.b2c.frontendBaseUrl}), for callers that build their own paths on it. */
+    public String frontendBase() {
+        return frontendBaseUrl;
+    }
+
     public String campaignLanding(String slug) {
         return assessmentBaseUrl + "/c/" + slug;
     }
@@ -67,11 +72,6 @@ public class LinkBuilder {
      */
     public String studentLogin() {
         return frontendBaseUrl + "/auth";
-    }
-
-    public String onePager(String accessToken, Long entitlementId) {
-        return shorten(frontendBaseUrl + "/report/one-pager?t=" + accessToken + "&e=" + entitlementId,
-                "one_pager");
     }
 
     public String finalReport(String accessToken, Long entitlementId) {

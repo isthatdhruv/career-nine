@@ -4,8 +4,8 @@ package com.kccitm.api.model.email;
  * Catalog of {{placeholders}} a template may reference. Each {@link EmailType} declares the
  * subset it supports; the editor's "insert variable" palette reads that subset, and
  * {@code PlaceholderResolver} fills the values per send. Branding placeholders
- * ({@link #EMAIL_HEADER}, {@link #EMAIL_FOOTER}, {@link #SCHOOL_NAME}, {@link #LOGO_URL}) are
- * derived from the institute/student context; the rest come from the caller's context map.
+ * ({@link #SCHOOL_NAME}, {@link #LOGO_URL}) are derived from the institute/student context;
+ * the rest come from the caller's context map.
  */
 public enum EmailPlaceholder {
 
@@ -22,12 +22,11 @@ public enum EmailPlaceholder {
     DASHBOARD_LINK("dashboard_link", "Student dashboard / login URL", "Links"),
     ACTION_LINK("action_link", "Primary call-to-action URL", "Links"),
     RESET_LINK("reset_link", "Password-reset URL", "Links"),
+    SITE_LINK("site_link", "Career-9 website", "Links"),
 
     // — Branding (derived from the institute/student) —
     SCHOOL_NAME("school_name", "School name (or 'Career-9')", "Branding"),
     LOGO_URL("logo_url", "School logo URL (whitelabel)", "Branding"),
-    EMAIL_HEADER("email_header", "Branded header block (HTML)", "Branding"),
-    EMAIL_FOOTER("email_footer", "Branded footer block (HTML)", "Branding"),
 
     // — Report —
     REPORT_LINK("report_link", "Hosted report URL", "Report"),
@@ -61,7 +60,8 @@ public enum EmailPlaceholder {
     LEAD_DETAILS("lead_details", "Every submitted field, as an HTML table", "Lead"),
     LEAD_RECEIVED_AT("lead_received_at", "When the enquiry arrived", "Lead"),
     LEAD_ID("lead_id", "Career-9 lead id", "Lead"),
-    LEAD_CRM_LINK("lead_crm_link", "Link to the lead in Odoo CRM (blank until synced)", "Lead");
+    LEAD_CRM_LINK("lead_crm_link", "Link to the lead in Odoo CRM (blank until synced)", "Lead"),
+    LEAD_ADMIN_LINK("lead_admin_link", "Link to the lead in the admin app", "Lead");
 
     private final String key;
     private final String label;

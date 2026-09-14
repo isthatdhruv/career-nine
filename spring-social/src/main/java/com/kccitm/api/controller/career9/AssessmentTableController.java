@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +40,7 @@ import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.service.AssessmentSessionService;
 import com.kccitm.api.service.branding.BrandingDto;
 import com.kccitm.api.service.branding.InstituteBrandingService;
+import com.kccitm.api.service.branding.StudentBrandingDto;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
@@ -537,6 +539,43 @@ public class AssessmentTableController {
         return new ArrayList<>(byId.values());
     }
 
+    /**
+     * Every assessment connected to ONE institute, under the same rule as
+     * {@link #getScopedAssessmentSummaryList()}: active registration-link
+     * mappings unioned with assessments the institute's students are allotted
+     * to. Backs the institute selector on Live Tracking (and the per-institute
+     * narrowing hooks), which previously read only assessment_institute_mapping
+     * and therefore hid assessments mapped solely through the school
+     * registration config.
+     *
+     * <p>Non-super-admins may only ask about institutes in their own scope; any
+     * other code is answered with 403 rather than an empty list so the UI can
+     * tell "nothing mapped" apart from "not yours".
+     */
+    @GetMapping("/get/list-summary-by-institute/{instituteCode}")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
+    public ResponseEntity<?> getAssessmentSummaryListByInstitute(@PathVariable Integer instituteCode) {
+        Optional<AccessScope> scope = accessScopeService.forCurrentUser();
+        if (scope.isPresent() && !scope.get().getAllowedInstituteCodes().contains(instituteCode)) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", 403);
+            body.put("error", "Forbidden");
+            body.put("message", "This institute is not in your scope");
+            return ResponseEntity.status(403).body(body);
+        }
+        Set<Integer> codes = Collections.singleton(instituteCode);
+        Map<Long, AssessmentTableRepository.AssessmentSummary> byId = new LinkedHashMap<>();
+        for (AssessmentTableRepository.AssessmentSummary s
+                : assessmentTableRepository.findAssessmentSummariesByInstitutes(codes)) {
+            byId.put(s.getId(), s);
+        }
+        for (AssessmentTableRepository.AssessmentSummary s
+                : assessmentTableRepository.findStudentAssignedAssessmentSummariesByInstitutes(codes)) {
+            byId.putIfAbsent(s.getId(), s);
+        }
+        return ResponseEntity.ok(new ArrayList<>(byId.values()));
+    }
+
     @GetMapping("/get/list-ids")
     @PreAuthorize("@auth.allows('assessment.read.all')")
     public HashMap<Long, String> getAllAssessmentIds() {
@@ -760,17 +799,27 @@ public class AssessmentTableController {
 
     /**
      * Whitelabel branding for a student (post-login). Returns
-     * {@code { whitelabel, schoolName, logoUrl }} resolved from the student's institute,
-     * or the standard (whitelabel=false) payload when the student has no school or the
-     * school is not whitelabel. Gated identically to {@code /prefetch} so the assessment
+     * {@code { whitelabel, schoolName, logoUrl, emailReportEnabled }}: the branding resolved
+     * from the student's institute (standard whitelabel=false payload when the student has no
+     * school or the school is not whitelabel), plus the assessment's "email report" toggle when
+     * an {@code assessmentId} query param is supplied (false otherwise). The thank-you page
+     * combines the two to decide whether it may say the report was emailed — the same rule
+     * the report pipeline applies. Gated identically to {@code /prefetch} so the assessment
      * app — which already calls prefetch on this student — can fetch it. Drives the
      * assessment legend logo + thank-you page logo. Not cached so an admin toggle takes
      * effect immediately.
      */
     @GetMapping("/branding/{userStudentId}")
     @PreAuthorize("@auth.allows('assessment.prefetch')")
-    public BrandingDto getStudentBranding(@PathVariable Long userStudentId) {
-        return brandingService.forUserStudent(userStudentId);
+    public StudentBrandingDto getStudentBranding(@PathVariable Long userStudentId,
+            @RequestParam(required = false) Long assessmentId) {
+        BrandingDto brand = brandingService.forUserStudent(userStudentId);
+        // Read live from the row — never the build-time assessment cache — so an admin
+        // flipping "Email report" is reflected on the very next thank-you page.
+        boolean emailReportEnabled = assessmentId != null && assessmentTableRepository.findById(assessmentId)
+                .map(a -> Boolean.TRUE.equals(a.getEmailReportEnabled()))
+                .orElse(false);
+        return StudentBrandingDto.of(brand, emailReportEnabled);
     }
 
     /**

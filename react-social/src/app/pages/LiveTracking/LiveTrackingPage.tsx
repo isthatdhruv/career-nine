@@ -24,6 +24,7 @@ import { ActionIcon } from "../../components/ActionIcon";
 import { useAssessmentsForCurrentUser } from "../../hooks/useScopedAssessments";
 import { useInstitutes } from "../../lib/queries/lookups";
 import SearchableSelect from "../../components/SearchableSelect";
+import { getScopedAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 
 /* ─── Types ─── */
 
@@ -205,7 +206,44 @@ const LiveTrackingPage = () => {
   // Cast through Assessment[] — the hook only reads .id so shape overlap is enough.
   const { assessments: scopedAssessments, allowedInstituteCodes } =
     useAssessmentsForCurrentUser(allAssessments as any);
-  const assessments = scopedAssessments as unknown as AssessmentOption[];
+
+  // Institute selector. "" = every institute in the user's scope (the scoped
+  // list above). A specific institute swaps the dropdown for EVERY assessment
+  // connected to it — active registration-link mappings unioned with student
+  // allotments — so assessments mapped only through the school registration
+  // config show up too.
+  const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  const [instituteAssessments, setInstituteAssessments] =
+    useState<AssessmentOption[] | null>(null);
+  const [instituteAssessmentsLoading, setInstituteAssessmentsLoading] = useState(false);
+  useEffect(() => {
+    if (selectedInstitute === "") {
+      setInstituteAssessments(null);
+      return;
+    }
+    let cancelled = false;
+    setInstituteAssessmentsLoading(true);
+    getScopedAssessmentSummariesByInstitute(Number(selectedInstitute))
+      .then((res) => {
+        if (!cancelled) setInstituteAssessments((res.data || []) as unknown as AssessmentOption[]);
+      })
+      .catch(() => {
+        if (!cancelled) setInstituteAssessments([]);
+      })
+      .finally(() => {
+        if (!cancelled) setInstituteAssessmentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInstitute]);
+  const assessments = useMemo<AssessmentOption[]>(
+    () =>
+      selectedInstitute === ""
+        ? (scopedAssessments as unknown as AssessmentOption[])
+        : instituteAssessments ?? [],
+    [selectedInstitute, scopedAssessments, instituteAssessments]
+  );
 
   // Allowed institute *names*, derived from /instituteDetail/get/list (which the
   // backend already scopes for the current user). Used to drop student rows from
@@ -294,6 +332,16 @@ const LiveTrackingPage = () => {
     }
     setAllowedInstituteNames(names);
   }, [allowedInstituteCodes, institutesForNames]);
+
+  // Display name of the selected institute — live-tracking rows carry the
+  // institute NAME, not the code, so the row filter below matches on it.
+  const selectedInstituteName = useMemo<string | null>(() => {
+    if (selectedInstitute === "") return null;
+    const inst = institutesForNames.find(
+      (i: any) => Number(i?.instituteCode) === Number(selectedInstitute)
+    );
+    return inst?.instituteName ? String(inst.instituteName) : null;
+  }, [selectedInstitute, institutesForNames]);
 
   // Track whether we've already loaded lite data for the current assessment
   const liteLoadedRef = useRef<number | null>(null);
@@ -441,9 +489,8 @@ const LiveTrackingPage = () => {
   };
 
   // Handle assessment change
-  const handleAssessmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = Number(e.target.value);
-    setSelectedId(id || null);
+  const resetSelection = useCallback((id: number | null) => {
+    setSelectedId(id);
     setData(null);
     prevDataRef.current = "";
     progressHighWaterRef.current = {};
@@ -452,7 +499,20 @@ const LiveTrackingPage = () => {
     setFilterStatus("all");
     setFilterInstitute("all");
     setSearchQuery("");
+  }, []);
+
+  const handleAssessmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = Number(e.target.value);
+    resetSelection(id || null);
   };
+
+  // Institute switch: if the current assessment isn't connected to the newly
+  // chosen institute, clear it so the auto-select above picks a valid one.
+  useEffect(() => {
+    if (selectedId == null) return;
+    if (selectedInstitute !== "" && instituteAssessments == null) return; // still loading
+    if (!assessments.some((a) => a.id === selectedId)) resetSelection(null);
+  }, [assessments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch Redis partials when tab switches or assessment changes
   const fetchRedisPartials = useCallback(async () => {
@@ -743,21 +803,27 @@ const LiveTrackingPage = () => {
   // this becomes a redundant client-side belt over the suspenders.
   const visibleStudents = useMemo(() => {
     if (!data) return [];
-    if (allowedInstituteNames == null) return data.students; // super-admin / wildcard
-    return data.students.filter((s) => {
-      // Empty instituteName means the row isn't tagged — fail-open so we don't
-      // hide students whose institute hasn't been resolved yet (lite-data path).
-      if (!s.instituteName) return true;
-      return allowedInstituteNames.has(s.instituteName);
-    });
-  }, [data, allowedInstituteNames]);
+    const scoped =
+      allowedInstituteNames == null
+        ? data.students // super-admin / wildcard
+        : data.students.filter((s) => {
+            // Empty instituteName means the row isn't tagged — fail-open so we don't
+            // hide students whose institute hasn't been resolved yet (lite-data path).
+            if (!s.instituteName) return true;
+            return allowedInstituteNames.has(s.instituteName);
+          });
+    // Institute selector: a shared assessment lists every institute's students;
+    // narrow to the chosen one (untagged lite rows pass until the full fetch).
+    if (!selectedInstituteName) return scoped;
+    return scoped.filter((s) => !s.instituteName || s.instituteName === selectedInstituteName);
+  }, [data, allowedInstituteNames, selectedInstituteName]);
 
-  // Summary that reflects ONLY the rows the user can see. When scope filtering is
-  // a no-op (super-admin) this equals `data.summary` so the cards/progress bar
-  // are unchanged for admins.
+  // Summary cards derive from the SAME rows the table renders, always. The old
+  // shortcut returned the server's summary for unscoped viewers, which drifted
+  // from the table whenever an institute filter applied or the lite payload's
+  // summary counted rows the full payload later dropped.
   const scopedSummary = useMemo<Summary>(() => {
     if (!data) return { total: 0, notStarted: 0, ongoing: 0, completed: 0 };
-    if (allowedInstituteNames == null) return data.summary;
     let notStarted = 0, ongoing = 0, completed = 0;
     for (const s of visibleStudents) {
       if (s.status === "completed") completed++;
@@ -765,7 +831,7 @@ const LiveTrackingPage = () => {
       else notStarted++;
     }
     return { total: visibleStudents.length, notStarted, ongoing, completed };
-  }, [data, visibleStudents, allowedInstituteNames]);
+  }, [data, visibleStudents]);
 
   // Unique institute names for filter dropdown
   const instituteOptions = useMemo(() => {
@@ -893,34 +959,64 @@ const LiveTrackingPage = () => {
       />
       <div className="card">
       <div className="card-body pt-4">
-        {/* Assessment selector */}
-        <div className="row mb-4">
-          <div className="col-md-6 col-lg-4">
-            <label className="form-label fw-semibold">Select Assessment</label>
-            <select
-              className="form-select"
-              value={selectedId ?? ""}
-              onChange={handleAssessmentChange}
-            >
-              <option value="">-- Choose Assessment --</option>
-              {assessments.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.assessmentName} {a.isActive ? "(Active)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          {lastUpdated && (
-            <div className="col-md-6 col-lg-4 d-flex align-items-end">
-              <small className="text-muted">
-                Last updated: {lastUpdated.toLocaleTimeString()}
+        {/* Institute + Assessment selectors — styled as the page's primary CTA */}
+        <div className="lt-cta-row">
+          <div className="lt-cta">
+            <div className="lt-cta-step">1</div>
+            <div className="lt-cta-body">
+              <label className="lt-cta-label">
+                <i className="bi bi-building" /> Institute
+              </label>
+              <SearchableSelect
+                className="lt-cta-control"
+                options={institutesForNames.map((inst: any) => ({
+                  value: String(inst.instituteCode),
+                  label: String(inst.instituteName ?? ""),
+                }))}
+                value={selectedInstitute === "" ? "" : String(selectedInstitute)}
+                onChange={(v) => setSelectedInstitute(v ? Number(v) : "")}
+                placeholder="All my institutes"
+              />
+              <small className="lt-cta-hint">
+                {selectedInstitute === ""
+                  ? "Showing assessments across all your institutes — pick one to list everything allotted there"
+                  : "Every assessment connected to this institute, including school-registration mappings"}
               </small>
             </div>
-          )}
+          </div>
+          <div className="lt-cta lt-cta-primary">
+            <div className="lt-cta-step">2</div>
+            <div className="lt-cta-body">
+              <label className="lt-cta-label" htmlFor="lt-assessment-select">
+                <i className="bi bi-clipboard-data" /> Assessment
+              </label>
+              <select
+                id="lt-assessment-select"
+                className="form-select lt-cta-select"
+                value={selectedId ?? ""}
+                onChange={handleAssessmentChange}
+                disabled={instituteAssessmentsLoading}
+              >
+                <option value="">
+                  {instituteAssessmentsLoading ? "Loading assessments..." : "-- Choose Assessment --"}
+                </option>
+                {assessments.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.assessmentName} {a.isActive ? "(Active)" : ""}
+                  </option>
+                ))}
+              </select>
+              <small className="lt-cta-hint">
+                {assessments.length} assessment{assessments.length === 1 ? "" : "s"}
+                {selectedInstitute === "" ? " in your scope" : " in this institute"}
+                {lastUpdated && <> · Last updated {lastUpdated.toLocaleTimeString()}</>}
+              </small>
+            </div>
+          </div>
         </div>
 
         {/* Tab toggle */}
-        <ul className="nav nav-tabs mb-4">
+        <ul className="nav nav-tabs mb-4 lt-tabs">
           <li className="nav-item">
             <button
               className={`nav-link ${activeTab === "live" ? "active" : ""}`}
@@ -1073,7 +1169,7 @@ const LiveTrackingPage = () => {
 
             {/* Student table */}
             <div className="table-responsive">
-              <table className="table table-hover align-middle">
+              <table className="table table-hover align-middle lt-table">
                 <thead className="table-light">
                   <tr>
                     <th style={{ width: 60 }}>#</th>
@@ -1206,7 +1302,7 @@ const LiveTrackingPage = () => {
             )}
 
             <div className="table-responsive">
-              <table className="table table-hover align-middle">
+              <table className="table table-hover align-middle lt-table">
                 <thead className="table-light">
                   <tr>
                     <th style={{ width: 40 }}>
@@ -1454,6 +1550,65 @@ const LiveTrackingPage = () => {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }
         }
+
+        /* ── Institute / Assessment CTA selectors ── */
+        .lt-cta-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+        .lt-cta {
+          flex: 1 1 320px; min-width: 0;
+          display: flex; gap: 14px; align-items: flex-start;
+          padding: 16px 18px; border-radius: 14px;
+          border: 2px solid rgba(67, 97, 238, 0.35);
+          background: linear-gradient(135deg, rgba(67, 97, 238, 0.09), rgba(58, 12, 163, 0.04));
+          box-shadow: 0 6px 18px rgba(67, 97, 238, 0.10);
+          transition: box-shadow .2s ease, border-color .2s ease, transform .2s ease;
+        }
+        .lt-cta:hover, .lt-cta:focus-within {
+          border-color: #4361ee; box-shadow: 0 10px 26px rgba(67, 97, 238, 0.20); transform: translateY(-1px);
+        }
+        .lt-cta-primary {
+          border-color: rgba(16, 185, 129, 0.45);
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.11), rgba(5, 150, 105, 0.04));
+          box-shadow: 0 6px 18px rgba(16, 185, 129, 0.10);
+        }
+        .lt-cta-primary:hover, .lt-cta-primary:focus-within {
+          border-color: #059669; box-shadow: 0 10px 26px rgba(16, 185, 129, 0.20);
+        }
+        .lt-cta-step {
+          flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; margin-top: 2px;
+          background: #4361ee; color: #fff; font-weight: 800; font-size: 0.9rem;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 3px 8px rgba(67, 97, 238, 0.35);
+        }
+        .lt-cta-primary .lt-cta-step { background: #059669; box-shadow: 0 3px 8px rgba(16, 185, 129, 0.35); }
+        .lt-cta-body { flex: 1 1 auto; min-width: 0; }
+        .lt-cta-label {
+          display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+          font-weight: 800; font-size: 0.8rem; letter-spacing: .06em; text-transform: uppercase; color: #0f172a;
+        }
+        .lt-cta-label i { color: #4361ee; font-size: 1rem; }
+        .lt-cta-primary .lt-cta-label i { color: #059669; }
+        .lt-cta-select, .lt-cta-control [class*="-control"] {
+          min-height: 44px !important; border: 2px solid #cbd5e1 !important; border-radius: 10px !important;
+          background: #fff; font-weight: 600; font-size: 0.95rem !important;
+        }
+        .lt-cta-control [class*="-control"]:hover { border-color: #4361ee !important; }
+        .lt-cta-select:focus, .lt-cta-control [class*="-control--is-focused"] {
+          border-color: #059669 !important; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15) !important;
+        }
+        .lt-cta-control [class*="-control--is-focused"] { border-color: #4361ee !important; box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.15) !important; }
+        .lt-cta-select:disabled { background: #f1f5f9; }
+        .lt-cta-hint { display: block; margin-top: 6px; color: #64748b; font-size: 0.8rem; line-height: 1.4; }
+
+        /* ── Mobile: tabs scroll sideways, tables keep their width and scroll inside ── */
+        .lt-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .lt-tabs .nav-link { white-space: nowrap; }
+        .lt-table { min-width: 960px; }
+        @media (max-width: 767.98px) {
+          .lt-cta { padding: 14px; gap: 10px; }
+          .lt-table { min-width: 880px; }
+          .lt-table th, .lt-table td { padding: 8px 10px; }
+          .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        }
       `}</style>
     </div>
     </div>
@@ -1586,7 +1741,7 @@ const PendingPersistenceTab = (props: PendingTabProps) => {
       </div>
 
       <div className="table-responsive">
-        <table className="table table-hover align-middle">
+        <table className="table table-hover align-middle lt-table">
           <thead className="table-light">
             <tr>
               <th style={{ width: 40 }}>#</th>

@@ -235,15 +235,6 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
                   </td>
                 </tr>
                 <tr>
-                  <td>1-pager</td>
-                  <td>—</td>
-                  <td>
-                    <Button size="sm" variant="outline-primary" disabled={busyService === "one_pager"} onClick={() => handleResend("one_pager")}>
-                      {busyService === "one_pager" ? <Spinner size="sm" animation="border" /> : "Resend 1-pager"}
-                    </Button>
-                  </td>
-                </tr>
-                <tr>
                   <td>Final report</td>
                   <td>{data.finalReportActive ? <span className="badge bg-success">Active</span> : <span className="badge bg-light text-muted">Not in tier</span>}</td>
                   <td>

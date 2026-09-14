@@ -69,7 +69,10 @@ public class DashboardDataService {
     private static final Logger log = LoggerFactory.getLogger(DashboardDataService.class);
 
     /** Redis key prefix for per-user cached dashboard payloads. */
-    private static final String CACHE_KEY_PREFIX = "dashboard:user:";
+    // v2: bumped when the scope predicate changed (null-tolerant dims + student
+    // allotment union) so stale 24h snapshots computed under the old, empty
+    // session-scoped query are not served after deploy.
+    private static final String CACHE_KEY_PREFIX = "dashboard:v2:user:";
 
     /** Cache TTL — user-confirmed 24 h. Staleness is surfaced to the FE via the
      *  {@code computedAt} field so the UI can show "updated X ago". */
@@ -349,6 +352,14 @@ public class DashboardDataService {
         // JPQL resolves Java field names, not column names. AssessmentInstituteMapping
         // does have a distinct `assessmentId` Java field, so the inner subquery is
         // correct as written.
+        //
+        // Two sources, OR-ed (same rule as /assessments/get/list-summary-scoped):
+        //   1. active registration-link mappings whose own dims match the scope;
+        //   2. assessments any in-scope student is directly allotted to.
+        // Source 2 is what surfaces assessments mapped only through the school
+        // registration config (school_assessment_config never mirrors into
+        // assessment_institute_mapping), so a school login sees the assessments
+        // its students are actually sitting.
         StringBuilder jpql = new StringBuilder(
                 "SELECT DISTINCT a FROM AssessmentTable a WHERE a.id IN (" +
                         "SELECT m.assessmentId FROM AssessmentInstituteMapping m " +
@@ -356,6 +367,11 @@ public class DashboardDataService {
         Map<String, Object> params = new HashMap<>();
         AccessScopeJpqlBuilder.appendScopePredicate(jpql, params, "asm", scope,
                 new Fields("m.instituteCode", "m.sessionId", "m.classId", "m.sectionId"));
+        jpql.append(") OR a.id IN (" +
+                "SELECT sm.assessmentId FROM StudentAssessmentMapping sm WHERE ");
+        AccessScopeJpqlBuilder.appendScopePredicate(jpql, params, "sas", scope,
+                new Fields("sm.userStudent.studentInfo.instituteId", "sm.userStudent.studentInfo.sessionId",
+                        "sm.userStudent.studentInfo.courseCode", "sm.userStudent.studentInfo.schoolSectionId"));
         jpql.append(")");
         return runQuery(jpql.toString(), AssessmentTable.class, params);
     }

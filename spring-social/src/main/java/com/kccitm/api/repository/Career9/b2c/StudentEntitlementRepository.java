@@ -17,6 +17,10 @@ public interface StudentEntitlementRepository extends JpaRepository<StudentEntit
 
     Optional<StudentEntitlement> findByPaymentTransactionId(Long paymentTransactionId);
 
+    // Used by the payment welcome-email resend: a payment transaction should mint at most one
+    // entitlement, but "latest by entitlementId" makes the lookup safe even if that ever changes.
+    Optional<StudentEntitlement> findFirstByPaymentTransactionIdOrderByEntitlementIdDesc(Long paymentTransactionId);
+
     List<StudentEntitlement> findByUserStudentIdAndAssessmentIdOrderByCreatedAtDesc(Long userStudentId, Long assessmentId);
 
     List<StudentEntitlement> findByUserStudentIdOrderByCreatedAtDesc(Long userStudentId);

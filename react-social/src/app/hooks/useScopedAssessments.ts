@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../modules/auth";
-import { getAssessmentMappingsByInstitute } from "../pages/AssessmentMapping/API/AssessmentMapping_APIs";
+import { getScopedAssessmentSummariesByInstitute } from "../pages/AssessmentMapping/API/AssessmentMapping_APIs";
 import { getUserCollegeMappings } from "../pages/Users/API/UserMapping_APIs";
 import { Assessment } from "../pages/StudentInformation/StudentInfo_APIs";
 
@@ -9,12 +9,16 @@ import { Assessment } from "../pages/StudentInformation/StudentInfo_APIs";
  *
  * Behaviour matches the Reports Hub baseline:
  *   - selectedInstitute === "" → returns `allAssessments` untouched (no institute picked).
- *   - mapping fetch fails OR returns zero active rows → returns `allAssessments` (fail-open
+ *   - fetch fails OR returns zero rows → returns `allAssessments` (fail-open
  *     fallback — better to show all than to silently hide everything from the user).
- *   - mapping returns N active rows → intersection with `allAssessments`.
+ *   - fetch returns N rows → intersection with `allAssessments`.
  *
- * The institute mapping is the source of truth; we never *add* assessments the institute
- * isn't mapped to, only narrow.
+ * The institute's connected set comes from /assessments/get/list-summary-by-institute,
+ * i.e. the backend's own scoping rule: active registration-link mappings UNIONED with
+ * assessments the institute's students are allotted to. (Reading only
+ * assessment_institute_mapping hid assessments mapped through the school registration
+ * config, which never mirrors into that table.) We never *add* assessments the institute
+ * isn't connected to, only narrow.
  */
 export function useAssessmentsForInstitute(
   selectedInstitute: number | "",
@@ -29,12 +33,12 @@ export function useAssessmentsForInstitute(
       return;
     }
     setLoading(true);
-    getAssessmentMappingsByInstitute(Number(selectedInstitute))
+    getScopedAssessmentSummariesByInstitute(Number(selectedInstitute))
       .then((res) => {
         const ids = new Set<number>(
           (res.data || [])
-            .filter((m: any) => m.isActive !== false)
-            .map((m: any) => Number(m.assessmentId))
+            .map((a: any) => Number(a.id ?? a.assessmentId))
+            .filter((v: number) => Number.isFinite(v))
         );
         setMappedIds(ids);
       })
@@ -139,11 +143,11 @@ export function useAssessmentsForCurrentUser(
     const codes = Array.from(allowedInstituteCodes);
     Promise.all(
       codes.map((code) =>
-        getAssessmentMappingsByInstitute(code)
+        getScopedAssessmentSummariesByInstitute(code)
           .then((res) =>
             (res.data || [])
-              .filter((m: any) => m.isActive !== false)
-              .map((m: any) => Number(m.assessmentId))
+              .map((a: any) => Number(a.id ?? a.assessmentId))
+              .filter((v: number) => Number.isFinite(v))
           )
           .catch(() => [] as number[])
       )
