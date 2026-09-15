@@ -47,7 +47,7 @@ class AdminOverviewLocalIT {
     private Map<String, Function<AdminOverviewFilter, CompletableFuture<AdminOverviewCard>>> cards() {
         Map<String, Function<AdminOverviewFilter, CompletableFuture<AdminOverviewCard>>> m = new LinkedHashMap<>();
         m.put(AdminOverviewService.SIGNUPS, service::signups);
-        m.put(AdminOverviewService.ASSESSMENTS_CONDUCTED, service::assessmentsConducted);
+        m.put(AdminOverviewService.ACTIVE_ASSESSMENTS, service::activeAssessments);
         m.put(AdminOverviewService.ASSESSMENTS_COMPLETED, service::assessmentsCompleted);
         m.put(AdminOverviewService.ASSESSMENTS_IN_PROGRESS, service::assessmentsInProgress);
         m.put(AdminOverviewService.ASSESSMENTS_NOT_STARTED, service::assessmentsNotStarted);
@@ -103,12 +103,12 @@ class AdminOverviewLocalIT {
             assertTrue(d.getThread().startsWith("dashboard-"), "expected dashboard pool thread, got " + d.getThread());
             assertTrue(d.getRows().size() <= 20);
             assertTrue(d.getRows().size() <= d.getTotal());
-            boolean distinctCard = c.getKey().equals(AdminOverviewService.ASSESSMENTS_CONDUCTED)
-                    || c.getKey().equals(AdminOverviewService.REPORTS_GENERATED);
-            if (!distinctCard) {
-                assertEquals(c.getValue(), d.getTotal(), "card vs list total for " + c.getKey());
+            if (c.getKey().equals(AdminOverviewService.REPORTS_GENERATED)) {
+                // lists every completed student (pending ones highlighted), so total = completed
+                Object completed = c.getExtra().get("completed");
+                assertEquals(completed == null ? 0L : ((Number) completed).longValue(), d.getTotal(), "reports list = completed students");
             } else {
-                assertTrue(d.getTotal() >= c.getValue(), "list total should cover the distinct count for " + c.getKey());
+                assertEquals(c.getValue(), d.getTotal(), "card vs list total for " + c.getKey());
             }
             Object sample = d.getRows().isEmpty() ? "-" : d.getRows().get(0);
             System.out.printf("  %-28s total=%-6d rows=%-3d cols=%-2d %4d ms  first=%s%n",
@@ -159,6 +159,20 @@ class AdminOverviewLocalIT {
             assertEquals(0L, c.getValue(), c.getKey());
         }
         drillAll("denied viewer", f, cards);
+    }
+
+    @Test
+    void funnelBucketsAddUpToSignups() {
+        AdminOverviewFilter f = new AdminOverviewFilter(null, null, null, Collections.<Long>emptySet(), Optional.<AccessScope>empty());
+        AdminOverviewCard signups = service.signups(f).join();
+        long notStarted = service.assessmentsNotStarted(f).join().getValue();
+        long inProgress = service.assessmentsInProgress(f).join().getValue();
+        long completed = service.assessmentsCompleted(f).join().getValue();
+        long withReport = service.reportsGenerated(f).join().getValue();
+        System.out.println("=== funnel: signups=" + signups.getValue() + " notStarted=" + notStarted
+                + " inProgress=" + inProgress + " completed=" + completed + " withReport=" + withReport + " ===");
+        assertEquals(signups.getValue(), notStarted + inProgress + completed, "funnel buckets must partition the cohort");
+        assertTrue(withReport <= completed, "a report implies a completion");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.kccitm.api.service.dashboard.admin;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -68,6 +69,9 @@ public class AdminOverviewDetailService {
     @Autowired
     private CounsellingClock clock;
 
+    @Autowired
+    private AdminCohortFunnel funnel;
+
     /**
      * The rows behind {@code key}. Unknown keys throw {@link IllegalArgumentException}
      * (the controller maps that to 404).
@@ -84,19 +88,13 @@ public class AdminOverviewDetailService {
         switch (key) {
             case AdminOverviewService.SIGNUPS:
                 return signups(f, search, pageNo, pageSize, offset, t0);
-            case AdminOverviewService.ASSESSMENTS_CONDUCTED:
+            case AdminOverviewService.ACTIVE_ASSESSMENTS:
+                return activeAssessments(f, search, pageNo, pageSize, offset, t0);
             case AdminOverviewService.ASSESSMENTS_COMPLETED:
-                return mappings(key, "Completed assessments", f, search, pageNo, pageSize, offset, t0,
-                        q -> q.and("m.status = 'completed'").dateRange("m.completedAt", f)
-                              .orderBy("m.completedAt DESC, m.studentAssessmentId DESC"));
             case AdminOverviewService.ASSESSMENTS_IN_PROGRESS:
-                return mappings(key, "Assessments in progress", f, search, pageNo, pageSize, offset, t0,
-                        q -> q.and("m.status = 'ongoing'").orderBy("m.studentAssessmentId DESC"));
             case AdminOverviewService.ASSESSMENTS_NOT_STARTED:
-                return mappings(key, "Assessments not started", f, search, pageNo, pageSize, offset, t0,
-                        q -> q.and("(m.status IS NULL OR m.status = 'notstarted')").orderBy("m.studentAssessmentId DESC"));
             case AdminOverviewService.REPORTS_GENERATED:
-                return reports(f, search, pageNo, pageSize, offset, t0);
+                return funnelStudents(key, f, search, pageNo, pageSize, offset, t0);
             case AdminOverviewService.COUNSELLING_BOOKED:
                 return appointments(key, "Counselling booked by students", f, search, pageNo, pageSize, offset, t0,
                         q -> q.and("a.status NOT IN ('CANCELLED', 'DECLINED')").localDateTimeRange("a.createdAt", f)
@@ -139,80 +137,233 @@ public class AdminOverviewDetailService {
         if (f.isDenied()) return empty(AdminOverviewService.SIGNUPS, "New sign-ups", page, size, search, columns, t0);
 
         OverviewQuery q = OverviewQuery.signups(em, clock.zone(), f)
-                .localDateTimeRange("us.createdAt", f)
+                .utcDateTimeRange("us.createdAt", f)
                 .search(search)
                 .orderBy("us.createdAt DESC, us.userStudentId DESC");
         long total = q.count("SELECT COUNT(us)");
         List<Map<String, Object>> rows = new ArrayList<>();
         for (UserStudent us : q.list("SELECT us", UserStudent.class, offset, size)) {
             Map<String, Object> r = studentRow(us);
-            r.put("registeredAt", iso(us.getCreatedAt()));
+            r.put("registeredAt", isoFromUtc(us.getCreatedAt()));
             rows.add(r);
         }
         return CompletableFuture.completedFuture(AdminOverviewDetail.of(
                 AdminOverviewService.SIGNUPS, "New sign-ups", total, page, size, search, columns, rows, t0));
     }
 
-    private CompletableFuture<AdminOverviewDetail> mappings(String key, String title, AdminOverviewFilter f, String search,
-                                                            int page, int size, int offset, long t0, Narrow narrow) {
-        List<Column> columns = new ArrayList<>(STUDENT_COLUMNS);
-        columns.add(new Column("assessmentName", "Assessment"));
-        columns.add(new Column("status", "Status"));
-        columns.add(new Column("completedAt", "Completed"));
-        if (f.isDenied()) return empty(key, title, page, size, search, columns, t0);
+    /**
+     * Active assessments: one row per assessment. Assessments that students
+     * completed inside the selected range are sorted to the top and flagged, so
+     * the "used in this range" ones stand out from the idle ones.
+     */
+    private CompletableFuture<AdminOverviewDetail> activeAssessments(AdminOverviewFilter f, String search,
+                                                                     int page, int size, int offset, long t0) {
+        String key = AdminOverviewService.ACTIVE_ASSESSMENTS;
+        List<Column> columns = Arrays.asList(
+                new Column("assessmentName", "Assessment"),
+                new Column("activity", "Activity in range"),
+                new Column("completedInRange", "Completed in range"),
+                new Column("status", "Status"),
+                new Column("reportType", "Report type"),
+                new Column("startDate", "Starts"),
+                new Column("endDate", "Ends"),
+                new Column("assigned", "Students assigned"),
+                new Column("completed", "Completed (all time)"),
+                new Column("inProgress", "In progress"));
+        if (f.isDenied()) return empty(key, "Active assessments", page, size, search, columns, t0);
 
-        OverviewQuery q = narrow.apply(OverviewQuery.mappings(em, clock.zone(), f)).search(search);
-        long total = q.count("SELECT COUNT(m)");
-        List<StudentAssessmentMapping> page0 = q.list("SELECT m", StudentAssessmentMapping.class, offset, size);
-        Set<Long> ids = new HashSet<>();
-        for (StudentAssessmentMapping m : page0) ids.add(m.getAssessmentId());
-        Map<Long, String> names = assessmentNames(ids);
+        OverviewQuery q = OverviewQuery.assessments(em, clock.zone(), f)
+                .and("a.isActive = TRUE")
+                .searchFields(search, "a.AssessmentName")
+                .orderBy("a.id DESC");
+        List<AssessmentTable> all = q.list("SELECT a", AssessmentTable.class, 0, Integer.MAX_VALUE);
 
+        Map<Long, long[]> counts = new HashMap<>();
+        Map<Long, Long> inRange = new HashMap<>();
+        if (!all.isEmpty()) {
+            Set<Long> ids = new HashSet<>();
+            for (AssessmentTable a : all) ids.add(a.getId());
+            List<Object[]> rows = em.createQuery(
+                    "SELECT m.assessmentId, COUNT(m), "
+                            + "SUM(CASE WHEN m.status = 'completed' THEN 1 ELSE 0 END), "
+                            + "SUM(CASE WHEN m.status = 'ongoing' THEN 1 ELSE 0 END) "
+                            + "FROM StudentAssessmentMapping m WHERE m.assessmentId IN :ids GROUP BY m.assessmentId",
+                    Object[].class).setParameter("ids", ids).getResultList();
+            for (Object[] r : rows) {
+                counts.put((Long) r[0], new long[] { ((Number) r[1]).longValue(), ((Number) r[2]).longValue(), ((Number) r[3]).longValue() });
+            }
+            // completions inside the applied window, same predicate the card's chip uses
+            OverviewQuery rq = OverviewQuery.mappings(em, clock.zone(), f)
+                    .and("m.status = 'completed'")
+                    .and("m.assessmentId IN :pageIds").param("pageIds", ids)
+                    .dateRange("m.completedAt", f)
+                    .groupBy("m.assessmentId");
+            for (Object[] r : rq.list("SELECT m.assessmentId, COUNT(m)", Object[].class, 0, Integer.MAX_VALUE)) {
+                inRange.put((Long) r[0], ((Number) r[1]).longValue());
+            }
+        }
+
+        all.sort((x, y) -> {
+            long ix = inRange.getOrDefault(x.getId(), 0L), iy = inRange.getOrDefault(y.getId(), 0L);
+            if (ix != iy) return Long.compare(iy, ix);
+            return Long.compare(y.getId() == null ? 0 : y.getId(), x.getId() == null ? 0 : x.getId());
+        });
+
+        int from = Math.min(offset, all.size());
+        int to = Math.min(offset + size, all.size());
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (StudentAssessmentMapping m : page0) {
-            Map<String, Object> r = studentRow(m.getUserStudent());
-            r.put("assessmentId", m.getAssessmentId());
-            r.put("assessmentName", names.getOrDefault(m.getAssessmentId(), "Assessment #" + m.getAssessmentId()));
-            r.put("status", m.getStatus() == null ? "notstarted" : m.getStatus());
-            r.put("completedAt", iso(m.getCompletedAt()));
+        for (AssessmentTable a : all.subList(from, to)) {
+            long[] c = counts.getOrDefault(a.getId(), new long[] { 0, 0, 0 });
+            long cir = inRange.getOrDefault(a.getId(), 0L);
+            Map<String, Object> r = AdminOverviewDetail.row();
+            r.put("assessmentId", a.getId());
+            r.put("assessmentName", a.getAssessmentName());
+            r.put("activity", cir > 0 ? "Completed by students" : "No completions");
+            r.put("completedInRange", cir);
+            r.put("highlight", cir > 0);
+            r.put("status", Boolean.TRUE.equals(a.getIsLocked()) ? "locked" : "active");
+            r.put("reportType", a.getReportType());
+            r.put("startDate", a.getStarDate());
+            r.put("endDate", a.getEndDate());
+            r.put("assigned", c[0]);
+            r.put("completed", c[1]);
+            r.put("inProgress", c[2]);
             rows.add(r);
         }
-        return CompletableFuture.completedFuture(AdminOverviewDetail.of(key, title, total, page, size, search, columns, rows, t0));
+        return CompletableFuture.completedFuture(AdminOverviewDetail.of(
+                key, "Active assessments", all.size(), page, size, search, columns, rows, t0));
     }
 
-    private CompletableFuture<AdminOverviewDetail> reports(AdminOverviewFilter f, String search,
-                                                           int page, int size, int offset, long t0) {
-        String key = AdminOverviewService.REPORTS_GENERATED;
+    /**
+     * The four funnel cards share one shape: one row per sign-up in the bucket,
+     * in registration order, with the bucket's own extra columns. Search runs in
+     * Java over the (bounded) cohort, since the bucket is not a single query.
+     */
+    private CompletableFuture<AdminOverviewDetail> funnelStudents(String key, AdminOverviewFilter f, String search,
+                                                                  int page, int size, int offset, long t0) {
         List<Column> columns = new ArrayList<>(STUDENT_COLUMNS);
-        columns.add(new Column("assessmentName", "Assessment"));
-        columns.add(new Column("typeOfReport", "Report type"));
-        columns.add(new Column("reportStatus", "Status"));
-        columns.add(new Column("generatedAt", "Generated"));
-        if (f.isDenied()) return empty(key, "Reports generated", page, size, search, columns, t0);
+        String title;
+        switch (key) {
+            case AdminOverviewService.ASSESSMENTS_COMPLETED:
+                title = "Completed fully";
+                columns.add(new Column("completedAttempts", "Completed"));
+                columns.add(new Column("lastAssessment", "Latest assessment"));
+                columns.add(new Column("completedAt", "Completed at"));
+                columns.add(new Column("reportStatus", "Report"));
+                break;
+            case AdminOverviewService.ASSESSMENTS_IN_PROGRESS:
+                title = "Partially completed / in progress";
+                columns.add(new Column("assessmentName", "Assessment"));
+                columns.add(new Column("answersSaved", "Answers saved"));
+                columns.add(new Column("lastSavedAt", "Last saved"));
+                break;
+            case AdminOverviewService.ASSESSMENTS_NOT_STARTED:
+                title = "Not started";
+                columns.add(new Column("assignedAssessments", "Assigned"));
+                columns.add(new Column("registeredAt", "Registered"));
+                break;
+            default:
+                title = "Reports generated";
+                columns.add(new Column("reportStatus", "Report"));
+                columns.add(new Column("reports", "Reports"));
+                columns.add(new Column("lastAssessment", "Latest assessment"));
+                columns.add(new Column("reportAt", "Generated at"));
+                break;
+        }
+        if (f.isDenied()) return empty(key, title, page, size, search, columns, t0);
 
-        OverviewQuery q = OverviewQuery.reports(em, clock.zone(), f)
-                .and("LOWER(r.reportStatus) = 'generated'")
-                .dateRange("r.createdAt", f)
-                .search(search)
-                .orderBy("r.createdAt DESC, r.generatedReportId DESC");
-        long total = q.count("SELECT COUNT(r)");
-        List<GeneratedReport> page0 = q.list("SELECT r", GeneratedReport.class, offset, size);
-        Set<Long> ids = new HashSet<>();
-        for (GeneratedReport r : page0) ids.add(r.getAssessmentId());
-        Map<Long, String> names = assessmentNames(ids);
+        AdminCohortFunnel.Funnel fn = funnel.compute(f);
+        List<AdminCohortFunnel.Student> bucket;
+        switch (key) {
+            case AdminOverviewService.ASSESSMENTS_COMPLETED: bucket = fn.completed(); break;
+            case AdminOverviewService.ASSESSMENTS_IN_PROGRESS: bucket = fn.inProgress(); break;
+            case AdminOverviewService.ASSESSMENTS_NOT_STARTED: bucket = fn.notStarted(); break;
+            default: {
+                // Every completed student, the ones still waiting for a report first
+                // (and highlighted), so the gaps stand out.
+                bucket = new ArrayList<>();
+                for (AdminCohortFunnel.Student st : fn.completed()) if (!st.hasReport()) bucket.add(st);
+                for (AdminCohortFunnel.Student st : fn.completed()) if (st.hasReport()) bucket.add(st);
+                break;
+            }
+        }
+
+        // Load the accounts behind the bucket (chunked IN), keep bucket order.
+        Map<Long, UserStudent> accounts = new HashMap<>();
+        List<Long> ids = new ArrayList<>();
+        for (AdminCohortFunnel.Student s : bucket) ids.add(s.id);
+        for (int i = 0; i < ids.size(); i += 900) {
+            List<Long> chunk = ids.subList(i, Math.min(ids.size(), i + 900));
+            for (UserStudent us : em.createQuery("SELECT us FROM UserStudent us WHERE us.userStudentId IN :ids", UserStudent.class)
+                    .setParameter("ids", chunk).getResultList()) {
+                accounts.put(us.getUserStudentId(), us);
+            }
+        }
+
+        String needle = search == null ? "" : search.trim().toLowerCase();
+        List<AdminCohortFunnel.Student> matched = new ArrayList<>();
+        for (AdminCohortFunnel.Student s : bucket) {
+            if (needle.isEmpty()) { matched.add(s); continue; }
+            UserStudent us = accounts.get(s.id);
+            StudentInfo si = us == null ? null : us.getStudentInfo();
+            String hay = ((si == null || si.getName() == null ? "" : si.getName()) + " "
+                    + (si == null || si.getEmail() == null ? "" : si.getEmail()) + " "
+                    + (si == null || si.getSchoolRollNumber() == null ? "" : si.getSchoolRollNumber())).toLowerCase();
+            if (hay.contains(needle)) matched.add(s);
+        }
+
+        int from = Math.min(offset, matched.size());
+        int to = Math.min(offset + size, matched.size());
+        List<AdminCohortFunnel.Student> pageStudents = matched.subList(from, to);
+        Map<Long, String> names = assessmentNames(AdminCohortFunnel.assessmentIds(pageStudents));
 
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (GeneratedReport rep : page0) {
-            Map<String, Object> r = studentRow(rep.getUserStudent());
-            r.put("assessmentId", rep.getAssessmentId());
-            r.put("assessmentName", names.getOrDefault(rep.getAssessmentId(), "Assessment #" + rep.getAssessmentId()));
-            r.put("typeOfReport", rep.getTypeOfReport());
-            r.put("reportStatus", rep.getReportStatus());
-            r.put("generatedAt", iso(rep.getCreatedAt()));
-            r.put("reportUrl", rep.getReportUrl());
+        for (AdminCohortFunnel.Student s : pageStudents) {
+            UserStudent us = accounts.get(s.id);
+            Map<String, Object> r = studentRow(us);
+            if (us == null) r.put("userStudentId", s.id);
+            switch (key) {
+                case AdminOverviewService.ASSESSMENTS_COMPLETED: {
+                    AdminCohortFunnel.Attempt last = s.latestCompleted();
+                    r.put("completedAttempts", s.completedAttempts());
+                    r.put("lastAssessment", last == null ? null : names.getOrDefault(last.assessmentId, "Assessment #" + last.assessmentId));
+                    r.put("completedAt", last == null ? null : iso(last.completedAt));
+                    r.put("reportStatus", s.hasReport() ? "generated" : (s.failedReports() > 0 ? "failed" : "pending"));
+                    break;
+                }
+                case AdminOverviewService.ASSESSMENTS_IN_PROGRESS: {
+                    AdminCohortFunnel.Draft d = s.latestDraft();
+                    AdminCohortFunnel.Attempt a = s.ongoingAttempt();
+                    Long aid = d != null ? d.assessmentId : (a != null ? a.assessmentId : null);
+                    r.put("assessmentName", aid == null ? null : names.getOrDefault(aid, "Assessment #" + aid));
+                    r.put("source", d != null ? "Answers saved" : "Started only");
+                    r.put("answersSaved", d != null ? d.answerCount : null);
+                    r.put("lastSavedAt", d != null ? d.savedAt : null);
+                    break;
+                }
+                case AdminOverviewService.ASSESSMENTS_NOT_STARTED: {
+                    r.put("assignedAssessments", s.attempts.size());
+                    r.put("registeredAt", us == null ? null : isoFromUtc(us.getCreatedAt()));
+                    break;
+                }
+                default: {
+                    AdminCohortFunnel.Report rep = s.latestReport();
+                    AdminCohortFunnel.Attempt last = s.latestCompleted();
+                    boolean has = s.hasReport();
+                    r.put("reportStatus", has ? "generated" : (s.failedReports() > 0 ? "failed" : "pending"));
+                    r.put("highlight", !has);
+                    r.put("reports", s.generatedReports());
+                    r.put("lastAssessment", rep != null
+                            ? names.getOrDefault(rep.assessmentId, "Assessment #" + rep.assessmentId)
+                            : (last == null ? null : names.getOrDefault(last.assessmentId, "Assessment #" + last.assessmentId)));
+                    r.put("reportAt", rep == null ? null : iso(rep.createdAt));
+                    break;
+                }
+            }
             rows.add(r);
         }
-        return CompletableFuture.completedFuture(AdminOverviewDetail.of(key, "Reports generated", total, page, size, search, columns, rows, t0));
+        return CompletableFuture.completedFuture(AdminOverviewDetail.of(
+                key, title, matched.size(), page, size, search, columns, rows, t0));
     }
 
     private CompletableFuture<AdminOverviewDetail> appointments(String key, String title, AdminOverviewFilter f, String search,
@@ -422,6 +573,11 @@ public class AdminOverviewDetailService {
 
     private static String iso(LocalDateTime t) {
         return t == null ? null : t.toString();
+    }
+
+    /** A UTC wall-clock value (user_student.created_at) rendered in the app zone. */
+    private String isoFromUtc(LocalDateTime utc) {
+        return utc == null ? null : utc.atOffset(ZoneOffset.UTC).atZoneSameInstant(clock.zone()).toLocalDateTime().toString();
     }
 
     private String iso(Date d) {

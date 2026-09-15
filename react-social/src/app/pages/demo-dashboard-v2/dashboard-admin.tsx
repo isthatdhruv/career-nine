@@ -213,6 +213,15 @@ const applyScopeToSnapshot = (
   };
 };
 
+/** A banner tile value from one overview card: "—" until it has loaded, "!" if it failed. */
+const heroStat = (st: CardState | undefined, take: (c: OverviewCard) => any): string => {
+  if (!st) return "\u2014";
+  if (st.loading && !st.data) return "\u2014";
+  if (st.error && !st.data) return "!";
+  if (!st.data) return "\u2014";
+  return fmtNum(Number(take(st.data) ?? 0));
+};
+
 const relativeTime = (iso: string | undefined): string => {
   if (!iso) return "";
   const then = new Date(iso).getTime();
@@ -437,7 +446,7 @@ const DashboardAdminContent: FC = () => {
       isSuperAdmin, viewInstituteKeys, viewAssessmentIds,
     ]
   );
-  const { students, institutes, assessments, reports, studentMappings } = viewFiltered;
+  const { institutes, assessments, reports, studentMappings } = viewFiltered;
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -452,10 +461,6 @@ const DashboardAdminContent: FC = () => {
   const [rangeKey, setRangeKey] = useState<RangeKey>("30d");
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
-  const draftRange = useMemo(
-    () => computeRange(rangeKey, customStart, customEnd),
-    [rangeKey, customStart, customEnd]
-  );
 
   const [applied, setApplied] = useState<AppliedFilters>(() => ({
     rangeKey: "30d",
@@ -634,20 +639,6 @@ const DashboardAdminContent: FC = () => {
   });
 
   /* Derived series ------------------------------------------- */
-  const validStudents = useMemo(() => {
-    const instituteIds = new Set<string>();
-    institutes.forEach((i) => {
-      const id = pick(i, ["id", "instituteId"]);
-      const code = pick(i, ["instituteCode", "code"]);
-      if (id != null) instituteIds.add(String(id));
-      if (code != null) instituteIds.add(String(code));
-    });
-    if (instituteIds.size === 0) return students;
-    return students.filter((s) => {
-      const sid = pick(s, ["instituteId", "institute_id"]);
-      return sid != null && instituteIds.has(String(sid));
-    });
-  }, [students, institutes]);
 
   return (
     <>
@@ -695,15 +686,18 @@ const DashboardAdminContent: FC = () => {
                       ? `${institutes.length} institutes`
                       : institutes[0]?.instituteName || "Not mapped",
                   },
-                  { label: "Students", value: loading ? "—" : fmtNum(validStudents.length) },
-                  { label: "Assessments", value: loading ? "—" : fmtNum(assessments.length) },
+                  { label: "Sign-ups", value: heroStat(overview.states.signups, (c) => c.value) },
+                  { label: "Assessments used", value: heroStat(overview.states["active-assessments"], (c) => c.extra.withCompletions) },
                 ]
               : [
-                  { label: "Students", value: loading ? "—" : fmtNum(validStudents.length) },
-                  { label: "Institutes", value: loading ? "—" : fmtNum(institutes.length) },
-                  { label: "Assessments", value: loading ? "—" : fmtNum(assessments.length) },
+                  { label: "Sign-ups", value: heroStat(overview.states.signups, (c) => c.value) },
+                  { label: "Institutes", value: heroStat(overview.states.signups, (c) => c.extra.institutes) },
+                  { label: "Assessments used", value: heroStat(overview.states["active-assessments"], (c) => c.extra.withCompletions) },
                 ]
           }
+          quickStatsCaption={`${rangeLabel(applied.rangeKey, applied.range)}${
+            isSuperAdmin && viewInstitute ? " · " + String(pick(viewInstituteRow, ["instituteName", "name"]) || `institute ${viewInstitute}`) : ""
+          }${isSuperAdmin && viewAssessmentIds.length > 0 ? ` · ${viewAssessmentIds.length} ${viewAssessmentIds.length === 1 ? "assessment" : "assessments"}` : ""}`}
         />
 
         {scopeDenied && (
@@ -729,7 +723,6 @@ const DashboardAdminContent: FC = () => {
           t={t}
           rangeKey={rangeKey}
           setRangeKey={setRangeKey}
-          range={draftRange}
           customStart={customStart}
           customEnd={customEnd}
           setCustomStart={setCustomStart}
@@ -795,7 +788,9 @@ const Hero: FC<{
   /** True if this payload was served from Redis (vs. a fresh DB compute). */
   cacheHit?: boolean;
   quickStats: { label: string; value: string }[];
-}> = ({ greeting, name, date, onLogout, onRefresh, refreshing, loading, error, computedAt, cacheHit, quickStats }) => (
+  /** What window / filters the tiles reflect. */
+  quickStatsCaption?: string;
+}> = ({ greeting, name, date, onLogout, onRefresh, refreshing, loading, error, computedAt, cacheHit, quickStats, quickStatsCaption }) => (
   <div className="ds-hero">
     <div className="ds-hero-grid" />
     <div className="ds-hero-glow ds-hero-glow-1" />
@@ -910,6 +905,7 @@ const Hero: FC<{
         </div>
       </div>
 
+      <div className="ds-hero-stats-wrap">
       <div className="ds-hero-stats">
         {quickStats.map((s, i) => (
           <div key={s.label} className="ds-hero-stat" style={{ animationDelay: `${i * 80}ms` }}>
@@ -938,6 +934,12 @@ const Hero: FC<{
             </div>
           </div>
         ))}
+      </div>
+      {quickStatsCaption && (
+        <div className="ds-hero-stats-caption">
+          <IconClock /> {quickStatsCaption}
+        </div>
+      )}
       </div>
     </div>
   </div>
@@ -1018,7 +1020,6 @@ const DateRangeBar: FC<{
   t: Theme;
   rangeKey: RangeKey;
   setRangeKey: (k: RangeKey) => void;
-  range: DateRange;
   customStart: string;
   customEnd: string;
   setCustomStart: (s: string) => void;
@@ -1033,7 +1034,6 @@ const DateRangeBar: FC<{
   t,
   rangeKey,
   setRangeKey,
-  range,
   customStart,
   customEnd,
   setCustomStart,
@@ -1104,12 +1104,6 @@ const DateRangeBar: FC<{
           onChange={(e) => setCustomEnd(e.target.value)}
         />
       </div>
-    )}
-    {rangeKey !== "custom" && range.start && range.end && (
-      <span style={{ fontSize: 12, color: t.textSubtle }}>
-        {range.start.toLocaleDateString(undefined, { day: "numeric", month: "short" })} –{" "}
-        {range.end.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
-      </span>
     )}
 
     <div
@@ -1307,6 +1301,7 @@ const toneColors = (t: Theme, k: Tone): { solid: string; soft: string } => {
 
 type Fact = { label: string; value: string; tone?: Tone };
 type MeterSeg = { label: string; value: number; tone: Tone };
+type Tile = { label: string; value: number; tone: Tone; hint?: string };
 
 const KpiCard: FC<{
   t: Theme;
@@ -1320,6 +1315,10 @@ const KpiCard: FC<{
   facts?: Fact[];
   /** Composition of the headline number, shown as a thin stacked meter with a legend. */
   meter?: MeterSeg[];
+  /** Mini stat tiles (one per group) under the headline. */
+  tiles?: Tile[];
+  /** Span two grid columns. */
+  wide?: boolean;
   /** Error / placeholder text (replaces note, facts and meter). */
   caption?: string;
   loading?: boolean;
@@ -1335,11 +1334,11 @@ const KpiCard: FC<{
   onRetry?: () => void;
   /** When set, the whole card is a button (opens the drill-down). */
   onClick?: () => void;
-}> = ({ t, tone, icon, title, value, note, facts, meter, caption, loading, errored, dateFiltered, badge, warn, meta, onRetry, onClick }) => {
+}> = ({ t, tone, icon, title, value, note, facts, meter, tiles, wide, caption, loading, errored, dateFiltered, badge, warn, meta, onRetry, onClick }) => {
   const meterTotal = meter ? meter.reduce((a, s) => a + Math.max(0, s.value), 0) : 0;
   return (
     <div
-      className={`ds-card ds-kpi-card ${onClick ? "clickable" : ""}`}
+      className={`ds-card ds-kpi-card ${onClick ? "clickable" : ""} ${wide ? "ds-kpi-wide" : ""}`}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       title={onClick ? "Click to see the students behind this number" : undefined}
@@ -1398,7 +1397,7 @@ const KpiCard: FC<{
         {loading ? <Spinner color={tone.solid} size={24} /> : value}
       </div>
 
-      {errored || (!note && !facts?.length && !meter?.length) ? (
+      {errored || (!note && !facts?.length && !meter?.length && !tiles?.length) ? (
         <div className="ds-kpi-note" style={{ color: errored ? t.danger : t.textMuted }}>
           {caption}
           {onRetry && (
@@ -1410,6 +1409,20 @@ const KpiCard: FC<{
       ) : (
         <>
           {note && <div className="ds-kpi-note" style={{ color: t.textMuted }}>{note}</div>}
+          {tiles && tiles.length > 0 && (
+            <div className="ds-kpi-tiles">
+              {tiles.map((tile) => {
+                const c = toneColors(t, tile.tone);
+                return (
+                  <div key={tile.label} className="ds-kpi-tile" title={tile.hint} style={{ background: c.soft, borderColor: `${c.solid}33` }}>
+                    <span className="ds-kpi-tile-dot" style={{ background: c.solid }} />
+                    <span className="ds-kpi-tile-value" style={{ color: t.text }}>{fmtNum(tile.value)}</span>
+                    <span className="ds-kpi-tile-label" style={{ color: c.solid }}>{tile.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {meter && meterTotal > 0 && (
             <div className="ds-kpi-meter">
               <div className="ds-kpi-meter-bar" style={{ background: t.bgSubtle }}>
@@ -1677,6 +1690,10 @@ type CardDef = {
   facts?: (c: OverviewCard) => Fact[];
   /** Composition of the headline number for the stacked meter. */
   meter?: (c: OverviewCard) => MeterSeg[];
+  /** Mini stat tiles inside the card (one per group), for the wide layout. */
+  tiles?: (c: OverviewCard) => Tile[];
+  /** Span two grid columns. */
+  wide?: boolean;
 };
 
 type CardSection = {
@@ -1692,7 +1709,7 @@ type CardSection = {
 const CARD_SECTIONS: CardSection[] = [
   {
     title: "Registrations & assessments",
-    subtitle: "Who joined, what was taken, and how far students got.",
+    subtitle: "Students who registered in the selected range, followed through: not started \u2192 in progress \u2192 completed \u2192 report.",
     tone: "primary",
     cards: [
       {
@@ -1704,13 +1721,13 @@ const CARD_SECTIONS: CardSection[] = [
         note: (c) => c.basis,
       },
       {
-        key: "assessments-conducted",
-        title: "Assessments conducted",
+        key: "active-assessments",
+        title: "Active assessments",
         tone: "purple",
         icon: <IconClipboard />,
-        mode: "range",
-        note: () => "distinct assessments with at least one completion",
-        facts: (c) => [fact(c.extra.completions, "completions", "purple")],
+        mode: "state",
+        note: (c) => `of ${num(c.extra.total)} assessments in total`,
+        facts: (c) => [fact(c.extra.withCompletions, "completed by students in this range", "success")],
       },
       {
         key: "assessments-completed",
@@ -1718,26 +1735,30 @@ const CARD_SECTIONS: CardSection[] = [
         tone: "success",
         icon: <IconFileCheck />,
         mode: "range",
-        note: () => "attempts submitted in full",
-        facts: (c) => [fact(c.extra.students, "students", "success")],
+        note: (c) => `of ${num(c.extra.signups)} sign-ups completed an assessment`,
+        facts: (c) => [fact(c.extra.attempts, "completed attempts", "success")],
       },
       {
         key: "assessments-in-progress",
         title: "Partially completed / in progress",
         tone: "warning",
         icon: <IconActivity />,
-        mode: "state",
-        note: () => "attempts opened but not yet submitted",
-        facts: (c) => [fact(c.extra.students, "students mid-way", "warning")],
+        mode: "range",
+        note: (c) => `of ${num(c.extra.signups)} sign-ups started but have not submitted`,
+        facts: (c) => [
+          fact(c.extra.withDraft, "with answers saved", "warning"),
+          fact(c.extra.ongoingOnly, "started, nothing saved yet", "info"),
+          ...(c.extra.redisAvailable === false ? [{ label: "saved answers could not be checked", value: "!", tone: "danger" as Tone }] : []),
+        ],
       },
       {
         key: "assessments-not-started",
         title: "Not started",
         tone: "info",
         icon: <IconClock />,
-        mode: "state",
-        note: () => "assigned attempts never opened",
-        facts: (c) => [fact(c.extra.students, "students yet to begin", "info")],
+        mode: "range",
+        note: (c) => `of ${num(c.extra.signups)} sign-ups have not opened an assessment`,
+        facts: (c) => [fact(c.extra.assigned, "assigned, never opened", "info"), fact(c.extra.unassigned, "nothing assigned yet", "warning")],
       },
       {
         key: "reports-generated",
@@ -1745,14 +1766,15 @@ const CARD_SECTIONS: CardSection[] = [
         tone: "success",
         icon: <IconFileCheck />,
         mode: "range",
-        note: () => "students holding a generated report",
+        note: (c) => `of ${num(c.extra.completed)} completions have a report`,
         facts: (c) => [
           fact(c.extra.reports, "reports", "success"),
+          ...(n(c.extra.awaitingReport) > 0 ? [fact(c.extra.awaitingReport, "completed, report pending", "warning")] : []),
           ...(n(c.extra.failed) > 0 ? [fact(c.extra.failed, "failed", "danger")] : []),
         ],
         meter: (c) => [
-          { label: "generated", value: n(c.extra.reports), tone: "success" },
-          { label: "failed", value: n(c.extra.failed), tone: "danger" },
+          { label: "with report", value: n(c.extra.completed) - n(c.extra.awaitingReport), tone: "success" },
+          { label: "report pending", value: n(c.extra.awaitingReport), tone: "warning" },
         ],
       },
     ],
@@ -1856,11 +1878,12 @@ const CARD_SECTIONS: CardSection[] = [
         tone: "purple",
         icon: <IconGlobe />,
         mode: "range",
-        note: () => "sign-ups captured on the website",
-        meter: (c) => [
-          { label: "students", value: n(c.extra.students), tone: "primary" },
-          { label: "parents", value: n(c.extra.parents), tone: "purple" },
-          { label: "schools", value: n(c.extra.schools), tone: "success" },
+        wide: true,
+        note: () => "sign-ups captured on the website, by who registered",
+        tiles: (c) => [
+          { label: "Students", value: n(c.extra.students), tone: "primary", hint: "Registered as a student" },
+          { label: "Parents", value: n(c.extra.parents), tone: "purple", hint: "Registered as a parent" },
+          { label: "Schools", value: n(c.extra.schools), tone: "success", hint: "Registered as a school" },
         ],
         facts: (c) => [fact(c.extra.signupForm, "via sign-up form", "info"), fact(c.extra.popup, "via pop-up", "warning")],
       },
@@ -1901,7 +1924,7 @@ const statusTone = (value: any): Tone => {
   const v = String(value ?? "").toLowerCase();
   if (/completed|generated|paid|confirmed|synced|attended/.test(v)) return "success";
   if (/ongoing|pending|assigned|in_progress|in progress|created|scheduled/.test(v)) return "warning";
-  if (/missed|failed|cancel|absent|awaiting|under_review|under review|declined|disput/.test(v)) return "danger";
+  if (/missed|failed|cancel|absent|awaiting|under_review|under review|declined|disput|locked/.test(v)) return "danger";
   if (/notstarted|not started/.test(v)) return "info";
   return "info";
 };
@@ -1911,12 +1934,13 @@ const chipTone = (key: string, value: any): Tone => {
   const v = String(value ?? "").toLowerCase();
   if (key === "leadType") return v === "student" ? "primary" : v === "parent" ? "purple" : "success";
   if (key === "purpose") return v.startsWith("counselling") ? "purple" : "success";
-  if (key === "source") return v.includes("popup") ? "warning" : "info";
+  if (key === "source") return v.includes("popup") || v.includes("saved") ? "warning" : "info";
   if (key === "mode") return v === "online" ? "primary" : "info";
+  if (key === "activity") return v.startsWith("completed") ? "success" : "info";
   return "info";
 };
 
-const CHIP_COLUMNS = new Set(["status", "reportStatus", "leadType", "purpose", "source", "mode", "typeOfReport"]);
+const CHIP_COLUMNS = new Set(["status", "reportStatus", "leadType", "purpose", "source", "mode", "typeOfReport", "activity"]);
 
 const AVATAR_TONES: Tone[] = ["primary", "purple", "success", "warning", "info", "danger"];
 const avatarTone = (name: string): Tone => {
@@ -2175,7 +2199,7 @@ const OverviewDetailModal: FC<{
                 </thead>
                 <tbody>
                   {(detail?.rows ?? []).map((row, i) => (
-                    <tr key={String(row.appointmentId ?? row.leadId ?? row.userStudentId ?? i) + "-" + i} className="ds-row">
+                    <tr key={String(row.appointmentId ?? row.leadId ?? row.userStudentId ?? i) + "-" + i} className={`ds-row ${row.highlight ? "ds-row-hot" : ""}`}>
                       <td className="ds-td-index">{i + 1}</td>
                       {columns.map((c) => (
                         <td key={c.key} title={row[c.key] == null ? undefined : String(row[c.key])}>
@@ -2249,17 +2273,15 @@ const OverviewSection: FC<{
                 </div>
                 <div className="ds-section-sub" style={{ color: t.textMuted }}>{section.subtitle}</div>
               </div>
-              <div className="ds-section-right">
-                {failed > 0 ? (
-                  <Pill t={t} tone="danger">{failed} failed</Pill>
-                ) : loaded < section.cards.length ? (
-                  <Pill t={t} tone="info">{loaded}/{section.cards.length} loaded</Pill>
-                ) : (
-                  <span className="ds-section-count" style={{ color: st.solid, background: st.soft }}>
-                    {section.cards.length} {section.cards.length === 1 ? "card" : "cards"}
-                  </span>
-                )}
-              </div>
+              {(failed > 0 || loaded < section.cards.length) && (
+                <div className="ds-section-right">
+                  {failed > 0 ? (
+                    <Pill t={t} tone="danger">{failed} failed</Pill>
+                  ) : (
+                    <Pill t={t} tone="info">Loading…</Pill>
+                  )}
+                </div>
+              )}
             </div>
             <div className={`ds-grid ${section.compact ? "ds-grid-compact" : ""}`}>
               {section.cards.map((def) => {
@@ -2276,6 +2298,8 @@ const OverviewSection: FC<{
                     note={data && !denied && def.note ? def.note(data) : undefined}
                     facts={data && !denied && def.facts ? def.facts(data) : undefined}
                     meter={data && !denied && def.meter ? def.meter(data) : undefined}
+                    tiles={data && !denied && def.tiles ? def.tiles(data) : undefined}
+                    wide={def.wide}
                     caption={
                       s.error
                         ? `Failed: ${s.error}`
@@ -2437,6 +2461,17 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255,255,255,0.08);
     }
+    .ds-hero-stats-wrap { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+    .ds-hero-stats-caption {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: rgba(255,255,255,0.6);
+    }
+    .ds-hero-stats-caption svg { width: 12px; height: 12px; }
     .ds-hero-stats {
       display: grid;
       grid-template-columns: repeat(3, minmax(104px, 1fr));
@@ -2680,15 +2715,6 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     }
     .ds-section-sub { font-size: 12px; margin-top: 3px; }
     .ds-section-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-    .ds-section-count {
-      display: inline-flex;
-      align-items: center;
-      padding: 3px 10px;
-      border-radius: 100px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
 
     /* --------------------- KPI CARD --------------------- */
     .ds-kpi-card {
@@ -2788,6 +2814,29 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     .ds-kpi-meter-legend > span { display: inline-flex; align-items: center; gap: 6px; }
     .ds-kpi-meter-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
     .ds-kpi-meter-legend b { font-weight: 700; }
+    .ds-kpi-wide { grid-column: span 2; }
+    @media (max-width: 640px) { .ds-kpi-wide { grid-column: span 1; } }
+    .ds-kpi-tiles {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 4px;
+    }
+    @media (max-width: 640px) { .ds-kpi-tiles { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); } }
+    .ds-kpi-tile {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      min-width: 0;
+      position: relative;
+    }
+    .ds-kpi-tile-dot { position: absolute; top: 12px; right: 12px; width: 8px; height: 8px; border-radius: 50%; }
+    .ds-kpi-tile-value { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
+    .ds-kpi-tile-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
     .ds-kpi-facts { position: relative; display: flex; flex-wrap: wrap; gap: 6px; }
     .ds-fact {
       display: inline-flex;
@@ -2863,6 +2912,8 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
       padding: 22px 26px 18px;
       min-width: 0;
       overflow: hidden;
+      /* never let the table squeeze the header (it clipped the title/icon) */
+      flex: 0 0 auto;
     }
     .ds-modal-head-wash {
       position: absolute;
@@ -2900,11 +2951,12 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
       flex-wrap: wrap;
       padding: 12px 26px;
       min-width: 0;
+      flex: 0 0 auto;
     }
     .ds-modal-stat-note { font-size: 12.5px; font-weight: 500; margin-right: 6px; }
     .ds-modal-body {
-      flex: 1;
-      min-height: 240px;
+      flex: 1 1 auto;
+      min-height: 160px;
       min-width: 0;
       display: flex;
       flex-direction: column;
@@ -2928,6 +2980,7 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
       gap: 12px;
       flex-wrap: wrap;
       padding: 12px 26px;
+      flex: 0 0 auto;
     }
     .ds-search-wrap {
       display: inline-flex;
@@ -3006,6 +3059,8 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     }
     .ds-table tbody tr:nth-child(even) td { background: ${t.name === "dark" ? "rgba(255,255,255,0.025)" : "rgba(15,23,42,0.02)"}; }
     .ds-table tbody tr:hover td { background: var(--modal-soft); }
+    .ds-row-hot td { background: var(--modal-soft) !important; }
+    .ds-row-hot td:first-child { box-shadow: inset 4px 0 0 var(--modal-tone); }
     .ds-td-index { color: ${t.textSubtle}; font-variant-numeric: tabular-nums; font-size: 11.5px; }
     .ds-cell-name { display: inline-flex; align-items: center; gap: 10px; }
     .ds-avatar {

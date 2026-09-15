@@ -18,7 +18,7 @@ const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
 
 export type OverviewCardKey =
   | "signups"
-  | "assessments-conducted"
+  | "active-assessments"
   | "assessments-completed"
   | "assessments-in-progress"
   | "assessments-not-started"
@@ -33,7 +33,7 @@ export type OverviewCardKey =
 
 export const OVERVIEW_CARD_KEYS: OverviewCardKey[] = [
   "signups",
-  "assessments-conducted",
+  "active-assessments",
   "assessments-completed",
   "assessments-in-progress",
   "assessments-not-started",

@@ -1,6 +1,7 @@
 package com.kccitm.api.service.dashboard.admin;
 
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,7 @@ final class OverviewQuery {
     private final StringBuilder where = new StringBuilder();
     private final Map<String, Object> params = new HashMap<>();
     private String orderBy;
+    private String groupBy;
     private int seq;
 
     OverviewQuery(EntityManager em, ZoneId zone, String fromClause) {
@@ -118,6 +120,33 @@ final class OverviewQuery {
         return q;
     }
 
+    /**
+     * Assessments ({@code AssessmentTable a}), soft-deleted ones excluded. For a
+     * scoped viewer or an institute filter, only assessments at least one of
+     * their students is assigned to.
+     */
+    static OverviewQuery assessments(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
+        OverviewQuery q = new OverviewQuery(em, zone, "FROM AssessmentTable a")
+                .and("(a.isDeleted = FALSE OR a.isDeleted IS NULL)");
+        if (f.getScope().isPresent() || f.hasInstitute()) {
+            StringBuilder sub = new StringBuilder(
+                    "EXISTS (SELECT m.studentAssessmentId FROM StudentAssessmentMapping m "
+                            + "JOIN m.userStudent us JOIN us.studentInfo si WHERE m.assessmentId = a.id");
+            if (f.getScope().isPresent()) {
+                StringBuilder p = new StringBuilder();
+                AccessScopeJpqlBuilder.appendScopePredicate(p, q.params, "sc", f.getScope().get(),
+                        new Fields("si.instituteId", "si.sessionId", "si.courseCode", "si.schoolSectionId"));
+                sub.append(" AND ").append(p);
+            }
+            if (f.hasInstitute()) {
+                sub.append(" AND si.instituteId = :inst");
+                q.param("inst", f.getInstituteCode());
+            }
+            q.and(sub.append(")").toString());
+        }
+        return q.assessments(f, "a.id");
+    }
+
     // ─── Predicates ──────────────────────────────────────────────────────
 
     OverviewQuery and(String predicate) {
@@ -194,6 +223,21 @@ final class OverviewQuery {
         return this;
     }
 
+    /**
+     * {@code LocalDateTime} column whose wall-clock is UTC (e.g. {@code user_student.created_at},
+     * stamped by the database with {@code UTC_TIMESTAMP}): the app-zone day boundaries,
+     * converted to UTC before comparing.
+     */
+    OverviewQuery utcDateTimeRange(String field, AdminOverviewFilter f) {
+        if (f.hasRange()) {
+            String k = "utc" + (seq++);
+            and(field + " >= :" + k + "From AND " + field + " < :" + k + "To")
+                    .param(k + "From", f.getFrom().atStartOfDay(zone).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime())
+                    .param(k + "To", f.getTo().plusDays(1).atStartOfDay(zone).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime());
+        }
+        return this;
+    }
+
     /** {@code java.util.Date} column: [from 00:00, to+1 00:00) as instants in the app zone. */
     OverviewQuery dateRange(String field, AdminOverviewFilter f) {
         if (f.hasRange()) {
@@ -210,6 +254,11 @@ final class OverviewQuery {
         return this;
     }
 
+    OverviewQuery groupBy(String clause) {
+        this.groupBy = clause;
+        return this;
+    }
+
     // ─── Execution ───────────────────────────────────────────────────────
 
     long count(String countSelect) {
@@ -220,7 +269,9 @@ final class OverviewQuery {
     }
 
     <T> List<T> list(String select, Class<T> type, int offset, int limit) {
-        String jpql = select + " " + fromClause + where + (orderBy != null ? " ORDER BY " + orderBy : "");
+        String jpql = select + " " + fromClause + where
+                + (groupBy != null ? " GROUP BY " + groupBy : "")
+                + (orderBy != null ? " ORDER BY " + orderBy : "");
         TypedQuery<T> q = em.createQuery(jpql, type);
         bind(q);
         q.setFirstResult(Math.max(0, offset));
