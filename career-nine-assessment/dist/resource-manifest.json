@@ -1,6 +1,6 @@
 {
-  "version": "mtxzs9hk",
-  "generated": "2026-09-12T06:16:26.888Z",
+  "version": "mu17wic5",
+  "generated": "2026-09-14T12:27:00.437Z",
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -58,11 +58,6 @@
       "priority": "game"
     },
     {
-      "url": "/mediapipe/face_mesh/README.md",
-      "size": 389,
-      "priority": "deferred"
-    },
-    {
       "url": "/mediapipe/face_mesh/face_mesh.binarypb",
       "size": 939,
       "priority": "deferred"
@@ -118,28 +113,23 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-B-p2k2DO.js",
+      "url": "/mediapipe/face_mesh/README.md",
+      "size": 389,
+      "priority": "deferred"
+    },
+    {
+      "url": "/assets/firebase-BzjeF8i9.js",
+      "size": 218084,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-C1orBrdJ.js",
+      "size": 355,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/HydroTubeGame-BKC9ITUh.js",
       "size": 23331,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/JungleSpotGame-CikEh04a.js",
-      "size": 23397,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/RabbitPathGame-CP9Yw6-o.js",
-      "size": 26981,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/firebase-BgISDq8X.js",
-      "size": 360,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/firebase-Illc6rc8.js",
-      "size": 218011,
       "priority": "critical"
     },
     {
@@ -148,18 +138,23 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-C5W3Nlem.js",
+      "url": "/assets/index-CQ-ecc4U.js",
+      "size": 1317561,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-DAs2WkXS.js",
       "size": 1274010,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-pUKJKrS5.js",
-      "size": 1317214,
+      "url": "/assets/index.es-Bg27Y7Uz.js",
+      "size": 158825,
       "priority": "critical"
     },
     {
-      "url": "/assets/index.es-DeL2lgbJ.js",
-      "size": 158432,
+      "url": "/assets/JungleSpotGame-BQLJv1Nv.js",
+      "size": 23397,
       "priority": "critical"
     },
     {
@@ -168,29 +163,29 @@
       "priority": "critical"
     },
     {
+      "url": "/assets/RabbitPathGame-Bd6_noCg.js",
+      "size": 26981,
+      "priority": "critical"
+    },
+    {
       "url": "/assets/react-l0sNRNKZ.js",
       "size": 1,
       "priority": "critical"
     },
     {
-      "url": "/assets/router-DdiDh5ql.js",
+      "url": "/assets/router-xHc6rn2s.js",
       "size": 33312,
       "priority": "critical"
     },
     {
       "url": "/index.html",
-      "size": 23783,
+      "size": 23846,
       "priority": "critical"
     },
     {
       "url": "/workbox-2ff6bd68.js",
       "size": 21348,
       "priority": "critical"
-    },
-    {
-      "url": "/_headers",
-      "size": 243,
-      "priority": "other"
     },
     {
       "url": "/catalogues/india-cities.json",
@@ -211,11 +206,16 @@
       "url": "/media/logos/kcc.webp",
       "size": 274630,
       "priority": "other"
+    },
+    {
+      "url": "/_headers",
+      "size": 254,
+      "priority": "other"
     }
   ],
   "summary": {
     "total": 42,
-    "totalSize": 23915012,
+    "totalSize": 23915894,
     "byPriority": {
       "game": {
         "count": 11,
@@ -227,11 +227,11 @@
       },
       "critical": {
         "count": 14,
-        "size": 3414494
+        "size": 3415365
       },
       "other": {
         "count": 5,
-        "size": 997322
+        "size": 997333
       }
     }
   }
