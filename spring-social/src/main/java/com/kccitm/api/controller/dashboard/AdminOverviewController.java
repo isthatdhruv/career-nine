@@ -75,13 +75,13 @@ public class AdminOverviewController {
     // ─── Assessments ─────────────────────────────────────────────────────
 
     @PreAuthorize("@auth.allows('dashboard.admin.read')")
-    @GetMapping("/assessments-conducted")
-    public CompletableFuture<AdminOverviewCard> assessmentsConducted(
+    @GetMapping("/active-assessments")
+    public CompletableFuture<AdminOverviewCard> activeAssessments(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
             @RequestParam(required = false) Integer instituteCode,
             @RequestParam(required = false) String assessmentIds) {
-        return service.assessmentsConducted(filter(from, to, instituteCode, assessmentIds));
+        return service.activeAssessments(filter(from, to, instituteCode, assessmentIds));
     }
 
     @PreAuthorize("@auth.allows('dashboard.admin.read')")
@@ -249,7 +249,7 @@ public class AdminOverviewController {
 
         CompletableFuture<AdminOverviewCard>[] jobs = new CompletableFuture[] {
                 service.signups(f),
-                service.assessmentsConducted(f),
+                service.activeAssessments(f),
                 service.assessmentsCompleted(f),
                 service.assessmentsInProgress(f),
                 service.assessmentsNotStarted(f),

@@ -54,7 +54,7 @@ public class AdminOverviewService {
     // Card keys — must match the endpoint path segments in AdminOverviewController
     // and the card registry in the frontend (dashboard-admin.overview.api.ts).
     public static final String SIGNUPS = "signups";
-    public static final String ASSESSMENTS_CONDUCTED = "assessments-conducted";
+    public static final String ACTIVE_ASSESSMENTS = "active-assessments";
     public static final String ASSESSMENTS_COMPLETED = "assessments-completed";
     public static final String ASSESSMENTS_IN_PROGRESS = "assessments-in-progress";
     public static final String ASSESSMENTS_NOT_STARTED = "assessments-not-started";
@@ -77,127 +77,125 @@ public class AdminOverviewService {
     @Autowired
     private CounsellingClock clock;
 
+    @Autowired
+    private AdminCohortFunnel funnel;
+
     // ─── Registrations ───────────────────────────────────────────────────
 
-    /** New sign-ups / registrations: {@code user_student} rows created in the window. */
+    /**
+     * New sign-ups / registrations: {@code user_student} rows created in the window.
+     * Also carries the funnel split of that cohort (not started / in progress /
+     * completed) so the card can draw it.
+     */
     @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
     @Transactional(readOnly = true)
     public CompletableFuture<AdminOverviewCard> signups(AdminOverviewFilter f) {
         long t0 = System.nanoTime();
         if (f.isDenied()) return done(AdminOverviewCard.of(SIGNUPS, 0, f, f.hasRange(), "no institute mapped", t0));
 
-        long value = OverviewQuery.signups(em, clock.zone(), f)
-                .localDateTimeRange("us.createdAt", f)
-                .count("SELECT COUNT(us)");
-
+        AdminCohortFunnel.Funnel fn = funnel.compute(f);
+        long institutes = OverviewQuery.signups(em, clock.zone(), f)
+                .utcDateTimeRange("us.createdAt", f)
+                .count("SELECT COUNT(DISTINCT si.instituteId)");
         String basis = f.hasRange()
                 ? "student accounts registered in the selected window"
                 : "all registered student accounts";
-        return done(AdminOverviewCard.of(SIGNUPS, value, f, f.hasRange(), basis, t0));
+        return done(AdminOverviewCard.of(SIGNUPS, fn.cohort.size(), f, f.hasRange(), basis, t0)
+                .with("institutes", institutes)
+                .with("notStarted", fn.notStarted().size())
+                .with("inProgress", fn.inProgress().size())
+                .with("completed", fn.completed().size())
+                .with("withReport", fn.withReport().size()));
     }
 
     // ─── Assessments ─────────────────────────────────────────────────────
 
-    /** Distinct assessments that had at least one completion in the window. */
+    /** Assessments currently active (a live state; the range only shapes the "with completions" extra). */
     @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
     @Transactional(readOnly = true)
-    public CompletableFuture<AdminOverviewCard> assessmentsConducted(AdminOverviewFilter f) {
+    public CompletableFuture<AdminOverviewCard> activeAssessments(AdminOverviewFilter f) {
         long t0 = System.nanoTime();
-        if (f.isDenied()) return done(AdminOverviewCard.of(ASSESSMENTS_CONDUCTED, 0, f, f.hasRange(), "no institute mapped", t0));
+        if (f.isDenied()) return done(AdminOverviewCard.of(ACTIVE_ASSESSMENTS, 0, f, false, "no institute mapped", t0));
 
-        long distinct = OverviewQuery.mappings(em, clock.zone(), f)
+        long active = OverviewQuery.assessments(em, clock.zone(), f).and("a.isActive = TRUE").count("SELECT COUNT(a)");
+        long total = OverviewQuery.assessments(em, clock.zone(), f).count("SELECT COUNT(a)");
+        long withCompletions = OverviewQuery.mappings(em, clock.zone(), f)
                 .and("m.status = 'completed'")
                 .dateRange("m.completedAt", f)
                 .count("SELECT COUNT(DISTINCT m.assessmentId)");
-        long completions = OverviewQuery.mappings(em, clock.zone(), f)
-                .and("m.status = 'completed'")
-                .dateRange("m.completedAt", f)
-                .count("SELECT COUNT(m)");
 
-        return done(AdminOverviewCard.of(ASSESSMENTS_CONDUCTED, distinct, f, f.hasRange(),
-                "distinct assessments with at least one student completion" + windowSuffix(f), t0)
-                .with("completions", completions));
+        return done(AdminOverviewCard.of(ACTIVE_ASSESSMENTS, active, f, false,
+                "assessments switched on right now", t0)
+                .with("total", total)
+                .with("withCompletions", withCompletions));
     }
 
-    /** Assessment attempts fully completed by students. */
+    /** Sign-ups (in the window) who have fully completed at least one assessment. */
     @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
     @Transactional(readOnly = true)
     public CompletableFuture<AdminOverviewCard> assessmentsCompleted(AdminOverviewFilter f) {
         long t0 = System.nanoTime();
         if (f.isDenied()) return done(AdminOverviewCard.of(ASSESSMENTS_COMPLETED, 0, f, f.hasRange(), "no institute mapped", t0));
 
-        long value = OverviewQuery.mappings(em, clock.zone(), f)
-                .and("m.status = 'completed'")
-                .dateRange("m.completedAt", f)
-                .count("SELECT COUNT(m)");
-        long students = OverviewQuery.mappings(em, clock.zone(), f)
-                .and("m.status = 'completed'")
-                .dateRange("m.completedAt", f)
-                .count("SELECT COUNT(DISTINCT us.userStudentId)");
-
-        return done(AdminOverviewCard.of(ASSESSMENTS_COMPLETED, value, f, f.hasRange(),
-                "student attempts submitted in full" + windowSuffix(f), t0)
-                .with("students", students));
+        AdminCohortFunnel.Funnel fn = funnel.compute(f);
+        return done(AdminOverviewCard.of(ASSESSMENTS_COMPLETED, fn.completed().size(), f, f.hasRange(),
+                "sign-ups who completed an assessment", t0)
+                .with("attempts", fn.completedAttempts())
+                .with("signups", fn.cohort.size()));
     }
 
-    /** Attempts currently in progress — a snapshot; nothing records when an attempt began. */
+    /**
+     * Sign-ups (in the window) who started but have not finished: an attempt marked
+     * ongoing in MySQL or, more reliably, a live autosave draft in Redis.
+     */
     @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
     @Transactional(readOnly = true)
     public CompletableFuture<AdminOverviewCard> assessmentsInProgress(AdminOverviewFilter f) {
         long t0 = System.nanoTime();
-        if (f.isDenied()) return done(AdminOverviewCard.of(ASSESSMENTS_IN_PROGRESS, 0, f, false, "no institute mapped", t0));
+        if (f.isDenied()) return done(AdminOverviewCard.of(ASSESSMENTS_IN_PROGRESS, 0, f, f.hasRange(), "no institute mapped", t0));
 
-        long value = OverviewQuery.mappings(em, clock.zone(), f).and("m.status = 'ongoing'").count("SELECT COUNT(m)");
-        long students = OverviewQuery.mappings(em, clock.zone(), f).and("m.status = 'ongoing'").count("SELECT COUNT(DISTINCT us.userStudentId)");
-
-        return done(AdminOverviewCard.of(ASSESSMENTS_IN_PROGRESS, value, f, false,
-                "attempts started but not yet submitted (current state)", t0)
-                .with("students", students));
+        AdminCohortFunnel.Funnel fn = funnel.compute(f);
+        return done(AdminOverviewCard.of(ASSESSMENTS_IN_PROGRESS, fn.inProgress().size(), f, f.hasRange(),
+                "sign-ups who started but have not submitted", t0)
+                .with("withDraft", fn.withDraft())
+                .with("ongoingOnly", fn.ongoingOnly())
+                .with("redisAvailable", fn.redisAvailable)
+                .with("signups", fn.cohort.size()));
     }
 
-    /** Assigned attempts not yet opened — a snapshot of current state. */
+    /** Sign-ups (in the window) who have not opened any assessment yet. */
     @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
     @Transactional(readOnly = true)
     public CompletableFuture<AdminOverviewCard> assessmentsNotStarted(AdminOverviewFilter f) {
         long t0 = System.nanoTime();
-        if (f.isDenied()) return done(AdminOverviewCard.of(ASSESSMENTS_NOT_STARTED, 0, f, false, "no institute mapped", t0));
+        if (f.isDenied()) return done(AdminOverviewCard.of(ASSESSMENTS_NOT_STARTED, 0, f, f.hasRange(), "no institute mapped", t0));
 
-        long value = OverviewQuery.mappings(em, clock.zone(), f)
-                .and("(m.status IS NULL OR m.status = 'notstarted')").count("SELECT COUNT(m)");
-        long students = OverviewQuery.mappings(em, clock.zone(), f)
-                .and("(m.status IS NULL OR m.status = 'notstarted')").count("SELECT COUNT(DISTINCT us.userStudentId)");
-
-        return done(AdminOverviewCard.of(ASSESSMENTS_NOT_STARTED, value, f, false,
-                "assigned attempts never opened (current state)", t0)
-                .with("students", students));
+        AdminCohortFunnel.Funnel fn = funnel.compute(f);
+        return done(AdminOverviewCard.of(ASSESSMENTS_NOT_STARTED, fn.notStarted().size(), f, f.hasRange(),
+                "sign-ups who have not started an assessment", t0)
+                .with("assigned", fn.assignedNotStarted())
+                .with("unassigned", fn.unassigned())
+                .with("signups", fn.cohort.size()));
     }
 
     // ─── Reports ─────────────────────────────────────────────────────────
 
-    /** Distinct students who received a generated report in the window. */
+    /** Sign-ups (in the window) who completed an assessment and hold a generated report. */
     @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
     @Transactional(readOnly = true)
     public CompletableFuture<AdminOverviewCard> reportsGenerated(AdminOverviewFilter f) {
         long t0 = System.nanoTime();
         if (f.isDenied()) return done(AdminOverviewCard.of(REPORTS_GENERATED, 0, f, f.hasRange(), "no institute mapped", t0));
 
-        long students = OverviewQuery.reports(em, clock.zone(), f)
-                .and("LOWER(r.reportStatus) = 'generated'")
-                .dateRange("r.createdAt", f)
-                .count("SELECT COUNT(DISTINCT us.userStudentId)");
-        long reports = OverviewQuery.reports(em, clock.zone(), f)
-                .and("LOWER(r.reportStatus) = 'generated'")
-                .dateRange("r.createdAt", f)
-                .count("SELECT COUNT(r)");
-        long failed = OverviewQuery.reports(em, clock.zone(), f)
-                .and("LOWER(r.reportStatus) = 'failed'")
-                .dateRange("r.createdAt", f)
-                .count("SELECT COUNT(r)");
-
-        return done(AdminOverviewCard.of(REPORTS_GENERATED, students, f, f.hasRange(),
-                "students with a successfully generated report" + windowSuffix(f), t0)
-                .with("reports", reports)
-                .with("failed", failed));
+        AdminCohortFunnel.Funnel fn = funnel.compute(f);
+        long completed = fn.completed().size();
+        long withReport = fn.withReport().size();
+        return done(AdminOverviewCard.of(REPORTS_GENERATED, withReport, f, f.hasRange(),
+                "sign-ups whose report has been generated", t0)
+                .with("reports", fn.generatedReports())
+                .with("failed", fn.failedReports())
+                .with("awaitingReport", Math.max(0, completed - withReport))
+                .with("completed", completed));
     }
 
     // ─── Counselling ─────────────────────────────────────────────────────
