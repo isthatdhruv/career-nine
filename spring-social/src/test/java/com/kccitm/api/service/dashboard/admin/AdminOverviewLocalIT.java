@@ -10,9 +10,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
@@ -134,10 +136,49 @@ class AdminOverviewLocalIT {
         Integer instituteCode = Integer.getInteger("adminoverview.institute", 1);
         Long assessmentId = Long.getLong("adminoverview.assessment", 1L);
         LocalDate to = LocalDate.now();
-        AdminOverviewFilter f = new AdminOverviewFilter(to.minusDays(89), to, instituteCode,
+        AdminOverviewFilter f = new AdminOverviewFilter(to.minusDays(89), to, Collections.singleton(instituteCode),
                 new HashSet<>(Arrays.asList(assessmentId)), Optional.<AccessScope>empty());
         String label = "super-admin / institute " + instituteCode + " / assessment " + assessmentId + " / last 90 days";
         drillAll(label, f, runAll(label, f));
+    }
+
+    /**
+     * The super-admin picker is a multi-select: {@code instituteCode=1,2} on the
+     * wire becomes a {@code Set} on the filter and an {@code IN (...)} in every
+     * card query. A card over {A, B} counts anything belonging to A <em>or</em>
+     * B, so it can never be below either institute alone nor above their sum.
+     * Override the pair with {@code -Dadminoverview.institutes=a,b}.
+     */
+    @Test
+    void superAdminMultipleInstitutesAtOnce() {
+        Set<Integer> institutes = new LinkedHashSet<>();
+        for (String part : System.getProperty("adminoverview.institutes", "1,2").split(",")) {
+            if (!part.trim().isEmpty()) institutes.add(Integer.parseInt(part.trim()));
+        }
+        assertTrue(institutes.size() >= 2, "need at least two institute codes: -Dadminoverview.institutes=a,b");
+
+        AdminOverviewFilter combined = new AdminOverviewFilter(null, null, institutes, Collections.<Long>emptySet(), Optional.<AccessScope>empty());
+        assertTrue(combined.hasInstitute());
+        assertEquals(institutes, combined.getInstituteCodes());
+        String label = "super-admin / institutes " + institutes + " / all time";
+        List<AdminOverviewCard> combinedCards = runAll(label, combined);
+        drillAll(label, combined, combinedCards);
+
+        Map<String, Long> maxOfSingles = new LinkedHashMap<>();
+        Map<String, Long> sumOfSingles = new LinkedHashMap<>();
+        for (Integer code : institutes) {
+            AdminOverviewFilter single = new AdminOverviewFilter(null, null, Collections.singleton(code), Collections.<Long>emptySet(), Optional.<AccessScope>empty());
+            for (AdminOverviewCard c : runAll("super-admin / institute " + code + " / all time", single)) {
+                maxOfSingles.merge(c.getKey(), c.getValue(), Math::max);
+                sumOfSingles.merge(c.getKey(), c.getValue(), Long::sum);
+            }
+        }
+        for (AdminOverviewCard c : combinedCards) {
+            assertTrue(c.getValue() >= maxOfSingles.getOrDefault(c.getKey(), 0L),
+                    c.getKey() + ": union of institutes must be >= each institute alone");
+            assertTrue(c.getValue() <= sumOfSingles.getOrDefault(c.getKey(), 0L),
+                    c.getKey() + ": union of institutes must be <= sum of the institutes");
+        }
     }
 
     @Test
