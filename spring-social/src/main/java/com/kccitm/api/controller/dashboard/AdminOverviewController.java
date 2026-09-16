@@ -40,7 +40,7 @@ import com.kccitm.api.service.dashboard.admin.AdminOverviewService;
  * <p>Common query parameters (all optional):
  * <ul>
  *   <li>{@code from}, {@code to} — ISO dates (inclusive). Omit both for "all time".</li>
- *   <li>{@code instituteCode} — narrow to one institute.</li>
+ *   <li>{@code instituteCode} — comma-separated institute codes; rows at any of them.</li>
  *   <li>{@code assessmentIds} — comma-separated assessment ids.</li>
  * </ul>
  * The caller's ABAC scope is resolved <em>here</em>, on the request thread, and
@@ -67,7 +67,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> signups(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.signups(filter(from, to, instituteCode, assessmentIds));
     }
@@ -79,7 +79,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> activeAssessments(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.activeAssessments(filter(from, to, instituteCode, assessmentIds));
     }
@@ -89,7 +89,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> assessmentsCompleted(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.assessmentsCompleted(filter(from, to, instituteCode, assessmentIds));
     }
@@ -99,7 +99,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> assessmentsInProgress(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.assessmentsInProgress(filter(from, to, instituteCode, assessmentIds));
     }
@@ -109,7 +109,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> assessmentsNotStarted(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.assessmentsNotStarted(filter(from, to, instituteCode, assessmentIds));
     }
@@ -121,7 +121,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> reportsGenerated(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.reportsGenerated(filter(from, to, instituteCode, assessmentIds));
     }
@@ -133,7 +133,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> counsellingBooked(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.counsellingBooked(filter(from, to, instituteCode, assessmentIds));
     }
@@ -143,7 +143,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> counsellingSessions(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.counsellingSessions(filter(from, to, instituteCode, assessmentIds));
     }
@@ -153,7 +153,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> counsellingCompleted(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.counsellingCompleted(filter(from, to, instituteCode, assessmentIds));
     }
@@ -163,7 +163,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> studentsAbsent(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.studentsAbsent(filter(from, to, instituteCode, assessmentIds));
     }
@@ -173,7 +173,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> counsellorsAbsent(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.counsellorsAbsent(filter(from, to, instituteCode, assessmentIds));
     }
@@ -185,7 +185,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> paymentsCompleted(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.paymentsCompleted(filter(from, to, instituteCode, assessmentIds));
     }
@@ -197,7 +197,7 @@ public class AdminOverviewController {
     public CompletableFuture<AdminOverviewCard> websiteRegistrations(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         return service.websiteRegistrations(filter(from, to, instituteCode, assessmentIds));
     }
@@ -216,7 +216,7 @@ public class AdminOverviewController {
             @PathVariable String key,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds,
             @RequestParam(required = false) String q,
             @RequestParam(required = false, defaultValue = "0") int page,
@@ -242,7 +242,7 @@ public class AdminOverviewController {
     public CompletableFuture<Map<String, AdminOverviewCard>> all(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
-            @RequestParam(required = false) Integer instituteCode,
+            @RequestParam(required = false) String instituteCode,
             @RequestParam(required = false) String assessmentIds) {
         AdminOverviewFilter f = filter(from, to, instituteCode, assessmentIds);
         final long started = System.nanoTime();
@@ -285,7 +285,7 @@ public class AdminOverviewController {
 
     // ─── Request → filter ────────────────────────────────────────────────
 
-    private AdminOverviewFilter filter(String from, String to, Integer instituteCode, String assessmentIds) {
+    private AdminOverviewFilter filter(String from, String to, String instituteCode, String assessmentIds) {
         LocalDate f = parseDate(from, "from");
         LocalDate t = parseDate(to, "to");
         if ((f == null) != (t == null)) {
@@ -293,6 +293,18 @@ public class AdminOverviewController {
         }
         if (f != null && t.isBefore(f)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "to must not be before from");
+        }
+        Set<Integer> codes = new LinkedHashSet<>();
+        if (instituteCode != null) {
+            for (String part : instituteCode.split(",")) {
+                String s = part.trim();
+                if (s.isEmpty()) continue;
+                try {
+                    codes.add(Integer.parseInt(s));
+                } catch (NumberFormatException e) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "instituteCode must be numeric: " + s);
+                }
+            }
         }
         Set<Long> ids = new LinkedHashSet<>();
         if (assessmentIds != null) {
@@ -308,7 +320,7 @@ public class AdminOverviewController {
         }
         // Resolved on the request thread on purpose — see class javadoc.
         Optional<AccessScope> scope = accessScopeService.forCurrentUser();
-        return new AdminOverviewFilter(f, t, instituteCode, ids, scope);
+        return new AdminOverviewFilter(f, t, codes, ids, scope);
     }
 
     private static LocalDate parseDate(String raw, String name) {

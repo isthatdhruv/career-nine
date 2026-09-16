@@ -25,7 +25,7 @@ public interface InstituteDetailRepository extends JpaRepository<InstituteDetail
 
     public InstituteDetail findById(int id);
 
-    @Query("SELECT new map(i.instituteCode as instituteCode, i.instituteName as instituteName) FROM InstituteDetail i WHERE i.display = true")
+    @Query("SELECT new map(i.instituteCode as instituteCode, i.instituteName as instituteName, i.city as city) FROM InstituteDetail i WHERE i.display = true")
     public List<Map<String, Object>> findAllIdAndName();
 
     @Query("SELECT COUNT(i) FROM InstituteDetail i WHERE i.assessmentCookieAuthEnabled IS NULL")

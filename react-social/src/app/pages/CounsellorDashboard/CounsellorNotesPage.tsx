@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PortalLayout from '../portal/PortalLayout'
 import { getCounsellorAppointments } from '../Counselling/API/AppointmentAPI'
-import { getSessionNotes, createSessionNotes } from '../Counselling/API/SessionNotesAPI'
+import {
+  getSessionNotes,
+  createSessionNotes,
+  getSessionNotesPhotosBulk,
+  SessionNotesPhoto,
+} from '../Counselling/API/SessionNotesAPI'
+import SessionNotesPhotoUpload from '../Counselling/shared/SessionNotesPhotoUpload'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
@@ -62,6 +68,8 @@ const CounsellorNotesPage: React.FC = () => {
   const [error, setError] = useState('')
   // Map of appointmentId -> existing notes data
   const [notesMap, setNotesMap] = useState<Record<number, any>>({})
+  // Map of appointmentId -> photos of the handwritten notes (stored in the report bucket)
+  const [photosMap, setPhotosMap] = useState<Record<number, SessionNotesPhoto[]>>({})
   // Map of appointmentId -> whether form is expanded
   const [expandedForms, setExpandedForms] = useState<Record<number, boolean>>({})
   // Map of appointmentId -> form state
@@ -69,6 +77,22 @@ const CounsellorNotesPage: React.FC = () => {
   // Map of appointmentId -> saving status
   const [savingMap, setSavingMap] = useState<Record<number, boolean>>({})
   const [counsellorId, setCounsellorId] = useState<number | null>(null)
+
+  // One bulk call for every completed session on the page. Best-effort: a
+  // failure here must not hide the notes themselves.
+  const loadPhotos = useCallback(async (completed: any[]) => {
+    try {
+      const ids = completed.map((a: any) => Number(a.id)).filter((n) => Number.isFinite(n))
+      const res = await getSessionNotesPhotosBulk(ids)
+      const next: Record<number, SessionNotesPhoto[]> = {}
+      Object.entries(res.data || {}).forEach(([k, v]) => {
+        next[Number(k)] = Array.isArray(v) ? v : []
+      })
+      setPhotosMap(next)
+    } catch {
+      // keep whatever we had
+    }
+  }, [])
 
   useRefreshInterval(async () => {
     if (!counsellorId) return
@@ -88,6 +112,7 @@ const CounsellorNotesPage: React.FC = () => {
         })
       )
       setNotesMap(notesResults)
+      await loadPhotos(completed)
     } catch {}
   }, { skip: !counsellorId })
 
@@ -120,6 +145,7 @@ const CounsellorNotesPage: React.FC = () => {
         })
       )
       setNotesMap(notesResults)
+      await loadPhotos(completed)
     }
 
     getCounsellorByUserId(currentUser.id)
@@ -135,7 +161,7 @@ const CounsellorNotesPage: React.FC = () => {
       })
       .catch(() => setError('Counsellor profile not found. Please contact admin to set up your profile.'))
       .finally(() => setLoading(false))
-  }, [currentUser, navigate])
+  }, [currentUser, navigate, loadPhotos])
 
   const toggleForm = (appointmentId: number) => {
     setExpandedForms((prev) => {
@@ -312,6 +338,29 @@ const CounsellorNotesPage: React.FC = () => {
                     >
                       {isFormOpen ? 'Cancel Edit' : 'Edit Notes'}
                     </button>
+                  )}
+
+                  {/* Photos of the handwritten notes. Shown whenever the notes form is open
+                      or notes already exist, so a counsellor can attach a picture before
+                      saving the typed notes or add more afterwards. Uploads go to the same
+                      Spaces bucket as the student reports. */}
+                  {(isFormOpen || existingNotes) && (
+                    <div
+                      style={{
+                        marginTop: 12,
+                        paddingTop: 12,
+                        borderTop: '1px dashed #DDE3EC',
+                      }}
+                    >
+                      <SessionNotesPhotoUpload
+                        appointmentId={appt.id}
+                        photos={photosMap[appt.id] || []}
+                        onPhotosChange={(next) =>
+                          setPhotosMap((prev) => ({ ...prev, [appt.id]: next }))
+                        }
+                        buttonClassName='cp-action-btn'
+                      />
+                    </div>
                   )}
                 </div>
 

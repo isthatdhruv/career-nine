@@ -4,9 +4,15 @@ import {
   buildStudentRows,
   computeSchoolSummary,
   formatDob,
+  navigatorShortName,
+  overviewExportFileName,
+  overviewExportTitle,
+  overviewSheetName,
   schoolReportFileName,
   SectionLookup,
+  SNO_HEADER,
   STUDENT_SHEET_COLUMNS,
+  styleOverviewSheet,
 } from "./dashboard-admin.export";
 
 const assessments = [
@@ -78,6 +84,110 @@ describe("schoolReportFileName", () => {
     expect(schoolReportFileName("Alpha School / Main", new Date(2026, 8, 11))).toBe(
       "Alpha_School_Main_Assessment_Report_2026-09-11.xlsx"
     );
+  });
+});
+
+describe("navigatorShortName", () => {
+  it("recognises the three navigator products anywhere in the name, any case", () => {
+    expect(navigatorShortName("Sandesh Subject Navigator May 2026")).toBe("Subject Navigator");
+    expect(navigatorShortName("Career-9 Career Navigator")).toBe("Career Navigator");
+    expect(navigatorShortName("INSIGHT NAVIGATOR_HINDI")).toBe("Insight Navigator");
+    expect(navigatorShortName("Career-9 subject navigator")).toBe("Subject Navigator");
+  });
+  it("returns null for anything else", () => {
+    expect(navigatorShortName("Navigator 360 HV Desai May 2026")).toBeNull();
+    expect(navigatorShortName("BET")).toBeNull();
+  });
+});
+
+describe("overviewExportTitle / overviewExportFileName", () => {
+  const ctx = {
+    assessmentNames: ["Sandesh Subject Navigator May 2026"],
+    instituteName: "Silver Bells Convent School",
+    region: "Bhopal",
+  };
+  const when = new Date(2026, 8, 16, 14, 5);
+
+  it("writes the title row in caps with the school and region", () => {
+    expect(overviewExportTitle(ctx, "Students signed up")).toBe(
+      "CAREER-9 SANDESH SUBJECT NAVIGATOR MAY 2026 - SILVER BELLS CONVENT SCHOOL, BHOPAL"
+    );
+  });
+  it("appends the download date when given", () => {
+    expect(overviewExportTitle(ctx, "x", when)).toBe(
+      "CAREER-9 SANDESH SUBJECT NAVIGATOR MAY 2026 - SILVER BELLS CONVENT SCHOOL, BHOPAL - 16-09-2026"
+    );
+  });
+  it("falls back to the card title and drops school/region when the view spans every institute", () => {
+    expect(overviewExportTitle({ assessmentNames: [], instituteName: "", region: "" }, "Students signed up")).toBe(
+      "CAREER-9 STUDENTS SIGNED UP"
+    );
+    expect(overviewExportTitle({ ...ctx, region: "" }, "x")).toBe(
+      "CAREER-9 SANDESH SUBJECT NAVIGATOR MAY 2026 - SILVER BELLS CONVENT SCHOOL"
+    );
+  });
+  it("names the file Class N <navigator kind>_<school>_<date>", () => {
+    expect(overviewExportFileName(ctx, "10", when)).toBe(
+      "Class 10 Career-9_Subject_Navigator_Silver_Bells_Convent_School_2026-09-16.xlsx"
+    );
+  });
+  it("uses the full name for a non-navigator assessment and omits the class when rows are mixed", () => {
+    expect(overviewExportFileName({ ...ctx, assessmentNames: ["BET: Class 10/11"] }, "", when)).toBe(
+      "Career-9_BET_Class_10_11_Silver_Bells_Convent_School_2026-09-16.xlsx"
+    );
+  });
+  it("leaves the assessment out when several (or none) are selected", () => {
+    const two = ["Sandesh Subject Navigator May 2026", "Sandesh Career Navigator May 2026"];
+    expect(overviewExportFileName({ ...ctx, assessmentNames: two }, "10", when)).toBe(
+      "Class 10 Career-9_Silver_Bells_Convent_School_2026-09-16.xlsx"
+    );
+    expect(overviewExportFileName({ assessmentNames: [], instituteName: "", region: "" }, "", when)).toBe(
+      "Career-9_2026-09-16.xlsx"
+    );
+  });
+});
+
+describe("overviewSheetName", () => {
+  it("drops the characters Excel forbids in a tab name", () => {
+    expect(overviewSheetName("New sign-ups / registrations")).toBe("New sign-ups registrations");
+    expect(overviewSheetName("A:B\\C?D*E[F]G")).toBe("A B C D E F G");
+  });
+  it("keeps a plain title as is and respects the 31-character limit", () => {
+    expect(overviewSheetName("Sessions completed")).toBe("Sessions completed");
+    expect(overviewSheetName("Partially completed / in progress")).toBe("Partially completed in progress");
+    expect(overviewSheetName("x".repeat(40))).toHaveLength(31);
+  });
+  it("falls back to Sheet1 when nothing printable is left", () => {
+    expect(overviewSheetName("///")).toBe("Sheet1");
+    expect(overviewSheetName("")).toBe("Sheet1");
+  });
+  it("produces a name book_append_sheet accepts for every dashboard card title", () => {
+    const wb = XLSX.utils.book_new();
+    expect(() =>
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["x"]]), overviewSheetName("New sign-ups / registrations"))
+    ).not.toThrow();
+  });
+});
+
+describe("styleOverviewSheet", () => {
+  const header = [SNO_HEADER, "Student", "Username", "Email"];
+  const ws = XLSX.utils.aoa_to_sheet([["TITLE"], header, [1, "Asha", "1001", "a@x.com"], [2, "Ravi", "1002", "r@x.com"]]);
+  styleOverviewSheet(ws, header, 2, [{ wch: 6 }, { wch: 28 }, { wch: 22 }, { wch: 32 }]);
+
+  it("merges a tall bold title across every column", () => {
+    expect(ws["!merges"]).toEqual([{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }]);
+    expect(ws["!rows"]![0].hpt).toBeGreaterThan(ws["!rows"]![1].hpt!);
+    expect(ws["A1"].s.font.bold).toBe(true);
+  });
+  it("bolds the header row and centres the S.No column", () => {
+    expect(ws["B2"].s.font.bold).toBe(true);
+    expect(ws["A2"].s.alignment.horizontal).toBe("center");
+    expect(ws["A3"].s.alignment.horizontal).toBe("center");
+    expect(ws["A4"].s.alignment.horizontal).toBe("center");
+    expect(ws["B3"].s).toBeUndefined();
+  });
+  it("caps the Username width and fixes the S.No width", () => {
+    expect(ws["!cols"]).toEqual([{ wch: 7 }, { wch: 28 }, { wch: 14 }, { wch: 32 }]);
   });
 });
 

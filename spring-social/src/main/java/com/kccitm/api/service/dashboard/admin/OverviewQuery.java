@@ -30,6 +30,10 @@ import com.kccitm.api.security.access.AccessScopeJpqlBuilder.Fields;
  * view-filtered from an {@link AdminOverviewFilter}. Every one of them joins the
  * student's {@code StudentInfo} as alias {@code si} and the {@code UserStudent}
  * as alias {@code us}.
+ *
+ * <p>Every shape also drops <em>test data</em>: any row whose student (name,
+ * email, school name, login, institute), assessment, counsellor, payer or lead
+ * has "test" anywhere in its name or email — see {@link #notTestStudent}.
  */
 final class OverviewQuery {
 
@@ -42,6 +46,9 @@ final class OverviewQuery {
     private String groupBy;
     private int seq;
 
+    /** Substring (case-insensitive) that marks a record as test data. */
+    static final String TEST_MARKER = "%test%";
+
     OverviewQuery(EntityManager em, ZoneId zone, String fromClause) {
         this.em = em;
         this.zone = zone;
@@ -53,7 +60,7 @@ final class OverviewQuery {
     /** Registered student accounts. Assessment filter = "assigned to at least one of them". */
     static OverviewQuery signups(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
         OverviewQuery q = new OverviewQuery(em, zone, "FROM UserStudent us JOIN us.studentInfo si")
-                .scope(f, "si").institute(f, "si");
+                .scope(f, "si").institute(f, "si").notTestStudent("si");
         if (f.hasAssessments()) {
             q.and("EXISTS (SELECT m2.studentAssessmentId FROM StudentAssessmentMapping m2 "
                     + "WHERE m2.userStudent = us AND m2.assessmentId IN :aids)")
@@ -65,13 +72,15 @@ final class OverviewQuery {
     /** Assessment attempts ({@code StudentAssessmentMapping m}). */
     static OverviewQuery mappings(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
         return new OverviewQuery(em, zone, "FROM StudentAssessmentMapping m JOIN m.userStudent us JOIN us.studentInfo si")
-                .scope(f, "si").institute(f, "si").assessments(f, "m.assessmentId");
+                .scope(f, "si").institute(f, "si").assessments(f, "m.assessmentId")
+                .notTestStudent("si").notTestAssessment("m.assessmentId");
     }
 
     /** Generated reports ({@code GeneratedReport r}). */
     static OverviewQuery reports(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
         return new OverviewQuery(em, zone, "FROM GeneratedReport r JOIN r.userStudent us JOIN us.studentInfo si")
-                .scope(f, "si").institute(f, "si").assessments(f, "r.assessmentId");
+                .scope(f, "si").institute(f, "si").assessments(f, "r.assessmentId")
+                .notTestStudent("si").notTestAssessment("r.assessmentId");
     }
 
     /**
@@ -81,7 +90,7 @@ final class OverviewQuery {
      */
     static OverviewQuery appointments(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
         return new OverviewQuery(em, zone, "FROM CounsellingAppointment a JOIN a.student us JOIN us.studentInfo si")
-                .scope(f, "si").institute(f, "si");
+                .scope(f, "si").institute(f, "si").notTestStudent("si").notTestCounsellor("a.counsellor");
     }
 
     /**
@@ -98,14 +107,16 @@ final class OverviewQuery {
                     Fields.instituteOnly("p.instituteCode"));
             q.and(p.toString());
         }
-        if (f.hasInstitute()) q.and("p.instituteCode = :inst").param("inst", f.getInstituteCode());
-        return q.assessments(f, "p.assessmentId");
+        if (f.hasInstitute()) q.and("p.instituteCode IN :inst").param("inst", f.getInstituteCodes());
+        return q.assessments(f, "p.assessmentId")
+                .and(notLike("p.studentName")).and(notLike("p.studentEmail")).param("test", TEST_MARKER)
+                .notTestAssessment("p.assessmentId");
     }
 
     /** Counselling purchases ({@code CounsellingPayment cp}), scoped through the student. */
     static OverviewQuery counsellingPayments(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
         return new OverviewQuery(em, zone, "FROM CounsellingPayment cp JOIN cp.student us JOIN us.studentInfo si")
-                .scope(f, "si").institute(f, "si");
+                .scope(f, "si").institute(f, "si").notTestStudent("si");
     }
 
     /**
@@ -115,7 +126,8 @@ final class OverviewQuery {
      * viewer has no natural claim on them, anyone with a scope sees zero.
      */
     static OverviewQuery leads(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
-        OverviewQuery q = new OverviewQuery(em, zone, "FROM Lead l");
+        OverviewQuery q = new OverviewQuery(em, zone, "FROM Lead l")
+                .and(notLike("l.fullName")).and(notLike("l.email")).and(notLike("l.schoolName")).param("test", TEST_MARKER);
         if (f.getScope().isPresent()) q.and("1 = 0");
         return q;
     }
@@ -127,7 +139,8 @@ final class OverviewQuery {
      */
     static OverviewQuery assessments(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
         OverviewQuery q = new OverviewQuery(em, zone, "FROM AssessmentTable a")
-                .and("(a.isDeleted = FALSE OR a.isDeleted IS NULL)");
+                .and("(a.isDeleted = FALSE OR a.isDeleted IS NULL)")
+                .and(notLike("a.AssessmentName")).param("test", TEST_MARKER);
         if (f.getScope().isPresent() || f.hasInstitute()) {
             StringBuilder sub = new StringBuilder(
                     "EXISTS (SELECT m.studentAssessmentId FROM StudentAssessmentMapping m "
@@ -139,8 +152,8 @@ final class OverviewQuery {
                 sub.append(" AND ").append(p);
             }
             if (f.hasInstitute()) {
-                sub.append(" AND si.instituteId = :inst");
-                q.param("inst", f.getInstituteCode());
+                sub.append(" AND si.instituteId IN :inst");
+                q.param("inst", f.getInstituteCodes());
             }
             q.and(sub.append(")").toString());
         }
@@ -172,9 +185,42 @@ final class OverviewQuery {
 
     OverviewQuery institute(AdminOverviewFilter f, String si) {
         if (f.hasInstitute()) {
-            and(si + ".instituteId = :inst").param("inst", f.getInstituteCode());
+            and(si + ".instituteId IN :inst").param("inst", f.getInstituteCodes());
         }
         return this;
+    }
+
+    // ─── Test-data exclusion ─────────────────────────────────────────────
+
+    /** {@code (field IS NULL OR LOWER(field) NOT LIKE :test)} — NULL is not a test marker. */
+    private static String notLike(String field) {
+        return "(" + field + " IS NULL OR LOWER(" + field + ") NOT LIKE :test)";
+    }
+
+    /**
+     * Drop test accounts: "test" anywhere in the student's name, email or school
+     * name, in their login's username / name / email, or in their institute's name.
+     * {@code si} is the {@code StudentInfo} alias.
+     */
+    OverviewQuery notTestStudent(String si) {
+        return and(notLike(si + ".name")).and(notLike(si + ".email")).and(notLike(si + ".schoolName"))
+                .and("NOT EXISTS (SELECT tu.id FROM User tu WHERE tu.id = " + si + ".user.id AND ("
+                        + "LOWER(tu.username) LIKE :test OR LOWER(tu.email) LIKE :test OR LOWER(tu.name) LIKE :test))")
+                .and("NOT EXISTS (SELECT ti.instituteCode FROM InstituteDetail ti WHERE ti.instituteCode = " + si
+                        + ".instituteId AND LOWER(ti.instituteName) LIKE :test)")
+                .param("test", TEST_MARKER);
+    }
+
+    /** Drop rows whose assessment's name carries the test marker. */
+    OverviewQuery notTestAssessment(String assessmentIdField) {
+        return and("NOT EXISTS (SELECT ta.id FROM AssessmentTable ta WHERE ta.id = " + assessmentIdField
+                + " AND LOWER(ta.AssessmentName) LIKE :test)").param("test", TEST_MARKER);
+    }
+
+    /** Drop rows whose counsellor's name or email carries the test marker. */
+    OverviewQuery notTestCounsellor(String counsellorField) {
+        return and("NOT EXISTS (SELECT tc.id FROM Counsellor tc WHERE tc.id = " + counsellorField
+                + ".id AND (LOWER(tc.name) LIKE :test OR LOWER(tc.email) LIKE :test))").param("test", TEST_MARKER);
     }
 
     OverviewQuery assessments(AdminOverviewFilter f, String assessmentIdField) {

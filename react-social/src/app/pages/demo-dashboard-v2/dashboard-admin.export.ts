@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 
 /**
  * Pure builders for the super-admin "Export for school" workbook on the admin
@@ -398,4 +398,120 @@ export const buildSchoolReportWorkbook = (input: SchoolReportWorkbookInput): XLS
   XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
   XLSX.utils.book_append_sheet(wb, studentsSheet, "Students");
   return wb;
+};
+
+// ───────────────────────── card drill-down (modal) export ─────────────────────────
+
+export interface OverviewExportContext {
+  /** Names of the assessments chosen in the view filter (empty = no assessment filter). */
+  assessmentNames: string[];
+  /** Institute name under the applied filter; empty when the view spans every institute. */
+  instituteName: string;
+  /** Institute city (falls back to state); empty when unknown. */
+  region: string;
+}
+
+const INVALID_FILE_CHARS = /[\\/:*?"<>|]+/g;
+const cleanPart = (s: string) => str(s).replace(INVALID_FILE_CHARS, " ").replace(/\s+/g, " ").trim();
+const underscored = (s: string) => cleanPart(s).replace(/\s+/g, "_");
+
+/**
+ * Row 1 of the modal's Excel, e.g.
+ * "CAREER-9 SUBJECT NAVIGATOR - SILVER BELLS CONVENT SCHOOL, BHOPAL - 16-09-2026".
+ * `fallbackSubject` (the card title) is used when no assessment is selected;
+ * `exportedAt`, when given, appends the download date.
+ */
+export const overviewExportTitle = (
+  ctx: OverviewExportContext,
+  fallbackSubject: string,
+  exportedAt?: Date
+): string => {
+  const subject = ctx.assessmentNames.length > 0 ? ctx.assessmentNames.join(" & ") : fallbackSubject;
+  let title = `CAREER-9 ${cleanPart(subject)}`.trim();
+  const school = cleanPart(ctx.instituteName);
+  const region = cleanPart(ctx.region);
+  if (school) title += ` - ${school}`;
+  if (region) title += school ? `, ${region}` : ` - ${region}`;
+  if (exportedAt) title += ` - ${formatDob(exportedAt)}`;
+  return title.toUpperCase();
+};
+
+/**
+ * Excel sheet name for a card drill-down: the card title with the characters
+ * Excel forbids in a tab name (: \ / ? * [ ]) dropped, collapsed whitespace,
+ * cut to Excel's 31-character limit, with "Sheet1" as the fallback. Without
+ * this, a card such as "New sign-ups / registrations" throws
+ * "Sheet name cannot contain : \ / ? * [ ]" from book_append_sheet.
+ */
+export const overviewSheetName = (title: string): string => {
+  const cleaned = String(title ?? "")
+    .replace(/[:\\/?*[\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 31)
+    .trim();
+  return cleaned || "Sheet1";
+};
+
+/** First column of every drill-down / live-tracking sheet. */
+export const SNO_HEADER = "S.No";
+
+/**
+ * Shared look of the drill-down / live-tracking sheets, applied after the
+ * cells exist: a tall bold title merged across every column, a bold header
+ * row, and a centred S.No column. Widths: the caller's, with Username capped.
+ */
+export const styleOverviewSheet = (
+  ws: XLSX.WorkSheet,
+  header: string[],
+  rowCount: number,
+  cols: { wch: number }[]
+): void => {
+  const at = (r: number, c: number) => ws[XLSX.utils.encode_cell({ r, c })];
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(0, header.length - 1) } }];
+  ws["!rows"] = [{ hpt: 34 }, { hpt: 22 }];
+  const title = at(0, 0);
+  if (title) title.s = { font: { bold: true, sz: 13 }, alignment: { vertical: "center" } };
+  header.forEach((_, c) => {
+    const cell = at(1, c);
+    if (cell) cell.s = { font: { bold: true }, alignment: { vertical: "center", horizontal: c === 0 ? "center" : "left" } };
+  });
+  for (let r = 2; r < 2 + rowCount; r++) {
+    const cell = at(r, 0);
+    if (cell) cell.s = { alignment: { horizontal: "center" } };
+  }
+  ws["!cols"] = cols.map((col, i) =>
+    header[i] === "Username" ? { wch: Math.min(col.wch, 14) } : header[i] === SNO_HEADER ? { wch: 7 } : col
+  );
+};
+
+const NAVIGATOR_KINDS = ["Subject Navigator", "Career Navigator", "Insight Navigator"] as const;
+
+/**
+ * "Sandesh Subject Navigator May 2026" → "Subject Navigator"; null when the
+ * name is not one of the three navigator products.
+ */
+export const navigatorShortName = (assessmentName: string): string | null => {
+  const flat = str(assessmentName).toLowerCase().replace(/[^a-z]+/g, " ");
+  return NAVIGATOR_KINDS.find((k) => flat.includes(k.toLowerCase())) ?? null;
+};
+
+/**
+ * "Class 10 Career-9_Subject_Navigator_Silver_Bells_Convent_School_2026-09-16.xlsx".
+ *  - the assessment part appears only when exactly ONE assessment is selected,
+ *    shortened to its navigator kind when it is a navigator;
+ *  - "Class N " leads only when the exported rows all share one class;
+ *  - empty parts are skipped.
+ */
+export const overviewExportFileName = (
+  ctx: OverviewExportContext,
+  className: string,
+  exportedAt: Date
+): string => {
+  const single = ctx.assessmentNames.length === 1 ? ctx.assessmentNames[0] : "";
+  const assessmentPart = single ? navigatorShortName(single) ?? single : "";
+  const parts = ["Career-9", assessmentPart, ctx.instituteName].map(underscored).filter(Boolean);
+  parts.push(isoDate(exportedAt));
+  const cls = cleanPart(className);
+  return `${cls ? `Class ${cls} ` : ""}${parts.join("_")}.xlsx`;
 };
