@@ -6,7 +6,7 @@ import axios from "axios";
  *
  * Every endpoint takes the same optional query string:
  *   from, to          ISO dates (inclusive) — omit both for "all time"
- *   instituteCode     narrow to one institute
+ *   instituteCode     comma-separated institute codes (any of them)
  *   assessmentIds     comma-separated assessment ids
  *
  * The backend computes each card on its own thread of a dedicated pool and
@@ -69,7 +69,7 @@ export interface OverviewQuery {
   /** ISO date (yyyy-mm-dd) or null for all time. */
   from: string | null;
   to: string | null;
-  instituteCode: string | null;
+  instituteCodes: string[];
   assessmentIds: string[];
 }
 
@@ -79,7 +79,7 @@ const buildParams = (q: OverviewQuery): Record<string, string> => {
     p.from = q.from;
     p.to = q.to;
   }
-  if (q.instituteCode) p.instituteCode = q.instituteCode;
+  if (q.instituteCodes.length > 0) p.instituteCode = q.instituteCodes.join(",");
   if (q.assessmentIds.length > 0) p.assessmentIds = q.assessmentIds.join(",");
   return p;
 };

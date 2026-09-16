@@ -7,9 +7,10 @@ import { useAuth } from "../../modules/auth/core/Auth";
 import { Scope } from "../../modules/auth";
 import { getUserCollegeMappings } from "../Users/API/UserMapping_APIs";
 import { getScopedAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import SearchableSelect from "../../components/SearchableSelect";
 import SearchableMultiSelect from "../../components/SearchableMultiSelect";
-import * as XLSX from "xlsx";
+// Drop-in fork of SheetJS (same API) that also writes cell styles — needed for
+// the bold title row on the card drill-down export.
+import * as XLSX from "xlsx-js-style";
 import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import { showErrorToast } from "../../utils/toast";
 import {
@@ -31,11 +32,18 @@ import {
   applyInstituteAssessmentFilter,
   assessmentIdsAssignedTo,
   instituteKeysOf,
+  stripTestEntities,
 } from "./dashboard-admin.filter";
 import {
   buildSchoolReportWorkbook,
+  OverviewExportContext,
+  overviewExportFileName,
+  overviewExportTitle,
+  overviewSheetName,
   schoolReportFileName,
   SectionLookup,
+  SNO_HEADER,
+  styleOverviewSheet,
 } from "./dashboard-admin.export";
 
 /* ============================================================
@@ -260,8 +268,13 @@ const DashboardAdminContent: FC = () => {
   // institutes, and deny-by-default when neither source yields anything.
   // null = fallback not resolved yet.
   const [fallbackRules, setFallbackRules] = useState<Scope[] | null>(null);
+  // Institute code -> name, resolved from the caller's ContactPerson mappings.
+  // Populated for every non-super-admin (even when user_role_scope already
+  // supplies the rules) so the hero "Institute" card can name the mapped
+  // institute even if the snapshot's institutes section is empty or fails.
+  const [contactInstituteNames, setContactInstituteNames] = useState<Map<number, string>>(new Map());
   useEffect(() => {
-    if (isSuperAdmin || userScopes.length > 0 || currentUser?.id == null) {
+    if (isSuperAdmin || currentUser?.id == null) {
       setFallbackRules([]);
       return;
     }
@@ -269,10 +282,18 @@ const DashboardAdminContent: FC = () => {
     getUserCollegeMappings(currentUser.id)
       .then((res: any) => {
         if (cancelled) return;
-        const rules: Scope[] = (res.data || [])
-          .map((cp: any) => Number(cp.institute?.instituteCode ?? cp.instituteCode))
-          .filter((v: number) => Number.isFinite(v))
-          .map((i: number) => ({ i }));
+        const rows: any[] = res.data || [];
+        const names = new Map<number, string>();
+        rows.forEach((cp: any) => {
+          const code = Number(cp.institute?.instituteCode ?? cp.instituteCode);
+          const name = cp.institute?.instituteName ?? cp.instituteName;
+          if (Number.isFinite(code) && name) names.set(code, name);
+        });
+        setContactInstituteNames(names);
+        // user_role_scope is the canonical rules source; only fall back to
+        // ContactPerson institutes when it gave nothing.
+        const rules: Scope[] =
+          userScopes.length > 0 ? [] : Array.from(names.keys()).map((i) => ({ i }));
         setFallbackRules(rules);
       })
       .catch(() => {
@@ -359,42 +380,33 @@ const DashboardAdminContent: FC = () => {
   const [rawReports, setRawReports] = useState<any[]>([]);
   const [rawStudentMappings, setRawStudentMappings] = useState<any[]>([]);
 
-  // ---- Super-admin view filter: one institute and/or a set of assessments ----
-  // `viewInstitute`/`viewAssessmentIds` are the APPLIED values (set on Search);
-  // the pickers edit `draftInstitute`/`draftAssessmentIds` below.
+  // ---- Super-admin view filter: a set of institutes and/or a set of assessments ----
+  // `viewInstitutes`/`viewAssessmentIds` are the APPLIED values (set on Search);
+  // the pickers edit `draftInstitutes`/`draftAssessmentIds` below.
   // Applied client-side to the loaded snapshot (it already holds every row for
   // a super-admin), so the KPIs, drill-downs and tables below narrow without
   // any of their code changing. Hidden for scoped (school) viewers, who are
   // already narrowed by ABAC.
-  const [viewInstitute, setViewInstitute] = useState<string>("");
+  const [viewInstitutes, setViewInstitutes] = useState<string[]>([]);
   const [viewAssessmentIds, setViewAssessmentIds] = useState<string[]>([]);
-  // Draft picker values — copied into viewInstitute/viewAssessmentIds on Search.
-  const [draftInstitute, setDraftInstitute] = useState<string>("");
+  // Draft picker values — copied into viewInstitutes/viewAssessmentIds on Search.
+  const [draftInstitutes, setDraftInstitutes] = useState<string[]>([]);
   const [draftAssessmentIds, setDraftAssessmentIds] = useState<string[]>([]);
-  const draftInstituteRow = useMemo(
-    () =>
-      draftInstitute
-        ? rawInstitutes.find((i) => String(pick(i, ["instituteCode", "code"]) ?? "") === draftInstitute) ?? null
-        : null,
-    [rawInstitutes, draftInstitute]
+  // Institute rows for a list of picked codes (unknown codes dropped), and the
+  // union of their filter keys — null when nothing is picked (= no narrowing).
+  const instituteRowsFor = useCallback(
+    (codes: string[]): any[] =>
+      codes
+        .map((code) => rawInstitutes.find((i) => String(pick(i, ["instituteCode", "code"]) ?? "") === code))
+        .filter(Boolean),
+    [rawInstitutes]
   );
-  const draftInstituteKeys = useMemo(
-    () => (draftInstituteRow ? instituteKeysOf(draftInstituteRow) : null),
-    [draftInstituteRow]
-  );
-  const viewInstituteRow = useMemo(
-    () =>
-      viewInstitute
-        ? rawInstitutes.find((i) => String(pick(i, ["instituteCode", "code"]) ?? "") === viewInstitute) ?? null
-        : null,
-    [rawInstitutes, viewInstitute]
-  );
-  const viewInstituteKeys = useMemo(
-    () => (viewInstituteRow ? instituteKeysOf(viewInstituteRow) : null),
-    [viewInstituteRow]
-  );
-  // Assessments offered in the picker: only those assigned to students at the
-  // chosen institute (or every scoped assessment when no institute is chosen).
+  const draftInstituteRows = useMemo(() => instituteRowsFor(draftInstitutes), [instituteRowsFor, draftInstitutes]);
+  const draftInstituteKeys = useMemo(() => unionInstituteKeys(draftInstituteRows), [draftInstituteRows]);
+  const viewInstituteRows = useMemo(() => instituteRowsFor(viewInstitutes), [instituteRowsFor, viewInstitutes]);
+  const viewInstituteKeys = useMemo(() => unionInstituteKeys(viewInstituteRows), [viewInstituteRows]);
+  // Assessments offered in the picker: only those assigned to students at any
+  // of the chosen institutes (or every scoped assessment when none is chosen).
   const viewAssessmentOptions = useMemo(() => {
     let pool = scopedAssessments;
     if (draftInstituteKeys) {
@@ -447,6 +459,46 @@ const DashboardAdminContent: FC = () => {
     ]
   );
   const { institutes, assessments, reports, studentMappings } = viewFiltered;
+  // The institutes a scoped (school) viewer is mapped to, each resolved to its
+  // name and region (city/state). The scope carries only institute codes, so
+  // resolve each from the fullest source available: the scoped snapshot
+  // institutes, then the unfiltered snapshot, then the caller's ContactPerson
+  // mappings (name only). This keeps the mapped institute named even when the
+  // snapshot's institutes section is empty or failed, and feeds both the hero
+  // "Institute" card and the card-drill-down Excel naming so it matches the
+  // main-dashboard exports. Empty for super-admins and wildcard scopes.
+  const scopedInstitutes = useMemo<{ code: number; name: string; region: string }[]>(() => {
+    if (isSuperAdmin) return [];
+    if (effectiveRules.some((r) => r.i == null)) return []; // wildcard institute scope
+    const codes = Array.from(
+      new Set(
+        effectiveRules
+          .map((r) => (r.i == null ? null : Number(r.i)))
+          .filter((v): v is number => v != null && Number.isFinite(v))
+      )
+    );
+    return codes.map((code) => {
+      const inSnap = (list: any[]) =>
+        list.find((i) => Number(pick(i, ["instituteCode", "code", "id"])) === code);
+      const row = inSnap(institutes) || inSnap(rawInstitutes);
+      const name =
+        (row && String(pick(row, ["instituteName", "name"]) || "")) ||
+        contactInstituteNames.get(code) ||
+        "";
+      const region = row ? String(pick(row, ["city", "state"]) || "") : "";
+      return { code, name, region };
+    });
+  }, [isSuperAdmin, effectiveRules, institutes, rawInstitutes, contactInstituteNames]);
+  // Hero "Institute" label. null => name not resolved yet (show a placeholder,
+  // not "Not mapped") or let the default institutes[] logic decide. As soon as
+  // the ContactPerson name fetch resolves (fast, independent of the slow
+  // snapshot) this returns the name, so the card fills in with the other tiles.
+  const scopedInstituteLabel = useMemo<string | null>(() => {
+    if (isSuperAdmin || effectiveRules.some((r) => r.i == null)) return null;
+    if (scopedInstitutes.length === 0) return null;
+    if (scopedInstitutes.length > 1) return `${scopedInstitutes.length} institutes`;
+    return scopedInstitutes[0].name || null;
+  }, [isSuperAdmin, effectiveRules, scopedInstitutes]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -475,12 +527,12 @@ const DashboardAdminContent: FC = () => {
     rangeKey !== applied.rangeKey ||
     (rangeKey === "custom" &&
       (customStart !== applied.customStart || customEnd !== applied.customEnd)) ||
-    draftInstitute !== viewInstitute ||
+    draftInstitutes.join(",") !== viewInstitutes.join(",") ||
     draftAssessmentIds.join(",") !== viewAssessmentIds.join(",");
 
   const handleSearch = () => {
     if (customIncomplete) return;
-    setViewInstitute(draftInstitute);
+    setViewInstitutes(draftInstitutes);
     setViewAssessmentIds(draftAssessmentIds);
     setApplied((prev) => ({
       rangeKey,
@@ -500,10 +552,39 @@ const DashboardAdminContent: FC = () => {
     return {
       from: applied.range.start ? toLocalISODate(applied.range.start) : null,
       to: applied.range.end ? toLocalISODate(applied.range.end) : null,
-      instituteCode: isSuperAdmin && viewInstitute ? viewInstitute : null,
+      instituteCodes: isSuperAdmin ? viewInstitutes : [],
       assessmentIds: isSuperAdmin ? viewAssessmentIds : [],
     };
-  }, [scopeReady, scopeDenied, applied, isSuperAdmin, viewInstitute, viewAssessmentIds]);
+  }, [scopeReady, scopeDenied, applied, isSuperAdmin, viewInstitutes, viewAssessmentIds]);
+  // Naming for the card drill-down Excel: "CAREER-9 <assessment> - <school>, <region>".
+  // Super-admins name the institutes via the view filter; school viewers get
+  // their mapped institute(s) from scopedInstitutes, which survives an empty or
+  // failed snapshot so the file is named the same way as the main-dashboard
+  // (Live Tracking) export.
+  const overviewExportContext = useMemo<OverviewExportContext>(() => {
+    const assessmentNames = scopedAssessments
+      .filter((a) => viewAssessmentIds.includes(String(pick(a, ["id", "assessmentId"]) ?? "")))
+      .map((a) => String(pick(a, ["assessmentName", "name", "title"]) || ""))
+      .filter(Boolean);
+    if (isSuperAdmin) {
+      return {
+        assessmentNames,
+        instituteName: viewInstituteRows
+          .map((r) => String(pick(r, ["instituteName", "name"]) || ""))
+          .filter(Boolean)
+          .join(" & "),
+        region:
+          viewInstituteRows.length === 1
+            ? String(pick(viewInstituteRows[0], ["city", "state"]) || "")
+            : "",
+      };
+    }
+    return {
+      assessmentNames: [],
+      instituteName: scopedInstitutes.map((i) => i.name).filter(Boolean).join(" & "),
+      region: scopedInstitutes.length === 1 ? scopedInstitutes[0].region : "",
+    };
+  }, [isSuperAdmin, viewInstituteRows, scopedInstitutes, scopedAssessments, viewAssessmentIds]);
   const overview = useOverviewCards(overviewQuery, refreshNonce);
   const refreshing = loading || overview.busy;
   const [manualRefresh, setManualRefresh] = useState(false);
@@ -520,16 +601,20 @@ const DashboardAdminContent: FC = () => {
   // fails we fall back to the flat `studentClass` column on each student.
   const [exporting, setExporting] = useState(false);
   const handleExportForSchool = async () => {
-    if (!viewInstituteRow || exporting) return;
+    if (viewInstituteRows.length === 0 || exporting) return;
     setExporting(true);
     try {
-      const instituteName = String(
-        pick(viewInstituteRow, ["instituteName", "name"]) || `Institute ${viewInstitute}`
-      );
+      const instituteName = viewInstituteRows
+        .map((r) => String(pick(r, ["instituteName", "name"]) || `Institute ${pick(r, ["instituteCode", "code"])}`))
+        .join(" & ");
       const sectionLookup: SectionLookup = new Map();
-      try {
-        const res: any = await GetSessionsByInstituteCode(viewInstitute);
-        for (const session of res?.data || []) {
+      // One hierarchy call per selected institute; a failed one just falls back
+      // to the flat class column for that institute's students.
+      const hierarchies = await Promise.all(
+        viewInstitutes.map((code) => GetSessionsByInstituteCode(code).catch(() => null))
+      );
+      for (const res of hierarchies) {
+        for (const session of (res as any)?.data || []) {
           for (const cls of session?.schoolClasses || []) {
             for (const sec of cls?.schoolSections || []) {
               if (sec?.id != null && !sectionLookup.has(Number(sec.id))) {
@@ -541,8 +626,6 @@ const DashboardAdminContent: FC = () => {
             }
           }
         }
-      } catch {
-        // hierarchy unavailable — export still works with the flat class column
       }
       const selectedNames = viewAssessmentOptions
         .filter((o) => viewAssessmentIds.includes(o.value))
@@ -591,7 +674,9 @@ const DashboardAdminContent: FC = () => {
           ? await refreshAdminDashboardSnapshot()
           : await fetchAdminDashboardSnapshot();
         if (cancelled) return;
-        const snap = applyScopeToSnapshot(raw, effectiveRules, isSuperAdmin);
+        // Test records (anything with "test" in a name / email / login) never
+        // reach a count, a table or an export — same rule as the card queries.
+        const snap = stripTestEntities(applyScopeToSnapshot(raw, effectiveRules, isSuperAdmin));
         setRawStudents(snap.students);
         setRawInstitutes(snap.institutes);
         setCounsellors(snap.counsellors);
@@ -680,11 +765,14 @@ const DashboardAdminContent: FC = () => {
               ? [
                   {
                     label: "Institute",
-                    value: loading
-                      ? "—"
-                      : institutes.length > 1
-                      ? `${institutes.length} institutes`
-                      : institutes[0]?.instituteName || "Not mapped",
+                    value:
+                      scopedInstituteLabel != null
+                        ? scopedInstituteLabel
+                        : loading
+                        ? "—"
+                        : institutes.length > 1
+                        ? `${institutes.length} institutes`
+                        : institutes[0]?.instituteName || "Not mapped",
                   },
                   { label: "Sign-ups", value: heroStat(overview.states.signups, (c) => c.value) },
                   { label: "Assessments used", value: heroStat(overview.states["active-assessments"], (c) => c.extra.withCompletions) },
@@ -696,7 +784,12 @@ const DashboardAdminContent: FC = () => {
                 ]
           }
           quickStatsCaption={`${rangeLabel(applied.rangeKey, applied.range)}${
-            isSuperAdmin && viewInstitute ? " · " + String(pick(viewInstituteRow, ["instituteName", "name"]) || `institute ${viewInstitute}`) : ""
+            isSuperAdmin && viewInstitutes.length > 0
+              ? " · " +
+                (viewInstitutes.length === 1
+                  ? String(pick(viewInstituteRows[0], ["instituteName", "name"]) || `institute ${viewInstitutes[0]}`)
+                  : `${viewInstitutes.length} institutes`)
+              : ""
           }${isSuperAdmin && viewAssessmentIds.length > 0 ? ` · ${viewAssessmentIds.length} ${viewAssessmentIds.length === 1 ? "assessment" : "assessments"}` : ""}`}
         />
 
@@ -740,13 +833,13 @@ const DashboardAdminContent: FC = () => {
           <ViewFilterBar
             t={t}
             institutes={rawInstitutes}
-            draftInstitute={draftInstitute}
-            setDraftInstitute={setDraftInstitute}
+            draftInstitutes={draftInstitutes}
+            setDraftInstitutes={setDraftInstitutes}
             assessmentOptions={viewAssessmentOptions}
             draftAssessmentIds={draftAssessmentIds}
             setDraftAssessmentIds={setDraftAssessmentIds}
             appliedActive={viewFilterActive}
-            exportEnabled={!!viewInstitute}
+            exportEnabled={viewInstitutes.length > 0}
             loading={loading}
             exporting={exporting}
             onExport={handleExportForSchool}
@@ -765,6 +858,7 @@ const DashboardAdminContent: FC = () => {
           appliedRange={applied.range}
           denied={scopeDenied}
           query={overviewQuery}
+          exportContext={overviewExportContext}
         />
       </div>
     </>
@@ -911,23 +1005,32 @@ const Hero: FC<{
           <div key={s.label} className="ds-hero-stat" style={{ animationDelay: `${i * 80}ms` }}>
             <div
               style={{
-                fontSize: 11,
+                fontSize: 10,
                 color: "rgba(255,255,255,0.55)",
                 fontWeight: 600,
-                letterSpacing: "0.08em",
+                letterSpacing: "0.07em",
                 textTransform: "uppercase",
+                whiteSpace: "nowrap",
               }}
             >
               {s.label}
             </div>
             <div
+              title={s.value}
               style={{
-                fontSize: 24,
+                fontSize: 18,
                 fontWeight: 700,
                 color: "#ffffff",
                 fontVariantNumeric: "tabular-nums",
                 marginTop: 2,
                 letterSpacing: "-0.02em",
+                lineHeight: 1.15,
+                maxWidth: 150,
+                overflowWrap: "break-word",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
               }}
             >
               {s.value}
@@ -977,6 +1080,14 @@ const endOfDay = (d: Date) => {
   const e = new Date(d);
   e.setHours(23, 59, 59, 999);
   return e;
+};
+
+/** Union of the filter keys of several institute rows; null when none are picked (= no narrowing). */
+const unionInstituteKeys = (rows: any[]): Set<string> | null => {
+  if (rows.length === 0) return null;
+  const keys = new Set<string>();
+  rows.forEach((r) => instituteKeysOf(r).forEach((k) => keys.add(k)));
+  return keys;
 };
 
 /** Local-calendar yyyy-mm-dd. (toISOString() would roll "today 00:00" back a day east of UTC.) */
@@ -1152,8 +1263,8 @@ const DateRangeBar: FC<{
 const ViewFilterBar: FC<{
   t: Theme;
   institutes: any[];
-  draftInstitute: string;
-  setDraftInstitute: (code: string) => void;
+  draftInstitutes: string[];
+  setDraftInstitutes: (codes: string[]) => void;
   assessmentOptions: { value: string; label: string }[];
   draftAssessmentIds: string[];
   setDraftAssessmentIds: (ids: string[]) => void;
@@ -1166,8 +1277,8 @@ const ViewFilterBar: FC<{
 }> = ({
   t,
   institutes,
-  draftInstitute,
-  setDraftInstitute,
+  draftInstitutes,
+  setDraftInstitutes,
   assessmentOptions,
   draftAssessmentIds,
   setDraftAssessmentIds,
@@ -1192,7 +1303,7 @@ const ViewFilterBar: FC<{
         .sort((a, b) => a.label.localeCompare(b.label)),
     [institutes]
   );
-  const draftActive = !!draftInstitute || draftAssessmentIds.length > 0;
+  const draftActive = draftInstitutes.length > 0 || draftAssessmentIds.length > 0;
 
   return (
     <div
@@ -1213,13 +1324,13 @@ const ViewFilterBar: FC<{
         <span style={{ letterSpacing: "0.04em", textTransform: "uppercase" }}>View</span>
       </div>
 
-      <SearchableSelect
+      <SearchableMultiSelect
         options={instituteOptions}
-        value={draftInstitute}
-        onChange={setDraftInstitute}
+        value={draftInstitutes}
+        onChange={setDraftInstitutes}
         placeholder={loading ? "Loading…" : "All institutes"}
         disabled={loading || instituteOptions.length === 0}
-        style={{ minWidth: 260 }}
+        style={{ minWidth: 260, flex: 1, maxWidth: 480 }}
       />
       <SearchableMultiSelect
         options={assessmentOptions}
@@ -1233,7 +1344,7 @@ const ViewFilterBar: FC<{
         <button
           className="ds-preset-btn"
           onClick={() => {
-            setDraftInstitute("");
+            setDraftInstitutes([]);
             setDraftAssessmentIds([]);
           }}
           title="Clear the pickers (press Search to apply)"
@@ -1254,8 +1365,8 @@ const ViewFilterBar: FC<{
           onClick={onExport}
           title={
             exportEnabled
-              ? "Download a two-sheet Excel report (summary + per-student rows) for this school"
-              : "Choose an institute and press Search to export its report"
+              ? "Download a two-sheet Excel report (summary + per-student rows) for the selected school(s)"
+              : "Choose one or more institutes and press Search to export their report"
           }
         >
           {exporting ? <Spinner color="#fff" size={14} /> : <IconDownload />}
@@ -1962,8 +2073,9 @@ const OverviewDetailModal: FC<{
   card: OverviewCard | null;
   query: OverviewQuery;
   rangeText: string;
+  exportContext: OverviewExportContext;
   onClose: () => void;
-}> = ({ t, def, card, query, rangeText, onClose }) => {
+}> = ({ t, def, card, query, rangeText, exportContext, onClose }) => {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [detail, setDetail] = useState<OverviewDetail | null>(null);
@@ -2020,7 +2132,8 @@ const OverviewDetailModal: FC<{
   const meterTotal = meter.reduce((a, s) => a + Math.max(0, s.value), 0);
 
   const scopeBits: string[] = [rangeText];
-  if (query.instituteCode) scopeBits.push(`Institute ${query.instituteCode}`);
+  if (query.instituteCodes.length === 1) scopeBits.push(`Institute ${query.instituteCodes[0]}`);
+  else if (query.instituteCodes.length > 1) scopeBits.push(`${query.instituteCodes.length} institutes`);
   if (query.assessmentIds.length > 0) scopeBits.push(`${query.assessmentIds.length} ${query.assessmentIds.length === 1 ? "assessment" : "assessments"}`);
 
   // Excel of every row currently in the list (the modal loads the whole list),
@@ -2032,7 +2145,7 @@ const OverviewDetailModal: FC<{
     if (!cols.some((c) => c.key === "phone") && detail.rows.some((r) => r.phone != null)) {
       cols.splice(Math.min(2, cols.length), 0, { key: "phone", label: "Phone" });
     }
-    const header = ["#", ...cols.map((c) => c.label)];
+    const header = [SNO_HEADER, ...cols.map((c) => c.label)];
     const body = detail.rows.map((row, i) => [
       i + 1,
       ...cols.map((c) => {
@@ -2042,22 +2155,24 @@ const OverviewDetailModal: FC<{
         return fmtCell(c.key, v);
       }),
     ]);
-    const ws = XLSX.utils.aoa_to_sheet([
-      [def.title],
-      [`Filters: ${scopeBits.join(" · ")}${debounced ? ` · search "${debounced}"` : ""}`],
-      [`Exported ${new Date().toLocaleString()} · ${detail.rows.length} rows`],
-      [],
+    // Row 1: "CAREER-9 <assessment> - <school>, <region>" in bold caps. The
+    // assessment is the applied filter; with none chosen the card title stands in.
+    const exportedAt = new Date();
+    const ws = XLSX.utils.aoa_to_sheet([[overviewExportTitle(exportContext, def.title, exportedAt)], header, ...body]);
+    styleOverviewSheet(
+      ws,
       header,
-      ...body,
-    ]);
-    ws["!cols"] = header.map((h, i) => ({
-      wch: Math.min(60, Math.max(String(h).length, ...body.map((r) => String(r[i] ?? "").length)) + 2),
-    }));
+      body.length,
+      header.map((h, i) => ({
+        wch: Math.min(60, Math.max(String(h).length, ...body.map((r) => String(r[i] ?? "").length)) + 2),
+      }))
+    );
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, def.title.slice(0, 31));
-    const stamp = toLocalISODate(new Date());
-    const slug = def.key.replace(/[^a-z0-9]+/gi, "-");
-    XLSX.writeFile(wb, `${slug}-${stamp}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, overviewSheetName(def.title));
+    // "Class N" leads the file name only when every exported row is in the same class.
+    const classes = new Set(detail.rows.map((r) => String(r.studentClass ?? "").trim()).filter(Boolean));
+    const className = classes.size === 1 ? Array.from(classes)[0] : "";
+    XLSX.writeFile(wb, overviewExportFileName(exportContext, className, exportedAt));
   };
 
   const renderCell = (c: OverviewDetailColumn, row: Record<string, any>) => {
@@ -2251,7 +2366,9 @@ const OverviewSection: FC<{
   denied: boolean;
   /** The applied query (null while scope resolves) — reused verbatim by the drill-down. */
   query: OverviewQuery | null;
-}> = ({ t, states, retry, appliedRangeKey, appliedRange, denied, query }) => {
+  /** Institute / assessment names behind `query`, for the drill-down's Excel title and file name. */
+  exportContext: OverviewExportContext;
+}> = ({ t, states, retry, appliedRangeKey, appliedRange, denied, query, exportContext }) => {
   const rangeText = rangeLabel(appliedRangeKey, appliedRange);
   const [openCard, setOpenCard] = useState<CardDef | null>(null);
   const closeModal = useCallback(() => setOpenCard(null), []);
@@ -2337,6 +2454,7 @@ const OverviewSection: FC<{
           card={states[openCard.key].data}
           query={query}
           rangeText={rangeText}
+          exportContext={exportContext}
           onClose={closeModal}
         />
       )}
@@ -2474,14 +2592,15 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     .ds-hero-stats-caption svg { width: 12px; height: 12px; }
     .ds-hero-stats {
       display: grid;
-      grid-template-columns: repeat(3, minmax(104px, 1fr));
-      gap: 10px;
-      min-width: 340px;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(80px, max-content);
+      gap: 8px;
+      min-width: 0;
     }
-    @media (max-width: 900px) { .ds-hero-stats { min-width: 0; grid-template-columns: repeat(3, 1fr); width: 100%; } }
+    @media (max-width: 900px) { .ds-hero-stats { grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); grid-auto-columns: auto; width: 100%; } }
     .ds-hero-stat {
-      padding: 10px 14px;
-      border-radius: 12px;
+      padding: 7px 11px;
+      border-radius: 10px;
       background: rgba(255,255,255,0.06);
       border: 1px solid rgba(255,255,255,0.1);
       backdrop-filter: blur(12px);

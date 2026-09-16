@@ -65,6 +65,104 @@ const appointmentStudentId = (a: any): string =>
 
 const reportAssessmentId = (r: any): string => str(pick(r, ["assessmentId", "assessment_id"]));
 
+// ───────────────────────── test-data exclusion ─────────────────────────
+
+/** True when any of the values contains "test" (case-insensitive) — the marker for test data. */
+export const hasTestMarker = (...values: any[]): boolean =>
+  values.some((v) => v != null && v !== "" && /test/i.test(String(v)));
+
+/** A student-like row (StudentInfo, mapping row, nested studentInfo) with "test" in its identity. */
+const studentTextIsTest = (s: any): boolean =>
+  !!s &&
+  hasTestMarker(
+    pick(s, ["name", "studentName"]),
+    s.email,
+    s.username,
+    s.schoolName,
+    s.instituteName,
+    s.user?.username,
+    s.user?.email,
+    s.user?.name
+  );
+
+/**
+ * Drop every test record from the snapshot BEFORE anything is counted or
+ * exported: institutes / assessments / counsellors whose name (or email) has
+ * "test" in it, students with "test" in their name, email, login, school or
+ * institute, and every mapping / report / appointment / rating that points at
+ * one of those. Mirrors the server-side rule in OverviewQuery#notTestStudent.
+ */
+export const stripTestEntities = (snap: AdminDashboardSnapshot): AdminDashboardSnapshot => {
+  const droppedInstituteKeys = new Set<string>();
+  const institutes = snap.institutes.filter((i) => {
+    if (!hasTestMarker(pick(i, ["instituteName", "name"]))) return true;
+    instituteKeysOf(i).forEach((k) => droppedInstituteKeys.add(k));
+    return false;
+  });
+
+  const droppedAssessmentIds = new Set<string>();
+  const assessments = snap.assessments.filter((a) => {
+    if (!hasTestMarker(pick(a, ["assessmentName", "name", "title"]))) return true;
+    const id = str(pick(a, ["id", "assessmentId"]));
+    if (id) droppedAssessmentIds.add(id);
+    return false;
+  });
+
+  const droppedCounsellorIds = new Set<string>();
+  const counsellors = snap.counsellors.filter((c) => {
+    if (!hasTestMarker(c?.name, c?.email, c?.user?.username, c?.user?.email)) return true;
+    const id = str(pick(c, ["id", "counsellorId"]));
+    if (id) droppedCounsellorIds.add(id);
+    return false;
+  });
+
+  const droppedStudentIds = new Set<string>();
+  const isTestStudent = (s: any) => studentTextIsTest(s) || droppedInstituteKeys.has(studentInstituteKey(s));
+  const students = snap.students.filter((s) => {
+    if (!isTestStudent(s)) return true;
+    const id = mappingStudentId(s);
+    if (id) droppedStudentIds.add(id);
+    return false;
+  });
+  const studentMappings = snap.studentMappings
+    .filter((m) => {
+      const id = mappingStudentId(m);
+      if (!isTestStudent(m) && !(id && droppedStudentIds.has(id))) return true;
+      if (id) droppedStudentIds.add(id);
+      return false;
+    })
+    .map((m) => {
+      if (droppedAssessmentIds.size === 0) return m;
+      const assigned = Array.isArray(m?.assessments) ? m.assessments : [];
+      return {
+        ...m,
+        assessments: assigned.filter((a: any) => !droppedAssessmentIds.has(str(pick(a, ["assessmentId", "assessment_id"])))),
+      };
+    });
+
+  const reports = snap.reports.filter((r) => {
+    const sid = reportStudentId(r);
+    return (
+      !(sid && droppedStudentIds.has(sid)) &&
+      !droppedAssessmentIds.has(reportAssessmentId(r)) &&
+      !studentTextIsTest(r?.userStudent?.studentInfo)
+    );
+  });
+  const appointments = snap.appointments.filter((a) => {
+    const sid = appointmentStudentId(a);
+    const cid = str(a?.counsellor?.id ?? a?.counsellorId);
+    return (
+      !(sid && droppedStudentIds.has(sid)) &&
+      !studentTextIsTest(a?.student?.studentInfo) &&
+      !(cid && droppedCounsellorIds.has(cid)) &&
+      !hasTestMarker(a?.counsellor?.name, a?.counsellor?.email)
+    );
+  });
+  const ratingSummary = snap.ratingSummary.filter((r) => !droppedCounsellorIds.has(str(r?.counsellorId)));
+
+  return { ...snap, students, studentMappings, institutes, assessments, counsellors, reports, appointments, ratingSummary };
+};
+
 export const applyInstituteAssessmentFilter = (
   snap: AdminDashboardSnapshot,
   filter: InstituteAssessmentFilter

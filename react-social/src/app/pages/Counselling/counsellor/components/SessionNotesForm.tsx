@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { createSessionNotes } from '../../API/SessionNotesAPI'
+import SessionNotesPhotoUpload from '../../shared/SessionNotesPhotoUpload'
 import '../../Counselling.css'
 
 interface SessionNotesFormProps {
@@ -172,6 +173,23 @@ const SessionNotesForm: React.FC<SessionNotesFormProps> = ({
           placeholder='Internal notes for reference only...'
           value={privateNotes}
           onChange={(e) => setPrivateNotes(e.target.value)}
+        />
+      </div>
+
+      {/* Photos of the handwritten notes — saved to the report bucket on Spaces,
+          independent of the Save button below (they hang off the appointment). */}
+      <div>
+        <label style={labelStyle}>
+          Photos of Session Notes{' '}
+          <span style={{ fontSize: 11, fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--sp-muted, #5C7A72)' }}>
+            Only visible to you and admin
+          </span>
+        </label>
+        <SessionNotesPhotoUpload
+          appointmentId={appointmentId}
+          buttonClassName='cl-btn-outline'
+          accent='var(--sp-primary, #0C6B5A)'
+          hideLabel
         />
       </div>
 

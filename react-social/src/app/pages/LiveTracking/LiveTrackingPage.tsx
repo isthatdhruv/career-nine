@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
+// Drop-in fork of SheetJS (same API) that also writes cell styles — for the bold title row.
+import * as XLSX from "xlsx-js-style";
 import {
   getAssessmentList,
   getLiveTracking,
@@ -24,6 +25,14 @@ import { ActionIcon } from "../../components/ActionIcon";
 import { useAssessmentsForCurrentUser } from "../../hooks/useScopedAssessments";
 import { useInstitutes } from "../../lib/queries/lookups";
 import SearchableSelect from "../../components/SearchableSelect";
+import {
+  OverviewExportContext,
+  overviewExportFileName,
+  overviewExportTitle,
+  SNO_HEADER,
+  styleOverviewSheet,
+} from "../demo-dashboard-v2/dashboard-admin.export";
+import { hasTestMarker } from "../demo-dashboard-v2/dashboard-admin.filter";
 import { getScopedAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 
 /* ─── Types ─── */
@@ -803,10 +812,15 @@ const LiveTrackingPage = () => {
   // this becomes a redundant client-side belt over the suspenders.
   const visibleStudents = useMemo(() => {
     if (!data) return [];
+    // Test accounts ("test" anywhere in the name, email, login or institute)
+    // are dropped first, so the summary cards, table and Excel never count them.
+    const real = data.students.filter(
+      (s) => !hasTestMarker(s.studentName, s.email, s.username, s.instituteName)
+    );
     const scoped =
       allowedInstituteNames == null
-        ? data.students // super-admin / wildcard
-        : data.students.filter((s) => {
+        ? real // super-admin / wildcard
+        : real.filter((s) => {
             // Empty instituteName means the row isn't tagged — fail-open so we don't
             // hide students whose institute hasn't been resolved yet (lite-data path).
             if (!s.instituteName) return true;
@@ -897,30 +911,38 @@ const LiveTrackingPage = () => {
       : s === "notstarted" ? "Not Started"
       : s;
 
-    const rows = filteredStudents.map((s) => ({
-      Student: s.studentName || "",
-      Username: s.username || "",
-      Email: s.email || "",
-      DOB: s.dob || "",
-      Institute: s.instituteName || "",
-      Status: statusLabel(s.status),
-      Progress: total > 0
-        ? `${((s.answeredCount / total) * 100).toFixed(1)}%`
-        : "0%",
-    }));
+    const header = [SNO_HEADER, "Student", "Username", "Email", "DOB", "Institute", "Status", "Progress"];
+    const body = filteredStudents.map((s, i) => [
+      i + 1,
+      s.studentName || "",
+      s.username || "",
+      s.email || "",
+      s.dob || "",
+      s.instituteName || "",
+      statusLabel(s.status),
+      total > 0 ? `${((s.answeredCount / total) * 100).toFixed(1)}%` : "0%",
+    ]);
 
-    const ws = XLSX.utils.json_to_sheet(rows, {
-      header: ["Student", "Username", "Email", "DOB", "Institute", "Status", "Progress"],
-    });
-    ws["!cols"] = [
-      { wch: 28 }, { wch: 22 }, { wch: 32 }, { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
-    ];
+    // Same naming as the admin dashboard exports: the school is the selected
+    // institute, or the one institute every exported row belongs to.
+    const rowInstitutes = new Set(filteredStudents.map((s) => s.instituteName).filter(Boolean));
+    const instituteName = selectedInstituteName ?? (rowInstitutes.size === 1 ? Array.from(rowInstitutes)[0] : "");
+    const instRow = institutesForNames.find((i: any) => String(i?.instituteName ?? "") === instituteName);
+    const ctx: OverviewExportContext = {
+      assessmentNames: data.assessmentName ? [data.assessmentName] : [],
+      instituteName,
+      region: String(instRow?.city ?? instRow?.state ?? ""),
+    };
+
+    const exportedAt = new Date();
+    const ws = XLSX.utils.aoa_to_sheet([[overviewExportTitle(ctx, "Live Tracking", exportedAt)], header, ...body]);
+    styleOverviewSheet(ws, header, body.length, [
+      { wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 32 }, { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+    ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Live Tracking");
-    const safeName = (data.assessmentName || "assessment").replace(/[^a-z0-9]+/gi, "_");
-    const stamp = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `live_tracking_${safeName}_${stamp}.xlsx`);
-  }, [data, filteredStudents]);
+    XLSX.writeFile(wb, overviewExportFileName(ctx, "", exportedAt));
+  }, [data, filteredStudents, selectedInstituteName, institutesForNames]);
 
   return (
     <div className="ph-page">

@@ -85,6 +85,8 @@ public class StudentPurgeService {
         Map<String, Integer> counts = new LinkedHashMap<>();
 
         // ── Counselling (children of appointments first) ─────────────────────
+        joinDelete(counts, "session_notes_photo",
+                "DELETE t FROM session_notes_photo t JOIN counselling_appointment ca ON t.appointment_id = ca.id WHERE ca.student_id = :id", userStudentId);
         joinDelete(counts, "session_notes",
                 "DELETE t FROM session_notes t JOIN counselling_appointment ca ON t.appointment_id = ca.id WHERE ca.student_id = :id", userStudentId);
         joinDelete(counts, "counselling_checkin_otp",
