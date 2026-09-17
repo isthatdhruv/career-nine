@@ -249,7 +249,12 @@ public class EmailDispatchService {
     private SmtpEmailRequest buildMessage(EmailSendRequest req, EmailAccount account, EmailTemplate template) {
         SmtpEmailRequest m = new SmtpEmailRequest();
         m.setFromEmail(account.getFromEmail());
-        m.setFromName(account.getFromName());
+        // A per-send display name wins over the account's, so one scenario can present a
+        // different name without re-labelling every other mail leaving that mailbox. The
+        // address itself is always the account's — only the name in front of it changes.
+        m.setFromName(req.getFromName() != null && !req.getFromName().trim().isEmpty()
+                ? req.getFromName().trim()
+                : account.getFromName());
         m.setTo(new ArrayList<>(req.getTo()));
         if (req.getCc() != null) {
             m.setCc(new ArrayList<>(req.getCc()));

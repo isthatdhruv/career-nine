@@ -48,6 +48,28 @@ public final class EntitlementMails {
             .action(lms, "Open my modules").small(PERSONAL).signature().build();
     }
 
+    /**
+     * Fallback body for an admin-sent campaign invite, used only until someone saves a
+     * CAMPAIGN_INVITE template on the Email Templates page — that template then takes over.
+     *
+     * <p>No greeting: the admin types an address, not a name, so there is nobody to greet.
+     * And no {@link #PERSONAL} footnote either — a campaign link is a public registration
+     * page, so forwarding it to a friend is the point rather than the risk.
+     */
+    public static Mail campaignInvite(String campaignName, String assessmentName, MailLink landing) {
+        String what = assessmentName == null || assessmentName.trim().isEmpty()
+                ? "a Career-9 career assessment" : b(assessmentName);
+        Mail.Builder m = Mail.builder().subject("You are invited to take a Career-9 assessment")
+            .preheader("Register on the page inside — it takes a couple of minutes.")
+            .title("Your Career-9 assessment invitation")
+            .p("You have been invited to take " + what + ".");
+        if (campaignName != null && !campaignName.trim().isEmpty()) {
+            m.p("This invitation is part of " + b(campaignName) + ".");
+        }
+        return m.p("Register on the page below to get started. It takes a couple of minutes, and you can begin the assessment as soon as you are done.")
+            .action(landing, "Register now").signature().build();
+    }
+
     public static Mail bookingLink(String firstName, MailLink booking) {
         return Mail.builder().subject("Book your Career-9 counselling session").preheader("Pick a time that suits you. No login needed.")
             .title("Book your counselling session").p(hi(firstName))

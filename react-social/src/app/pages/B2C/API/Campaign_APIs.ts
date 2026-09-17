@@ -151,3 +151,20 @@ export const deleteClassRoute = (routeId: number) =>
 export const importSchoolConfig = (campaignId: number, sessionId: number) =>
   axios.post<{ imported: number; assessmentsAttached: number; assessmentsTouched: number; message: string }>(
     `${API_URL}/campaign/${campaignId}/import-school-config`, { sessionId });
+
+// Emailing the registration link. The backend rebuilds the URL from the campaign's own
+// slug + these ids, so only a real campaign link can ever go out; omit assessmentId for
+// the campaign-wide link, add campaignAssessmentTierId for a per-tier deep link.
+export interface SendCampaignLinkResult {
+  link: string;
+  requested: number;
+  accepted: number;
+  failed: number;
+  results: { email: string; status: string; error?: string | null }[];
+}
+
+export const sendCampaignLink = (campaignId: number, body: {
+  emails: string[];
+  assessmentId?: number;
+  campaignAssessmentTierId?: number;
+}) => axios.post<SendCampaignLinkResult>(`${API_URL}/campaign/${campaignId}/send-link`, body);

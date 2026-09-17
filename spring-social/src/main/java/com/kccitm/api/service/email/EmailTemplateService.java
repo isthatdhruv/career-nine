@@ -251,6 +251,7 @@ public class EmailTemplateService {
             case REPORT_PDF_LINK:return "https://app.career-9.net/report/sample.pdf";
             case REPORT_TYPE:    return "Career Discovery Report";
             case ASSESSMENT_NAME:return "Career Discovery Assessment";
+            case CAMPAIGN_NAME:  return "Class 10 Career Discovery 2026";
             case AMOUNT:         return "₹499";
             case PLAN_NAME:      return "Career Discovery";
             case INVOICE_ID:     return "INV-2026-00123";
