@@ -28,6 +28,18 @@ public class EmailSendRequest {
     private String htmlContent;
     private String textContent;
 
+    /**
+     * The display name on the From line, overriding the sending account's own {@code from_name}
+     * for this send only. Set it where one scenario needs a different name to the rest of the
+     * mail leaving that mailbox — an account shared by several senders can stay as it is.
+     *
+     * <p>Left null, the account's {@code from_name} is used, exactly as before. Left null on an
+     * account that has none either, the message goes out with a bare address and the recipient's
+     * mail client invents a name from the local part ({@code notifications@…} shows as
+     * "notifications").
+     */
+    private String fromName;
+
     /** Manual pick — wins over institute/global default account (Phase 2 surfaces). */
     private Long overrideAccountId;
     /** Manual pick — wins over the send-scenario default template (Phase 3 surfaces). */
@@ -91,6 +103,8 @@ public class EmailSendRequest {
     public void setHtmlContent(String htmlContent) { this.htmlContent = htmlContent; }
     public String getTextContent() { return textContent; }
     public void setTextContent(String textContent) { this.textContent = textContent; }
+    public String getFromName() { return fromName; }
+    public void setFromName(String fromName) { this.fromName = fromName; }
     public Long getOverrideAccountId() { return overrideAccountId; }
     public void setOverrideAccountId(Long overrideAccountId) { this.overrideAccountId = overrideAccountId; }
     public Long getOverrideTemplateId() { return overrideTemplateId; }

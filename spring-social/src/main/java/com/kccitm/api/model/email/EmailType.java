@@ -77,6 +77,14 @@ public enum EmailType {
             EmailPlaceholder.ACTION_LINK),
     COUNSELLING_REQUEST("Counselling request received", "B2C", EmailDeliveryMode.ASYNC,
             EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.STUDENT_EMAIL, EmailPlaceholder.ACTION_LINK),
+    /**
+     * The campaign registration link, mailed by an admin from the Campaign page. Unlike the
+     * entitlement mails above, the recipient is a prospect rather than a student we hold — the
+     * name placeholders are usually blank and get stripped before the send.
+     */
+    CAMPAIGN_INVITE("Campaign registration invite", "B2C", EmailDeliveryMode.ASYNC,
+            EmailPlaceholder.FIRST_NAME, EmailPlaceholder.STUDENT_NAME, EmailPlaceholder.CAMPAIGN_NAME,
+            EmailPlaceholder.ASSESSMENT_NAME, EmailPlaceholder.ACTION_LINK, EmailPlaceholder.SCHOOL_NAME),
 
     // ── Payments ────────────────────────────────────────────────────────────
     PAYMENT_SUCCESS("Payment success / receipt", "Payment", EmailDeliveryMode.SYNC,

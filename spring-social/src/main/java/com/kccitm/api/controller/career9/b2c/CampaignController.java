@@ -28,6 +28,10 @@ import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.CampaignClassAssessment;
 import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.model.career9.school.SchoolSession;
+import com.kccitm.api.model.email.EmailPlaceholder;
+import com.kccitm.api.model.email.EmailSendRequest;
+import com.kccitm.api.model.email.EmailSendResult;
+import com.kccitm.api.model.email.EmailType;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.SchoolAssessmentConfigRepository;
 import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
@@ -39,6 +43,9 @@ import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
 import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.service.b2c.CampaignResolutionService;
+import com.kccitm.api.service.b2c.LinkBuilder;
+import com.kccitm.api.service.email.EmailDispatchService;
+import com.kccitm.api.service.email.mails.EntitlementMails;
 
 @RestController
 @RequestMapping("/campaign")
@@ -58,6 +65,9 @@ public class CampaignController {
 
     @Autowired private com.kccitm.api.service.career9.InstituteAssessmentService instituteAssessmentService;
     @Autowired private com.kccitm.api.service.DigitalOceanSpacesService spacesService;
+    @Autowired private LinkBuilder linkBuilder;
+    @Autowired private EmailDispatchService emailDispatchService;
+    @Autowired private com.kccitm.api.service.email.theme.BrandResolver brandResolver;
 
     @PreAuthorize("@auth.allows('campaign.read.all')")
     @GetMapping("/getAll")
@@ -418,6 +428,166 @@ public class CampaignController {
         tm.setIsActive(false);
         tierMappingRepository.save(tm);
         return ResponseEntity.ok("Tier detached");
+    }
+
+    // ── Emailing the registration link ──────────────────────────────────────────
+
+    /** Refuses a send of more than this many addresses at once — a typo in a paste, not a mailing list. */
+    private static final int MAX_INVITE_RECIPIENTS = 200;
+
+    /** Deliberately loose: the SMTP server is the real judge, this only catches obvious typos. */
+    private static final java.util.regex.Pattern EMAIL_RE =
+            java.util.regex.Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
+
+    /**
+     * Email this campaign's registration link to the addresses an admin types on the Campaign
+     * page, from the configured career-9 sending account.
+     *
+     * <p>The link is rebuilt here from the campaign's own slug and the ids in the body, never
+     * taken from the request, so this endpoint cannot be used to mail an arbitrary URL out of
+     * a career-9 address. The same checks the public landing page applies are applied first —
+     * inactive campaign, expired window, assessment not attached, tier not on that assessment —
+     * so we never mail a link to a page that would turn the student away.
+     *
+     * <p>One send per address rather than one message addressed to everybody: each student gets
+     * their own {@code email_send_log} row, so a bounce is attributable, and nobody sees who
+     * else was invited. Delivery is the type's ASYNC default, so a slow SMTP cannot hold this
+     * request open; the response says what was queued and the Email Log page carries the
+     * terminal status.
+     *
+     * <p>Copy comes from the CAMPAIGN_INVITE template once an admin saves one on the Email
+     * Templates page; until then {@link EntitlementMails#campaignInvite} is the fallback body.
+     */
+    @PreAuthorize("@auth.allows('campaign.update')")
+    @PostMapping("/{campaignId}/send-link")
+    public ResponseEntity<?> sendLink(@PathVariable Long campaignId, @RequestBody Map<String, Object> req) {
+        Campaign campaign = campaignRepository.findById(campaignId).orElse(null);
+        if (campaign == null || Boolean.TRUE.equals(campaign.getIsDeleted())) {
+            return ResponseEntity.notFound().build();
+        }
+        // Mirrors CampaignPublicController's landing-page guards, so an admin cannot mail a
+        // link that the student would open only to be told the campaign is closed.
+        if (Boolean.FALSE.equals(campaign.getIsActive())) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "This campaign is not active — students opening the link would be turned away."));
+        }
+        if (campaign.getValidTo() != null && campaign.getValidTo().before(new java.util.Date())) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "This campaign has expired — students opening the link would be turned away."));
+        }
+
+        // An assessment (and optionally one of its tiers) narrows the link to the same deep
+        // link the Copy buttons offer. Both must really belong to this campaign.
+        Long assessmentId = toLong(req.get("assessmentId"));
+        Long tierMapId = toLong(req.get("campaignAssessmentTierId"));
+        String assessmentName = null;
+        if (assessmentId != null) {
+            Optional<CampaignAssessmentMapping> mOpt = mappingRepository
+                    .findByCampaignIdAndAssessmentIdAndIsDeletedFalse(campaignId, assessmentId);
+            if (!mOpt.isPresent() || !Boolean.TRUE.equals(mOpt.get().getIsActive())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Assessment not in this campaign"));
+            }
+            if (tierMapId != null) {
+                Optional<CampaignAssessmentTier> tOpt = tierMappingRepository.findById(tierMapId);
+                if (!tOpt.isPresent() || !Boolean.TRUE.equals(tOpt.get().getIsActive())
+                        || !mOpt.get().getId().equals(tOpt.get().getCampaignAssessmentMappingId())) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Tier not on this assessment"));
+                }
+            }
+            AssessmentTable a = assessmentTableRepository.findById(assessmentId).orElse(null);
+            assessmentName = a != null ? a.getAssessmentName() : null;
+        } else if (tierMapId != null) {
+            // A tier link without its assessment is not a page that exists.
+            return ResponseEntity.badRequest().body(Map.of("error", "A tier link needs its assessmentId"));
+        }
+
+        List<String> emails = parseRecipients(req.get("emails"));
+        if (emails.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Enter at least one email address"));
+        }
+        if (emails.size() > MAX_INVITE_RECIPIENTS) {
+            return ResponseEntity.badRequest().body(Map.of("error",
+                    "That is " + emails.size() + " addresses — send at most " + MAX_INVITE_RECIPIENTS + " at a time."));
+        }
+        List<String> invalid = new ArrayList<>();
+        for (String e : emails) {
+            if (!EMAIL_RE.matcher(e).matches()) invalid.add(e);
+        }
+        if (!invalid.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "These do not look like email addresses: " + String.join(", ", invalid),
+                    "invalid", invalid));
+        }
+
+        String link = linkBuilder.campaignLanding(campaign.getSlug(), assessmentId, tierMapId);
+        com.kccitm.api.service.email.theme.MailLink landing =
+                com.kccitm.api.service.email.theme.MailLink.plain(link);
+
+        // The From line always reads "Career-9", whatever the shared sending account happens to
+        // be labelled and whichever institute the campaign belongs to. An invite is the first
+        // thing a prospect ever sees from us, so the sender has to be the name they recognise.
+        // Set per send, so every other notification leaving that mailbox is left alone.
+        String fromName = brandResolver.standard().getName();
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        int accepted = 0;
+        for (String email : emails) {
+            EmailSendRequest send = EmailSendRequest.mail(EmailType.CAMPAIGN_INVITE, email,
+                    EntitlementMails.campaignInvite(campaign.getName(), assessmentName, landing));
+            // Institute-tied campaigns send from that institute's configured account and pick up
+            // its branding; a campaign with no institute falls through to the global default.
+            send.setInstituteCode(campaign.getInstituteCode());
+            send.setFromName(fromName);
+            // Career-9 branding throughout, whitelabel institute or not: an explicit Brand stops
+            // the shell resolving the campaign's institute for the logo and footer, and the
+            // explicit school_name overrides the one the resolver would derive. A prospect being
+            // invited has no relationship with the school yet — the name they need to recognise
+            // on every line of this mail is ours.
+            send.setBrand(brandResolver.standard());
+            send.put(EmailPlaceholder.SCHOOL_NAME.key(), fromName);
+            send.put(EmailPlaceholder.ACTION_LINK.key(), link);
+            send.put(EmailPlaceholder.CAMPAIGN_NAME.key(), campaign.getName());
+            send.put(EmailPlaceholder.ASSESSMENT_NAME.key(), assessmentName == null ? "" : assessmentName);
+
+            EmailSendResult result = emailDispatchService.send(send);
+            if (result.isSuccess()) accepted++;
+            Map<String, Object> row = new HashMap<>();
+            row.put("email", email);
+            row.put("status", result.getStatus() != null ? result.getStatus().name() : "UNKNOWN");
+            row.put("error", result.getError());
+            results.add(row);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("link", link);
+        response.put("requested", emails.size());
+        response.put("accepted", accepted);
+        response.put("failed", emails.size() - accepted);
+        response.put("results", results);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Accepts either a JSON array of addresses or one pasted string (commas, semicolons or
+     * newlines), because both are things an admin will reasonably send. Trimmed, lowercased
+     * and de-duplicated, so pasting a list twice does not mail anybody twice.
+     */
+    private static List<String> parseRecipients(Object raw) {
+        List<String> parts = new ArrayList<>();
+        if (raw instanceof List) {
+            for (Object o : (List<?>) raw) {
+                if (o != null) parts.add(o.toString());
+            }
+        } else if (raw != null) {
+            parts.addAll(java.util.Arrays.asList(raw.toString().split("[,;\\s]+")));
+        }
+        List<String> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        for (String p : parts) {
+            String e = p == null ? "" : p.trim().toLowerCase();
+            if (!e.isEmpty() && seen.add(e)) out.add(e);
+        }
+        return out;
     }
 
     // ── Class-based registration (class → assessment routing) ───────────────────

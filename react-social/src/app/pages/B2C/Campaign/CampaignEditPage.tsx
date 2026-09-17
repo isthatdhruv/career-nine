@@ -743,8 +743,9 @@ const CampaignEditPage = () => {
         onChanged={refreshCampaign}
       />
 
-      {isEdit && campaign.slug && (
+      {isEdit && campaign.slug && campaign.campaignId && (
         <RegistrationLinks
+          campaignId={campaign.campaignId}
           slug={campaign.slug}
           assessments={assessmentRows.map(r => ({
             assessmentId: r.assessmentId,

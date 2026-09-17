@@ -50,6 +50,26 @@ public class LinkBuilder {
         return assessmentBaseUrl + "/c/" + slug;
     }
 
+    /**
+     * The campaign landing page, optionally deep-linked to one attached assessment and one of
+     * its tiers — the same three link shapes the Campaign page offers as copyable URLs.
+     *
+     * <p>Built here rather than accepted from the caller: the admin-triggered campaign invite
+     * mails whatever this returns from the career-9 sending account, so the URL must be
+     * composed from our own slug and ids and can never be an address the request supplied.
+     *
+     * <p>A tier without an assessment is not a page that exists, so it is ignored rather than
+     * appended — mirroring how the frontend builds the same three links.
+     */
+    public String campaignLanding(String slug, Long assessmentId, Long campaignAssessmentTierId) {
+        String url = campaignLanding(slug);
+        if (assessmentId == null) {
+            return url;
+        }
+        url = url + "/" + assessmentId;
+        return campaignAssessmentTierId == null ? url : url + "/" + campaignAssessmentTierId;
+    }
+
     public String assessmentStart(String accessToken, Long entitlementId) {
         return shorten(assessmentBaseUrl + "/assessment/start?t=" + accessToken + "&e=" + entitlementId,
                 "assessment_start");

@@ -35,6 +35,7 @@ public enum EmailPlaceholder {
 
     // — Assessment —
     ASSESSMENT_NAME("assessment_name", "Assessment name", "Assessment"),
+    CAMPAIGN_NAME("campaign_name", "Campaign name", "Assessment"),
 
     // — Payment —
     AMOUNT("amount", "Payment amount", "Payment"),
