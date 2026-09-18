@@ -38,7 +38,7 @@ public class CounsellingReminderSent implements Serializable {
     @Column(name = "audience", nullable = false, length = 20)
     private String audience;
 
-    /** T12H | T4H | T2H | T15M */
+    /** T12H | T4H | T2H | T15M | T5M */
     @Column(name = "offset_code", nullable = false, length = 10)
     private String offsetCode;
 
