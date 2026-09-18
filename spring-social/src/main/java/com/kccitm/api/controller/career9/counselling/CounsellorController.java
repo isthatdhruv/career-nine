@@ -30,6 +30,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.counselling.CounsellorDeactivationService;
 import com.kccitm.api.service.counselling.CounsellorService;
+import com.kccitm.api.service.counselling.CounsellingClock;
 
 /**
  * Everything a counsellor record is made of: self-registration, login, profile CRUD, the
@@ -43,6 +44,10 @@ import com.kccitm.api.service.counselling.CounsellorService;
  */
 @RestController
 public class CounsellorController {
+    /** Slot dates/times are IST wall-clock while the JVM runs UTC; never compare them against a raw now(). */
+    @Autowired
+    private CounsellingClock clock;
+
 
     private static final Logger logger = LoggerFactory.getLogger(CounsellorController.class);
 
@@ -418,7 +423,7 @@ public class CounsellorController {
     @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/api/counsellor/{id}/dashboard-summary")
     public ResponseEntity<?> dashboardSummary(@PathVariable Long id) {
-        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate today = clock.today();
         java.time.LocalDate weekEnd = today.plusDays(6);
 
         // Today's confirmed/in-progress sessions.

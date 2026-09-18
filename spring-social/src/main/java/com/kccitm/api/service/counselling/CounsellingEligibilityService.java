@@ -36,6 +36,10 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
  */
 @Service
 public class CounsellingEligibilityService {
+    /** Slot dates/times are IST wall-clock while the JVM runs UTC; never compare them against a raw now(). */
+    @Autowired
+    private CounsellingClock clock;
+
 
     private static final Logger logger = LoggerFactory.getLogger(CounsellingEligibilityService.class);
 
@@ -121,7 +125,7 @@ public class CounsellingEligibilityService {
         if (student.getInstitute() != null) {
             Integer instituteCode = student.getInstitute().getInstituteCode();
             List<CounsellingPlan> activePlans =
-                    counsellingPlanRepository.findActivePlansForInstitute(instituteCode, LocalDate.now());
+                    counsellingPlanRepository.findActivePlansForInstitute(instituteCode, clock.today());
 
             if (!activePlans.isEmpty()) {
                 CounsellingPlan plan = activePlans.get(0); // use the first active plan

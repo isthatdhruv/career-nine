@@ -139,7 +139,7 @@ public class CounsellorService {
         if (newMeetingLink != null && !newMeetingLink.isEmpty()) {
             try {
                 List<com.kccitm.api.model.career9.counselling.CounsellingAppointment> upcoming =
-                        appointmentRepository.findUpcomingOnlineByCounsellor(id, java.time.LocalDate.now());
+                        appointmentRepository.findUpcomingOnlineByCounsellor(id, counsellingClock.today());
                 int repointed = 0;
                 for (com.kccitm.api.model.career9.counselling.CounsellingAppointment a : upcoming) {
                     // Never clobber a link an admin set by hand for one specific session.

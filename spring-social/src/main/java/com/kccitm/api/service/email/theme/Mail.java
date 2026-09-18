@@ -44,6 +44,8 @@ public final class Mail {
         public Builder title(String html) { blocks.add(new Blocks.Title(html)); return this; }
         public Builder p(String html) { blocks.add(new Blocks.Paragraph(html)); return this; }
         public Builder small(String html) { blocks.add(new Blocks.Small(html)); return this; }
+        /** As {@link #small} but skips a null/blank line, like {@link #action} skips a null link. */
+        public Builder smallIf(String html) { if (html != null && !html.trim().isEmpty()) blocks.add(new Blocks.Small(html)); return this; }
         public Builder notice(String html) { blocks.add(new Blocks.Notice(html)); return this; }
         public Builder internal(String tag) { blocks.add(new Blocks.Internal(tag)); return this; }
         public Builder details(Row... rows) { blocks.add(new Blocks.Details(Arrays.asList(rows))); return this; }

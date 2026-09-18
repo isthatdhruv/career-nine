@@ -58,6 +58,9 @@ public class UserController {
     @Autowired
     private MailLinks mailLinks;
 
+    @Autowired
+    private com.kccitm.api.service.email.EmailNotificationRecipientService emailRecipientService;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
@@ -427,6 +430,10 @@ public class UserController {
     @GetMapping(value = "user/registered-users")
     public List<Map<String, Object>> getRegisteredUsers() {
         List<User> users = userRepository.findByProviderNot(AuthProvider.custom_student);
+        // One read for the whole table, not one per row: the Send-email column is a
+        // set-membership test against the dashboard-digest recipient list.
+        java.util.Set<String> digestSubscribers =
+                emailRecipientService.subscribedAddresses(EmailType.ADMIN_DASHBOARD_DIGEST);
         List<Map<String, Object>> result = new ArrayList<>();
         for (User u : users) {
             Map<String, Object> row = new HashMap<>();
@@ -438,6 +445,8 @@ public class UserController {
             row.put("designation", u.getDesignation());
             row.put("isActive", u.getIsActive());
             row.put("isSuperAdmin", Boolean.TRUE.equals(u.getIsSuperAdmin()));
+            row.put("dashboardEmail", u.getEmail() != null
+                    && digestSubscribers.contains(u.getEmail().trim().toLowerCase()));
             row.put("provider", u.getProvider() != null ? u.getProvider().name() : null);
             if (u.getDobDate() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -585,6 +594,50 @@ public class UserController {
 
         String who = counsellorSynced ? "Counsellor" : "User";
         return ResponseEntity.ok(new ApiResponse(true, who + (newStatus ? " activated" : " deactivated")));
+    }
+
+    /**
+     * Turn the daily dashboard digest on or off for one user — the <b>Send email</b> switch on
+     * the User Management table.
+     *
+     * <p>The switch does not live on the user row. It writes {@code email_notification_recipient}
+     * under {@link EmailType#ADMIN_DASHBOARD_DIGEST}, the same table the Notification Recipients
+     * page edits, so there is one list of who receives what rather than two that can disagree.
+     * That also means the subscription follows the <em>address</em>: a user whose email is later
+     * changed keeps the old address on the list until an admin switches them on again.
+     *
+     * <p>Switching off deactivates the row instead of deleting it, so anything configured
+     * against that recipient (a WhatsApp number, a Cc header) survives being switched back on.
+     */
+    @PreAuthorize("@auth.allows('user.update')")
+    @PostMapping(value = "user/toggle-dashboard-email/{id}")
+    public ResponseEntity<?> toggleDashboardEmail(@PathVariable("id") Long userId,
+                                                  @CurrentUser UserPrincipal currentUser) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        String email = user.getEmail() == null ? "" : user.getEmail().trim();
+        if (email.isEmpty()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "This user has no email address to send the dashboard numbers to"));
+        }
+
+        boolean on = !emailRecipientService.isSubscribed(EmailType.ADMIN_DASHBOARD_DIGEST, email);
+        try {
+            on = emailRecipientService.setSubscribed(EmailType.ADMIN_DASHBOARD_DIGEST, email,
+                    user.getName(), on, currentUser != null ? currentUser.getId() : null);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, e.getMessage()));
+        }
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("dashboardEmail", on);
+        resp.put("message", on
+                ? "Dashboard numbers will be emailed to " + email + " daily at 8 PM."
+                : "Stopped the daily dashboard email to " + email + ".");
+        return ResponseEntity.ok(resp);
     }
 
     /**

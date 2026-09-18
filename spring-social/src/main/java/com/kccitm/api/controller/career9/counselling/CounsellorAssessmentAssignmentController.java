@@ -29,6 +29,7 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingRequestRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorAssessmentAssignmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
+import com.kccitm.api.service.counselling.CounsellingClock;
 
 /**
  * Counselling Phase 4 — admin CRUD for assigning counsellors to assessments.
@@ -39,6 +40,10 @@ import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 @RestController
 @RequestMapping("/api/counsellor-assessment")
 public class CounsellorAssessmentAssignmentController {
+    /** Slot dates/times are IST wall-clock while the JVM runs UTC; never compare them against a raw now(). */
+    @Autowired
+    private CounsellingClock clock;
+
 
     private static final Logger logger = LoggerFactory.getLogger(CounsellorAssessmentAssignmentController.class);
 
@@ -128,7 +133,7 @@ public class CounsellorAssessmentAssignmentController {
         // Assigning a counsellor with nothing bookable strands every student who finishes
         // this assessment: the booking screen offers only assigned counsellors' slots, so
         // they would be sent to an empty calendar. Require availability first.
-        long availableSlots = slotRepository.countUpcomingAvailable(counsellorId, java.time.LocalDate.now());
+        long availableSlots = slotRepository.countUpcomingAvailable(counsellorId, clock.today());
         if (availableSlots == 0) {
             logger.info("Refused assignment of counsellor {} to assessment {}: no upcoming available slots",
                     counsellorId, assessmentId);

@@ -26,10 +26,15 @@ import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepos
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.service.counselling.AvailabilityTemplateService;
 import com.kccitm.api.service.counselling.BookingService;
+import com.kccitm.api.service.counselling.CounsellingClock;
 
 @RestController
 @RequestMapping("/api/counselling-slot")
 public class CounsellingSlotController {
+    /** Slot dates/times are IST wall-clock while the JVM runs UTC; never compare them against a raw now(). */
+    @Autowired
+    private CounsellingClock clock;
+
 
     private static final Logger logger = LoggerFactory.getLogger(CounsellingSlotController.class);
 
@@ -51,7 +56,7 @@ public class CounsellingSlotController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week,
             @RequestParam(required = false) Integer instituteCode,
             @RequestParam(required = false) Long studentId) {
-        LocalDate weekStart = (week != null) ? week : LocalDate.now();
+        LocalDate weekStart = (week != null) ? week : clock.today();
 
         List<CounsellingSlot> slots;
         if (studentId != null) {
@@ -179,7 +184,7 @@ public class CounsellingSlotController {
     @GetMapping("/available-counts")
     public ResponseEntity<Map<String, Long>> availableCounts() {
         Map<String, Long> out = new java.util.HashMap<>();
-        for (Object[] row : slotRepository.countUpcomingAvailableByCounsellor(LocalDate.now())) {
+        for (Object[] row : slotRepository.countUpcomingAvailableByCounsellor(clock.today())) {
             if (row.length < 2 || row[0] == null) continue;
             out.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
         }

@@ -25,6 +25,10 @@ import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
  */
 @Service
 public class AvailabilityTemplateService {
+    /** Slot dates/times are IST wall-clock while the JVM runs UTC; never compare them against a raw now(). */
+    @Autowired
+    private CounsellingClock clock;
+
 
     private static final Logger logger = LoggerFactory.getLogger(AvailabilityTemplateService.class);
 
@@ -88,7 +92,7 @@ public class AvailabilityTemplateService {
     @Transactional
     public boolean deleteTemplateIfExhausted(Long templateId) {
         if (templateId == null) return false;
-        if (slotRepository.countActiveFutureByTemplate(templateId, LocalDate.now()) > 0) return false;
+        if (slotRepository.countActiveFutureByTemplate(templateId, clock.today()) > 0) return false;
         if (!templateRepository.existsById(templateId)) return false;
         logger.info("Availability template {} has no live slots left — removing it", templateId);
         deleteTemplate(templateId);

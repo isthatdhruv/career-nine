@@ -198,6 +198,28 @@ app:
   openai:
     # Supplied via the OPENAI_API_KEY environment variable. Never commit a key here.
     api-key: ${OPENAI_API_KEY:}
+  # WhatsApp (AiSensy). Every email the system sends is accompanied by a WhatsApp to the same
+  # people, dispatched from the same call — see WhatsAppDispatchService.
+  whatsapp:
+    # Supplied via the AISENSY_API_KEY environment variable. Never commit a key here.
+    #
+    # BLANK UNTIL A KEY IS ISSUED, and that is the expected state: recipient resolution,
+    # campaign selection and logging all run as normal, each send is recorded as
+    # not-delivered with the reason, and the accompanying email goes out either way. Filling
+    # this in is the only step needed to make messages start leaving.
+    api-key: ${AISENSY_API_KEY:}
+    # Master switch. false stops every WhatsApp without touching the emails — the way to turn
+    # the second channel off in an incident without a deploy.
+    enabled: ${APP_WHATSAPP_ENABLED:true}
+    # The label AiSensy records the send against. Not what the recipient sees: that is the
+    # WhatsApp Business display name on the account.
+    sender-name: ${APP_WHATSAPP_SENDER_NAME:Career-9}
+    # Per-scenario template (AiSensy campaign) overrides, keyed by EmailType — e.g.
+    #   campaigns:
+    #     PAYMENT_SUCCESS: career9_payment_success_v2
+    # Defaults live in WhatsAppCampaigns; anything unmapped falls back to career9_notification.
+    # Each name must exist as an approved campaign in the AiSensy dashboard before it will send.
+    campaigns: {}
   # Principal dashboard release. Both thresholds are stamped onto every row at
   # generation time, so changing them here never retroactively reinterprets
   # dashboards that were already produced.
@@ -362,7 +384,7 @@ spring:
     # production apply strictly in order and must keep the default.
     out-of-order: true
   datasource:
-    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+    url: jdbc:mysql://localhost:3307/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
     username: root
     password: Career-qCsfeuECc3MW
     hikari:

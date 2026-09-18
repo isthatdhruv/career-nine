@@ -23,10 +23,22 @@ public final class CounsellingMails {
             this.school = school; this.assessment = assessment; this.student = student; this.join = join; this.report = report;
         }
     }
+    /**
+     * A muted "School - X" line for the short notice mails that carry no details table.
+     * Returns null when the student has no institute, and {@code smallIf} then omits the
+     * line entirely rather than leaving a stray empty paragraph.
+     */
+    static String schoolNote(Session s) {
+        return (s == null || s.school == null || s.school.trim().isEmpty())
+                ? null : "School: " + b(s.school);
+    }
+
     static Mail.Row[] rows(Session s, boolean withStudent, boolean withSchool) {
         List<Mail.Row> r = new ArrayList<>();
         if (withStudent) r.add(new Mail.Row("Student", s.student));
-        if (withSchool) { r.add(new Mail.Row("School", s.school)); r.add(new Mail.Row("Assessment", s.assessment)); }
+        // School only: the assessment name was dropped from these tables deliberately -
+        // a parent reading a session reminder needs to know which school, not which test.
+        if (withSchool) r.add(new Mail.Row("School", s.school));
         r.add(new Mail.Row("Date", s.date)); r.add(new Mail.Row("Time", s.time));
         r.add(new Mail.Row("Counsellor", s.counsellor)); r.add(new Mail.Row("Mode", s.mode));
         return r.toArray(new Mail.Row[0]);
@@ -65,7 +77,7 @@ public final class CounsellingMails {
             .preheader(s.date + " at " + s.time + ". Join link inside.")
             .title("Your counselling session is confirmed").p(hi(firstName))
             .p("Your counselling session has been confirmed.")
-            .details(new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Duration", s.duration == null ? null : s.duration + " minutes"), new Mail.Row("Mode", s.mode))
+            .details(new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Duration", s.duration == null ? null : s.duration + " minutes"), new Mail.Row("Mode", s.mode))
             .action(s.join, "Join the session").small(EARLY).signature().build();
     }
 
@@ -75,7 +87,7 @@ public final class CounsellingMails {
             .title("Counselling session cancelled").p(hi(firstName))
             .p("Your counselling session on " + b(s.date) + " at " + b(s.time) + " has been cancelled by " + b(cancelledBy) + ".");
         if (reason != null && !reason.isEmpty()) m.notice("Reason given: " + v(reason));
-        return m.action(sessions, buttonLabel).small("If you have any questions, write to " + SUPPORT + ".").signature().build();
+        return m.action(sessions, buttonLabel).small("If you have any questions, write to " + SUPPORT + ".").smallIf(schoolNote(s)).signature().build();
     }
 
     public static Mail studentCancellationConfirmation(String firstName, Session s, int changesLeft, boolean creditedBack, MailLink sessions) {
@@ -90,7 +102,7 @@ public final class CounsellingMails {
             .title("Your session has been cancelled").p(hi(firstName))
             .p("Your counselling session on " + b(s.date) + " at " + b(s.time) + " has been cancelled as you requested.")
             .notice(notice)
-            .p("Ready to pick a new time?").action(sessions, "Book a new time").signature().build();
+            .p("Ready to pick a new time?").action(sessions, "Book a new time").smallIf(schoolNote(s)).signature().build();
     }
 
     public static Mail adminCancellationStudent(String firstName, Session s, MailLink sessions) {
@@ -100,7 +112,7 @@ public final class CounsellingMails {
             .p("Your counselling session on " + b(s.date) + " at " + b(s.time) + " has been cancelled by the Career-9 team.")
             .notice("This does not affect your counselling entitlement. Our team will be in touch shortly to arrange a new time.")
             .p("Prefer not to wait?").action(sessions, "Pick a new time")
-            .small("We apologise for the inconvenience.").signature().build();
+            .small("We apologise for the inconvenience.").smallIf(schoolNote(s)).signature().build();
     }
 
     public static Mail adminCancellationCounsellor(String counsellorName, String studentName, Session s, MailLink portal) {
@@ -108,7 +120,7 @@ public final class CounsellingMails {
             .preheader("The " + s.time + " session on " + s.date + " has been cancelled.")
             .title("A counselling session has been cancelled").p(hi(counsellorName))
             .p("The counselling session with " + b(studentName) + " on " + b(s.date) + " at " + b(s.time) + " has been cancelled by the Career-9 team.")
-            .details(new Mail.Row("Student", studentName), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time))
+            .details(new Mail.Row("Student", studentName), new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time))
             .action(portal, "Open my dashboard").small("Nothing is required from you.").signature().build();
     }
 
@@ -126,6 +138,7 @@ public final class CounsellingMails {
     static Mail.Row[] rescheduleRows(Session old, Session s, boolean withStudent) {
         List<Mail.Row> r = new ArrayList<>();
         if (withStudent) r.add(new Mail.Row("Student", s.student));
+        r.add(new Mail.Row("School", s.school));
         r.add(new Mail.Row("Previously", old.date + ", " + old.time));
         r.add(new Mail.Row("New date", s.date)); r.add(new Mail.Row("New time", s.time));
         r.add(new Mail.Row("Counsellor", s.counsellor)); r.add(new Mail.Row("Mode", s.mode));
@@ -159,7 +172,7 @@ public final class CounsellingMails {
             .p(s.join != null
                     ? "A different counsellor, " + b(newCounsellor) + ", will now be taking it, so please use the updated joining link below."
                     : "A different counsellor, " + b(newCounsellor) + ", will now be taking it. The venue is unchanged; the details are below.")
-            .details(new Mail.Row("Date", s.date), new Mail.Row("Time", s.time),
+            .details(new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time),
                      new Mail.Row("Counsellor", newCounsellor), new Mail.Row("Mode", s.mode));
         if (s.join != null) m.action(s.join, "Join the session").small(EARLY);
         return m.signature().build();
@@ -172,7 +185,7 @@ public final class CounsellingMails {
             .p("Your counsellor is no longer available at " + b(oldTime) + ", so we have moved your session to " + b(s.time) + " on " + b(s.date) + ".")
             .action(s.join, "Join the session")
             .p("If the new time does not suit you, you can pick another one. Choosing your own time uses one of your free changes.")
-            .outline(reschedule, "Choose another time").small("We are sorry for the disruption.").signature().build();
+            .outline(reschedule, "Choose another time").small("We are sorry for the disruption.").smallIf(schoolNote(s)).signature().build();
     }
 
     public static Mail counsellorDeactivatedStudent(String firstName, Session s, MailLink reschedule) {
@@ -183,7 +196,7 @@ public final class CounsellingMails {
             .notice("This does not affect your counselling entitlement. Another counsellor is available, so you can choose a new time right away.")
             .action(reschedule, "Pick a new slot")
             .small("No login is needed; the link opens your booking page directly. If you would rather we arranged it for you, write to " + SUPPORT + ". We apologise for the inconvenience.")
-            .signature().build();
+            .smallIf(schoolNote(s)).signature().build();
     }
 
     // ─── Reminders, check-in and follow-ups ──────────────────────────────────────
@@ -192,7 +205,7 @@ public final class CounsellingMails {
         return Mail.builder().subject("Your counselling session is " + whenLabel)
             .preheader(s.date + ", " + s.time + ". Join link inside.")
             .title("Your counselling session is " + v(whenLabel)).p(hi(firstName))
-            .p("This is a reminder that your counselling session is " + b(whenLabel) + ".").details(rows(s, false, false))
+            .p("This is a reminder that your counselling session is " + b(whenLabel) + ".").details(rows(s, false, true))
             .action(s.join, "Join the session").links(null, s.report, "Open your assessment report").small(EARLY).signature().build();
     }
     public static Mail reminderCounsellor(String counsellorName, String studentName, String whenLabel, Session s) {
@@ -200,7 +213,7 @@ public final class CounsellingMails {
             .preheader(s.date + ", " + s.time + ". Join link inside.")
             .title("Session " + v(whenLabel) + ": " + v(studentName)).p(hi(counsellorName))
             .p("You have a counselling session " + b(whenLabel) + " with " + b(studentName) + ".")
-            .details(new Mail.Row("Student", studentName), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Mode", s.mode))
+            .details(new Mail.Row("Student", studentName), new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Mode", s.mode))
             .action(s.join, "Join the session").small(EARLY).signature().build();
     }
     public static Mail sessionComplete(String firstName, MailLink referral) {
@@ -241,7 +254,7 @@ public final class CounsellingMails {
             .title("Your check-in code").p(hi(firstName))
             .p("Read the code below out to your counsellor to start your counselling session.")
             .code(code, "Check-in code")
-            .details(new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Counsellor", s.counsellor))
+            .details(new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Counsellor", s.counsellor))
             .action(s.join, "Join the session")
             .small("This is the same 4-digit code printed on your Career-9 report. Please don&rsquo;t share it with anyone else; it is what records you as present.").signature().build();
     }
@@ -250,7 +263,7 @@ public final class CounsellingMails {
             .title("Your session is waiting to start").p(hi(firstName))
             .p("Your session has not been started yet. Please read out the 4-digit check-in code from your Career-9 report so your counsellor can begin.")
             .action(s.join, "Join the session").links(null, findCode, "Find my check-in code")
-            .small("If nobody has joined, you do not need to do anything else. Your session will be preserved and we will send you a link to pick a new time.").signature().build();
+            .small("If nobody has joined, you do not need to do anything else. Your session will be preserved and we will send you a link to pick a new time.").smallIf(schoolNote(s)).signature().build();
     }
     public static Mail checkinPromptCounsellor(String counsellorName, String studentName, String time, MailLink portal) {
         return Mail.builder().subject("Action needed: session with " + studentName + " not started")
@@ -280,7 +293,7 @@ public final class CounsellingMails {
             m.p("You have no free changes left, so this session can no longer be moved. You can book a new session.");
         }
         return m.action(sessions, canReschedule ? "Reschedule my session" : "View my sessions")
-            .small("If you were present and believe this is a mistake, raise it from your Career-9 dashboard or write to " + SUPPORT + ". The session will be reviewed and nothing counts against you until it is settled.").signature().build();
+            .small("If you were present and believe this is a mistake, raise it from your Career-9 dashboard or write to " + SUPPORT + ". The session will be reviewed and nothing counts against you until it is settled.").smallIf(schoolNote(s)).signature().build();
     }
     public static Mail disputeOutcome(String firstName, String date, boolean upheld, String note, MailLink sessions) {
         Mail.Builder m = upheld

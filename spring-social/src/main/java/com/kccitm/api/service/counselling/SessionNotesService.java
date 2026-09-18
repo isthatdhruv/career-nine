@@ -20,9 +20,14 @@ import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.model.career9.counselling.SessionNotes;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.SessionNotesRepository;
+import com.kccitm.api.service.counselling.CounsellingClock;
 
 @Service
 public class SessionNotesService {
+    /** Slot dates/times are IST wall-clock while the JVM runs UTC; never compare them against a raw now(). */
+    @Autowired
+    private CounsellingClock clock;
+
 
     private static final Logger logger = LoggerFactory.getLogger(SessionNotesService.class);
 
@@ -79,7 +84,7 @@ public class SessionNotesService {
             throw new BadRequestException("This appointment has no scheduled time, so notes cannot be added yet.");
         }
         LocalDateTime sessionEnd = LocalDateTime.of(slot.getDate(), slot.getEndTime());
-        if (LocalDateTime.now().isBefore(sessionEnd)) {
+        if (clock.now().isBefore(sessionEnd)) {
             throw new BadRequestException("Notes can be added only after the session's scheduled time has ended.");
         }
 

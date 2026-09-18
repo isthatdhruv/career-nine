@@ -73,6 +73,15 @@ public class ReminderSchedulerService {
         LABELS.put("T15M", "in 15 minutes");
     }
 
+    /**
+     * Slot times are IST wall-clock while the JVM runs UTC, so every "how long until this
+     * session" calculation below must go through this rather than {@code LocalDateTime.now()}.
+     * On the raw clock each offset lands 5h30m adrift: the 4h, 2h and 15m reminders would go
+     * out <i>after</i> the session they are announcing.
+     */
+    @Autowired
+    private CounsellingClock clock;
+
     @Autowired
     private CounsellingAppointmentRepository appointmentRepository;
 
@@ -104,12 +113,12 @@ public class ReminderSchedulerService {
      */
     @Scheduled(cron = "0 */5 * * * *")
     public void sendDueReminders() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();
         // 12h offset can reach into tomorrow, so scan today + tomorrow.
         List<CounsellingAppointment> appts = appointmentRepository.findConfirmedBetween(today, today.plusDays(1));
         if (appts.isEmpty()) return;
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = clock.now();
         int sent = 0;
         for (CounsellingAppointment a : appts) {
             if (a.getSlot() == null || a.getSlot().getDate() == null || a.getSlot().getStartTime() == null) continue;
@@ -137,9 +146,9 @@ public class ReminderSchedulerService {
      * 8pm daily: emails each counsellor the list of their sessions for the next
      * day (plus a short WhatsApp summary).
      */
-    @Scheduled(cron = "0 0 20 * * *")
+    @Scheduled(cron = "0 0 20 * * *", zone = "${app.counselling.timezone:Asia/Kolkata}")
     public void sendCounsellorDailyDigest() {
-        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        LocalDate tomorrow = clock.today().plusDays(1);
         List<CounsellingAppointment> appts = appointmentRepository.findConfirmedOnDate(tomorrow);
         if (appts.isEmpty()) {
             logger.info("Daily counsellor digest: no sessions tomorrow ({})", tomorrow);
@@ -171,7 +180,7 @@ public class ReminderSchedulerService {
      * includes counselling, still have unused sessions, and haven't booked yet
      * (granted more than 24h ago). Sent at most once per entitlement.
      */
-    @Scheduled(cron = "0 30 10 * * *")
+    @Scheduled(cron = "0 30 10 * * *", zone = "${app.counselling.timezone:Asia/Kolkata}")
     public void sendCounsellingBookingNudges() {
         Date before = new Date(System.currentTimeMillis() - 24L * 60 * 60 * 1000);
         List<StudentEntitlement> due = entitlementRepository.findCounsellingNudgeDue(before);

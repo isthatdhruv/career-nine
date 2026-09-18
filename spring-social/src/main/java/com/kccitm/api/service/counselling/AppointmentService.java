@@ -129,7 +129,7 @@ public class AppointmentService {
     }
 
     public Map<String, Long> getStats() {
-        LocalDate weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+        LocalDate weekStart = clock.today().with(java.time.DayOfWeek.MONDAY);
         LocalDate weekEnd = weekStart.plusDays(6);
 
         Long pending = appointmentRepository.countByStatus("PENDING");

@@ -52,6 +52,9 @@ class AvailabilityTemplateServiceTest {
         ReflectionTestUtils.setField(service, "templateRepository", templateRepository);
         ReflectionTestUtils.setField(service, "slotRepository", slotRepository);
         ReflectionTestUtils.setField(service, "appointmentRepository", appointmentRepository);
+        // The service asks the clock for "today" when counting a template's future slots.
+        // A real one, not a mock: it is a value object over a ZoneId with no collaborators.
+        ReflectionTestUtils.setField(service, "clock", new CounsellingClock("Asia/Kolkata"));
     }
 
     private CounsellingSlot slot(long id, String status, boolean blocked) {

@@ -39,6 +39,7 @@ public class AsyncExecutorsConfig {
     public static final String SUBMISSION_EXECUTOR = "submissionExecutor";
     public static final String PROCTORING_EXECUTOR = "proctoringExecutor";
     public static final String DASHBOARD_EXECUTOR = "dashboardExecutor";
+    public static final String WHATSAPP_EXECUTOR = "whatsAppExecutor";
 
     @Bean(SUBMISSION_EXECUTOR)
     public ThreadPoolTaskExecutor submissionExecutor() {
@@ -83,6 +84,33 @@ public class AsyncExecutorsConfig {
         executor.setMaxPoolSize(16);
         executor.setQueueCapacity(200);
         executor.setThreadNamePrefix("dashboard-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
+
+    /**
+     * WhatsApp companions, kept off the email pool for the same reason the dashboard is.
+     *
+     * <p>Every email now dispatches a WhatsApp beside it, and a WhatsApp is a blocking HTTP call
+     * to AiSensy that can sit for up to fifteen seconds when the provider is slow. Left on
+     * {@code applicationTaskExecutor} a batch of a few hundred report emails would put twice as
+     * many jobs on the pool that sends the emails, and the slow half would hold threads the fast
+     * half needs — the second channel delaying the first, which is the one thing it must never
+     * do. Both channels are dispatched at the same moment either way; this is what keeps them
+     * arriving at the same moment too.
+     *
+     * <p>{@code CallerRunsPolicy} on a full queue, like the others: a WhatsApp that cannot be
+     * queued runs inline rather than being dropped. The caller is already an async thread, so
+     * that slows one notification rather than failing it.
+     */
+    @Bean(WHATSAPP_EXECUTOR)
+    public ThreadPoolTaskExecutor whatsAppExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(8);
+        executor.setMaxPoolSize(16);
+        executor.setQueueCapacity(2000);
+        executor.setThreadNamePrefix("whatsapp-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;

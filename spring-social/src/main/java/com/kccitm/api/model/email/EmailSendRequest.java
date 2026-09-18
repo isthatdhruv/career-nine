@@ -62,6 +62,24 @@ public class EmailSendRequest {
     /** A themed mail; when set, subject/html/text are rendered from it (a DB template still wins). */
     private com.kccitm.api.service.email.theme.Mail mail;
 
+    /**
+     * The WhatsApp that goes out with this mail, dispatched from the same call so both channels
+     * fire at one moment. Left null — as almost every caller does — the dispatcher still sends
+     * one, on the campaign mapped to this {@link #emailType} and filled from the rendered mail.
+     * Set it to name a dedicated template, supply its positional parameters, add a number the
+     * email addresses cannot resolve to, or mark this mail email-only.
+     *
+     * @see com.kccitm.api.model.whatsapp.WhatsAppMessage
+     */
+    private com.kccitm.api.model.whatsapp.WhatsAppMessage whatsApp;
+
+    /**
+     * Who this is being sent to, as a person rather than an address. Used to greet the reader
+     * in a WhatsApp template and to name them in {@code communication_log}; the email itself
+     * gets the name from the mail body, which is already written to a person.
+     */
+    private String recipientName;
+
     public EmailSendRequest() {
     }
 
@@ -132,4 +150,20 @@ public class EmailSendRequest {
     public void setBrand(com.kccitm.api.service.email.theme.Brand brand) { this.brand = brand; }
     public com.kccitm.api.service.email.theme.Mail getMail() { return mail; }
     public void setMail(com.kccitm.api.service.email.theme.Mail mail) { this.mail = mail; }
+    public com.kccitm.api.model.whatsapp.WhatsAppMessage getWhatsApp() { return whatsApp; }
+    public void setWhatsApp(com.kccitm.api.model.whatsapp.WhatsAppMessage whatsApp) { this.whatsApp = whatsApp; }
+    public String getRecipientName() { return recipientName; }
+    public void setRecipientName(String recipientName) { this.recipientName = recipientName; }
+
+    /** Fluent form of {@link #setWhatsApp}, for the one-line send helpers. */
+    public EmailSendRequest whatsApp(com.kccitm.api.model.whatsapp.WhatsAppMessage message) {
+        this.whatsApp = message;
+        return this;
+    }
+
+    /** Fluent form of {@link #setRecipientName}. */
+    public EmailSendRequest recipient(String name) {
+        this.recipientName = name;
+        return this;
+    }
 }

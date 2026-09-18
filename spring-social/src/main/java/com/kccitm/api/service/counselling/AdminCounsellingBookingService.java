@@ -110,7 +110,7 @@ public class AdminCounsellingBookingService {
         List<Long> ids = new ArrayList<>(rows.size());
         for (StudentRow r : rows) ids.add(r.id);
         return new HashSet<>(
-                appointmentRepository.findStudentIdsWithUpcomingAppointment(ids, LocalDate.now()));
+                appointmentRepository.findStudentIdsWithUpcomingAppointment(ids, clock.today()));
     }
 
     /**
@@ -124,7 +124,7 @@ public class AdminCounsellingBookingService {
         for (StudentRow r : rows) ids.add(r.id);
         Map<Long, CounsellingAppointment> byStudent = new LinkedHashMap<>();
         for (CounsellingAppointment a :
-                appointmentRepository.findUpcomingAppointmentsForStudents(ids, LocalDate.now())) {
+                appointmentRepository.findUpcomingAppointmentsForStudents(ids, clock.today())) {
             Long sid = a.getStudent() != null ? a.getStudent().getUserStudentId() : null;
             if (sid != null) byStudent.putIfAbsent(sid, a);
         }
@@ -276,7 +276,7 @@ public class AdminCounsellingBookingService {
         CounsellingSlot oldSlot = existing.getSlot();
         LocalDateTime sessionEnd = (oldSlot != null && oldSlot.getDate() != null && oldSlot.getEndTime() != null)
                 ? LocalDateTime.of(oldSlot.getDate(), oldSlot.getEndTime()) : null;
-        if (sessionEnd == null || !sessionEnd.isBefore(LocalDateTime.now())) {
+        if (sessionEnd == null || !sessionEnd.isBefore(clock.now())) {
             throw new IllegalStateException(
                     "This session's time hasn't passed yet — rebook is available only after the scheduled session has ended.");
         }

@@ -17,6 +17,8 @@ interface UserRow {
   designation: string;
   isActive: boolean | null;
   isSuperAdmin?: boolean;
+  /** On = this user is on the daily 8 PM dashboard-numbers email. */
+  dashboardEmail?: boolean;
   provider: string;
   dob?: string;
   roleGroups?: string[];
@@ -29,6 +31,7 @@ const RegisteredUsersTab: FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [togglingSuperAdminId, setTogglingSuperAdminId] = useState<number | null>(null);
+  const [togglingEmailId, setTogglingEmailId] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [showMappingModal, setShowMappingModal] = useState(false);
@@ -63,6 +66,30 @@ const RegisteredUsersTab: FC = () => {
       console.error("Failed to toggle user status", err);
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  // The Send-email switch. Optimistic like toggleActive above: the row flips at once and is
+  // put back if the request fails, so a busy admin never waits on a round trip to see the
+  // state they just chose.
+  const toggleDashboardEmail = async (user: UserRow) => {
+    if (!user.email) {
+      window.alert("This user has no email address, so there is nowhere to send the dashboard numbers.");
+      return;
+    }
+    const previous = user.dashboardEmail === true;
+    setTogglingEmailId(user.id);
+    setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, dashboardEmail: !previous } : u)));
+    try {
+      const { data } = await axios.post(`${API_URL}/user/toggle-dashboard-email/${user.id}`);
+      const newStatus = typeof data?.dashboardEmail === "boolean" ? data.dashboardEmail : !previous;
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, dashboardEmail: newStatus } : u)));
+    } catch (err: any) {
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, dashboardEmail: previous } : u)));
+      const msg = err?.response?.data?.message || err?.message || "Failed to update the dashboard email setting";
+      window.alert(msg);
+    } finally {
+      setTogglingEmailId(null);
     }
   };
 
@@ -151,7 +178,7 @@ const RegisteredUsersTab: FC = () => {
                 <table className="table table-hover align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
                   <thead>
                     <tr style={{ borderBottom: "2px solid #e5e7eb" }}>
-                      {["#", "Name", "Email", "Phone", "Organisation", "Designation", "Status", "Actions"].map((h) => (
+                      {["#", "Name", "Email", "Phone", "Organisation", "Designation", "Status", "Send Email", "Actions"].map((h) => (
                         <th key={h} style={{ padding: "10px 12px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px", whiteSpace: "nowrap", background: "#f9fafb" }}>
                           {h}
                         </th>
@@ -205,6 +232,35 @@ const RegisteredUsersTab: FC = () => {
                             }}>
                               {active ? "Active" : "Inactive"}
                             </span>
+                          </td>
+                          <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                            {/* Dashboard digest opt-in. Off by default, so nobody starts
+                                receiving the figures because of a deploy. */}
+                            <div
+                              className="form-check form-switch d-inline-flex align-items-center m-0"
+                              style={{ minHeight: 0, paddingLeft: "2.5em" }}
+                              title={
+                                !user.email
+                                  ? "No email address on this account"
+                                  : user.dashboardEmail
+                                  ? `Dashboard numbers are emailed to ${user.email} every day at 8 PM`
+                                  : "Switch on to email this user the dashboard numbers every day at 8 PM"
+                              }
+                            >
+                              <input
+                                className="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                id={`digest-${user.id}`}
+                                checked={user.dashboardEmail === true}
+                                disabled={!user.email || togglingEmailId === user.id}
+                                onChange={() => toggleDashboardEmail(user)}
+                                style={{ cursor: !user.email ? "not-allowed" : "pointer", width: "2.4em", height: "1.2em", marginLeft: "-2.5em", backgroundColor: user.dashboardEmail ? "#059669" : undefined, borderColor: user.dashboardEmail ? "#059669" : undefined }}
+                              />
+                              {togglingEmailId === user.id && (
+                                <span className="spinner-border spinner-border-sm ms-2" style={{ width: "0.8rem", height: "0.8rem", color: "#059669" }} />
+                              )}
+                            </div>
                           </td>
                           <td style={{ padding: "8px 12px", textAlign: "center" }}>
                             <Dropdown className="d-inline">

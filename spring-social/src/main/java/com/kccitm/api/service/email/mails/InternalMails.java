@@ -63,6 +63,28 @@ public final class InternalMails {
             .p(b("Here is what you sent us:")).details(fields)
             .action(site, "Explore Career-9").signature().build();
     }
+    /**
+     * The end-of-day dashboard digest: every figure the admin dashboard shows, for one
+     * calendar day, grouped under the same section headings the page uses so a reader can
+     * match a number in the mail to the tile it came from.
+     *
+     * <p>Two columns and nothing else. A digest is read on a phone at the end of the day, and
+     * the captions that explain each tile on the page only got in the way of the numbers here.
+     *
+     * @param sections ordered section heading → rows of {metric, today's number}
+     */
+    public static Mail dashboardDigest(String dayLabel, String summary, java.util.Map<String, List<String[]>> sections) {
+        Mail.Builder m = Mail.builder().subject("Career-9 today — " + dayLabel)
+            .preheader(summary)
+            .internal("Daily dashboard").title("Today's numbers")
+            .p("Everything the dashboard counted on " + b(dayLabel) + ". Every figure covers that calendar day alone, not the running total.");
+        for (java.util.Map.Entry<String, List<String[]>> section : sections.entrySet()) {
+            m.p(b(section.getKey()));
+            m.table(new String[]{"Metric", "Today"}, section.getValue());
+        }
+        return m.signature().build();
+    }
+
     public static Mail accountTest(String accountName, String provider, String sentAt) {
         return Mail.builder().subject("Career-9 email test: " + accountName)
             .preheader("If you can read this, the account can send.")

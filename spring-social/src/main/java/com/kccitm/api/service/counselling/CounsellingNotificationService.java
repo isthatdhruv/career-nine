@@ -23,6 +23,7 @@ import com.kccitm.api.model.email.EmailDeliveryMode;
 import com.kccitm.api.model.email.EmailSendRequest;
 import com.kccitm.api.model.email.EmailSendResult;
 import com.kccitm.api.model.email.EmailType;
+import com.kccitm.api.model.whatsapp.WhatsAppMessage;
 import com.kccitm.api.service.email.EmailDispatchService;
 import com.kccitm.api.service.email.EmailNotificationRecipientService;
 import com.kccitm.api.service.email.mails.AccountMails;
@@ -146,7 +147,8 @@ public class CounsellingNotificationService {
                     session(appointment),
                     mailLinks.of(counsellorPortalUrl(), "counsellor_portal"));
 
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, counsellorEmail, mail);
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, counsellorEmail, mail,
+                    contactNumbersWithCounsellor(appointment));
         } catch (Exception e) {
             logger.error("Failed to send assigned-to-counsellor email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -162,7 +164,8 @@ public class CounsellingNotificationService {
             Mail mail = CounsellingMails.confirmedToStudent(
                     AccountMails.firstName(studentName), session(appointment));
 
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, mail);
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, mail,
+                    contactNumbers(appointment));
         } catch (Exception e) {
             logger.error("Failed to send confirmed-to-student email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -204,7 +207,8 @@ public class CounsellingNotificationService {
                     toCounsellor ? "the student" : cancelledByName, reason, sessions,
                     toCounsellor ? "Open my dashboard" : "View my sessions");
 
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, recipientEmail, mail);
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, recipientEmail, mail,
+                    contactNumbersWithCounsellor(appointment));
         } catch (Exception e) {
             logger.error("Failed to send cancellation email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -288,7 +292,8 @@ public class CounsellingNotificationService {
                     AccountMails.firstName(studentName), opening, adminReason,
                     mailLinks.of(rescheduleUrl, "counselling_reschedule"));
 
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, mail);
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, mail,
+                    contactNumbers(appointment));
         } catch (Exception e) {
             logger.error("Failed to send self-reschedule email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -309,7 +314,8 @@ public class CounsellingNotificationService {
 
             sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail,
                     CounsellingMails.rescheduledStudent(
-                            AccountMails.firstName(studentName), was, now));
+                            AccountMails.firstName(studentName), was, now),
+                    contactNumbers(newAppointment));
 
             // The counsellor is on the new session too — they were told about the original
             // and would otherwise be left holding a time that has moved.
@@ -319,7 +325,8 @@ public class CounsellingNotificationService {
                     sendMail(EmailType.COUNSELLING_NOTIFICATION, counsellorEmail,
                             CounsellingMails.rescheduledCounsellor(
                                     AccountMails.firstName(newAppointment.getCounsellor().getName()),
-                                    studentName, was, now));
+                                    studentName, was, now),
+                                    counsellorNumber(newAppointment.getCounsellor()));
                 }
             }
         } catch (Exception e) {
@@ -342,21 +349,58 @@ public class CounsellingNotificationService {
             String studentName = studentName(appointment);
             Mail studentMail = CounsellingMails.reminderStudent(
                     AccountMails.firstName(studentName), period, studentView(s, appointment));
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, studentMail);
+
+            // The WhatsApp rides with the mail rather than being sent beside it, so both leave
+            // in the same dispatch. It carries the student's number and the parent's, and is
+            // deduped on the appointment and offset so the parent's email — the same message to
+            // a second address — does not produce a second copy of it.
+            WhatsAppMessage wa = studentWhatsApp(appointment, whatsAppService.reminderCampaign(),
+                    studentName, period)
+                    .dedupeOn("reminder-" + appointment.getId() + "-" + period);
+
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, studentMail, wa);
             String parentEmail = appointment.getParentEmail();
             if (parentEmail != null && !parentEmail.isEmpty()) {
-                sendMail(EmailType.COUNSELLING_NOTIFICATION, parentEmail, studentMail);
+                sendMail(EmailType.COUNSELLING_NOTIFICATION, parentEmail, studentMail, wa);
             }
 
-            // Counsellor copy: same session, their own subject line and student row.
-            if (appointment.getCounsellor() != null) {
-                sendMail(EmailType.COUNSELLING_NOTIFICATION, appointment.getCounsellor().getEmail(),
-                        CounsellingMails.reminderCounsellor(
-                                AccountMails.firstName(appointment.getCounsellor().getName()),
-                                studentName, period, s));
-            }
+            // The counsellor is deliberately NOT mailed here. They have their own offsets
+            // (2h / 15min) and their own call into sendCounsellorReminderEmail; copying them
+            // on the student's schedule as well handed them the student's 12h and 4h notices
+            // too, so one session produced up to six counsellor emails, two of them duplicates.
         } catch (Exception e) {
             logger.error("Failed to send reminder email for appointment ID: {}. Error: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
+     * The counsellor's own reminder, on the counsellor's own offsets. Separate from
+     * {@link #sendReminderEmail} so each audience keeps to its own schedule.
+     */
+    @Async
+    public void sendCounsellorReminderEmail(CounsellingAppointment appointment, String period) {
+        try {
+            Counsellor counsellor = appointment.getCounsellor();
+            if (counsellor == null) return;
+            String email = counsellor.getEmail();
+            if (email == null || email.isBlank()) return;
+
+            // Same reminder template as the student's, addressed to the counsellor: their name,
+            // when it is, and how to attend. Dispatched with the mail, not after it.
+            WhatsAppMessage wa = WhatsAppMessage
+                    .of(whatsAppService.reminderCampaign())
+                    .dedupeOn("reminder-counsellor-" + appointment.getId() + "-" + period);
+            wa.setParams(sessionParams(appointment, counsellor.getName(), period));
+            wa.forAddress(email, counsellor.getPhone());
+
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, email,
+                    CounsellingMails.reminderCounsellor(
+                            AccountMails.firstName(counsellor.getName()),
+                            studentName(appointment), period, session(appointment)),
+                    wa);
+        } catch (Exception e) {
+            logger.error("Failed to send counsellor reminder for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
         }
     }
@@ -373,7 +417,8 @@ public class CounsellingNotificationService {
                     AccountMails.firstName(studentName),
                     mailLinks.of(referralShareUrl(appointment), "referral"));
 
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, mail);
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, studentEmail, mail,
+                    contactNumbers(appointment));
         } catch (Exception e) {
             logger.error("Failed to send session-complete email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -443,7 +488,9 @@ public class CounsellingNotificationService {
         List<String> accepted = new java.util.ArrayList<>();
         String failure = null;
         for (String addr : recipients) {
-            EmailSendResult result = sendMail(EmailType.COUNSELLING_NOTIFICATION, addr, mail);
+            EmailSendResult result = sendMail(EmailType.COUNSELLING_NOTIFICATION, addr, mail,
+                    contactNumbers(appointment)
+                            .dedupeOn("summary-" + appointment.getId() + "-" + mail.getSubject()));
             if (result != null && result.isSuccess()) accepted.add(addr);
             else if (failure == null && result != null) failure = result.getError();
         }
@@ -477,7 +524,8 @@ public class CounsellingNotificationService {
                 session(appointment),
                 reportGuidance(appointment, true).trim());
 
-        EmailSendResult result = sendMail(EmailType.COUNSELLING_NOTIFICATION, to, mail);
+        EmailSendResult result = sendMail(EmailType.COUNSELLING_NOTIFICATION, to, mail,
+                counsellorNumber(counsellor));
         if (result == null || !result.isSuccess()) {
             String failure = result != null ? result.getError() : null;
             throw new IllegalStateException("The email could not be sent: "
@@ -669,6 +717,33 @@ public class CounsellingNotificationService {
                     AccountMails.firstName(studentName), session(appointment),
                     mailLinks.of(gcal, "gcal"));
 
+            // The WhatsApp confirmation, built once and attached to every send below so it
+            // leaves with the mail rather than after it. One message per person who is emailed:
+            // the student, the parent/guardian, and the counsellor taking the session.
+            //
+            // The dedupe key is what holds that to one each. This mail is sent to three
+            // addresses and retries up to three rounds, so without it a single booking could
+            // produce nine WhatsApps; with it, each person is written to once however many
+            // rounds the email needs.
+            String waWhen = appointment.getSlot().getDate().format(DATE_FMT)
+                    + " " + appointment.getSlot().getStartTime().format(TIME_FMT);
+            String waMode = "OFFLINE".equals(appointment.getMode()) ? "In-person" : "Online";
+            WhatsAppMessage confirmation = WhatsAppMessage.of(
+                    whatsAppService.confirmationCampaign(), studentName, waWhen, waMode)
+                    .dedupeOn("booking-confirmation-" + appointment.getId());
+            confirmation.forAddress(studentEmail, studentPhone(appointment));
+            confirmation.forAddress(appointment.getParentEmail(), appointment.getParentPhone());
+            // The counsellor's copy greets the counsellor. Same template, same facts — the only
+            // thing that changes is whose name is at the top, which is the difference between a
+            // confirmation and somebody else's confirmation arriving on your phone.
+            if (appointment.getCounsellor() != null) {
+                confirmation.forAddress(
+                        appointment.getCounsellor().getEmail(),
+                        appointment.getCounsellor().getPhone(),
+                        appointment.getCounsellor().getName(),
+                        Arrays.asList(appointment.getCounsellor().getName(), waWhen, waMode));
+            }
+
             // Recipients: the student, the parent/guardian if one was given, and the
             // counsellor taking the session — they need the same calendar entry on their own
             // calendar, and the report link above.
@@ -723,7 +798,9 @@ public class CounsellingNotificationService {
                 if (acceptedAddrs.isEmpty() && ics != null) {
                     try {
                         EmailSendRequest req = EmailSendRequest.mail(
-                                EmailType.COUNSELLING_BOOKING, null, mail);
+                                EmailType.COUNSELLING_BOOKING, null, mail)
+                                .whatsApp(confirmation)
+                                .recipient(studentName);
                         req.setTo(new java.util.ArrayList<>(emailTo));
                         req.getAttachments().add(new SmtpEmailRequest.EmailAttachment(
                                 icsService.fileName(appointment), ics, "text/calendar"));
@@ -743,7 +820,8 @@ public class CounsellingNotificationService {
                 for (String addr : emailTo) {
                     if (acceptedAddrs.contains(addr)) continue;
                     try {
-                        EmailSendResult r = sendMail(EmailType.COUNSELLING_BOOKING, addr, mail);
+                        EmailSendResult r = sendMail(EmailType.COUNSELLING_BOOKING, addr, mail,
+                                confirmation);
                         if (r != null && r.isSuccess()) acceptedAddrs.add(addr);
                     } catch (Exception e) {
                         logger.warn("Branded confirmation email to {} failed for appointment {} (round {}): {}",
@@ -759,19 +837,9 @@ public class CounsellingNotificationService {
                         appointment.getId(), acceptedAddrs);
             }
 
-            // Best-effort WhatsApp confirmation in addition to the email — to the
-            // student and, if provided, the parent/guardian number.
-            // WhatsApp templates take positional parameters, so these stay formatted here
-            // rather than coming from the email block.
-            String waWhen = appointment.getSlot().getDate().format(DATE_FMT)
-                    + " " + appointment.getSlot().getStartTime().format(TIME_FMT);
-            java.util.List<String> waParams = Arrays.asList(studentName, waWhen,
-                    "OFFLINE".equals(appointment.getMode()) ? "In-person" : "Online");
-            whatsAppService.sendTemplate(studentPhone(appointment), whatsAppService.confirmationCampaign(), waParams);
-            String parentPhone = appointment.getParentPhone();
-            if (parentPhone != null && !parentPhone.isEmpty()) {
-                whatsAppService.sendTemplate(parentPhone, whatsAppService.confirmationCampaign(), waParams);
-            }
+            // The WhatsApp confirmation is not sent here. It went out with the first email
+            // above, attached to the send — which is the point: one dispatch, both channels,
+            // and no second copy when the email needed a retry round.
         } catch (Exception e) {
             logger.error("Failed to send confirmation for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -779,46 +847,23 @@ public class CounsellingNotificationService {
     }
 
     /**
-     * Reminder to the student via WhatsApp; falls back to email if WhatsApp
-     * isn't configured or the send fails. {@code whenLabel} is e.g. "in 12 hours".
+     * Reminder to the student, and to the parent/guardian when one was given at booking.
+     * {@code whenLabel} is e.g. "in 12 hours".
+     *
+     * <p>Email <i>and</i> WhatsApp, from one dispatch. WhatsApp used to be tried first with
+     * email as the fallback, which made the email's delivery depend on whether AiSensy happened
+     * to be configured — the day a key was added, the reminder emails would have stopped. Both
+     * channels now go out together and neither can displace the other.
      */
     @Async
     public void notifyStudentReminder(CounsellingAppointment appointment, String whenLabel) {
-        String date = appointment.getSlot().getDate().format(DATE_FMT);
-        String time = appointment.getSlot().getStartTime().format(TIME_FMT);
-        // Phase 5: mode-aware — append the meeting link (online) or venue (offline)
-        // to the date/time parameter so the reminder tells the student how to attend.
-        java.util.List<String> waParams = Arrays.asList(studentName(appointment), whenLabel,
-                date + " " + time + " — " + attendanceLine(appointment));
-        boolean sent = whatsAppService.sendTemplate(
-                studentPhone(appointment), whatsAppService.reminderCampaign(), waParams);
-        // Parent/guardian WhatsApp reminder, if a number was provided at booking.
-        String parentPhone = appointment.getParentPhone();
-        if (parentPhone != null && !parentPhone.isEmpty()) {
-            whatsAppService.sendTemplate(parentPhone, whatsAppService.reminderCampaign(), waParams);
-        }
-        if (!sent) {
-            sendReminderEmail(appointment, whenLabel);
-        }
+        sendReminderEmail(appointment, whenLabel);
     }
 
-    /** Reminder to the counsellor via WhatsApp; email fallback. */
+    /** The same, to the counsellor, on the counsellor's own offsets. */
     @Async
     public void notifyCounsellorReminder(CounsellingAppointment appointment, String whenLabel) {
-        if (appointment.getCounsellor() == null) return;
-        String date = appointment.getSlot().getDate().format(DATE_FMT);
-        String time = appointment.getSlot().getStartTime().format(TIME_FMT);
-        boolean sent = whatsAppService.sendTemplate(
-                appointment.getCounsellor().getPhone(), whatsAppService.reminderCampaign(),
-                Arrays.asList(appointment.getCounsellor().getName(), whenLabel,
-                        date + " " + time + " — " + attendanceLine(appointment)));
-        if (!sent) {
-            // whenLabel already reads "in 2 hours"; nothing here adds a second "in".
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, appointment.getCounsellor().getEmail(),
-                    CounsellingMails.reminderCounsellor(
-                            AccountMails.firstName(appointment.getCounsellor().getName()),
-                            studentName(appointment), whenLabel, session(appointment)));
-        }
+        sendCounsellorReminderEmail(appointment, whenLabel);
     }
 
     /**
@@ -885,16 +930,27 @@ public class CounsellingNotificationService {
                     "OFFLINE".equals(a.getMode()) ? "In-person" : "Online"});
         }
 
+        // The mail carries the full table; the WhatsApp carries the count, which is what a
+        // counsellor actually wants to know at 8pm. Both leave in the same dispatch.
+        WhatsAppMessage digest = WhatsAppMessage.of(whatsAppService.counsellorDigestCampaign(),
+                counsellor.getName(), dateLabel, String.valueOf(appointments.size()))
+                .dedupeOn("digest-" + counsellor.getId() + "-" + dateLabel);
+        digest.forAddress(counsellor.getEmail(), counsellor.getPhone());
+
         sendMail(EmailType.COUNSELLING_NOTIFICATION, counsellor.getEmail(),
                 CounsellingMails.dailyDigest(AccountMails.firstName(counsellor.getName()), dateLabel, rows,
-                        mailLinks.of(counsellorPortalUrl(), "counsellor_portal")));
-        whatsAppService.sendTemplate(counsellor.getPhone(), whatsAppService.counsellorDigestCampaign(),
-                Arrays.asList(counsellor.getName(), dateLabel, String.valueOf(appointments.size())));
+                        mailLinks.of(counsellorPortalUrl(), "counsellor_portal")),
+                digest);
     }
 
     /**
-     * "You still have counselling session(s) to book" nudge — WhatsApp primary,
-     * email fallback, plus an in-app notification when a userId is available.
+     * "You still have counselling session(s) to book" nudge — email and WhatsApp together,
+     * plus an in-app notification when a userId is available.
+     *
+     * <p>This was the clearest case of the old either/or arrangement doing harm: the email was
+     * sent only when the WhatsApp had <i>failed</i>. A student with no WhatsApp number on record
+     * got the mail; a student with one would have stopped getting it the moment an API key was
+     * added. A nudge is exactly the message worth putting on both channels.
      *
      * @param bookingUrl the tokenized booking link for this entitlement, so the mail opens the
      *                   booking page with no login; the plain portal URL is the fallback when it
@@ -904,14 +960,22 @@ public class CounsellingNotificationService {
     public void sendCounsellingBookingNudge(String name, String email, String phone,
             Long userId, int sessionsRemaining, String bookingUrl) {
         String safeName = (name != null && !name.isEmpty()) ? name : "there";
-        boolean sent = whatsAppService.sendTemplate(phone, whatsAppService.bookingNudgeCampaign(),
-                Arrays.asList(safeName, String.valueOf(sessionsRemaining)));
-        if (!sent && email != null && !email.isEmpty()) {
+
+        WhatsAppMessage nudge = WhatsAppMessage.of(whatsAppService.bookingNudgeCampaign(),
+                safeName, String.valueOf(sessionsRemaining));
+        nudge.forAddress(email, phone);
+
+        if (email != null && !email.isEmpty()) {
             sendMail(EmailType.COUNSELLING_NOTIFICATION, email,
                     CounsellingMails.bookingNudge(AccountMails.firstName(safeName), sessionsRemaining,
                             bookingUrl != null
                                     ? mailLinks.of(bookingUrl, "counselling_book")
-                                    : mailLinks.of(portalCounsellingUrl(), "counselling_portal")));
+                                    : mailLinks.of(portalCounsellingUrl(), "counselling_portal")),
+                    nudge);
+        } else {
+            // No address on record, so there is no mail for the WhatsApp to ride with — but the
+            // number may still be good, and the nudge is the whole reason this ran.
+            whatsAppService.sendTemplate(phone, nudge.getCampaign(), nudge.getParams());
         }
         if (userId != null) {
             try {
@@ -1002,7 +1066,8 @@ public class CounsellingNotificationService {
                         CounsellingMails.adminCancellationCounsellor(
                                 AccountMails.firstName(counsellor.getName()),
                                 studentName(appointment), s,
-                                mailLinks.of(counsellorPortalUrl(), "counsellor_portal")));
+                                mailLinks.of(counsellorPortalUrl(), "counsellor_portal")),
+                        counsellorNumber(counsellor));
             }
         } catch (Exception e) {
             logger.error("Failed to send admin cancellation emails for appointment {}: {}",
@@ -1125,8 +1190,15 @@ public class CounsellingNotificationService {
                 // Only counted as delivered if the dispatcher actually took it. A skipped send
                 // — no email account configured — used to be reported to the counsellor as
                 // "sent to the student", who then waited for a mail that was never queued.
+                //
+                // Both channels are sent here, as everywhere else — the WhatsApp just went out
+                // a few lines above rather than with the mail, because the counsellor is waiting
+                // at the button to be told which channels took it and that answer has to be
+                // synchronous. The companion is marked already-sent so the student does not get
+                // a second message about the same code; it is not an email-only send.
                 EmailSendResult result = sendMail(
-                        EmailType.COUNSELLING_NOTIFICATION, email, mail);
+                        EmailType.COUNSELLING_NOTIFICATION, email, mail,
+                        WhatsAppMessage.alreadySentByCaller());
                 if (result != null && result.isSuccess()) {
                     delivered.add("email");
                 } else {
@@ -1159,7 +1231,8 @@ public class CounsellingNotificationService {
                     AccountMails.firstName(studentName(appointment)), session(appointment),
                     mailLinks.of(portalCounsellingUrl(), "counselling_portal"));
 
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, email, mail);
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, email, mail,
+                    contactNumbers(appointment));
         } catch (Exception e) {
             logger.warn("Check-in prompt to student failed for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -1185,7 +1258,8 @@ public class CounsellingNotificationService {
                     mailLinks.of(counsellorPortalUrl(), "counsellor_portal"));
 
             if (counsellor.getEmail() != null && !counsellor.getEmail().isEmpty()) {
-                sendMail(EmailType.COUNSELLING_NOTIFICATION, counsellor.getEmail(), mail);
+                sendMail(EmailType.COUNSELLING_NOTIFICATION, counsellor.getEmail(), mail,
+                        counsellorNumber(counsellor));
             }
             if (counsellor.getUser() != null) {
                 createInAppNotification(counsellor.getUser(), "CHECKIN_REQUIRED",
@@ -1217,7 +1291,8 @@ public class CounsellingNotificationService {
                     mailLinks.of(portalCounsellingUrl(), "counselling_portal"));
 
             if (email != null && !email.isEmpty()) {
-                sendMail(EmailType.COUNSELLING_NOTIFICATION, email, mail);
+                sendMail(EmailType.COUNSELLING_NOTIFICATION, email, mail,
+                        contactNumbers(appointment));
             }
 
             Long userId = appointment.getStudent() != null ? appointment.getStudent().getUserId() : null;
@@ -1302,7 +1377,8 @@ public class CounsellingNotificationService {
                     AccountMails.firstName(studentName(appointment)), date, upheld, note,
                     mailLinks.of(portalCounsellingUrl(), "counselling_portal"));
 
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, email, mail);
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, email, mail,
+                    contactNumbers(appointment));
         } catch (Exception e) {
             logger.warn("Failed to send dispute outcome for appointment {}: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
@@ -1393,10 +1469,118 @@ public class CounsellingNotificationService {
         return emailDispatchService.sendMail(type, to, mail);
     }
 
+    /**
+     * One themed mail plus the WhatsApp that goes with it, dispatched together.
+     *
+     * <p>Counselling messages are the ones with dedicated, Meta-approved templates — a reminder
+     * and a booking confirmation read quite differently on WhatsApp to the four-line generic
+     * template every other scenario falls back to — so those call sites name their campaign and
+     * its positional parameters here rather than letting the mail be summarised.
+     *
+     * <p>Handing the WhatsApp to the dispatcher rather than sending it separately is what keeps
+     * the two channels together: one call, one recipient list, one moment. It also removes the
+     * double-send that would otherwise happen, since the dispatcher sends a companion for every
+     * mail whether or not the caller asked for one.
+     */
+    private EmailSendResult sendMail(EmailType type, String to, Mail mail, WhatsAppMessage whatsApp) {
+        noteBlankAddress(to, mail != null ? mail.getSubject() : null);
+        return emailDispatchService.sendMail(type, to, mail, whatsApp);
+    }
+
+    /**
+     * The numbers to reach everyone this appointment concerns, for a mail that has no dedicated
+     * WhatsApp template of its own — a cancellation, a reschedule, a no-show notice.
+     *
+     * <p>Without this those mails went out on email alone, and the reason is worth recording
+     * because it is not obvious. The dispatcher finds a number by looking the email address up
+     * in the student, counsellor, contact-person and lead tables. But an appointment carries its
+     * <i>own</i> contact details, captured at booking: {@code studentContactEmail} and
+     * {@code parentEmail} are whatever was typed into the booking form. A parent's address
+     * belongs to no record in the system at all, and a student who booked with a different
+     * address to the one on her student record is equally invisible. So the lookup found
+     * nothing, and the people the mail was actually addressed to — whose phone numbers were
+     * sitting on the appointment row the whole time — got the email and nothing else.
+     *
+     * <p>Each number is held against the address it belongs to, never as a loose list. That is
+     * what keeps one email to one person to one WhatsApp: this can be handed to a mail going to
+     * the student, to the parent, or to the counsellor, and only the entry matching that mail's
+     * address is ever used. Handed round as a list it did the opposite — a cancellation to the
+     * counsellor sent the student and the parent a copy of a message addressed to somebody else.
+     */
+    private WhatsAppMessage contactNumbers(CounsellingAppointment a) {
+        WhatsAppMessage wa = new WhatsAppMessage();
+        if (a == null) return wa;
+        wa.forAddress(studentEmail(a), studentPhone(a));
+        wa.forAddress(a.getParentEmail(), a.getParentPhone());
+        return wa;
+    }
+
+    /** The configured WhatsApp number for one alert recipient, paired to their address. */
+    private WhatsAppMessage alertNumber(EmailNotificationRecipientService.Resolved who, String address) {
+        return new WhatsAppMessage().forAddress(address, who.phoneFor(address));
+    }
+
+    /** Just the counsellor, for a mail addressed only to them. */
+    private WhatsAppMessage counsellorNumber(Counsellor counsellor) {
+        WhatsAppMessage wa = new WhatsAppMessage();
+        if (counsellor != null) wa.forAddress(counsellor.getEmail(), counsellor.getPhone());
+        return wa;
+    }
+
+    /**
+     * Student, parent and counsellor — for a mail that may be addressed to any of them. Only the
+     * one it is actually sent to receives a WhatsApp; the other entries simply never match.
+     */
+    private WhatsAppMessage contactNumbersWithCounsellor(CounsellingAppointment a) {
+        WhatsAppMessage wa = contactNumbers(a);
+        if (a != null && a.getCounsellor() != null) {
+            wa.forAddress(a.getCounsellor().getEmail(), a.getCounsellor().getPhone());
+        }
+        return wa;
+    }
+
+    /**
+     * The reminder/confirmation template's three parameters: who, when in words, and the one
+     * line that says when and how to attend.
+     *
+     * <p>{@code whenLabel} already carries its preposition ("in 2 hours"), so nothing here adds
+     * a second one.
+     */
+    private List<String> sessionParams(CounsellingAppointment a, String name, String whenLabel) {
+        String date = a.getSlot() != null && a.getSlot().getDate() != null
+                ? a.getSlot().getDate().format(DATE_FMT) : "";
+        String time = a.getSlot() != null && a.getSlot().getStartTime() != null
+                ? a.getSlot().getStartTime().format(TIME_FMT) : "";
+        return Arrays.asList(name, whenLabel, (date + " " + time).trim() + " — " + attendanceLine(a));
+    }
+
+    /**
+     * The student's reminder WhatsApp, and the parent/guardian's copy of it — each against its
+     * own address, so the student's mail reaches the student's phone and the parent's mail the
+     * parent's. Two emails, two messages.
+     *
+     * <p>Both numbers are named explicitly because neither can be reached otherwise: a contact
+     * given at booking belongs to no student, counsellor or user record, so the address-to-number
+     * lookup that covers every other recipient in the system cannot find it.
+     */
+    private WhatsAppMessage studentWhatsApp(CounsellingAppointment a, String campaign,
+                                            String name, String whenLabel) {
+        WhatsAppMessage wa = new WhatsAppMessage();
+        wa.setCampaign(campaign);
+        wa.setParams(sessionParams(a, name, whenLabel));
+        wa.forAddress(studentEmail(a), studentPhone(a));
+        wa.forAddress(a.getParentEmail(), a.getParentPhone());
+        return wa;
+    }
+
     /** Student plus parent/guardian, matching the confirmation email's recipient list. */
     private void sendMailToStudentAndParent(CounsellingAppointment appointment, Mail mail) {
+        // One WhatsApp message object across both addresses, deduped on the subject, so the
+        // parent's copy of the email does not produce a second copy of the WhatsApp.
+        WhatsAppMessage wa = contactNumbers(appointment)
+                .dedupeOn("appt-" + appointment.getId() + "-" + mail.getSubject());
         for (String addr : studentAndParentEmails(appointment)) {
-            sendMail(EmailType.COUNSELLING_NOTIFICATION, addr, mail);
+            sendMail(EmailType.COUNSELLING_NOTIFICATION, addr, mail, wa);
         }
     }
 
@@ -1410,11 +1594,16 @@ public class CounsellingNotificationService {
         List<String> to = studentAndParentEmails(appointment);
         if (to.isEmpty()) return;
 
+        WhatsAppMessage wa = contactNumbers(appointment)
+                .dedupeOn("appt-" + appointment.getId() + "-" + mail.getSubject());
+
         byte[] ics = icsService.buildCancellation(appointment);
         if (ics != null) {
             try {
                 EmailSendRequest req = EmailSendRequest.mail(
-                        EmailType.COUNSELLING_NOTIFICATION, null, mail);
+                        EmailType.COUNSELLING_NOTIFICATION, null, mail)
+                        .whatsApp(wa)
+                        .recipient(studentName(appointment));
                 req.setTo(new java.util.ArrayList<>(to));
                 req.getAttachments().add(new SmtpEmailRequest.EmailAttachment(
                         icsService.cancellationFileName(appointment), ics, "text/calendar"));
@@ -1425,7 +1614,7 @@ public class CounsellingNotificationService {
                         appointment.getId(), e.getMessage());
             }
         }
-        for (String addr : to) sendMail(EmailType.COUNSELLING_NOTIFICATION, addr, mail);
+        for (String addr : to) sendMail(EmailType.COUNSELLING_NOTIFICATION, addr, mail, wa);
     }
 
     private List<String> studentAndParentEmails(CounsellingAppointment appointment) {
@@ -1481,7 +1670,8 @@ public class CounsellingNotificationService {
 
             sendMail(EmailType.COUNSELLING_NOTIFICATION, counsellor.getEmail(),
                     CounsellingMails.counsellorDeactivated(
-                            AccountMails.firstName(counsellor.getName()), sessions));
+                            AccountMails.firstName(counsellor.getName()), sessions),
+                    counsellorNumber(counsellor));
         } catch (Exception e) {
             logger.error("Failed to send deactivation notice to counsellor {}: {}",
                     counsellor != null ? counsellor.getId() : "null", e.getMessage());
@@ -1559,9 +1749,19 @@ public class CounsellingNotificationService {
 
             // Its own type, not COUNSELLING_NOTIFICATION: the alert is resolved, throttled and
             // read back in the Email Logs under the type it was configured against.
-            for (String to : who.to) sendMail(EmailType.COUNSELLOR_DEACTIVATED_ALERT, to, mail);
-            for (String cc : who.cc) sendMail(EmailType.COUNSELLOR_DEACTIVATED_ALERT, cc, mail);
-            for (String bcc : who.bcc) sendMail(EmailType.COUNSELLOR_DEACTIVATED_ALERT, bcc, mail);
+            // The team's WhatsApp numbers come from the Notification Recipients screen: these
+            // addresses belong to no record, so nothing can be looked up from them. One message
+            // per address, carrying that address's own number — the alert goes to as many phones
+            // as it goes to inboxes, and to no more.
+            for (String to : who.to) {
+                sendMail(EmailType.COUNSELLOR_DEACTIVATED_ALERT, to, mail, alertNumber(who, to));
+            }
+            for (String cc : who.cc) {
+                sendMail(EmailType.COUNSELLOR_DEACTIVATED_ALERT, cc, mail, alertNumber(who, cc));
+            }
+            for (String bcc : who.bcc) {
+                sendMail(EmailType.COUNSELLOR_DEACTIVATED_ALERT, bcc, mail, alertNumber(who, bcc));
+            }
         } catch (Exception e) {
             logger.error("Failed to send counsellor-deactivated admin alert for counsellor {}: {}",
                     counsellor != null ? counsellor.getId() : "null", e.getMessage());

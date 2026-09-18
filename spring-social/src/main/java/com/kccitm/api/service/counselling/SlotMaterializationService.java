@@ -20,6 +20,10 @@ import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 
 @Service
 public class SlotMaterializationService {
+    /** Slot dates/times are IST wall-clock while the JVM runs UTC; never compare them against a raw now(). */
+    @Autowired
+    private CounsellingClock clock;
+
 
     private static final Logger logger = LoggerFactory.getLogger(SlotMaterializationService.class);
 
@@ -105,7 +109,7 @@ public class SlotMaterializationService {
             return new MaterializationResult(0, 0, 0);
         }
         DayOfWeek templateDayOfWeek = DayOfWeek.valueOf(template.getDayOfWeek().toUpperCase());
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();
         // Honour the template's effective start date: materialize from max(startDate, today).
         //
         // Today counts. Generation used to begin at tomorrow, which silently made same-day
@@ -125,7 +129,7 @@ public class SlotMaterializationService {
         }
         // Read the clock once: a run that straddles a minute boundary would otherwise apply
         // two different cut-offs to the same day's slots.
-        LocalTime now = LocalTime.now();
+        LocalTime now = clock.timeNow();
         int created = 0;
         int skipped = 0;
         int past = 0;
