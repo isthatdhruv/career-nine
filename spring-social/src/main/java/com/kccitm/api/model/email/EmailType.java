@@ -145,6 +145,15 @@ public enum EmailType {
     COUNSELLOR_DEACTIVATED_ALERT("Counsellor deactivated — affected students (internal)", "Counselling",
             EmailDeliveryMode.ASYNC),
 
+    // ── Dashboard ───────────────────────────────────────────────────
+    /**
+     * The end-of-day digest of the admin dashboard figures, sent by
+     * {@code DashboardDigestService} at 8 PM IST. Like {@link #LEAD_NOTIFICATION} the
+     * recipients are configured rather than passed by the caller — the Send-email toggle on
+     * User Management writes the rows — so who receives the numbers changes without a deploy.
+     */
+    ADMIN_DASHBOARD_DIGEST("Daily dashboard numbers (internal)", "Dashboard", EmailDeliveryMode.ASYNC),
+
     // ── Legacy KCCITM (Phase 5) ─────────────────────────────────────────────
     KCCITM_NOTIFICATION("Legacy KCCITM email", "KCCITM", EmailDeliveryMode.ASYNC),
 

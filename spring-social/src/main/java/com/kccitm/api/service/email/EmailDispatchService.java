@@ -84,9 +84,28 @@ public class EmailDispatchService {
     @Autowired
     private com.kccitm.api.service.email.theme.MailLinks mailLinks;
 
+    /**
+     * The WhatsApp companion. Every send below hands it the same request, so the second channel
+     * is dispatched from this one call rather than from a schedule of its own — see
+     * {@link com.kccitm.api.service.whatsapp.WhatsAppDispatchService}. Optional so this starts
+     * in containers where the WhatsApp stack is not wired.
+     */
+    @Autowired(required = false)
+    private com.kccitm.api.service.whatsapp.WhatsAppDispatchService whatsAppDispatchService;
+
     /** Convenience for a themed {@link com.kccitm.api.service.email.theme.Mail} send. */
     public EmailSendResult sendMail(EmailType type, String to, com.kccitm.api.service.email.theme.Mail mail) {
         return send(EmailSendRequest.mail(type, to, mail));
+    }
+
+    /**
+     * As above, with the WhatsApp that accompanies it named explicitly — for the scenarios that
+     * have their own approved template and their own positional parameters.
+     */
+    public EmailSendResult sendMail(EmailType type, String to,
+                                    com.kccitm.api.service.email.theme.Mail mail,
+                                    com.kccitm.api.model.whatsapp.WhatsAppMessage whatsApp) {
+        return send(EmailSendRequest.mail(type, to, mail).whatsApp(whatsApp));
     }
 
     /** Convenience for the common single-recipient HTML send. */
@@ -143,12 +162,19 @@ public class EmailDispatchService {
     public EmailSendResult send(EmailSendRequest req) {
         String recipient = firstRecipient(req);
         if (recipient == null) {
+            // No address, but possibly a number: a WhatsApp-only recipient (a parent contact
+            // given as a phone alone) is still owed the message. Nothing is rendered at this
+            // point, so only a caller-supplied template can be sent.
+            notifyWhatsApp(req, null, resolveDeliveryMode(req, null));
             return logSkip(req, null, "No recipient");
         }
 
         EmailAccount account = resolveAccount(req);
         if (account == null) {
             logger.warn("No email account configured for {} → {}", req.getEmailType(), recipient);
+            // A mailbox nobody has configured is an ops problem, not a reason to leave the
+            // recipient uninformed on the channel that does work.
+            notifyWhatsApp(req, null, resolveDeliveryMode(req, null));
             return logSkip(req, null, "No email account configured");
         }
 
@@ -160,6 +186,13 @@ public class EmailDispatchService {
         }
 
         EmailSendLog row = saveLog(req, account, template, mode, EmailSendStatus.QUEUED, null);
+
+        // The WhatsApp goes out here — before the mail is handed to the transport, so neither
+        // channel follows the other, and so a mail that fails at the SMTP/API layer still
+        // reaches the person on their phone. It is timed the way this email is timed: sent
+        // inline when the email is sent inline, queued when the email is queued. See
+        // notifyWhatsApp.
+        notifyWhatsApp(req, message, mode);
 
         if (mode == EmailDeliveryMode.SYNC) {
             try {
@@ -181,6 +214,40 @@ public class EmailDispatchService {
         // ASYNC — hand off to the bounded executor; terminal status lands in the log.
         asyncExecutor.sendAsync(row.getId(), account, message);
         return EmailSendResult.queued(row.getId(), account.getId());
+    }
+
+    /**
+     * Hands the send to the WhatsApp companion, which decides for itself whether this scenario
+     * and these recipients should produce a message.
+     *
+     * <p>Guarded twice over. The bean is optional, so a container without the WhatsApp stack
+     * behaves exactly as it did before; and the call is wrapped, so even a failure raised before
+     * the {@code @Async} proxy hands off — a bean-creation error, a proxy problem — cannot take
+     * an email down with it. Email is the channel of record here and nothing about the second
+     * channel is permitted to put it at risk.
+     *
+     * <p>The mode decides the timing, and it is the <b>email's</b> mode, not a choice made here:
+     * a SYNC mail sends its WhatsApp on this thread, so both leave in the same instant for
+     * somebody waiting on an OTP or a receipt; an ASYNC mail queues its WhatsApp, the same way it
+     * queues itself. Neither channel is ever sequenced behind the other.
+     *
+     * @param message the rendered mail, or null when the send did not get that far
+     * @param mode    the email's delivery mode; null is treated as ASYNC, like the email would be
+     */
+    private void notifyWhatsApp(EmailSendRequest req, SmtpEmailRequest message, EmailDeliveryMode mode) {
+        if (whatsAppDispatchService == null) {
+            return;
+        }
+        try {
+            if (mode == EmailDeliveryMode.SYNC) {
+                whatsAppDispatchService.sendNow(req, message);
+            } else {
+                whatsAppDispatchService.sendAlongside(req, message);
+            }
+        } catch (Exception e) {
+            logger.warn("WhatsApp companion could not be dispatched for {}: {}",
+                    req != null ? req.getEmailType() : null, e.getMessage());
+        }
     }
 
     // ─── resolution ──────────────────────────────────────────────────────

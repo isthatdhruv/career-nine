@@ -22,6 +22,7 @@ interface Props {
 const EMPTY: EmailRecipientPayload = {
   emailType: "",
   email: "",
+  phone: null,
   label: null,
   recipientKind: "TO",
   leadType: null,
@@ -51,6 +52,7 @@ const EmailRecipientModal: FC<Props> = ({
         ? {
             emailType: editing.emailType,
             email: editing.email,
+            phone: editing.phone,
             label: editing.label,
             recipientKind: editing.recipientKind,
             leadType: editing.leadType,
@@ -75,6 +77,7 @@ const EmailRecipientModal: FC<Props> = ({
       await onSave({
         ...form,
         email: form.email.trim(),
+        phone: form.phone && form.phone.trim() ? form.phone.trim() : null,
         // Blank inputs mean "no filter", which the server stores as null.
         label: form.label && form.label.trim() ? form.label.trim() : null,
         source: form.source && form.source.trim() ? form.source.trim() : null,
@@ -126,6 +129,23 @@ const EmailRecipientModal: FC<Props> = ({
             onChange={(e) => set("email", e.target.value)}
             autoFocus
           />
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>
+            WhatsApp number
+          </label>
+          <input
+            type="tel"
+            className="form-control form-control-sm"
+            placeholder="98765 43210"
+            value={form.phone ?? ""}
+            onChange={(e) => set("phone", e.target.value)}
+          />
+          <div className="form-text" style={{ fontSize: "0.75rem" }}>
+            Optional. Every alert is sent by email and on WhatsApp; leave this blank to receive
+            the email only.
+          </div>
         </div>
 
         <div className="mb-3">

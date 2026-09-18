@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 import com.kccitm.api.model.career9.CommunicationLog;
 import com.kccitm.api.repository.Career9.CommunicationLogRepository;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+
 /**
  * Records every email/WhatsApp send attempt in the communication_log table.
  * Failures while logging are swallowed and just logged — they must never
@@ -28,6 +31,22 @@ public class CommunicationLogService {
     @Autowired
     private CommunicationLogRepository repository;
 
+    /**
+     * The zone every row is stamped in. Shared with counselling rather than left to the JVM,
+     * which runs UTC: the Communication Log is read by an India-based team asking "when did this
+     * actually go out?", and an un-zoned stamp answers that five and a half hours early.
+     */
+    @org.springframework.beans.factory.annotation.Value("${app.counselling.timezone:Asia/Kolkata}")
+    private String timezone;
+
+    private LocalDateTime now() {
+        try {
+            return LocalDateTime.now(ZoneId.of(timezone));
+        } catch (Exception e) {
+            return LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
+        }
+    }
+
     /** Log an email send. errorMessage may be null for successful sends. */
     public void logEmail(String recipientName, String recipientEmail, String messageType,
                          boolean success, String errorMessage) {
@@ -40,6 +59,7 @@ public class CommunicationLogService {
             log.setStatus(success ? STATUS_SENT : STATUS_FAILED);
             log.setErrorMessage(errorMessage);
             log.setSentBy(currentUser());
+            log.setCreatedAt(now());
             repository.save(log);
         } catch (Exception e) {
             logger.warn("Failed to record email communication log: {}", e.getMessage());
@@ -58,6 +78,7 @@ public class CommunicationLogService {
             log.setStatus(success ? STATUS_SENT : STATUS_FAILED);
             log.setErrorMessage(errorMessage);
             log.setSentBy(currentUser());
+            log.setCreatedAt(now());
             repository.save(log);
         } catch (Exception e) {
             logger.warn("Failed to record whatsapp communication log: {}", e.getMessage());

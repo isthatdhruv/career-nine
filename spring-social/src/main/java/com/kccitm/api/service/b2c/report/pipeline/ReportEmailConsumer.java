@@ -44,6 +44,16 @@ public class ReportEmailConsumer {
     @Autowired(required = false)
     private com.kccitm.api.service.counselling.CounsellingBookingLinkService bookingLinkService;
 
+    /**
+     * The WhatsApp that goes with the report email. Every email in the system is accompanied by
+     * one, and this pipeline is the main place that does not get it for free: the workers
+     * compose and transport their own mail rather than going through
+     * {@code EmailDispatchService}, because the send has to be synchronous and throw to hold the
+     * delivery guarantee. So the companion is sent explicitly, below, beside the email.
+     */
+    @Autowired(required = false)
+    private com.kccitm.api.service.whatsapp.WhatsAppDispatchService whatsAppDispatchService;
+
     @RetryableTopic(
             attempts = "${report.pipeline.max-attempts:5}",
             backoff = @Backoff(delayExpression = "${report.pipeline.backoff-ms:5000}", multiplier = 2.0),
@@ -106,6 +116,11 @@ public class ReportEmailConsumer {
                         ev.userStudentId, ev.assessmentId, ev.entitlementId);
             }
             rateLimiter.acquire();
+            // Both channels leave together, the same way they do for every other notification in
+            // the system: the WhatsApp is dispatched immediately before the mail is handed to the
+            // transport, not after it has gone. It cannot throw and it does not block, so nothing
+            // about it delays or endangers the email it accompanies.
+            sendWhatsAppCompanion(ev);
             emailSender.sendReportEmail(ev, pdf);
             idempotency.markSent(ev.userStudentId, ev.assessmentId, ev.batchId);
             logEntitlementDelivery(ev);
@@ -118,6 +133,40 @@ public class ReportEmailConsumer {
                     ev.userStudentId, ev.assessmentId, e.getMessage());
             idempotency.release(ev.userStudentId, ev.assessmentId, ev.batchId); // let the retry re-claim
             throw e; // → @RetryableTopic retry → DLT
+        }
+    }
+
+    /**
+     * Tells the student on WhatsApp that their report is ready, as the email does.
+     *
+     * <p>Sent beside the email rather than after it, so a student is not told on one channel
+     * seconds before the other. It is safe in front of the send because it cannot fail into the
+     * retry path: the call is {@code @Async} on its own pool and swallows everything, so a
+     * WhatsApp problem can neither throw here nor slow the worker's throughput.
+     *
+     * <p>The one consequence of going first is that a WhatsApp can be sent for an email that
+     * then fails. The email is then retried — the job releases its idempotency claim and comes
+     * back round — so without a dedupe key the student would be told again on every attempt.
+     * The key is the student, the assessment and the batch: one message per report, however many
+     * attempts the email takes.
+     */
+    private void sendWhatsAppCompanion(ReportEmailEvent ev) {
+        if (whatsAppDispatchService == null) return;
+        try {
+            String name = ev.studentName != null && !ev.studentName.trim().isEmpty()
+                    ? ev.studentName : "there";
+            String school = ev.schoolName != null && !ev.schoolName.trim().isEmpty()
+                    ? ev.schoolName : "Career-9";
+            whatsAppDispatchService.sendForExternalEmail(
+                    com.kccitm.api.model.email.EmailType.REPORT_READY,
+                    ev.recipientEmail, name, null,
+                    "Your Career-9 report is ready",
+                    "Your assessment report is ready to view.",
+                    java.util.Arrays.asList(name, school, ev.reportUrl == null ? "" : ev.reportUrl),
+                    "report-ready-" + ev.userStudentId + "-" + ev.assessmentId + "-" + ev.batchId);
+        } catch (Exception e) {
+            logger.warn("Report WhatsApp companion failed student={} assessment={}: {}",
+                    ev.userStudentId, ev.assessmentId, e.getMessage());
         }
     }
 

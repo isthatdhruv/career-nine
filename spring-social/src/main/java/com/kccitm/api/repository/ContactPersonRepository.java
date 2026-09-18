@@ -15,6 +15,12 @@ public interface ContactPersonRepository extends JpaRepository<ContactPerson, Lo
     // Find all contact persons for an institute (by institute_code)
     List<ContactPerson> findByInstitute_InstituteCode(int instituteCode);
 
+    /**
+     * For the WhatsApp companion's address-to-number lookup. A list, not an Optional: one person
+     * can be the named contact for several institutes, and each of those rows carries the number.
+     */
+    List<ContactPerson> findByEmail(String email);
+
     // Convenience: getOne (exists on JpaRepository, but re-declared for clarity)
     ContactPerson getOne(Long id);
 

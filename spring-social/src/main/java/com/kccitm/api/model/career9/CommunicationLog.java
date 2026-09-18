@@ -56,10 +56,24 @@ public class CommunicationLog implements Serializable {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Stamps the row in IST when nothing else has.
+     *
+     * <p>This was {@code LocalDateTime.now()}, and on this application that is wrong by five and
+     * a half hours. The JVM is forced to UTC at startup, and a {@code LocalDateTime} carries no
+     * zone — so a UTC wall-clock reading went into a plain datetime column and came back out
+     * looking like local time. Every email and WhatsApp in the Communication Log read as having
+     * been sent five and a half hours before it actually was, which for a message sent at
+     * 9:00 am reads as 3:30 am the same morning.
+     *
+     * <p>{@code CommunicationLogService} normally sets this before the entity gets here, from the
+     * configured zone. This is the fallback for anything constructing the entity directly, and it
+     * uses the same zone so the two cannot disagree.
+     */
     @PrePersist
     public void prePersist() {
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata"));
         }
     }
 

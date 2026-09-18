@@ -46,6 +46,14 @@ public class EmailNotificationRecipient implements Serializable {
     @Column(name = "email", length = 320, nullable = false)
     private String email;
 
+    /**
+     * WhatsApp number for this recipient. Optional: blank means they keep getting the email and
+     * nothing else, which is how every row starts. Nothing is inferred from the address — an
+     * alert only reaches somebody's phone because an admin put the number here.
+     */
+    @Column(name = "phone", length = 30)
+    private String phone;
+
     /** Admin-facing label ("Sales desk"); never part of the message. */
     @Column(name = "label", length = 160)
     private String label;
@@ -112,6 +120,8 @@ public class EmailNotificationRecipient implements Serializable {
     public void setEmailType(String emailType) { this.emailType = emailType; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
     public String getLabel() { return label; }
     public void setLabel(String label) { this.label = label; }
     public RecipientKind getRecipientKind() { return recipientKind; }

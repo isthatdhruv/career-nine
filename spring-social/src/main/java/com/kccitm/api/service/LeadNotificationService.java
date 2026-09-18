@@ -137,6 +137,17 @@ public class LeadNotificationService {
                 receivedAt(lead), fieldRows(lead), String.valueOf(lead.getId()),
                 mailLinks.of(frontendUrl + "/leads", "leads")));
 
+        // The alert goes to the team on WhatsApp as well as by email, one message per person on
+        // the To line. The numbers come from the Notification Recipients screen — the addresses
+        // here belong to no student, counsellor or contact-person record, so there is nothing to
+        // look a number up from. A recipient who has not given one keeps getting the email alone.
+        com.kccitm.api.model.whatsapp.WhatsAppMessage wa =
+                new com.kccitm.api.model.whatsapp.WhatsAppMessage();
+        for (String address : who.to) {
+            wa.forAddress(address, who.phoneFor(address));
+        }
+        req.setWhatsApp(wa);
+
         emailDispatchService.send(req);
         logger.info("Lead {}: new-lead alert queued to {} recipient(s)", lead.getId(), who.size());
     }

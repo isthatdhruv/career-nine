@@ -44,6 +44,24 @@ public class EmailNotificationRecipientService {
         public final List<String> cc = new ArrayList<>();
         public final List<String> bcc = new ArrayList<>();
 
+        /**
+         * The WhatsApp number configured for each address, keyed by the lower-cased address.
+         *
+         * <p>Keyed rather than listed so the alert keeps one message per recipient: the send
+         * loop mails one address at a time, and each of those mails carries the number belonging
+         * to that address and no other. A flat list handed to every mail would send the whole
+         * team a copy per address — three recipients, nine messages.
+         *
+         * <p>Rows with no number contribute nothing, so this is routinely smaller than the
+         * address lists and often empty.
+         */
+        public final Map<String, String> phonesByAddress = new LinkedHashMap<>();
+
+        /** The number configured for an address, or null when that recipient has none. */
+        public String phoneFor(String address) {
+            return address == null ? null : phonesByAddress.get(address.trim().toLowerCase());
+        }
+
         public boolean isEmpty() {
             return to.isEmpty() && cc.isEmpty() && bcc.isEmpty();
         }
@@ -79,6 +97,10 @@ public class EmailNotificationRecipientService {
             }
             String key = address.toLowerCase();
             RecipientKind kind = row.getRecipientKind() != null ? row.getRecipientKind() : RecipientKind.TO;
+            String phone = row.getPhone();
+            if (phone != null && !phone.trim().isEmpty()) {
+                out.phonesByAddress.putIfAbsent(key, phone.trim());
+            }
             if (seen.add(key)) {
                 kinds.put(key, kind);
                 // Keep the address as typed for the header; the lowercase form is only the key.
@@ -179,6 +201,11 @@ public class EmailNotificationRecipientService {
             throw new IllegalArgumentException("email is required");
         }
 
+        // Optional, and blank clears it: a recipient who no longer wants alerts on their phone
+        // is taken off WhatsApp by emptying this, without losing the email subscription.
+        if (form.containsKey("phone")) {
+            row.setPhone(str(form.get("phone")));
+        }
         if (form.containsKey("label")) {
             row.setLabel(str(form.get("label")));
         }
@@ -199,11 +226,94 @@ public class EmailNotificationRecipientService {
         }
     }
 
+    // ─── one-click subscription (the Send-email toggle on User Management) ───
+
+    /**
+     * The lower-cased addresses currently subscribed to one scenario.
+     *
+     * <p>Read by any screen that shows a per-person on/off switch: a row exists and is active
+     * for that address, or the switch is off. Lower-cased because the switch belongs to the
+     * person, not to the capitalisation their account happens to use.
+     */
+    public Set<String> subscribedAddresses(EmailType type) {
+        Set<String> out = new LinkedHashSet<>();
+        if (type == null) {
+            return out;
+        }
+        for (EmailNotificationRecipient row : repository.findByEmailTypeAndActiveTrue(type.name())) {
+            if (row.getEmail() != null && !row.getEmail().trim().isEmpty()) {
+                out.add(row.getEmail().trim().toLowerCase());
+            }
+        }
+        return out;
+    }
+
+    /** Whether this address is on the list for this scenario. */
+    public boolean isSubscribed(EmailType type, String email) {
+        if (email == null || email.trim().isEmpty()) {
+            return false;
+        }
+        return subscribedAddresses(type).contains(email.trim().toLowerCase());
+    }
+
+    /**
+     * Put an address on the list for one scenario, or take it off.
+     *
+     * <p>Turning it off flips {@code active} rather than deleting: the row keeps whatever an
+     * admin configured on the Notification Recipients page — a WhatsApp number, a Cc header —
+     * so switching back on restores the same recipient instead of a bare default. Every row for
+     * the address is flipped, so an address entered twice cannot be half-subscribed.
+     *
+     * @return the state the address is now in
+     */
+    public boolean setSubscribed(EmailType type, String email, String label, boolean on, Long userId) {
+        if (type == null) {
+            throw new IllegalArgumentException("emailType is required");
+        }
+        String address = str(email);
+        if (address == null || !EMAIL.matcher(address).matches()) {
+            throw new IllegalArgumentException("A valid email address is required");
+        }
+
+        List<EmailNotificationRecipient> existing = new ArrayList<>();
+        for (EmailNotificationRecipient row : repository.findByEmailTypeOrderByEmailAsc(type.name())) {
+            if (row.getEmail() != null && address.equalsIgnoreCase(row.getEmail().trim())) {
+                existing.add(row);
+            }
+        }
+
+        if (existing.isEmpty()) {
+            if (!on) {
+                return false; // Nothing to unsubscribe; already off.
+            }
+            EmailNotificationRecipient row = new EmailNotificationRecipient();
+            row.setEmailType(type.name());
+            row.setEmail(address);
+            row.setLabel(str(label));
+            row.setRecipientKind(RecipientKind.TO);
+            row.setActive(Boolean.TRUE);
+            row.setUpdatedBy(userId);
+            repository.save(row);
+            return true;
+        }
+
+        for (EmailNotificationRecipient row : existing) {
+            row.setActive(on);
+            if (on && row.getLabel() == null) {
+                row.setLabel(str(label));
+            }
+            row.setUpdatedBy(userId);
+        }
+        repository.saveAll(existing);
+        return on;
+    }
+
     private Map<String, Object> toDto(EmailNotificationRecipient row) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", row.getId());
         m.put("emailType", row.getEmailType());
         m.put("email", row.getEmail());
+        m.put("phone", row.getPhone());
         m.put("label", row.getLabel());
         m.put("recipientKind", row.getRecipientKind() != null ? row.getRecipientKind().name() : "TO");
         m.put("leadType", row.getLeadType());

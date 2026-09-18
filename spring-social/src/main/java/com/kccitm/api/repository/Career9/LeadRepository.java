@@ -15,4 +15,10 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     List<Lead> findByLeadType(LeadType leadType);
 
     List<Lead> findByOdooSyncStatus(OdooSyncStatus odooSyncStatus);
+
+    /**
+     * Newest first, for the WhatsApp companion's address-to-number lookup: the same person can
+     * enquire more than once, and the number they gave most recently is the one to use.
+     */
+    List<Lead> findByEmailOrderByIdDesc(String email);
 }

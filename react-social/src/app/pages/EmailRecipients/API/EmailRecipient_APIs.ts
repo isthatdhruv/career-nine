@@ -14,6 +14,8 @@ export interface EmailRecipient {
   id: number;
   emailType: string;
   email: string;
+  /** WhatsApp number for this recipient; null when they receive the email only. */
+  phone: string | null;
   label: string | null;
   recipientKind: RecipientKind;
   leadType: string | null;
@@ -25,6 +27,7 @@ export interface EmailRecipient {
 export interface EmailRecipientPayload {
   emailType: string;
   email: string;
+  phone: string | null;
   label: string | null;
   recipientKind: RecipientKind;
   leadType: string | null;
