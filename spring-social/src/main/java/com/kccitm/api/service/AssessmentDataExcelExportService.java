@@ -45,6 +45,7 @@ import com.kccitm.api.repository.Career9.StudentDemographicResponseRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
 
 /**
  * "Generate Data Excel" export: one row per student, covering everything from
@@ -67,6 +68,7 @@ public class AssessmentDataExcelExportService {
     @Autowired private AssessmentDemographicMappingRepository demographicMappingRepository;
     @Autowired private StudentDemographicResponseRepository demographicResponseRepository;
     @Autowired private SchoolSectionsRepository schoolSectionsRepository;
+    @Autowired private NavigatorReportGenerationService navigatorReportGenerationService;
 
     // Registration basics already emitted as fixed columns — system demographic
     // fields with these keys would duplicate them, so they are skipped.
@@ -291,6 +293,11 @@ public class AssessmentDataExcelExportService {
                 }
             }
 
+            // Navigator 360 assessments also get the analyst's careless-
+            // responding screen: a "Response Quality" sheet with the item marks
+            // and the flag formulas, plus a verdict echoed onto this sheet.
+            appendResponseQuality(workbook, sheet, headers.size(), assessmentId, targetStudents);
+
             // Only size the fixed columns — autosizing hundreds of question
             // columns over many rows is very slow.
             for (int i = 0; i < 12; i++) {
@@ -304,6 +311,38 @@ public class AssessmentDataExcelExportService {
             return out.toByteArray();
         } finally {
             workbook.close();
+        }
+    }
+
+    /**
+     * Adds the "Response Quality" sheet when the assessment is a Navigator 360
+     * (RIASEC + aptitude + MI sections all detected). Any failure here is
+     * logged and swallowed — the data export itself must never be lost to it.
+     */
+    private void appendResponseQuality(XSSFWorkbook workbook, Sheet dataSheet, int firstFreeCol,
+            Long assessmentId, List<StudentAssessmentMapping> targetStudents) {
+        try {
+            NavigatorReportGenerationService.AssessmentScoringContext ctx =
+                    navigatorReportGenerationService.buildScoringContext(assessmentId);
+            List<ResponseQualitySheetWriter.StudentItems> items = new ArrayList<>();
+            for (StudentAssessmentMapping sam : targetStudents) {
+                UserStudent us = sam.getUserStudent();
+                NavigatorReportGenerationService.ItemLevelMarks marks =
+                        navigatorReportGenerationService.computeItemLevelMarks(us.getUserStudentId(), ctx);
+                // Section detection is per assessment, so the first student tells.
+                if (marks.riasec.length == 0 || marks.aptitude.length == 0 || marks.mi.length == 0) {
+                    return;
+                }
+                StudentInfo si = us.getStudentInfo();
+                items.add(new ResponseQualitySheetWriter.StudentItems(us.getUserStudentId(),
+                        si != null ? safe(si.getName()) : "", marks.riasec, marks.aptitude, marks.mi));
+            }
+            ResponseQualitySheetWriter.write(workbook, dataSheet, firstFreeCol, items);
+            logger.info("Data excel: response-quality flags added for {} students of assessment {}",
+                    items.size(), assessmentId);
+        } catch (Exception e) {
+            logger.warn("Data excel: response-quality sheet skipped for assessment {}: {}",
+                    assessmentId, e.getMessage(), e);
         }
     }
 

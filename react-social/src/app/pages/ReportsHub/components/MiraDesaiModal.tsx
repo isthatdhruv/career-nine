@@ -67,6 +67,7 @@ const MiraDesaiModal: React.FC<Props> = ({
             className="btn"
             onClick={onGenerateDataExcel}
             disabled={generating}
+            title="Registration details and every answer, one row per student. Navigator 360 assessments also get a Response Quality sheet — scatter, distance from the group, straightlining and extremeness per student, with an OK/EXCLUDE verdict echoed onto the data sheet"
             style={{
               background: generating
                 ? "#6c757d"
