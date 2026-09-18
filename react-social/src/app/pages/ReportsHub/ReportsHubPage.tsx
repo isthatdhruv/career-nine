@@ -43,6 +43,7 @@ import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
 import PageHeader from "../../components/PageHeader";
 import SearchableSelect from "../../components/SearchableSelect";
+import SearchableMultiSelect from "../../components/SearchableMultiSelect";
 import { useAuth, Scope } from "../../modules/auth";
 
 // ═══════════════════════ TYPES ═══════════════════════
@@ -62,6 +63,22 @@ type StudentRow = {
   assessments?: { assessmentId: number; assessmentName: string; status: string }[];
   assignedAssessmentIds?: number[];
 };
+
+/**
+ * One table row: a student paired with one of the shown assessments. A student
+ * enrolled in several selected assessments therefore appears once per
+ * assessment, and Status / Completed On / Report / Visible are that pairing's.
+ */
+type StudentAssessmentRow = {
+  key: string;
+  student: StudentRow;
+  assessment: Assessment;
+  status: string;
+  completedAt?: string;
+};
+
+/** Key for the per-(assessment, student) maps and for row selection. */
+const rowKey = (assessmentId: number, userStudentId: number) => `${assessmentId}:${userStudentId}`;
 
 type SectionInfo = {
   className: string;
@@ -157,7 +174,14 @@ const ReportsHubPage: React.FC = () => {
   // ── Assessment (URM approach: filtered by institute mapping) ──
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
+  /** Every assessment whose rows are on the table, in dropdown order. */
+  const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<number[]>([]);
+  /**
+   * The one assessment the bulk actions act on. The table can show several at
+   * once, but generation, sending and the Excel exports are per assessment, so
+   * the action bar carries a picker and ticked rows of the others are ignored.
+   */
+  const [actionAssessmentId, setActionAssessmentId] = useState<number | "">("");
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
   const [mappedAssessmentIds, setMappedAssessmentIds] = useState<Set<number> | null>(null);
 
@@ -171,15 +195,18 @@ const ReportsHubPage: React.FC = () => {
   const [studentsLoading, setStudentsLoading] = useState(false);
 
   // ── Report data ──
-  const [reportDataMap, setReportDataMap] = useState<Map<number, ReportData>>(new Map());
+  /** Keyed by `${assessmentId}:${userStudentId}` — the table can show several assessments at once. */
+  const [reportDataMap, setReportDataMap] = useState<Map<string, ReportData>>(new Map());
   const [reportDataLoading, setReportDataLoading] = useState(false);
 
   // ── Visibility ──
-  const [visibilityMap, setVisibilityMap] = useState<Map<number, { id: number; visible: boolean }>>(new Map());
+  /** Keyed by `${assessmentId}:${userStudentId}`, like {@link reportDataMap}. */
+  const [visibilityMap, setVisibilityMap] = useState<Map<string, { id: number; visible: boolean }>>(new Map());
   const [togglingVisibility, setTogglingVisibility] = useState(false);
 
   // ── Selection + pagination ──
-  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+  /** Ticked rows, as `${assessmentId}:${userStudentId}` keys. */
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -275,14 +302,12 @@ const ReportsHubPage: React.FC = () => {
       .finally(() => setAssessmentsLoading(false));
   }, [selectedInstitute]);
 
-  // Filter assessments by institute mapping; fall back to ALL assessments when
-  // the institute has no linked assessments (or mapping fetch failed).
+  // Only the assessments mapped to the selected institute are offered — an
+  // institute with no mapping gets an empty list and says so, rather than the
+  // whole system's catalogue.
   useEffect(() => {
-    if (mappedAssessmentIds && mappedAssessmentIds.size > 0) {
-      setAssessments(allAssessments.filter((a) => mappedAssessmentIds.has(a.id)));
-    } else {
-      setAssessments(allAssessments);
-    }
+    if (mappedAssessmentIds == null) { setAssessments([]); return; }
+    setAssessments(allAssessments.filter((a) => mappedAssessmentIds.has(a.id)));
   }, [allAssessments, mappedAssessmentIds]);
 
   // Load students + sections when institute changes
@@ -297,7 +322,7 @@ const ReportsHubPage: React.FC = () => {
         setStudents(studentsRes.data || []);
         // Nobody starts ticked — the user builds the selection up (the table
         // header checkbox selects all visible rows in one click when needed).
-        setSelectedStudentIds(new Set());
+        setSelectedRowKeys(new Set());
         const lookup = new Map<number, SectionInfo>();
         for (const session of sessionsRes.data || []) {
           for (const cls of session.schoolClasses || []) {
@@ -319,11 +344,30 @@ const ReportsHubPage: React.FC = () => {
   }, [selectedInstitute]);
 
   // Reset on selection change
-  useEffect(() => { setSelectedAssessment(""); }, [selectedInstitute]);
+  useEffect(() => { setSelectedAssessmentIds([]); }, [selectedInstitute]);
+
+  /** The assessments on the table, in dropdown order. */
+  const shownAssessments = useMemo(
+    () => assessments.filter((a) => selectedAssessmentIds.includes(a.id)),
+    [assessments, selectedAssessmentIds]
+  );
+  /** Stable identity for the shown set, so effects re-run on a real change only. */
+  const selectedAssessmentKey = useMemo(
+    () => shownAssessments.map((a) => a.id).join(","),
+    [shownAssessments]
+  );
+
+  // Keep the action picker pointing at one of the selected assessments.
+  useEffect(() => {
+    setActionAssessmentId((prev) =>
+      prev !== "" && selectedAssessmentIds.includes(Number(prev))
+        ? prev
+        : (selectedAssessmentIds[0] ?? ""));
+  }, [selectedAssessmentIds]);
   useEffect(() => {
     // Back to the default of nobody ticked — selection is built up
     // explicitly (header checkbox = select all visible).
-    setSelectedStudentIds(new Set());
+    setSelectedRowKeys(new Set());
     setCurrentPage(1);
     setNameQuery("");
     setSelectedGrade("");
@@ -331,13 +375,14 @@ const ReportsHubPage: React.FC = () => {
     setReportDataMap(new Map());
     setVisibilityMap(new Map());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedInstitute, selectedAssessment]);
+  }, [selectedInstitute, selectedAssessmentKey]);
 
-  // Load report data + visibility when assessment selected
+  // Everything that is per assessment — templates, generation, sending, the
+  // Excel exports — follows the action picker rather than the table.
   const selectedAssessmentObj = useMemo(() => {
-    if (selectedAssessment === "") return null;
-    return assessments.find((a) => a.id === Number(selectedAssessment)) || null;
-  }, [assessments, selectedAssessment]);
+    if (actionAssessmentId === "") return null;
+    return assessments.find((a) => a.id === Number(actionAssessmentId)) || null;
+  }, [assessments, actionAssessmentId]);
 
   const reportType: ReportType = selectedAssessmentObj ? getReportType(selectedAssessmentObj) : "bet";
   const isBet = reportType === "bet";
@@ -351,26 +396,44 @@ const ReportsHubPage: React.FC = () => {
     return gr.reportTemplateId === selectedTemplateId;
   }, [selectedTemplateId]);
 
-  const refreshReportData = useCallback(async (): Promise<Map<number, ReportData>> => {
-    if (!selectedAssessmentObj) return new Map();
+  /**
+   * The template dropdown belongs to the action assessment, so it only narrows
+   * that assessment's reports; rows of the other shown assessments keep
+   * whichever template they were generated with.
+   */
+  const keepReport = useCallback((assessmentId: number, gr: { reportTemplateId?: number | null }) =>
+    assessmentId !== Number(actionAssessmentId) || matchesTemplate(gr),
+  [actionAssessmentId, matchesTemplate]);
+
+  const refreshReportData = useCallback(async (): Promise<Map<string, ReportData>> => {
+    if (shownAssessments.length === 0) { setReportDataMap(new Map()); return new Map(); }
     setReportDataLoading(true);
     try {
-      const res = await getGeneratedReportsByAssessment(selectedAssessmentObj.id);
-      const map = new Map<number, ReportData>();
-      for (const gr of res.data || []) {
-        if (!matchesTemplate(gr)) continue;
-        const id = gr.userStudent?.userStudentId;
-        if (!id) continue;
-        const existing = map.get(id);
-        // Prefer a generated row if a student somehow has multiple.
-        if (!existing || gr.reportStatus === "generated") {
-          map.set(id, {
-            userStudent: { userStudentId: id },
-            reportStatus: gr.reportStatus,
-            reportUrl: gr.reportUrl,
-            pdfUrl: gr.pdfUrl ?? null,
-            pdfStatus: gr.pdfStatus ?? "notRequested",
-          });
+      const map = new Map<string, ReportData>();
+      const responses = await Promise.all(
+        shownAssessments.map((a) =>
+          getGeneratedReportsByAssessment(a.id)
+            .then((res) => ({ assessmentId: a.id, rows: res.data || [] }))
+            // One assessment failing must not blank the whole table.
+            .catch(() => ({ assessmentId: a.id, rows: [] as any[] })))
+      );
+      for (const { assessmentId, rows } of responses) {
+        for (const gr of rows) {
+          if (!keepReport(assessmentId, gr)) continue;
+          const id = gr.userStudent?.userStudentId;
+          if (!id) continue;
+          const key = rowKey(assessmentId, id);
+          const existing = map.get(key);
+          // Prefer a generated row if a student somehow has multiple.
+          if (!existing || gr.reportStatus === "generated") {
+            map.set(key, {
+              userStudent: { userStudentId: id },
+              reportStatus: gr.reportStatus,
+              reportUrl: gr.reportUrl,
+              pdfUrl: gr.pdfUrl ?? null,
+              pdfStatus: gr.pdfStatus ?? "notRequested",
+            });
+          }
         }
       }
       setReportDataMap(map);
@@ -381,25 +444,32 @@ const ReportsHubPage: React.FC = () => {
     } finally {
       setReportDataLoading(false);
     }
-  }, [selectedAssessmentObj, matchesTemplate]);
+  }, [shownAssessments, keepReport]);
 
   const refreshVisibility = useCallback(async () => {
-    if (!selectedAssessmentObj) return;
+    if (shownAssessments.length === 0) { setVisibilityMap(new Map()); return; }
     try {
-      const res = await getGeneratedReportsByAssessment(selectedAssessmentObj.id);
-      const map = new Map<number, { id: number; visible: boolean }>();
-      for (const gr of res.data || []) {
-        if (!matchesTemplate(gr)) continue;
-        map.set(gr.userStudent.userStudentId, {
-          id: gr.generatedReportId,
-          visible: gr.visibleToStudent ?? false,
-        });
+      const map = new Map<string, { id: number; visible: boolean }>();
+      const responses = await Promise.all(
+        shownAssessments.map((a) =>
+          getGeneratedReportsByAssessment(a.id)
+            .then((res) => ({ assessmentId: a.id, rows: res.data || [] }))
+            .catch(() => ({ assessmentId: a.id, rows: [] as any[] })))
+      );
+      for (const { assessmentId, rows } of responses) {
+        for (const gr of rows) {
+          if (!keepReport(assessmentId, gr)) continue;
+          map.set(rowKey(assessmentId, gr.userStudent.userStudentId), {
+            id: gr.generatedReportId,
+            visible: gr.visibleToStudent ?? false,
+          });
+        }
       }
       setVisibilityMap(map);
     } catch {
       setVisibilityMap(new Map());
     }
-  }, [selectedAssessmentObj, matchesTemplate]);
+  }, [shownAssessments, keepReport]);
 
   // Load the templates mapped to this assessment; preselect the
   // default (else the first) so generation has a target.
@@ -421,14 +491,17 @@ const ReportsHubPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [selectedAssessmentObj]);
 
-  useEffect(() => { if (selectedAssessmentObj) { refreshReportData(); refreshVisibility(); } }, [selectedAssessmentObj, refreshReportData, refreshVisibility]);
+  useEffect(() => { refreshReportData(); refreshVisibility(); }, [refreshReportData, refreshVisibility]);
 
   // ═══════════════════════ FILTERING ═══════════════════════
 
+  // Students enrolled in at least one of the shown assessments.
   const assessmentStudents = useMemo(() => {
-    if (!selectedAssessmentObj) return [];
-    return students.filter((s) => (s.assignedAssessmentIds || []).includes(selectedAssessmentObj.id));
-  }, [students, selectedAssessmentObj]);
+    if (shownAssessments.length === 0) return [];
+    const shownIds = new Set(shownAssessments.map((a) => a.id));
+    return students.filter((s) =>
+      (s.assignedAssessmentIds || []).some((id) => shownIds.has(id)));
+  }, [students, shownAssessments]);
 
   // Apply the user's ABAC scopes (session/class/section) within the chosen
   // institute. Mirrors the backend predicate in AccessScopeJpqlBuilder: a
@@ -482,11 +555,33 @@ const ReportsHubPage: React.FC = () => {
     return Array.from(sec).sort();
   }, [scopedStudents, sectionLookup]);
 
-  const displayedStudents = useMemo(() => {
-    let result = scopedStudents;
+  // Expand the scoped students into one row per (student, shown assessment)
+  // they are enrolled in, grouped by student so a person's assessments sit
+  // together on the page.
+  const scopedRows = useMemo<StudentAssessmentRow[]>(() => {
+    const rows: StudentAssessmentRow[] = [];
+    for (const student of scopedStudents) {
+      const assigned = new Set(student.assignedAssessmentIds || []);
+      for (const assessment of shownAssessments) {
+        if (!assigned.has(assessment.id)) continue;
+        const detail = (student.assessments || []).find((a) => a.assessmentId === assessment.id);
+        rows.push({
+          key: rowKey(assessment.id, student.userStudentId),
+          student,
+          assessment,
+          status: detail?.status || "notstarted",
+          completedAt: (detail as any)?.completedAt,
+        });
+      }
+    }
+    return rows;
+  }, [scopedStudents, shownAssessments]);
+
+  const displayedRows = useMemo(() => {
+    let result = scopedRows;
     if (nameQuery.trim()) {
       const q = nameQuery.toLowerCase();
-      result = result.filter((s) =>
+      result = result.filter(({ student: s }) =>
         s.name.toLowerCase().includes(q) ||
         (s.username || "").toLowerCase().includes(q) ||
         (s.schoolRollNumber || "").toLowerCase().includes(q) ||
@@ -496,26 +591,21 @@ const ReportsHubPage: React.FC = () => {
     }
     if (usernameQuery.trim()) {
       const u = usernameQuery.trim().toLowerCase();
-      result = result.filter((s) => (s.username || "").toLowerCase().includes(u));
+      result = result.filter(({ student: s }) => (s.username || "").toLowerCase().includes(u));
     }
     if (usernamePresence === "with") {
-      result = result.filter((s) => !!(s.username && s.username.trim()));
+      result = result.filter(({ student: s }) => !!(s.username && s.username.trim()));
     } else if (usernamePresence === "without") {
-      result = result.filter((s) => !(s.username && s.username.trim()));
+      result = result.filter(({ student: s }) => !(s.username && s.username.trim()));
     }
-    if (selectedGrade) result = result.filter((s) => gradeOf(s) === selectedGrade);
-    if (selectedSection) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.sectionName === selectedSection);
-    if (selectedStatus && selectedAssessmentObj) {
-      result = result.filter((s) => {
-        const st = (s.assessments || []).find((a: any) => a.assessmentId === selectedAssessmentObj.id)?.status || "notstarted";
-        return st === selectedStatus;
-      });
-    }
-    if ((completedFrom || completedTo) && selectedAssessmentObj) {
-      result = result.filter((s) => {
-        const day = localDayKey(
-          (s.assessments || []).find((a: any) => a.assessmentId === selectedAssessmentObj.id)?.completedAt
-        );
+    if (selectedGrade) result = result.filter(({ student: s }) => gradeOf(s) === selectedGrade);
+    if (selectedSection) result = result.filter(({ student: s }) => sectionLookup.get(s.schoolSectionId!)?.sectionName === selectedSection);
+    // Status and completion now read off the row's own assessment, so these
+    // filters work across every assessment on the table at once.
+    if (selectedStatus) result = result.filter((r) => r.status === selectedStatus);
+    if (completedFrom || completedTo) {
+      result = result.filter((r) => {
+        const day = localDayKey(r.completedAt);
         // No completion date — never in range. Filtering by *when* someone finished
         // implies they finished, so unfinished students drop out here.
         if (!day) return false;
@@ -525,15 +615,27 @@ const ReportsHubPage: React.FC = () => {
       });
     }
     return result;
-  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo, selectedAssessmentObj, sectionLookup, gradeOf]);
+  }, [scopedRows, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo, sectionLookup, gradeOf]);
 
-  const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
+  /** Displayed rows belonging to the assessment the bulk actions act on. */
+  const actionRows = useMemo(
+    () => (actionAssessmentId === "" ? [] : displayedRows.filter((r) => r.assessment.id === Number(actionAssessmentId))),
+    [displayedRows, actionAssessmentId]
+  );
+
+  /** Distinct students on the table — the roster count, as opposed to row count. */
+  const displayedStudentCount = useMemo(
+    () => new Set(displayedRows.map((r) => r.student.userStudentId)).size,
+    [displayedRows]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(displayedRows.length / pageSize));
   // Clamped rather than reset, so shrinking the result set past the current page
   // still renders rows instead of an empty table.
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedStudents = useMemo(
-    () => displayedStudents.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize),
-    [displayedStudents, safeCurrentPage, pageSize]
+  const paginatedRows = useMemo(
+    () => displayedRows.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize),
+    [displayedRows, safeCurrentPage, pageSize]
   );
 
   useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, completedFrom, completedTo]);
@@ -552,33 +654,59 @@ const ReportsHubPage: React.FC = () => {
 
   // ═══════════════════════ HELPERS ═══════════════════════
 
-  // Visible students that are ticked. Everyone starts ticked when the list
-  // loads, so an empty result means the user deliberately deselected all —
-  // bulk actions then act on nobody rather than silently falling back to all.
-  const getSelectedIds = () => {
-    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
-    return Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
-  };
+  /** Report row for one (assessment, student) pairing. */
+  const reportOf = useCallback(
+    (assessmentId: number, userStudentId: number) => reportDataMap.get(rowKey(assessmentId, userStudentId)),
+    [reportDataMap]
+  );
+  /** Report row under the action assessment — what every bulk action works off. */
+  const actionReportOf = useCallback(
+    (userStudentId: number) =>
+      actionAssessmentId === "" ? undefined : reportDataMap.get(rowKey(Number(actionAssessmentId), userStudentId)),
+    [reportDataMap, actionAssessmentId]
+  );
+  const visibilityOf = useCallback(
+    (assessmentId: number, userStudentId: number) => visibilityMap.get(rowKey(assessmentId, userStudentId)),
+    [visibilityMap]
+  );
 
-  const visibleSelectedCount = useMemo(() => {
-    const vis = new Set(displayedStudents.map((s) => s.userStudentId));
-    return Array.from(selectedStudentIds).filter((id) => vis.has(id)).length;
-  }, [selectedStudentIds, displayedStudents]);
+  // Ticked, on-screen rows *of the action assessment* — ticking rows of another
+  // shown assessment never feeds a bulk action, which is what the action picker
+  // means. Nobody starts ticked, so an empty result means the user picked
+  // nobody rather than a silent fall back to everyone.
+  const getSelectedIds = () => actionRows
+    .filter((r) => selectedRowKeys.has(r.key))
+    .map((r) => r.student.userStudentId);
 
+  /** Student behind a ticked id, looked up among the action assessment's rows. */
+  const actionStudentOf = useCallback(
+    (userStudentId: number) => actionRows.find((r) => r.student.userStudentId === userStudentId)?.student,
+    [actionRows]
+  );
+
+  const visibleSelectedCount = useMemo(
+    () => actionRows.filter((r) => selectedRowKeys.has(r.key)).length,
+    [selectedRowKeys, actionRows]
+  );
+
+  /** Ticked rows that belong to some other assessment, so the UI can say so. */
+  const otherAssessmentSelectedCount = useMemo(
+    () => displayedRows.filter((r) => selectedRowKeys.has(r.key) && r.assessment.id !== Number(actionAssessmentId)).length,
+    [selectedRowKeys, displayedRows, actionAssessmentId]
+  );
+
+  // Counted over the action assessment's rows: these numbers gate the bulk
+  // Show/Hide/Send buttons, which only ever touch that assessment.
   const reportStats = useMemo(() => {
     let generated = 0, notGenerated = 0, completed = 0;
-    const assessmentId = selectedAssessmentObj?.id;
-    for (const s of displayedStudents) {
-      const rd = reportDataMap.get(s.userStudentId);
+    for (const r of actionRows) {
+      const rd = reportOf(r.assessment.id, r.student.userStudentId);
       if (rd && rd.reportStatus === "generated") generated++;
       else notGenerated++;
-      if (assessmentId != null) {
-        const status = s.assessments?.find((a) => a.assessmentId === assessmentId)?.status;
-        if (status === "completed") completed++;
-      }
+      if (r.status === "completed") completed++;
     }
     return { generated, notGenerated, completed };
-  }, [displayedStudents, reportDataMap, selectedAssessmentObj]);
+  }, [actionRows, reportOf]);
 
   const downloadBlob = (data: any, filename: string) => {
     const url = window.URL.createObjectURL(new Blob([data]));
@@ -588,7 +716,7 @@ const ReportsHubPage: React.FC = () => {
 
   const selectedInstituteName = institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
   const selectedAssessmentName = selectedAssessmentObj?.assessmentName || "";
-  const ready = selectedInstitute !== "" && selectedAssessment !== "";
+  const ready = selectedInstitute !== "" && shownAssessments.length > 0;
   const accentColor = isBet ? "#4361ee" : "#0d9488";
 
   // ═══════════════════════ GENERATE (opens modal) ═══════════════════════
@@ -634,15 +762,16 @@ const ReportsHubPage: React.FC = () => {
 
   // ═══════════════════════ VISIBILITY ═══════════════════════
 
-  const handleToggleVisibility = async (studentId: number) => {
-    const entry = visibilityMap.get(studentId);
+  const handleToggleVisibility = async (assessmentId: number, studentId: number) => {
+    const key = rowKey(assessmentId, studentId);
+    const entry = visibilityMap.get(key);
     if (!entry) return;
     const newVisible = !entry.visible;
     try {
       await toggleReportVisibility([entry.id], newVisible);
       setVisibilityMap((prev) => {
         const next = new Map(prev);
-        next.set(studentId, { ...entry, visible: newVisible });
+        next.set(key, { ...entry, visible: newVisible });
         return next;
       });
     } catch { showErrorToast("Failed to update visibility"); }
@@ -650,7 +779,7 @@ const ReportsHubPage: React.FC = () => {
 
   const handleBulkVisibility = async (visible: boolean) => {
     const ids = getSelectedIds()
-      .map((sid) => visibilityMap.get(sid))
+      .map((sid) => (actionAssessmentId === "" ? undefined : visibilityMap.get(rowKey(Number(actionAssessmentId), sid))))
       .filter((e): e is { id: number; visible: boolean } => !!e && e.visible !== visible)
       .map((e) => e.id);
     if (ids.length === 0) {
@@ -672,7 +801,7 @@ const ReportsHubPage: React.FC = () => {
   const handleDownloadZipClick = () => {
     if (!selectedAssessmentObj) return;
     let ids = getSelectedIds().filter((id) => {
-      const rd = reportDataMap.get(id);
+      const rd = actionReportOf(id);
       return rd && rd.pdfStatus === "ready" && rd.pdfUrl;
     });
     if (ids.length === 0) { showErrorToast("No rendered PDFs to download yet."); return; }
@@ -713,7 +842,7 @@ const ReportsHubPage: React.FC = () => {
           .map((id) => {
             const s = students.find((st) => st.userStudentId === id);
             const safe = (s?.name || `student_${id}`).replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
-            const rd = reportDataMap.get(id);
+            const rd = actionReportOf(id);
             return { fileName: `${safe}_report`, pdfUrl: rd?.pdfUrl ?? null };
           })
           .filter((x) => !!x.pdfUrl);
@@ -788,8 +917,7 @@ const ReportsHubPage: React.FC = () => {
 
   const handleExportBetCoreData = async () => {
     if (!selectedAssessmentObj) return;
-    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
-    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+    const selectedVisible = getSelectedIds();
     const ids = selectedVisible.length > 0 ? selectedVisible : undefined;
     setExportingMQT(true);
     try {
@@ -800,13 +928,13 @@ const ReportsHubPage: React.FC = () => {
   };
 
   // Navigator360 school dashboard. Every active filter is already baked into
-  // displayedStudents, so sending those ids is what keeps the export in step
+  // actionRows, so sending those ids is what keeps the export in step
   // with the table — unlike the other exports, an empty selection falls back to
   // the filtered list rather than to the whole assessment.
   const handleExportDashboardSheet = async () => {
     if (!selectedAssessmentObj) return;
     const ticked = getSelectedIds();
-    const ids = ticked.length > 0 ? ticked : displayedStudents.map((s) => s.userStudentId);
+    const ids = ticked.length > 0 ? ticked : actionRows.map((r) => r.student.userStudentId);
     if (ids.length === 0) { showErrorToast("No students match the current filters."); return; }
 
     // The grade filter doubles as sheet 2's CLASS FILTER when it is a plain
@@ -841,7 +969,7 @@ const ReportsHubPage: React.FC = () => {
   const handleExportPsychometricProperties = async () => {
     if (!selectedAssessmentObj) return;
     const ticked = getSelectedIds();
-    const ids = ticked.length > 0 ? ticked : displayedStudents.map((s) => s.userStudentId);
+    const ids = ticked.length > 0 ? ticked : actionRows.map((r) => r.student.userStudentId);
     if (ids.length === 0) { showErrorToast("No students match the current filters."); return; }
 
     setExportingPsychometric(true);
@@ -864,23 +992,25 @@ const ReportsHubPage: React.FC = () => {
 
   // ═══════════════════════ SEND ACTIONS ═══════════════════════
 
-  const handleSendEmail = (student: StudentRow) => {
-    const rd = reportDataMap.get(student.userStudentId);
+  const handleSendEmail = (row: StudentAssessmentRow) => {
+    const { student } = row;
+    const rd = reportOf(row.assessment.id, student.userStudentId);
     if (!student.email || !rd?.reportUrl) return;
     setComposeStudentIds([student.userStudentId]);
     setComposeRecipients([{ email: student.email, name: student.name }]);
-    setComposeSubject(`Your ${selectedAssessmentName} Report - Career-9`);
-    setComposeBody(buildEmailTemplate(student.name, rd.reportUrl, selectedAssessmentName));
+    setComposeSubject(`Your ${row.assessment.assessmentName} Report - Career-9`);
+    setComposeBody(buildEmailTemplate(student.name, rd.reportUrl, row.assessment.assessmentName));
     setComposeOpen(true);
   };
 
-  const handleSendWhatsApp = async (student: StudentRow) => {
-    const rd = reportDataMap.get(student.userStudentId);
+  const handleSendWhatsApp = async (row: StudentAssessmentRow) => {
+    const { student } = row;
+    const rd = reportOf(row.assessment.id, student.userStudentId);
     if (!student.phoneNumber || !rd?.reportUrl) return;
     setSendingWhatsApp((prev) => new Set(prev).add(student.userStudentId));
     try {
       await SendWhatsApp(student.phoneNumber, "report_notification", [
-        student.name, selectedAssessmentName, rd.reportUrl,
+        student.name, row.assessment.assessmentName, rd.reportUrl,
       ]);
       showSuccessToast(`WhatsApp sent to ${student.name}`);
     } catch (err: any) {
@@ -893,8 +1023,8 @@ const ReportsHubPage: React.FC = () => {
   const handleBulkEmail = () => {
     const selected = getSelectedIds()
       .map((id) => {
-        const s = displayedStudents.find((st) => st.userStudentId === id);
-        const rd = reportDataMap.get(id);
+        const s = actionStudentOf(id);
+        const rd = actionReportOf(id);
         return s && s.email && rd?.reportUrl ? { ...s, reportUrl: rd.reportUrl } : null;
       })
       .filter((s): s is StudentRow & { reportUrl: string } => !!s);
@@ -918,8 +1048,8 @@ const ReportsHubPage: React.FC = () => {
         // Bulk: personalize for each student
         const studentsToSend = composeStudentIds
           .map((id) => {
-            const s = displayedStudents.find((st) => st.userStudentId === id);
-            const rd = reportDataMap.get(id);
+            const s = actionStudentOf(id);
+            const rd = actionReportOf(id);
             return s && s.email ? { name: s.name, email: s.email, reportUrl: rd?.reportUrl || "" } : null;
           })
           .filter((s): s is { name: string; email: string; reportUrl: string } => !!s);
@@ -947,8 +1077,8 @@ const ReportsHubPage: React.FC = () => {
   const handleBulkWhatsApp = async () => {
     const selected = getSelectedIds()
       .map((id) => {
-        const s = displayedStudents.find((st) => st.userStudentId === id);
-        const rd = reportDataMap.get(id);
+        const s = actionStudentOf(id);
+        const rd = actionReportOf(id);
         return s && s.phoneNumber && rd?.reportUrl
           ? { phoneNumber: s.phoneNumber, name: s.name, reportUrl: rd.reportUrl }
           : null;
@@ -970,8 +1100,17 @@ const ReportsHubPage: React.FC = () => {
 
   // ═══════════════════════ STYLES ═══════════════════════
 
-  const thStyle: React.CSSProperties = { padding: "10px 14px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0", whiteSpace: "nowrap", fontSize: "0.85rem" };
-  const tdStyle: React.CSSProperties = { padding: "10px 14px", borderBottom: "1px solid #f0f0f0", whiteSpace: "nowrap", fontSize: "0.85rem" };
+  // Tighter than a default table: the Assessment column is the 13th, and the
+  // whole row has to fit the page width without a horizontal scrollbar.
+  const thStyle: React.CSSProperties = { padding: "9px 8px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0", fontSize: "0.78rem", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" };
+  const tdStyle: React.CSSProperties = { padding: "9px 8px", borderBottom: "1px solid #f0f0f0", fontSize: "0.8rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+  /** Wrapping cell for the two long text columns, so nothing is cut off mid-name. */
+  const tdWrapStyle: React.CSSProperties = { ...tdStyle, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.25 };
+  /** Percentage widths, in column order; the last entry is the admin-only column. */
+  const colWidths = useMemo(() => {
+    const base = ["3%", "3.5%", "12%", "8.5%", "15%", "8%", "8%", "5.5%", "6.5%", "8%", "5%", "9%", "8%"];
+    return adminEditMode ? [...base, "6%"] : base;
+  }, [adminEditMode]);
   const statusBadge = (bg: string, color: string, text: string) => (
     <span style={{ background: bg, color, padding: "3px 10px", borderRadius: 6, fontWeight: 600, fontSize: "0.75rem" }}>{text}</span>
   );
@@ -988,9 +1127,13 @@ const ReportsHubPage: React.FC = () => {
         subtitle={
           ready ? (
             <>
-              <strong>{displayedStudents.length}</strong> students · {selectedAssessmentName}
+              <strong>{displayedStudentCount}</strong> students · <strong>{displayedRows.length}</strong> rows
               {" · "}
-              <strong>{reportStats.generated}</strong> reports generated
+              {shownAssessments.length === 1
+                ? shownAssessments[0].assessmentName
+                : `${shownAssessments.length} assessments`}
+              {" · "}
+              <strong>{reportStats.generated}</strong> reports generated in {selectedAssessmentName || "—"}
             </>
           ) : (
             <>Generate, manage, export, and send reports from one place</>
@@ -1002,14 +1145,14 @@ const ReportsHubPage: React.FC = () => {
             iconClass: "bi-play-circle",
             onClick: openGenerateModal,
             variant: "primary",
-            disabled: !ready || displayedStudents.length === 0,
+            disabled: !ready || actionRows.length === 0,
           },
           {
             label: `Queue${countLabel}`,
             iconClass: "bi-stack",
             onClick: openQueueModal,
             variant: "ghost",
-            disabled: !ready || displayedStudents.length === 0,
+            disabled: !ready || actionRows.length === 0,
           },
           {
             label: "Download ZIP",
@@ -1054,20 +1197,31 @@ const ReportsHubPage: React.FC = () => {
         </div>
         <div>
           <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 6, display: "block" }}>
-            Assessment
+            Assessments
+            {shownAssessments.length > 0 && (
+              <span style={{ fontWeight: 500, color: "#6b7280" }}> · {shownAssessments.length} selected</span>
+            )}
           </label>
           {assessmentsLoading ? (
             <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
+          ) : selectedInstitute !== "" && assessments.length === 0 ? (
+            <div style={{
+              padding: "9px 12px", borderRadius: 8, border: "1px dashed #fcd34d",
+              background: "#fffbeb", color: "#92400e", fontSize: "0.8rem",
+            }}>
+              No assessments are mapped to this school yet.
+            </div>
           ) : (
-            <select className="form-select form-select-solid" value={selectedAssessment}
+            <SearchableMultiSelect
+              options={assessments.map((a) => ({
+                value: String(a.id),
+                label: `${a.assessmentName} [${getReportType(a).toUpperCase()}]`,
+              }))}
+              value={selectedAssessmentIds.map(String)}
+              onChange={(vals) => setSelectedAssessmentIds(vals.map(Number))}
               disabled={selectedInstitute === ""}
-              onChange={(e) => setSelectedAssessment(e.target.value === "" ? "" : Number(e.target.value))}>
-              <option value="">-- Select an assessment --</option>
-              {assessments.map((a) => {
-                const type = getReportType(a);
-                return <option key={a.id} value={a.id}>{a.assessmentName} [{type.toUpperCase()}]</option>;
-              })}
-            </select>
+              placeholder="-- Select one or more assessments --"
+            />
           )}
         </div>
       </div>
@@ -1079,7 +1233,7 @@ const ReportsHubPage: React.FC = () => {
           border: "2px dashed #e5e7eb", borderRadius: 12, background: "#fff",
         }}>
           <div style={{ fontSize: "2rem", marginBottom: 8, opacity: 0.4 }}><i className="bi bi-bar-chart" /></div>
-          <div>Select a school and assessment to get started</div>
+          <div>Select a school and at least one assessment to get started</div>
         </div>
       )}
 
@@ -1096,7 +1250,24 @@ const ReportsHubPage: React.FC = () => {
           }}>
             <span style={{ fontWeight: 700, color: accentColor }}>{selectedInstituteName}</span>
             <span style={{ color: "#cbd5e1" }}>/</span>
-            <span style={{ fontWeight: 600, color: "#1e293b" }}>{selectedAssessmentName}</span>
+            {/* Actions are per assessment, so the bar names the one they act on
+                and lets it be switched without changing what the table shows. */}
+            <span style={{ fontSize: "0.8rem", color: "#475569", fontWeight: 600 }}>Actions on:</span>
+            {shownAssessments.length === 1 ? (
+              <span style={{ fontWeight: 600, color: "#1e293b" }}>{selectedAssessmentName}</span>
+            ) : (
+              <select
+                className="form-select form-select-sm"
+                value={actionAssessmentId === "" ? "" : String(actionAssessmentId)}
+                onChange={(e) => setActionAssessmentId(e.target.value === "" ? "" : Number(e.target.value))}
+                style={{ width: "auto", minWidth: 220, fontSize: "0.82rem", fontWeight: 600 }}
+                title="Generation, sending and the Excel exports run on this assessment; ticked rows of the others are ignored"
+              >
+                {shownAssessments.map((a) => (
+                  <option key={a.id} value={a.id}>{a.assessmentName}</option>
+                ))}
+              </select>
+            )}
             <span style={{
               background: accentColor + "18", color: accentColor,
               padding: "2px 10px", borderRadius: 6, fontWeight: 700, fontSize: "0.75rem",
@@ -1225,10 +1396,18 @@ const ReportsHubPage: React.FC = () => {
                 marginBottom: 12, flexWrap: "wrap", gap: 8,
               }}>
                 <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-                  {displayedStudents.length} student(s)
+                  {displayedRows.length} row(s) · {displayedStudentCount} student(s)
                   {visibleSelectedCount > 0 && (
                     <span style={{ fontWeight: 600, color: accentColor, marginLeft: 8 }}>
-                      ({visibleSelectedCount} selected)
+                      ({visibleSelectedCount} selected in {selectedAssessmentName})
+                    </span>
+                  )}
+                  {otherAssessmentSelectedCount > 0 && (
+                    <span
+                      style={{ color: "#b45309", marginLeft: 8 }}
+                      title="Bulk actions only use rows of the assessment named in 'Actions on'"
+                    >
+                      + {otherAssessmentSelectedCount} ticked in other assessments (not used)
                     </span>
                   )}
                   {adminEditMode && (
@@ -1274,7 +1453,7 @@ const ReportsHubPage: React.FC = () => {
                   </select>
 
                   {/* Generate All → opens the generation modal */}
-                  <button className="btn btn-sm" disabled={displayedStudents.length === 0}
+                  <button className="btn btn-sm" disabled={actionRows.length === 0}
                     onClick={openGenerateModal}
                     style={{
                       background: `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)`,
@@ -1285,7 +1464,7 @@ const ReportsHubPage: React.FC = () => {
                   </button>
 
                   {/* Generate via Kafka queue → report-worker */}
-                  <button className="btn btn-sm btn-light" disabled={displayedStudents.length === 0}
+                  <button className="btn btn-sm btn-light" disabled={actionRows.length === 0}
                     onClick={openQueueModal}
                     style={{ borderRadius: 8, padding: "8px 20px", fontWeight: 600, fontSize: "0.85rem" }}>
                     {`Queue${countLabel}`}
@@ -1362,28 +1541,34 @@ const ReportsHubPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Table */}
-              <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e5e7eb" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              {/* Table — fixed layout with percentage widths so the extra
+                  Assessment column fits on the page instead of pushing the
+                  table into a horizontal scrollbar. */}
+              <div style={{ borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                  <colgroup>
+                    {colWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
+                  </colgroup>
                   <thead>
                     <tr style={{ background: "#f8fafc" }}>
-                      <th style={{ ...thStyle, width: 40 }}>
+                      <th style={thStyle}>
                         <input type="checkbox"
-                          checked={displayedStudents.length > 0 && displayedStudents.every((s) => selectedStudentIds.has(s.userStudentId))}
+                          checked={displayedRows.length > 0 && displayedRows.every((r) => selectedRowKeys.has(r.key))}
                           onChange={(e) => {
-                            setSelectedStudentIds((prev) => {
+                            setSelectedRowKeys((prev) => {
                               const next = new Set(prev);
-                              if (e.target.checked) displayedStudents.forEach((s) => next.add(s.userStudentId));
-                              else displayedStudents.forEach((s) => next.delete(s.userStudentId));
+                              if (e.target.checked) displayedRows.forEach((r) => next.add(r.key));
+                              else displayedRows.forEach((r) => next.delete(r.key));
                               return next;
                             });
                           }} />
                       </th>
-                      <th style={{ ...thStyle, width: 44 }}>#</th>
+                      <th style={thStyle}>#</th>
                       <th style={thStyle}>Name</th>
                       <th style={thStyle}>Username</th>
+                      <th style={thStyle}>Assessment</th>
                       <th style={thStyle}>Status</th>
-                      <th style={thStyle}>Completed On</th>
+                      <th style={thStyle}>Completed</th>
                       <th style={thStyle}>Grade</th>
                       <th style={thStyle}>Section</th>
                       <th style={thStyle}>Report</th>
@@ -1396,15 +1581,15 @@ const ReportsHubPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedStudents.map((s, idx) => {
+                    {paginatedRows.map((row, idx) => {
+                      const s = row.student;
+                      const isActionRow = row.assessment.id === Number(actionAssessmentId);
                       const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
                       const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
-                      const asmtDetail = (s.assessments || []).find(
-                        (a) => a.assessmentId === selectedAssessmentObj!.id
-                      );
-                      const asmtStatus = asmtDetail?.status || "notstarted";
-                      const completedOn = formatCompletedOn(asmtDetail?.completedAt);
-                      const rd = reportDataMap.get(s.userStudentId);
+                      const asmtStatus = row.status;
+                      const completedOn = formatCompletedOn(row.completedAt);
+                      const rd = reportOf(row.assessment.id, s.userStudentId);
+                      const vis = visibilityOf(row.assessment.id, s.userStudentId);
                       const reportStatus = rd?.reportStatus || "notGenerated";
                       const reportUrl = rd?.reportUrl || null;
                       const hasReport = reportStatus === "generated" && !!reportUrl;
@@ -1415,52 +1600,68 @@ const ReportsHubPage: React.FC = () => {
                       const rsc = hasReport ? { bg: "#dcfce7", color: "#059669" } : { bg: "#fef3c7", color: "#d97706" };
 
                       return (
-                        <tr key={s.userStudentId} style={{
-                          background: selectedStudentIds.has(s.userStudentId)
+                        <tr key={row.key} style={{
+                          background: selectedRowKeys.has(row.key)
                             ? accentColor + "08"
                             : globalIdx % 2 === 0 ? "#fff" : "#f9fafb",
                         }}>
                           <td style={tdStyle}>
-                            <input type="checkbox" checked={selectedStudentIds.has(s.userStudentId)}
+                            <input type="checkbox" checked={selectedRowKeys.has(row.key)}
+                              title={isActionRow ? undefined
+                                : `Bulk actions run on ${selectedAssessmentName}; this row is ${row.assessment.assessmentName}`}
                               onChange={(e) => {
-                                const next = new Set(selectedStudentIds);
-                                if (e.target.checked) next.add(s.userStudentId); else next.delete(s.userStudentId);
-                                setSelectedStudentIds(next);
+                                const next = new Set(selectedRowKeys);
+                                if (e.target.checked) next.add(row.key); else next.delete(row.key);
+                                setSelectedRowKeys(next);
                               }} />
                           </td>
                           <td style={tdStyle}>{globalIdx + 1}</td>
-                          <td style={{ ...tdStyle, fontWeight: 600 }}>{s.name || "-"}</td>
-                          <td style={tdStyle}>
+                          <td style={{ ...tdWrapStyle, fontWeight: 600 }}>{s.name || "-"}</td>
+                          <td style={tdStyle} title={s.username || undefined}>
                             {s.username ? (
-                              <span style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>{s.username}</span>
+                              <span style={{ fontFamily: "monospace", fontSize: "0.78rem" }}>{s.username}</span>
                             ) : (
                               <span style={{ color: "#9ca3af", fontStyle: "italic", fontSize: "0.8rem" }}>—</span>
+                            )}
+                          </td>
+                          {/* The assessment this row belongs to; the acting one is marked
+                              so it is obvious which rows the bulk buttons will use. */}
+                          <td style={tdWrapStyle} title={row.assessment.assessmentName}>
+                            <span style={{ fontWeight: isActionRow ? 600 : 400, color: isActionRow ? "#1e293b" : "#64748b" }}>
+                              {row.assessment.assessmentName}
+                            </span>
+                            {isActionRow && shownAssessments.length > 1 && (
+                              <span style={{
+                                marginLeft: 5, padding: "1px 5px", borderRadius: 4, fontSize: "0.62rem",
+                                fontWeight: 700, background: accentColor + "1a", color: accentColor,
+                                whiteSpace: "nowrap",
+                              }}>ACTIONS</span>
                             )}
                           </td>
                           <td style={tdStyle}>{statusBadge(asc.bg, asc.color, asmtStatus)}</td>
                           <td style={tdStyle}>
                             {completedOn ? (
-                              <span title={new Date(asmtDetail!.completedAt!).toLocaleString()}>{completedOn}</span>
+                              <span title={new Date(row.completedAt!).toLocaleString()}>{completedOn}</span>
                             ) : (
                               <span style={{ color: "#9ca3af", fontStyle: "italic", fontSize: "0.8rem" }}>—</span>
                             )}
                           </td>
                           <td style={tdStyle}>{gradeOf(s) || "-"}</td>
-                          <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
+                          <td style={tdStyle} title={secInfo?.sectionName || undefined}>{secInfo?.sectionName || "-"}</td>
                           <td style={tdStyle}>{statusBadge(rsc.bg, rsc.color, hasReport ? "Generated" : "Not Generated")}</td>
                           <td style={tdStyle}>
-                            {visibilityMap.has(s.userStudentId) ? (
+                            {vis ? (
                               <label style={{ position: "relative", display: "inline-block", width: 36, height: 20, cursor: "pointer" }}>
-                                <input type="checkbox" checked={visibilityMap.get(s.userStudentId)!.visible}
-                                  onChange={() => handleToggleVisibility(s.userStudentId)}
+                                <input type="checkbox" checked={vis.visible}
+                                  onChange={() => handleToggleVisibility(row.assessment.id, s.userStudentId)}
                                   style={{ opacity: 0, width: 0, height: 0, position: "absolute" }} />
                                 <span style={{
                                   position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 10,
-                                  background: visibilityMap.get(s.userStudentId)!.visible ? "#059669" : "#d1d5db",
+                                  background: vis.visible ? "#059669" : "#d1d5db",
                                   transition: "background 0.2s",
                                 }}>
                                   <span style={{
-                                    position: "absolute", left: visibilityMap.get(s.userStudentId)!.visible ? 18 : 2, top: 2,
+                                    position: "absolute", left: vis.visible ? 18 : 2, top: 2,
                                     width: 16, height: 16, borderRadius: "50%", background: "#fff",
                                     transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
                                   }} />
@@ -1472,19 +1673,19 @@ const ReportsHubPage: React.FC = () => {
                           </td>
                           <td style={tdStyle}>
                             {reportUrl ? (
-                              <div style={{ display: "flex", gap: 4 }}>
+                              <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
                                 <a href={reportUrl} target="_blank" rel="noopener noreferrer"
                                   style={{
-                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                    padding: "3px 7px", borderRadius: 6, fontSize: "0.7rem",
                                     fontWeight: 600, background: "#dbeafe", color: "#2563eb", textDecoration: "none",
                                   }}>
-                                  Preview
+                                  View
                                 </a>
                                 <button
                                   disabled={downloadingStudentId === s.userStudentId || rd?.pdfStatus !== "ready" || !rd?.pdfUrl}
                                   title={rd?.pdfStatus !== "ready" ? `PDF ${rd?.pdfStatus ?? "not ready"}` : "Download PDF"}
                                   style={{
-                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
+                                    padding: "3px 7px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 600,
                                     background: downloadingStudentId === s.userStudentId ? "#d1d5db" : "#f0fdf4",
                                     color: downloadingStudentId === s.userStudentId ? "#6b7280" : "#059669",
                                     border: "none",
@@ -1507,7 +1708,7 @@ const ReportsHubPage: React.FC = () => {
                                 <button
                                   disabled={downloadingStudentId === s.userStudentId}
                                   style={{
-                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
+                                    padding: "3px 7px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 600,
                                     background: "#f3f4f6", color: "#374151", border: "none", cursor: "pointer",
                                   }}
                                   onClick={async () => {
@@ -1528,14 +1729,14 @@ const ReportsHubPage: React.FC = () => {
                           </td>
                           <td style={{ ...tdStyle, textAlign: "center" }}>
                             {hasReport && (
-                              <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                              <div style={{ display: "flex", gap: 3, justifyContent: "center", flexWrap: "wrap" }}>
                                 <button
                                   className="btn btn-light-primary btn-sm"
                                   disabled={!s.email}
-                                  onClick={() => handleSendEmail(s)}
+                                  onClick={() => handleSendEmail(row)}
                                   title={s.email ? `Email to ${s.email}` : "No email"}
-                                  style={{ padding: "4px 8px", fontSize: "0.7rem", display: "flex", alignItems: "center", gap: 3 }}>
-                                  <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  style={{ padding: "3px 6px", fontSize: "0.68rem", display: "flex", alignItems: "center", gap: 2 }}>
+                                  <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                   </svg>
                                   Email
@@ -1543,10 +1744,10 @@ const ReportsHubPage: React.FC = () => {
                                 <button
                                   className="btn btn-light-success btn-sm"
                                   disabled={!s.phoneNumber || sendingWhatsApp.has(s.userStudentId)}
-                                  onClick={() => handleSendWhatsApp(s)}
+                                  onClick={() => handleSendWhatsApp(row)}
                                   title={s.phoneNumber ? `WhatsApp to ${s.phoneNumber}` : "No phone"}
-                                  style={{ padding: "4px 8px", fontSize: "0.7rem", display: "flex", alignItems: "center", gap: 3 }}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                  style={{ padding: "3px 6px", fontSize: "0.68rem", display: "flex", alignItems: "center", gap: 2 }}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                                   </svg>
                                   WA
@@ -1556,17 +1757,13 @@ const ReportsHubPage: React.FC = () => {
                           </td>
                           {adminEditMode && (
                             <td style={{ ...tdStyle, textAlign: "center" }}>
-                              {selectedAssessmentObj ? (
-                                <button
-                                  className="btn btn-light-warning btn-sm"
-                                  onClick={() => navigate(`/admin-assessment-edit/${selectedAssessmentObj.id}/${s.userStudentId}`)}
-                                  title="View & edit student's assessment"
-                                  style={{ padding: "4px 10px", fontSize: "0.7rem", fontWeight: 600 }}>
-                                  Show
-                                </button>
-                              ) : (
-                                <span style={{ color: "#d1d5db", fontSize: "0.75rem" }}>-</span>
-                              )}
+                              <button
+                                className="btn btn-light-warning btn-sm"
+                                onClick={() => navigate(`/admin-assessment-edit/${row.assessment.id}/${s.userStudentId}`)}
+                                title={`View & edit this student's ${row.assessment.assessmentName}`}
+                                style={{ padding: "3px 8px", fontSize: "0.68rem", fontWeight: 600 }}>
+                                Show
+                              </button>
                             </td>
                           )}
                         </tr>
@@ -1577,7 +1774,7 @@ const ReportsHubPage: React.FC = () => {
               </div>
 
               {/* Pagination — right-aligned "Rows per page: [n]  x - y of z  ‹ ›" bar */}
-              {displayedStudents.length > 0 && (
+              {displayedRows.length > 0 && (
                 <div style={{
                   display: "flex", alignItems: "center", justifyContent: "flex-end",
                   marginTop: 12, gap: 14, flexWrap: "wrap",
@@ -1589,7 +1786,7 @@ const ReportsHubPage: React.FC = () => {
                     {[10, 25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                   <span style={{ fontSize: "0.8rem", color: "#374151" }}>
-                    {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
+                    {(safeCurrentPage - 1) * pageSize + 1} - {Math.min(safeCurrentPage * pageSize, displayedRows.length)} of {displayedRows.length}
                   </span>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
@@ -1625,20 +1822,19 @@ const ReportsHubPage: React.FC = () => {
         onExportPsychometricProperties={handleExportPsychometricProperties}
         onSchoolReport={() => setSchoolReportOpen(true)}
         visibleSelectedCount={visibleSelectedCount}
-        displayedCount={displayedStudents.length}
+        displayedCount={actionRows.length}
       />
 
       <SchoolReportModal
         open={schoolReportOpen}
         onClose={() => setSchoolReportOpen(false)}
-        assessmentId={Number(selectedAssessment) || 0}
+        assessmentId={Number(actionAssessmentId) || 0}
         assessmentName={selectedAssessmentName}
         instituteName={selectedInstituteName}
         instituteCode={Number(selectedInstitute) || 0}
         userStudentIds={
           (() => {
-            const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
-            const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+            const selectedVisible = getSelectedIds();
             return selectedVisible.length > 0 ? selectedVisible : undefined;
           })()
         }
@@ -1808,20 +2004,20 @@ const ReportsHubPage: React.FC = () => {
       )}
 
       {/* Navigator 360 Preview Modal */}
-      {nav360Preview && selectedAssessment && (
+      {nav360Preview && actionAssessmentId !== "" && (
         <Navigator360Preview
           studentId={nav360Preview.studentId}
-          assessmentId={Number(selectedAssessment)}
+          assessmentId={Number(actionAssessmentId)}
           studentName={nav360Preview.studentName}
           onClose={() => setNav360Preview(null)}
         />
       )}
 
       {/* 4-Pager Preview Modal */}
-      {fourPagerPreview && selectedAssessment && (
+      {fourPagerPreview && actionAssessmentId !== "" && (
         <FourPagerPreview
           studentId={fourPagerPreview.studentId}
-          assessmentId={Number(selectedAssessment)}
+          assessmentId={Number(actionAssessmentId)}
           studentName={fourPagerPreview.studentName}
           studentClass={fourPagerPreview.studentClass}
           schoolName={selectedInstituteName}
