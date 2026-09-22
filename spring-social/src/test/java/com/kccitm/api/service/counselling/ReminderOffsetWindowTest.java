@@ -54,7 +54,7 @@ class ReminderOffsetWindowTest {
         assertEquals(Long.valueOf(5L), offsets("COUNSELLOR_OFFSETS").get("T5M"));
         assertEquals(java.util.Arrays.asList("T12H", "T4H", "T2H", "T15M", "T5M"),
                 new ArrayList<>(offsets("STUDENT_OFFSETS").keySet()));
-        assertEquals(java.util.Arrays.asList("T2H", "T15M", "T5M"),
+        assertEquals(java.util.Arrays.asList("T12H", "T2H", "T15M", "T5M"),
                 new ArrayList<>(offsets("COUNSELLOR_OFFSETS").keySet()));
     }
 

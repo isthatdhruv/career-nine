@@ -36,6 +36,7 @@ import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
 import com.kccitm.api.model.career9.counselling.CounsellingRequest;
 import com.kccitm.api.model.career9.school.SchoolClasses;
+import com.kccitm.api.model.career9.school.SchoolSections;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.PromoCodeRepository;
@@ -274,6 +275,23 @@ public class CampaignPublicController {
                 cDto.put("className", sc.getClassName());
                 cDto.put("assessmentId", r.getAssessmentId());
                 cDto.put("sortOrder", r.getSortOrder());
+                // Sections of this class, exactly as the school-registration link
+                // offers them. Optional throughout: a campaign may run for an
+                // institute with no sections set up, and a parent buying from a
+                // public link may not know which one the child is in — an empty
+                // list simply means the page shows no section picker.
+                List<Map<String, Object>> sectionsOut = new ArrayList<>();
+                if (sc.getSchoolSections() != null) {
+                    for (SchoolSections sec : sc.getSchoolSections()) {
+                        Map<String, Object> secDto = new HashMap<>();
+                        secDto.put("sectionId", sec.getId());
+                        secDto.put("sectionName", sec.getSectionName());
+                        sectionsOut.add(secDto);
+                    }
+                }
+                sectionsOut.sort((x, y) -> String.valueOf(x.get("sectionName"))
+                        .compareToIgnoreCase(String.valueOf(y.get("sectionName"))));
+                cDto.put("sections", sectionsOut);
                 // Per-class 18+ flag; in class-mode the SPA uses the selected class's
                 // flag rather than the assessment mapping's.
                 cDto.put("audience18Plus", Boolean.TRUE.equals(r.getAudience18Plus()));
@@ -347,6 +365,10 @@ public class CampaignPublicController {
         // Optional: the class the student picked (class-based campaigns). Persisted
         // as a grade number on StudentInfo so reports resolve the right template.
         Integer classId = intFromBody(body, "classId");
+        // Optional: the section within that class, offered only when the class has
+        // any. Null is normal — campaigns run for institutes with no sections set
+        // up, and a buyer may not know which section the child is in.
+        Integer schoolSectionId = intFromBody(body, "schoolSectionId");
         // DPDP parental consent given on the form (the UI enforces it; older clients omit it).
         boolean dpdpConsent = boolFromBody(body, "dpdpConsent");
 
@@ -415,13 +437,13 @@ public class CampaignPublicController {
         // 6. Free path → inline-provision and return session
         if (finalInr == 0L) {
             return provisionFreeAndRespond(campaign, mapping, tierMapping, pricingTier,
-                    existing, name, email, dob, dobStr, phone, gender, classId,
+                    existing, name, email, dob, dobStr, phone, gender, classId, schoolSectionId,
                     promoCodeSaved, promoDiscountPercent, originalInr, dpdpConsent, httpResponse);
         }
 
         // 7. Paid path → create Razorpay payment link + PaymentTransaction
         return createPaymentAndRedirect(campaign, mapping, tierMapping, pricingTier,
-                name, email, dob, dobStr, phone, gender, classId,
+                name, email, dob, dobStr, phone, gender, classId, schoolSectionId,
                 finalInr, originalInr, promoCodeSaved, promoDiscountPercent, dpdpConsent);
     }
 
@@ -467,6 +489,9 @@ public class CampaignPublicController {
         String phone = strFromBody(body, "phone");
         String gender = strFromBody(body, "gender");
         Integer classId = intFromBody(body, "classId");
+        // Optional throughout: only offered when the chosen class has sections,
+        // and a parent who does not know the section can leave it blank.
+        Integer schoolSectionId = intFromBody(body, "schoolSectionId");
         String studentClass = resolveClassLabel(classId);
         boolean dpdpConsent = boolFromBody(body, "dpdpConsent");
 
@@ -528,6 +553,7 @@ public class CampaignPublicController {
             info.setPhoneNumber(phone);
             info.setGender(gender);
             info.setStudentClass(studentClass);
+            info.setSchoolSectionId(schoolSectionId);
             info.setUser(user);
             info = studentInfoRepository.save(info);
 
@@ -876,7 +902,7 @@ public class CampaignPublicController {
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier, StudentInfo existing,
             String name, String email, Date dob, String dobStr, String phone, String gender,
-            Integer classId,
+            Integer classId, Integer schoolSectionId,
             String promoCodeSaved, Integer promoDiscountPercent, long originalInr,
             boolean dpdpConsent,
             HttpServletResponse httpResponse) {
@@ -1033,7 +1059,7 @@ public class CampaignPublicController {
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier,
             String name, String email, Date dob, String dobStr, String phone, String gender,
-            Integer classId,
+            Integer classId, Integer schoolSectionId,
             long finalInr, long originalInr, String promoCodeSaved, Integer promoDiscountPercent,
             boolean dpdpConsent) {
 
@@ -1054,6 +1080,9 @@ public class CampaignPublicController {
             txn.setAssessmentId(mapping.getAssessmentId());
             txn.setCampaignId(campaign.getCampaignId());
             txn.setCampaignAssessmentTierId(tierMapping.getId());
+            // Durable copy of the picked section: the webhook creates the student
+            // for a paid registration and may redrive without the Razorpay notes.
+            txn.setSchoolSectionId(schoolSectionId);
             txn.setStudentName(name);
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
@@ -1081,6 +1110,10 @@ public class CampaignPublicController {
             notes.put("customerName", name);
             notes.put("customerDob", dobStr);
             notes.put("transactionId", String.valueOf(txn.getTransactionId()));
+            // payment_transaction has no section column, so the chosen section
+            // rides to the webhook on the Razorpay notes — the same way the
+            // school-registration link already carries it.
+            if (schoolSectionId != null) notes.put("schoolSectionId", String.valueOf(schoolSectionId));
 
             Map<String, String> rzpResponse = razorpayService.createPaymentLink(
                     finalInr, "INR", description, callbackUrl, referenceId, notes);

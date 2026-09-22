@@ -377,9 +377,10 @@ public class CounsellingNotificationService {
             }
 
             // The counsellor is deliberately NOT mailed here. They have their own offsets
-            // (2h / 15min) and their own call into sendCounsellorReminderEmail; copying them
-            // on the student's schedule as well handed them the student's 12h and 4h notices
-            // too, so one session produced up to six counsellor emails, two of them duplicates.
+            // (12h / 2h / 15min / 5min) and their own call into sendCounsellorReminderEmail;
+            // copying them on the student's schedule as well sent every offset twice, so one
+            // session produced up to six counsellor emails, two of them duplicates. The
+            // counsellor's own 12h reminder comes from COUNSELLOR_OFFSETS, not from here.
         } catch (Exception e) {
             logger.error("Failed to send reminder email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());

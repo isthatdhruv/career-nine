@@ -265,6 +265,20 @@ public class CampaignController {
                 && (b[2] & 0xFF) == 0xFF;
     }
 
+    /**
+     * The slug a deleted campaign keeps: the original with a {@code -deleted-<id>}
+     * suffix, so the name it was using becomes available again while the row stays
+     * recognisable. Idempotent — deleting twice does not stack suffixes — and
+     * trimmed to the column's 100 characters.
+     */
+    static String releasedSlug(Campaign c) {
+        String slug = c.getSlug() == null ? "" : c.getSlug();
+        String suffix = "-deleted-" + c.getCampaignId();
+        if (slug.endsWith(suffix)) return slug;
+        int room = 100 - suffix.length();
+        return (slug.length() > room ? slug.substring(0, room) : slug) + suffix;
+    }
+
     @PreAuthorize("@auth.allows('campaign.delete')")
     @org.springframework.transaction.annotation.Transactional
     @DeleteMapping("/delete/{id}")
@@ -274,6 +288,13 @@ public class CampaignController {
         Campaign c = opt.get();
         c.setIsDeleted(true);
         c.setIsActive(false);
+        // Hand the slug back. It carries a UNIQUE index and the create check does
+        // not filter deleted rows, so leaving it would reserve the name for ever —
+        // and a deleted campaign is invisible to getAll and 404s on get/update, so
+        // there would be no way left to free it from the admin UI. Deleted
+        // campaigns are unreachable by slug anyway (every public lookup filters on
+        // isDeleted), and nothing keys on slug, so the rename costs nothing.
+        c.setSlug(releasedSlug(c));
         campaignRepository.save(c);
         // CRUD2: cascade-deactivate child mappings + their tiers so a deleted
         // campaign's assessments are no longer registrable or price-resolvable.
