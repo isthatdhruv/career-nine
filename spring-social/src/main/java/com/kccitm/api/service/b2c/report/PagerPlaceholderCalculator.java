@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 
 import com.kccitm.api.model.career9.StudentDemographicResponse;
 import com.kccitm.api.model.career9.StudentInfo;
+import com.kccitm.api.model.career9.DemographicFieldOption;
+import com.kccitm.api.repository.Career9.DemographicFieldOptionRepository;
 import com.kccitm.api.repository.Career9.StudentDemographicResponseRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
@@ -34,10 +36,13 @@ public class PagerPlaceholderCalculator implements PlaceholderCalculator {
     @Autowired private FourPagerEngineService    fourPagerEngineService;
     @Autowired private UserStudentRepository     userStudentRepository;
     @Autowired private StudentDemographicResponseRepository demographicResponseRepository;
+    @Autowired private DemographicFieldOptionRepository demographicFieldOptionRepository;
 
     /** Demographic field ids (created once, reused) for the narrative profile fields. */
     private static final long FIELD_ID_ACHIEVEMENTS = 19L;
     private static final long FIELD_ID_HOBBIES       = 18L;
+    /** "What is your current specialization?" — a SELECT_SINGLE, so it stores an option value. */
+    private static final long FIELD_ID_STREAM        = 8L;
     private static final String FALLBACK_ACHIEVEMENTS = "You have not filled your Achievements";
     private static final String FALLBACK_HOBBIES      = "You have not filled your hobbies";
 
@@ -85,7 +90,35 @@ public class PagerPlaceholderCalculator implements PlaceholderCalculator {
         });
         meta.achievements     = readDemographic(userStudentId, assessmentId, FIELD_ID_ACHIEVEMENTS, FALLBACK_ACHIEVEMENTS);
         meta.hobbiesInterests = readDemographic(userStudentId, assessmentId, FIELD_ID_HOBBIES, FALLBACK_HOBBIES);
+        // Blank rather than a fallback sentence: the career pager only prints the
+        // Stream row when there is one, and a cohort without the field must not
+        // get "You have not filled..." in a one-word slot.
+        meta.stream = streamLabel(readDemographic(userStudentId, assessmentId, FIELD_ID_STREAM, ""));
         return meta;
+    }
+
+    /**
+     * Turns the stored stream answer into what the student actually picked.
+     * {@code student_demographic_response} holds the option <i>value</i> ("2"),
+     * so printing it raw would put a digit on the report; this maps it to the
+     * option label ("Science"). An answer that matches no option is passed
+     * through unchanged, which covers free-text variants of the field.
+     */
+    private String streamLabel(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return "";
+        String v = raw.trim();
+        try {
+            for (DemographicFieldOption o :
+                    demographicFieldOptionRepository.findByFieldDefinitionFieldIdOrderByDisplayOrderAsc(FIELD_ID_STREAM)) {
+                if (v.equalsIgnoreCase(o.getOptionValue()) && o.getOptionLabel() != null) {
+                    return o.getOptionLabel();
+                }
+            }
+        } catch (Exception e) {
+            // Options unavailable — show what the student answered rather than nothing.
+            return v;
+        }
+        return v;
     }
 
     /** Completed years between {@code dob} and today; {@code ""} when DOB is missing or in the future. */

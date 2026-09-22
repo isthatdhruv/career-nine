@@ -688,7 +688,15 @@ public class CampaignController {
         if (req.containsKey("isActive")) route.setIsActive(toBool(req.get("isActive")));
         if (req.containsKey("audience18Plus")) route.setAudience18Plus(toBool(req.get("audience18Plus")));
         route.setIsDeleted(false);
-        if (route.getIsActive() == null) route.setIsActive(true);
+        // Mapping a class means it should be live. The lookup above is by
+        // (campaign, class), so removing a class and adding it back reuses the
+        // same row — and deleteClassRoute leaves isActive=false. Without this the
+        // re-added class saved happily, showed in the admin table, and never
+        // appeared in the registration page's class picker, which skips inactive
+        // routes. Only an explicit isActive in the request overrides.
+        if (!req.containsKey("isActive") || route.getIsActive() == null) {
+            route.setIsActive(true);
+        }
         return ResponseEntity.ok(classRouteRepository.save(route));
     }
 

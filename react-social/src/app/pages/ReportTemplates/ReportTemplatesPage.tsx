@@ -12,6 +12,18 @@ import AssessmentReportTemplateConfig from "./components/AssessmentReportTemplat
 
 const ENGINES = ["bet", "pager", "legacy"];
 
+/**
+ * The template URL with a cache-busting stamp so the link always opens what was
+ * last uploaded rather than whatever the browser cached earlier.
+ */
+function templateHref(t: ReportTemplateDto): string {
+  const url = t.templateSpacesUrl;
+  if (!url) return "#";
+  const v = t.templateUploadedAt ? Date.parse(t.templateUploadedAt) : NaN;
+  if (!v || Number.isNaN(v)) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}v=${v}`;
+}
+
 interface AssessmentOption {
   id: number;
   assessmentName: string;
@@ -190,7 +202,11 @@ const ReportTemplatesPage = () => {
                     <td><span className="badge badge-light-primary">{t.engineCode}</span></td>
                     <td>
                       {t.hasTemplate ? (
-                        <a href={t.templateSpacesUrl ?? "#"} target="_blank" rel="noreferrer">
+                        // Stamped with the upload time: the Spaces object carries no
+                        // Cache-Control, so a browser that fetched the previous version
+                        // keeps serving it from its own cache and "uploaded" opens the
+                        // old HTML. A new upload changes the URL, so the cache misses.
+                        <a href={templateHref(t)} target="_blank" rel="noreferrer">
                           uploaded
                         </a>
                       ) : (

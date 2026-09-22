@@ -166,5 +166,11 @@ public final class Navigator360Models {
         public String reportUrl;
         public String achievements;        // from demographic field_id 19
         public String hobbiesInterests;    // from demographic field_id 18
+        /**
+         * Stream / specialization, from demographic field_id 8 — resolved to its
+         * option label ("Science"), not the stored option value ("2"). Empty for
+         * cohorts whose form has no stream field; only the career pager shows it.
+         */
+        public String stream;
     }
 }
