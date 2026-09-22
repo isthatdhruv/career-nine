@@ -758,6 +758,9 @@ public class PaymentWebhookController {
                 studentInfo.setPhoneNumber(phone);
                 // Grade resolved at registration from the picked class (class-based campaigns).
                 studentInfo.setStudentClass(txn.getStudentClass());
+                // Section picked on the same form, when the class had any. Null is
+                // normal: the picker is optional and many campaigns have no sections.
+                studentInfo.setSchoolSectionId(txn.getSchoolSectionId());
                 studentInfo.setUser(user);
                 studentInfo = studentInfoRepository.save(studentInfo);
 

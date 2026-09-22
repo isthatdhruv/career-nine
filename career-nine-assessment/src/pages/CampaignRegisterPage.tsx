@@ -52,11 +52,18 @@ type Assessment = {
   tiers: Tier[]
 }
 
+type CampaignSection = {
+  sectionId: number
+  sectionName: string
+}
+
 type CampaignClass = {
   classId: number
   className: string
   assessmentId: number
   sortOrder?: number
+  /** Sections of this class. Empty/absent when the institute has none configured. */
+  sections?: CampaignSection[]
   /** true → this class route is an 18+ cohort (class mode's audience flag). */
   audience18Plus?: boolean | null
 }
@@ -100,6 +107,8 @@ const CampaignRegisterPage = () => {
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(aidFromUrl)
   const [selectedTierId, setSelectedTierId] = useState<number | null>(tidFromUrl)
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null)
+  // Optional: only shown when the picked class has sections. Never blocks submit.
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null)
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -201,6 +210,9 @@ const CampaignRegisterPage = () => {
       ? info.classes?.find((c) => c.classId === selectedClassId) || null
       : null
 
+  /** Sections of the picked class; empty when none are configured for it. */
+  const sectionsForClass: CampaignSection[] = selectedClassRoute?.sections ?? []
+
   // 18+ cohorts consent for themselves: class mode takes the flag off the picked
   // class route, deep-link mode off the selected assessment. Nothing picked yet
   // (or a legacy/null flag) → minor copy.
@@ -301,6 +313,7 @@ const CampaignRegisterPage = () => {
       }
       if (!isTryFirst && promoApplied) data.promoCode = promoApplied.code
       if (selectedClassId != null) data.classId = selectedClassId
+      if (selectedSectionId != null) data.schoolSectionId = selectedSectionId
 
       const res = isTryFirst
         ? await registerTrial(info.campaign.slug, selectedAssessment.assessmentId, data)
@@ -471,16 +484,22 @@ const CampaignRegisterPage = () => {
       >
         {/* Class picker (class-based campaigns) — picking a class auto-selects
             its assessment and default tier. */}
-        {showClassPicker && (
+        {(showClassPicker || sectionsForClass.length > 0) && (
           <section>
             <h3 className="reg-section-title">Choose your class</h3>
             <div className="reg-grid">
-              <div>
+              <div style={{ display: showClassPicker ? undefined : "none" }}>
+                <label style={s.label} htmlFor="campaign-class">Class</label>
                 <select
+                  id="campaign-class"
                   value={selectedClassId ?? ""}
                   onChange={(e) => {
                     const cid = e.target.value === "" ? null : Number(e.target.value)
                     const cls = cid == null ? null : info.classes!.find((c) => c.classId === cid) ?? null
+                    // The section list belongs to the class, so a class change
+                    // always drops the previous pick rather than carrying a
+                    // section id that belongs to a different class.
+                    setSelectedSectionId(null)
                     if (cls) {
                       selectClass(cls)
                     } else {
@@ -504,6 +523,31 @@ const CampaignRegisterPage = () => {
                   })}
                 </select>
               </div>
+
+              {/* Section picker — only when this class actually has sections.
+                  Optional: a parent who does not know the section leaves it. */}
+              {sectionsForClass.length > 0 && (
+                <div>
+                  <label style={s.label} htmlFor="campaign-section">Section</label>
+                  <select
+                    id="campaign-section"
+                    value={selectedSectionId ?? ""}
+                    onChange={(e) =>
+                      setSelectedSectionId(e.target.value === "" ? null : Number(e.target.value))
+                    }
+                    style={selectStyle(selectedSectionId ? String(selectedSectionId) : "")}
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                  >
+                    <option value="">Select your section</option>
+                    {sectionsForClass.map((sec) => (
+                      <option key={sec.sectionId} value={sec.sectionId}>
+                        {sec.sectionName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </section>
         )}

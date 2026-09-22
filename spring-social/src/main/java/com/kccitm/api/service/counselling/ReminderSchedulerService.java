@@ -31,8 +31,11 @@ import com.kccitm.api.repository.Career9.counselling.CounsellingReminderSentRepo
  * Multi-offset counselling reminders + the 8pm day-before counsellor digest.
  *
  * Student reminders fire 12h / 4h / 2h / 15min / 5min before the session;
- * counsellor reminders fire 2h / 15min / 5min before. The 5-minute one is the
- * "join now" call. Each (appointment, audience, offset) is
+ * counsellor reminders fire 12h / 2h / 15min / 5min before. The 5-minute one is
+ * the "join now" call. Each audience is mailed once per offset from its own map,
+ * so a counsellor is never copied on the student's schedule as well — that is
+ * what used to produce six counsellor mails for one session. Each
+ * (appointment, audience, offset) is
  * recorded in {@code counselling_reminder_sent} so re-runs never double-send.
  *
  * The offset job runs every 5 minutes (needed for the 15-minute reminder). An
@@ -63,6 +66,7 @@ public class ReminderSchedulerService {
         STUDENT_OFFSETS.put("T2H", 120L);
         STUDENT_OFFSETS.put("T15M", 15L);
         STUDENT_OFFSETS.put("T5M", 5L);
+        COUNSELLOR_OFFSETS.put("T12H", 720L);
         COUNSELLOR_OFFSETS.put("T2H", 120L);
         COUNSELLOR_OFFSETS.put("T15M", 15L);
         COUNSELLOR_OFFSETS.put("T5M", 5L);

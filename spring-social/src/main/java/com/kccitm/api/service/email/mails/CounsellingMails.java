@@ -230,19 +230,25 @@ public final class CounsellingMails {
     public static Mail joinNowStudent(String firstName, Session s) {
         boolean online = s.join != null;
         return Mail.builder()
-            .subject("Your counselling session starts in 5 minutes" + (online ? " &mdash; join now" : ""))
+            // Subjects are plain text — an HTML entity here would reach the inbox
+            // as the literal "&mdash;", so the dash is a real character.
+            .subject("Your counselling session starts in 5 minutes" + (online ? " — join now" : ""))
             .preheader(s.time + ". Your session starts in 5 minutes.")
             .title("Your session starts in " + v("5 minutes")).p(hi(firstName))
             .p("Your counselling session with " + b(s.counsellor) + " starts in " + b("5 minutes") + ". "
                 + (online ? "Please join now so you do not lose any of your session time."
                           : "Please make your way to the venue now."))
             .details(rows(s, false, true))
-            .action(s.join, "Join now").signature().build();
+            // Same facts and the same report link as every earlier reminder — only
+            // the "join a few minutes early" footer is dropped, which at five
+            // minutes out is the message rather than a footnote.
+            .action(s.join, "Join now").links(null, s.report, "Open your assessment report")
+            .signature().build();
     }
     /** The counsellor's copy of the 5-minute call. */
     public static Mail joinNowCounsellor(String counsellorName, String studentName, Session s) {
         boolean online = s.join != null;
-        return Mail.builder().subject("Starting in 5 minutes &mdash; session with " + studentName)
+        return Mail.builder().subject("Starting in 5 minutes — session with " + studentName)
             .preheader(s.time + ". Your session starts in 5 minutes.")
             .title("Starting in " + v("5 minutes") + ": " + v(studentName)).p(hi(counsellorName))
             .p("Your counselling session with " + b(studentName) + " starts in " + b("5 minutes") + ". "

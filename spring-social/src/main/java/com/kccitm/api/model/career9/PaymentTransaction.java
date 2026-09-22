@@ -81,6 +81,16 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "student_class")
     private String studentClass;
 
+    /**
+     * Section chosen on the registration form, when the campaign's class has any.
+     * Optional — null for campaigns whose institute has no sections configured,
+     * and for a buyer who did not know which section the child is in. Kept on the
+     * transaction rather than only in the Razorpay notes so a reconcile redrive,
+     * which may not carry the notes, still provisions the student with a section.
+     */
+    @Column(name = "school_section_id")
+    private Integer schoolSectionId;
+
     @Column(name = "user_student_id")
     private Long userStudentId;
 
@@ -226,6 +236,10 @@ public class PaymentTransaction implements Serializable {
 
     public String getStudentClass() { return studentClass; }
     public void setStudentClass(String studentClass) { this.studentClass = studentClass; }
+
+    public Integer getSchoolSectionId() { return schoolSectionId; }
+
+    public void setSchoolSectionId(Integer schoolSectionId) { this.schoolSectionId = schoolSectionId; }
 
     public Long getUserStudentId() { return userStudentId; }
     public void setUserStudentId(Long userStudentId) { this.userStudentId = userStudentId; }
