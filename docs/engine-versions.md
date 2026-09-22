@@ -7,6 +7,10 @@ tag forces a cache miss — placeholders are recomputed on the next
 
 ## pager
 
+- **pager-v4** (2026-09-22) — added the `stream` placeholder (demographic
+  field_id 8, resolved from the stored option value to its label, e.g.
+  "Science"); blank for cohorts whose form has no stream field.
+
 - **pager-v3** (2026-07-07) — added plain-word level placeholders
   `cp_1..3_level_text`, `mi_1..3_level_text`, `ab_1..4_level_text`
   ("High" / "Moderate" / "Low"), alongside the existing composite
