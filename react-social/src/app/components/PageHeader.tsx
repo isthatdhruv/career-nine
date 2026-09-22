@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, CSSProperties } from "react";
 import { ActionIcon, ActionType } from "./ActionIcon";
 
 const ICON_CLASS_TO_ACTION: Record<string, ActionType> = {
@@ -96,6 +96,12 @@ export type PageHeaderAction = {
   actionType?: ActionType; // Explicit duotone ActionIcon type (takes precedence over iconClass)
   variant?: "primary" | "ghost" | "danger";
   disabled?: boolean;
+  /**
+   * Fixed width in px for buttons whose label changes as the user works — a
+   * live count, or a "Saving..." swap. Without it the button resizes with its
+   * text and shifts every button after it along the row.
+   */
+  minWidth?: number;
 };
 
 const PageHeader: FC<{
@@ -125,6 +131,9 @@ const PageHeader: FC<{
               const variant = a.variant || "ghost";
               const className = `ph-btn ph-btn-${variant}`;
               const resolvedType = a.actionType ?? iconClassToAction(a.iconClass);
+              const sizing: CSSProperties | undefined = a.minWidth
+                ? { width: a.minWidth, justifyContent: "center", overflow: "hidden" }
+                : undefined;
               const iconOnDark = variant === "primary" ? undefined : "#ffffff";
               const content = (
                 <>
@@ -138,7 +147,7 @@ const PageHeader: FC<{
               );
               if (a.href) {
                 return (
-                  <a key={i} href={a.href} className={className}>
+                  <a key={i} href={a.href} className={className} style={sizing}>
                     {content}
                   </a>
                 );
@@ -150,6 +159,7 @@ const PageHeader: FC<{
                   onClick={a.onClick}
                   disabled={a.disabled}
                   className={className}
+                  style={sizing}
                 >
                   {content}
                 </button>

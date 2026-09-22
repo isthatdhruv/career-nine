@@ -337,6 +337,15 @@ public class CounsellingNotificationService {
 
     @Async
     public void sendReminderEmail(CounsellingAppointment appointment, String period) {
+        sendReminderEmail(appointment, period, false);
+    }
+
+    /**
+     * @param joinNow true for the final 5-minute reminder, which uses the
+     *                "join now" mail instead of the standard reminder one.
+     */
+    @Async
+    public void sendReminderEmail(CounsellingAppointment appointment, String period, boolean joinNow) {
         try {
             // The scheduler's label already carries the preposition ("in 12 hours"), so it is
             // used exactly once here. The old subject and title prepended another "in", which
@@ -347,8 +356,11 @@ public class CounsellingNotificationService {
             // studentSession: a report held for counsellor release must not ride along on them.
             String studentEmail = studentEmail(appointment);
             String studentName = studentName(appointment);
-            Mail studentMail = CounsellingMails.reminderStudent(
-                    AccountMails.firstName(studentName), period, studentView(s, appointment));
+            Mail studentMail = joinNow
+                    ? CounsellingMails.joinNowStudent(
+                            AccountMails.firstName(studentName), studentView(s, appointment))
+                    : CounsellingMails.reminderStudent(
+                            AccountMails.firstName(studentName), period, studentView(s, appointment));
 
             // The WhatsApp rides with the mail rather than being sent beside it, so both leave
             // in the same dispatch. It carries the student's number and the parent's, and is
@@ -380,6 +392,12 @@ public class CounsellingNotificationService {
      */
     @Async
     public void sendCounsellorReminderEmail(CounsellingAppointment appointment, String period) {
+        sendCounsellorReminderEmail(appointment, period, false);
+    }
+
+    /** @param joinNow true for the final 5-minute reminder. */
+    @Async
+    public void sendCounsellorReminderEmail(CounsellingAppointment appointment, String period, boolean joinNow) {
         try {
             Counsellor counsellor = appointment.getCounsellor();
             if (counsellor == null) return;
@@ -395,9 +413,13 @@ public class CounsellingNotificationService {
             wa.forAddress(email, counsellor.getPhone());
 
             sendMail(EmailType.COUNSELLING_NOTIFICATION, email,
-                    CounsellingMails.reminderCounsellor(
-                            AccountMails.firstName(counsellor.getName()),
-                            studentName(appointment), period, session(appointment)),
+                    joinNow
+                        ? CounsellingMails.joinNowCounsellor(
+                                AccountMails.firstName(counsellor.getName()),
+                                studentName(appointment), session(appointment))
+                        : CounsellingMails.reminderCounsellor(
+                                AccountMails.firstName(counsellor.getName()),
+                                studentName(appointment), period, session(appointment)),
                     wa);
         } catch (Exception e) {
             logger.error("Failed to send counsellor reminder for appointment ID: {}. Error: {}",
@@ -573,6 +595,23 @@ public class CounsellingNotificationService {
             }
             String name = appointment.getStudent().getInstitute().getInstituteName();
             return (name != null && !name.isBlank()) ? name : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * The student's class as they are enrolled, e.g. "10", "10-A", "1st Year". Stored verbatim
+     * on StudentInfo, so it is shown as entered rather than parsed into a grade number.
+     * Null when the student has no profile or no class on it; the mails then omit the row.
+     */
+    public String studentClassFor(CounsellingAppointment appointment) {
+        try {
+            if (appointment.getStudent() == null || appointment.getStudent().getStudentInfo() == null) {
+                return null;
+            }
+            String cls = appointment.getStudent().getStudentInfo().getStudentClass();
+            return (cls != null && !cls.isBlank()) ? cls : null;
         } catch (Exception e) {
             return null;
         }
@@ -857,13 +896,29 @@ public class CounsellingNotificationService {
      */
     @Async
     public void notifyStudentReminder(CounsellingAppointment appointment, String whenLabel) {
-        sendReminderEmail(appointment, whenLabel);
+        sendReminderEmail(appointment, whenLabel, false);
+    }
+
+    /**
+     * As above, but {@code joinNow} swaps in the 5-minute "join now" wording.
+     * Same recipients, same WhatsApp campaign and same dedupe key, so the
+     * last reminder travels the paths every earlier one already uses.
+     */
+    @Async
+    public void notifyStudentReminder(CounsellingAppointment appointment, String whenLabel, boolean joinNow) {
+        sendReminderEmail(appointment, whenLabel, joinNow);
     }
 
     /** The same, to the counsellor, on the counsellor's own offsets. */
     @Async
     public void notifyCounsellorReminder(CounsellingAppointment appointment, String whenLabel) {
-        sendCounsellorReminderEmail(appointment, whenLabel);
+        sendCounsellorReminderEmail(appointment, whenLabel, false);
+    }
+
+    /** The counsellor's copy of the 5-minute "join now" call. */
+    @Async
+    public void notifyCounsellorReminder(CounsellingAppointment appointment, String whenLabel, boolean joinNow) {
+        sendCounsellorReminderEmail(appointment, whenLabel, joinNow);
     }
 
     /**
@@ -1431,7 +1486,7 @@ public class CounsellingNotificationService {
         MailLink report = reportUrl == null ? null : mailLinks.of(reportUrl, "report");
         return new CounsellingMails.Session(date, time, duration,
                 a.getCounsellor() != null ? a.getCounsellor().getName() : null, mode,
-                instituteNameFor(a), assessmentNameFor(a), studentName(a), join, report);
+                instituteNameFor(a), studentClassFor(a), assessmentNameFor(a), studentName(a), join, report);
     }
 
     /**
@@ -1456,7 +1511,7 @@ public class CounsellingNotificationService {
     private CounsellingMails.Session studentView(CounsellingMails.Session s, CounsellingAppointment a) {
         if (s.report == null || !isHeldForCounsellorRelease(a)) return s;
         return new CounsellingMails.Session(s.date, s.time, s.duration, s.counsellor, s.mode,
-                s.school, s.assessment, s.student, s.join, null);
+                s.school, s.studentClass, s.assessment, s.student, s.join, null);
     }
 
     /**

@@ -1106,6 +1106,18 @@ const ReportsHubPage: React.FC = () => {
   const tdStyle: React.CSSProperties = { padding: "9px 8px", borderBottom: "1px solid #f0f0f0", fontSize: "0.8rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
   /** Wrapping cell for the two long text columns, so nothing is cut off mid-name. */
   const tdWrapStyle: React.CSSProperties = { ...tdStyle, whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.25 };
+  /**
+   * The action bar must not reflow when something is clicked. Every button gets
+   * a fixed width, so a changing label — "Generate (0)" to "Generate (12)",
+   * "Release" to "..." — cannot resize it and shove its neighbours along; the
+   * text is centred and clipped inside that fixed box instead.
+   */
+  const actionBtn = (width: number): React.CSSProperties => ({
+    width, flex: `0 0 ${width}px`, boxSizing: "border-box",
+    padding: "8px 6px", borderRadius: 8, fontWeight: 600, fontSize: "0.85rem",
+    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center",
+  });
+
   /** Percentage widths, in column order; the last entry is the admin-only column. */
   const colWidths = useMemo(() => {
     const base = ["3%", "3.5%", "12%", "8.5%", "15%", "8%", "8%", "5.5%", "6.5%", "8%", "5%", "9%", "8%"];
@@ -1145,6 +1157,8 @@ const ReportsHubPage: React.FC = () => {
             iconClass: "bi-play-circle",
             onClick: openGenerateModal,
             variant: "primary",
+            // Pinned: the label carries a live selection count.
+            minWidth: 148,
             disabled: !ready || actionRows.length === 0,
           },
           {
@@ -1152,6 +1166,7 @@ const ReportsHubPage: React.FC = () => {
             iconClass: "bi-stack",
             onClick: openQueueModal,
             variant: "ghost",
+            minWidth: 128,
             disabled: !ready || actionRows.length === 0,
           },
           {
@@ -1395,7 +1410,13 @@ const ReportsHubPage: React.FC = () => {
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 marginBottom: 12, flexWrap: "wrap", gap: 8,
               }}>
-                <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+                {/* Fixed flex basis + clipping: the selection caption grows and
+                    shrinks as rows are ticked, and must not move the buttons. */}
+                <span style={{
+                  fontSize: "0.85rem", color: "#6b7280",
+                  flex: "1 1 240px", minWidth: 0,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
                   {displayedRows.length} row(s) · {displayedStudentCount} student(s)
                   {visibleSelectedCount > 0 && (
                     <span style={{ fontWeight: 600, color: accentColor, marginLeft: 8 }}>
@@ -1420,13 +1441,13 @@ const ReportsHubPage: React.FC = () => {
                     </span>
                   )}
                 </span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0, justifyContent: "flex-end" }}>
                   {/* Mira Desai */}
                   <button className="btn btn-sm" onClick={() => setMiraDesaiOpen(true)}
                     style={{
+                      ...actionBtn(118),
                       background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                      border: "none", borderRadius: 8, padding: "8px 20px",
-                      fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      border: "none", color: "white",
                       boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
                     }}>
                     Mira Desai
@@ -1435,11 +1456,14 @@ const ReportsHubPage: React.FC = () => {
                   {/* Report template picker (default preselected) */}
                   <select
                     className="form-select form-select-sm"
-                    style={{ width: "auto", minWidth: 200, borderRadius: 8, fontSize: "0.85rem" }}
+                    style={{ ...actionBtn(230), padding: "8px 6px", fontWeight: 500, textAlign: "left" }}
                     value={selectedTemplateId}
                     onChange={(e) => setSelectedTemplateId(e.target.value === "" ? "" : Number(e.target.value))}
                     disabled={templates.length === 0}
-                    title={templates.length === 0 ? "No template mapped to this assessment" : "Template to generate"}
+                    title={templates.length === 0
+                      ? "No template mapped to this assessment"
+                      // The box is a fixed width, so a long name is clipped — keep it readable here.
+                      : `Template to generate: ${templates.find((m) => m.template.reportTemplateId === selectedTemplateId)?.template.displayName ?? ""}`}
                   >
                     {templates.length === 0 ? (
                       <option value="">No template mapped</option>
@@ -1456,9 +1480,9 @@ const ReportsHubPage: React.FC = () => {
                   <button className="btn btn-sm" disabled={actionRows.length === 0}
                     onClick={openGenerateModal}
                     style={{
+                      ...actionBtn(122),
                       background: `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)`,
-                      border: "none", borderRadius: 8, padding: "8px 20px",
-                      fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      border: "none", color: "white",
                     }}>
                     {`Generate${countLabel}`}
                   </button>
@@ -1466,7 +1490,7 @@ const ReportsHubPage: React.FC = () => {
                   {/* Generate via Kafka queue → report-worker */}
                   <button className="btn btn-sm btn-light" disabled={actionRows.length === 0}
                     onClick={openQueueModal}
-                    style={{ borderRadius: 8, padding: "8px 20px", fontWeight: 600, fontSize: "0.85rem" }}>
+                    style={actionBtn(104)}>
                     {`Queue${countLabel}`}
                   </button>
 
@@ -1474,9 +1498,9 @@ const ReportsHubPage: React.FC = () => {
                   <button className="btn btn-sm" disabled={reportStats.generated === 0}
                     onClick={handleDownloadZipClick}
                     style={{
+                      ...actionBtn(128),
                       background: reportStats.generated === 0 ? "#6c757d" : "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
-                      border: "none", borderRadius: 8, padding: "8px 20px",
-                      fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      border: "none", color: "white",
                     }}>
                     Download ZIP
                   </button>
@@ -1484,13 +1508,14 @@ const ReportsHubPage: React.FC = () => {
                   {/* Downloads Manager */}
                   <button className="btn btn-sm" onClick={() => setDownloadsOpen(true)}
                     style={{
+                      ...actionBtn(116),
                       background: activeZipJobs.length > 0
                         ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
                         : "#f3f4f6",
-                      border: activeZipJobs.length > 0 ? "none" : "1px solid #d1d5db",
-                      borderRadius: 8, padding: "8px 16px",
-                      fontWeight: 600, color: activeZipJobs.length > 0 ? "white" : "#374151",
-                      fontSize: "0.85rem", position: "relative",
+                      // Keep the border on both states so the box never changes size.
+                      border: activeZipJobs.length > 0 ? "1px solid transparent" : "1px solid #d1d5db",
+                      color: activeZipJobs.length > 0 ? "white" : "#374151",
+                      position: "relative", overflow: "visible",
                     }}>
                     Downloads
                     {zipJobs.length > 0 && (
@@ -1510,18 +1535,18 @@ const ReportsHubPage: React.FC = () => {
                   <button className="btn btn-sm" disabled={togglingVisibility || reportStats.generated === 0}
                     onClick={() => handleBulkVisibility(true)}
                     style={{
+                      ...actionBtn(116),
                       background: togglingVisibility ? "#6c757d" : "linear-gradient(135deg, #059669 0%, #047857 100%)",
-                      border: "none", borderRadius: 8, padding: "8px 20px",
-                      fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      border: "none", color: "white",
                     }}>
                     {togglingVisibility ? "..." : `Release${countLabel}`}
                   </button>
                   <button className="btn btn-sm" disabled={togglingVisibility || reportStats.generated === 0}
                     onClick={() => handleBulkVisibility(false)}
                     style={{
+                      ...actionBtn(82),
                       background: togglingVisibility ? "#6c757d" : "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
-                      border: "none", borderRadius: 8, padding: "8px 20px",
-                      fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      border: "none", color: "white",
                     }}>
                     {togglingVisibility ? "..." : "Hide"}
                   </button>
@@ -1531,9 +1556,9 @@ const ReportsHubPage: React.FC = () => {
                     onClick={() => setBulkSendOpen(true)}
                     disabled={reportStats.generated === 0}
                     style={{
+                      ...actionBtn(112),
                       background: reportStats.generated === 0 ? "#6c757d" : "linear-gradient(135deg, #e11d48 0%, #be123c 100%)",
-                      border: "none", borderRadius: 8, padding: "8px 20px",
-                      fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      border: "none", color: "white",
                       boxShadow: reportStats.generated === 0 ? "none" : "0 4px 12px rgba(225, 29, 72, 0.3)",
                     }}>
                     Bulk Send

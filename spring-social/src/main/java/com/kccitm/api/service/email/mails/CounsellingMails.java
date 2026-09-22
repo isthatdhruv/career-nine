@@ -16,11 +16,12 @@ public final class CounsellingMails {
 
     /** The facts of a session, already formatted. Nullable fields are simply not shown. */
     public static final class Session {
-        public final String date, time, duration, counsellor, mode, school, assessment, student;
+        public final String date, time, duration, counsellor, mode, school, studentClass, assessment, student;
         public final MailLink join, report;
-        public Session(String date, String time, String duration, String counsellor, String mode, String school, String assessment, String student, MailLink join, MailLink report) {
+        public Session(String date, String time, String duration, String counsellor, String mode, String school, String studentClass, String assessment, String student, MailLink join, MailLink report) {
             this.date = date; this.time = time; this.duration = duration; this.counsellor = counsellor; this.mode = mode;
-            this.school = school; this.assessment = assessment; this.student = student; this.join = join; this.report = report;
+            this.school = school; this.studentClass = studentClass; this.assessment = assessment;
+            this.student = student; this.join = join; this.report = report;
         }
     }
     /**
@@ -29,8 +30,13 @@ public final class CounsellingMails {
      * line entirely rather than leaving a stray empty paragraph.
      */
     static String schoolNote(Session s) {
-        return (s == null || s.school == null || s.school.trim().isEmpty())
-                ? null : "School: " + b(s.school);
+        if (s == null) return null;
+        boolean hasSchool = s.school != null && !s.school.trim().isEmpty();
+        boolean hasClass = s.studentClass != null && !s.studentClass.trim().isEmpty();
+        if (!hasSchool && !hasClass) return null;
+        if (!hasClass) return "School: " + b(s.school);
+        if (!hasSchool) return "Class: " + b(s.studentClass);
+        return "School: " + b(s.school) + " &middot; Class: " + b(s.studentClass);
     }
 
     static Mail.Row[] rows(Session s, boolean withStudent, boolean withSchool) {
@@ -38,7 +44,10 @@ public final class CounsellingMails {
         if (withStudent) r.add(new Mail.Row("Student", s.student));
         // School only: the assessment name was dropped from these tables deliberately -
         // a parent reading a session reminder needs to know which school, not which test.
-        if (withSchool) r.add(new Mail.Row("School", s.school));
+        if (withSchool) {
+            r.add(new Mail.Row("School", s.school));
+            r.add(new Mail.Row("Class", s.studentClass));
+        }
         r.add(new Mail.Row("Date", s.date)); r.add(new Mail.Row("Time", s.time));
         r.add(new Mail.Row("Counsellor", s.counsellor)); r.add(new Mail.Row("Mode", s.mode));
         return r.toArray(new Mail.Row[0]);
@@ -77,7 +86,7 @@ public final class CounsellingMails {
             .preheader(s.date + " at " + s.time + ". Join link inside.")
             .title("Your counselling session is confirmed").p(hi(firstName))
             .p("Your counselling session has been confirmed.")
-            .details(new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Duration", s.duration == null ? null : s.duration + " minutes"), new Mail.Row("Mode", s.mode))
+            .details(new Mail.Row("School", s.school), new Mail.Row("Class", s.studentClass), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Duration", s.duration == null ? null : s.duration + " minutes"), new Mail.Row("Mode", s.mode))
             .action(s.join, "Join the session").small(EARLY).signature().build();
     }
 
@@ -120,7 +129,7 @@ public final class CounsellingMails {
             .preheader("The " + s.time + " session on " + s.date + " has been cancelled.")
             .title("A counselling session has been cancelled").p(hi(counsellorName))
             .p("The counselling session with " + b(studentName) + " on " + b(s.date) + " at " + b(s.time) + " has been cancelled by the Career-9 team.")
-            .details(new Mail.Row("Student", studentName), new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time))
+            .details(new Mail.Row("Student", studentName), new Mail.Row("School", s.school), new Mail.Row("Class", s.studentClass), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time))
             .action(portal, "Open my dashboard").small("Nothing is required from you.").signature().build();
     }
 
@@ -139,6 +148,7 @@ public final class CounsellingMails {
         List<Mail.Row> r = new ArrayList<>();
         if (withStudent) r.add(new Mail.Row("Student", s.student));
         r.add(new Mail.Row("School", s.school));
+        r.add(new Mail.Row("Class", s.studentClass));
         r.add(new Mail.Row("Previously", old.date + ", " + old.time));
         r.add(new Mail.Row("New date", s.date)); r.add(new Mail.Row("New time", s.time));
         r.add(new Mail.Row("Counsellor", s.counsellor)); r.add(new Mail.Row("Mode", s.mode));
@@ -172,7 +182,7 @@ public final class CounsellingMails {
             .p(s.join != null
                     ? "A different counsellor, " + b(newCounsellor) + ", will now be taking it, so please use the updated joining link below."
                     : "A different counsellor, " + b(newCounsellor) + ", will now be taking it. The venue is unchanged; the details are below.")
-            .details(new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time),
+            .details(new Mail.Row("School", s.school), new Mail.Row("Class", s.studentClass), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time),
                      new Mail.Row("Counsellor", newCounsellor), new Mail.Row("Mode", s.mode));
         if (s.join != null) m.action(s.join, "Join the session").small(EARLY);
         return m.signature().build();
@@ -208,12 +218,44 @@ public final class CounsellingMails {
             .p("This is a reminder that your counselling session is " + b(whenLabel) + ".").details(rows(s, false, true))
             .action(s.join, "Join the session").links(null, s.report, "Open your assessment report").small(EARLY).signature().build();
     }
+    /**
+     * The last call before the session — sent 5 minutes out. It drops the "join
+     * a few minutes early" footer the earlier reminders carry, since by now that
+     * is the whole message, and asks for the one thing still left to do.
+     *
+     * <p>An in-person session has no meeting link ({@code s.join} is null for
+     * OFFLINE), so telling that student to "join now" would be wrong — they are
+     * pointed at the venue instead, and no button is rendered.
+     */
+    public static Mail joinNowStudent(String firstName, Session s) {
+        boolean online = s.join != null;
+        return Mail.builder()
+            .subject("Your counselling session starts in 5 minutes" + (online ? " &mdash; join now" : ""))
+            .preheader(s.time + ". Your session starts in 5 minutes.")
+            .title("Your session starts in " + v("5 minutes")).p(hi(firstName))
+            .p("Your counselling session with " + b(s.counsellor) + " starts in " + b("5 minutes") + ". "
+                + (online ? "Please join now so you do not lose any of your session time."
+                          : "Please make your way to the venue now."))
+            .details(rows(s, false, true))
+            .action(s.join, "Join now").signature().build();
+    }
+    /** The counsellor's copy of the 5-minute call. */
+    public static Mail joinNowCounsellor(String counsellorName, String studentName, Session s) {
+        boolean online = s.join != null;
+        return Mail.builder().subject("Starting in 5 minutes &mdash; session with " + studentName)
+            .preheader(s.time + ". Your session starts in 5 minutes.")
+            .title("Starting in " + v("5 minutes") + ": " + v(studentName)).p(hi(counsellorName))
+            .p("Your counselling session with " + b(studentName) + " starts in " + b("5 minutes") + ". "
+                + (online ? "Please join now." : "Please be at the venue now."))
+            .details(new Mail.Row("Student", studentName), new Mail.Row("School", s.school), new Mail.Row("Class", s.studentClass), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Mode", s.mode))
+            .action(s.join, "Join now").signature().build();
+    }
     public static Mail reminderCounsellor(String counsellorName, String studentName, String whenLabel, Session s) {
         return Mail.builder().subject("Reminder: session " + whenLabel + " with " + studentName)
             .preheader(s.date + ", " + s.time + ". Join link inside.")
             .title("Session " + v(whenLabel) + ": " + v(studentName)).p(hi(counsellorName))
             .p("You have a counselling session " + b(whenLabel) + " with " + b(studentName) + ".")
-            .details(new Mail.Row("Student", studentName), new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Mode", s.mode))
+            .details(new Mail.Row("Student", studentName), new Mail.Row("School", s.school), new Mail.Row("Class", s.studentClass), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Mode", s.mode))
             .action(s.join, "Join the session").small(EARLY).signature().build();
     }
     public static Mail sessionComplete(String firstName, MailLink referral) {
@@ -254,7 +296,7 @@ public final class CounsellingMails {
             .title("Your check-in code").p(hi(firstName))
             .p("Read the code below out to your counsellor to start your counselling session.")
             .code(code, "Check-in code")
-            .details(new Mail.Row("School", s.school), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Counsellor", s.counsellor))
+            .details(new Mail.Row("School", s.school), new Mail.Row("Class", s.studentClass), new Mail.Row("Date", s.date), new Mail.Row("Time", s.time), new Mail.Row("Counsellor", s.counsellor))
             .action(s.join, "Join the session")
             .small("This is the same 4-digit code printed on your Career-9 report. Please don&rsquo;t share it with anyone else; it is what records you as present.").signature().build();
     }

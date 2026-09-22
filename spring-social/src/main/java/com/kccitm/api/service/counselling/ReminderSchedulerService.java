@@ -30,8 +30,9 @@ import com.kccitm.api.repository.Career9.counselling.CounsellingReminderSentRepo
 /**
  * Multi-offset counselling reminders + the 8pm day-before counsellor digest.
  *
- * Student reminders fire 12h / 4h / 2h / 15min before the session; counsellor
- * reminders fire 2h / 15min before. Each (appointment, audience, offset) is
+ * Student reminders fire 12h / 4h / 2h / 15min / 5min before the session;
+ * counsellor reminders fire 2h / 15min / 5min before. The 5-minute one is the
+ * "join now" call. Each (appointment, audience, offset) is
  * recorded in {@code counselling_reminder_sent} so re-runs never double-send.
  *
  * The offset job runs every 5 minutes (needed for the 15-minute reminder). An
@@ -61,9 +62,23 @@ public class ReminderSchedulerService {
         STUDENT_OFFSETS.put("T4H", 240L);
         STUDENT_OFFSETS.put("T2H", 120L);
         STUDENT_OFFSETS.put("T15M", 15L);
+        STUDENT_OFFSETS.put("T5M", 5L);
         COUNSELLOR_OFFSETS.put("T2H", 120L);
         COUNSELLOR_OFFSETS.put("T15M", 15L);
+        COUNSELLOR_OFFSETS.put("T5M", 5L);
     }
+
+    /**
+     * The last reminder before the session: "starts in 5 minutes, join now".
+     * It carries its own mail wording rather than the standard reminder copy.
+     *
+     * <p>Its window is the only one narrower than {@link #WINDOW_MIN}: at a
+     * 5-minute offset the usual 7-minute window would reach back into the
+     * 15-minute reminder's, and the job runs every 5 minutes anyway, so a
+     * 5-minute window still cannot skip it.
+     */
+    private static final String JOIN_NOW = "T5M";
+    private static final long JOIN_NOW_WINDOW_MIN = 5;
 
     private static final Map<String, String> LABELS = new LinkedHashMap<>();
     static {
@@ -71,6 +86,7 @@ public class ReminderSchedulerService {
         LABELS.put("T4H", "in 4 hours");
         LABELS.put("T2H", "in 2 hours");
         LABELS.put("T15M", "in 15 minutes");
+        LABELS.put("T5M", "in 5 minutes");
     }
 
     /**
@@ -234,7 +250,8 @@ public class ReminderSchedulerService {
     }
 
     private boolean due(long minutesUntil, long offset) {
-        return minutesUntil <= offset && minutesUntil > offset - WINDOW_MIN;
+        long window = offset <= JOIN_NOW_WINDOW_MIN ? JOIN_NOW_WINDOW_MIN : WINDOW_MIN;
+        return minutesUntil <= offset && minutesUntil > offset - window;
     }
 
     /** Records a send; returns false if it was already recorded (idempotent). */
@@ -253,13 +270,13 @@ public class ReminderSchedulerService {
 
     private void sendStudent(CounsellingAppointment a, String offsetCode) {
         String label = LABELS.getOrDefault(offsetCode, "soon");
-        notificationService.notifyStudentReminder(a, label);
+        notificationService.notifyStudentReminder(a, label, JOIN_NOW.equals(offsetCode));
         createInApp(a, true, offsetCode, label);
     }
 
     private void sendCounsellor(CounsellingAppointment a, String offsetCode) {
         String label = LABELS.getOrDefault(offsetCode, "soon");
-        notificationService.notifyCounsellorReminder(a, label);
+        notificationService.notifyCounsellorReminder(a, label, JOIN_NOW.equals(offsetCode));
         createInApp(a, false, offsetCode, label);
     }
 
@@ -273,11 +290,14 @@ public class ReminderSchedulerService {
                 if (a.getCounsellor() == null || a.getCounsellor().getUser() == null) return;
                 target = a.getCounsellor().getUser();
             }
+            boolean joinNow = JOIN_NOW.equals(offsetCode);
             notificationService.createInAppNotification(
                     target,
                     "REMINDER_" + offsetCode,
-                    "Counselling Session " + label,
-                    "Reminder: your counselling session is " + label + ".",
+                    joinNow ? "Your session starts in 5 minutes" : "Counselling Session " + label,
+                    joinNow
+                            ? "Your counselling session starts in 5 minutes — join now."
+                            : "Reminder: your counselling session is " + label + ".",
                     a.getId(),
                     "APPOINTMENT");
         } catch (Exception e) {

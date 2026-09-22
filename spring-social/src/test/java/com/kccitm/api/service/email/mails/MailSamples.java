@@ -11,7 +11,7 @@ import com.kccitm.api.service.email.theme.MailLinks;
 public final class MailSamples {
     public static final String SHORT = "https://api.career-9.com/s/Kx7Pq2M";
     static final String FIRST = "Aarav", STUDENT = "Aarav Sharma", COUNSELLOR = "Priya Iyer", ASSESSMENT = "Career Discovery Assessment",
-            SCHOOL = "Delhi Public School, Noida", DATE = "Thursday, 18 Sep 2026", TIME = "4:30 – 5:00 PM IST", MODE = "Online (Google Meet)";
+            SCHOOL = "Delhi Public School, Noida", STUDENT_CLASS = "10-A", DATE = "Thursday, 18 Sep 2026", TIME = "4:30 – 5:00 PM IST", MODE = "Online (Google Meet)";
     private MailSamples() { }
 
     /** What MailLinks.of would produce for this url, without a database. */
@@ -56,8 +56,8 @@ public final class MailSamples {
         m.put("b2c-dashboard-access", EntitlementMails.dashboardAccess(FIRST, L("https://dashboard.career-9.com/student/sso?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79")));
         m.put("b2c-lms-access", EntitlementMails.learningAccess(FIRST, L("https://dashboard.career-9.com/lms/launch?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79")));
         m.put("b2c-counselling-book-link", EntitlementMails.bookingLink(FIRST, L("https://dashboard.career-9.com/counselling/book?t=Ew-aWvPgNTh-0ZyMkdeKiBR6XH3WMdcL1RyRpWMP&e=79")));
-        CounsellingMails.Session S = new CounsellingMails.Session(DATE, TIME, "30", COUNSELLOR, MODE, SCHOOL, ASSESSMENT, STUDENT, JOIN, REPORT);
-        CounsellingMails.Session OLD = new CounsellingMails.Session("Tuesday, 16 Sep 2026", "3:00 – 3:30 PM IST", "30", COUNSELLOR, MODE, SCHOOL, ASSESSMENT, STUDENT, null, null);
+        CounsellingMails.Session S = new CounsellingMails.Session(DATE, TIME, "30", COUNSELLOR, MODE, SCHOOL, STUDENT_CLASS, ASSESSMENT, STUDENT, JOIN, REPORT);
+        CounsellingMails.Session OLD = new CounsellingMails.Session("Tuesday, 16 Sep 2026", "3:00 – 3:30 PM IST", "30", COUNSELLOR, MODE, SCHOOL, STUDENT_CLASS, ASSESSMENT, STUDENT, null, null);
         MailLink RESCHEDULE = L("https://assessment.career-9.com/counselling-reschedule/eyJhbGciOiJIUzI1NiJ9.eyJhIjoxfQ.sig");
         m.put("counselling-booking-confirmation", CounsellingMails.bookingConfirmation(FIRST, S, L("https://calendar.google.com/calendar/render?action=TEMPLATE&text=Career-9+Counselling&dates=20260918T110000Z/20260918T113000Z")));
         m.put("counselling-assigned-to-counsellor", CounsellingMails.assignedToCounsellor(COUNSELLOR, "Wants help choosing a stream after Class 10", S, PORTAL));
@@ -71,7 +71,7 @@ public final class MailSamples {
         m.put("counselling-rescheduled", CounsellingMails.rescheduledStudent(FIRST, OLD, S));
         m.put("counselling-rescheduled-counsellor", CounsellingMails.rescheduledCounsellor(COUNSELLOR, STUDENT, OLD, S));
         m.put("counselling-counsellor-swapped", CounsellingMails.counsellorSwapped(FIRST, S, "Rohit Verma"));
-        CounsellingMails.Session OFFLINE = new CounsellingMails.Session(DATE, TIME, "30", COUNSELLOR, "In-person · Room 204, Main Block", SCHOOL, ASSESSMENT, STUDENT, null, null);
+        CounsellingMails.Session OFFLINE = new CounsellingMails.Session(DATE, TIME, "30", COUNSELLOR, "In-person · Room 204, Main Block", SCHOOL, STUDENT_CLASS, ASSESSMENT, STUDENT, null, null);
         m.put("counselling-counsellor-swapped-in-person", CounsellingMails.counsellorSwapped(FIRST, OFFLINE, "Rohit Verma"));
         m.put("counselling-session-shifted", CounsellingMails.sessionShifted(FIRST, S, "3:00 – 3:30 PM IST", RESCHEDULE));
         m.put("counsellor-deactivated-student", CounsellingMails.counsellorDeactivatedStudent(FIRST, S, RESCHEDULE));
@@ -90,7 +90,7 @@ public final class MailSamples {
         m.put("counselling-dispute-outcome-upheld", CounsellingMails.disputeOutcome(FIRST, DATE, true, null, SESSIONS));
         m.put("counselling-session-summary-student", CounsellingMails.summaryStudent(FIRST, S, "Read your report before the session so you can bring your questions."));
         m.put("counselling-session-summary-counsellor", CounsellingMails.summaryCounsellor(COUNSELLOR, S, "Please read the report before the session."));
-        CounsellingMails.Session UNASSIGNED = new CounsellingMails.Session(DATE, TIME, "30", null, MODE, SCHOOL, ASSESSMENT, STUDENT, JOIN, REPORT);
+        CounsellingMails.Session UNASSIGNED = new CounsellingMails.Session(DATE, TIME, "30", null, MODE, SCHOOL, STUDENT_CLASS, ASSESSMENT, STUDENT, JOIN, REPORT);
         m.put("counselling-session-summary-student-no-counsellor", CounsellingMails.summaryStudent(FIRST, UNASSIGNED, "Read your report before the session so you can bring your questions."));
         m.put("counsellor-deactivated-notice", CounsellingMails.counsellorDeactivated(COUNSELLOR, "Your 4 upcoming sessions have been reassigned or returned to the students to rebook."));
         m.put("counsellor-deactivated-admin-alert", InternalMails.counsellorDeactivatedAlert(COUNSELLOR, "priya.iyer@career-9.net", "Admin",
