@@ -394,7 +394,7 @@ public class FourPagerEngineService {
 
     /** Keys mirrored from {@code FOUR_PAGER_PLACEHOLDER_KEYS} in FourPagerTypes.ts. */
     public static final List<String> PLACEHOLDER_KEYS = Arrays.asList(
-        "student_name", "grade", "age", "school_name", "school_city",
+        "student_name", "grade", "age", "school_name", "school_city", "stream",
         "report_date", "qr_code", "qr_image_url",
         "holland_code", "ability_aggregate",
         "cp_1", "cp_1_level", "cp_1_level_text", "cp_1_desc",
@@ -448,6 +448,7 @@ public class FourPagerEngineService {
         out.put("grade", nz(s.studentClass, r.studentClass));
         out.put("age", s.age != null ? s.age : "");
         out.put("school_name", nz(s.schoolName, ""));
+        out.put("stream", nz(s.stream, ""));
         out.put("school_city", nz(s.schoolCity, ""));
         out.put("report_date", todayLabel());
         out.put("qr_code", nz(s.reportUrl, ""));
