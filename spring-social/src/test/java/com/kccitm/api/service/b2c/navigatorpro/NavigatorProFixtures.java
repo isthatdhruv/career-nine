@@ -15,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** In-memory Navigator Pro questionnaire on the September bank shape, built from the construct map. */
+/** In-memory Navigator Pro questionnaire on the v3 instrument shape, built from the construct map. */
 public final class NavigatorProFixtures {
 
     public final NavigatorProConstructMap map = new NavigatorProConstructMap();
@@ -23,6 +23,11 @@ public final class NavigatorProFixtures {
     public final Map<Long, List<OptionScoreBasedOnMEasuredQualityTypes>> scoresByOptionId = new HashMap<>();
     public final Map<String, List<QuestionnaireQuestion>> byConstruct = new LinkedHashMap<>();
     public QuestionnaireQuestion ranking;
+    public QuestionnaireQuestion aspiration;
+    /** Value tags in option order of the ranking question (Core Algorithm sheet 3 column order). */
+    public static final List<String> VALUE_TAGS = List.of("Curiosity", "Autonomy", "Learning", "Stability",
+            "Pay & benefits", "Structure", "Helping people", "Family respect", "Purpose", "Recognition",
+            "Advancement", "Influence");
 
     private long nextQuestion = 100;
     private long nextOption = 1000;
@@ -36,6 +41,7 @@ public final class NavigatorProFixtures {
             }
         }
         f.ranking = f.rankingQuestion();
+        f.aspiration = f.aspirationQuestion();
         return f;
     }
 
@@ -85,13 +91,9 @@ public final class NavigatorProFixtures {
         q.setQuestionType("ranking");
         q.setQuestionText("Choose the four that matter most");
         List<AssessmentQuestionOptions> opts = new ArrayList<>();
-        for (String text : NavigatorProContent.VALUE_TEXTS) {
-            AssessmentQuestionOptions o = new AssessmentQuestionOptions();
-            o.setOptionId(nextOption++);
-            o.setOptionText(text);
-            o.setQuestion(q);
-            o.setOptionScores(new ArrayList<>());
-            opts.add(o);
+        for (String tag : VALUE_TAGS) {
+            String text = NavigatorProContent.defaults().value(tag).orElseThrow().option;
+            opts.add(taggedOption(q, text, tag));
         }
         q.setOptions(opts);
         QuestionnaireQuestion qq = new QuestionnaireQuestion();
@@ -100,6 +102,48 @@ public final class NavigatorProFixtures {
         nextQuestion++;
         questions.add(qq);
         return qq;
+    }
+
+    private QuestionnaireQuestion aspirationQuestion() {
+        AssessmentQuestions q = new AssessmentQuestions();
+        q.setQuestionId(nextQuestion);
+        q.setQuestionType("multiple-choice");
+        q.setQuestionText("Which 2 or 3 of these areas would you most like to explore this year?");
+        List<AssessmentQuestionOptions> opts = new ArrayList<>();
+        for (String d : NavigatorProConstructMap.DOMAIN_KEYS) opts.add(taggedOption(q, map.label(d), "Aspiration"));
+        q.setOptions(opts);
+        QuestionnaireQuestion qq = new QuestionnaireQuestion();
+        qq.setQuestionnaireQuestionId(10_000 + nextQuestion);
+        qq.setQuestion(q);
+        nextQuestion++;
+        questions.add(qq);
+        return qq;
+    }
+
+    /** An option scoring 1 under {@code mqtName} (value tag or Aspiration). */
+    private AssessmentQuestionOptions taggedOption(AssessmentQuestions q, String text, String mqtName) {
+        MeasuredQualityTypes mqt = new MeasuredQualityTypes();
+        mqt.setMeasuredQualityTypeName(mqtName);
+        AssessmentQuestionOptions o = new AssessmentQuestionOptions();
+        o.setOptionId(nextOption++);
+        o.setOptionText(text);
+        o.setQuestion(q);
+        OptionScoreBasedOnMEasuredQualityTypes s = new OptionScoreBasedOnMEasuredQualityTypes();
+        s.setScore(1);
+        s.setMeasuredQualityType(mqt);
+        s.setQuestion_option(o);
+        o.setOptionScores(new ArrayList<>(List.of(s)));
+        scoresByOptionId.put(o.getOptionId(), new ArrayList<>(List.of(s)));
+        return o;
+    }
+
+    /** Aspiration rows: one per picked domain key. */
+    public List<AssessmentAnswer> aspirationAnswers(UserStudent us, String... domainKeys) {
+        List<AssessmentAnswer> out = new ArrayList<>();
+        for (String d : domainKeys) {
+            out.add(answer(us, aspiration, NavigatorProConstructMap.DOMAIN_KEYS.indexOf(d)));
+        }
+        return out;
     }
 
     /** What OptionScoreBasedOnMeasuredQualityTypesRepository.findByOptionIdIn would return. */

@@ -40,13 +40,22 @@ class NavigatorProNormsTest {
     }
 
     @Test
-    void rag_usesRawThresholds() {
+    void rag_usesRawThresholdsOnThePrintedInteger() {
         assertThat(NavigatorProNorms.ragBand(67)).isEqualTo("Strong");
+        assertThat(NavigatorProNorms.ragBand(66.67)).isEqualTo("Strong");     // prints 67 (v3 sample)
         assertThat(NavigatorProNorms.ragColour(67)).isEqualTo("green");
         assertThat(NavigatorProNorms.ragBand(66.4)).isEqualTo("Developing");
         assertThat(NavigatorProNorms.ragColour(34)).isEqualTo("amber");
-        assertThat(NavigatorProNorms.ragBand(33.9)).isEqualTo("Early");
+        assertThat(NavigatorProNorms.ragBand(33.4)).isEqualTo("Early");
+        assertThat(NavigatorProNorms.ragBand(33.33)).isEqualTo("Early");
         assertThat(NavigatorProNorms.ragColour(0)).isEqualTo("red");
+    }
+
+    @Test
+    void familyBand_highMidLow() {
+        assertThat(NavigatorProNorms.familyBand(66.67)).isEqualTo("High");
+        assertThat(NavigatorProNorms.familyBand(50)).isEqualTo("Mid");
+        assertThat(NavigatorProNorms.familyBand(33.33)).isEqualTo("Low");
     }
 
     @Test
@@ -65,9 +74,9 @@ class NavigatorProNormsTest {
     @Test
     void zone_treatsTheCutAsAbove() {
         assertThat(NavigatorProNorms.zone(50, 50, 50, 50)).isEqualTo("Ready to accelerate");
-        assertThat(NavigatorProNorms.zone(60, 40, 50, 50)).isEqualTo("Driven, still building");
-        assertThat(NavigatorProNorms.zone(40, 60, 50, 50)).isEqualTo("Skilled, needs a spark");
-        assertThat(NavigatorProNorms.zone(40, 40, 50, 50)).isEqualTo("Starting the journey");
+        assertThat(NavigatorProNorms.zone(60, 40, 50, 50)).isEqualTo("Motivated, needs skilling");
+        assertThat(NavigatorProNorms.zone(40, 60, 50, 50)).isEqualTo("Capable, needs engagement");
+        assertThat(NavigatorProNorms.zone(40, 40, 50, 50)).isEqualTo("Needs structured support");
     }
 
     @Test

@@ -1,0 +1,592 @@
+{
+  "_source": "NavigatorPro_Backend_Content_v3.xlsx (Content v3, Sept 2026). Generated verbatim; edit copy here, never in code.",
+  "static": {
+    "cover_title": "Navigator Pro — your career starting map",
+    "cover_caption": "Your profile is your unique constellation. No two students share this shape.",
+    "p2_title": "Your starting point",
+    "p2_intro": "Four numbers that show where you are today — and every one of them can move.",
+    "ring_will": "your inner drive",
+    "ring_foundation": "22 everyday habits",
+    "ring_skill": "self-rated, 12 areas",
+    "ring_logic": "5 objective checks",
+    "top_strip": "YOUR TOP 3 DIRECTIONS* — #1 {top1} · #2 {top2} · #3 {top3} — details on page 4",
+    "factors_heading": "Your three will factors, against the batch",
+    "factor_line_suffix": "raw {r}/100",
+    "mentor_capture": "Beyond the assessment (filled in with your mentor): Hobbies and interests · Achievements",
+    "how_to_read": "How to read this report, {first}: scores describe behaviour, and behaviour moves; your assessment next year measures what changed. * Specialisation and sector mappings are being validated with industry practitioners; treat direction outputs as doors to explore with your counsellor. Counselling is part of this programme, not an add-on.",
+    "p3_title": "Where you stand today",
+    "axis_caption": "Acquired skill → (↑ Will). Lines at provisional batch cut-lines until cohort medians land",
+    "families_heading": "Your six work personality Domains",
+    "values_heading": "What matters to you: your top four values",
+    "values_intro": "You chose these four out of twelve. We used them — 20% of the recipe — when ranking your directions on the next page.",
+    "p4_title": "Your direction",
+    "p4_heading": "Where your profile points*",
+    "ranking_caption": "Ranked from your own answers: interests 40% + what you have tried 40% + what you want from work 20%. A low rank only means you have not explored that area yet — worth trying, not closed.",
+    "divider_label": "THE OTHER NINE, IN YOUR ORDER",
+    "counsellor_callout": "Talk this list through with your counsellor — start with the top three, and ask about any row that surprises you. This ranking is your starting order, not a verdict.",
+    "habits_heading": "Your everyday work habits",
+    "checks_label": "Everyday logic — five checks:",
+    "p5_title": "What next",
+    "p5_intro": "One page, one plan — everything here feeds Reading 2, where we measure what moved.",
+    "p5_heading": "Suggestions picked for you*",
+    "p5_intro_2": "Based on your profile, these are the kind of project and internships you would actually enjoy — and finish.",
+    "qr_block": "Scan to open the Career-9 Career Library — every specialisation explained: what the work is, India pathways, and what to build first.",
+    "method_note": "Method and fine print: self-report from one sitting plus five objectively scored checks; every band derives from batch percentiles; the direction ranking is guidance, not prescription; reports generate only after built-in response-quality checks pass.",
+    "agenda_line": "Everything on this page feeds your assessment next year, where we measure what moved. Bring it to your counselling session — this page is the agenda."
+  },
+  "factorLines": {
+    "f_id": "how strongly you start on your own, without being pushed",
+    "f_st": "your staying power when work gets long or boring",
+    "f_ae": "how you adjust and still finish when things change"
+  },
+  "zones": {
+    "Ready to accelerate": {
+      "paragraph": "You are motivated and you already have real skills — a strong place to start from. Now push: join a competition, apply for an internship, pick up a certification. Act this semester, while the momentum is yours.",
+      "means": "you are strong on both sides",
+      "first": "keep both moving with harder challenges",
+      "do": "join one competition or start one certification this semester"
+    },
+    "Motivated, needs skilling": {
+      "paragraph": "You are motivated — and that is the hard part, which you already have. Your skills just need practice and time. Start building this semester: one small project will teach you more than any lecture, and your next report will show the jump.",
+      "means": "your Will is high; your skill needs work",
+      "first": "skill — work on it first",
+      "do": "do one guided project in your #1 direction this semester"
+    },
+    "Capable, needs engagement": {
+      "paragraph": "You have real skills — do not doubt that. What is missing right now is a reason to use them. More classes will not give you that; a problem you actually care about will. Pick one and give it four honest weeks.",
+      "means": "your skill is real; your Will needs a push",
+      "first": "Will — work on it first",
+      "do": "pick one problem you care about and spend four weeks on it"
+    },
+    "Needs structured support": {
+      "paragraph": "Your motivation and skills are both at the start line — and that is fine, because everyone starts somewhere. Your plan is simple: finish one small task every week. Small wins, done regularly, grow both faster than you expect.",
+      "means": "both are at the starting line — normal in first year",
+      "first": "Will first, in small steps",
+      "do": "finish one small task you chose yourself, every week"
+    }
+  },
+  "familyBullets": {
+    "Hands-on": {
+      "High": [
+        "You learn fastest by building and handling real things.",
+        "Labs, workshops and site visits are your natural classrooms."
+      ],
+      "Mid": [
+        "Practical work engages you when it connects to something concrete.",
+        "One small build each semester keeps this muscle growing."
+      ],
+      "Low": [
+        "Hands-on work has not pulled you yet, and that is worth testing, not assuming.",
+        "Try one small build this semester before deciding it is not for you."
+      ]
+    },
+    "Analytical": {
+      "High": [
+        "You dig into why things work, not just how.",
+        "Data, puzzles and root causes energise rather than drain you."
+      ],
+      "Mid": [
+        "You analyse well when the question matters to you.",
+        "Pick problems you personally care about and the depth follows."
+      ],
+      "Low": [
+        "Deep theory costs you energy right now.",
+        "Enter analysis through practice: measure something real, then ask why."
+      ]
+    },
+    "Creative": {
+      "High": [
+        "You naturally look for the better version of everything you touch.",
+        "Design, improvement and originality are where you add value fastest."
+      ],
+      "Mid": [
+        "You enjoy improving what exists more than inventing from zero.",
+        "Redesign tasks and upgrades are your creative sweet spot."
+      ],
+      "Low": [
+        "Original-design work is not your fuel today, and that is fine.",
+        "Borrow proven templates first; creativity can be trained through remixing."
+      ]
+    },
+    "People-focused": {
+      "High": [
+        "You do your best work with and for people.",
+        "Teaching, mentoring and team roles multiply your impact."
+      ],
+      "Mid": [
+        "You work well with people in small doses and structured settings.",
+        "Team roles suit you when responsibilities are clearly divided."
+      ],
+      "Low": [
+        "People-heavy roles will cost you more energy than building does.",
+        "Plan recovery time around group work rather than avoiding it."
+      ]
+    },
+    "Enterprising": {
+      "High": [
+        "You are comfortable pitching, persuading and taking charge.",
+        "Competitions, clubs and startups are your stage: use them early."
+      ],
+      "Mid": [
+        "You can lead and pitch when the stakes feel worth it.",
+        "Volunteer to present your team’s work once a semester."
+      ],
+      "Low": [
+        "Leading and selling do not pull you yet.",
+        "Let your work speak first; influence can come through craft."
+      ]
+    },
+    "Organized": {
+      "High": [
+        "You finish what you start: documented, on time, properly.",
+        "Systems, checklists and quality work come naturally to you."
+      ],
+      "Mid": [
+        "You keep order when the structure is given to you.",
+        "Adopt one planning tool and your finishing rate jumps."
+      ],
+      "Low": [
+        "Loose ends accumulate around you right now.",
+        "One weekly review habit changes this faster than any app."
+      ]
+    }
+  },
+  "values": {
+    "Curiosity": {
+      "icon": "🔍",
+      "option": "Work that keeps me curious and interested",
+      "why": "You want work that stays interesting. Look for roles with variety and new problems — routine will bore you fast."
+    },
+    "Autonomy": {
+      "icon": "🕊️",
+      "option": "Freedom to decide how I do my work",
+      "why": "You do your best work when the result matters more than the process. Projects, research and startups suit you."
+    },
+    "Learning": {
+      "icon": "📚",
+      "option": "Work where I keep learning new things",
+      "why": "Careers now reward learning speed over degrees. This value predicts thriving in changing fields."
+    },
+    "Stability": {
+      "icon": "🛡️",
+      "option": "A steady job I can count on for years",
+      "why": "You value a base you can build a life on. Government, PSU and established-industry routes deserve your attention."
+    },
+    "Pay & benefits": {
+      "icon": "💰",
+      "option": "Good pay and benefits",
+      "why": "Honest and practical. Pair it with a growth value so comfort never becomes golden handcuffs."
+    },
+    "Structure": {
+      "icon": "📋",
+      "option": "Clear expectations and a predictable routine",
+      "why": "You work best when the goal is clear. Quality, operations and process roles are built exactly this way."
+    },
+    "Helping people": {
+      "icon": "🤝",
+      "option": "Work that makes life better for other people",
+      "why": "You need to see who your work helps. Pick roles where the user is a person, not a number."
+    },
+    "Family respect": {
+      "icon": "🏠",
+      "option": "Work that my family and community respect",
+      "why": "Recognition at home matters to you — a real motivator, not a weakness. Discuss respected pathways with your counsellor."
+    },
+    "Purpose": {
+      "icon": "🌍",
+      "option": "Work that serves something bigger than myself",
+      "why": "Purpose beyond self is the most durable motivator on hard days."
+    },
+    "Recognition": {
+      "icon": "🏅",
+      "option": "Being recognised as good at what I do",
+      "why": "You grow fastest where good work is visible. Build a portfolio — let the work speak where you can point at it."
+    },
+    "Advancement": {
+      "icon": "📈",
+      "option": "Moving up to positions of greater responsibility",
+      "why": "You want a ladder, not just a job. Ask about growth paths before you join anything."
+    },
+    "Influence": {
+      "icon": "🎯",
+      "option": "Having influence over decisions that matter",
+      "why": "You want a say in what gets built. Consulting, product and leadership tracks reward this early."
+    }
+  },
+  "pathways": {
+    "Software Development": [
+      {
+        "pathway": "Product companies & GCC engineering roles",
+        "type": "Core industry",
+        "firstStep": "Ship 2 portfolio projects; DSA basics"
+      },
+      {
+        "pathway": "AI-application engineering (LLM apps, automation)",
+        "type": "Emerging sector",
+        "firstStep": "Build one AI-powered tool end to end"
+      },
+      {
+        "pathway": "Tech startup / freelancing",
+        "type": "Startup",
+        "firstStep": "Freelance one real client project in year 2"
+      }
+    ],
+    "Data & AI": [
+      {
+        "pathway": "Data analyst → data scientist track",
+        "type": "Core industry",
+        "firstStep": "Excel + SQL + one dashboard project"
+      },
+      {
+        "pathway": "AI/ML engineering, model deployment",
+        "type": "Emerging sector",
+        "firstStep": "One ML project with real data, deployed"
+      },
+      {
+        "pathway": "Research → MS/M.Tech in AI",
+        "type": "Higher study",
+        "firstStep": "Maintain CGPA; one faculty research assistantship"
+      }
+    ],
+    "Systems & Infrastructure": [
+      {
+        "pathway": "Cloud & DevOps engineering",
+        "type": "Core industry",
+        "firstStep": "One cloud certification (free tier practice)"
+      },
+      {
+        "pathway": "Data-centre & AI-infrastructure operations",
+        "type": "Emerging sector",
+        "firstStep": "Linux + networking fundamentals"
+      },
+      {
+        "pathway": "Govt digital infrastructure (NIC, PSU IT)",
+        "type": "Govt / PSU",
+        "firstStep": "GATE-CS awareness from year 3"
+      }
+    ],
+    "Cybersecurity": [
+      {
+        "pathway": "Security operations & audit (banks, GCCs)",
+        "type": "Core industry",
+        "firstStep": "TryHackMe basics; one CTF"
+      },
+      {
+        "pathway": "Product security / bug bounty",
+        "type": "Emerging sector",
+        "firstStep": "One responsible-disclosure report"
+      },
+      {
+        "pathway": "Defence & national cyber agencies",
+        "type": "Govt / PSU",
+        "firstStep": "Track CDAC/DRDO cyber openings"
+      }
+    ],
+    "Product & UX Design": [
+      {
+        "pathway": "UX design in product companies",
+        "type": "Core industry",
+        "firstStep": "Portfolio: redesign 2 real apps"
+      },
+      {
+        "pathway": "Design for AI products & voice/vernacular UX",
+        "type": "Emerging sector",
+        "firstStep": "One vernacular-first design case study"
+      },
+      {
+        "pathway": "Design entrepreneurship / agency",
+        "type": "Startup",
+        "firstStep": "Freelance 2 student-club or MSME briefs"
+      }
+    ],
+    "Electronics & Embedded": [
+      {
+        "pathway": "Semiconductor design & verification (ISM units)",
+        "type": "Emerging sector",
+        "firstStep": "Verilog basics; one FPGA mini-project"
+      },
+      {
+        "pathway": "Embedded/IoT product firms",
+        "type": "Core industry",
+        "firstStep": "2 microcontroller builds with sensors"
+      },
+      {
+        "pathway": "ISRO/DRDO/BEL via GATE-EC",
+        "type": "Govt / PSU",
+        "firstStep": "GATE syllabus map from year 2"
+      }
+    ],
+    "Power & Energy": [
+      {
+        "pathway": "Renewables & green hydrogen",
+        "type": "Emerging sector",
+        "firstStep": "Solar plant visit + one energy-audit project"
+      },
+      {
+        "pathway": "Power grid & utilities (NTPC, PGCIL, DISCOM)",
+        "type": "Govt / PSU",
+        "firstStep": "GATE-EE track; utility internship"
+      },
+      {
+        "pathway": "EV charging & battery systems",
+        "type": "Emerging sector",
+        "firstStep": "One BMS or charger teardown study"
+      }
+    ],
+    "Mechanical Design & Manufacturing": [
+      {
+        "pathway": "EV & automotive manufacturing (incl. ancillaries)",
+        "type": "Core industry",
+        "firstStep": "CAD certification + one manufacturing internship"
+      },
+      {
+        "pathway": "Defence & aerospace (HAL, DRDO, private space)",
+        "type": "Emerging sector",
+        "firstStep": "GATE-ME awareness; aeromodelling/rocketry club"
+      },
+      {
+        "pathway": "Robotics & industrial automation",
+        "type": "Emerging sector",
+        "firstStep": "One robot build; PLC basics"
+      }
+    ],
+    "Civil & Structural": [
+      {
+        "pathway": "Infrastructure & construction majors",
+        "type": "Core industry",
+        "firstStep": "Site internship year 2; AutoCAD"
+      },
+      {
+        "pathway": "Railways, metro & national infra (via GATE/ESE)",
+        "type": "Govt / PSU",
+        "firstStep": "ESE/GATE-CE track from year 3"
+      },
+      {
+        "pathway": "Green buildings & sustainable design",
+        "type": "Emerging sector",
+        "firstStep": "IGBC student membership; one audit project"
+      }
+    ],
+    "Process & Chemical": [
+      {
+        "pathway": "Chemical & pharma manufacturing",
+        "type": "Core industry",
+        "firstStep": "One plant visit + process-flow project"
+      },
+      {
+        "pathway": "Biotech & bioprocess industry",
+        "type": "Emerging sector",
+        "firstStep": "One fermentation/bioreactor mini-study"
+      },
+      {
+        "pathway": "PSU refineries (IOCL, ONGC via GATE-CH)",
+        "type": "Govt / PSU",
+        "firstStep": "GATE-CH track"
+      }
+    ],
+    "Quality, Testing & Operations": [
+      {
+        "pathway": "Manufacturing quality & Six Sigma roles",
+        "type": "Core industry",
+        "firstStep": "Yellow-belt basics; one 5S project"
+      },
+      {
+        "pathway": "Software QA & test automation",
+        "type": "Core industry",
+        "firstStep": "Selenium/pytest on one app"
+      },
+      {
+        "pathway": "Supply chain & operations analytics",
+        "type": "Emerging sector",
+        "firstStep": "One logistics case study with data"
+      }
+    ],
+    "Technical Business & Consulting": [
+      {
+        "pathway": "Tech consulting & analyst programmes",
+        "type": "Core industry",
+        "firstStep": "Case-prep club; one live business project"
+      },
+      {
+        "pathway": "Product management track",
+        "type": "Emerging sector",
+        "firstStep": "Run one student product end to end"
+      },
+      {
+        "pathway": "Entrepreneurship (incubator route)",
+        "type": "Startup",
+        "firstStep": "Join campus E-cell; one revenue experiment"
+      }
+    ]
+  },
+  "projects": {
+    "Software Development": {
+      "Build": "Build a working attendance or mess-menu app for your hostel — 3 screens, real users, feedback logged.",
+      "Design/People": "Redesign your college website's worst page and user-test it with 10 students; ship the before/after.",
+      "Business/Ops": "Map every manual process in one college office and prototype the simplest digital fix for one."
+    },
+    "Data & AI": {
+      "Build": "Scrape or download AKTU/placement public data and build one chart that answers a question students actually ask.",
+      "Design/People": "Turn one Indian public dataset (census, UDISE) into a 5-slide data story a non-technical person understands.",
+      "Business/Ops": "Take one messy public dataset, clean it, document every step, and publish the tidy version."
+    },
+    "Systems & Infrastructure": {
+      "Build": "Set up a home/hostel server (old laptop) running two services; document uptime for 4 weeks.",
+      "Design/People": "Write a plain-language \"how our college WiFi actually works\" explainer after interviewing the IT cell.",
+      "Business/Ops": "Inventory one lab's systems and produce a maintenance checklist the lab assistant adopts."
+    },
+    "Cybersecurity": {
+      "Build": "Complete 10 rooms on a free CTF platform and write up 3 solutions.",
+      "Design/People": "Run a phishing-awareness session for one class; measure before/after with a 5-question quiz.",
+      "Business/Ops": "Do a password-hygiene audit template for a small shop or family business."
+    },
+    "Product & UX Design": {
+      "Build": "Clone one popular app screen in Figma, then improve it; post both with your reasoning.",
+      "Design/People": "Interview 10 first-years about one campus pain-point; design a paper prototype and test it.",
+      "Business/Ops": "Audit one government website for usability; document 5 fixes with mockups."
+    },
+    "Electronics & Embedded": {
+      "Build": "One Arduino/ESP32 build that senses something real in your hostel (water level, noise) — logged for 2 weeks.",
+      "Design/People": "Build a demo kit that explains one sensor to school students; run one session.",
+      "Business/Ops": "Cost and source a BOM for a simple IoT product from Indian suppliers; document the supply map."
+    },
+    "Power & Energy": {
+      "Build": "Measure one building's energy pattern (meter readings, appliance census) and model one saving.",
+      "Design/People": "Make a one-page solar explainer for your locality with real tariff numbers; discuss with 5 households.",
+      "Business/Ops": "Audit the college's EB bill pattern and propose one load-shift saving with numbers."
+    },
+    "Mechanical Design & Manufacturing": {
+      "Build": "Disassemble one appliance, CAD 3 parts, and 3D-print or fabricate one improvement.",
+      "Design/People": "Design an assistive jig or fixture for one campus task; get one user to try it.",
+      "Business/Ops": "Time-study one canteen/workshop process and redesign the layout on paper; simulate the saving."
+    },
+    "Civil & Structural": {
+      "Build": "Survey and map one campus drainage/path problem; propose a costed fix with sketches.",
+      "Design/People": "Document accessibility gaps on campus with photos and a priority list; present to admin.",
+      "Business/Ops": "Quantity-estimate one small campus structure from drawings; compare with actuals."
+    },
+    "Process & Chemical": {
+      "Build": "Build a small filtration/fermentation rig at hostel scale; log parameters for 3 weeks.",
+      "Design/People": "Create a safety-poster series for one lab after interviewing the lab staff.",
+      "Business/Ops": "Map the material flow of one mess/canteen and propose one waste-reduction with numbers."
+    },
+    "Quality, Testing & Operations": {
+      "Build": "Write a test plan for one college app/form; execute it and log every defect found.",
+      "Design/People": "Design a feedback system for one campus service; run it for a month and report.",
+      "Business/Ops": "5S one lab or storeroom; photograph before/after and measure retrieval time."
+    },
+    "Technical Business & Consulting": {
+      "Build": "Build a simple cost calculator (sheet or app) for one local business; get them to use it.",
+      "Design/People": "Case-study one campus startup or vendor: interviews, unit economics, one recommendation.",
+      "Business/Ops": "Run a mini market survey (50 responses) for a real local business decision; present findings to the owner."
+    }
+  },
+  "internships": {
+    "Software Development": [
+      "SDE intern at a GCC or startup",
+      "Web/app development internship",
+      "Open-source contribution sprint"
+    ],
+    "Data & AI": [
+      "Data-analyst intern (fintech/e-comm)",
+      "ML model-evaluation & annotation internship",
+      "Business-intelligence internship"
+    ],
+    "Systems & Infrastructure": [
+      "Cloud/DevOps trainee at an IT services firm",
+      "Data-centre operations internship",
+      "Network admin internship on campus"
+    ],
+    "Cybersecurity": [
+      "SOC (security operations) trainee",
+      "VAPT internship with a security firm",
+      "Bank IT-security compliance internship"
+    ],
+    "Product & UX Design": [
+      "UI/UX internship at a design studio",
+      "Product-management internship (early-stage startup)",
+      "User-research internship"
+    ],
+    "Electronics & Embedded": [
+      "Embedded-systems internship (IoT startup)",
+      "PCB design & testing internship",
+      "Semiconductor fab/OSAT trainee programme"
+    ],
+    "Power & Energy": [
+      "Solar-plant O&M internship",
+      "Electrical-utility (DISCOM) internship",
+      "EV charging-infrastructure internship"
+    ],
+    "Mechanical Design & Manufacturing": [
+      "CAD/CAM internship at an auto ancillary",
+      "Production-engineering internship (PLI unit)",
+      "Maintenance engineering internship"
+    ],
+    "Civil & Structural": [
+      "Site-engineer internship (NHAI/metro contractor)",
+      "Structural-design office internship",
+      "Quantity-surveying internship"
+    ],
+    "Process & Chemical": [
+      "Plant operations internship (refinery/chemicals)",
+      "Quality-control lab internship",
+      "Green-hydrogen pilot-project internship"
+    ],
+    "Quality, Testing & Operations": [
+      "Quality-assurance internship (electronics/auto)",
+      "Six-sigma project internship",
+      "Supply-chain quality internship"
+    ],
+    "Technical Business & Consulting": [
+      "Business-analyst internship (consulting firm)",
+      "Pre-sales engineering internship",
+      "Startup founder's-office internship"
+    ]
+  },
+  "widerDoors": {
+    "Creative": {
+      "doors": [
+        "Product & communication design",
+        "Media-tech & content creation",
+        "Architecture-adjacent spatial design"
+      ],
+      "note": "Every one of these has a strong tech edge today — UI/UX, creator-economy tools, computational design — so an engineering base is an asset, not a detour."
+    },
+    "People-focused": {
+      "doors": [
+        "Psychology & counselling pathways",
+        "Ed-tech & teaching",
+        "HR & talent roles"
+      ],
+      "note": "India's ed-tech and people-analytics wave hires people who understand both humans and systems."
+    },
+    "Enterprising": {
+      "doors": [
+        "Management & entrepreneurship (BBA/MBA path)",
+        "Marketing & growth roles",
+        "Product/business roles inside tech companies"
+      ],
+      "note": "Tech companies fill product and growth seats with people who can talk to engineers — your engineering exposure becomes the differentiator."
+    },
+    "Organized": {
+      "doors": [
+        "Commerce & finance operations",
+        "Supply chain & logistics",
+        "Banking, insurance & fintech operations"
+      ],
+      "note": "Fintech and quality-driven operations are among India's biggest hirers — process minds with technical literacy lead them."
+    }
+  },
+  "templates": {
+    "tie": "Your top two directions sit {gap} point(s) apart — treat them as equally suited and test both.",
+    "shape_clear": "One interest clearly leads ({family1}) — your interests did much of the steering here.",
+    "shape_tied": "Your interests are genuinely wide — so what you have tried and what you want did most of the steering here.",
+    "project_card": "This suits you: it matches your #1 direction ({lean}) and the way you like to work. Four to six weeks, finishable, and worth showing off. Shape the details with your counsellor.",
+    "project_heading": "A project you would enjoy building*",
+    "internship_card": "These fit your profile — start circling them in second semester. The project above is what gets you the interview conversation.",
+    "habit_plan": "Work on your two lowest bars, one small task every week. {low1} ({low1v}): do one real task in it each week and write it down. {low2} ({low2v}): same rule. Do this for eight weeks and your score will move — next year's assessment will show it.",
+    "one_line": "{first} in one line: {zone, lowercase} — leaning {lean} — next checkpoint: Reading 2.",
+    "banner": "This report may be biased — read it with your counsellor.",
+    "track_a_closing": "Your strengths are real — the right map for them is a conversation with your counsellor, not a paragraph."
+  }
+}

@@ -7,6 +7,10 @@ type Props = {
   exportingMQT: boolean;
   exportingDashboard: boolean;
   exportingPsychometric: boolean;
+  exportingNavigatorPro: boolean;
+  /** A navigator_pro template is mapped to the selected assessment. */
+  isNavigatorPro: boolean;
+  onExportNavigatorProRaw: () => void;
   onGenerateDataExcel: () => void;
   onExportBetCoreData: () => void;
   onExportDashboardSheet: () => void;
@@ -18,6 +22,7 @@ type Props = {
 
 const MiraDesaiModal: React.FC<Props> = ({
   open, onClose, isNavigator, generating, exportingMQT, exportingDashboard, exportingPsychometric,
+  exportingNavigatorPro, isNavigatorPro, onExportNavigatorProRaw,
   onGenerateDataExcel, onExportBetCoreData, onExportDashboardSheet,
   onExportPsychometricProperties, onSchoolReport,
   visibleSelectedCount, displayedCount,
@@ -134,6 +139,26 @@ const MiraDesaiModal: React.FC<Props> = ({
               ? "Computing statistics..."
               : `Psychometric Properties of Navigator 360${countLabel}`}
           </button>
+
+          {isNavigatorPro && (
+            <button
+              className="btn"
+              onClick={onExportNavigatorProRaw}
+              disabled={exportingNavigatorPro}
+              title="Navigator Pro raw data — one row per student with item marks, Will/Foundation/Everyday logic/Acquired Skill, families, internal cohort bands, gate outcome (R1–R6) and the 12-direction blend, for the students currently in view"
+              style={{
+                background: exportingNavigatorPro
+                  ? "#6c757d"
+                  : "linear-gradient(135deg, #16345f 0%, #0b1e42 100%)",
+                border: "none", borderRadius: 10, padding: "12px 20px",
+                fontWeight: 600, color: "white", fontSize: "0.9rem",
+                boxShadow: exportingNavigatorPro ? "none" : "0 4px 12px rgba(22, 52, 95, 0.3)",
+                width: "100%", textAlign: "left",
+              }}
+            >
+              {exportingNavigatorPro ? "Computing..." : `Navigator Pro Raw Data${countLabel}`}
+            </button>
+          )}
 
           <button
             className="btn"

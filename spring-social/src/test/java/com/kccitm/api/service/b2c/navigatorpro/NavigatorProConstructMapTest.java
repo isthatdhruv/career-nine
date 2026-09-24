@@ -13,21 +13,39 @@ class NavigatorProConstructMapTest {
     private final NavigatorProConstructMap map = new NavigatorProConstructMap();
 
     @Test
-    void loadsAllThirtyThreeConstructsFromClasspath() {
+    void loadsTheV3InstrumentFromClasspath() {
         assertThat(map.all()).hasSize(33);
         assertThat(map.get("fs_tp").questions).isEqualTo(6);
-        assertThat(map.get("d_pe").max).isEqualTo(5);
-        assertThat(map.get("attention").mqts).containsExactly("Personality- Validity");
-        assertThat(map.label("fam_r")).isEqualTo("Hands-on");
+        assertThat(map.get("d_pe").max).isEqualTo(4);                       // 4-point doing scale
+        assertThat(map.get("f_id").mqts).containsExactly("Self-Efficacy", "Growth Mindset");
+        assertThat(map.get("f_ae").mqts).containsExactly("Proactivity", "Learning Agility", "Metacognition");
+        assertThat(map.get("attention").mqts).containsExactly("Attention Check");
+        assertThat(map.label("f_id")).isEqualTo("Self-Motivation");
+        assertThat(map.label("f_st")).isEqualTo("Consistency");
+        assertThat(map.label("f_ae")).isEqualTo("Adaptability");
+        assertThat(map.label("fam_s")).isEqualTo("People-focused");
+        assertThat(map.label("fam_c")).isEqualTo("Organized");
+        assertThat(map.label("fs_gd")).isEqualTo("Finishing what you start");
     }
 
     @Test
     void resolvesMqtNamesIgnoringCaseAndWhitespace() {
-        assertThat(map.constructFor("  doer ")).contains("fam_r");
-        assertThat(map.constructFor("personality-  validity")).contains("attention");
+        assertThat(map.constructFor("  self-efficacy ")).contains("f_id");
+        assertThat(map.constructFor("Metacognition")).contains("f_ae");
+        assertThat(map.constructFor("Getting things done")).contains("fs_gd");
+        assertThat(map.constructFor("Cognitive check — spreadsheet logic")).contains("chk_spr");
         assertThat(map.constructFor("Quality, Testing & Operations")).contains("d_qt");
-        assertThat(map.constructFor("Grit")).isEmpty();
+        assertThat(map.constructFor("Doer")).isEmpty();                      // retired v2 name
+        assertThat(map.constructFor("Cognitive Check")).isEmpty();           // shared pilot type
         assertThat(map.constructFor(null)).isEmpty();
+    }
+
+    @Test
+    void aspirationAndDomainLabels() {
+        assertThat(map.isAspiration(" aspiration")).isTrue();
+        assertThat(map.isAspiration("Validity")).isFalse();
+        assertThat(map.domainForLabel("power & energy")).contains("d_pe");
+        assertThat(map.domainForLabel("Grit")).isEmpty();
     }
 
     @Test

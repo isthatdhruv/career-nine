@@ -31,15 +31,22 @@ public final class NavigatorProQuestionnaireIndex {
     public final Map<String, Set<Long>> questionsByConstruct;
     /** questionnaireQuestionId of the single ranking question, or null when the check failed. */
     public final Long rankingQuestionId;
+    /** Ranking option id → its value tag (the option's MQT name, e.g. "Pay & benefits"). */
+    public final Map<Long, String> valueTagByOptionId;
+    /** questionnaireQuestionId of the aspiration multi-select, or null when absent. */
+    public final Long aspirationQuestionId;
     public final List<String> problems;
 
     private NavigatorProQuestionnaireIndex(long questionnaireId, Map<Long, String> constructByQuestion,
                                            Map<String, Set<Long>> questionsByConstruct,
-                                           Long rankingQuestionId, List<String> problems) {
+                                           Long rankingQuestionId, Map<Long, String> valueTagByOptionId,
+                                           Long aspirationQuestionId, List<String> problems) {
         this.questionnaireId = questionnaireId;
         this.constructByQuestion = Collections.unmodifiableMap(constructByQuestion);
         this.questionsByConstruct = Collections.unmodifiableMap(questionsByConstruct);
         this.rankingQuestionId = rankingQuestionId;
+        this.valueTagByOptionId = Collections.unmodifiableMap(valueTagByOptionId);
+        this.aspirationQuestionId = aspirationQuestionId;
         this.problems = Collections.unmodifiableList(problems);
     }
 
@@ -56,6 +63,8 @@ public final class NavigatorProQuestionnaireIndex {
         Map<String, Set<Long>> byConstruct = new TreeMap<>();
         List<String> problems = new ArrayList<>();
         List<Long> rankingIds = new ArrayList<>();
+        List<Long> aspirationIds = new ArrayList<>();
+        Map<Long, String> valueTags = new HashMap<>();
 
         for (QuestionnaireQuestion qq : questions) {
             AssessmentQuestions q = qq.getQuestion();
@@ -68,6 +77,37 @@ public final class NavigatorProQuestionnaireIndex {
                 if (options.size() != 12) {
                     problems.add("ranking question " + qqId + " has " + options.size() + " options, expected 12");
                 }
+                Set<String> seenTags = new TreeSet<>();
+                for (AssessmentQuestionOptions o : options) {
+                    String tag = null;
+                    for (OptionScoreBasedOnMEasuredQualityTypes s : scoresByOptionId.getOrDefault(o.getOptionId(), List.of())) {
+                        if (s.getMeasuredQualityType() != null && s.getMeasuredQualityType().getMeasuredQualityTypeName() != null) {
+                            tag = s.getMeasuredQualityType().getMeasuredQualityTypeName().trim();
+                            break;
+                        }
+                    }
+                    if (tag == null) {
+                        problems.add("ranking option '" + o.getOptionText() + "' has no value tag (MQT)");
+                    } else if (!seenTags.add(NavigatorProConstructMap.normalize(tag))) {
+                        problems.add("ranking value tag '" + tag + "' is used by two options");
+                    } else {
+                        valueTags.put(o.getOptionId(), tag);
+                    }
+                }
+                continue;
+            }
+
+            boolean aspiration = !options.isEmpty();
+            for (AssessmentQuestionOptions o : options) {
+                List<OptionScoreBasedOnMEasuredQualityTypes> sc = scoresByOptionId.getOrDefault(o.getOptionId(), List.of());
+                if (sc.isEmpty() || !sc.stream().allMatch(x -> x.getMeasuredQualityType() != null
+                        && map.isAspiration(x.getMeasuredQualityType().getMeasuredQualityTypeName()))) {
+                    aspiration = false;
+                    break;
+                }
+            }
+            if (aspiration) {
+                aspirationIds.add(qqId);
                 continue;
             }
 
@@ -110,7 +150,11 @@ public final class NavigatorProQuestionnaireIndex {
         if (rankingIds.size() != 1) {
             problems.add("expected exactly one ranking question, found " + rankingIds.size());
         }
+        if (aspirationIds.size() > 1) {
+            problems.add("expected at most one aspiration question, found " + aspirationIds.size());
+        }
         return new NavigatorProQuestionnaireIndex(questionnaireId, byQuestion, byConstruct,
-                rankingIds.size() == 1 ? rankingIds.get(0) : null, problems);
+                rankingIds.size() == 1 ? rankingIds.get(0) : null, valueTags,
+                aspirationIds.size() == 1 ? aspirationIds.get(0) : null, problems);
     }
 }

@@ -33,6 +33,12 @@ tag forces a cache miss — placeholders are recomputed on the next
 
 ## navigator_pro
 
+- **navigator_pro-v3** (2026-09-23) — engine moved to the v3 instrument and documents
+  (Tech Spec v3, Report Logic v3, Backend Content v3, Core Algorithm Weightages): v3 MQT
+  names and display map, 4-point Domain Exposure ((Σ−12)/36, per-domain (m−1)/3), gates
+  R1/R2/R5/R3/R4 and R6 Explorer, internal percentiles for bands (never printed), locked
+  .40/.40/.20 blend over all 12 domains, Track A/B, all copy from `content-v3.json`.
+  Invalidates every navigator_pro-v1 calculation.
 - **navigator_pro-v1** (2026-09-10) — initial `NavigatorProCalculationService` mapping
   (MQT option scores → factors, foundation, reasoning, skill, families, values,
   cohort percentiles, bands, zone; blend keys reserved).

@@ -26,6 +26,31 @@ class NavigatorProQuestionnaireIndexTest {
         assertThat(ix.questionsByConstruct.get("d_pe")).hasSize(1);
         assertThat(ix.constructByQuestion).hasSize(90);
         assertThat(ix.rankingQuestionId).isEqualTo(fx.ranking.getQuestionnaireQuestionId());
+        assertThat(ix.valueTagByOptionId).hasSize(12).containsValues("Pay & benefits", "Influence");
+        assertThat(ix.aspirationQuestionId).isEqualTo(fx.aspiration.getQuestionnaireQuestionId());
+        assertThat(ix.constructByQuestion).doesNotContainKey(fx.aspiration.getQuestionnaireQuestionId());
+    }
+
+    @Test
+    void rankingOptionWithoutValueTag_isReported() {
+        NavigatorProFixtures fx = NavigatorProFixtures.validQuestionnaire();
+        AssessmentQuestionOptions o = fx.ranking.getQuestion().getOptions().get(3);
+        fx.scoresByOptionId.put(o.getOptionId(), new ArrayList<>());
+        NavigatorProQuestionnaireIndex ix = build(fx);
+        assertThat(ix.problems).anySatisfy(p -> assertThat(p).contains("has no value tag"));
+    }
+
+    @Test
+    void sharedPilotReasoningType_failsTheFiveChecks() {
+        NavigatorProFixtures fx = NavigatorProFixtures.validQuestionnaire();
+        for (String k : NavigatorProConstructMap.CHECK_KEYS) {
+            QuestionnaireQuestion qq = fx.byConstruct.get(k).get(0);
+            for (AssessmentQuestionOptions o : qq.getQuestion().getOptions()) {
+                fx.scoresByOptionId.get(o.getOptionId()).get(0).getMeasuredQualityType().setMeasuredQualityTypeName("Cognitive Check");
+            }
+        }
+        NavigatorProQuestionnaireIndex ix = build(fx);
+        assertThat(ix.problems).anySatisfy(p -> assertThat(p).contains("Applied numeracy").contains("0 question(s) scored, expected 1"));
     }
 
     @Test
@@ -44,7 +69,7 @@ class NavigatorProQuestionnaireIndexTest {
         AssessmentQuestionOptions last = qq.getQuestion().getOptions().get(4);
         fx.scoresByOptionId.put(last.getOptionId(), new ArrayList<>());
         NavigatorProQuestionnaireIndex ix = build(fx);
-        assertThat(ix.problems).anySatisfy(p -> assertThat(p).contains("1 option(s) without a score under Internal Drive"));
+        assertThat(ix.problems).anySatisfy(p -> assertThat(p).contains("1 option(s) without a score under Self-Motivation"));
     }
 
     @Test
@@ -61,7 +86,7 @@ class NavigatorProQuestionnaireIndexTest {
         NavigatorProFixtures fx = NavigatorProFixtures.validQuestionnaire();
         QuestionnaireQuestion qq = fx.byConstruct.get("f_id").get(0);
         MeasuredQualityTypes other = new MeasuredQualityTypes();
-        other.setMeasuredQualityTypeName("Sustained Tenacity");
+        other.setMeasuredQualityTypeName("Perseverance");
         for (AssessmentQuestionOptions o : qq.getQuestion().getOptions()) {
             OptionScoreBasedOnMEasuredQualityTypes s = new OptionScoreBasedOnMEasuredQualityTypes();
             s.setScore(3);
@@ -75,7 +100,7 @@ class NavigatorProQuestionnaireIndexTest {
     @Test
     void unmappedMqt_isIgnored() {
         NavigatorProFixtures fx = NavigatorProFixtures.validQuestionnaire();
-        fx.question("Grit", new int[]{1, 2, 3, 4, 5});   // old pilot type, not in the map
+        fx.question("Grit", new int[]{1, 2, 3, 4, 5});   // retired pilot type, not in the map
         NavigatorProQuestionnaireIndex ix = build(fx);
         assertThat(ix.valid()).isTrue();
     }

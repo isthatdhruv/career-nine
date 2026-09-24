@@ -6,7 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Cohort maths for one assessment: empirical percentile rank (midrank on ties),
+ * Cohort maths for one assessment (v3): empirical percentile rank within the cohort
+ * (midrank on ties) — used internally to pick bands, never printed on the report —
  * medians as quadrant cuts, n-gates, precision, bands. Pure and static; the
  * calculation service owns caching.
  */
@@ -15,10 +16,11 @@ public final class NavigatorProNorms {
     public static final List<String> METRICS =
             List.of("drive", "f_id", "f_st", "f_ae", "foundation", "skill", "reasoning");
 
-    public static final String ZONE_READY    = "Ready to accelerate";
-    public static final String ZONE_DRIVEN   = "Driven, still building";
-    public static final String ZONE_SKILLED  = "Skilled, needs a spark";
-    public static final String ZONE_STARTING = "Starting the journey";
+    // Report Logic v3 sheet 4 / Tech Spec v3: locked grid, Q1 = High-High (Will × Acquired Skill).
+    public static final String ZONE_READY     = "Ready to accelerate";        // HH
+    public static final String ZONE_MOTIVATED = "Motivated, needs skilling";  // High Will · Low Skill
+    public static final String ZONE_CAPABLE   = "Capable, needs engagement";  // Low Will · High Skill
+    public static final String ZONE_SUPPORT   = "Needs structured support";   // LL
 
     private NavigatorProNorms() {}
 
@@ -101,26 +103,39 @@ public final class NavigatorProNorms {
         return "Early";
     }
 
-    /** Raw-threshold band for the foundation sub-domain bars. */
+    /**
+     * Raw RAG band (Report Logic v3 sheet 2): green ≥ 67 · amber 34–66 · red &lt; 34, judged
+     * on the integer that prints (66.67 prints 67 and is Strong, as in the v3 sample).
+     */
     public static String ragBand(double raw) {
-        if (raw >= 67.0) return "Strong";
-        if (raw >= 34.0) return "Developing";
+        long v = Math.round(raw);
+        if (v >= 67) return "Strong";
+        if (v >= 34) return "Developing";
         return "Early";
     }
 
     public static String ragColour(double raw) {
-        if (raw >= 67.0) return "green";
-        if (raw >= 34.0) return "amber";
+        long v = Math.round(raw);
+        if (v >= 67) return "green";
+        if (v >= 34) return "amber";
         return "red";
     }
 
-    /** "At the cut" counts as above. */
-    public static String zone(double drive, double skill, double driveCut, double skillCut) {
-        boolean d = drive >= driveCut;
+    /** Personality-card bullet band (Backend Content v3 sheet 3): High ≥ 67 · Mid 34–66 · Low ≤ 33. */
+    public static String familyBand(double pct) {
+        long v = Math.round(pct);
+        if (v >= 67) return "High";
+        if (v >= 34) return "Mid";
+        return "Low";
+    }
+
+    /** Will × Acquired Skill quadrant; "at the cut" counts as high. */
+    public static String zone(double will, double skill, double willCut, double skillCut) {
+        boolean w = will >= willCut;
         boolean s = skill >= skillCut;
-        if (d && s) return ZONE_READY;
-        if (d) return ZONE_DRIVEN;
-        if (s) return ZONE_SKILLED;
-        return ZONE_STARTING;
+        if (w && s) return ZONE_READY;
+        if (w) return ZONE_MOTIVATED;
+        if (s) return ZONE_CAPABLE;
+        return ZONE_SUPPORT;
     }
 }

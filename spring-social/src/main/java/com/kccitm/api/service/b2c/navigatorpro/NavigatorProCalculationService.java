@@ -14,6 +14,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.annotation.PostConstruct;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,16 +46,23 @@ import com.kccitm.api.service.b2c.report.ReportRoutingException;
 import com.kccitm.api.service.b2c.report.ReportSuppressedException;
 
 /**
- * Navigator Pro engine (engineCode {@code navigator_pro}). Scores from the stored
- * MQT option scores (reversal already applied there), applies gates R1–R5,
- * computes cohort norms per assessment and emits the placeholder map. Runs on the
- * report-worker thread with no open session: every query here fetches eagerly.
+ * Navigator Pro engine v3 (engineCode {@code navigator_pro}). Scores the Sept-2026
+ * instrument from the stored MQT option scores, applies gates R1–R6, computes cohort
+ * norms (internal percentiles pick bands; no percentile is ever printed), runs the
+ * locked two-tier blend and emits the placeholder map. Runs on the report-worker
+ * thread with no open session: every query here fetches eagerly.
+ *
+ * <p>Gate order: R1 attention → R2 validity (never suppresses) → R5 incomplete → R3
+ * weak peak → R4 no signal → R6 Explorer (generates). R5 is checked before R3/R4 so a
+ * half-answered sheet is reported as incomplete rather than as a weak profile.
  */
 @Component
 public class NavigatorProCalculationService implements PlaceholderCalculator {
 
     private static final Logger logger = LoggerFactory.getLogger(NavigatorProCalculationService.class);
     static final long NORMS_TTL_MS = 60_000L;
+    /** Circumference of the page-2 ring (r = 34) for stroke-dasharray. */
+    private static final double RING_C = 2 * Math.PI * 34;
 
     @Autowired private AssessmentAnswerRepository answerRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
@@ -63,14 +72,21 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private AssessmentReportTemplateRepository assessmentReportTemplateRepository;
     @Autowired private NavigatorProConstructMap map;
+    @Autowired private NavigatorProBlend blend;
 
-    @Value("${app.navigator-pro.career-library-url:}") private String careerLibraryUrl;
-    @Value("${app.navigator-pro.flat-gap:10}")          private double flatGap;
-    @Value("${app.navigator-pro.weak-peak:50}")         private double weakPeak;
-    @Value("${app.navigator-pro.no-signal-domain:50}")  private double noSignalDomain;
-    @Value("${app.navigator-pro.banner-flag-count:2}")  private int bannerFlagCount;
-    @Value("${app.navigator-pro.norms-min-n:60}")       private int normsMinN;
-    @Value("${app.navigator-pro.percentile-min-n:30}")  private int percentileMinN;
+    private final NavigatorProContent content = NavigatorProContent.defaults();
+
+    @Value("${app.navigator-pro.career-library-url:https://library.career-9.com/}") private String careerLibraryUrl;
+    @Value("${app.navigator-pro.flat-gap:10}")              private double flatGap;
+    @Value("${app.navigator-pro.weak-peak:50}")             private double weakPeak;
+    @Value("${app.navigator-pro.no-signal-exposure:0}")     private double noSignalExposure;
+    @Value("${app.navigator-pro.banner-flag-count:2}")      private int bannerFlagCount;
+    @Value("${app.navigator-pro.norms-min-n:60}")           private int normsMinN;
+    @Value("${app.navigator-pro.percentile-min-n:30}")      private int percentileMinN;
+    @Value("${app.navigator-pro.tie-gap:3}")                private double tieGap;
+    @Value("${app.navigator-pro.explorer-spread:5}")        private double explorerSpread;
+    @Value("${app.navigator-pro.explorer-max-exposure:75}") private double explorerMaxExposure;
+    @Value("${app.navigator-pro.track-a-cut:50}")           private double trackACut;
 
     private final Map<Long, NavigatorProQuestionnaireIndex> indexCache = new ConcurrentHashMap<>();
     private final Map<Long, CachedNorms> normsCache = new ConcurrentHashMap<>();
@@ -80,39 +96,61 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
         CachedNorms(int completedCount, long at, NormSet norms) { this.completedCount = completedCount; this.at = at; this.norms = norms; }
     }
 
-    private static final List<String> RESERVED_TEXT_KEYS = List.of(
-            "top1", "top2", "top3", "top1_score", "top2_score", "top3_score", "gap12",
-            "sector_1", "sector_2", "sector_3", "sector_1_fit", "sector_2_fit", "sector_3_fit",
-            "tier_line", "rank_copy_1", "rank_copy_2", "rank_copy_3", "cta_variant", "cta_text",
-            "one_line", "move_1", "move_2", "move_3");
+    /** One student's full evaluation, suppressed or not. Shared by the report and the raw export. */
+    public static final class Evaluation {
+        public final long userStudentId;
+        public final NavigatorProScores scores;
+        /** First suppressing gate (R1, R5, R3, R4) or null. */
+        public final String gateCode;
+        public final String gateReason;
+        /** Null only when the blend could not run (values incomplete). */
+        public final NavigatorProBlend.Result blend;
+        public final boolean banner;
+        public final boolean trackA;
 
-    @Override public String typeCode()        { return "navigator_pro"; }
-    @Override public String engineVersion()   { return EngineVersions.NAVIGATOR_PRO_V1; }
+        Evaluation(long userStudentId, NavigatorProScores scores, String gateCode, String gateReason,
+                   NavigatorProBlend.Result blend, boolean banner, boolean trackA) {
+            this.userStudentId = userStudentId; this.scores = scores; this.gateCode = gateCode;
+            this.gateReason = gateReason; this.blend = blend; this.banner = banner; this.trackA = trackA;
+        }
+
+        public boolean suppressed() { return gateCode != null; }
+        public boolean explorer()   { return !suppressed() && blend != null && blend.explorer; }
+
+        /** R1–R6 outcome as one word for the manifest / raw export. */
+        public String outcome() {
+            if (suppressed()) return gateCode + " suppressed";
+            return explorer() ? "R6 Explorer" : "Generated";
+        }
+    }
+
+    @PostConstruct
+    void checkMatrices() {
+        blend.validateAgainst(map);
+    }
+
+    @Override public String typeCode()          { return "navigator_pro"; }
+    @Override public String engineVersion()     { return EngineVersions.NAVIGATOR_PRO_V3; }
     @Override public boolean usesIntermediary() { return false; }
 
     @Override
     public Map<String, Object> calculate(Long userStudentId, Long assessmentId, IntermediaryScoresPayload intermediary) {
         NavigatorProQuestionnaireIndex index = indexFor(assessmentId);
-        NavigatorProScorer scorer = new NavigatorProScorer(map, flatGap);
-
         List<AssessmentAnswer> answers = answerRepository.findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
-        NavigatorProScores s = scorer.score(contributions(index, answers), valueRanks(index, answers), index.questionsByConstruct);
-
-        String[] gate = gate(s);
-        if (gate != null) {
-            if (!s.incomplete.isEmpty()) {
-                logger.info("Navigator Pro incomplete student={} assessment={}: {}", userStudentId, assessmentId, s.incomplete);
+        Evaluation ev = evaluate(userStudentId, index, answers);
+        if (ev.suppressed()) {
+            if (!ev.scores.incomplete.isEmpty()) {
+                logger.info("Navigator Pro incomplete student={} assessment={}: {}", userStudentId, assessmentId, ev.scores.incomplete);
             }
-            throw new ReportSuppressedException(gate[0], gate[1]);
+            throw new ReportSuppressedException(ev.gateCode, ev.gateReason);
         }
-
-        NormSet norms = normsFor(assessmentId, index, scorer);
-        return placeholders(userStudentId, assessmentId, s, norms);
+        NormSet norms = normsFor(assessmentId, index);
+        return placeholders(userStudentId, assessmentId, ev, norms);
     }
 
     // ── schema check ─────────────────────────────────────────────────────────
 
-    NavigatorProQuestionnaireIndex indexFor(Long assessmentId) {
+    public NavigatorProQuestionnaireIndex indexFor(Long assessmentId) {
         NavigatorProQuestionnaireIndex ix = indexCache.get(assessmentId);
         if (ix != null && ix.valid()) return ix;
         AssessmentTable a = assessmentTableRepository.findById(assessmentId).orElse(null);
@@ -134,9 +172,13 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
             }
         }
         ix = NavigatorProQuestionnaireIndex.build(map, questionnaireId, questions, scoresByOptionId);
-        if (!ix.valid()) {
-            throw new ReportRoutingException("Questionnaire " + questionnaireId + " is not on the Navigator Pro bank: "
-                    + String.join("; ", ix.problems));
+        List<String> problems = new ArrayList<>(ix.problems);
+        for (String tag : ix.valueTagByOptionId.values()) {
+            if (!blend.knowsValueTag(tag)) problems.add("value tag '" + tag + "' has no column in the value-supply matrix");
+        }
+        if (!problems.isEmpty()) {
+            throw new ReportRoutingException("Questionnaire " + questionnaireId + " is not on the Navigator Pro v3 instrument: "
+                    + String.join("; ", problems));
         }
         indexCache.put(assessmentId, ix);
         return ix;
@@ -144,7 +186,7 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
 
     // ── answers → scorer input ───────────────────────────────────────────────
 
-    List<Contribution> contributions(NavigatorProQuestionnaireIndex index, List<AssessmentAnswer> answers) {
+    public List<Contribution> contributions(NavigatorProQuestionnaireIndex index, List<AssessmentAnswer> answers) {
         List<Contribution> out = new ArrayList<>();
         for (AssessmentAnswer a : answers) {
             QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
@@ -173,50 +215,97 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
             if (qq == null || !index.rankingQuestionId.equals(qq.getQuestionnaireQuestionId())) continue;
             AssessmentQuestionOptions option = a.getOption() != null ? a.getOption() : a.getMappedOption();
             if (a.getRankOrder() == null || option == null) continue;
-            out.add(new ValueRank(a.getRankOrder(), option.getOptionText()));
+            String tag = index.valueTagByOptionId.get(option.getOptionId());
+            if (tag == null) continue;
+            out.add(new ValueRank(a.getRankOrder(), tag, option.getOptionText()));
         }
         return out;
     }
 
-    // ── gates ────────────────────────────────────────────────────────────────
+    List<String> aspirations(NavigatorProQuestionnaireIndex index, List<AssessmentAnswer> answers) {
+        List<String> out = new ArrayList<>();
+        if (index.aspirationQuestionId == null) return out;
+        for (AssessmentAnswer a : answers) {
+            QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
+            if (qq == null || !index.aspirationQuestionId.equals(qq.getQuestionnaireQuestionId())) continue;
+            AssessmentQuestionOptions option = a.getOption() != null ? a.getOption() : a.getMappedOption();
+            if (option == null) continue;
+            map.domainForLabel(option.getOptionText()).filter(d -> !out.contains(d)).ifPresent(out::add);
+        }
+        return out;
+    }
 
-    /** {code, reason} for the first tripped suppressing gate, else null. R2 never suppresses. */
+    // ── evaluation and gates ─────────────────────────────────────────────────
+
+    public Evaluation evaluate(long userStudentId, NavigatorProQuestionnaireIndex index, List<AssessmentAnswer> answers) {
+        NavigatorProScorer scorer = new NavigatorProScorer(map, flatGap);
+        NavigatorProScores s = scorer.score(contributions(index, answers), valueRanks(index, answers),
+                aspirations(index, answers), index.questionsByConstruct);
+        NavigatorProBlend.Result b = s.valuesMissing ? null
+                : blend.compute(s, map, tieGap, explorerSpread, explorerMaxExposure);
+        String[] gate = gate(s);
+        boolean banner = s.validityFlags >= bannerFlagCount;
+        boolean trackA = s.get("fam_r") < trackACut && s.get("fam_i") < trackACut;
+        return new Evaluation(userStudentId, s, gate == null ? null : gate[0], gate == null ? null : gate[1], b, banner, trackA);
+    }
+
+    /** {code, reason} for the first tripped suppressing gate, else null. R2 and R6 never suppress. */
     String[] gate(NavigatorProScores s) {
         if (!s.attentionPassed) return new String[]{"R1", "attention check not passed"};
-        if (!s.incomplete.isEmpty()) return new String[]{"R5", s.incomplete.size() + " scored question(s) unanswered or duplicated"};
-        if (!s.flat && s.maxFamily() < weakPeak) return new String[]{"R3", "peak interest family below " + (int) weakPeak};
-        if (s.flat && s.maxDomain() < noSignalDomain && s.valuesMissing) return new String[]{"R4", "flat interests, no domain rating at or above " + (int) noSignalDomain + ", values missing"};
+        if (!s.incomplete.isEmpty()) return new String[]{"R5", s.incomplete.size() + " item(s) unanswered, duplicated or values not ranked 4"};
+        if (s.maxFamily() < weakPeak) return new String[]{"R3", "weak peak: no interest family at or above " + (int) weakPeak};
+        if (s.flat && s.maxDomain() <= noSignalExposure) {
+            return new String[]{"R4", "no signal: tied interests and no domain exposure above " + (int) noSignalExposure};
+        }
         return null;
     }
 
     // ── cohort norms ─────────────────────────────────────────────────────────
 
-    NormSet normsFor(Long assessmentId, NavigatorProQuestionnaireIndex index, NavigatorProScorer scorer) {
+    /** Every answer row of the assessment, grouped by student (one query). */
+    public Map<Long, List<AssessmentAnswer>> answersByStudent(Long assessmentId) {
+        Map<Long, List<AssessmentAnswer>> byStudent = new HashMap<>();
+        for (AssessmentAnswer a : answerRepository.findAllByAssessmentIdWithScores(assessmentId)) {
+            if (a.getUserStudent() == null || a.getUserStudent().getUserStudentId() == null) continue;
+            byStudent.computeIfAbsent(a.getUserStudent().getUserStudentId(), k -> new ArrayList<>()).add(a);
+        }
+        return byStudent;
+    }
+
+    /** Evaluates each completed student (or just {@code onlyIds}) from one load of the assessment's answers. */
+    public Map<Long, Evaluation> evaluateCohort(Long assessmentId, NavigatorProQuestionnaireIndex index, Set<Long> onlyIds) {
+        return evaluateCohort(assessmentId, index, onlyIds, answersByStudent(assessmentId));
+    }
+
+    public Map<Long, Evaluation> evaluateCohort(Long assessmentId, NavigatorProQuestionnaireIndex index, Set<Long> onlyIds,
+                                                Map<Long, List<AssessmentAnswer>> byStudent) {
+        Set<Long> completedIds = new HashSet<>();
+        for (StudentAssessmentMapping m : mappingRepository.findCompletedForAssessment(assessmentId)) {
+            if (m.getUserStudent() != null && m.getUserStudent().getUserStudentId() != null) completedIds.add(m.getUserStudent().getUserStudentId());
+        }
+        Map<Long, Evaluation> out = new LinkedHashMap<>();
+        Set<Long> ids = onlyIds != null ? onlyIds : completedIds;
+        for (Long sid : ids) {
+            out.put(sid, evaluate(sid, index, byStudent.getOrDefault(sid, List.of())));
+        }
+        return out;
+    }
+
+    public NormSet normsFor(Long assessmentId, NavigatorProQuestionnaireIndex index) {
         List<StudentAssessmentMapping> completed = mappingRepository.findCompletedForAssessment(assessmentId);
         CachedNorms cached = normsCache.get(assessmentId);
         long now = System.currentTimeMillis();
         if (cached != null && cached.completedCount == completed.size() && now - cached.at < NORMS_TTL_MS) {
             return cached.norms;
         }
-        Set<Long> completedIds = new HashSet<>();
-        for (StudentAssessmentMapping m : completed) {
-            if (m.getUserStudent() != null && m.getUserStudent().getUserStudentId() != null) completedIds.add(m.getUserStudent().getUserStudentId());
-        }
-        Map<Long, List<AssessmentAnswer>> byStudent = new HashMap<>();
-        for (AssessmentAnswer a : answerRepository.findAllByAssessmentIdWithScores(assessmentId)) {
-            if (a.getUserStudent() == null || a.getUserStudent().getUserStudentId() == null) continue;
-            byStudent.computeIfAbsent(a.getUserStudent().getUserStudentId(), k -> new ArrayList<>()).add(a);
-        }
         List<NavigatorProNorms.Member> members = new ArrayList<>();
-        for (Long sid : completedIds) {
-            List<AssessmentAnswer> rows = byStudent.getOrDefault(sid, List.of());
-            NavigatorProScores s = scorer.score(contributions(index, rows), valueRanks(index, rows), index.questionsByConstruct);
-            if (gate(s) != null) continue;
+        for (Evaluation ev : evaluateCohort(assessmentId, index, null).values()) {
+            if (ev.suppressed()) continue;   // cohort = completed and gate-passed
             Map<String, Double> metrics = new HashMap<>();
             for (String metric : NavigatorProNorms.METRICS) {
-                metrics.put(metric, metric.equals("reasoning") ? (double) s.reasoning : s.get(metric));
+                metrics.put(metric, metric.equals("reasoning") ? (double) ev.scores.reasoning : ev.scores.get(metric));
             }
-            members.add(new NavigatorProNorms.Member(sid, metrics));
+            members.add(new NavigatorProNorms.Member(ev.userStudentId, metrics));
         }
         NormSet norms = NavigatorProNorms.build(members, percentileMinN, normsMinN);
         normsCache.put(assessmentId, new CachedNorms(completed.size(), now, norms));
@@ -225,147 +314,336 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
 
     // ── placeholders ─────────────────────────────────────────────────────────
 
-    Map<String, Object> placeholders(Long userStudentId, Long assessmentId, NavigatorProScores s, NormSet norms) {
+    Map<String, Object> placeholders(Long userStudentId, Long assessmentId, Evaluation ev, NormSet norms) {
+        NavigatorProScores s = ev.scores;
+        NavigatorProBlend.Result b = ev.blend;
         Map<String, Object> p = new LinkedHashMap<>();
 
         // Identity and batch
         UserStudent us = userStudentRepository.findByIdWithStudentInfo(userStudentId).orElse(null);
         StudentInfo si = us != null ? us.getStudentInfo() : null;
-        String name = si != null && si.getName() != null ? si.getName().trim() : "";
+        String name = si != null && si.getName() != null ? titleCase(si.getName().trim()) : "";
+        String first = name.isEmpty() ? "" : name.split("\\s+")[0];
+        String college = us != null && us.getInstitute() != null && us.getInstitute().getInstituteName() != null
+                ? us.getInstitute().getInstituteName() : "";
         p.put("student_name", name);
-        p.put("first_name", name.isEmpty() ? "" : name.split("\\s+")[0]);
+        p.put("first_name", first);
         p.put("student_id", studentId(si, userStudentId));
-        p.put("college", us != null && us.getInstitute() != null && us.getInstitute().getInstituteName() != null
-                ? us.getInstitute().getInstituteName() : "");
+        p.put("college", college);
+        p.put("student_line", college);
         StudentAssessmentMapping mapping = mappingRepository
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId).orElse(null);
         Date completedAt = mapping != null ? mapping.getCompletedAt() : null;
         p.put("reading_no", readingNo(userStudentId, assessmentId, completedAt));
         p.put("reading_date", completedAt == null ? "" : new SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).format(completedAt));
         p.put("batch_n", norms.n);
-        p.put("prec", norms.prec);
         p.put("career_library_url", careerLibraryUrl == null ? "" : careerLibraryUrl);
+        p.put("norms_provisional", norms.provisional);
+        p.put("percentiles_suppressed", norms.percentilesSuppressed);
+        p.put("cohort_note", norms.percentilesSuppressed ? "cohort forming" : "");
 
-        // Drive and factors
-        boolean pct = !norms.percentilesSuppressed;
-        p.put("drive", r(s.get("drive")));
-        putIndexBand(p, "drive", s.get("drive"), norms);
-        Map<String, Double> factorP = new LinkedHashMap<>();
-        for (String k : NavigatorProConstructMap.FACTOR_KEYS) {
-            p.put(k, r(s.get(k)));
-            Double pk = norms.percentile(k, s.get(k));
-            factorP.put(k, pk);
-            p.put("p_" + k.substring(2), pk == null ? "" : r(pk));
-            p.put("p_" + k.substring(2) + "_text", pk == null ? "" : "P" + r(pk));
-            putIndexBand(p, k, s.get(k), norms);
-            p.put("def_" + k.substring(2), NavigatorProContent.factorDefinition(k));
+        // Static copy (content sheet 1)
+        for (String k : List.of("cover_title", "cover_caption", "cover_footer", "p2_title", "p2_intro", "factors_heading",
+                "mentor_capture", "p3_title", "axis_caption", "families_heading", "values_heading", "values_intro",
+                "p4_title", "p4_heading", "ranking_caption", "divider_label", "counsellor_callout", "habits_heading",
+                "checks_label", "p5_title", "p5_intro", "p5_heading", "p5_intro_2", "qr_block", "method_note", "agenda_line")) {
+            p.put(k, content.text(k));
         }
-        List<String> order = new ArrayList<>(NavigatorProConstructMap.FACTOR_KEYS);
-        Comparator<String> byValue = pct
-                ? Comparator.comparingDouble((String k) -> factorP.get(k)).thenComparingDouble(s::get)
-                : Comparator.comparingDouble(s::get);
-        order.sort(byValue.reversed());
-        String top = order.get(0), bottom = order.get(order.size() - 1);
-        p.put("top_factor", map.label(top));
-        p.put("bottom_factor", map.label(bottom));
-        p.put("top_factor_p", pct ? r(factorP.get(top)) : "");
-        p.put("bottom_factor_p", pct ? r(factorP.get(bottom)) : "");
-        p.put("factor_callout", pct
-                ? NavigatorProContent.factorCallout(map.label(top), r(factorP.get(top)), map.label(bottom), r(factorP.get(bottom)), norms.prec)
-                : "");
+        p.put("how_to_read", NavigatorProContent.fill(content.text("how_to_read"), Map.of("first", first)));
+        p.put("cta_text", content.text("counsellor_callout"));
+        p.put("ring_drive", content.text("ring_will"));
+        p.put("ring_foundation", content.text("ring_foundation"));
+        p.put("ring_skill", content.text("ring_skill"));
+        p.put("ring_reasoning", content.text("ring_logic"));
 
-        // Foundation
-        p.put("foundation", r(s.get("foundation")));
-        putIndexBand(p, "foundation", s.get("foundation"), norms);
-        String lowest = null;
-        for (String k : NavigatorProConstructMap.SUB_KEYS) {
+        // Will (internal: drive) and factors — percentiles pick bands but are never printed.
+        putIndex(p, "drive", s.get("drive"), norms);
+        p.put("will", p.get("drive"));
+        p.put("will_band", p.get("drive_band"));
+        p.put("dash_drive", dash(s.get("drive")));
+        for (String k : NavigatorProConstructMap.FACTOR_KEYS) {
+            String suffix = k.substring(2);
+            putIndex(p, k, s.get(k), norms);
+            p.put("label_" + k, map.label(k));
+            p.put("def_" + suffix, content.factorLine(k));
+            p.put(k + "_line", content.factorLine(k) + ": raw " + r(s.get(k)) + "/100");
+            p.put("p_" + suffix, "");
+            p.put("p_" + suffix + "_text", "");
+            p.put("w_p_" + suffix, r(s.get(k)));
+        }
+
+        // Foundation Skill and sub-skills (raw RAG)
+        putIndex(p, "foundation", s.get("foundation"), norms);
+        p.put("dash_foundation", dash(s.get("foundation")));
+        List<String> subs = new ArrayList<>(NavigatorProConstructMap.SUB_KEYS);
+        for (String k : subs) {
             double v = s.get(k);
             p.put(k, r(v));
+            p.put(k + "_label", map.label(k));
             p.put(k + "_band", NavigatorProNorms.ragBand(v));
             p.put(k + "_rag", NavigatorProNorms.ragColour(v));
-            if (lowest == null || v < s.get(lowest)) lowest = k;
+            p.put("w_" + k, r(v));
         }
-        p.put("lowest_bar", map.label(lowest));
-        p.put("lowest_bar_step", NavigatorProContent.firstStep(lowest));
+        subs.sort(Comparator.comparingDouble(s::get));   // stable: ND, DI, TP, CI, GD order on ties
+        String low1 = subs.get(0), low2 = subs.get(1);
+        p.put("lowest_bar", map.label(low1));
+        p.put("low1", map.label(low1));
+        p.put("low1v", r(s.get(low1)));
+        p.put("low2", map.label(low2));
+        p.put("low2v", r(s.get(low2)));
+        p.put("habit_plan", NavigatorProContent.fill(content.template("habit_plan"), Map.of(
+                "low1", map.label(low1), "low1v", String.valueOf(r(s.get(low1))),
+                "low2", map.label(low2), "low2v", String.valueOf(r(s.get(low2))))));
 
-        // Reasoning
+        // Everyday logic (internal: reasoning) — shown as n/5 with a band word, never a percentile.
         p.put("reasoning", s.reasoning);
         p.put("reasoning_display", s.reasoning + "/5");
-        putIndexBand(p, "reasoning", s.reasoning, norms);
+        p.put("reasoning_band", band("reasoning", s.reasoning, norms));
+        p.put("dash_reasoning", dash(s.reasoning * 20.0));
         for (String k : NavigatorProConstructMap.CHECK_KEYS) {
             boolean ok = Boolean.TRUE.equals(s.checks.get(k));
             p.put(k, ok);
             p.put(k + "_mark", ok ? "✔" : "✘");
+            p.put(k + "_label", map.label(k));
         }
 
-        // Skill and domains
-        p.put("skill", r(s.get("skill")));
-        Double skillP = norms.percentile("skill", s.get("skill"));
-        p.put("skill_p", skillP == null ? "" : r(skillP));
-        putIndexBand(p, "skill", s.get("skill"), norms);
-        for (String k : NavigatorProConstructMap.DOMAIN_KEYS) p.put(k, r(s.get(k)));
+        // Acquired Skill (Domain Exposure)
+        putIndex(p, "skill", s.get("skill"), norms);
+        p.put("skill_p", "");
+        p.put("dash_skill", dash(s.get("skill")));
+        for (String k : NavigatorProConstructMap.DOMAIN_KEYS) {
+            p.put(k, r(s.get(k)));
+            p.put(k + "_rag", NavigatorProNorms.ragColour(s.get(k)));
+        }
 
-        // Interests
-        for (String k : NavigatorProConstructMap.FAMILY_KEYS) p.put(k, r(s.get(k)));
+        // Personality families and shape
+        for (String k : NavigatorProConstructMap.FAMILY_KEYS) {
+            String label = map.label(k);
+            String fb = NavigatorProNorms.familyBand(s.get(k));
+            List<String> bullets = content.familyBullets(label, fb);
+            p.put(k, r(s.get(k)));
+            p.put(k + "_label", label);
+            p.put(k + "_band", fb);
+            p.put(k + "_bullet_1", bullets.size() > 0 ? bullets.get(0) : "");
+            p.put(k + "_bullet_2", bullets.size() > 1 ? bullets.get(1) : "");
+        }
         p.put("top_family", map.label(s.topFamily));
         p.put("second_family", map.label(s.secondFamily));
-        p.put("profile_shape", s.flat ? "Flat" : "Differentiated");
+        p.put("profile_shape", s.flat ? "Tied" : "Clear leader");
+        p.put("shape_line", s.flat ? content.template("shape_tied")
+                : NavigatorProContent.fill(content.template("shape_clear"), Map.of("family1", map.label(s.topFamily))));
+        p.put("cover_mark", hexagon(s));
 
-        // Zone
+        // Zone (Will × Acquired Skill)
         String zone = NavigatorProNorms.zone(s.get("drive"), s.get("skill"), norms.driveCut, norms.skillCut);
+        NavigatorProContent.Zone z = content.zone(zone).orElseThrow(() -> new IllegalStateException("no zone copy for " + zone));
         p.put("zone", zone);
-        p.put("zone_copy", NavigatorProContent.zoneCopy(zone));
-        String cut = norms.provisional ? "provisional cut" : "batch median";
-        p.put("zone_note", "Drive " + r(s.get("drive")) + " (" + (s.get("drive") >= norms.driveCut ? "above" : "below") + " the " + cut + ") — skill "
-                + r(s.get("skill")) + " (" + (s.get("skill") >= norms.skillCut ? "above" : "below") + " " + cut + ").");
+        p.put("zone_copy", z.paragraph);
+        p.put("zone_means", z.means);
+        p.put("zone_first", z.first);
+        p.put("zone_do", z.todo);
+        p.put("zone_note", "What your position means: will " + r(s.get("drive")) + ", skill " + r(s.get("skill")) + " — "
+                + z.means + ". Which moves first: " + z.first + ". What to do: " + z.todo + ".");
         p.put("drive_median", r(norms.driveCut));
         p.put("skill_median", r(norms.skillCut));
-        p.put("norms_provisional", norms.provisional);
-        p.put("percentiles_suppressed", norms.percentilesSuppressed);
+        double[] face = face(s.get("skill"), s.get("drive"), norms.skillCut, norms.driveCut);
+        p.put("face_dx", Math.round(face[0]));
+        p.put("face_dy", Math.round(face[1]));
 
-        // Values
+        // Values (join on value tag)
         for (int i = 1; i <= 4; i++) {
-            Optional<NavigatorProContent.ValueRow> v = (!s.valuesMissing && s.values.size() >= i)
-                    ? NavigatorProContent.value(s.values.get(i - 1)) : Optional.empty();
-            p.put("value_" + i, v.map(x -> x.title).orElse(""));
+            String tag = s.values.size() >= i ? s.values.get(i - 1) : null;
+            Optional<NavigatorProContent.ValueRow> v = content.value(tag);
+            p.put("value_" + i, v.map(x -> x.option).orElse(""));
+            p.put("value_" + i + "_tag", v.map(x -> x.tag).orElse(""));
             p.put("value_" + i + "_icon", v.map(x -> x.icon).orElse(""));
             p.put("value_" + i + "_why", v.map(x -> x.why).orElse(""));
         }
 
+        // Direction: all twelve ranked, tie, Explorer, pathways
+        boolean explorer = ev.explorer();
+        p.put("explorer", explorer);
+        for (int i = 1; i <= 12; i++) {
+            String d = b.ranking.get(i - 1);
+            p.put("rank_" + i, map.label(d));
+            p.put("rank_" + i + "_score", r(b.careerScore.get(d)));
+        }
+        StringBuilder rows = new StringBuilder();
+        for (int i = 4; i <= 12; i++) {
+            rows.append("<div class=\"np-rank-row\"><span class=\"np-rank\">").append(i).append("</span> <span class=\"np-rank-domain\">")
+                .append(escape(map.label(b.ranking.get(i - 1)))).append("</span> <span class=\"np-rank-score\">")
+                .append(r(b.careerScore.get(b.ranking.get(i - 1)))).append("</span></div>");
+        }
+        p.put("other_nine_rows", rows.toString());
+        String lean = explorer ? "" : map.label(b.ranking.get(0));
+        p.put("lean", lean);
+        for (int i = 1; i <= 3; i++) {
+            String d = b.ranking.get(i - 1);
+            p.put("top" + i, explorer ? "" : map.label(d));
+            p.put("top" + i + "_score", explorer ? "" : r(b.careerScore.get(d)));
+            List<NavigatorProContent.Pathway> paths = content.pathways(map.label(d));
+            for (int j = 1; j <= 2; j++) {
+                NavigatorProContent.Pathway pw = !explorer && paths.size() >= j ? paths.get(j - 1) : null;
+                p.put("top" + i + "_path_" + j, pw == null ? "" : pw.pathway);
+                p.put("top" + i + "_path_" + j + "_type", pw == null ? "" : pw.type);
+            }
+            p.put("rank_copy_" + i, "");
+        }
+        p.put("top_strip", explorer ? "" : NavigatorProContent.fill(content.text("top_strip"),
+                Map.of("top1", map.label(b.ranking.get(0)), "top2", map.label(b.ranking.get(1)), "top3", map.label(b.ranking.get(2)))));
+        p.put("gap12", r(b.gap12));
+        p.put("tie", !explorer && b.tie);
+        p.put("tie_line", !explorer && b.tie
+                ? NavigatorProContent.fill(content.template("tie"), Map.of("gap", String.valueOf(r(b.gap12)))) : "");
+
+        // Explorer branch: aspiration picks drive the suggestions (Report Logic v3, gates sheet).
+        for (int i = 1; i <= 3; i++) {
+            String d = s.aspirations.size() >= i ? s.aspirations.get(i - 1) : null;
+            p.put("aspiration_" + i, d == null ? "" : map.label(d));
+            List<NavigatorProContent.Pathway> paths = d == null || !explorer ? List.of() : content.pathways(map.label(d));
+            for (int j = 1; j <= 2; j++) {
+                NavigatorProContent.Pathway pw = paths.size() >= j ? paths.get(j - 1) : null;
+                p.put("explorer_" + i + "_path_" + j, pw == null ? "" : pw.pathway);
+                p.put("explorer_" + i + "_path_" + j + "_type", pw == null ? "" : pw.type);
+            }
+        }
+
+        // Emerging-sector recipes: engine capability, asterisked (no v3 display copy).
+        List<Map.Entry<String, Double>> sectors = new ArrayList<>(b.sectors.entrySet());
+        sectors.sort(Map.Entry.<String, Double>comparingByValue().reversed());
+        for (int i = 1; i <= 3; i++) {
+            p.put("sector_" + i, sectors.size() >= i ? sectors.get(i - 1).getKey() : "");
+            p.put("sector_" + i + "_fit", sectors.size() >= i ? r(sectors.get(i - 1).getValue()) : "");
+        }
+
+        // What next: Track A / Track B
+        p.put("track", ev.trackA ? "A" : "B");
+        String topLabel = map.label(b.ranking.get(0));
+        if (!ev.trackA && !explorer) {
+            p.put("project_heading", content.template("project_heading"));
+            p.put("project", content.project(topLabel, NavigatorProContent.flavourFor(s.topFamily)));
+            p.put("project_card", NavigatorProContent.fill(content.template("project_card"), Map.of("lean", topLabel)));
+            p.put("internships", String.join(" · ", content.internships(topLabel)));
+            p.put("internship_card", content.template("internship_card"));
+        } else {
+            for (String k : List.of("project_heading", "project", "project_card", "internships", "internship_card")) p.put(k, "");
+        }
+        String doorsFamily = ev.trackA ? widerDoorsFamily(s) : null;
+        List<String> doors = doorsFamily == null ? List.of() : content.widerDoors(map.label(doorsFamily));
+        p.put("track_a_families", ev.trackA ? map.label(s.topFamily) + " + " + map.label(s.secondFamily) : "");
+        for (int i = 1; i <= 3; i++) p.put("wider_door_" + i, doors.size() >= i ? doors.get(i - 1) : "");
+        p.put("wider_doors_note", doorsFamily == null ? "" : content.widerDoorsNote(map.label(doorsFamily)));
+        p.put("track_a_closing", ev.trackA ? content.template("track_a_closing") : "");
+
+        // One-line close
+        if (explorer) {
+            p.put("one_line", "");
+            p.put("one_line_full", "");
+        } else {
+            String full = NavigatorProContent.fill(content.template("one_line").replace("{zone, lowercase}", "{zone_lc}"),
+                    Map.of("first", first, "zone_lc", zone.toLowerCase(Locale.ENGLISH), "lean", lean));
+            p.put("one_line_full", full);
+            String prefix = first + " in one line: ";
+            p.put("one_line", full.startsWith(prefix) ? full.substring(prefix.length()) : full);
+        }
+
         // Response quality (the flag count itself never enters the map)
-        boolean banner = s.validityFlags >= bannerFlagCount;
-        p.put("response_quality_banner", banner ? NavigatorProContent.banner() : "");
-        p.put("counselling_mandatory", banner);
+        p.put("response_quality_banner", ev.banner ? content.template("banner") : "");
+        p.put("counselling_mandatory", ev.banner || explorer);
         if (s.validityFlags > 0) {
             logger.info("Navigator Pro validity flags={} student={} assessment={}", s.validityFlags, userStudentId, assessmentId);
         }
 
-        // Static copy
-        p.put("cover_caption", NavigatorProContent.COVER_CAPTION);
-        p.put("cover_footer", String.format(NavigatorProContent.COVER_FOOTER_TEMPLATE, p.get("first_name")));
-        p.put("about_career9", NavigatorProContent.ABOUT_CAREER9);
-        p.put("about_report", NavigatorProContent.ABOUT_REPORT);
-        p.put("how_to_read", NavigatorProContent.howToRead((String) p.get("first_name")));
-        p.put("precision_line", NavigatorProContent.precisionLine(norms.prec, norms.n));
-        p.put("sector_caveat", NavigatorProContent.SECTOR_CAVEAT);
-        p.put("ring_drive", NavigatorProContent.RING_DRIVE);
-        p.put("ring_foundation", NavigatorProContent.RING_FOUNDATION);
-        p.put("ring_skill", NavigatorProContent.RING_SKILL);
-        p.put("ring_reasoning", NavigatorProContent.RING_REASONING);
-
-        // Reserved for phase 2 (blend, sectors, R6)
-        p.put("explorer", false);
-        p.put("tie", false);
-        for (String k : RESERVED_TEXT_KEYS) p.put(k, "");
+        // Keys the V3 HTML still binds but the v3 content has no copy for: emitted empty, never invented.
+        for (String k : List.of("prec", "precision_line", "factor_callout", "lowest_bar_step", "sector_caveat",
+                "move_1", "move_2", "move_3")) {
+            p.put(k, "");
+        }
         return p;
     }
 
-    /** Percentile band + paragraph for an index key; both empty while percentiles are suppressed. */
-    private void putIndexBand(Map<String, Object> p, String key, double raw, NormSet norms) {
+    /** Raw 0–100 value, plus the percentile band (internal percentile, never printed). */
+    private void putIndex(Map<String, Object> p, String key, double raw, NormSet norms) {
+        p.put(key, r(raw));
+        p.put(key + "_band", band(key, raw, norms));
+    }
+
+    private static String band(String key, double raw, NormSet norms) {
         Double pk = norms.percentile(key, raw);
-        String band = pk == null ? "" : NavigatorProNorms.band(pk);
-        p.put(key + "_band", band);
-        p.put(key + "_text", band.isEmpty() ? "" : NavigatorProContent.bandParagraph(key, band));
+        return pk == null ? "" : NavigatorProNorms.band(pk);
+    }
+
+    /** Wider Doors row: the student's highest family that has one (Hands-on/Analytical have none). */
+    private String widerDoorsFamily(NavigatorProScores s) {
+        List<String> ranked = new ArrayList<>(NavigatorProConstructMap.FAMILY_KEYS);
+        ranked.sort(Comparator.comparingDouble((String k) -> s.get(k)).reversed());
+        for (String k : ranked) if (content.hasWiderDoors(map.label(k))) return k;
+        return null;
+    }
+
+    /** stroke-dasharray for the page-2 ring (r = 34). */
+    static String dash(double value) {
+        double v = Math.max(0, Math.min(100, value));
+        return String.format(Locale.ROOT, "%.1f %.1f", RING_C * v / 100.0, RING_C);
+    }
+
+    /**
+     * Page-3 face offset. The plot spans x 10–310 (Acquired Skill) and y 22–242 (Will) with the
+     * cut-lines drawn at the centre (160, 132); each half-axis is scaled so the cut maps to the
+     * centre line. The face is drawn at (175, 55), so the offset is target − that point.
+     */
+    static double[] face(double skill, double will, double skillCut, double willCut) {
+        double x = half(skill, skillCut, 25, 160, 295);   // 15px inside the plot on each side
+        double y = mapY(will, willCut);
+        return new double[]{x - 175, y - 55};
+    }
+
+    private static double half(double v, double cut, double lo, double mid, double hi) {
+        v = Math.max(0, Math.min(100, v));
+        if (cut <= 0 || cut >= 100) return lo + (hi - lo) * v / 100.0;
+        return v < cut ? lo + (mid - lo) * v / cut : mid + (hi - mid) * (v - cut) / (100 - cut);
+    }
+
+    private static double mapY(double will, double cut) {
+        // 100 → y 37 (top, 15px inside), cut → 132, 0 → 227 (bottom, 15px inside)
+        double v = Math.max(0, Math.min(100, will));
+        if (cut <= 0 || cut >= 100) return 227 - 190 * v / 100.0;
+        return v < cut ? 227 - 95 * v / cut : 132 - 95 * (v - cut) / (100 - cut);
+    }
+
+    /** Cover hexagon constellation drawn from the six family scores (no numbers). */
+    String hexagon(NavigatorProScores s) {
+        double cx = 319, cy = 165, rad = 150;
+        StringBuilder grid = new StringBuilder(), pts = new StringBuilder(), dots = new StringBuilder();
+        List<String> fams = NavigatorProConstructMap.FAMILY_KEYS;
+        for (int i = 0; i < 6; i++) {
+            double a = Math.toRadians(-90 + 60 * i);
+            double ex = cx + rad * Math.cos(a), ey = cy + rad * Math.sin(a);
+            grid.append(String.format(Locale.ROOT, "%.1f,%.1f ", ex, ey));
+            double f = Math.max(0.06, s.get(fams.get(i)) / 100.0);
+            double px = cx + rad * f * Math.cos(a), py = cy + rad * f * Math.sin(a);
+            pts.append(String.format(Locale.ROOT, "%.1f,%.1f ", px, py));
+            dots.append(String.format(Locale.ROOT, "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"5\" fill=\"#eda93e\"/>", px, py));
+        }
+        return "<svg viewBox=\"0 0 638 330\" style=\"width:100%;height:100%\" xmlns=\"http://www.w3.org/2000/svg\">"
+                + "<polygon points=\"" + grid.toString().trim() + "\" fill=\"none\" stroke=\"#6f86ad\" stroke-width=\"1\"/>"
+                + "<polygon points=\"" + pts.toString().trim() + "\" fill=\"rgba(237,169,62,0.18)\" stroke=\"#eda93e\" stroke-width=\"2\"/>"
+                + dots + "</svg>";
+    }
+
+    private static String escape(String t) {
+        return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /** Tech Spec v3 §3: trim and Title-Case names. */
+    static String titleCase(String name) {
+        StringBuilder sb = new StringBuilder();
+        for (String w : name.split("\\s+")) {
+            if (w.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1).toLowerCase(Locale.ENGLISH));
+        }
+        return sb.toString();
     }
 
     private static String studentId(StudentInfo si, Long userStudentId) {
@@ -396,7 +674,27 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
         return 1 + earlier;
     }
 
-    private static int r(double v) {
+    static int r(double v) {
         return (int) Math.round(v);
+    }
+
+    // accessors for the raw export
+    public NavigatorProConstructMap constructMap() { return map; }
+    public NavigatorProBlend blendConfig()         { return blend; }
+
+    /** The thresholds in force, for the raw export's settings sheet. */
+    public Map<String, Object> thresholds() {
+        Map<String, Object> t = new LinkedHashMap<>();
+        t.put("flat-gap", flatGap);
+        t.put("weak-peak (R3)", weakPeak);
+        t.put("no-signal-exposure (R4)", noSignalExposure);
+        t.put("banner-flag-count (R2)", bannerFlagCount);
+        t.put("norms-min-n", normsMinN);
+        t.put("percentile-min-n", percentileMinN);
+        t.put("tie-gap", tieGap);
+        t.put("explorer-spread (R6)", explorerSpread);
+        t.put("explorer-max-exposure (R6)", explorerMaxExposure);
+        t.put("track-a-cut", trackACut);
+        return t;
     }
 }
