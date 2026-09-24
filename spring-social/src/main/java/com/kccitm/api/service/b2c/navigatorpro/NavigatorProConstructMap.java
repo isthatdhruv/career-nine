@@ -16,7 +16,7 @@ import org.yaml.snakeyaml.Yaml;
 
 /**
  * Which measured-quality-type (MQT) names feed each Navigator Pro construct.
- * Loaded once from {@code navigator-pro/mqt-map.yml}. A question belongs to a
+ * Loaded once from {@code navigator-pro/mqt-map.yml} (v3 instrument). A question belongs to a
  * construct because its options carry scores under that construct's MQT; nothing
  * is identified by item code or excel header.
  */
@@ -48,6 +48,8 @@ public class NavigatorProConstructMap {
 
     private final Map<String, Construct> byKey = new LinkedHashMap<>();
     private final Map<String, String> keyByMqt = new HashMap<>();
+    /** MQT of the unscored aspiration multi-select (v3: "Aspiration"). */
+    private String aspirationMqt = "Aspiration";
 
     public NavigatorProConstructMap() {
         this(NavigatorProConstructMap.class.getResourceAsStream("/navigator-pro/mqt-map.yml"));
@@ -82,6 +84,13 @@ public class NavigatorProConstructMap {
                 }
             }
         }
+        Object asp = ((Map<String, Object>) root).get("aspiration");
+        if (asp instanceof Map && ((Map<String, Object>) asp).get("mqt") != null) {
+            aspirationMqt = String.valueOf(((Map<String, Object>) asp).get("mqt"));
+            if (keyByMqt.containsKey(normalize(aspirationMqt))) {
+                throw new IllegalStateException("mqt-map.yml: aspiration MQT '" + aspirationMqt + "' is also a scored construct");
+            }
+        }
         List<String> required = new ArrayList<>(FACTOR_KEYS);
         required.add(VALIDITY);
         required.add(ATTENTION);
@@ -99,6 +108,18 @@ public class NavigatorProConstructMap {
     /** Trim, collapse inner whitespace, lower-case — the only normalisation applied to MQT names. */
     public static String normalize(String name) {
         return name == null ? "" : name.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+    }
+
+    /** True when {@code mqtName} is the aspiration multi-select's MQT. */
+    public boolean isAspiration(String mqtName) {
+        return normalize(aspirationMqt).equals(normalize(mqtName));
+    }
+
+    /** Domain key whose label equals {@code text} (case/space-insensitive), e.g. an aspiration option. */
+    public Optional<String> domainForLabel(String text) {
+        String n = normalize(text);
+        for (String k : DOMAIN_KEYS) if (normalize(get(k).label).equals(n)) return Optional.of(k);
+        return Optional.empty();
     }
 
     public Optional<String> constructFor(String mqtName) {

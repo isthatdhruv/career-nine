@@ -11,14 +11,20 @@ import java.util.TreeSet;
 import com.kccitm.api.service.b2c.navigatorpro.NavigatorProConstructMap.Construct;
 
 /**
- * Pure scoring: contribution rows → indices, families, checks, flags, incomplete
- * list. No I/O. Σ per construct is the plain sum of matched rows; the stored MQT
- * scores already carry any reversal.
+ * Pure scoring (Report Logic v3, sheet 1): contribution rows → indices, families,
+ * checks, flags, incomplete list. No I/O. Σ per construct is the plain sum of
+ * matched rows; the stored MQT scores already carry any reversal.
+ *
+ * <p>Every index is (Σ − q·min) / (q·(max − min)) × 100 over the construct's
+ * questions q and mark range, which yields exactly the v3 formulas: Will
+ * (Σ−11)/44, factors (Σ−4)/16 · (Σ−3)/12 · (Σ−4)/16, Foundation (Σ−22)/66, sub-skills
+ * (Σ−k)/3k, Acquired Skill (Σ−12)/36, per-domain (m−1)/3, families Yes/6.
  */
 public final class NavigatorProScorer {
 
-    /** A validity row scoring this or higher is one flag (scores are oriented high = suspicious). */
+    /** A validity row scoring this or higher is one flag (all three items are oriented high = suspicious). */
     public static final int VALIDITY_FLAG_SCORE = 4;
+    public static final int RANKED_VALUES = 4;
 
     private final NavigatorProConstructMap map;
     private final double flatGap;
@@ -30,6 +36,11 @@ public final class NavigatorProScorer {
 
     public NavigatorProScores score(List<Contribution> rows, List<ValueRank> values,
                                     Map<String, Set<Long>> expected) {
+        return score(rows, values, List.of(), expected);
+    }
+
+    public NavigatorProScores score(List<Contribution> rows, List<ValueRank> values, List<String> aspirations,
+                                    Map<String, Set<Long>> expected) {
         NavigatorProScores s = new NavigatorProScores();
 
         Map<String, Integer> sum = new HashMap<>();
@@ -40,6 +51,7 @@ public final class NavigatorProScorer {
             perRow.computeIfAbsent(r.construct, k -> new ArrayList<>()).add(r.score);
             countByQuestion.computeIfAbsent(r.construct, k -> new HashMap<>()).merge(r.questionId, 1, Integer::sum);
         }
+        for (Construct c : map.all()) s.sums.put(c.key, sum.getOrDefault(c.key, 0));
 
         // Completeness: every expected question exactly once.
         for (Construct c : map.all()) {
@@ -51,29 +63,14 @@ public final class NavigatorProScorer {
             }
         }
 
-        // Factors and drive: floor = questions × 1, range = questions × 4.
-        int factorSum = 0;
-        int factorQuestions = 0;
-        for (String k : NavigatorProConstructMap.FACTOR_KEYS) {
-            Construct c = map.get(k);
-            s.index.put(k, scale(sum.getOrDefault(k, 0), c.questions, c.questions * 4));
-            factorSum += sum.getOrDefault(k, 0);
-            factorQuestions += c.questions;
-        }
-        s.index.put("drive", scale(factorSum, factorQuestions, factorQuestions * 4));
+        // Will (drive) = union of the three factor rows; Foundation = union of the five sub-skills;
+        // Acquired Skill = union of the twelve domains.
+        s.index.put("drive", group(s, sum, NavigatorProConstructMap.FACTOR_KEYS));
+        s.index.put("foundation", group(s, sum, NavigatorProConstructMap.SUB_KEYS));
+        s.index.put("skill", group(s, sum, NavigatorProConstructMap.DOMAIN_KEYS));
+        for (String k : NavigatorProConstructMap.FAMILY_KEYS) s.index.put(k, scaled(map.get(k), sum.getOrDefault(k, 0)));
 
-        // Foundation sub-domains: (Σ − k)/(3k); foundation over all 22.
-        int subSum = 0;
-        int subQuestions = 0;
-        for (String k : NavigatorProConstructMap.SUB_KEYS) {
-            Construct c = map.get(k);
-            s.index.put(k, scale(sum.getOrDefault(k, 0), c.questions, c.questions * 3));
-            subSum += sum.getOrDefault(k, 0);
-            subQuestions += c.questions;
-        }
-        s.index.put("foundation", scale(subSum, subQuestions, subQuestions * 3));
-
-        // Reasoning checks: the single row is correct when it scores 1.
+        // Everyday logic: the single row of each check is correct when it scores 1.
         int correct = 0;
         for (String k : NavigatorProConstructMap.CHECK_KEYS) {
             List<Integer> r = perRow.getOrDefault(k, List.of());
@@ -83,33 +80,26 @@ public final class NavigatorProScorer {
         }
         s.reasoning = correct;
 
-        // Specialized domains: (m − 1)/4; skill over all 12.
-        int domSum = 0;
-        for (String k : NavigatorProConstructMap.DOMAIN_KEYS) {
-            s.index.put(k, scale(sum.getOrDefault(k, 0), 1, 4));
-            domSum += sum.getOrDefault(k, 0);
-        }
-        int domains = NavigatorProConstructMap.DOMAIN_KEYS.size();
-        s.index.put("skill", scale(domSum, domains, domains * 4));
-
-        // Families: Yes-count / questions × 100.
-        for (String k : NavigatorProConstructMap.FAMILY_KEYS) {
-            Construct c = map.get(k);
-            s.index.put(k, sum.getOrDefault(k, 0) * 100.0 / c.questions);
-        }
+        // Interest shape: families ranked, ties broken in map order (Hands-on first).
         List<String> ranked = new ArrayList<>(NavigatorProConstructMap.FAMILY_KEYS);
         ranked.sort(Comparator.comparingDouble((String k) -> s.get(k)).reversed());
         s.topFamily = ranked.get(0);
         s.secondFamily = ranked.get(1);
         s.flat = (s.get(s.topFamily) - s.get(s.secondFamily)) < flatGap;
 
-        // Values: rank order 1..4.
+        // Values: rank order 1..4 (weights 4/3/2/1 are applied by the blend).
         List<ValueRank> sorted = new ArrayList<>(values);
         sorted.sort(Comparator.comparingInt(v -> v.rank));
         for (ValueRank v : sorted) {
-            if (v.rank >= 1 && v.rank <= 4 && s.values.size() < 4) s.values.add(v.optionText);
+            if (v.rank >= 1 && v.rank <= RANKED_VALUES && s.values.size() < RANKED_VALUES) {
+                s.values.add(v.tag);
+                s.valueOptions.add(v.optionText);
+            }
         }
-        s.valuesMissing = s.values.size() < 4;
+        s.valuesMissing = s.values.size() < RANKED_VALUES;
+        if (s.valuesMissing) s.incomplete.add("values:ranked:" + s.values.size());
+
+        s.aspirations.addAll(aspirations);
 
         // Validity and attention.
         s.validityFlags = (int) perRow.getOrDefault(NavigatorProConstructMap.VALIDITY, List.of())
@@ -120,7 +110,22 @@ public final class NavigatorProScorer {
         return s;
     }
 
-    private static double scale(int sum, int floor, int range) {
-        return range == 0 ? 0.0 : (sum - floor) * 100.0 / range;
+    /** Scales each member construct and returns the index over their union. */
+    private double group(NavigatorProScores s, Map<String, Integer> sum, List<String> keys) {
+        int total = 0, floor = 0, range = 0;
+        for (String k : keys) {
+            Construct c = map.get(k);
+            int sk = sum.getOrDefault(k, 0);
+            s.index.put(k, scaled(c, sk));
+            total += sk;
+            floor += c.questions * c.min;
+            range += c.questions * (c.max - c.min);
+        }
+        return range == 0 ? 0.0 : (total - floor) * 100.0 / range;
+    }
+
+    static double scaled(Construct c, int sum) {
+        int range = c.questions * (c.max - c.min);
+        return range == 0 ? 0.0 : (sum - c.questions * c.min) * 100.0 / range;
     }
 }

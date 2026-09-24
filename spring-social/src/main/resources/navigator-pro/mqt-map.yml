@@ -1,39 +1,56 @@
-# Navigator Pro construct map.
+# Navigator Pro construct map — v3 (Sept 2026 instrument, questionnaire "Navigator Pro").
 # Which measured-quality-type (MQT) names feed each construct, how many questions
 # each construct must have in the questionnaire, and the score range every stored
-# option score must lie in. Renaming an MQT in the admin = editing this file.
-# Reversal lives in the stored scores; the engine only sums.
+# option score must lie in. Source: Assessment_questionnaire_SEQUENCED.xlsx (MQT tags)
+# and NavigatorPro_Report_Logic_v3.xlsx (sheet 1 Scoring, sheet 5 display maps).
+# Reversal lives in the stored scores (reverse-keyed items and the attended-class
+# validity item are pre-inverted); the engine only sums. Renaming an MQT in the
+# admin = editing this file. Labels are the student-facing display names.
+#
+# Internal keys keep the engine's names (f_id Internal Drive, f_st Sustained Tenacity,
+# f_ae Adaptive Execution); the labels are the v3 display map.
 constructs:
-  f_id:      { label: "Internal Drive",       mqts: ["Internal Drive"],        questions: 4, min: 1, max: 5 }
-  f_st:      { label: "Sustained Tenacity",   mqts: ["Sustained Tenacity"],    questions: 3, min: 1, max: 5 }
-  f_ae:      { label: "Adaptive Execution",   mqts: ["Adaptive Execution"],    questions: 4, min: 1, max: 5 }
-  validity:  { label: "Validity",             mqts: ["Validity"],              questions: 3, min: 1, max: 5 }
-  attention: { label: "Attention check",      mqts: ["Personality- Validity"], questions: 1, min: 0, max: 1 }
-  fam_r:     { label: "Hands-on",             mqts: ["Doer"],                  questions: 6, min: 0, max: 1 }
-  fam_i:     { label: "Analytical",           mqts: ["Thinker"],               questions: 6, min: 0, max: 1 }
-  fam_a:     { label: "Creative",             mqts: ["Creator"],               questions: 6, min: 0, max: 1 }
-  fam_s:     { label: "Social",               mqts: ["Helper"],                questions: 6, min: 0, max: 1 }
-  fam_e:     { label: "Enterprising",         mqts: ["Persuader"],             questions: 6, min: 0, max: 1 }
-  fam_c:     { label: "Organising",           mqts: ["Organizer"],             questions: 6, min: 0, max: 1 }
+  f_id:      { label: "Self-Motivation", mqts: ["Self-Efficacy", "Growth Mindset"],                    questions: 4, min: 1, max: 5 }
+  f_st:      { label: "Consistency",     mqts: ["Perseverance"],                                       questions: 3, min: 1, max: 5 }
+  f_ae:      { label: "Adaptability",    mqts: ["Proactivity", "Learning Agility", "Metacognition"],  questions: 4, min: 1, max: 5 }
+  validity:  { label: "Validity",        mqts: ["Validity"],        questions: 3, min: 1, max: 5 }
+  attention: { label: "Attention check", mqts: ["Attention Check"], questions: 1, min: 0, max: 1 }
+  fam_r:     { label: "Hands-on",       mqts: ["Hands-on"],       questions: 6, min: 0, max: 1 }
+  fam_i:     { label: "Analytical",     mqts: ["Analytical"],     questions: 6, min: 0, max: 1 }
+  fam_a:     { label: "Creative",       mqts: ["Creative"],       questions: 6, min: 0, max: 1 }
+  fam_s:     { label: "People-focused", mqts: ["People-focused"], questions: 6, min: 0, max: 1 }
+  fam_e:     { label: "Enterprising",   mqts: ["Enterprising"],   questions: 6, min: 0, max: 1 }
+  fam_c:     { label: "Organized",      mqts: ["Organized"],      questions: 6, min: 0, max: 1 }
   fs_nd:     { label: "Numbers & data",             mqts: ["Numbers & data"],             questions: 4, min: 1, max: 4 }
   fs_di:     { label: "Digital & information",      mqts: ["Digital & information"],      questions: 4, min: 1, max: 4 }
   fs_tp:     { label: "Thinking & problem-solving", mqts: ["Thinking & problem-solving"], questions: 6, min: 1, max: 4 }
   fs_ci:     { label: "Creating & improving",       mqts: ["Creating & improving"],       questions: 4, min: 1, max: 4 }
-  fs_gd:     { label: "Getting things done",        mqts: ["Getting things done"],        questions: 4, min: 1, max: 4 }
-  chk_num:   { label: "Applied numeracy",   mqts: ["Numeracy"],          questions: 1, min: 0, max: 1 }
-  chk_dat:   { label: "Data reading",       mqts: ["Data reading"],      questions: 1, min: 0, max: 1 }
-  chk_cau:   { label: "Causal reasoning",   mqts: ["Causal reasoning"],  questions: 1, min: 0, max: 1 }
-  chk_src:   { label: "Source judgment",    mqts: ["Source judgment"],   questions: 1, min: 0, max: 1 }
-  chk_spr:   { label: "Spreadsheet logic",  mqts: ["Spreadsheet logic"], questions: 1, min: 0, max: 1 }
-  d_sd:      { label: "Software Development",              mqts: ["Software Development"],              questions: 1, min: 1, max: 5 }
-  d_da:      { label: "Data & AI",                         mqts: ["Data & AI"],                         questions: 1, min: 1, max: 5 }
-  d_si:      { label: "Systems & Infrastructure",          mqts: ["Systems & Infrastructure"],          questions: 1, min: 1, max: 5 }
-  d_cy:      { label: "Cybersecurity",                     mqts: ["Cybersecurity"],                     questions: 1, min: 1, max: 5 }
-  d_ux:      { label: "Product & UX Design",               mqts: ["Product & UX Design"],               questions: 1, min: 1, max: 5 }
-  d_ee:      { label: "Electronics & Embedded",            mqts: ["Electronics & Embedded"],            questions: 1, min: 1, max: 5 }
-  d_pe:      { label: "Power & Energy",                    mqts: ["Power & Energy"],                    questions: 1, min: 1, max: 5 }
-  d_md:      { label: "Mechanical Design & Manufacturing", mqts: ["Mechanical Design & Manufacturing"], questions: 1, min: 1, max: 5 }
-  d_cs:      { label: "Civil & Structural",                mqts: ["Civil & Structural"],                questions: 1, min: 1, max: 5 }
-  d_pc:      { label: "Process & Chemical",                mqts: ["Process & Chemical"],                questions: 1, min: 1, max: 5 }
-  d_qt:      { label: "Quality, Testing & Operations",     mqts: ["Quality, Testing & Operations"],     questions: 1, min: 1, max: 5 }
-  d_tb:      { label: "Technical Business & Consulting",   mqts: ["Technical Business & Consulting"],   questions: 1, min: 1, max: 5 }
+  fs_gd:     { label: "Finishing what you start",   mqts: ["Getting things done"],        questions: 4, min: 1, max: 4 }
+  chk_num:   { label: "Applied numeracy",  mqts: ["Cognitive check — numeracy"],         questions: 1, min: 0, max: 1 }
+  chk_dat:   { label: "Data reading",      mqts: ["Cognitive check — data reading"],     questions: 1, min: 0, max: 1 }
+  chk_cau:   { label: "Causal reasoning",  mqts: ["Cognitive check — causal reasoning"], questions: 1, min: 0, max: 1 }
+  chk_src:   { label: "Source judgment",   mqts: ["Cognitive check — source evaluation"], questions: 1, min: 0, max: 1 }
+  chk_spr:   { label: "Spreadsheet logic", mqts: ["Cognitive check — spreadsheet logic"], questions: 1, min: 0, max: 1 }
+  # Domain Exposure: 4-point doing scale (Never tried it … Did it on my own) → 1..4.
+  d_sd:      { label: "Software Development",              mqts: ["Software Development"],              questions: 1, min: 1, max: 4 }
+  d_da:      { label: "Data & AI",                         mqts: ["Data & AI"],                         questions: 1, min: 1, max: 4 }
+  d_si:      { label: "Systems & Infrastructure",          mqts: ["Systems & Infrastructure"],          questions: 1, min: 1, max: 4 }
+  d_cy:      { label: "Cybersecurity",                     mqts: ["Cybersecurity"],                     questions: 1, min: 1, max: 4 }
+  d_ux:      { label: "Product & UX Design",               mqts: ["Product & UX Design"],               questions: 1, min: 1, max: 4 }
+  d_ee:      { label: "Electronics & Embedded",            mqts: ["Electronics & Embedded"],            questions: 1, min: 1, max: 4 }
+  d_pe:      { label: "Power & Energy",                    mqts: ["Power & Energy"],                    questions: 1, min: 1, max: 4 }
+  d_md:      { label: "Mechanical Design & Manufacturing", mqts: ["Mechanical Design & Manufacturing"], questions: 1, min: 1, max: 4 }
+  d_cs:      { label: "Civil & Structural",                mqts: ["Civil & Structural"],                questions: 1, min: 1, max: 4 }
+  d_pc:      { label: "Process & Chemical",                mqts: ["Process & Chemical"],                questions: 1, min: 1, max: 4 }
+  d_qt:      { label: "Quality, Testing & Operations",     mqts: ["Quality, Testing & Operations"],     questions: 1, min: 1, max: 4 }
+  d_tb:      { label: "Technical Business & Consulting",   mqts: ["Technical Business & Consulting"],   questions: 1, min: 1, max: 4 }
+
+# Unscored rows. Work Values: the single ranking question; each option carries a
+# value tag as its MQT (Curiosity … Influence), and the rank order is what counts.
+# Aspiration: the multi-select pick (2–3 domains) whose options score under this
+# MQT; it never enters scoring and feeds the Explorer branch only.
+values:
+  options: 12
+  ranked: 4
+aspiration:
+  mqt: "Aspiration"

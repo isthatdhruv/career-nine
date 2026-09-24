@@ -1,0 +1,310 @@
+{
+  "_source": "Core_Algorithm_Weightages.xlsx sheets 2-4 and 6 (LOCKED Sept 2026). Edit here, never in code.",
+  "weights": {
+    "interest": 0.4,
+    "exposure": 0.4,
+    "values": 0.2
+  },
+  "rankWeights": [
+    4,
+    3,
+    2,
+    1
+  ],
+  "valueAlignmentDivisor": 30,
+  "interestMatrix": {
+    "Software Development": {
+      "Hands-on": 1,
+      "Analytical": 3,
+      "Creative": 0,
+      "People-focused": 0,
+      "Enterprising": 0,
+      "Organized": 2
+    },
+    "Data & AI": {
+      "Hands-on": 0,
+      "Analytical": 3,
+      "Creative": 1,
+      "People-focused": 0,
+      "Enterprising": 0,
+      "Organized": 2
+    },
+    "Systems & Infrastructure": {
+      "Hands-on": 2,
+      "Analytical": 2,
+      "Creative": 0,
+      "People-focused": 0,
+      "Enterprising": 0,
+      "Organized": 3
+    },
+    "Cybersecurity": {
+      "Hands-on": 1,
+      "Analytical": 3,
+      "Creative": 0,
+      "People-focused": 0,
+      "Enterprising": 1,
+      "Organized": 2
+    },
+    "Product & UX Design": {
+      "Hands-on": 0,
+      "Analytical": 2,
+      "Creative": 3,
+      "People-focused": 1,
+      "Enterprising": 1,
+      "Organized": 0
+    },
+    "Electronics & Embedded": {
+      "Hands-on": 3,
+      "Analytical": 3,
+      "Creative": 0,
+      "People-focused": 0,
+      "Enterprising": 0,
+      "Organized": 1
+    },
+    "Power & Energy": {
+      "Hands-on": 3,
+      "Analytical": 2,
+      "Creative": 0,
+      "People-focused": 0,
+      "Enterprising": 0,
+      "Organized": 2
+    },
+    "Mechanical Design & Manufacturing": {
+      "Hands-on": 3,
+      "Analytical": 2,
+      "Creative": 1,
+      "People-focused": 0,
+      "Enterprising": 0,
+      "Organized": 1
+    },
+    "Civil & Structural": {
+      "Hands-on": 3,
+      "Analytical": 2,
+      "Creative": 0,
+      "People-focused": 0,
+      "Enterprising": 0,
+      "Organized": 2
+    },
+    "Process & Chemical": {
+      "Hands-on": 2,
+      "Analytical": 3,
+      "Creative": 0,
+      "People-focused": 0,
+      "Enterprising": 0,
+      "Organized": 2
+    },
+    "Quality, Testing & Operations": {
+      "Hands-on": 2,
+      "Analytical": 1,
+      "Creative": 0,
+      "People-focused": 0,
+      "Enterprising": 1,
+      "Organized": 3
+    },
+    "Technical Business & Consulting": {
+      "Hands-on": 0,
+      "Analytical": 2,
+      "Creative": 0,
+      "People-focused": 1,
+      "Enterprising": 3,
+      "Organized": 1
+    }
+  },
+  "valueSupply": {
+    "Software Development": {
+      "Curiosity": 2,
+      "Autonomy": 2,
+      "Learning": 3,
+      "Stability": 1,
+      "Pay & benefits": 3,
+      "Structure": 1,
+      "Helping people": 1,
+      "Family respect": 2,
+      "Purpose": 1,
+      "Recognition": 2,
+      "Advancement": 2,
+      "Influence": 1
+    },
+    "Data & AI": {
+      "Curiosity": 3,
+      "Autonomy": 2,
+      "Learning": 3,
+      "Stability": 1,
+      "Pay & benefits": 3,
+      "Structure": 1,
+      "Helping people": 1,
+      "Family respect": 2,
+      "Purpose": 2,
+      "Recognition": 2,
+      "Advancement": 2,
+      "Influence": 2
+    },
+    "Systems & Infrastructure": {
+      "Curiosity": 1,
+      "Autonomy": 1,
+      "Learning": 2,
+      "Stability": 2,
+      "Pay & benefits": 2,
+      "Structure": 2,
+      "Helping people": 1,
+      "Family respect": 1,
+      "Purpose": 1,
+      "Recognition": 1,
+      "Advancement": 2,
+      "Influence": 1
+    },
+    "Cybersecurity": {
+      "Curiosity": 3,
+      "Autonomy": 1,
+      "Learning": 3,
+      "Stability": 2,
+      "Pay & benefits": 2,
+      "Structure": 1,
+      "Helping people": 2,
+      "Family respect": 1,
+      "Purpose": 2,
+      "Recognition": 2,
+      "Advancement": 2,
+      "Influence": 2
+    },
+    "Product & UX Design": {
+      "Curiosity": 2,
+      "Autonomy": 2,
+      "Learning": 2,
+      "Stability": 1,
+      "Pay & benefits": 2,
+      "Structure": 1,
+      "Helping people": 2,
+      "Family respect": 1,
+      "Purpose": 1,
+      "Recognition": 2,
+      "Advancement": 1,
+      "Influence": 2
+    },
+    "Electronics & Embedded": {
+      "Curiosity": 2,
+      "Autonomy": 1,
+      "Learning": 2,
+      "Stability": 2,
+      "Pay & benefits": 2,
+      "Structure": 1,
+      "Helping people": 1,
+      "Family respect": 2,
+      "Purpose": 2,
+      "Recognition": 1,
+      "Advancement": 1,
+      "Influence": 1
+    },
+    "Power & Energy": {
+      "Curiosity": 1,
+      "Autonomy": 0,
+      "Learning": 1,
+      "Stability": 3,
+      "Pay & benefits": 1,
+      "Structure": 2,
+      "Helping people": 2,
+      "Family respect": 2,
+      "Purpose": 3,
+      "Recognition": 1,
+      "Advancement": 1,
+      "Influence": 1
+    },
+    "Mechanical Design & Manufacturing": {
+      "Curiosity": 2,
+      "Autonomy": 1,
+      "Learning": 1,
+      "Stability": 2,
+      "Pay & benefits": 1,
+      "Structure": 2,
+      "Helping people": 1,
+      "Family respect": 2,
+      "Purpose": 1,
+      "Recognition": 1,
+      "Advancement": 2,
+      "Influence": 1
+    },
+    "Civil & Structural": {
+      "Curiosity": 1,
+      "Autonomy": 0,
+      "Learning": 1,
+      "Stability": 2,
+      "Pay & benefits": 1,
+      "Structure": 2,
+      "Helping people": 2,
+      "Family respect": 2,
+      "Purpose": 2,
+      "Recognition": 1,
+      "Advancement": 1,
+      "Influence": 1
+    },
+    "Process & Chemical": {
+      "Curiosity": 2,
+      "Autonomy": 0,
+      "Learning": 1,
+      "Stability": 2,
+      "Pay & benefits": 1,
+      "Structure": 2,
+      "Helping people": 2,
+      "Family respect": 1,
+      "Purpose": 2,
+      "Recognition": 1,
+      "Advancement": 1,
+      "Influence": 1
+    },
+    "Quality, Testing & Operations": {
+      "Curiosity": 1,
+      "Autonomy": 0,
+      "Learning": 1,
+      "Stability": 2,
+      "Pay & benefits": 1,
+      "Structure": 3,
+      "Helping people": 1,
+      "Family respect": 1,
+      "Purpose": 1,
+      "Recognition": 1,
+      "Advancement": 2,
+      "Influence": 2
+    },
+    "Technical Business & Consulting": {
+      "Curiosity": 2,
+      "Autonomy": 1,
+      "Learning": 2,
+      "Stability": 1,
+      "Pay & benefits": 3,
+      "Structure": 1,
+      "Helping people": 1,
+      "Family respect": 2,
+      "Purpose": 1,
+      "Recognition": 2,
+      "Advancement": 3,
+      "Influence": 3
+    }
+  },
+  "sectors": {
+    "Bioengineering": {
+      "Process & Chemical": 0.35,
+      "Electronics & Embedded": 0.3,
+      "Data & AI": 0.2,
+      "Quality, Testing & Operations": 0.15
+    },
+    "Space Engineering": {
+      "Mechanical Design & Manufacturing": 0.35,
+      "Electronics & Embedded": 0.3,
+      "Quality, Testing & Operations": 0.2,
+      "Software Development": 0.075,
+      "Systems & Infrastructure": 0.075
+    },
+    "EV & Automotive": {
+      "Mechanical Design & Manufacturing": 0.4,
+      "Electronics & Embedded": 0.3,
+      "Power & Energy": 0.2,
+      "Software Development": 0.1
+    },
+    "Semiconductor": {
+      "Electronics & Embedded": 0.45,
+      "Systems & Infrastructure": 0.2,
+      "Quality, Testing & Operations": 0.2,
+      "Data & AI": 0.15
+    }
+  }
+}

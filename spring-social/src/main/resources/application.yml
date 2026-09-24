@@ -181,15 +181,20 @@ app:
   googleAPIJSON: classpath:google.json
   fileTempFolder: classpath:temp
   navigator-pro:
-    # Navigator Pro report engine. Thresholds mirror Report_Logic_Spec.xlsx; the
-    # QR on page 5 targets the Career Library and must be live before a batch ships.
-    career-library-url: ${APP_NAVIGATOR_PRO_CAREER_LIBRARY_URL:}
-    flat-gap: 10
-    weak-peak: 50
-    no-signal-domain: 50
-    banner-flag-count: 2
-    norms-min-n: 60
-    percentile-min-n: 30
+    # Navigator Pro report engine v3. Thresholds are config, not code (Tech Spec v3 §10);
+    # values mirror Report Logic v3 / Core Algorithm Weightages. The page-5 QR targets
+    # the Career Library and must be live before a batch ships.
+    career-library-url: ${APP_NAVIGATOR_PRO_CAREER_LIBRARY_URL:https://library.career-9.com/}
+    flat-gap: 10              # top family − 2nd < this → tied shape (copy only)
+    weak-peak: 50             # R3: no family at or above this → suppress
+    no-signal-exposure: 0     # R4: tied interests AND every domain exposure ≤ this → suppress
+    banner-flag-count: 2      # R2: validity flags ≥ this → banner + mandatory counselling
+    norms-min-n: 60           # cohort medians as zone cuts at n ≥ this, else provisional 50/50
+    percentile-min-n: 30      # bands suppressed ("cohort forming") below this
+    tie-gap: 3                # #1 − #2 < this → tie line
+    explorer-spread: 5        # R6: #1 − #3 < this …
+    explorer-max-exposure: 75 # … AND no domain exposure ≥ this → Explorer branch
+    track-a-cut: 50           # Track A: Hands-on < this AND Analytical < this
   auth:
     tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
     tokenExpirationMsec: 864000000
@@ -375,7 +380,7 @@ spring:
     # production apply strictly in order and must keep the default.
     out-of-order: true
   datasource:
-    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+    url: jdbc:mysql://localhost:3307/career-9-staging-v4?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
     username: root
     password: Career-qCsfeuECc3MW
     hikari:

@@ -28,5 +28,5 @@ public final class EngineVersions {
     public static final String PAGER_V1 = "pager-v3";
 
     /** Bumped when NavigatorProCalculationService's placeholder mapping or NavigatorProScorer changes. */
-    public static final String NAVIGATOR_PRO_V1 = "navigator_pro-v1";
+    public static final String NAVIGATOR_PRO_V3 = "navigator_pro-v3";
 }

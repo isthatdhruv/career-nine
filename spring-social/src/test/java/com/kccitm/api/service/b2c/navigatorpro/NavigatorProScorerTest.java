@@ -42,6 +42,11 @@ class NavigatorProScorerTest {
             for (String k : NavigatorProConstructMap.SUB_KEYS) add(k, repeat(freq, k.equals("fs_tp") ? 6 : 4));
             for (String k : NavigatorProConstructMap.CHECK_KEYS) add(k, mcq);
             for (String k : NavigatorProConstructMap.DOMAIN_KEYS) add(k, intensity);
+            rank("Pay & benefits", "Autonomy", "Learning", "Stability");
+        }
+
+        void rank(String... tags) {
+            for (int i = 0; i < tags.length; i++) values.add(new ValueRank(i + 1, tags[i], "opt " + tags[i]));
         }
 
         static int[] repeat(int v, int n) { int[] a = new int[n]; java.util.Arrays.fill(a, v); return a; }
@@ -54,7 +59,7 @@ class NavigatorProScorerTest {
     @Test
     void maxFixture_scoresEverythingAtHundred() {
         Fx fx = new Fx();
-        fx.fillAll(5, 4, 1, 5, 1, 1, 1);
+        fx.fillAll(5, 4, 1, 4, 1, 1, 1);   // exposure max is "Did it on my own" = 4
         NavigatorProScores s = score(fx);
         assertThat(s.get("f_id")).isEqualTo(100.0);
         assertThat(s.get("f_st")).isEqualTo(100.0);
@@ -163,21 +168,24 @@ class NavigatorProScorerTest {
     }
 
     @Test
-    void domains_ratingAndSkillIndex() {
+    void domains_fourPointExposureAndSkillIndex() {
         Fx fx = new Fx();
-        int[] m = {5, 4, 4, 3, 3, 3, 3, 2, 3, 2, 3, 3}; // Σ38 → (38−12)/48 = 54.17
+        int[] m = {4, 3, 2, 1, 2, 3, 3, 4, 2, 1, 3, 2}; // Σ30 → (30−12)/36 = 50
         int i = 0;
         for (String k : NavigatorProConstructMap.DOMAIN_KEYS) fx.add(k, m[i++]);
         NavigatorProScores s = score(fx);
-        assertThat(s.get("d_sd")).isEqualTo(100.0);
-        assertThat(s.get("d_da")).isEqualTo(75.0);
-        assertThat(s.get("skill")).isCloseTo(54.167, within(0.01));
+        assertThat(s.get("d_sd")).isEqualTo(100.0);                          // (4−1)/3
+        assertThat(s.get("d_da")).isCloseTo(66.667, within(0.01));           // (3−1)/3
+        assertThat(s.get("d_si")).isCloseTo(33.333, within(0.01));
+        assertThat(s.get("d_cy")).isZero();
+        assertThat(s.get("skill")).isEqualTo(50.0);
         assertThat(s.maxDomain()).isEqualTo(100.0);
     }
 
     @Test
     void incomplete_listsSkippedAndDuplicatedQuestions() {
         Fx fx = new Fx();
+        fx.rank("Pay & benefits", "Autonomy", "Learning", "Stability");
         fx.add("f_id", 4, 4, 4, 4);
         long skipped = 99L;
         fx.expected.get("f_id").add(skipped);                       // expected but never answered
@@ -187,20 +195,31 @@ class NavigatorProScorerTest {
     }
 
     @Test
-    void values_orderedByRankAndMissingBelowFour() {
+    void values_orderedByRankAndFewerThanFourIsIncomplete() {
         Fx fx = new Fx();
-        fx.values.add(new ValueRank(3, "C"));
-        fx.values.add(new ValueRank(1, "A"));
-        fx.values.add(new ValueRank(4, "D"));
-        fx.values.add(new ValueRank(2, "B"));
+        fx.values.add(new ValueRank(3, "Learning", "c"));
+        fx.values.add(new ValueRank(1, "Pay & benefits", "a"));
+        fx.values.add(new ValueRank(4, "Stability", "d"));
+        fx.values.add(new ValueRank(2, "Autonomy", "b"));
         NavigatorProScores s = score(fx);
-        assertThat(s.values).containsExactly("A", "B", "C", "D");
+        assertThat(s.values).containsExactly("Pay & benefits", "Autonomy", "Learning", "Stability");
+        assertThat(s.valueOptions).containsExactly("a", "b", "c", "d");
         assertThat(s.valuesMissing).isFalse();
+        assertThat(s.incomplete).isEmpty();
 
         Fx three = new Fx();
-        three.values.add(new ValueRank(1, "A"));
-        three.values.add(new ValueRank(2, "B"));
-        three.values.add(new ValueRank(3, "C"));
-        assertThat(score(three).valuesMissing).isTrue();
+        three.rank("Pay & benefits", "Autonomy", "Learning");
+        NavigatorProScores t = score(three);
+        assertThat(t.valuesMissing).isTrue();
+        assertThat(t.incomplete).containsExactly("values:ranked:3");        // Tech Spec v3 §3: <4 ranks = R5
+    }
+
+    @Test
+    void aspirations_arePassedThroughUnscored() {
+        Fx fx = new Fx();
+        fx.fillAll(3, 2, 1, 2, 1, 1, 1);
+        NavigatorProScores s = scorer.score(fx.rows, fx.values, java.util.List.of("d_ee", "d_pe"), fx.expected);
+        assertThat(s.aspirations).containsExactly("d_ee", "d_pe");
+        assertThat(s.get("d_ee")).isCloseTo(33.333, within(0.01));           // exposure untouched by the pick
     }
 }

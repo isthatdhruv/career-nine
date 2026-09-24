@@ -24,7 +24,7 @@ import {
   GenerateUnifiedReport,
   TemplateMappingDto,
 } from "../ReportTemplates/API/Report_Templates_APIs";
-import { exportAssessmentDataExcel, exportPsychometricProperties } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
+import { exportAssessmentDataExcel, exportPsychometricProperties, exportNavigatorProRaw } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
 import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
 import {
   SendReportEmail,
@@ -203,6 +203,7 @@ const ReportsHubPage: React.FC = () => {
   const [exportingDataExcel, setExportingDataExcel] = useState(false);
   const [exportingDashboard, setExportingDashboard] = useState(false);
   const [exportingPsychometric, setExportingPsychometric] = useState(false);
+  const [exportingNavigatorPro, setExportingNavigatorPro] = useState(false);
   // downloadingZip / zipProgress removed — replaced by zipJobs
 
   // ── ZIP jobs (persisted across re-renders via ref+state) ──
@@ -862,6 +863,33 @@ const ReportsHubPage: React.FC = () => {
       }
       showErrorToast("Psychometric export failed: " + message);
     } finally { setExportingPsychometric(false); }
+  };
+
+  // Navigator Pro raw data: the v3 engine's full per-student computation. Like the
+  // psychometric export, an empty selection falls back to the filtered list.
+  const isNavigatorPro = templates.some((m) => m.template.engineCode === "navigator_pro");
+  const handleExportNavigatorProRaw = async () => {
+    if (!selectedAssessmentObj) return;
+    const ticked = getSelectedIds();
+    const ids = ticked.length > 0 ? ticked : displayedStudents.map((s) => s.userStudentId);
+    if (ids.length === 0) { showErrorToast("No students match the current filters."); return; }
+
+    setExportingNavigatorPro(true);
+    try {
+      const res = await exportNavigatorProRaw(selectedAssessmentObj.id, ids);
+      downloadBlob(res.data, `navigator_pro_raw_data_${selectedAssessmentObj.id}.xlsx`);
+      showSuccessToast(`Navigator Pro raw data computed for ${ids.length} student(s).`);
+      setMiraDesaiOpen(false);
+    } catch (err: any) {
+      let message = err?.message || "Unknown error";
+      const blob = err?.response?.data;
+      if (blob instanceof Blob) {
+        try { message = JSON.parse(await blob.text()).error || message; } catch { /* keep message */ }
+      } else if (err?.response?.data?.error) {
+        message = err.response.data.error;
+      }
+      showErrorToast("Navigator Pro export failed: " + message);
+    } finally { setExportingNavigatorPro(false); }
   };
 
   // ═══════════════════════ SEND ACTIONS ═══════════════════════
@@ -1626,6 +1654,9 @@ const ReportsHubPage: React.FC = () => {
         exportingMQT={exportingMQT}
         exportingDashboard={exportingDashboard}
         exportingPsychometric={exportingPsychometric}
+        exportingNavigatorPro={exportingNavigatorPro}
+        isNavigatorPro={isNavigatorPro}
+        onExportNavigatorProRaw={handleExportNavigatorProRaw}
         onGenerateDataExcel={handleGenerateDataExcel}
         onExportBetCoreData={handleExportBetCoreData}
         onExportDashboardSheet={handleExportDashboardSheet}
