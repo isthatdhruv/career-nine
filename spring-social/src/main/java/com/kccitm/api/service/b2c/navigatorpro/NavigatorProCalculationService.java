@@ -24,16 +24,20 @@ import org.springframework.stereotype.Component;
 
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.DemographicFieldDefinition;
+import com.kccitm.api.model.career9.DemographicFieldOption;
 import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.StudentDemographicResponse;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.report.AssessmentReportTemplate;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesRepository;
+import com.kccitm.api.repository.Career9.StudentDemographicResponseRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.report.AssessmentReportTemplateRepository;
@@ -61,8 +65,8 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
 
     private static final Logger logger = LoggerFactory.getLogger(NavigatorProCalculationService.class);
     static final long NORMS_TTL_MS = 60_000L;
-    /** Circumference of the page-2 ring (r = 34) for stroke-dasharray. */
-    private static final double RING_C = 2 * Math.PI * 34;
+    /** Circumference of the page-2 ring (r = 36) for stroke-dasharray. */
+    private static final double RING_C = 2 * Math.PI * 36;
 
     @Autowired private AssessmentAnswerRepository answerRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
@@ -71,6 +75,7 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
     @Autowired private StudentAssessmentMappingRepository mappingRepository;
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private AssessmentReportTemplateRepository assessmentReportTemplateRepository;
+    @Autowired private StudentDemographicResponseRepository demographicResponseRepository;
     @Autowired private NavigatorProConstructMap map;
     @Autowired private NavigatorProBlend blend;
 
@@ -331,6 +336,13 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
         p.put("student_id", studentId(si, userStudentId));
         p.put("college", college);
         p.put("student_line", college);
+        p.put("stream", stream(userStudentId, assessmentId));
+        String logoUrl = us != null && us.getInstitute() != null && us.getInstitute().getLogoUrl() != null
+                ? us.getInstitute().getLogoUrl().trim() : "";
+        p.put("school_logo_url", logoUrl);
+        p.put("school_logo", logoUrl.isEmpty() ? "" : "<img src=\"" + escapeAttr(logoUrl) + "\" alt=\"\" style=\"position:absolute; "
+                + "top:14px; bottom:14px; right:78px; left:30px; width:calc(100% - 108px); height:48px; background:#ffffff; "
+                + "object-fit:contain; object-position:right center\">");
         StudentAssessmentMapping mapping = mappingRepository
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId).orElse(null);
         Date completedAt = mapping != null ? mapping.getCompletedAt() : null;
@@ -361,6 +373,7 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
         p.put("will", p.get("drive"));
         p.put("will_band", p.get("drive_band"));
         p.put("dash_drive", dash(s.get("drive")));
+        p.put("col_drive", bandColour((String) p.get("drive_band")));
         for (String k : NavigatorProConstructMap.FACTOR_KEYS) {
             String suffix = k.substring(2);
             putIndex(p, k, s.get(k), norms);
@@ -375,6 +388,7 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
         // Foundation Skill and sub-skills (raw RAG)
         putIndex(p, "foundation", s.get("foundation"), norms);
         p.put("dash_foundation", dash(s.get("foundation")));
+        p.put("col_foundation", bandColour((String) p.get("foundation_band")));
         List<String> subs = new ArrayList<>(NavigatorProConstructMap.SUB_KEYS);
         for (String k : subs) {
             double v = s.get(k);
@@ -383,6 +397,7 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
             p.put(k + "_band", NavigatorProNorms.ragBand(v));
             p.put(k + "_rag", NavigatorProNorms.ragColour(v));
             p.put("w_" + k, r(v));
+            p.put("col_" + k, ragHex(NavigatorProNorms.ragColour(v)));
         }
         subs.sort(Comparator.comparingDouble(s::get));   // stable: ND, DI, TP, CI, GD order on ties
         String low1 = subs.get(0), low2 = subs.get(1);
@@ -400,20 +415,31 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
         p.put("reasoning_display", s.reasoning + "/5");
         p.put("reasoning_band", band("reasoning", s.reasoning, norms));
         p.put("dash_reasoning", dash(s.reasoning * 20.0));
+        p.put("col_reasoning", bandColour((String) p.get("reasoning_band")));
         for (String k : NavigatorProConstructMap.CHECK_KEYS) {
             boolean ok = Boolean.TRUE.equals(s.checks.get(k));
             p.put(k, ok);
             p.put(k + "_mark", ok ? "✔" : "✘");
             p.put(k + "_label", map.label(k));
+            p.put("col_" + k, ok ? RAG_GREEN : COL_RED);
         }
 
         // Acquired Skill (Domain Exposure)
         putIndex(p, "skill", s.get("skill"), norms);
         p.put("skill_p", "");
         p.put("dash_skill", dash(s.get("skill")));
+        p.put("col_skill", bandColour((String) p.get("skill_band")));
         for (String k : NavigatorProConstructMap.DOMAIN_KEYS) {
             p.put(k, r(s.get(k)));
             p.put(k + "_rag", NavigatorProNorms.ragColour(s.get(k)));
+            p.put("w_" + k, r(s.get(k)));
+        }
+
+        // Ring and headline font sizes shrink for long values (template renderVals).
+        for (String k : List.of("drive", "foundation", "skill", "reasoning_display")) {
+            int n = String.valueOf(p.get(k)).length();
+            p.put("rfs_" + k, n > 6 ? 9 : n > 4 ? 12 : 20);
+            p.put("sfs_" + k, n > 6 ? 14 : 30);
         }
 
         // Personality families and shape
@@ -426,7 +452,11 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
             p.put(k + "_band", fb);
             p.put(k + "_bullet_1", bullets.size() > 0 ? bullets.get(0) : "");
             p.put(k + "_bullet_2", bullets.size() > 1 ? bullets.get(1) : "");
+            p.put("w_" + k, r(s.get(k)));
+            p.put("col_" + k, r(s.get(k)) >= 67 ? COL_AMBER : "#a9b8d6");
         }
+        radar(p, s, "cr", 240, 170, 130, 0.3);   // cover constellation
+        radar(p, s, "p3", 150, 120, 90, 0);      // page-3 hexagon
         p.put("top_family", map.label(s.topFamily));
         p.put("second_family", map.label(s.secondFamily));
         p.put("profile_shape", s.flat ? "Tied" : "Clear leader");
@@ -446,9 +476,13 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
                 + z.means + ". Which moves first: " + z.first + ". What to do: " + z.todo + ".");
         p.put("drive_median", r(norms.driveCut));
         p.put("skill_median", r(norms.skillCut));
-        double[] face = face(s.get("skill"), s.get("drive"), norms.skillCut, norms.driveCut);
-        p.put("face_dx", Math.round(face[0]));
-        p.put("face_dy", Math.round(face[1]));
+        // Quadrant plot: x 0–318 (Acquired Skill), y 16–228 (Will, top = 100); cut-lines at the medians.
+        p.put("qx", fixed1(quadX(r(norms.skillCut))));
+        p.put("qy", fixed1(quadY(r(norms.driveCut))));
+        p.put("face_dx", fixed1(Math.max(16, Math.min(302, quadX(r(s.get("skill")))))));
+        p.put("face_dy", fixed1(Math.max(44, Math.min(214, quadY(r(s.get("drive")))))));
+        p.put("quad_caption", "Acquired skill → (↑ Will). " + (norms.provisional
+                ? "Lines at provisional batch cut-lines until cohort medians land." : "Lines at batch medians."));
 
         // Values (join on value tag)
         for (int i = 1; i <= 4; i++) {
@@ -467,6 +501,11 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
             String d = b.ranking.get(i - 1);
             p.put("rank_" + i, map.label(d));
             p.put("rank_" + i + "_score", r(b.careerScore.get(d)));
+            if (i >= 4) {   // ranks 4–12 print even for Explorer; top1–3 are set below
+                p.put("top" + i, map.label(d));
+                p.put("top" + i + "_score", r(b.careerScore.get(d)));
+                p.put("w_top" + i, Math.max(0, Math.min(100, r(b.careerScore.get(d)))));
+            }
         }
         StringBuilder rows = new StringBuilder();
         for (int i = 4; i <= 12; i++) {
@@ -556,10 +595,118 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
 
         // Keys the V3 HTML still binds but the v3 content has no copy for: emitted empty, never invented.
         for (String k : List.of("prec", "precision_line", "factor_callout", "lowest_bar_step", "sector_caveat",
-                "move_1", "move_2", "move_3")) {
+                "move_1", "move_2", "move_3", "tier_line", "about_career9", "about_report", "drive_text",
+                "f_id_text", "f_st_text", "f_ae_text", "foundation_text", "reasoning_text", "skill_text",
+                "counselling_otp")) {
             p.put(k, "");
         }
         return p;
+    }
+
+    // Template palette (Navigator_pro_report_page renderVals).
+    private static final String COL_GREEN = "#1f7a34", COL_AMBER = "#e8a33d", COL_RED = "#c0392b", COL_NEUTRAL = "#8a97ab";
+    private static final String RAG_GREEN = "#2e7d32";
+    /** Hexagon axis order in both radars: Hands-on at the top, then clockwise. */
+    private static final List<String> RADAR_FAMILIES = List.of("fam_r", "fam_i", "fam_a", "fam_e", "fam_c", "fam_s");
+    /** Demographic fields that carry the stream, in preference order ("Stream/ Major", then "current specialization"). */
+    private static final List<String> STREAM_FIELDS = List.of("specilization_pro", "stream");
+
+    /** Band word → pill/ring colour; an empty band (cohort forming) is neutral grey. */
+    static String bandColour(String band) {
+        String b = band == null ? "" : band.toLowerCase(Locale.ENGLISH);
+        if (b.contains("strong")) return COL_GREEN;
+        if (b.contains("develop")) return COL_AMBER;
+        if (b.contains("early")) return COL_RED;
+        return COL_NEUTRAL;
+    }
+
+    static String ragHex(String rag) {
+        switch (rag) {
+            case "green": return RAG_GREEN;
+            case "amber": return COL_AMBER;
+            case "red":   return COL_RED;
+            default:      return COL_NEUTRAL;
+        }
+    }
+
+    /**
+     * Six-point family radar: {prefix}_x0..5, {prefix}_y0..5 and {prefix}_poly. Each point sits at
+     * {@code rMax × (base + (1 − base) × score/100)} from the centre, so {@code base} keeps a zero off the hub.
+     */
+    private static void radar(Map<String, Object> p, NavigatorProScores s, String prefix, double cx, double cy,
+                              double rMax, double base) {
+        StringBuilder poly = new StringBuilder();
+        for (int i = 0; i < RADAR_FAMILIES.size(); i++) {
+            double v = Math.max(0, Math.min(100, r(s.get(RADAR_FAMILIES.get(i)))));
+            double rad = rMax * (base + (1 - base) * v / 100.0);
+            double t = Math.toRadians(-90 + 60 * i);
+            String x = number1(cx + rad * Math.cos(t)), y = number1(cy + rad * Math.sin(t));
+            p.put(prefix + "_x" + i, x);
+            p.put(prefix + "_y" + i, y);
+            if (poly.length() > 0) poly.append(' ');
+            poly.append(x).append(',').append(y);
+        }
+        p.put(prefix + "_poly", poly.toString());
+    }
+
+    private static double quadX(double skill) {
+        return 318 * Math.max(0, Math.min(100, skill)) / 100.0;
+    }
+
+    private static double quadY(double will) {
+        return 16 + 212 * (1 - Math.max(0, Math.min(100, will)) / 100.0);
+    }
+
+    /** One decimal, always shown (JS toFixed(1)). */
+    static String fixed1(double v) {
+        return String.format(Locale.ROOT, "%.1f", v);
+    }
+
+    /** One decimal, trailing ".0" dropped (JS +x.toFixed(1)). */
+    static String number1(double v) {
+        String s = fixed1(v);
+        if (s.equals("-0.0")) return "0";
+        return s.endsWith(".0") ? s.substring(0, s.length() - 2) : s;
+    }
+
+    /** The student's stream/major from demographics: this assessment's answer first, else their latest one. */
+    private String stream(Long userStudentId, Long assessmentId) {
+        List<StudentDemographicResponse> rows;
+        try {
+            rows = demographicResponseRepository.findByUserStudentId(userStudentId);
+        } catch (Exception e) {
+            logger.warn("stream lookup failed for student {}: {}", userStudentId, e.getMessage());
+            return "";
+        }
+        if (rows == null) return "";
+        for (String field : STREAM_FIELDS) {
+            StudentDemographicResponse best = null;
+            String bestValue = null;
+            for (StudentDemographicResponse row : rows) {
+                DemographicFieldDefinition def = row.getFieldDefinition();
+                if (def == null || !field.equals(def.getFieldName())) continue;
+                String v = demographicDisplay(def, row.getResponseValue());
+                if (v.isEmpty()) continue;
+                if (assessmentId.equals(row.getAssessmentId())) return v;
+                if (best == null || (row.getSubmittedAt() != null
+                        && (best.getSubmittedAt() == null || row.getSubmittedAt().after(best.getSubmittedAt())))) {
+                    best = row;
+                    bestValue = v;
+                }
+            }
+            if (bestValue != null) return bestValue;
+        }
+        return "";
+    }
+
+    /** SELECT answers are stored as option values; print the option label instead. */
+    private static String demographicDisplay(DemographicFieldDefinition def, String raw) {
+        String v = raw == null ? "" : raw.trim();
+        if (v.isEmpty() || def.getOptions() == null) return v;
+        for (DemographicFieldOption o : def.getOptions()) {
+            if (v.equals(o.getOptionValue()) && o.getOptionLabel() != null) return o.getOptionLabel().trim();
+        }
+        return v;
     }
 
     /** Raw 0–100 value, plus the percentile band (internal percentile, never printed). */
@@ -581,34 +728,10 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
         return null;
     }
 
-    /** stroke-dasharray for the page-2 ring (r = 34). */
+    /** stroke-dasharray for the page-2 ring (r = 36). */
     static String dash(double value) {
         double v = Math.max(0, Math.min(100, value));
         return String.format(Locale.ROOT, "%.1f %.1f", RING_C * v / 100.0, RING_C);
-    }
-
-    /**
-     * Page-3 face offset. The plot spans x 10–310 (Acquired Skill) and y 22–242 (Will) with the
-     * cut-lines drawn at the centre (160, 132); each half-axis is scaled so the cut maps to the
-     * centre line. The face is drawn at (175, 55), so the offset is target − that point.
-     */
-    static double[] face(double skill, double will, double skillCut, double willCut) {
-        double x = half(skill, skillCut, 25, 160, 295);   // 15px inside the plot on each side
-        double y = mapY(will, willCut);
-        return new double[]{x - 175, y - 55};
-    }
-
-    private static double half(double v, double cut, double lo, double mid, double hi) {
-        v = Math.max(0, Math.min(100, v));
-        if (cut <= 0 || cut >= 100) return lo + (hi - lo) * v / 100.0;
-        return v < cut ? lo + (mid - lo) * v / cut : mid + (hi - mid) * (v - cut) / (100 - cut);
-    }
-
-    private static double mapY(double will, double cut) {
-        // 100 → y 37 (top, 15px inside), cut → 132, 0 → 227 (bottom, 15px inside)
-        double v = Math.max(0, Math.min(100, will));
-        if (cut <= 0 || cut >= 100) return 227 - 190 * v / 100.0;
-        return v < cut ? 227 - 95 * v / cut : 132 - 95 * (v - cut) / (100 - cut);
     }
 
     /** Cover hexagon constellation drawn from the six family scores (no numbers). */
@@ -633,6 +756,10 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
 
     private static String escape(String t) {
         return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private static String escapeAttr(String t) {
+        return escape(t).replace("\"", "&quot;");
     }
 
     /** Tech Spec v3 §3: trim and Title-Case names. */

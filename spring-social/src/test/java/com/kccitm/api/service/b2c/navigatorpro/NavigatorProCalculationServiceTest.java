@@ -1,22 +1,27 @@
 package com.kccitm.api.service.b2c.navigatorpro;
 
 import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.DemographicFieldDefinition;
+import com.kccitm.api.model.career9.DemographicFieldOption;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.StudentDemographicResponse;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesRepository;
+import com.kccitm.api.repository.Career9.StudentDemographicResponseRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.report.AssessmentReportTemplateRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.service.b2c.report.ReportRoutingException;
 import com.kccitm.api.service.b2c.report.ReportSuppressedException;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,11 +33,19 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -63,6 +76,7 @@ class NavigatorProCalculationServiceTest {
     @Mock StudentAssessmentMappingRepository mappingRepository;
     @Mock UserStudentRepository userStudentRepository;
     @Mock AssessmentReportTemplateRepository assessmentReportTemplateRepository;
+    @Mock StudentDemographicResponseRepository demographicResponseRepository;
     @Spy NavigatorProConstructMap map = new NavigatorProConstructMap();
     @Spy NavigatorProBlend blend = new NavigatorProBlend();
     @InjectMocks NavigatorProCalculationService service;
@@ -217,8 +231,104 @@ class NavigatorProCalculationServiceTest {
         assertThat(p.get("counselling_mandatory")).isEqualTo(false);
         assertThat(p).doesNotContainKey("validity_flags");
         assertThat(p.get("factor_callout")).isEqualTo("");
-        assertThat(p.get("dash_drive")).isEqualTo("160.2 213.6");
+        assertThat(p.get("dash_drive")).isEqualTo("169.6 226.2");       // ring r = 36
         assertThat((String) p.get("cover_mark")).startsWith("<svg");
+    }
+
+    /** Keys the updated Navigator_pro_report_page.html binds beyond the v3 copy: colours, radars, quadrant, ranks 4–12. */
+    @Test
+    void templateGeometryAndColours() {
+        answers(standard(DONE_OWN, YES));
+
+        Map<String, Object> p = service.calculate(5L, 9L, null);
+
+        // Bands are blank while the cohort forms → neutral ring; raw RAG and checks keep their colours.
+        assertThat(p.get("col_drive")).isEqualTo("#8a97ab");
+        assertThat(p.get("col_fs_gd")).isEqualTo("#2e7d32");
+        assertThat(p.get("col_chk_spr")).isEqualTo("#2e7d32");
+        assertThat(p.get("w_fam_r")).isEqualTo(100);
+        assertThat(p.get("col_fam_r")).isEqualTo("#e8a33d");
+
+        // Every family 100 → points on the outer ring; Hands-on at the top, Analytical next clockwise.
+        assertThat(p.get("cr_x0")).isEqualTo("240");
+        assertThat(p.get("cr_y0")).isEqualTo("40");
+        assertThat(p.get("cr_x1")).isEqualTo("352.6");
+        assertThat(p.get("cr_y1")).isEqualTo("105");
+        assertThat((String) p.get("cr_poly")).startsWith("240,40 352.6,105 ");
+        assertThat(p.get("p3_x0")).isEqualTo("150");
+        assertThat(p.get("p3_y0")).isEqualTo("30");
+
+        // Provisional 50/50 cuts; skill 100 clamps the face inside the plot, will 75 → y 69.
+        assertThat(p.get("qx")).isEqualTo("159.0");
+        assertThat(p.get("qy")).isEqualTo("122.0");
+        assertThat(p.get("face_dx")).isEqualTo("302.0");
+        assertThat(p.get("face_dy")).isEqualTo("69.0");
+        assertThat((String) p.get("quad_caption")).startsWith("Acquired skill → (↑ Will). ");
+
+        assertThat(p.get("top4")).isEqualTo(p.get("rank_4"));
+        assertThat(p.get("top12")).isEqualTo("Quality, Testing & Operations");
+        assertThat(p.get("w_top12")).isEqualTo(p.get("rank_12_score"));
+        assertThat(p.get("rfs_drive")).isEqualTo(20);
+        assertThat(p.get("sfs_reasoning_display")).isEqualTo(30);
+
+        assertThat(p.get("stream")).isEqualTo("");
+        assertThat(p.get("school_logo")).isEqualTo("");
+    }
+
+    @Test
+    void streamFromDemographics_andSchoolLogo() {
+        answers(standard(DONE_OWN, YES));
+        student.getInstitute().setLogoUrl("https://cdn.example/logo.png");
+        DemographicFieldDefinition select = field("stream");
+        DemographicFieldOption science = new DemographicFieldOption();
+        science.setOptionValue("2");
+        science.setOptionLabel("Science");
+        select.setOptions(List.of(science));
+        when(demographicResponseRepository.findByUserStudentId(5L)).thenReturn(List.of(
+                response(select, 3L, "2"),
+                response(field("specilization_pro"), 9L, "B.Tech Mechanical Engineering")));
+
+        Map<String, Object> p = service.calculate(5L, 9L, null);
+
+        assertThat(p.get("stream")).isEqualTo("B.Tech Mechanical Engineering");   // Stream/ Major wins
+        assertThat(p.get("school_logo_url")).isEqualTo("https://cdn.example/logo.png");
+        assertThat((String) p.get("school_logo")).startsWith("<img src=\"https://cdn.example/logo.png\"");
+
+        when(demographicResponseRepository.findByUserStudentId(5L)).thenReturn(List.of(response(select, 3L, "2")));
+        assertThat(service.calculate(5L, 9L, null).get("stream")).isEqualTo("Science");   // SELECT prints its label
+    }
+
+    /** "More is good, less is bad": every placeholder in the root template must be emitted. */
+    @Test
+    void emitsEveryPlaceholderOfTheReportTemplate() throws Exception {
+        Path page = Paths.get("..", "Navigator_pro_report_page.html");
+        Assumptions.assumeTrue(Files.exists(page), "template not checked out next to spring-social");
+        Set<String> keys = new TreeSet<>();
+        Matcher m = Pattern.compile("\\{\\{\\s*([a-zA-Z0-9_%]+)\\s*\\}\\}")
+                .matcher(new String(Files.readAllBytes(page), StandardCharsets.UTF_8));
+        while (m.find()) keys.add(m.group(1));
+        keys.remove("chartDataJson");   // added by ReportService from this map
+        answers(standard(DONE_OWN, YES));
+
+        Map<String, Object> p = service.calculate(5L, 9L, null);
+
+        assertThat(keys).isNotEmpty();
+        assertThat(p.keySet()).containsAll(keys);
+    }
+
+    private static DemographicFieldDefinition field(String name) {
+        DemographicFieldDefinition d = new DemographicFieldDefinition();
+        d.setFieldName(name);
+        return d;
+    }
+
+    private static StudentDemographicResponse response(DemographicFieldDefinition def, Long assessmentId, String value) {
+        StudentDemographicResponse r = new StudentDemographicResponse();
+        r.setUserStudentId(5L);
+        r.setAssessmentId(assessmentId);
+        r.setFieldDefinition(def);
+        r.setResponseValue(value);
+        return r;
     }
 
     /** Tech Spec v3 §9 EXPLORER: bunched blend and no domain done on their own → R6 branch, aspiration-led. */

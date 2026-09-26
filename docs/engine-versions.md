@@ -33,6 +33,12 @@ tag forces a cache miss — placeholders are recomputed on the next
 
 ## navigator_pro
 
+- **navigator_pro-v3.1** (2026-09-26) — placeholder map covers every key of the updated
+  `Navigator_pro_report_page.html`: ring/pill/bar colours (`col_*`), cover and page-3 family
+  radars (`cr_*`, `p3_*`), `top4`–`top12` with bar widths, quadrant cut-lines (`qx`/`qy`) and
+  absolute face position, ring font sizes (`rfs_*`/`sfs_*`), `quad_caption`, `stream` (from
+  demographics), `school_logo`/`school_logo_url`. Ring circumference now r = 36 (226.2).
+  Percentiles stay unprinted. Invalidates every navigator_pro-v3 calculation.
 - **navigator_pro-v3** (2026-09-23) — engine moved to the v3 instrument and documents
   (Tech Spec v3, Report Logic v3, Backend Content v3, Core Algorithm Weightages): v3 MQT
   names and display map, 4-point Domain Exposure ((Σ−12)/36, per-domain (m−1)/3), gates
