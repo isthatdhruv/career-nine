@@ -121,6 +121,13 @@ public final class NavigatorProContent {
         return Optional.empty();
     }
 
+    /** Every value tag the content knows, in content order (the twelve value cards). */
+    public List<String> valueTags() {
+        List<String> out = new ArrayList<>();
+        root.path("values").fieldNames().forEachRemaining(out::add);
+        return Collections.unmodifiableList(out);
+    }
+
     public List<Pathway> pathways(String domainLabel) {
         List<Pathway> out = new ArrayList<>();
         root.path("pathways").path(domainLabel).forEach(n -> out.add(new Pathway(
@@ -137,6 +144,28 @@ public final class NavigatorProContent {
         List<String> out = new ArrayList<>();
         root.path("internships").path(domainLabel).forEach(n -> out.add(n.asText()));
         return out;
+    }
+
+    /** One direction's college industry card: organisations to approach and a visit to plan. */
+    public static final class IndustryCard {
+        public final List<String> organisations;
+        public final String visit;
+        /** Copy drafted for review rather than signed off. */
+        public final boolean draft;
+
+        IndustryCard(List<String> organisations, String visit, boolean draft) {
+            this.organisations = organisations; this.visit = visit; this.draft = draft;
+        }
+    }
+
+    /** College dashboard industry card for a direction; empty when the content has none. */
+    public Optional<IndustryCard> industryCard(String domainLabel) {
+        JsonNode n = root.path("collegeIndustry").path(domainLabel);
+        if (n.isMissingNode()) return Optional.empty();
+        List<String> orgs = new ArrayList<>();
+        n.path("organisations").forEach(o -> orgs.add(o.asText()));
+        return Optional.of(new IndustryCard(Collections.unmodifiableList(orgs),
+                n.path("visit").asText(""), n.path("draft").asBoolean(false)));
     }
 
     /** Track A wider doors for the student's top family (Creative, People-focused, Enterprising, Organized). */

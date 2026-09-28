@@ -301,6 +301,10 @@ const PrivateRoutes = () => {
   const SchoolDashboardReleasePage = lazy(
     () => import("../pages/SchoolDashboard/SchoolDashboardReleasePage")
   );
+  // The Navigator Pro college dashboard: same release store, its own page.
+  const NavigatorProDashboardPage = lazy(
+    () => import("../pages/SchoolDashboard/navigatorPro/NavigatorProDashboardPage")
+  );
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
   const AssessmentMappingPage = lazy(() => import("../pages/AssessmentMapping/AssessmentMappingPage"));
@@ -1527,6 +1531,17 @@ const PrivateRoutes = () => {
             <RequirePermission perm="dashboard.school.read">
               <SuspensedView>
                 <SchoolInsightsDashboardPage />
+              </SuspensedView>
+            </RequirePermission>
+          }
+        />
+        {/* Read-gated like the Navigator 360 dashboard: the same people see both. */}
+        <Route
+          path="/school-dashboard/navigator-pro"
+          element={
+            <RequirePermission perm="dashboard.school.read">
+              <SuspensedView>
+                <NavigatorProDashboardPage />
               </SuspensedView>
             </RequirePermission>
           }

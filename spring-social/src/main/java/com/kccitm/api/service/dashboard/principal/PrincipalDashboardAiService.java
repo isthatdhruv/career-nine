@@ -106,6 +106,16 @@ public class PrincipalDashboardAiService {
      *         rather than quietly storing empty narratives for every scope
      */
     public AiResult generate(Map<String, Object> request, ScopeKey scope) {
+        return call(request, scope, systemPrompt(), responseFormat(), PROMPT_VERSION);
+    }
+
+    /**
+     * One structured-output round trip. Shared with the Navigator Pro dashboard, which
+     * brings its own prompt, schema and version but must fail, validate and log exactly
+     * as this one does.
+     */
+    AiResult call(Map<String, Object> request, ScopeKey scope, String systemPrompt,
+                  Map<String, Object> responseFormat, String promptVersion) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException(
                     "OPENAI_API_KEY is not configured — cannot generate dashboard narratives.");
@@ -122,9 +132,9 @@ public class PrincipalDashboardAiService {
         body.put("model", model);
         body.put("temperature", 0.2);
         body.put("messages", List.of(
-                Map.of("role", "system", "content", systemPrompt()),
+                Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userContent)));
-        body.put("response_format", responseFormat());
+        body.put("response_format", responseFormat);
 
         try {
             String payload = objectMapper.writeValueAsString(body);
@@ -156,7 +166,7 @@ public class PrincipalDashboardAiService {
             JsonNode usage = root.path("usage");
             AiResult result = new AiResult();
             result.json = json;
-            result.promptVersion = PROMPT_VERSION;
+            result.promptVersion = promptVersion;
             result.requestJson = userContent;
             result.promptTokens = usage.path("prompt_tokens").asInt();
             result.completionTokens = usage.path("completion_tokens").asInt();
@@ -435,7 +445,7 @@ public class PrincipalDashboardAiService {
     // required. Building objects through one helper is what keeps that true as the
     // schema grows, rather than relying on remembering it at each site.
 
-    private static Map<String, Object> obj(Map<String, Object> properties) {
+    static Map<String, Object> obj(Map<String, Object> properties) {
         Map<String, Object> o = new LinkedHashMap<>();
         o.put("type", "object");
         o.put("properties", properties);
@@ -444,7 +454,7 @@ public class PrincipalDashboardAiService {
         return o;
     }
 
-    private static Map<String, Object> props(Object... keyValues) {
+    static Map<String, Object> props(Object... keyValues) {
         Map<String, Object> m = new LinkedHashMap<>();
         for (int i = 0; i + 1 < keyValues.length; i += 2) {
             m.put(String.valueOf(keyValues[i]), keyValues[i + 1]);
@@ -452,24 +462,24 @@ public class PrincipalDashboardAiService {
         return m;
     }
 
-    private static Map<String, Object> str() {
+    static Map<String, Object> str() {
         return Map.of("type", "string");
     }
 
-    private static Map<String, Object> num() {
+    static Map<String, Object> num() {
         return Map.of("type", "number");
     }
 
-    private static Map<String, Object> arr(Map<String, Object> items) {
+    static Map<String, Object> arr(Map<String, Object> items) {
         return Map.of("type", "array", "items", items);
     }
 
     /** Strict mode has no optional fields; an absent value is an explicit null. */
-    private static Map<String, Object> nullable(String type) {
+    static Map<String, Object> nullable(String type) {
         return Map.of("type", Arrays.asList(type, "null"));
     }
 
-    private static Map<String, Object> enumOf(String... values) {
+    static Map<String, Object> enumOf(String... values) {
         return Map.of("type", "string", "enum", Arrays.asList(values));
     }
 

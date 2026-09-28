@@ -588,5 +588,115 @@
     "one_line": "{first} in one line: {zone, lowercase} — leaning {lean} — next checkpoint: Reading 2.",
     "banner": "This report may be biased — read it with your counsellor.",
     "track_a_closing": "Your strengths are real — the right map for them is a conversation with your counsellor, not a paragraph."
+  },
+  "collegeIndustry": {
+    "Software Development": {
+      "organisations": [
+        "IT services majors",
+        "GCCs of global firms",
+        "product startups"
+      ],
+      "visit": "Half-day GCC office visit — see how a sprint actually runs",
+      "draft": false
+    },
+    "Data & AI": {
+      "organisations": [
+        "Analytics consultancies",
+        "GCC data teams",
+        "AI startups"
+      ],
+      "visit": "Analytics-firm visit with a live dashboard walkthrough",
+      "draft": false
+    },
+    "Systems & Infrastructure": {
+      "organisations": [
+        "Cloud and managed-services providers",
+        "data-centre operators",
+        "telecom network teams"
+      ],
+      "visit": "Data-centre or network operations centre visit — see uptime being kept",
+      "draft": true
+    },
+    "Cybersecurity": {
+      "organisations": [
+        "Security services firms (SOC)",
+        "bank security teams",
+        "Big-4 cyber practices"
+      ],
+      "visit": "SOC visit — watch a shift triage real alerts",
+      "draft": false
+    },
+    "Product & UX Design": {
+      "organisations": [
+        "Design studios",
+        "product-company design teams",
+        "fintech/edtech startups"
+      ],
+      "visit": "Design-studio visit with a portfolio-review session",
+      "draft": false
+    },
+    "Electronics & Embedded": {
+      "organisations": [
+        "Semiconductor design services (ISM units)",
+        "ESDM/IoT manufacturers",
+        "defence electronics (BEL)"
+      ],
+      "visit": "ESDM plant visit — SMT line from paste to test",
+      "draft": false
+    },
+    "Power & Energy": {
+      "organisations": [
+        "State and central power utilities",
+        "solar and wind EPC firms",
+        "EV and battery makers"
+      ],
+      "visit": "Substation or solar-park visit — follow power from generation to grid",
+      "draft": true
+    },
+    "Mechanical Design & Manufacturing": {
+      "organisations": [
+        "Auto OEMs & ancillaries",
+        "defence/aerospace manufacturers",
+        "robotics-automation integrators"
+      ],
+      "visit": "Auto ancillary plant visit — machining, assembly, quality gate",
+      "draft": false
+    },
+    "Civil & Structural": {
+      "organisations": [
+        "Infrastructure EPC contractors",
+        "structural design consultancies",
+        "real-estate developers"
+      ],
+      "visit": "Live construction-site visit with the site engineer's daily walk-through",
+      "draft": true
+    },
+    "Process & Chemical": {
+      "organisations": [
+        "Chemical and pharma plants",
+        "refineries and petrochemical units",
+        "water-treatment operators"
+      ],
+      "visit": "Process-plant visit — control room and a safety briefing",
+      "draft": true
+    },
+    "Quality, Testing & Operations": {
+      "organisations": [
+        "Manufacturing quality teams",
+        "software testing firms",
+        "logistics and operations companies"
+      ],
+      "visit": "Quality lab or warehouse operations visit — see how defects and delays are caught",
+      "draft": true
+    },
+    "Technical Business & Consulting": {
+      "organisations": [
+        "Technology consulting firms",
+        "B2B tech sales teams",
+        "startup incubators"
+      ],
+      "visit": "Consulting-firm session — how a client problem becomes a proposal",
+      "draft": true
+    }
   }
 }

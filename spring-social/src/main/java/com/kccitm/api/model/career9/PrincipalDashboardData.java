@@ -61,6 +61,10 @@ public class PrincipalDashboardData implements Serializable {
     /** Cohort below the configured floor: aggregates computed, AI narrative withheld. */
     public static final String STATUS_SKIPPED_SMALL_COHORT = "SKIPPED_SMALL_COHORT";
 
+    /** Which product generated this row, and so which page renders it. */
+    public static final String ENGINE_NAVIGATOR_360 = "navigator_360";
+    public static final String ENGINE_NAVIGATOR_PRO = "navigator_pro";
+
     public static final String LEVEL_INSTITUTE = "INSTITUTE";
     public static final String LEVEL_SESSION = "SESSION";
     public static final String LEVEL_CLASS = "CLASS";
@@ -77,6 +81,14 @@ public class PrincipalDashboardData implements Serializable {
 
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
+
+    /**
+     * {@link #ENGINE_NAVIGATOR_360} or {@link #ENGINE_NAVIGATOR_PRO}. Decided by the
+     * assessment's default report template when the release is planned, and stored so the
+     * read path never has to re-resolve it.
+     */
+    @Column(name = "engine_code", nullable = false, length = 32)
+    private String engineCode = ENGINE_NAVIGATOR_360;
 
     @Column(name = "scope_key", nullable = false, length = 128)
     private String scopeKey;
@@ -236,6 +248,9 @@ public class PrincipalDashboardData implements Serializable {
 
     public Long getAssessmentId() { return assessmentId; }
     public void setAssessmentId(Long assessmentId) { this.assessmentId = assessmentId; }
+
+    public String getEngineCode() { return engineCode; }
+    public void setEngineCode(String engineCode) { this.engineCode = engineCode; }
 
     public String getScopeKey() { return scopeKey; }
     public void setScopeKey(String scopeKey) { this.scopeKey = scopeKey; }

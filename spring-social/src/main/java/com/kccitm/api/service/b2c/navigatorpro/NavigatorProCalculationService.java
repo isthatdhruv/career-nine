@@ -113,7 +113,7 @@ public class NavigatorProCalculationService implements PlaceholderCalculator {
         public final boolean banner;
         public final boolean trackA;
 
-        Evaluation(long userStudentId, NavigatorProScores scores, String gateCode, String gateReason,
+        public Evaluation(long userStudentId, NavigatorProScores scores, String gateCode, String gateReason,
                    NavigatorProBlend.Result blend, boolean banner, boolean trackA) {
             this.userStudentId = userStudentId; this.scores = scores; this.gateCode = gateCode;
             this.gateReason = gateReason; this.blend = blend; this.banner = banner; this.trackA = trackA;

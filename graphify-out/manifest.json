@@ -805,8 +805,8 @@
     "semantic_hash": ""
   },
   "react-social/src/_metronic/layout/components/aside/AsideMenuMain.tsx": {
-    "mtime": 1789382508.8576636,
-    "ast_hash": "9e4d43569dc93ef08a72716b8b0ff5f3",
+    "mtime": 1790585854.1189864,
+    "ast_hash": "822d0632f83242848719588051533ad8",
     "semantic_hash": ""
   },
   "react-social/src/_metronic/layout/components/header/Header.tsx": {
@@ -4130,8 +4130,8 @@
     "semantic_hash": ""
   },
   "react-social/src/app/pages/SchoolDashboard/PrincipalDashboardRelease_APIs.ts": {
-    "mtime": 1789021501.1034434,
-    "ast_hash": "95d4281b8e0d274a78a6304248732477",
+    "mtime": 1790585918.9428542,
+    "ast_hash": "144fe75da2d3ae94f8584d5dc849e16a",
     "semantic_hash": ""
   },
   "react-social/src/app/pages/SchoolDashboard/SchoolDashboardInsights.tsx": {
@@ -4145,8 +4145,8 @@
     "semantic_hash": ""
   },
   "react-social/src/app/pages/SchoolDashboard/SchoolDashboardReleasePage.tsx": {
-    "mtime": 1789021501.110986,
-    "ast_hash": "78301ae3784ff89cb45ff00eae0e6d91",
+    "mtime": 1790585918.9436116,
+    "ast_hash": "2082282c462e55b4f38469cc63828e54",
     "semantic_hash": ""
   },
   "react-social/src/app/pages/SchoolDashboard/SchoolDashboardSummary.tsx": {
@@ -4810,8 +4810,8 @@
     "semantic_hash": ""
   },
   "react-social/src/app/routing/PrivateRoutes.tsx": {
-    "mtime": 1789021501.1576312,
-    "ast_hash": "8a239c9d7dfacce091037a096c77ab82",
+    "mtime": 1790585854.1185126,
+    "ast_hash": "e73e33f12e02ba3d759b80db6f4d8eb3",
     "semantic_hash": ""
   },
   "react-social/src/app/routing/StudentRoutes.tsx": {
@@ -5675,8 +5675,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/dashboard/PrincipalDashboardReleaseController.java": {
-    "mtime": 1789021501.261425,
-    "ast_hash": "410ff244a631e8bbea4f5027b82c6194",
+    "mtime": 1790585882.4833574,
+    "ast_hash": "26e02922e777d8ea5b5a3476585e3e16",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/controller/email/EmailAccountController.java": {
@@ -6270,8 +6270,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/model/career9/PrincipalDashboardData.java": {
-    "mtime": 1789021501.2710536,
-    "ast_hash": "c3eeb96d3ec784aa884e1c0bddaea7e7",
+    "mtime": 1790584925.7446158,
+    "ast_hash": "8cdefaca9b1762ce4f1389a099939260",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/model/career9/PrincipalDashboardReleaseLog.java": {
@@ -7065,8 +7065,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/repository/Career9/PrincipalDashboardDataRepository.java": {
-    "mtime": 1789021501.2876818,
-    "ast_hash": "9950f8bb80d2ccf9e8487e4ffaf3dd1f",
+    "mtime": 1790584925.74431,
+    "ast_hash": "b8e309ad481ce2bc47a904a968539a61",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/repository/Career9/PromoCodeRepository.java": {
@@ -8245,8 +8245,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/navigatorpro/NavigatorProCalculationService.java": {
-    "mtime": 1790420477.3456612,
-    "ast_hash": "5d192d139f4649510d3c0eed935ee818",
+    "mtime": 1790585032.1006033,
+    "ast_hash": "9ea4143e9c5b2c80d064fb457ed2687a",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/navigatorpro/NavigatorProConstructMap.java": {
@@ -8255,8 +8255,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/navigatorpro/NavigatorProContent.java": {
-    "mtime": 1790144416.0708694,
-    "ast_hash": "6bdcff929d53d788d8ce3b68990e7e1b",
+    "mtime": 1790585109.8163767,
+    "ast_hash": "a95069ff382a7ac3fe39e181ae28b59b",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/b2c/navigatorpro/NavigatorProNorms.java": {
@@ -8755,8 +8755,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardAiService.java": {
-    "mtime": 1789021501.3954833,
-    "ast_hash": "61290f50f35adcc31617adca3a6071fd",
+    "mtime": 1790585258.3938284,
+    "ast_hash": "43479f37ccae871058244eab899cdfb2",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardChartLogger.java": {
@@ -8765,8 +8765,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardNotificationService.java": {
-    "mtime": 1789382526.2896936,
-    "ast_hash": "5e37766ba032d207af33673d6c6229a6",
+    "mtime": 1790585360.975229,
+    "ast_hash": "8d1bb21552ef122c2e86a5841c5bd0de",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardReleaseLogger.java": {
@@ -8775,8 +8775,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardReleaseService.java": {
-    "mtime": 1789021501.3991218,
-    "ast_hash": "8e1bba07aba1377098e43b7171418465",
+    "mtime": 1790585317.2846906,
+    "ast_hash": "cb06528dac4e8c2bc43d7302fd1882bd",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardRequestBuilder.java": {
@@ -8785,13 +8785,13 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/PrincipalDashboardScopeCalculator.java": {
-    "mtime": 1789021501.3996928,
-    "ast_hash": "2828b5f691427f6c7fe865925ca89834",
+    "mtime": 1790585109.8161771,
+    "ast_hash": "3228ec03a218d9fe0dcbabddc65706f9",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/ReleaseSnapshot.java": {
-    "mtime": 1789021501.3998914,
-    "ast_hash": "30c6307051ade62cd5323897ef6e8b81",
+    "mtime": 1790585032.0999632,
+    "ast_hash": "f75c9bf2bd48e3b4046453f538b1fa10",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/ScopeExpansion.java": {
@@ -9065,8 +9065,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/schoolreport/SchoolDashboardDataService.java": {
-    "mtime": 1789021501.4046075,
-    "ast_hash": "7fd3133eb26c6d7511ae155b3fa1e8b1",
+    "mtime": 1790585023.1734262,
+    "ast_hash": "da710e8d21c432654ac39b96be5236b3",
     "semantic_hash": ""
   },
   "spring-social/src/main/java/com/kccitm/api/service/schoolreport/SchoolDashboardView.java": {
@@ -9655,8 +9655,8 @@
     "semantic_hash": ""
   },
   "spring-social/src/main/resources/navigator-pro/content-v3.json": {
-    "mtime": 1790144455.2579727,
-    "ast_hash": "d12737734b69c99a065a6a336f159ced",
+    "mtime": 1790585059.6114736,
+    "ast_hash": "75453cde4c8de85bc07ba5cba134e3a8",
     "semantic_hash": ""
   },
   "spring-social/src/test/java/com/kccitm/api/archtest/ConstantPool.java": {
@@ -20057,6 +20057,61 @@
   "Navigator_pro_report_page.html": {
     "mtime": 1790419458.7012818,
     "ast_hash": "b897ff718b024452ed6ad6b59fc7f842",
+    "semantic_hash": ""
+  },
+  "react-social/src/app/pages/SchoolDashboard/navigatorPro/NavigatorProDashboardPage.tsx": {
+    "mtime": 1790585787.882595,
+    "ast_hash": "91945057d6333402f58b3b9643cff80e",
+    "semantic_hash": ""
+  },
+  "react-social/src/app/pages/SchoolDashboard/navigatorPro/NavigatorProDashboard_APIs.ts": {
+    "mtime": 1790585544.084813,
+    "ast_hash": "6ddbc490ccb3200b74abf5c12b6448eb",
+    "semantic_hash": ""
+  },
+  "react-social/src/app/pages/SchoolDashboard/navigatorPro/ProWidgets.tsx": {
+    "mtime": 1790585586.509159,
+    "ast_hash": "0ee1b0d5dc4af563c4b12e0b055eb37b",
+    "semantic_hash": ""
+  },
+  "react-social/src/app/pages/SchoolDashboard/navigatorPro/StudentList.tsx": {
+    "mtime": 1790585646.7035594,
+    "ast_hash": "e9aa082cf15d7a95c6e30d4e3f0755ae",
+    "semantic_hash": ""
+  },
+  "react-social/src/app/pages/SchoolDashboard/navigatorPro/WillSkillMap.tsx": {
+    "mtime": 1790585608.215509,
+    "ast_hash": "c616a2f01b46c0c620c859abc28e5adf",
+    "semantic_hash": ""
+  },
+  "react-social/src/app/pages/SchoolDashboard/navigatorPro/navigatorProTypes.ts": {
+    "mtime": 1790585562.5997145,
+    "ast_hash": "11417545c9fd1e1556a6f330d215bf80",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/DashboardEngineResolver.java": {
+    "mtime": 1790585046.3659515,
+    "ast_hash": "37bcf9a6e2b99fed647a364bdbadeb4d",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/NavigatorProDashboardAiService.java": {
+    "mtime": 1790585291.6227756,
+    "ast_hash": "fba500607e412836fbaf4c6fe0735b7b",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/java/com/kccitm/api/service/dashboard/principal/NavigatorProDashboardCalculator.java": {
+    "mtime": 1790585248.6585994,
+    "ast_hash": "758638afb6f4c1f75b15bfa6519929af",
+    "semantic_hash": ""
+  },
+  "spring-social/src/main/resources/db/migration/V20260928001__principal_dashboard_engine_code.sql": {
+    "mtime": 1790584906.1432738,
+    "ast_hash": "0921c785f0f436b5a6ca675c3b6b693c",
+    "semantic_hash": ""
+  },
+  "spring-social/src/test/java/com/kccitm/api/service/dashboard/principal/NavigatorProDashboardCalculatorTest.java": {
+    "mtime": 1790585455.672987,
+    "ast_hash": "beb86828e364c53456f6cc75a02e2950",
     "semantic_hash": ""
   }
 }

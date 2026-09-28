@@ -626,6 +626,16 @@ export function AsideMenuMain() {
               fontIcon="bi-buildings"
             />
           )}
+          {/* Offered to everyone who can open the School Dashboard: the page is guarded by
+              the same permission, so no separate URL grant is needed per role. */}
+          {allowed("/school-dashboard") && (
+            <AsideMenuItem
+              to="/school-dashboard/navigator-pro"
+              icon="/media/icons/duotune/graphs/gra008.svg"
+              title="College Dashboard (Navigator Pro)"
+              fontIcon="bi-mortarboard"
+            />
+          )}
           {/* The admin side of the dashboard above. Gated on the release whitelist so
               a principal who can read their dashboard does not see the controls that
               generate and withdraw it. */}

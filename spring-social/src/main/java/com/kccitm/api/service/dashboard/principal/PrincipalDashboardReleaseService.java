@@ -98,6 +98,16 @@ public class PrincipalDashboardReleaseService {
     @Autowired
     private PrincipalDashboardReleaseLogger trace;
 
+    /** Picks Navigator 360 or Navigator Pro for an assessment, from its default report template. */
+    @Autowired
+    private DashboardEngineResolver engineResolver;
+
+    @Autowired
+    private NavigatorProDashboardCalculator proCalculator;
+
+    @Autowired
+    private NavigatorProDashboardAiService proAiService;
+
     @Value("${app.principal-dashboard.min-cohort-size:10}")
     private int minCohortSize;
 
@@ -207,6 +217,8 @@ public class PrincipalDashboardReleaseService {
         public Map<String, Integer> byVerdict = new LinkedHashMap<>();
         public List<ScopePlanItem> scopes = new ArrayList<>();
         public Date existingGeneratedAt;
+        /** {@code navigator_360} or {@code navigator_pro} — which dashboard this release builds. */
+        public String engineCode;
 
         /** Carried to the async worker so generation sees exactly what was planned. */
         @JsonIgnore
@@ -276,8 +288,12 @@ public class PrincipalDashboardReleaseService {
      */
     @Transactional(readOnly = true)
     public ReleaseSnapshot buildSnapshot(Long instituteCode, Long assessmentId) {
-        SchoolDashboardDataService.ScoredRoster roster =
-                dashboardDataService.buildScoredRoster(instituteCode.intValue(), assessmentId);
+        // The engine decides how the cohort is scored; everything after this line —
+        // scopes, counselling, names — is the same for both products.
+        boolean pro = PrincipalDashboardData.ENGINE_NAVIGATOR_PRO.equals(engineResolver.engineFor(assessmentId));
+        SchoolDashboardDataService.ScoredRoster roster = pro
+                ? dashboardDataService.buildNavigatorProRoster(instituteCode.intValue(), assessmentId)
+                : dashboardDataService.buildScoredRoster(instituteCode.intValue(), assessmentId);
 
         List<Long> studentIds = new ArrayList<>(roster.students.size());
         for (ScoredStudent s : roster.students) {
@@ -371,6 +387,7 @@ public class PrincipalDashboardReleaseService {
         plan.staleThreshold = staleThreshold;
         plan.refreshCooldownHours = refreshCooldownHours;
         plan.snapshot = snapshot;
+        plan.engineCode = snapshot.engineCode();
 
         Map<String, PrincipalDashboardData> existing = new LinkedHashMap<>();
         for (PrincipalDashboardData row :
@@ -453,6 +470,7 @@ public class PrincipalDashboardReleaseService {
             row.setInstituteCode(instituteCode);
             row.setAssessmentId(assessmentId);
             row.setScopeKey(item.scopeKey);
+            row.setEngineCode(snapshot.engineCode());
             row.setScopeLevel(item.scopeLevel);
             row.setScopeLabel(item.scopeLabel);
             row.setSessionId(scope.getSessionId());
@@ -476,7 +494,7 @@ public class PrincipalDashboardReleaseService {
         }
 
         // This assessment is now the one the school's dashboard shows.
-        repository.markCurrentAssessment(instituteCode, assessmentId);
+        repository.markCurrentAssessment(instituteCode, assessmentId, snapshot.engineCode());
 
         plan.releaseId = releaseId;
         plan.scopeCount = written;
@@ -513,7 +531,7 @@ public class PrincipalDashboardReleaseService {
         Map<String, Object> event = null;
         try {
             PrincipalDashboardScopeCalculator.ScopeResult institute =
-                    calculator.compute(snapshot, ScopeKey.institute(snapshot.assessmentId()));
+                    compute(snapshot, ScopeKey.institute(snapshot.assessmentId()));
             baselineSheets = institute.sheets;
             event = buildEvent(snapshot);
             trace.run(releaseId, instituteCode, assessmentId,
@@ -603,7 +621,7 @@ public class PrincipalDashboardReleaseService {
         // 1. Deterministic half — a filter over the snapshot, then the same aggregation
         //    the Mira Desai dashboard export uses.
         long metricsStarted = System.currentTimeMillis();
-        PrincipalDashboardScopeCalculator.ScopeResult result = calculator.compute(snapshot, scope);
+        PrincipalDashboardScopeCalculator.ScopeResult result = compute(snapshot, scope);
         trace.scope(row.getReleaseId(), row.getInstituteCode(), row.getAssessmentId(),
                 row.getScopeKey(), row.getScopeLabel(),
                 PrincipalDashboardReleaseLog.STEP_METRICS,
@@ -615,7 +633,9 @@ public class PrincipalDashboardReleaseService {
         row.setScoredCount(result.scoredCount);
         row.setScoredAtGeneration(result.scoredCount);
         row.setStaleThreshold(staleThreshold);
-        row.setLogicVersion(PrincipalDashboardScopeCalculator.LOGIC_VERSION);
+        row.setLogicVersion(snapshot.isNavigatorPro()
+                ? NavigatorProDashboardCalculator.LOGIC_VERSION
+                : PrincipalDashboardScopeCalculator.LOGIC_VERSION);
         row.setGeneratedAt(new Date());
 
         // 2. Expensive half — withheld below the floor. A narrative over four students is
@@ -638,17 +658,22 @@ public class PrincipalDashboardReleaseService {
         Map<String, Object> baseline =
                 PrincipalDashboardData.LEVEL_INSTITUTE.equals(scope.level()) ? null : baselineSheets;
 
-        Map<String, Object> request = requestBuilder.build(
-                result.payload, baseline, event, scope.level());
+        boolean pro = snapshot.isNavigatorPro();
+        Map<String, Object> request = pro
+                ? proAiService.buildRequest(result.payload, result.sheets, baseline, event)
+                : requestBuilder.build(result.payload, baseline, event, scope.level());
 
         trace.scope(row.getReleaseId(), row.getInstituteCode(), row.getAssessmentId(),
                 row.getScopeKey(), row.getScopeLabel(),
                 PrincipalDashboardReleaseLog.STEP_AI_REQUEST,
                 PrincipalDashboardReleaseLog.OUTCOME_OK,
-                "Sent to " + PrincipalDashboardAiService.PROMPT_VERSION, null);
+                "Sent to " + (pro ? NavigatorProDashboardAiService.PROMPT_VERSION
+                                  : PrincipalDashboardAiService.PROMPT_VERSION), null);
 
         long aiStarted = System.currentTimeMillis();
-        PrincipalDashboardAiService.AiResult ai = aiService.generate(request, scope);
+        PrincipalDashboardAiService.AiResult ai = pro
+                ? proAiService.generate(request, scope)
+                : aiService.generate(request, scope);
         trace.scope(row.getReleaseId(), row.getInstituteCode(), row.getAssessmentId(),
                 row.getScopeKey(), row.getScopeLabel(),
                 PrincipalDashboardReleaseLog.STEP_AI_RESPONSE,
@@ -661,6 +686,13 @@ public class PrincipalDashboardReleaseService {
         row.setGenerationStatus(PrincipalDashboardData.STATUS_GENERATED);
         repository.save(row);
         return PrincipalDashboardData.STATUS_GENERATED;
+    }
+
+    /** The deterministic half for either product, from the same snapshot. */
+    private PrincipalDashboardScopeCalculator.ScopeResult compute(ReleaseSnapshot snapshot, ScopeKey scope) {
+        return snapshot.isNavigatorPro()
+                ? proCalculator.compute(snapshot, scope)
+                : calculator.compute(snapshot, scope);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
