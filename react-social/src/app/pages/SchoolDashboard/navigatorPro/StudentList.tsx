@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AttentionItem, StudentRow, ZoneCount, ZoneKey } from "./navigatorProTypes";
 import { OwnerTag, ZONE_COLOURS, ZONE_ORDER } from "./ProWidgets";
 
@@ -15,6 +15,9 @@ const GATE_TEXT: Record<string, string> = {
   R4: "Held — no signal",
   R5: "Held — incomplete",
 };
+
+const zoneStyle = (z?: ZoneKey) =>
+  ({ "--zc": z ? ZONE_COLOURS[z] : "transparent" } as React.CSSProperties);
 
 interface Props {
   students: StudentRow[];
@@ -36,7 +39,7 @@ const StudentList: React.FC<Props> = ({
   const [q, setQ] = useState("");
   const [zone, setZone] = useState<ZoneKey | "all" | "held">("all");
   const [field, setField] = useState("all");
-  const [attention, setAttention] = useState<"all" | "1" | "2" | "3" | "any">("all");
+  const [attention, setAttention] = useState<"all" | "1" | "2" | "3" | "any" | "mismatch">("all");
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "will", desc: true });
 
   const zoneLabel = (z?: ZoneKey) => zones.find((c) => c.key === z)?.label ?? "";
@@ -56,6 +59,7 @@ const StudentList: React.FC<Props> = ({
       if (zone !== "all" && zone !== "held" && s.zone !== zone) return false;
       if (field !== "all" && s.lean !== field) return false;
       if (attention === "any" && s.priority == null) return false;
+      if (attention === "mismatch" && s.ambitionMatch !== false) return false;
       if (["1", "2", "3"].includes(attention) && String(s.priority) !== attention) return false;
       return true;
     });
@@ -84,7 +88,10 @@ const StudentList: React.FC<Props> = ({
     <th
       className="npd-sortable"
       onClick={() =>
-        setSort((prev) => ({ key, desc: prev.key === key ? !prev.desc : key !== "name" }))
+        setSort((prev) => ({
+          key,
+          desc: prev.key === key ? !prev.desc : key !== "name" && key !== "lean" && key !== "priority",
+        }))
       }
       aria-sort={sort.key === key ? (sort.desc ? "descending" : "ascending") : "none"}
     >
@@ -95,9 +102,9 @@ const StudentList: React.FC<Props> = ({
 
   const exportCsv = () => {
     const cols = [
-      "Name", "Section", "Status", "Zone", "Will", "Skill", "Foundation", "Everyday logic (of 5)",
+      "Name", "Section", "Status", "Zone", "Will", "Skill", "Everyday habits", "Everyday logic (of 5)",
       "Top interest", "Best-fit direction", "Second direction", "Two equally suited", "Track",
-      "Weakest habit", "Top values", "Aspirations", "Ambition matches fit", "Attention priority",
+      "Weakest habit", "Top values", "Aspirations", "Ambition inside top three fits", "Attention priority",
       "Counselled",
     ];
     const esc = (v: unknown) => {
@@ -142,15 +149,16 @@ const StudentList: React.FC<Props> = ({
   };
 
   return (
-    <div>
+    <>
       <div className="npd-filters">
         <input
-          className="form-control form-control-sm"
+          id="npd-student-search"
           placeholder={namesLoading ? "Loading names…" : "Search by name"}
+          aria-label="Search by name"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <select className="form-select form-select-sm" value={zone} onChange={(e) => setZone(e.target.value as any)}>
+        <select aria-label="Zone" value={zone} onChange={(e) => setZone(e.target.value as any)}>
           <option value="all">All zones</option>
           {ZONE_ORDER.map((z) => (
             <option key={z} value={z}>
@@ -159,7 +167,7 @@ const StudentList: React.FC<Props> = ({
           ))}
           <option value="held">Report held</option>
         </select>
-        <select className="form-select form-select-sm" value={field} onChange={(e) => setField(e.target.value)}>
+        <select aria-label="Best-fit direction" value={field} onChange={(e) => setField(e.target.value)}>
           <option value="all">All directions</option>
           {fields.map((f) => (
             <option key={f} value={f}>
@@ -168,7 +176,7 @@ const StudentList: React.FC<Props> = ({
           ))}
         </select>
         <select
-          className="form-select form-select-sm"
+          aria-label="Attention"
           value={attention}
           onChange={(e) => setAttention(e.target.value as any)}
         >
@@ -177,13 +185,14 @@ const StudentList: React.FC<Props> = ({
           <option value="1">Priority 1</option>
           <option value="2">Priority 2</option>
           <option value="3">Priority 3</option>
+          <option value="mismatch">Ambition outside top three fits</option>
         </select>
-        <button type="button" className="btn btn-sm btn-light-primary" onClick={exportCsv}>
+        <button type="button" className="npd-btn npd-push" onClick={exportCsv}>
           Export CSV ({rows.length})
         </button>
       </div>
 
-      <div className="npd-table-wrap">
+      <div className="npd-tw">
         <table className="npd-table">
           <thead>
             <tr>
@@ -209,9 +218,10 @@ const StudentList: React.FC<Props> = ({
                   {s.status === "held" ? (
                     <span className="npd-held">{GATE_TEXT[s.gate ?? ""] ?? "Report held"}</span>
                   ) : (
-                    <span style={{ color: s.zone ? ZONE_COLOURS[s.zone] : undefined, fontWeight: 700 }}>
+                    <>
+                      <span className="npd-zdot" style={zoneStyle(s.zone)} />
                       {zoneLabel(s.zone)}
-                    </span>
+                    </>
                   )}
                 </td>
                 <td>{s.will ?? "—"}</td>
@@ -225,7 +235,7 @@ const StudentList: React.FC<Props> = ({
                     <>
                       {s.lean ?? "—"}
                       {s.tie && (
-                        <span className="npd-tie" title={`Two equally suited: also ${s.second}`}>
+                        <span className="npd-muted" title={`Two equally suited: also ${s.second}`}>
                           {" "}≈
                         </span>
                       )}
@@ -235,8 +245,12 @@ const StudentList: React.FC<Props> = ({
                 <td>{s.topFamily ?? "—"}</td>
                 <td>
                   {s.priority ? <span className={`npd-prio npd-prio--${s.priority}`}>P{s.priority}</span> : ""}
-                  {s.flagged && <span title="Report delivered with a consistency notice"> ⚠️</span>}
-                  {s.counselled && <span className="npd-muted" title="Already counselled"> ✓</span>}
+                  {s.flagged && <span title="Report delivered with a consistency notice"> ⚠</span>}
+                  {s.counselled && (
+                    <span className="npd-muted" title="Already counselled">
+                      {" "}✓
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -250,11 +264,11 @@ const StudentList: React.FC<Props> = ({
           </tbody>
         </table>
       </div>
-      <p className="npd-cap">
-        ≈ two directions equally suited · ⚠️ report delivered with a consistency notice · ✓ already
+      <p className="npd-card-s npd-card-s--end">
+        ≈ two equally suited directions · ⚠ delivered with a consistency notice · ✓ already
         counselled · P1–P3 attention priority. Click a row for the full profile.
       </p>
-    </div>
+    </>
   );
 };
 
@@ -269,34 +283,54 @@ export const StudentDrawer: React.FC<{
   zoneLabel: string;
   onClose: () => void;
 }> = ({ student, item, name, zoneLabel, onClose }) => {
+  useEffect(() => {
+    if (!student) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [student, onClose]);
+
   if (!student) return null;
   const s = student;
   return (
-    <div className="npd-drawer-backdrop" onClick={onClose}>
-      <aside className="npd-drawer" onClick={(e) => e.stopPropagation()} aria-label={`Profile of ${name}`}>
-        <button type="button" className="btn btn-sm btn-light npd-drawer-close" onClick={onClose}>
-          Close
-        </button>
-        <h3>{name}</h3>
-        {s.section && <div className="npd-muted">{s.section}</div>}
+    <div className="npd-dr-bg" onClick={onClose}>
+      <aside
+        className="npd-dr"
+        role="dialog"
+        aria-label={`Profile of ${name}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="npd-dr-top">
+          <div>
+            <p className="npd-eyebrow">Student profile</p>
+            <h3>{name}</h3>
+            {s.section && <div className="npd-muted">{s.section}</div>}
+          </div>
+          <button type="button" className="npd-btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
 
         {s.status === "held" ? (
-          <div className="npd-disc" style={{ marginTop: 12 }}>
-            <b>Report held ({s.gate}).</b> {s.gateReason}. No report was delivered; a counsellor should
-            meet this student first.
-          </div>
+          <section className="npd-todo">
+            <h3>Report held ({s.gate})</h3>
+            <p style={{ margin: 0 }}>
+              {s.gateReason}. No report was delivered; a counsellor should meet this student first.
+            </p>
+          </section>
         ) : (
           <>
-            <div className="npd-drawer-zone" style={{ borderColor: s.zone ? ZONE_COLOURS[s.zone] : "#ccc" }}>
+            <span className="npd-dr-zone" style={zoneStyle(s.zone)}>
+              <span className="npd-zdot" style={zoneStyle(s.zone)} />
               {zoneLabel}
-            </div>
-            <div className="npd-drawer-grid">
+            </span>
+            <div className="npd-dr-g">
               <Stat label="Will" value={s.will} />
               <Stat label="Acquired skill" value={s.skill} />
               <Stat label="Everyday habits" value={s.foundation} />
               <Stat label="Everyday logic" value={`${s.reasoning}/5`} />
             </div>
-            <dl className="npd-dl">
+            <dl>
               <dt>Best-fit direction</dt>
               <dd>
                 {s.explorer
@@ -317,7 +351,7 @@ export const StudentDrawer: React.FC<{
               <dd>
                 {(s.aspirations ?? []).join(", ") || "—"}
                 {s.ambitionMatch === false && (
-                  <span className="npd-muted"> · outside their top three fits — worth a conversation</span>
+                  <div className="npd-muted">Outside their top three fits — worth a conversation.</div>
                 )}
               </dd>
             </dl>
@@ -325,19 +359,20 @@ export const StudentDrawer: React.FC<{
         )}
 
         {item && (
-          <div className="npd-drawer-attn">
-            <div className="npd-actions-title">
-              Needs a person · <span className={`npd-prio npd-prio--${item.priority}`}>P{item.priority}</span>
-              {item.counselled && <span className="npd-muted"> · already counselled</span>}
-            </div>
+          <section className="npd-todo">
+            <h3>
+              Needs a person · P{item.priority}
+              {item.counselled ? " · already counselled" : ""}
+            </h3>
             <ul>
               {item.reasons.map((r) => (
                 <li key={r.code}>
-                  <b>{r.label}.</b> {r.action}. <OwnerTag owner={r.owner} />
+                  <b>{r.label}.</b> {r.action}.
+                  <OwnerTag owner={r.owner} />
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
       </aside>
     </div>
@@ -345,8 +380,8 @@ export const StudentDrawer: React.FC<{
 };
 
 const Stat: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="npd-stat">
-    <div className="npd-stat-v">{value ?? "—"}</div>
-    <div className="npd-stat-l">{label}</div>
+  <div className="npd-dr-s">
+    <b>{value ?? "—"}</b>
+    <span>{label}</span>
   </div>
 );
