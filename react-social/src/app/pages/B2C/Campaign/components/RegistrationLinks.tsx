@@ -1,4 +1,5 @@
 import React, { useState } from "react"
+import { QRCodeCanvas } from "qrcode.react"
 import { sendCampaignLink } from "../../API/Campaign_APIs"
 import { showErrorToast, showSuccessToast } from "../../../../utils/toast"
 
@@ -29,6 +30,7 @@ const ASSESSMENT_DOMAIN =
 const RegistrationLinks = ({ campaignId, slug, assessments }: RegistrationLinksProps) => {
   const [copied, setCopied] = useState<string>("")
   const [target, setTarget] = useState<SendTarget | null>(null)
+  const [qrOpen, setQrOpen] = useState(false)
 
   const copy = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(
@@ -65,6 +67,9 @@ const RegistrationLinks = ({ campaignId, slug, assessments }: RegistrationLinksP
           <div className="d-flex gap-2 align-items-center">
             <code className="flex-grow-1 p-2 bg-light rounded">{campaignUrl}</code>
             {actions(campaignUrl, "campaign", { url: campaignUrl, label: "this campaign" })}
+            <button className="btn btn-sm btn-outline-primary" onClick={() => setQrOpen(true)}>
+              QR
+            </button>
           </div>
           <small className="text-muted">Shows all assessments and tiers in this campaign.</small>
         </div>
@@ -128,6 +133,94 @@ const RegistrationLinks = ({ campaignId, slug, assessments }: RegistrationLinksP
           onClose={() => setTarget(null)}
         />
       )}
+
+      {qrOpen && (
+        <CampaignQrModal url={campaignUrl} slug={slug} onClose={() => setQrOpen(false)} />
+      )}
+    </div>
+  )
+}
+
+const QR_CANVAS_ID = "campaign-qr-canvas"
+
+/** QR of the campaign-wide link, downloadable as PNG or copyable as an image. */
+const CampaignQrModal = ({ url, slug, onClose }: { url: string; slug: string; onClose: () => void }) => {
+  const [copiedWhat, setCopiedWhat] = useState<"" | "link" | "qr">("")
+
+  const flash = (what: "link" | "qr") => {
+    setCopiedWhat(what)
+    setTimeout(() => setCopiedWhat(""), 1500)
+  }
+
+  const canvas = () => document.getElementById(QR_CANVAS_ID) as HTMLCanvasElement | null
+
+  const download = () => {
+    const c = canvas()
+    if (!c) return
+    const a = document.createElement("a")
+    a.href = c.toDataURL("image/png")
+    a.download = `QR_Campaign_${slug.replace(/[^a-zA-Z0-9]/g, "_")}.png`
+    a.click()
+  }
+
+  const copyQr = () => {
+    const c = canvas()
+    if (!c) return
+    const ClipboardItemCtor = (window as any).ClipboardItem
+    if (!ClipboardItemCtor || !navigator.clipboard?.write) {
+      showErrorToast("This browser can't copy images — use Download QR instead.")
+      return
+    }
+    c.toBlob((blob) => {
+      if (!blob) return
+      navigator.clipboard.write([new ClipboardItemCtor({ "image/png": blob })]).then(
+        () => flash("qr"),
+        () => showErrorToast("Could not copy the QR — use Download QR instead."),
+      )
+    }, "image/png")
+  }
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(url).then(
+      () => flash("link"),
+      () => window.prompt("Copy this link:", url),
+    )
+  }
+
+  return (
+    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)" }} role="dialog">
+      <div className="modal-dialog modal-dialog-centered">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">QR Code — Campaign-wide link</h5>
+            <button type="button" className="btn-close" onClick={onClose} />
+          </div>
+
+          <div className="modal-body text-center py-4">
+            <div className="d-inline-block p-3 bg-white rounded border">
+              <QRCodeCanvas id={QR_CANVAS_ID} value={url} size={240} level="H" includeMargin />
+            </div>
+            <div className="mt-3 small text-muted" style={{ wordBreak: "break-all" }}>
+              {url}
+            </div>
+          </div>
+
+          <div className="modal-footer justify-content-center">
+            <button className="btn btn-sm btn-success" onClick={download}>
+              Download QR
+            </button>
+            <button className="btn btn-sm btn-outline-primary" onClick={copyQr}>
+              {copiedWhat === "qr" ? "Copied" : "Copy QR"}
+            </button>
+            <button className="btn btn-sm btn-outline-primary" onClick={copyLink}>
+              {copiedWhat === "link" ? "Copied" : "Copy link"}
+            </button>
+            <button className="btn btn-sm btn-light" onClick={onClose}>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

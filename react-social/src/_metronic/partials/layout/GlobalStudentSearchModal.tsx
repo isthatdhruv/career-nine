@@ -420,6 +420,10 @@ const GlobalStudentSearchModal: React.FC<Props> = ({ show, handleClose }) => {
               </div>
             </div>
             <kbd
+              role="button"
+              tabIndex={0}
+              title="Back to results"
+              onClick={handleBackToResults}
               style={{
                 fontSize: "0.7rem",
                 color: "#64748b",
@@ -428,6 +432,7 @@ const GlobalStudentSearchModal: React.FC<Props> = ({ show, handleClose }) => {
                 borderRadius: 4,
                 padding: "2px 6px",
                 fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                cursor: "pointer",
               }}
             >
               esc
@@ -478,6 +483,10 @@ const GlobalStudentSearchModal: React.FC<Props> = ({ show, handleClose }) => {
               {scopeSummary}
             </span>
             <kbd
+              role="button"
+              tabIndex={0}
+              title="Close search"
+              onClick={handleClose}
               style={{
                 fontSize: "0.7rem",
                 color: "#64748b",
@@ -486,6 +495,7 @@ const GlobalStudentSearchModal: React.FC<Props> = ({ show, handleClose }) => {
                 borderRadius: 4,
                 padding: "2px 6px",
                 fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                cursor: "pointer",
               }}
             >
               esc

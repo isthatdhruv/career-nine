@@ -155,14 +155,15 @@ public class ReportEmailConsumer {
         try {
             String name = ev.studentName != null && !ev.studentName.trim().isEmpty()
                     ? ev.studentName : "there";
-            String school = ev.schoolName != null && !ev.schoolName.trim().isEmpty()
-                    ? ev.schoolName : "Career-9";
+            // career9_report_ready takes name + link; with no report URL the dispatcher fills
+            // the link with the portal.
             whatsAppDispatchService.sendForExternalEmail(
                     com.kccitm.api.model.email.EmailType.REPORT_READY,
                     ev.recipientEmail, name, null,
                     "Your Career-9 report is ready",
                     "Your assessment report is ready to view.",
-                    java.util.Arrays.asList(name, school, ev.reportUrl == null ? "" : ev.reportUrl),
+                    ev.reportUrl == null || ev.reportUrl.trim().isEmpty()
+                            ? null : java.util.Arrays.asList(name, ev.reportUrl),
                     "report-ready-" + ev.userStudentId + "-" + ev.assessmentId + "-" + ev.batchId);
         } catch (Exception e) {
             logger.warn("Report WhatsApp companion failed student={} assessment={}: {}",

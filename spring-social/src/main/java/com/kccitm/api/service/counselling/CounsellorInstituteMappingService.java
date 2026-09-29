@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.kccitm.api.exception.BadRequestException;
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.model.career9.counselling.CounsellorInstituteMapping;
@@ -34,7 +33,9 @@ public class CounsellorInstituteMappingService {
 
     /**
      * Allocate a counsellor to an institute.
-     * If mapping already exists but is inactive, reactivate it.
+     * A counsellor may serve any number of institutes at once, so existing allocations
+     * elsewhere are left untouched. If this exact mapping already exists it is
+     * returned as-is (active) or reactivated (inactive).
      */
     public CounsellorInstituteMapping allocate(Long counsellorId, Integer instituteCode, Long assignedBy, String notes) {
         Counsellor counsellor = counsellorRepository.findById(counsellorId)
@@ -43,23 +44,14 @@ public class CounsellorInstituteMappingService {
         InstituteDetail institute = instituteDetailRepository.findById(instituteCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Institute", "code", instituteCode));
 
-        // Check if counsellor is already active in ANY institute
-        List<CounsellorInstituteMapping> activeForCounsellor =
-                mappingRepository.findByCounsellorIdAndIsActiveTrue(counsellorId);
-
-        if (!activeForCounsellor.isEmpty()) {
-            String currentInstitute = activeForCounsellor.get(0).getInstitute().getInstituteName();
-            throw new BadRequestException(
-                    "Counsellor is currently allocated to \"" + currentInstitute
-                    + "\". Remove them from that institute first before allocating to a new one.");
-        }
-
-        // Check if this exact mapping already exists (inactive — reactivate it)
         Optional<CounsellorInstituteMapping> existing =
                 mappingRepository.findByCounsellorIdAndInstituteInstituteCode(counsellorId, instituteCode);
 
         if (existing.isPresent()) {
             CounsellorInstituteMapping mapping = existing.get();
+            if (Boolean.TRUE.equals(mapping.getIsActive())) {
+                return mapping;
+            }
             mapping.setIsActive(true);
             mapping.setAssignedBy(assignedBy);
             if (notes != null) mapping.setNotes(notes);

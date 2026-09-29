@@ -449,7 +449,7 @@ const CounsellorManagementPage: React.FC = () => {
     if (failCount === 0) {
       showSuccess(`${successCount} counsellor(s) allocated successfully.`)
     } else {
-      showSuccess(`${successCount} allocated, ${failCount} failed (may already be allocated to another institute).`)
+      showSuccess(`${successCount} allocated, ${failCount} failed.`)
     }
     await loadCounsellors()
   }

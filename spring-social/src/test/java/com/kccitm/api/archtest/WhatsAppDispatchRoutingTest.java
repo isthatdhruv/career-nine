@@ -140,7 +140,8 @@ public class WhatsAppDispatchRoutingTest {
             for (JavaMethodCall call : cls.getMethodCallsFromSelf()) {
                 if (!TRANSPORT.equals(call.getTargetOwner().getFullName())) continue;
                 // Only the act of sending matters; asking for a campaign name does not.
-                if (!"sendTemplate".equals(call.getName())) continue;
+                if (!"sendTemplate".equals(call.getName())
+                        && !"sendAuthCode".equals(call.getName())) continue;
 
                 violations.add(caller + "#" + call.getOrigin().getName()
                         + " → WhatsAppService.sendTemplate()");
