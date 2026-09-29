@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../app/modules/auth";
 import { urlAllowed } from "../../../../app/modules/auth/core/permissions";
 import { getImpersonationMode } from "../../../../app/modules/auth/core/AuthHelpers";
+import { useOfflineCounsellingContext } from "../../../../app/pages/Counselling/API/OfflineCounsellingAPI";
 import { AsideMenuItem } from "./AsideMenuItem";
 import { AsideMenuItemWithSub } from "./AsideMenuItemWithSub";
 
@@ -171,6 +172,13 @@ export function AsideMenuMain() {
         return u === "COUNSELLOR" || u === "ROLE_COUNSELLOR";
       }));
 
+  // "Offline Counselling" is shown only to counsellors an admin flagged offline. That flag is
+  // on the counsellor profile, not in /auth/me, so it takes one /context call — cached per user
+  // and shared with the page itself. Called here, above the early return below, so the hook
+  // runs on every render (rules of hooks); users who can't see any counsellor menu skip it.
+  const { ctx: offlineCtx } = useOfflineCounsellingContext(isCounsellorOnly || showCounsellorPortal);
+  const showOfflineSessions = offlineCtx?.offline === true;
+
   if (isCounsellorOnly) {
     return (
       <>
@@ -182,6 +190,9 @@ export function AsideMenuMain() {
           </div>
         </div>
         <AsideMenuItem to="/counsellor/dashboard" title="Dashboard" icon="/media/icons/duotune/art/art002.svg" fontIcon="bi-grid" />
+        {showOfflineSessions && (
+          <AsideMenuItem to="/counsellor/offline-sessions" title="Offline Counselling" icon="/media/icons/duotune/communication/com014.svg" fontIcon="bi-people" />
+        )}
         <AsideMenuItem to="/counsellor/appointments" title="Appointments" icon="/media/icons/duotune/general/gen019.svg" fontIcon="bi-calendar-check" />
         <AsideMenuItem to="/counsellor/notes" title="Session Notes" icon="/media/icons/duotune/files/fil003.svg" fontIcon="bi-journal-text" />
         <AsideMenuItem to="/counsellor/availability" title="Availability" icon="/media/icons/duotune/general/gen005.svg" fontIcon="bi-clock" />
@@ -923,6 +934,9 @@ export function AsideMenuMain() {
             icon="/media/icons/duotune/general/gen049.svg"
           >
             <AsideMenuItem to="/counsellor/dashboard" title="Dashboard" hasBullet={true} />
+            {showOfflineSessions && (
+              <AsideMenuItem to="/counsellor/offline-sessions" title="Offline Counselling" hasBullet={true} />
+            )}
             <AsideMenuItem to="/counsellor/appointments" title="Appointments" hasBullet={true} />
             <AsideMenuItem to="/counsellor/notes" title="Session Notes" hasBullet={true} />
             <AsideMenuItem to="/counsellor/availability" title="Availability" hasBullet={true} />

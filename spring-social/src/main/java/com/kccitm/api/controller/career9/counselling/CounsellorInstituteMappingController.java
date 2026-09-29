@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.counselling.CounsellorInstituteMapping;
+import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.counselling.CounsellorInstituteMappingService;
 
 /**
@@ -46,6 +49,14 @@ public class CounsellorInstituteMappingController {
     @PreAuthorize("@auth.allows('counsellor_institute_mapping.create')")
     @PostMapping("/allocate")
     public ResponseEntity<?> allocate(@RequestBody Map<String, Object> body) {
+        // Hard, enforce-mode-independent check: @auth.allows(...) above is a NO-OP while
+        // auth.enforce-mode=log-only. A counsellor's active mappings are the allow-list the
+        // offline counselling page trusts, and the body names any counsellor — without this a
+        // counsellor could add any school to their own list and read or record its students.
+        if (!callerHolds("counsellor_institute_mapping.create")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Not authorized to allocate counsellors to institutes"));
+        }
         Long counsellorId = ((Number) body.get("counsellorId")).longValue();
         Integer instituteCode = ((Number) body.get("instituteCode")).intValue();
         Long assignedBy = body.get("assignedBy") != null ? ((Number) body.get("assignedBy")).longValue() : null;
@@ -66,6 +77,11 @@ public class CounsellorInstituteMappingController {
     @PreAuthorize("@auth.allows('counsellor_institute_mapping.delete')")
     @DeleteMapping("/deallocate/{id}")
     public ResponseEntity<?> deallocate(@PathVariable Long id) {
+        // Same hard check as allocate: removing a mapping changes who may see a school's students.
+        if (!callerHolds("counsellor_institute_mapping.delete")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Not authorized to deallocate counsellors from institutes"));
+        }
         try {
             CounsellorInstituteMapping mapping = mappingService.deallocate(id);
             return ResponseEntity.ok(mapping);
@@ -101,5 +117,19 @@ public class CounsellorInstituteMappingController {
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<List<CounsellorInstituteMapping>> getByCounsellor(@PathVariable Long counsellorId) {
         return ResponseEntity.ok(mappingService.getInstitutesForCounsellor(counsellorId));
+    }
+
+    /**
+     * Super-admin, or the caller's DB-hydrated permissions include {@code code}. Mirrors the
+     * check in {@code ImpersonationController}; the counsellor role holds neither mapping code.
+     */
+    private static boolean callerHolds(String code) {
+        Authentication authn = SecurityContextHolder.getContext().getAuthentication();
+        if (authn == null || !(authn.getPrincipal() instanceof UserPrincipal)) {
+            return false;
+        }
+        UserPrincipal caller = (UserPrincipal) authn.getPrincipal();
+        return caller.isSuperAdmin()
+                || (caller.getPermissions() != null && caller.getPermissions().contains(code));
     }
 }

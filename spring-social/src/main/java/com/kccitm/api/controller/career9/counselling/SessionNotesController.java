@@ -47,9 +47,12 @@ public class SessionNotesController {
     private SessionNotesPhotoService photoService;
 
     // no scope arg: counsellor writes notes; scope-filter narrows access
+    // The principal is passed down for offline records, whose notes are gated on who is
+    // signed in (see SessionNotesService.create) rather than on the client-supplied userId.
     @PreAuthorize("@auth.allows('counselling.session_notes.create')")
     @PostMapping("/create")
-    public ResponseEntity<?> create(@RequestBody Map<String, Object> body, @RequestParam Long userId) {
+    public ResponseEntity<?> create(@RequestBody Map<String, Object> body, @RequestParam Long userId,
+                                    @AuthenticationPrincipal UserPrincipal principal) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
@@ -67,7 +70,7 @@ public class SessionNotesController {
         notes.setPublicRemarks(asString(body.get("publicRemarks")));
         notes.setPrivateNotes(asString(body.get("privateNotes")));
 
-        SessionNotes created = sessionNotesService.create(appointmentId, notes, user);
+        SessionNotes created = sessionNotesService.create(appointmentId, notes, user, principal);
         logger.info("Session notes created for userId: {} appointment: {}", userId, appointmentId);
         return ResponseEntity.ok(created);
     }

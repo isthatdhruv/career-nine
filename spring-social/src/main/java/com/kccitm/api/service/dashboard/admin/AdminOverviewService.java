@@ -200,7 +200,11 @@ public class AdminOverviewService {
 
     // ─── Counselling ─────────────────────────────────────────────────────
 
-    /** Bookings students made in the window (by booking time), whatever day the session is on. */
+    /**
+     * Bookings students made in the window (by booking time), whatever day the session is on.
+     * Offline records are not bookings (the counsellor wrote them after the fact), so all three
+     * figures leave them out; they still count under sessions and completed.
+     */
     @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
     @Transactional(readOnly = true)
     public CompletableFuture<AdminOverviewCard> counsellingBooked(AdminOverviewFilter f) {
@@ -209,15 +213,18 @@ public class AdminOverviewService {
 
         long value = OverviewQuery.appointments(em, clock.zone(), f)
                 .and("a.status NOT IN ('CANCELLED', 'DECLINED')")
+                .notOfflineRecord("a")
                 .localDateTimeRange("a.createdAt", f)
                 .count("SELECT COUNT(a)");
         long forFuture = OverviewQuery.appointments(em, clock.zone(), f)
                 .and("a.status NOT IN ('CANCELLED', 'DECLINED')")
+                .notOfflineRecord("a")
                 .localDateTimeRange("a.createdAt", f)
                 .and("a.slot.date >= :today").param("today", clock.today())
                 .count("SELECT COUNT(a)");
         long students = OverviewQuery.appointments(em, clock.zone(), f)
                 .and("a.status NOT IN ('CANCELLED', 'DECLINED')")
+                .notOfflineRecord("a")
                 .localDateTimeRange("a.createdAt", f)
                 .count("SELECT COUNT(DISTINCT us.userStudentId)");
 

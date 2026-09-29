@@ -60,6 +60,22 @@ public class Counsellor implements Serializable {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    /**
+     * Offline counsellor: counsels a school's students in person on the school's own schedule,
+     * and records each session from the "Offline Counselling" page instead of through slots.
+     *
+     * <p>Admin-only, and deliberately awkward to write. READ_ONLY means no request body can bind
+     * it — the counsellor's own profile save and the availability forms post partial
+     * {@code Counsellor} bodies to {@code PUT /api/counsellor/update}, which counsellors may
+     * call. For the same reason there is no field initializer: an initializer would deserialise
+     * every partial body as {@code false}. The only writer is
+     * {@code PUT /api/offline-counselling/admin/counsellor/{id}/offline}; the default lives in
+     * {@link #prePersist()}.
+     */
+    @JsonProperty(value = "isOffline", access = JsonProperty.Access.READ_ONLY)
+    @Column(name = "is_offline", nullable = false)
+    private Boolean isOffline;
+
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
@@ -154,11 +170,16 @@ public class Counsellor implements Serializable {
         if (this.onboardingStatus == null) this.onboardingStatus = "PENDING";
         if (this.isExternal == null) this.isExternal = false;
         if (this.isActive == null) this.isActive = true;
+        if (this.isOffline == null) this.isOffline = false;
     }
 
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
+        // Only reachable when a Counsellor built from a request body is merged over a row
+        // (POST /create with an id): that body can never carry the flag, and a null would
+        // fail the NOT NULL column instead of saving.
+        if (this.isOffline == null) this.isOffline = false;
     }
 
     public Counsellor() {
@@ -248,6 +269,16 @@ public class Counsellor implements Serializable {
     @JsonProperty("isActive")
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
+    }
+
+    @JsonProperty(value = "isOffline", access = JsonProperty.Access.READ_ONLY)
+    public Boolean getIsOffline() {
+        return isOffline;
+    }
+
+    // Not annotated: JSON must never reach this (see the field). Only the admin toggle calls it.
+    public void setIsOffline(Boolean isOffline) {
+        this.isOffline = isOffline;
     }
 
     public String getProfileImageUrl() {

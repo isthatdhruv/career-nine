@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Dropdown } from 'react-bootstrap'
 import { AiOutlineUserAdd, AiOutlineCheckCircle, AiOutlineCloseCircle } from 'react-icons/ai'
-import { MdOutlineEventRepeat, MdOutlineMailOutline, MdOutlineMarkEmailRead } from 'react-icons/md'
+import { MdOutlineEventRepeat, MdOutlineMailOutline, MdOutlineMarkEmailRead, MdOutlineUndo } from 'react-icons/md'
 import '../Counselling.css'
 import PageHeader from '../../../components/PageHeader'
 import { useAuth } from '../../../modules/auth'
@@ -12,6 +12,7 @@ import {
 } from '../API/AppointmentAPI'
 import { getActiveCounsellors } from '../API/CounsellorAPI'
 import { getAvailableSlots } from '../API/SlotAPI'
+import { ORIGIN_OFFLINE_RECORD, revertOfflineRecord, offlineApiErrorOf } from '../API/OfflineCounsellingAPI'
 import {
   usePeriodFilter, PeriodFilterControl, fmtDateShort, localDateStr,
 } from '../shared/PeriodFilter'
@@ -52,6 +53,14 @@ function studentName(a: any): string {
 }
 const counsellorName = (a: any): string => a?.counsellor?.name || 'Unassigned'
 
+/**
+ * An in-person session an offline counsellor recorded as done. It sits on a synthetic
+ * slot timed 00:00–00:00 (only the date was asked), so its time is never shown.
+ */
+const isOfflineRecord = (a: any): boolean => a?.origin === ORIGIN_OFFLINE_RECORD
+/** An offline record an admin reverted — kept for the audit trail, never actionable. */
+const isRevertedOffline = (a: any): boolean => isOfflineRecord(a) && status(a) === 'CANCELLED'
+
 /** Status → badge tint. Uses the shared `cl-badge` shape from Counselling.css. */
 const STATUS_STYLE: Record<string, React.CSSProperties> = {
   PENDING: { background: '#FEF3C7', color: '#92400E' },
@@ -89,7 +98,7 @@ const STATUS_FILTERS: [string, string][] = [
 
 const OPEN_STATUSES = ['PENDING', 'ASSIGNED', 'CONFIRMED', 'AWAITING_RESCHEDULE']
 
-type ActionKey = 'assign' | 'confirm' | 'reschedule' | 'cancel' | 'mailStudent' | 'mailCounsellor'
+type ActionKey = 'assign' | 'confirm' | 'reschedule' | 'cancel' | 'mailStudent' | 'mailCounsellor' | 'revert'
 
 const th: React.CSSProperties = {
   padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: 12,
@@ -219,10 +228,16 @@ const CounsellingSessionsPage: React.FC = () => {
             <tbody>
               {rows.map((a, idx) => {
                 const st = status(a)
+                const offline = isOfflineRecord(a)
+                const reverted = isRevertedOffline(a)
                 const canAssign = ['PENDING', 'AWAITING_RESCHEDULE'].includes(st) || !a.counsellor
                 const canConfirm = st === 'ASSIGNED'
                 const canReschedule = [...OPEN_STATUSES, 'MISSED'].includes(st)
                 const canCancel = OPEN_STATUSES.includes(st)
+                // The Email actions re-send pre-session details (time, venue, link) — meaningless
+                // for an in-person session that was recorded after it happened.
+                const canEmail = !offline
+                const canRevert = offline && st === 'COMPLETED'
                 return (
                   <tr
                     key={a.id}
@@ -246,7 +261,9 @@ const CounsellingSessionsPage: React.FC = () => {
                         {slotDate(a) ? fmtDateShort(slotDate(a)) : '—'}
                       </div>
                       <div style={subText}>
-                        {slotStartTime(a) ? `${fmtTime(slotStartTime(a))} – ${fmtTime(slotEndTime(a))}` : '—'}
+                        {offline
+                          ? 'Date only'
+                          : slotStartTime(a) ? `${fmtTime(slotStartTime(a))} – ${fmtTime(slotEndTime(a))}` : '—'}
                       </div>
                     </td>
 
@@ -256,75 +273,101 @@ const CounsellingSessionsPage: React.FC = () => {
                     </td>
 
                     <td style={td}>
-                      <span className='cl-badge' style={STATUS_STYLE[st] || STATUS_STYLE.CANCELLED}>
-                        {STATUS_LABEL[st] || st || '—'}
-                      </span>
+                      {reverted ? (
+                        <span className='cl-badge' style={STATUS_STYLE.CANCELLED}>Reverted offline record</span>
+                      ) : (
+                        <>
+                          <span className='cl-badge' style={STATUS_STYLE[st] || STATUS_STYLE.CANCELLED}>
+                            {STATUS_LABEL[st] || st || '—'}
+                          </span>
+                          {offline && (
+                            <span className='cl-badge' style={{ ...OFFLINE_PILL, marginLeft: 6 }}>Offline record</span>
+                          )}
+                          {offline && !a.checkinVerifiedAt && <div style={subText}>OTP not verified</div>}
+                        </>
+                      )}
                     </td>
 
                     {/* Actions — the green Actions ▾ dropdown used on the institute
                         table, so every list in the admin behaves the same way. */}
                     <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      <Dropdown className='d-inline' align='end'>
-                        <Dropdown.Toggle
-                          variant='success'
-                          size='sm'
-                          id={`session-actions-${a.id}`}
-                          className='dropdown-toggle'
-                        >
-                          Actions
-                        </Dropdown.Toggle>
+                      {reverted ? (
+                        <span style={{ color: 'var(--sp-muted, #5C7A72)' }}>—</span>
+                      ) : (
+                        <Dropdown className='d-inline' align='end'>
+                          <Dropdown.Toggle
+                            variant='success'
+                            size='sm'
+                            id={`session-actions-${a.id}`}
+                            className='dropdown-toggle'
+                          >
+                            Actions
+                          </Dropdown.Toggle>
 
-                        {/* strategy:fixed keeps the menu out of the table's overflow
-                            clipping, exactly as the institute table does. */}
-                        <Dropdown.Menu
-                          style={{ minWidth: 210, zIndex: 1050 }}
-                          popperConfig={{ strategy: 'fixed' }}
-                          renderOnMount
-                        >
-                          {canAssign && (
-                            <Dropdown.Item onClick={() => setDialog({ action: 'assign', appt: a })}>
-                              <AiOutlineUserAdd size={18} className='me-2' />
-                              Assign Counsellor
-                            </Dropdown.Item>
-                          )}
-                          {canConfirm && (
-                            <Dropdown.Item onClick={() => setDialog({ action: 'confirm', appt: a })}>
-                              <AiOutlineCheckCircle size={18} className='me-2' />
-                              Confirm Session
-                            </Dropdown.Item>
-                          )}
-                          {canReschedule && (
-                            <Dropdown.Item onClick={() => setDialog({ action: 'reschedule', appt: a })}>
-                              <MdOutlineEventRepeat size={18} className='me-2' />
-                              Reschedule
-                            </Dropdown.Item>
-                          )}
+                          {/* strategy:fixed keeps the menu out of the table's overflow
+                              clipping, exactly as the institute table does. */}
+                          <Dropdown.Menu
+                            style={{ minWidth: 210, zIndex: 1050 }}
+                            popperConfig={{ strategy: 'fixed' }}
+                            renderOnMount
+                          >
+                            {canAssign && (
+                              <Dropdown.Item onClick={() => setDialog({ action: 'assign', appt: a })}>
+                                <AiOutlineUserAdd size={18} className='me-2' />
+                                Assign Counsellor
+                              </Dropdown.Item>
+                            )}
+                            {canConfirm && (
+                              <Dropdown.Item onClick={() => setDialog({ action: 'confirm', appt: a })}>
+                                <AiOutlineCheckCircle size={18} className='me-2' />
+                                Confirm Session
+                              </Dropdown.Item>
+                            )}
+                            {canReschedule && (
+                              <Dropdown.Item onClick={() => setDialog({ action: 'reschedule', appt: a })}>
+                                <MdOutlineEventRepeat size={18} className='me-2' />
+                                Reschedule
+                              </Dropdown.Item>
+                            )}
 
-                          {(canAssign || canConfirm || canReschedule) && <Dropdown.Divider />}
+                            {canEmail && (canAssign || canConfirm || canReschedule) && <Dropdown.Divider />}
 
-                          <Dropdown.Item onClick={() => setDialog({ action: 'mailStudent', appt: a })}>
-                            <MdOutlineMailOutline size={18} className='me-2' />
-                            Email Student
-                          </Dropdown.Item>
-                          {a.counsellor && (
-                            <Dropdown.Item onClick={() => setDialog({ action: 'mailCounsellor', appt: a })}>
-                              <MdOutlineMarkEmailRead size={18} className='me-2' />
-                              Email Counsellor
-                            </Dropdown.Item>
-                          )}
+                            {canEmail && (
+                              <Dropdown.Item onClick={() => setDialog({ action: 'mailStudent', appt: a })}>
+                                <MdOutlineMailOutline size={18} className='me-2' />
+                                Email Student
+                              </Dropdown.Item>
+                            )}
+                            {canEmail && a.counsellor && (
+                              <Dropdown.Item onClick={() => setDialog({ action: 'mailCounsellor', appt: a })}>
+                                <MdOutlineMarkEmailRead size={18} className='me-2' />
+                                Email Counsellor
+                              </Dropdown.Item>
+                            )}
 
-                          {canCancel && <Dropdown.Divider />}
-                          {canCancel && (
-                            <Dropdown.Item
-                              className='text-danger'
-                              onClick={() => setDialog({ action: 'cancel', appt: a })}
-                            >
-                              <AiOutlineCloseCircle size={18} className='me-2' />
-                              Cancel Session
-                            </Dropdown.Item>
-                          )}
-                        </Dropdown.Menu>
-                      </Dropdown>
+                            {canRevert && (
+                              <Dropdown.Item
+                                className='text-danger'
+                                onClick={() => setDialog({ action: 'revert', appt: a })}
+                              >
+                                <MdOutlineUndo size={18} className='me-2' />
+                                Revert Offline Record
+                              </Dropdown.Item>
+                            )}
+
+                            {canCancel && <Dropdown.Divider />}
+                            {canCancel && (
+                              <Dropdown.Item
+                                className='text-danger'
+                                onClick={() => setDialog({ action: 'cancel', appt: a })}
+                              >
+                                <AiOutlineCloseCircle size={18} className='me-2' />
+                                Cancel Session
+                              </Dropdown.Item>
+                            )}
+                          </Dropdown.Menu>
+                        </Dropdown>
+                      )}
                     </td>
                   </tr>
                 )
@@ -507,10 +550,17 @@ const ActionDialog: React.FC<{
           onDone(`Session details sent to ${to}${res.data?.reportIncluded ? ' (report link included)' : ''}.`)
           break
         }
+        case 'revert':
+          await revertOfflineRecord(appt.id, note.trim() || null)
+          onDone(`Offline record for ${name} reverted. Their counselling is no longer counted as done for this assessment.`)
+          break
       }
     } catch (e: any) {
       const body = e?.response?.data
-      setErr(typeof body === 'string' ? body : body?.error || 'That did not go through. Please try again.')
+      // The offline-counselling controller puts its text in `message`; `error` there is only
+      // the HTTP reason phrase ("Conflict").
+      const offlineMessage = action === 'revert' ? offlineApiErrorOf(e)?.message : undefined
+      setErr(offlineMessage || (typeof body === 'string' ? body : body?.error) || 'That did not go through. Please try again.')
       setBusy(false)
     }
   }
@@ -522,6 +572,7 @@ const ActionDialog: React.FC<{
     confirm: { title: 'Confirm Session', cta: 'Confirm', cls: 'cl-btn-primary' },
     mailStudent: { title: 'Email Details to Student', cta: 'Send Email', cls: 'cl-btn-primary' },
     mailCounsellor: { title: 'Email Details to Counsellor', cta: 'Send Email', cls: 'cl-btn-primary' },
+    revert: { title: 'Revert Offline Record', cta: 'Revert Record', cls: 'cl-btn-danger' },
   }[action]
 
   return (
@@ -551,7 +602,7 @@ const ActionDialog: React.FC<{
             </div>
             <div style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
               {name} · {slotDate(appt) ? fmtDateShort(slotDate(appt)) : '—'}
-              {slotStartTime(appt) ? ` at ${fmtTime(slotStartTime(appt))}` : ''} · {counsellorName(appt)}
+              {slotStartTime(appt) && !isOfflineRecord(appt) ? ` at ${fmtTime(slotStartTime(appt))}` : ''} · {counsellorName(appt)}
             </div>
           </div>
           <button
@@ -682,6 +733,28 @@ const ActionDialog: React.FC<{
             </p>
           )}
 
+          {action === 'revert' && (
+            <>
+              <p style={noteStyle}>
+                Undoes this in-person session record: it is kept as a reverted record, the student no
+                longer counts as counselled for this assessment, and their counsellor can record the
+                session again. Uploaded photos are kept. Nobody is emailed and no session is
+                credited back — recording it never used one.
+              </p>
+              {!appt.checkinVerifiedAt && (
+                <p style={{ ...noteStyle, color: '#92400E' }}>
+                  This record was saved without the student's OTP.
+                </p>
+              )}
+              <label style={labelStyle}>Reason (optional — kept with the record)</label>
+              <textarea
+                style={{ ...inputStyle, resize: 'vertical' }} rows={3} value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder='e.g. recorded against the wrong student'
+              />
+            </>
+          )}
+
           {(action === 'mailStudent' || action === 'mailCounsellor') && (
             <p style={noteStyle}>
               Re-sends the full session details — date, time, mode, meeting link or address — with
@@ -738,6 +811,8 @@ const pickMainStyle: React.CSSProperties = {
   fontSize: 13, fontWeight: 600, color: 'var(--sp-text, #1A2B28)',
 }
 const pickSubStyle: React.CSSProperties = { fontSize: 11.5, color: 'var(--sp-muted, #5C7A72)' }
+/** The "Offline record" tag next to a status badge. */
+const OFFLINE_PILL: React.CSSProperties = { background: '#FEF3C7', color: '#92400E' }
 
 /** Only the header controls need styling — they sit on the dark PageHeader. */
 const ToolbarStyles: React.FC = () => (

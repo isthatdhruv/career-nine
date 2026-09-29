@@ -6,6 +6,7 @@ import {
   getDeactivationPreview, deactivateCounsellor, AffectedSession, DeactivationResult,
 } from '../API/CounsellorAPI'
 import { getAllMappings, allocateCounsellor, CounsellorInstituteMapping } from '../API/CounsellorInstituteAPI'
+import { setCounsellorOffline } from '../API/OfflineCounsellingAPI'
 import { getSlotsByCounsellor } from '../API/SlotAPI'
 import { Modal } from 'react-bootstrap-v5'
 import CounsellorForm, { COUNSELLOR_FORM_ID } from './components/CounsellorForm'
@@ -31,6 +32,8 @@ interface Counsellor {
   officeAddress?: string
   bio?: string
   isExternal?: boolean
+  /** Admin-flagged: records in-person sessions from the counsellor's Offline Counselling page. */
+  isOffline?: boolean
   isActive?: boolean
   onboardingStatus?: string
   profileImageUrl?: string
@@ -48,6 +51,7 @@ interface SlotData {
   endTime: string
   durationMinutes: number
   status: string
+  blockReason?: string | null
 }
 
 const SlotsSection: React.FC<{ counsellor: Counsellor; onClose: () => void }> = ({ counsellor, onClose }) => {
@@ -63,7 +67,12 @@ const SlotsSection: React.FC<{ counsellor: Counsellor; onClose: () => void }> = 
 
     getSlotsByCounsellor(getCounsellorId(counsellor), today, end)
       .then((res) => {
-        const data: SlotData[] = Array.isArray(res.data) ? res.data : []
+        // An offline counselling record carries a synthetic 00:00 slot (reason OFFLINE_RECORD,
+        // COMPLETED, or CANCELLED once reverted). It is a record, not a bookable hour, so it
+        // stays out of this list and its count.
+        const data: SlotData[] = (Array.isArray(res.data) ? res.data : []).filter(
+          (s: SlotData) => s.blockReason !== 'OFFLINE_RECORD'
+        )
         setSlots(data.sort((a, b) => {
           const dc = a.date.localeCompare(b.date)
           return dc !== 0 ? dc : a.startTime.localeCompare(b.startTime)
@@ -255,22 +264,56 @@ const CounsellorManagementPage: React.FC = () => {
     setEditingCounsellor(null)
   }
 
+  /**
+   * The offline flag never rides on the profile save: counsellors can call
+   * /api/counsellor/update on themselves, so the server ignores isOffline there and only
+   * the admin-checked PUT /offline sets it. It is sent only when the checkbox changed, so
+   * an ordinary profile edit by an admin without that permission still goes through.
+   */
   const handleSave = async (data: any) => {
     setError(null)
+    // The form state is the whole counsellor row from the list, including the linked `user`.
+    // Posting that back fails to deserialise (User.role is a list of the abstract
+    // GrantedAuthority) as soon as the user holds any role — a 500 on every edit, which also
+    // meant the offline flag below was never reached. The update copies only profile fields,
+    // so the nested user is dropped from the body.
+    const { isOffline, user, ...profile } = data ?? {}
+    const isEdit = !!(editingCounsellor && getCounsellorId(editingCounsellor))
+    const wantOffline = isOffline === true
+    const wasOffline = isEdit && editingCounsellor?.isOffline === true
+    let counsellorId = 0
     try {
-      if (editingCounsellor && getCounsellorId(editingCounsellor)) {
-        await updateCounsellor(getCounsellorId(editingCounsellor), data)
-        showSuccess('Counsellor updated successfully.')
+      if (isEdit && editingCounsellor) {
+        counsellorId = getCounsellorId(editingCounsellor)
+        await updateCounsellor(counsellorId, profile)
       } else {
-        await createCounsellor(data)
-        showSuccess('Counsellor added successfully.')
+        const res = await createCounsellor(profile)
+        counsellorId = res.data?.id ?? res.data?.counsellorId ?? 0
       }
-      setShowForm(false)
-      setEditingCounsellor(null)
-      await loadCounsellors()
     } catch {
       setError('Failed to save counsellor. Please try again.')
+      return
     }
+
+    let offlineFailed = false
+    if (counsellorId && wantOffline !== wasOffline) {
+      try {
+        await setCounsellorOffline(counsellorId, wantOffline)
+      } catch {
+        offlineFailed = true
+      }
+    }
+
+    if (offlineFailed) {
+      setError(
+        `Counsellor saved, but the Offline counsellor setting could not be ${wantOffline ? 'turned on' : 'turned off'}. Please try again.`
+      )
+    } else {
+      showSuccess(isEdit ? 'Counsellor updated successfully.' : 'Counsellor added successfully.')
+    }
+    setShowForm(false)
+    setEditingCounsellor(null)
+    await loadCounsellors()
   }
 
   const handleToggleActive = async (counsellor: Counsellor) => {
@@ -754,9 +797,22 @@ const CounsellorManagementPage: React.FC = () => {
                       </div>
                       <div>
                         <div style={{ fontWeight: 600, color: 'var(--sp-text, #1A2B28)' }}>{c.name}</div>
-                        {c.isExternal && (
-                          <div style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)', marginTop: 1 }}>
-                            External
+                        {(c.isExternal || c.isOffline) && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+                            {c.isExternal && (
+                              <span style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)' }}>External</span>
+                            )}
+                            {c.isOffline && (
+                              <span
+                                title='Counsels in person and records sessions from the Offline Counselling page'
+                                style={{
+                                  fontSize: 10, fontWeight: 700, color: '#92400E', background: '#FEF3C7',
+                                  border: '1px solid #FDE68A', borderRadius: 999, padding: '0 7px', lineHeight: '16px',
+                                }}
+                              >
+                                Offline
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>

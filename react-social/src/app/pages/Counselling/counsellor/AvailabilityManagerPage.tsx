@@ -40,7 +40,17 @@ const AvailabilityManagerPage: React.FC = () => {
       const slotsRes = await getSlotsByCounsellor(counsellorId)
       const allSlots: any[] = slotsRes.data || []
       setManualSlots(allSlots.filter((s: any) => s.isManual && !s.isBlocked))
-      setBlockedDates(allSlots.filter((s: any) => s.isBlocked))
+      // A blocked COMPLETED slot is the synthetic slot behind an offline counselling
+      // record, not a date block, so it stays out of "Blocked Dates" — as does a reverted
+      // record's slot, which is CANCELLED but keeps its OFFLINE_RECORD reason.
+      setBlockedDates(
+        allSlots.filter(
+          (s: any) =>
+            s.isBlocked &&
+            String(s.status || '').toUpperCase() !== 'COMPLETED' &&
+            s.blockReason !== 'OFFLINE_RECORD'
+        )
+      )
     } catch {
       setError('Failed to load availability data.')
     }

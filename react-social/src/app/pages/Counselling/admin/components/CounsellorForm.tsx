@@ -12,6 +12,11 @@ interface CounsellorData {
   meetingLink?: string
   bio?: string
   isExternal?: boolean
+  /**
+   * Read-only on the counsellor JSON: the page saves it through its own admin-only call,
+   * never through the profile update (see CounsellorManagementPage.handleSave).
+   */
+  isOffline?: boolean
 }
 
 /**
@@ -35,6 +40,7 @@ const EMPTY_FORM: CounsellorData = {
   meetingLink: '',
   bio: '',
   isExternal: false,
+  isOffline: false,
 }
 
 const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave }) => {
@@ -247,6 +253,26 @@ const CounsellorForm: React.FC<CounsellorFormProps> = ({ counsellor, onSave }) =
           <label htmlFor='cf-isExternal' style={{ ...labelStyle, margin: 0, cursor: 'pointer', fontWeight: 500 }}>
             External Counsellor (not part of institute staff)
           </label>
+        </div>
+
+        {/* Is Offline — unlocks the counsellor's Offline Counselling page */}
+        <div style={fieldStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input
+              id='cf-isOffline'
+              name='isOffline'
+              type='checkbox'
+              checked={form.isOffline ?? false}
+              onChange={handleChange}
+              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--sp-primary, #0C6B5A)' }}
+            />
+            <label htmlFor='cf-isOffline' style={{ ...labelStyle, margin: 0, cursor: 'pointer', fontWeight: 500 }}>
+              Offline counsellor (counsels students in person at their schools)
+            </label>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 4, marginLeft: 26 }}>
+            Lets them map students of their schools to themselves and record sessions as done.
+          </div>
         </div>
 
     </form>

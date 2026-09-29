@@ -15,6 +15,7 @@ import { allows } from "./permissions";
 import * as authRequests from "./_requests";
 import { getCurrentUser } from "./_requests";
 import { WithChildren } from "../../../../_metronic/helpers";
+import { clearOfflineContextCache } from "../../../pages/Counselling/API/OfflineCounsellingAPI";
 
 type AuthContextProps = {
   currentUser: User | undefined;
@@ -56,6 +57,10 @@ const AuthProvider: FC<WithChildren> = ({ children }) => {
     // user scope server-side, so a next-login under a different account
     // must not see the previous user's list).
     queryClient.clear();
+    // Same for the offline-counselling /context answer, which lives outside React Query and
+    // is keyed only by user id: signing back in as the same user on this tab (via /auth, no
+    // reload) would otherwise reuse the old "offline" flag after an admin changed it.
+    clearOfflineContextCache();
   };
 
   // Mirrors backend AuthorizationService.allows() — see permissions.ts.

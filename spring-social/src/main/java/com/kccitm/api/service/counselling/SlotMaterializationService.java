@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.career9.counselling.AvailabilityTemplate;
+import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.model.career9.counselling.SlotConfiguration;
@@ -142,7 +143,7 @@ public class SlotMaterializationService {
             // Skip if date is blocked for this counsellor
             List<CounsellingSlot> blockedSlots = slotRepository
                     .findByCounsellorIdAndDateAndIsBlockedTrue(template.getCounsellor().getId(), date);
-            if (!blockedSlots.isEmpty()) {
+            if (blocksDay(blockedSlots)) {
                 continue;
             }
 
@@ -288,6 +289,24 @@ public class SlotMaterializationService {
         }
 
         return new MaterializationResult(created, skipped);
+    }
+
+    /**
+     * Whether any of a day's blocked slots actually blocks the day. A held session's slot does
+     * not: every offline record hangs on a synthetic slot that is blocked (so nothing can book
+     * it) and COMPLETED, dated the day the counsellor recorded it — today, typically, which is
+     * the first day this run fills. Counting it would silently stop an offline counsellor's
+     * availability from being generated for any day they marked a student done. A reverted
+     * record's slot is CANCELLED but keeps its OFFLINE_RECORD block reason, so both are matched.
+     */
+    static boolean blocksDay(List<CounsellingSlot> blockedSlots) {
+        if (blockedSlots == null) return false;
+        for (CounsellingSlot s : blockedSlots) {
+            boolean heldSession = "COMPLETED".equals(s.getStatus())
+                    || CounsellingAppointment.ORIGIN_OFFLINE_RECORD.equals(s.getBlockReason());
+            if (!heldSession) return true;
+        }
+        return false;
     }
 
     /**

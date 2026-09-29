@@ -18,6 +18,7 @@ This document describes everything changed across this work cycle for the **coun
 9. [Full file inventory](#full-file-inventory)
 10. [Verification checklist](#verification-checklist)
 11. [Known limitations / risks](#known-limitations--risks)
+12. [Offline records](#offline-records)
 
 ---
 
@@ -265,6 +266,100 @@ react-social/src/app/pages/CounsellorDashboard/CounsellorProfilePage.tsx        
 - **Reminders** use a ±7‑minute window around each offset; if the scheduler is down for an entire window, that offset is skipped (idempotency still prevents duplicates).
 - **No explicit "complete session"** action yet — OTP marks a session `IN_PROGRESS`; closing it out isn't wired.
 - **Pre‑existing dead link:** the counsellor sidebar's **"Reports"** item points to `/counsellor/reports`, which has no route and redirects to login. Not introduced by these changes; flagged for cleanup.
+
+---
+
+<a name="offline-records"></a>
+## 12. Offline records
+
+### Intent
+Some schools run counselling themselves: the school sets the timetable and an offline counsellor sees the students in person. None of the online machinery applies (published slots, student booking, OTP check-in, the 5‑minute sweep), so before this change there was no way to record that a student had been counselled, and nothing downstream (principal dashboard, admin cards, student history, report release) could see it.
+
+An admin flags a counsellor as **offline** on the counsellor profile. That counsellor gets one page, `/counsellor/offline-sessions`, where they:
+- see every student of the school(s) they are mapped to, filtered by assessment, class and section;
+- take a student over with **Map to me**, whether the student is unmapped or mapped to someone else;
+- **Mark done** for a student mapped to them, per assessment, with an optional OTP and optional photos of the paper counselling sheet.
+
+Marking done emails the student (and the parent, when one is on file). There is no rating prompt. A counsellor cannot undo a record; only an admin can revert one. A live online booking for the same assessment is cancelled silently when the student is marked done: no mail, the slot is released, nothing is credited back.
+
+### How a session is stored
+An offline session is an ordinary `counselling_appointment` row with `status = COMPLETED`, `mode = OFFLINE`, `origin = 'OFFLINE_RECORD'` and the new `assessment_id` set. Keeping it an appointment means photos (`session_notes_photo`), the audit log, the principal dashboard's `findCounselledStudentIds`, the admin cards, student history and report release all work without changes.
+
+`slot_id` is NOT NULL and about 20 JPQL queries inner-join `a.slot`, so each record gets a slot of its own.
+
+**Synthetic slot convention** (one per record, never shared, never bookable):
+
+| Field | Value |
+|---|---|
+| `counsellor` | the recording counsellor |
+| `date` | the session date the counsellor picked (today back to today−30, never future) |
+| `start_time` / `end_time` | `00:00` / `00:00` |
+| `duration_minutes` | `0` |
+| `mode` | `OFFLINE` |
+| `status` | `COMPLETED` (`CANCELLED` after an admin revert) |
+| `is_blocked` | `true` |
+| `is_manually_created` | `true` |
+| `block_reason` | `OFFLINE_RECORD` |
+
+The slot is saved before the appointment (there is no cascade). Code that needs to recognise one should match `block_reason = 'OFFLINE_RECORD'`: that survives a revert, where `status` alone does not.
+
+"Done for this assessment" means a COMPLETED appointment tied to the assessment, either through `assessment_id` or through the entitlement it was booked on (`CounsellingAppointmentRepository.findLatestCompletedForAssessment`). New online bookings are stamped with `assessment_id` where it is known (campaign bookings from the entitlement, admin bulk allotment from the cohort, and reschedules carry it forward), so a future online completion counts as done too.
+
+### The origin predicate rule
+Normal bookings have `origin = NULL`. Every filter that excludes offline records **must be null-safe**:
+
+```sql
+(a.origin IS NULL OR a.origin <> 'OFFLINE_RECORD')
+```
+
+A bare `a.origin <> 'OFFLINE_RECORD'` is false for NULL and would silently drop every ordinary booking. In Java, use `CounsellingAppointment.isOfflineRecord()`, which is null-safe. `OverviewQuery.notOfflineRecord(alias)` wraps the predicate for the admin overview.
+
+Where offline records are excluded, and why:
+
+| Reader | Behaviour |
+|---|---|
+| Rating prompt (`CounsellingRatingRepository.findUnratedCompletedAppointmentsForStudent`) | Excluded: the student never booked the session. |
+| Admin overview "Scheduled by students" (`AdminOverviewService.counsellingBooked`, all three counts, plus its drill-down) | Excluded: a record is not a booking. The sessions and completed cards still count it. |
+| Counsellor portal list `GET /api/counselling-appointment/by-counsellor/{id}` | Excluded unless `?includeOffline=true`, because those screens poll and fetch notes per completed row. |
+| Counsellor dashboard summary "today" list | Excluded (nothing to start or check in). `completedCount` still includes them. |
+| Student history `by-student` | Reverted records (`OFFLINE_RECORD` + `CANCELLED`) are hidden. |
+| Admin bulk allotment preview | Students already done for the assessment go in a read-only `alreadyCounselled` bucket (it wins over "already booked"); confirm drops them on the server and reports them as unbooked with a reason. |
+| Rebook with counsellor / reschedule | COMPLETED sessions and offline records are refused. |
+| Slot materialization, blocked-date approval | A blocked COMPLETED or `OFFLINE_RECORD` slot does not mark the day as blocked; the approve loop never cancels a COMPLETED slot. |
+
+Typed session notes on an offline record skip the check-in and slot-end gates. Instead, the caller must be the record's own counsellor (identified by the signed-in principal, not the `userId` parameter) or an admin holding `counselling.appointment.delete`, and the record must be COMPLETED. The session-complete mail and in-app notice are not sent again.
+
+Purging a student reads the synthetic slot ids while the appointments still exist, deletes the slots after the appointments (the slot is the FK parent), and deletes the student's `counselling_otp_guard` row.
+
+### OTP
+The OTP is optional. When one is typed, it is checked against the student's DOB-derived code by `OtpGuardService`, in its own transaction so the failure counter really commits. Three wrong codes within 15 minutes (`app.counselling.checkin-max-attempts`) lock the OTP for 15 minutes; ten in total lock it for good. A student with no DOB gets `OTP_NO_DOB`, and the `1111` fallback is never accepted as proof. The counsellor can always save without the OTP; the record then has `checkin_verified_at = NULL` and shows "OTP not verified".
+
+### Endpoints (`/api/offline-counselling`)
+
+| Method & path | Purpose |
+|---|---|
+| `GET /context` | Always 200: `{offline, counsellorId, name, institutes}`; `offline:false` for anyone who is not an active offline counsellor. |
+| `GET /assessments?instituteCode=` | Assessments allotted in that school. |
+| `GET /students?instituteCode=&assessmentId=` | The student list (native SQL; no DOB, phone or email). |
+| `POST /map-to-me` | Take over up to 500 students. |
+| `POST /mark-done` | Record the session (optional OTP). |
+| `POST /admin/{appointmentId}/revert` | Admin only (`counselling.appointment.delete`, hard-checked). |
+| `PUT /admin/counsellor/{counsellorId}/offline` | Admin only (`counsellor.create`, hard-checked). |
+
+Every gate is an in-code check off the principal, because `auth.enforce-mode: log-only` makes `@PreAuthorize` a no-op.
+
+### Hardening shipped alongside
+- `POST /api/counsellor-institute/allocate` and `DELETE /deallocate/{id}` are hard-checked (`counsellor_institute_mapping.create` / `.delete`, or super-admin). A counsellor's active mappings are the allow-list the offline page trusts, and before this a counsellor could add schools to their own list.
+- "Open as Counsellor" (`POST /admin/impersonate/counsellor/{id}`) now needs `counsellor.create` (admin-only) instead of `counsellor.update` (which every counsellor holds), and refuses a counsellor whose login is a super-admin.
+- `appointment.counsellor` and the student mapping's `counsellor` no longer serialise the counsellor's bank, government-id, agreement, rate or login fields, and `assignedBy` is narrowed to `{id, name}`. `appointment.slot.counsellor` still serialises the full counsellor; that is not fixed yet.
+
+### Migration
+`V20260928001__offline_counselling.sql` adds `counsellors.is_offline`, `counselling_appointment.assessment_id` and `origin` (plus index `idx_ca_student_assessment`), dedupes `student_counsellor_mapping` and adds `UNIQUE uk_scm_student(student_id)`, and creates `counselling_otp_guard`. Every statement is guarded on `information_schema`, so it is safe to re-run and safe on a database where Hibernate added the columns first.
+
+### Known limitations
+- The principal dashboard's "students counselled" is a release-time snapshot; offline records appear after a re-release or refresh.
+- The thank-you page still offers online booking to students of offline schools.
+- Admin impersonation tabs are recorded as the counsellor (the token has no impersonator claim).
 
 ---
 

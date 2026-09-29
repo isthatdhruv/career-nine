@@ -29,6 +29,8 @@ interface CounsellorOption {
  *   • "To be booked" — students with no upcoming session (all ticked by default).
  *   • "Already have an upcoming session" — students already booked (none ticked by default;
  *      tick to give them a second session).
+ * plus a read-only "Already counselled" list: students whose counselling for this assessment
+ * is done (online, or in person recorded by an offline counsellor). They can't be booked.
  * Confirming books exactly the ticked students into the earliest available counsellor slots —
  * we book what fits and report the rest. No emails are sent from here.
  */
@@ -86,7 +88,13 @@ const BulkCounsellingAllotmentPage = () => {
     if (!p || !Array.isArray(p.toBook) || !Array.isArray(p.alreadyBooked)) {
       throw new Error("Unexpected response from the preview endpoint.");
     }
-    setPreview(p);
+    // The counselled bucket is newer than the endpoint; a backend without it means "none".
+    const counselled = Array.isArray(p.alreadyCounselled) ? p.alreadyCounselled : [];
+    setPreview({
+      ...p,
+      alreadyCounselled: counselled,
+      alreadyCounselledCount: typeof p.alreadyCounselledCount === "number" ? p.alreadyCounselledCount : counselled.length,
+    });
     // To-book selected by default; re-book starts empty.
     setToBookSel(new Set(p.toBook.map((s) => s.studentId)));
     setRebookSel(new Set());
@@ -222,6 +230,7 @@ const BulkCounsellingAllotmentPage = () => {
             <Stat label="Completed students" value={preview.totalCompleted} />
             <Stat label="Not yet booked" value={preview.toBookCount} accent="#2563eb" />
             <Stat label="Already booked" value={preview.alreadyBookedCount} accent="#b45309" />
+            <Stat label="Already counselled" value={preview.alreadyCounselledCount} accent="#0f766e" />
             <Stat label="Available slots" value={preview.availableSlotCount} accent="#059669" />
           </div>
 
@@ -263,6 +272,14 @@ const BulkCounsellingAllotmentPage = () => {
             rebookingId={rebookingId}
             emptyText="No students have an upcoming session yet."
           />
+
+          {/* List 3: already counselled — read-only, never booked from here. */}
+          {preview.alreadyCounselled.length > 0 && (
+            <CounselledList
+              title={`Already counselled (${preview.alreadyCounselled.length})`}
+              rows={preview.alreadyCounselled}
+            />
+          )}
 
           {/* Confirm */}
           <div style={{ marginTop: 22 }}>
@@ -527,6 +544,36 @@ const AlreadyBookedList = ({
         </table>
       </div>
     )}
+  </div>
+);
+
+// Students whose counselling for this assessment is already done. No checkboxes: booking
+// them again would give a second session for the same report, and confirm drops them anyway.
+const CounselledList = ({ title, rows }: { title: string; rows: StudentBrief[] }) => (
+  <div style={{ marginTop: 22 }}>
+    <div style={{ fontWeight: 700, fontSize: "0.9rem", color: "#0f766e", marginBottom: 4 }}>{title}</div>
+    <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginBottom: 10 }}>
+      Their counselling for this assessment is done — online, or in person at their school — so they
+      are not booked again.
+    </div>
+    <div style={{ overflowX: "auto" }}>
+      <table style={tableStyle}>
+        <thead>
+          <tr style={trHead}>
+            <th style={th}>Student</th>
+            <th style={th}>Email</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((s) => (
+            <tr key={s.studentId} style={trBody}>
+              <td style={td}>{s.name || "—"}</td>
+              <td style={{ ...td, color: "#94a3b8" }}>{s.email || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </div>
 );
 

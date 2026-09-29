@@ -100,12 +100,19 @@ const labelStyle: React.CSSProperties = {
  * server stamps those "Counsellor cancelled…" / "Counsellor unavailable…", legacy rows
  * have no reason at all) stays hidden — the session's story lives on the appointment,
  * and leaving these here made every cancelled booking linger in the panel forever.
+ * A blocked COMPLETED slot is the synthetic slot behind an offline counselling record,
+ * not a date block — a counsellor recording 60 sessions today would otherwise see 60
+ * "blocked" rows here until midnight. A reverted record's slot turns CANCELLED but keeps
+ * its OFFLINE_RECORD reason, so that reason is dropped too (the server's
+ * SlotMaterializationService.blocksDay uses the same rule); it could not be unblocked
+ * anyway, since the reverted appointment still points at it.
  */
 const visibleBlockedDates = (slots: any[]) => {
   const d = new Date()
   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return slots.filter((s: any) => {
     if (!s?.isBlocked) return false
+    if (String(s.status || '').toUpperCase() === 'COMPLETED' || s.blockReason === 'OFFLINE_RECORD') return false
     if (s.date && String(s.date).slice(0, 10) < today) return false
     const reason = String(s.blockReason || s.reason || '')
     if (!reason) return false

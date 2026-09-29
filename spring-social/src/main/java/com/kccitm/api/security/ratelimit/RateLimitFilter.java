@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 import com.kccitm.api.security.UserPrincipal;
 
@@ -79,12 +80,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     /**
      * PER_USER scope (run AFTER auth filter — needs {@link UserPrincipal}).
-     * {@code /student/save-csv} is exact. The other two are wildcard.
+     * {@code /student/save-csv} is exact. The next two are wildcard. The offline-counselling
+     * pair are the counsellor's write actions (bulk re-mapping and recording sessions, which
+     * also checks an OTP); a cheap second layer only — the per-student OTP guard is what
+     * actually bounds code guessing, and this bucket is per instance.
      */
     private static final Pattern PER_USER_PATTERNS = Pattern.compile(
             "^/student/save-csv$|" +
             "^/user/getbyid/.+$|" +
-            "^/student-info/getStudentsWithMappingByInstituteId/.+$");
+            "^/student-info/getStudentsWithMappingByInstituteId/.+$|" +
+            "^/api/offline-counselling/(mark-done|map-to-me)$");
 
     private final Mode mode;
     private final BucketRegistry registry;
@@ -162,7 +167,26 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (mode == Mode.PER_IP) {
             return PER_IP_PATHS.contains(path);
         }
-        return PER_USER_PATTERNS.matcher(path).matches();
+        return PER_USER_PATTERNS.matcher(path).matches()
+                || PER_USER_PATTERNS.matcher(routedPath(request)).matches();
+    }
+
+    /**
+     * The path as Spring MVC will route it: percent-decoded, and without the one trailing slash
+     * that 5.3's trailing-slash matching ignores. Matching only the raw URI let
+     * {@code /mark-done/} or {@code /map%2Dto%2Dme} reach the controller without being charged.
+     * Checked in addition to the raw URI, so nothing that was limited before stops being limited.
+     */
+    private static String routedPath(HttpServletRequest request) {
+        String p;
+        try {
+            p = UrlPathHelper.defaultInstance.getPathWithinApplication(request);
+        } catch (RuntimeException e) {
+            // A malformed escape: the dispatcher will refuse it too, so there is nothing to charge.
+            return "";
+        }
+        if (p != null && p.length() > 1 && p.endsWith("/")) p = p.substring(0, p.length() - 1);
+        return p == null ? "" : p;
     }
 
     private String resolveIdentifier(HttpServletRequest request) {
