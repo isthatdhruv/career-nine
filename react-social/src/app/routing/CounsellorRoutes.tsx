@@ -24,6 +24,9 @@ const CounsellorAvailabilityPage = lazy(
 const CounsellorProfilePage = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorProfilePage')
 )
+const CounsellorOfflineSessionsPage = lazy(
+  () => import('../pages/CounsellorDashboard/CounsellorOfflineSessionsPage')
+)
 const PermissionDeniedPage = lazy(
   () => import('../components/PermissionDeniedPage')
 )
@@ -141,6 +144,9 @@ const CounsellorAuthGuard: FC = () => {
  *   /counsellor/notes       — Session notes
  *   /counsellor/availability — Availability templates + slots
  *   /counsellor/profile     — Counsellor profile editor
+ *   /counsellor/offline-sessions — Offline counselling (map students, mark sessions done);
+ *                             the page itself shows "not enabled" unless an admin flagged
+ *                             this counsellor offline
  */
 const CounsellorRoutes: FC = () => {
   useEffect(() => {
@@ -184,6 +190,7 @@ const CounsellorRoutes: FC = () => {
             <Route path='notes' element={<PageSuspense><CounsellorNotesPage /></PageSuspense>} />
             <Route path='availability' element={<PageSuspense><CounsellorAvailabilityPage /></PageSuspense>} />
             <Route path='profile' element={<PageSuspense><CounsellorProfilePage /></PageSuspense>} />
+            <Route path='offline-sessions' element={<PageSuspense><CounsellorOfflineSessionsPage /></PageSuspense>} />
           </Route>
         </Route>
 

@@ -57,6 +57,9 @@ public class GeneralAssessmentController {
     private com.kccitm.api.service.psychometric.PsychometricPropertiesExportService psychometricPropertiesExportService;
 
     @Autowired
+    private com.kccitm.api.service.b2c.navigatorpro.NavigatorProRawExportService navigatorProRawExportService;
+
+    @Autowired
     private SchoolDashboardDataService schoolDashboardDataService;
 
     @Autowired
@@ -280,6 +283,50 @@ public class GeneralAssessmentController {
                 "psychometric_properties_navigator360_" + assessmentId + ".xlsx");
         headers.setContentLength(excelBytes.length);
 
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * "Navigator Pro Raw Data" — one row per student with item marks, construct sums, v3
+     * indices, internal cohort percentiles and bands, gate outcome (R1–R6) and the full
+     * direction blend, plus an item key and the matrices/thresholds used.
+     *
+     * Body: { "assessmentId": 58, "userStudentIds": [1, 2, 3] }
+     * userStudentIds optional — omitted/empty means every student mapped to the assessment.
+     */
+    @PostMapping("/export-navigator-pro-raw")
+    @PreAuthorize("@auth.allows('report.export')")
+    public ResponseEntity<?> exportNavigatorProRaw(@RequestBody Map<String, Object> request) throws Exception {
+        Object rawAssessmentId = request.get("assessmentId");
+        if (!(rawAssessmentId instanceof Number)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+        }
+        Long assessmentId = ((Number) rawAssessmentId).longValue();
+        List<Long> userStudentIds = null;
+        Object rawIds = request.get("userStudentIds");
+        if (rawIds instanceof List) {
+            userStudentIds = new ArrayList<>();
+            for (Object o : (List<?>) rawIds) {
+                if (o instanceof Number) userStudentIds.add(((Number) o).longValue());
+            }
+        }
+
+        byte[] excelBytes;
+        try {
+            excelBytes = navigatorProRawExportService.export(assessmentId, userStudentIds);
+        } catch (com.kccitm.api.service.b2c.report.ReportRoutingException e) {
+            // Not a Navigator Pro v3 questionnaire (or its MQT tags are off) — say exactly why.
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+        if (excelBytes == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No students found for this assessment/selection"));
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment", "navigator_pro_raw_data_" + assessmentId + ".xlsx");
+        headers.setContentLength(excelBytes.length);
         return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
     }
 

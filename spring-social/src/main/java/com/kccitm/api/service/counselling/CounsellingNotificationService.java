@@ -462,6 +462,29 @@ public class CounsellingNotificationService {
     }
 
     /**
+     * The post-session thank-you for a session an offline counsellor recorded, to the student
+     * and — unlike the online {@link #sendSessionCompleteEmail} — the parent/guardian too when
+     * one is on file: the school ran the session, so the parent had no booking mail telling them
+     * it was coming. No rating prompt rides on it.
+     *
+     * <p>Called after the recording transaction commits. It runs on another thread with a
+     * detached appointment, so everything it reads must be on the row itself: the recording
+     * flow fills the contact snapshot for exactly that reason (the student's profile is LAZY).
+     */
+    @Async
+    public void sendOfflineSessionCompleteEmail(CounsellingAppointment appointment) {
+        try {
+            Mail mail = CounsellingMails.sessionComplete(
+                    AccountMails.firstName(studentName(appointment)),
+                    mailLinks.of(referralShareUrl(appointment), "referral"));
+            sendMailToStudentAndParent(appointment, mail);
+        } catch (Exception e) {
+            logger.error("Failed to send offline session-complete email for appointment ID: {}. Error: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
+    /**
      * Share link for the post-session mail's referral button: the campaign landing
      * page the student came through, or the assessment site root when they didn't
      * come via a campaign. There is no per-student referral tracking yet — this is
@@ -631,9 +654,15 @@ public class CounsellingNotificationService {
         }
     }
 
-    /** The assessment this session was booked against, resolved through the entitlement. */
+    /**
+     * The assessment this session is for: the one stamped on the appointment when there is one
+     * (offline records, and bookings made against a known assessment), else the entitlement's.
+     * Offline records usually carry no entitlement, so without the first step their report
+     * link, report button and assessment name would all come back empty.
+     */
     public Long assessmentIdFor(CounsellingAppointment appointment) {
         try {
+            if (appointment.getAssessmentId() != null) return appointment.getAssessmentId();
             if (appointment.getEntitlementId() == null) return null;
             return studentEntitlementRepository.findById(appointment.getEntitlementId())
                     .map(e -> e.getAssessmentId())

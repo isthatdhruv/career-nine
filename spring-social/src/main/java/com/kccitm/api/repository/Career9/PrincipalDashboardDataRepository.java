@@ -32,12 +32,17 @@ public interface PrincipalDashboardDataRepository extends JpaRepository<Principa
      * but no assessment, and asking the live computation which assessments exist would
      * reintroduce the recompute the read path is meant to avoid. The first row is the
      * most recent release, and carries the assessmentId every other scope lookup needs.
+     *
+     * <p>Per engine: a college's Navigator 360 and Navigator Pro dashboards are separate
+     * pages, and each asks only for its own product's live release.
      */
     @Query("SELECT p FROM PrincipalDashboardData p "
-         + "WHERE p.instituteCode = :instituteCode AND p.scopeLevel = 'INSTITUTE' "
+         + "WHERE p.instituteCode = :instituteCode AND p.engineCode = :engineCode "
+         + "AND p.scopeLevel = 'INSTITUTE' "
          + "AND p.isCurrent = true AND p.generatedAt IS NOT NULL "
          + "ORDER BY p.generatedAt DESC")
-    List<PrincipalDashboardData> findInstituteScopesNewestFirst(@Param("instituteCode") Long instituteCode);
+    List<PrincipalDashboardData> findInstituteScopesNewestFirst(@Param("instituteCode") Long instituteCode,
+                                                                @Param("engineCode") String engineCode);
 
     /**
      * Make one assessment the school's live dashboard and clear the others.
@@ -45,13 +50,17 @@ public interface PrincipalDashboardDataRepository extends JpaRepository<Principa
      * <p>Ordering by {@code generatedAt} alone answered the wrong question: re-releasing
      * an older assessment would make it live purely because it was regenerated last.
      * A release states which assessment is current instead.
+     *
+     * <p>Only among rows of the same engine. Releasing a Navigator Pro assessment must not
+     * take the same college's Navigator 360 dashboard off the air.
      */
     @Modifying
     @Query("UPDATE PrincipalDashboardData p "
          + "SET p.isCurrent = CASE WHEN p.assessmentId = :assessmentId THEN true ELSE false END "
-         + "WHERE p.instituteCode = :instituteCode")
+         + "WHERE p.instituteCode = :instituteCode AND p.engineCode = :engineCode")
     void markCurrentAssessment(@Param("instituteCode") Long instituteCode,
-                               @Param("assessmentId") Long assessmentId);
+                               @Param("assessmentId") Long assessmentId,
+                               @Param("engineCode") String engineCode);
 
     /**
      * Whether a release is already in flight for this institute+assessment — the

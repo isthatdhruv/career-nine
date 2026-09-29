@@ -509,3 +509,212 @@
   width: 100%;
 }
 
+/* ── Offline counselling page (/counsellor/offline-sessions) ──
+   Used in schools, mostly from a phone: below 768px the student table becomes a
+   list of cards and every control a finger lands on is at least 44px tall. */
+.cp-off-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px 12px;
+}
+
+.cp-off-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6B7A8D;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+.cp-off-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cp-off-stat {
+  background: #fff;
+  border: 1px solid #DDE3EC;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 14px 12px;
+  text-align: center;
+}
+
+.cp-off-stat-value { font-size: 26px; font-weight: 700; line-height: 1.2; }
+.cp-off-stat-label {
+  font-size: 11px;
+  color: #6B7A8D;
+  margin-top: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.cp-off-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cp-off-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6B7A8D;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 10px 8px;
+  border-bottom: 1px solid #DDE3EC;
+  background: #F8F9FC;
+  white-space: nowrap;
+}
+
+.cp-off-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #EEF1F6;
+  vertical-align: top;
+  color: #1A1F2E;
+}
+
+.cp-off-table tr.is-selected td,
+.cp-off-card.is-selected { background: rgba(105, 132, 169, 0.08); }
+
+.cp-off-sub { font-size: 11px; color: #6B7A8D; margin-top: 2px; }
+
+.cp-off-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cp-off-chip--mine { background: #D1FAE5; color: #065F46; }
+.cp-off-chip--other { background: #FEF3C7; color: #92400E; }
+.cp-off-chip--muted { background: #F1F5F9; color: #475569; }
+.cp-off-chip--done { background: #DCFCE7; color: #166534; }
+.cp-off-chip--info { background: #DBEAFE; color: #1E40AF; }
+
+.cp-off-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cp-off-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cp-off-card {
+  border: 1px solid #DDE3EC;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+}
+
+.cp-off-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 0;
+}
+
+.cp-off-check input { width: 18px; height: 18px; cursor: pointer; }
+
+/* Sticks to the bottom of the viewport while the list scrolls under it. */
+.cp-off-bulkbar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 20;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #263B6A;
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.25);
+  font-size: 13px;
+}
+
+.cp-off-bulkbar .cp-action-btn { border-color: #fff; }
+
+/* .cp-action-btn has no disabled look of its own, so a disabled "Mark done" (a session in
+   progress, photos still preparing, a save under way) looked clickable. Scoped to this page's
+   buttons: every modal/bulk-bar button carries cp-off-touch, every row action sits in cp-off-actions. */
+.cp-action-btn.cp-off-touch:disabled,
+.cp-off-actions .cp-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cp-action-btn.cp-off-touch:disabled:hover,
+.cp-off-actions .cp-action-btn:disabled:hover { background: #fff; }
+.cp-action-btn-primary.cp-off-touch:disabled:hover,
+.cp-off-actions .cp-action-btn-primary:disabled:hover { background: #263B6A; border-color: #263B6A; }
+
+/* Remove on a pending photo thumbnail: a 26px dot drawn inside a larger transparent hit box
+   (44px on phones — the only way to drop a bad capture there). */
+.cp-off-photo-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 34px;
+  padding: 4px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cp-off-photo-remove span {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(17, 24, 39, 0.75);
+  color: #fff;
+  font-size: 16px;
+  line-height: 26px;
+  text-align: center;
+}
+
+@media (max-width: 767.98px) {
+  .cp-off-photo-remove { width: 44px; height: 44px; }
+  /* Small text/icon controls (Clear filters, a notice's dismiss ×) */
+  .cp-off-hit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .cp-page-card { padding: 12px; }
+  .cp-off-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .cp-off-stat { padding: 10px 8px; }
+  .cp-off-stat-value { font-size: 22px; }
+  .cp-off-filters { grid-template-columns: 1fr; }
+  .cp-off-touch,
+  .cp-off-actions .cp-action-btn,
+  .cp-off-filters .form-control,
+  .cp-off-filters .form-select,
+  .cp-off-filters div[class*="-control"] { min-height: 44px; } /* react-select's control */
+  .cp-off-check { min-width: 44px; min-height: 44px; }
+  .cp-off-check input { width: 22px; height: 22px; }
+  .cp-off-bulkbar { bottom: 0; border-radius: 12px 12px 0 0; }
+}
+

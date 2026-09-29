@@ -54,6 +54,17 @@ public class ReportPipelineProducer {
     private boolean enabled;
 
     /**
+     * Engine codes whose reports are generated only from the admin Generate Queue.
+     * On-submit completion skips them (cohort norms need the whole batch first).
+     * Comma-separated; empty disables the gate.
+     */
+    @Value("${report.pipeline.manual-only-engines:navigator_pro}")
+    private String manualOnlyEngines;
+
+    @Autowired @org.springframework.context.annotation.Lazy
+    private com.kccitm.api.service.b2c.report.ReportService reportService;
+
+    /**
      * Enqueue a report-generation job for this student. Generation runs for ALL
      * students; the {@code whitelabel} flag on the event gates only the email
      * stage. A whitelabel student with no email address still has their report
@@ -66,6 +77,11 @@ public class ReportPipelineProducer {
     public boolean enqueue(UserStudent userStudentArg, Long assessmentId) {
         if (!enabled || userStudentArg == null || assessmentId == null) {
             return false;
+        }
+        if (isManualOnly(assessmentId)) {
+            logger.info("Report pipeline: on-submit generation skipped (manual-only engine) student={} assessment={}",
+                    userStudentArg.getUserStudentId(), assessmentId);
+            return true;   // handled: the legacy auto-gen must not run either
         }
         // Re-fetch with studentInfo JOIN-FETCHed. Callers reach this from @Async /
         // background threads with no open Hibernate session, so the passed entity
@@ -155,6 +171,24 @@ public class ReportPipelineProducer {
         } catch (Exception e) {
             throw new IllegalStateException("Kafka enqueue failed for student " + userStudentId
                     + ": " + e.getMessage(), e);
+        }
+    }
+
+    /** True when the assessment's default template runs an engine listed in report.pipeline.manual-only-engines. */
+    boolean isManualOnly(Long assessmentId) {
+        java.util.Set<String> engines = new java.util.HashSet<>();
+        if (manualOnlyEngines != null) {
+            for (String e : manualOnlyEngines.split(",")) {
+                if (!e.trim().isEmpty()) engines.add(e.trim().toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        if (engines.isEmpty() || reportService == null) return false;
+        try {
+            com.kccitm.api.model.career9.ReportTemplate t = reportService.resolveTemplate(assessmentId, null);
+            return t != null && t.getEngineCode() != null
+                    && engines.contains(t.getEngineCode().trim().toLowerCase(java.util.Locale.ROOT));
+        } catch (com.kccitm.api.service.b2c.report.ReportRoutingException e) {
+            return false;   // no template mapped → let the worker apply its benign skip
         }
     }
 

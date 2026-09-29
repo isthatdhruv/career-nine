@@ -1,5 +1,6 @@
 package com.kccitm.api.service.counselling;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -36,19 +37,37 @@ public class StudentCounsellorMappingService {
     @Autowired
     private UserRepository userRepository;
 
+    /**
+     * Maps a student to a counsellor — the admin {@code /assign} endpoint.
+     *
+     * <p>A student has exactly one mapping row ({@code uk_scm_student}), so this moves that row
+     * to the new counsellor in place (reactivating it if it had been deactivated) rather than
+     * adding a second active row next to the old counsellor's. Only mapping a student to the
+     * counsellor they are already actively mapped to is refused, as before.
+     */
     public StudentCounsellorMapping assignStudentToCounsellor(Long studentId, Long counsellorId, Long adminUserId, String notes) {
         logger.info("Assigning student {} to counsellor {} by admin {}", studentId, counsellorId, adminUserId);
 
-        Optional<StudentCounsellorMapping> existing = mappingRepository.findByCounsellorIdAndStudentUserStudentId(counsellorId, studentId);
+        Optional<StudentCounsellorMapping> existing = mappingRepository.findByStudentUserStudentId(studentId);
 
         if (existing.isPresent()) {
             StudentCounsellorMapping mapping = existing.get();
-            if (Boolean.TRUE.equals(mapping.getIsActive())) {
+            boolean sameCounsellor = mapping.getCounsellor() != null
+                    && counsellorId.equals(mapping.getCounsellor().getId());
+            if (sameCounsellor && Boolean.TRUE.equals(mapping.getIsActive())) {
                 throw new DuplicateResourceException("Student " + studentId + " is already assigned to counsellor " + counsellorId);
             }
-            // Reactivate inactive mapping
-            logger.info("Reactivating existing mapping for student {} and counsellor {}", studentId, counsellorId);
+            if (!sameCounsellor) {
+                Counsellor counsellor = counsellorRepository.findById(counsellorId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Counsellor", "id", counsellorId));
+                logger.info("Moving student {} from counsellor {} to counsellor {}", studentId,
+                        mapping.getCounsellor() != null ? mapping.getCounsellor().getId() : null, counsellorId);
+                mapping.setCounsellor(counsellor);
+            } else {
+                logger.info("Reactivating existing mapping for student {} and counsellor {}", studentId, counsellorId);
+            }
             mapping.setIsActive(true);
+            mapping.setAssignedAt(LocalDateTime.now());
             if (notes != null) {
                 mapping.setNotes(notes);
             }
@@ -79,6 +98,16 @@ public class StudentCounsellorMappingService {
         return mappingRepository.save(mapping);
     }
 
+    /**
+     * Maps one student to a counsellor with a single native upsert, in its own transaction —
+     * the offline page's bulk "Map to me", which reports per student. Moves the row if another
+     * counsellor has it, reactivates it if inactive, inserts it otherwise. Never touches the
+     * student's OTP guard: re-mapping must not reset the wrong-code counter.
+     */
+    public void upsertActiveMapping(Long studentId, Long counsellorId, Long assignedByUserId) {
+        mappingRepository.upsertActive(studentId, counsellorId, assignedByUserId, LocalDateTime.now());
+    }
+
     public List<StudentCounsellorMapping> getStudentsForCounsellor(Long counsellorId) {
         logger.debug("Fetching students for counsellor {}", counsellorId);
         return mappingRepository.findByCounsellorIdAndIsActiveTrue(counsellorId);
@@ -102,6 +131,12 @@ public class StudentCounsellorMappingService {
         mappingRepository.save(mapping);
     }
 
+    /**
+     * {@link #assignStudentToCounsellor} for each student, so students already mapped elsewhere
+     * are moved to this counsellor. Deliberately not transactional: every row commits on its own,
+     * and a failure (unknown student, already this counsellor's, a unique-key race) skips that
+     * student without rolling back the rest. Returns the rows that were written.
+     */
     public List<StudentCounsellorMapping> bulkAssign(Long counsellorId, List<Long> studentIds, Long adminUserId) {
         logger.info("Bulk assigning {} students to counsellor {} by admin {}", studentIds.size(), counsellorId, adminUserId);
         List<StudentCounsellorMapping> results = new ArrayList<>();

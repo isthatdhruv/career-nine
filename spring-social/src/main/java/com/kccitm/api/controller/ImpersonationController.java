@@ -103,8 +103,13 @@ public class ImpersonationController {
      * The counsellor equivalent of the student impersonation above: mints a short-lived JWT
      * for the User behind a counsellor profile so an admin can open the counsellor portal as
      * them, in a new tab, without disturbing their own session.
+     *
+     * <p>Gated on {@code counsellor.create}, not {@code counsellor.update}: every counsellor
+     * holds {@code counsellor.update} (for their own profile), so that code let any counsellor
+     * mint a token for any other — including an offline counsellor, whose token can map a
+     * school's students and record sessions. {@code counsellor.create} is admin-only.
      */
-    @PreAuthorize("@auth.allows('counsellor.update')")
+    @PreAuthorize("@auth.allows('counsellor.create')")
     @PostMapping("/admin/impersonate/counsellor/{counsellorId}")
     public ResponseEntity<?> impersonateCounsellor(@PathVariable Long counsellorId,
                                                    HttpServletRequest request) {
@@ -118,7 +123,7 @@ public class ImpersonationController {
         }
         UserPrincipal caller = (UserPrincipal) authn.getPrincipal();
         boolean permitted = caller.isSuperAdmin()
-                || (caller.getPermissions() != null && caller.getPermissions().contains("counsellor.update"));
+                || (caller.getPermissions() != null && caller.getPermissions().contains("counsellor.create"));
         if (!permitted) {
             return ResponseEntity.status(403).body("Not authorized to impersonate counsellors");
         }
@@ -136,6 +141,14 @@ public class ImpersonationController {
                     .loadUserById(counsellorOpt.get().getUser().getId());
         } catch (RuntimeException ex) {
             return ResponseEntity.status(404).body("Counsellor user not found");
+        }
+
+        // The minted token carries the target's own super-admin flag, so opening a counsellor
+        // profile that is linked to a super-admin login would hand the caller super-admin
+        // powers. Refuse it: such an account is not a counsellor to act as.
+        if (principal.isSuperAdmin()) {
+            return ResponseEntity.status(403)
+                    .body("This counsellor's login is a super-admin account and can't be opened as.");
         }
 
         String jwt = tokenProvider.createImpersonationToken(principal);

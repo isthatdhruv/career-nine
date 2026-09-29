@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.User;
-import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
@@ -136,16 +135,26 @@ public class AdminCounsellingBookingService {
     /**
      * Dry-run for bulk allotment: how many students completed, who is already booked, how many
      * free slots exist, how many will fit, and how many won't. No bookings are made.
+     *
+     * <p>Students already counselled for this assessment (a completed online session, or one an
+     * offline counsellor recorded at school) get a bucket of their own and are never offered for
+     * booking. That bucket wins over "already booked": a booking left over for a student who has
+     * been counselled is not one to rebook, and {@link #confirmBulk} drops these students anyway,
+     * so listing them as tickable would only produce a booking the server then refuses. The
+     * three lists are disjoint and add up to {@code totalCompleted}.
      */
     public Map<String, Object> previewBulk(Long assessmentId) {
         List<StudentRow> rows = completedStudentRows(assessmentId);
+        Set<Long> counselled = counselledIds(rows, assessmentId);
         Map<Long, CounsellingAppointment> upcoming = upcomingApptByStudent(rows);
 
         List<Map<String, Object>> alreadyBooked = new ArrayList<>();
+        List<Map<String, Object>> alreadyCounselled = new ArrayList<>();
         List<Map<String, Object>> toBook = new ArrayList<>();
         for (StudentRow r : rows) {
             CounsellingAppointment appt = upcoming.get(r.id);
-            if (appt != null) alreadyBooked.add(bookedBrief(r, appt));
+            if (counselled.contains(r.id)) alreadyCounselled.add(studentBrief(r));
+            else if (appt != null) alreadyBooked.add(bookedBrief(r, appt));
             else toBook.add(studentBrief(r));
         }
 
@@ -156,6 +165,8 @@ public class AdminCounsellingBookingService {
         out.put("toBookCount", toBook.size());
         out.put("alreadyBooked", alreadyBooked);
         out.put("alreadyBookedCount", alreadyBooked.size());
+        out.put("alreadyCounselled", alreadyCounselled);
+        out.put("alreadyCounselledCount", alreadyCounselled.size());
         out.put("availableSlotCount", availableSlots().size());
         return out;
     }
@@ -166,6 +177,13 @@ public class AdminCounsellingBookingService {
      * lists). Ids are restricted to students who actually completed the assessment. Each is
      * greedily assigned to the earliest AVAILABLE slot across all counsellors; we book what fits
      * and report the rest.
+     *
+     * <p>Students already counselled for this assessment are dropped here, whatever the client
+     * sent: the preview shows them read-only, but it can be stale (an offline counsellor may
+     * mark a student done in between) and the request body is the admin's to edit. They come
+     * back under {@code unbooked} with the reason, so booked + unbooked still equals requested.
+     * Every booking made is stamped with {@code assessmentId}, so it counts as counselling for
+     * this assessment once it completes.
      *
      * <p>Intentionally NOT {@code @Transactional}: each {@code bookSlot} commits in its own
      * transaction, so one failure (e.g. a slot taken concurrently, a missing student record)
@@ -188,6 +206,8 @@ public class AdminCounsellingBookingService {
             }
         }
 
+        Set<Long> counselled = counselledIds(targets, assessmentId);
+
         // Earliest-first pool of available slots; each successful booking consumes one.
         Deque<CounsellingSlot> pool = new ArrayDeque<>(availableSlots());
 
@@ -195,6 +215,10 @@ public class AdminCounsellingBookingService {
         List<Map<String, Object>> unbooked = new ArrayList<>();
 
         for (StudentRow r : targets) {
+            if (counselled.contains(r.id)) {
+                unbooked.add(briefWithReason(r, "Already counselled for this assessment"));
+                continue;
+            }
             UserStudent student = userStudentRepository.findByIdWithStudentInfo(r.id).orElse(null);
             if (student == null) {
                 unbooked.add(briefWithReason(r, "Student record not found"));
@@ -203,6 +227,7 @@ public class AdminCounsellingBookingService {
             boolean poolWasEmpty = pool.isEmpty();
             CounsellingAppointment appt = tryBook(student, pool, "Allotted by admin (bulk)");
             if (appt != null) {
+                appt = stampAssessment(appt, assessmentId);
                 Map<String, Object> b = studentBrief(r);
                 b.putAll(appointmentSnapshot(appt));
                 bookedResult.add(b);
@@ -240,6 +265,26 @@ public class AdminCounsellingBookingService {
         return null;
     }
 
+    /**
+     * Records which assessment a bulk booking is for. {@code bookSlot} derives it only from an
+     * entitlement, and a bulk booking has none, so without this a session held for the cohort
+     * would never count as "counselled for this assessment" (the done check reads
+     * {@code assessment_id} first, then the entitlement's). The booking has already committed
+     * and is valid without the stamp, so a failure here is logged rather than reported as
+     * unbooked.
+     */
+    private CounsellingAppointment stampAssessment(CounsellingAppointment appt, Long assessmentId) {
+        if (assessmentId == null || appt.getAssessmentId() != null) return appt;
+        try {
+            appt.setAssessmentId(assessmentId);
+            return appointmentRepository.save(appt);
+        } catch (RuntimeException e) {
+            logger.warn("Bulk booking: could not stamp assessment {} on appointment {} ({})",
+                    assessmentId, appt.getId(), e.getMessage());
+            return appt;
+        }
+    }
+
     // ---- Single-student booking --------------------------------------------
 
     /**
@@ -270,6 +315,15 @@ public class AdminCounsellingBookingService {
     public Map<String, Object> rebookWithCounsellor(Long appointmentId, Long counsellorId, User actor) {
         CounsellingAppointment existing = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
+
+        // A held session is done, not missed: "rebooking" it would flip it to RESCHEDULED and
+        // un-counsel the student. An offline record is refused in any state — its slot is a
+        // synthetic marker, never a bookable hour. (reschedule refuses both too; checking here
+        // first gives the admin the reason instead of the time-window message below.)
+        if ("COMPLETED".equalsIgnoreCase(existing.getStatus()) || existing.isOfflineRecord()) {
+            throw new IllegalStateException(
+                    "This session has already taken place, so it can't be moved to another counsellor.");
+        }
 
         // Rebook is only for sessions whose scheduled time has already passed (e.g. missed/finished).
         // Still-upcoming sessions are left alone — the admin can't yank a confirmed future session around.
@@ -325,17 +379,43 @@ public class AdminCounsellingBookingService {
     // ---- helpers ------------------------------------------------------------
 
     /** Snapshot the student's profile contact so the appointment record (and any later
-     *  confirmation the email service sends) has a recipient. */
+     *  confirmation the email service sends) has a recipient — plus the parent/guardian
+     *  contact from an earlier booking, the only place one is kept, so the parent hears
+     *  about an admin-made booking too. */
     private BookingService.BookingContact contactFor(UserStudent student) {
-        BookingService.BookingContact c = new BookingService.BookingContact();
-        StudentInfo info = student.getStudentInfo();
-        if (info != null) {
-            c.name = info.getName();
-            c.email = info.getEmail();
-            c.phone = info.getPhoneNumber();
+        return BookingService.BookingContact.fromProfile(student, priorWithParentContact(student));
+    }
+
+    /** The student's newest booking that carries a parent contact, else her newest one, else null. */
+    private CounsellingAppointment priorWithParentContact(UserStudent student) {
+        if (student == null || student.getUserStudentId() == null) return null;
+        List<CounsellingAppointment> history = appointmentRepository.findByStudentIdOrdered(student.getUserStudentId());
+        if (history == null || history.isEmpty()) return null;
+        for (CounsellingAppointment a : history) {
+            if (notBlank(a.getParentEmail()) || notBlank(a.getParentPhone())) return a;
         }
-        c.preferredContactMethod = "EMAIL";
-        return c;
+        return history.get(0);
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.trim().isEmpty();
+    }
+
+    /**
+     * Of these students, the ones already counselled for the assessment: a COMPLETED session tied
+     * to it directly or through the entitlement it was booked on. Same native query as the
+     * offline page's mark-done check (its list applies the same predicate per school), so the
+     * two screens agree on who is done.
+     */
+    private Set<Long> counselledIds(List<StudentRow> rows, Long assessmentId) {
+        if (rows.isEmpty() || assessmentId == null) return Set.of();
+        List<Long> ids = new ArrayList<>(rows.size());
+        for (StudentRow r : rows) ids.add(r.id);
+        Set<Long> out = new HashSet<>();
+        for (Object[] row : appointmentRepository.findLatestCompletedForAssessment(ids, assessmentId)) {
+            if (row != null && row.length > 0 && row[0] != null) out.add(((Number) row[0]).longValue());
+        }
+        return out;
     }
 
     /** AVAILABLE, non-blocked, future slots across all counsellors, earliest first. */

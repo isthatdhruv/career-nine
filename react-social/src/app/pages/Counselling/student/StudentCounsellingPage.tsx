@@ -40,6 +40,13 @@ interface Appointment {
   markedAbsentAt?: string | null
   /** Set once she contests an absent mark. The server allows only one. */
   disputeRaisedAt?: string | null
+  /** ONLINE / OFFLINE (in person). */
+  mode?: string | null
+  /**
+   * OFFLINE_RECORD when her school's counsellor recorded an in-person session as done; null
+   * for a session she booked. Such a record has a date but no real time.
+   */
+  origin?: string | null
 }
 
 /**
@@ -240,6 +247,8 @@ const StudentCounsellingPage: React.FC = () => {
           missedByRole: a.missedByRole ?? null,
           markedAbsentAt: a.markedAbsentAt ?? null,
           disputeRaisedAt: a.disputeRaisedAt ?? null,
+          mode: a.mode ?? null,
+          origin: a.origin ?? null,
           slot: a.slot
             ? {
                 date: a.slot.date,

@@ -5,6 +5,7 @@ import PageHeader from '../../../components/PageHeader'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import { getAllAppointments } from '../API/AppointmentAPI'
 import { getAvailableSlots } from '../API/SlotAPI'
+import { ORIGIN_OFFLINE_RECORD } from '../API/OfflineCounsellingAPI'
 import {
   usePeriodFilter, PeriodFilterControl,
   localDateStr, shiftDate, daysBetween, fmtDateShort,
@@ -64,6 +65,18 @@ function colorFor(name: string): string {
 
 /** Title of the issues tile — its drill-down is by reason, not by status. */
 const ISSUE_TILE = 'Students Facing Issues'
+
+/**
+ * Offline counselling records (origin OFFLINE_RECORD): in-person sessions an offline
+ * counsellor recorded after they happened. They were never booked, have no slot time and
+ * can't be a no-show, so counting them as bookings would swamp the funnel and push the
+ * completion rate toward 100%. They get one tile of their own and stay out of every other
+ * figure; a reverted one (CANCELLED) is an admin's undo and counts nowhere.
+ */
+const isOfflineRecord = (a: any): boolean => a?.origin === ORIGIN_OFFLINE_RECORD
+/** Title of the offline tile — its drill-down lists offline records, not a status. */
+const OFFLINE_TILE = 'Recorded Offline'
+const OFFLINE_ACCENT = '#0891B2'
 
 /**
  * Sessions that went wrong for the student, and why.
@@ -334,7 +347,8 @@ const DrillModal: React.FC<{
                       <td style={{ whiteSpace: 'nowrap' }}>
                         {slotDate(a) ? fmtDateShort(slotDate(a)) : '—'}
                         <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
-                          {fmtTime(slotStartTime(a)) || '—'}
+                          {/* Offline records carry a date only (their slot is a 00:00 placeholder). */}
+                          {isOfflineRecord(a) ? 'Date only' : fmtTime(slotStartTime(a)) || '—'}
                         </div>
                       </td>
                       <td>{counsellorName(a)}</td>
@@ -398,7 +412,8 @@ const SectionTitle: React.FC<{ icon: string; title: string; right?: React.ReactN
 
 const CounsellingDashboardPage: React.FC = () => {
   const navigate = useNavigate()
-  const [appts, setAppts] = useState<any[]>([])
+  // Everything getAll returned; `appts` below is the online part every figure reads.
+  const [allAppts, setAllAppts] = useState<any[]>([])
   const [openSlots, setOpenSlots] = useState<any[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -413,7 +428,7 @@ const CounsellingDashboardPage: React.FC = () => {
     if (!opts?.silent) setLoading(true)
     setRefreshing(true)
     const a = getAllAppointments()
-      .then((res) => { setAppts(Array.isArray(res.data) ? res.data : []); setError(null) })
+      .then((res) => { setAllAppts(Array.isArray(res.data) ? res.data : []); setError(null) })
       .catch(() => { if (!opts?.silent) setError('Failed to load counselling data. Please refresh.') })
     // Open-slot availability is best-effort — needs counselling.slot.read; hide gracefully if denied.
     const s = getAvailableSlots(localDateStr())
@@ -433,10 +448,25 @@ const CounsellingDashboardPage: React.FC = () => {
     return () => clearInterval(t)
   }, [])
 
+  // Online sessions (every tile, list, chart and rate) vs completed offline records (the
+  // "Recorded Offline" tile only). Reverted offline records land in neither.
+  const { appts, offlineDone } = useMemo(() => {
+    const online: any[] = []
+    const offline: any[] = []
+    for (const a of allAppts) {
+      if (!isOfflineRecord(a)) online.push(a)
+      else if (String(a?.status || '').toUpperCase() === 'COMPLETED') offline.push(a)
+    }
+    return { appts: online, offlineDone: offline }
+  }, [allAppts])
+
   // Period filter (All time / Today / Range) and the window every count below is
   // read through — shared with Manage Sessions so both screens agree on what a
   // period means.
-  const allDates = useMemo(() => appts.map(slotDate).filter(Boolean), [appts])
+  const allDates = useMemo(
+    () => appts.concat(offlineDone).map(slotDate).filter(Boolean),
+    [appts, offlineDone],
+  )
   const filter = usePeriodFilter(allDates)
   const { mode, win, winLabel, inWin, isToday, today } = filter
 
@@ -449,6 +479,15 @@ const CounsellingDashboardPage: React.FC = () => {
     const booked = pending + assigned + confirmed + inProgress + completed + missed
     return { onDay, pending, assigned, confirmed, inProgress, completed, missed, cancelled, booked }
   }, [appts, win])
+
+  // Offline records dated inside the window, by their session date.
+  const offlineInWin = useMemo(
+    () => offlineDone.filter((a) => {
+      const d = slotDate(a)
+      return !!d && d >= win.from && d <= win.to
+    }),
+    [offlineDone, win],
+  )
 
   // ── Slot availability (open / bookable) ──
   const slotStats = useMemo(() => {
@@ -605,11 +644,14 @@ const CounsellingDashboardPage: React.FC = () => {
   // narrowed to its statuses and read in the order they happen.
   const drillRows = useMemo(() => {
     if (!drill) return []
-    return winBuckets.onDay
-      .filter((a: any) => drill.statuses.includes(String(a.status || '').toUpperCase()))
+    const source = drill.label === OFFLINE_TILE
+      ? offlineInWin
+      : winBuckets.onDay.filter((a: any) => drill.statuses.includes(String(a.status || '').toUpperCase()))
+    return source
+      .slice()
       .sort((a: any, b: any) =>
         (slotDate(a) + slotStartTime(a)).localeCompare(slotDate(b) + slotStartTime(b)))
-  }, [drill, winBuckets])
+  }, [drill, winBuckets, offlineInWin])
 
   const funnel = [
     { label: 'Booked', value: winBuckets.booked, color: '#0C6B5A' },
@@ -630,7 +672,7 @@ const CounsellingDashboardPage: React.FC = () => {
         subtitle={
           <span>
             {winLabel}
-            {mode === 'all' && appts.length > 0 && (
+            {mode === 'all' && allDates.length > 0 && (
               <span className="cdash-sub-span"> ({fmtDateShort(win.from)} – {fmtDateShort(win.to)})</span>
             )}
             {' · '}<strong>{winBuckets.booked}</strong> booked · <strong>{winBuckets.completed}</strong> completed · <strong>{remaining}</strong> remaining
@@ -697,6 +739,15 @@ const CounsellingDashboardPage: React.FC = () => {
               hint="Lost a session or disputing an absence"
               pulse={issues.studentCount > 0}
               onClick={() => setDrill({ label: ISSUE_TILE, accent: '#B45309', statuses: [] })}
+            />
+            {/* Kept apart from Booked / Completed and the rates — see isOfflineRecord. */}
+            <StatCard
+              label={OFFLINE_TILE}
+              value={offlineInWin.length}
+              accent={OFFLINE_ACCENT}
+              icon="bi-clipboard-check"
+              hint="In-person sessions recorded at schools"
+              onClick={() => setDrill({ label: OFFLINE_TILE, accent: OFFLINE_ACCENT, statuses: [] })}
             />
           </div>
 

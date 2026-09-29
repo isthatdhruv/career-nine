@@ -13,14 +13,25 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.PrePersist;
 import javax.persistence.Table;
+import javax.persistence.UniqueConstraint;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIncludeProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.UserStudent;
 
+/**
+ * The one counsellor a student is mapped to. One row per student ({@code uk_scm_student}):
+ * reassigning moves the row to the new counsellor instead of adding a second active one, and
+ * an {@code is_active = 0} row counts as unmapped everywhere.
+ *
+ * <p>The constraint name is repeated from V20260928001 so Hibernate's {@code ddl-auto=update}
+ * finds it by name and does not add a hash-named duplicate beside it.
+ */
 @Entity
-@Table(name = "student_counsellor_mapping")
+@Table(name = "student_counsellor_mapping",
+        uniqueConstraints = @UniqueConstraint(name = "uk_scm_student", columnNames = "student_id"))
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class StudentCounsellorMapping implements Serializable {
 
@@ -34,10 +45,16 @@ public class StudentCounsellorMapping implements Serializable {
     @JoinColumn(name = "student_id", nullable = false)
     private UserStudent student;
 
+    // Returned raw by /api/student-counsellor-mapping/*; keep the counsellor's payout and
+    // identity details (and their whole User) out of it, as on CounsellingAppointment.
+    @JsonIgnoreProperties({"bankName", "bankAccount", "bankIfsc", "bankBranch", "govtIdLast4",
+            "govtIdHash", "signedAgreementUrl", "certificationsUrl", "hourlyRatePreference",
+            "passwordHash", "user", "hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "counsellor_id", nullable = false)
     private Counsellor counsellor;
 
+    @JsonIncludeProperties({"id", "name"})
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "assigned_by")
     private User assignedBy;

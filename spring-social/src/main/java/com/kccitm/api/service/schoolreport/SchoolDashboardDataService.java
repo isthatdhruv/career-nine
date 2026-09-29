@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.PrincipalDashboardData;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
@@ -26,6 +27,9 @@ import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.service.Navigator.NavigatorCoreAnalysis;
 import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
+import com.kccitm.api.service.b2c.navigatorpro.NavigatorProCalculationService;
+import com.kccitm.api.service.b2c.navigatorpro.NavigatorProNorms;
+import com.kccitm.api.service.b2c.navigatorpro.NavigatorProQuestionnaireIndex;
 import com.kccitm.api.service.schoolreport.SchoolReportService.PasteDataRow;
 
 /**
@@ -53,6 +57,7 @@ public class SchoolDashboardDataService {
     @Autowired private NavigatorReportGenerationService navigatorReportGenerationService;
     @Autowired private NavigatorCoreAnalysis navigatorCoreAnalysis;
     @Autowired private SchoolReportService schoolReportService;
+    @Autowired private NavigatorProCalculationService navigatorProCalculationService;
 
     /** Keys into {@code IntermediaryScores.aptitudeScores}, aligned with {@link SchoolReportService#ABILITY_HEADERS}. */
     private static final String[] APTITUDE_KEYS = {
@@ -286,9 +291,19 @@ public class SchoolDashboardDataService {
         public String status;
         /** Null unless the student completed <em>and</em> scoring succeeded. */
         public PasteDataRow row;
+        /**
+         * Navigator Pro releases only: the student's engine evaluation, suppressed or not.
+         * Null for Navigator 360 rosters, and for anyone who has not completed.
+         */
+        public NavigatorProCalculationService.Evaluation pro;
 
+        /**
+         * Completed and evaluated by the roster's engine. For Navigator Pro a held report
+         * (gates R1–R5) still counts: the student sat the assessment and belongs on the
+         * dashboard's attention queue, even though no report went out.
+         */
         public boolean isScored() {
-            return row != null;
+            return row != null || pro != null;
         }
     }
 
@@ -312,6 +327,10 @@ public class SchoolDashboardDataService {
         public final List<ScoredStudent> students = new ArrayList<>();
         /** Completed sittings whose scoring threw — feeds the release's data audit. */
         public int scoringFailures;
+        /** Which engine scored this roster ({@code navigator_360} unless built for Pro). */
+        public String engineCode = PrincipalDashboardData.ENGINE_NAVIGATOR_360;
+        /** Navigator Pro only: the assessment's cohort norms (medians that cut the zones). */
+        public NavigatorProNorms.NormSet proNorms;
     }
 
     /**
@@ -326,39 +345,10 @@ public class SchoolDashboardDataService {
         roster.instituteCode = instituteCode;
         roster.assessmentId = assessmentId;
 
-        List<StudentAssessmentMapping> mappings = mappingRepository.findAllByInstituteCode(instituteCode);
         List<UserStudent> completed = new ArrayList<>();
         List<ScoredStudent> completedEntries = new ArrayList<>();
         Map<Integer, String> sectionNameCache = new HashMap<>();
-
-        for (StudentAssessmentMapping mapping : mappings) {
-            if (!assessmentId.equals(mapping.getAssessmentId())) {
-                continue;
-            }
-            UserStudent student = mapping.getUserStudent();
-            if (student == null) {
-                continue;
-            }
-            if (roster.instituteName == null && student.getInstitute() != null) {
-                roster.instituteName = student.getInstitute().getInstituteName();
-            }
-
-            StudentInfo info = student.getStudentInfo();
-            ScoredStudent entry = new ScoredStudent();
-            entry.userStudentId = student.getUserStudentId();
-            entry.sessionId = info == null ? null : longOf(info.getSessionId());
-            entry.classId = info == null ? null
-                    : longOf(com.kccitm.api.util.GradeParser.numericGradeOrNull(info.getStudentClass()));
-            entry.sectionId = info == null ? null : longOf(info.getSchoolSectionId());
-            entry.sectionName = sectionName(info, sectionNameCache);
-            entry.status = normalizeStatus(mapping.getStatus());
-            roster.students.add(entry);
-
-            if ("completed".equals(entry.status)) {
-                completed.add(student);
-                completedEntries.add(entry);
-            }
-        }
+        collectRoster(roster, completed, completedEntries, sectionNameCache);
 
         if (completed.isEmpty()) {
             return roster;
@@ -397,6 +387,106 @@ public class SchoolDashboardDataService {
         roster.assessmentName = names.getOrDefault(assessmentId, "Assessment " + assessmentId);
 
         logger.info("Scored roster: institute {} assessment {} — {} students, {} completed, {} scored",
+                instituteCode, assessmentId, roster.students.size(), completed.size(),
+                completed.size() - roster.scoringFailures);
+        return roster;
+    }
+
+    /**
+     * Everyone mapped to this assessment at this institute, placed on the session /
+     * class / section lattice with their completion status. Unscored: the caller decides
+     * which engine scores the completed ones.
+     */
+    private void collectRoster(ScoredRoster roster, List<UserStudent> completed,
+                               List<ScoredStudent> completedEntries,
+                               Map<Integer, String> sectionNameCache) {
+        Integer instituteCode = roster.instituteCode;
+        Long assessmentId = roster.assessmentId;
+        List<StudentAssessmentMapping> mappings = mappingRepository.findAllByInstituteCode(instituteCode);
+
+        for (StudentAssessmentMapping mapping : mappings) {
+            if (!assessmentId.equals(mapping.getAssessmentId())) {
+                continue;
+            }
+            UserStudent student = mapping.getUserStudent();
+            if (student == null) {
+                continue;
+            }
+            if (roster.instituteName == null && student.getInstitute() != null) {
+                roster.instituteName = student.getInstitute().getInstituteName();
+            }
+
+            StudentInfo info = student.getStudentInfo();
+            ScoredStudent entry = new ScoredStudent();
+            entry.userStudentId = student.getUserStudentId();
+            entry.sessionId = info == null ? null : longOf(info.getSessionId());
+            entry.classId = info == null ? null
+                    : longOf(com.kccitm.api.util.GradeParser.numericGradeOrNull(info.getStudentClass()));
+            entry.sectionId = info == null ? null : longOf(info.getSchoolSectionId());
+            entry.sectionName = sectionName(info, sectionNameCache);
+            entry.status = normalizeStatus(mapping.getStatus());
+            roster.students.add(entry);
+
+            if ("completed".equals(entry.status)) {
+                completed.add(student);
+                completedEntries.add(entry);
+            }
+        }
+    }
+
+    /**
+     * The Navigator Pro counterpart of {@link #buildScoredRoster}: the same roster, the
+     * same lattice placement, but each completed student carries their Navigator Pro
+     * {@link NavigatorProCalculationService.Evaluation} instead of a Navigator 360 row.
+     *
+     * <p>The whole assessment's answers load in one query and every completed student is
+     * evaluated from it, so a release still scores the institute exactly once. Norms are
+     * the assessment's (every completed, gate-passed student) — the same medians each
+     * student's own report was cut at, so the dashboard's zones agree with the reports.
+     */
+    @Transactional(readOnly = true)
+    public ScoredRoster buildNavigatorProRoster(Integer instituteCode, Long assessmentId) {
+        ScoredRoster roster = new ScoredRoster();
+        roster.instituteCode = instituteCode;
+        roster.assessmentId = assessmentId;
+        roster.engineCode = PrincipalDashboardData.ENGINE_NAVIGATOR_PRO;
+
+        List<UserStudent> completed = new ArrayList<>();
+        List<ScoredStudent> completedEntries = new ArrayList<>();
+        collectRoster(roster, completed, completedEntries, new HashMap<>());
+
+        Map<Long, String> names = assessmentNames(Collections.singleton(assessmentId));
+        roster.assessmentName = names.getOrDefault(assessmentId, "Assessment " + assessmentId);
+
+        if (completed.isEmpty()) {
+            return roster;
+        }
+
+        NavigatorProQuestionnaireIndex index;
+        try {
+            index = navigatorProCalculationService.indexFor(assessmentId);
+        } catch (Exception e) {
+            logger.warn("Navigator Pro roster: assessment {} is not on the v3 instrument: {}",
+                    assessmentId, e.getMessage());
+            roster.scoringFailures = completed.size();
+            return roster;
+        }
+
+        Set<Long> ids = new HashSet<>();
+        for (ScoredStudent entry : completedEntries) ids.add(entry.userStudentId);
+        Map<Long, NavigatorProCalculationService.Evaluation> evaluations =
+                navigatorProCalculationService.evaluateCohort(assessmentId, index, ids);
+        for (ScoredStudent entry : completedEntries) {
+            NavigatorProCalculationService.Evaluation ev = evaluations.get(entry.userStudentId);
+            if (ev == null) {
+                roster.scoringFailures++;
+            } else {
+                entry.pro = ev;
+            }
+        }
+        roster.proNorms = navigatorProCalculationService.normsFor(assessmentId, index);
+
+        logger.info("Navigator Pro roster: institute {} assessment {} — {} students, {} completed, {} evaluated",
                 instituteCode, assessmentId, roster.students.size(), completed.size(),
                 completed.size() - roster.scoringFailures);
         return roster;

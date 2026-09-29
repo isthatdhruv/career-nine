@@ -168,6 +168,15 @@ public final class ReleaseSnapshot {
     public Integer instituteCode() { return roster.instituteCode; }
     public int scoringFailures() { return roster.scoringFailures; }
     public List<ScoredStudent> allStudents() { return roster.students; }
+    /** {@code navigator_360} or {@code navigator_pro} — which calculator and prompt this release uses. */
+    public String engineCode() { return roster.engineCode; }
+    public boolean isNavigatorPro() {
+        return com.kccitm.api.model.career9.PrincipalDashboardData.ENGINE_NAVIGATOR_PRO.equals(roster.engineCode);
+    }
+    /** Navigator Pro only: the cohort norms the zones are cut at. Null for 360. */
+    public com.kccitm.api.service.b2c.navigatorpro.NavigatorProNorms.NormSet proNorms() { return roster.proNorms; }
+    /** Whether this student has at least one completed counselling appointment. */
+    public boolean isCounselled(Long studentId) { return counselledStudentIds.contains(studentId); }
 
     /** Groups this student belongs to; empty when they are in none. */
     public List<Long> groupsOf(Long studentId) {

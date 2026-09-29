@@ -258,6 +258,17 @@ final class OverviewQuery {
                 + ".id AND (LOWER(tc.name) LIKE :test OR LOWER(tc.email) LIKE :test))").param("test", TEST_MARKER);
     }
 
+    /**
+     * Drop sessions an offline counsellor recorded after counselling the student in person.
+     * They are appointments only so the rest of the module can see them; the student never
+     * booked one, so they must not count as "booked by students". Null-safe: an ordinary
+     * booking has no origin, and a bare {@code <>} would drop every one of them.
+     */
+    OverviewQuery notOfflineRecord(String appointmentAlias) {
+        return and("(" + appointmentAlias + ".origin IS NULL OR " + appointmentAlias
+                + ".origin <> 'OFFLINE_RECORD')");
+    }
+
     OverviewQuery assessments(AdminOverviewFilter f, String assessmentIdField) {
         if (f.hasAssessments()) {
             and(assessmentIdField + " IN :aids").param("aids", f.getAssessmentIds());

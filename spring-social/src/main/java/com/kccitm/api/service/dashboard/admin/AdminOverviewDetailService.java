@@ -98,7 +98,9 @@ public class AdminOverviewDetailService {
                 return funnelStudents(key, f, search, pageNo, pageSize, offset, t0);
             case AdminOverviewService.COUNSELLING_BOOKED:
                 return appointments(key, "Counselling booked by students", f, search, pageNo, pageSize, offset, t0,
-                        q -> q.and("a.status NOT IN ('CANCELLED', 'DECLINED')").localDateTimeRange("a.createdAt", f)
+                        // Same predicates as the card (AdminOverviewService.counsellingBooked).
+                        q -> q.and("a.status NOT IN ('CANCELLED', 'DECLINED')").notOfflineRecord("a")
+                              .localDateTimeRange("a.createdAt", f)
                               .orderBy("a.createdAt DESC, a.id DESC"));
             case AdminOverviewService.COUNSELLING_SESSIONS:
                 return appointments(key, "Counselling sessions", f, search, pageNo, pageSize, offset, t0,

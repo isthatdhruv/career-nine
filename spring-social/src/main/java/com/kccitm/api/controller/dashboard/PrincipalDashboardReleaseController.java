@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +31,7 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.PrincipalDashboardDataRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.dashboard.principal.DashboardEngineResolver;
 import com.kccitm.api.service.dashboard.principal.PrincipalDashboardChartLogger;
 import com.kccitm.api.service.dashboard.principal.PrincipalDashboardReleaseService;
 import com.kccitm.api.service.dashboard.principal.ScopeExpansion;
@@ -66,6 +68,10 @@ public class PrincipalDashboardReleaseController {
     private final PrincipalDashboardReleaseLogger trace;
     private final PrincipalDashboardNotificationService notifications;
 
+    /** Which product an assessment releases into; field-injected to leave the constructor as it was. */
+    @Autowired
+    private DashboardEngineResolver engineResolver;
+
     public PrincipalDashboardReleaseController(PrincipalDashboardReleaseService releaseService,
                                                PrincipalDashboardDataRepository repository,
                                                UserStudentRepository userStudentRepository,
@@ -100,6 +106,20 @@ public class PrincipalDashboardReleaseController {
             return ScopeExpansion.Selection.groups(groupIds);
         }
         return ScopeExpansion.Selection.academic(sessionId, classId, sectionId);
+    }
+
+    /**
+     * Which dashboard an assessment releases into: {@code navigator_360} or
+     * {@code navigator_pro}. A template lookup, not a preview — the release page needs it
+     * to label the release and to link the notification mail, and a preview would score
+     * the whole school to answer it.
+     */
+    @PreAuthorize("@auth.allows('dashboard.school.release', #instituteCode)")
+    @GetMapping("/release/{instituteCode}/engine")
+    public ResponseEntity<Map<String, Object>> engine(@PathVariable Long instituteCode,
+                                                      @RequestParam Long assessmentId) {
+        return ResponseEntity.ok(Map.of("assessmentId", assessmentId,
+                "engineCode", engineResolver.engineFor(assessmentId)));
     }
 
     /**
@@ -141,6 +161,8 @@ public class PrincipalDashboardReleaseController {
         // So the dialog can say "overwrites the dashboard released on <date>" rather than
         // letting an admin discover the overwrite afterwards.
         out.put("existingGeneratedAt", plan.existingGeneratedAt);
+        // Which dashboard this release builds — the page labels the release with it.
+        out.put("engineCode", plan.engineCode);
         return ResponseEntity.ok(out);
     }
 
@@ -272,8 +294,11 @@ public class PrincipalDashboardReleaseController {
      */
     @PreAuthorize("@auth.allows('dashboard.school.read', #instituteCode)")
     @GetMapping("/{instituteCode}/latest")
-    public ResponseEntity<?> latest(@PathVariable Long instituteCode) {
-        List<PrincipalDashboardData> rows = repository.findInstituteScopesNewestFirst(instituteCode);
+    public ResponseEntity<?> latest(@PathVariable Long instituteCode,
+                                    @RequestParam(required = false,
+                                            defaultValue = PrincipalDashboardData.ENGINE_NAVIGATOR_360)
+                                    String engine) {
+        List<PrincipalDashboardData> rows = repository.findInstituteScopesNewestFirst(instituteCode, engine);
 
         Map<String, Object> out = new LinkedHashMap<>();
         if (rows.isEmpty()) {
@@ -402,6 +427,59 @@ public class PrincipalDashboardReleaseController {
     }
 
     /**
+     * Names for the students a Navigator Pro scope was generated over.
+     *
+     * <p>The stored payload carries ids and numbers only, so the student list, the map's
+     * hover card and the attention queue ask for names here — once, when the page needs
+     * them — rather than every dashboard load shipping a class roster. Only ids already in
+     * the stored scope are resolved, so this cannot be used to look up arbitrary students.
+     *
+     * <p>Gated on {@code dashboard.school.read}, like {@code /flagged}: anyone who can open
+     * this college's dashboard can see who its students are.
+     */
+    @PreAuthorize("@auth.allows('dashboard.school.read', #instituteCode)")
+    @GetMapping("/{instituteCode}/students")
+    public ResponseEntity<?> students(@PathVariable Long instituteCode,
+                                      @RequestParam Long assessmentId,
+                                      @RequestParam(required = false) Long sessionId,
+                                      @RequestParam(required = false) Long classId,
+                                      @RequestParam(required = false) Long sectionId,
+                                      @RequestParam(required = false) Long groupId) {
+
+        ScopeKey scope = ScopeKey.of(assessmentId, sessionId, classId, sectionId, groupId);
+        Optional<PrincipalDashboardData> found =
+                repository.findByInstituteCodeAndScopeKey(instituteCode, scope.key());
+        if (found.isEmpty() || found.get().getInternalCalculation() == null) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<Long> ids = new ArrayList<>();
+        try {
+            JsonNode rows = objectMapper.readTree(found.get().getInternalCalculation()).path("students");
+            rows.forEach(node -> {
+                if (node.path("id").canConvertToLong()) ids.add(node.path("id").asLong());
+            });
+        } catch (Exception e) {
+            return ResponseEntity.ok(List.of());
+        }
+        if (ids.isEmpty()) {
+            return ResponseEntity.ok(List.of());
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (UserStudent student : userStudentRepository.findAllById(ids)) {
+            StudentInfo info = student.getStudentInfo();
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("userStudentId", student.getUserStudentId());
+            m.put("name", info == null || info.getName() == null ? "Unnamed student" : info.getName());
+            m.put("studentClass", info == null ? null : info.getStudentClass());
+            m.put("rollNumber", info == null ? null : info.getSchoolRollNumber());
+            out.add(m);
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /**
      * Every released scope for an institute, without payloads — lets the dashboard's
      * filter rail grey out combinations that were never generated instead of offering them
      * and then showing an empty state.
@@ -449,6 +527,7 @@ public class PrincipalDashboardReleaseController {
         int live = releaseService.liveScoredCount(instituteCode, row.getAssessmentId(), scope);
 
         out.put("released", usable);
+        out.put("engineCode", row.getEngineCode());
         out.put("status", row.getGenerationStatus());
         out.put("generatedAt", row.getGeneratedAt());
         out.put("scopeLevel", row.getScopeLevel());
@@ -607,12 +686,15 @@ public class PrincipalDashboardReleaseController {
             @PathVariable Long instituteCode,
             @RequestParam(required = false) String instituteName,
             @RequestParam(required = false) String assessmentName,
-            @RequestParam List<Long> contactPersonIds) {
+            @RequestParam List<Long> contactPersonIds,
+            @RequestParam(required = false, defaultValue = PrincipalDashboardData.ENGINE_NAVIGATOR_360)
+            String engine) {
 
         return ResponseEntity.ok(notifications.notify(
                 instituteCode,
                 instituteName == null || instituteName.isBlank() ? "your school" : instituteName,
                 assessmentName,
-                contactPersonIds));
+                contactPersonIds,
+                engine));
     }
 }

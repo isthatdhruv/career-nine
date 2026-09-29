@@ -512,6 +512,19 @@ const ThankYouPage: React.FC = () => {
         setShowBookedCelebration(true);   // celebratory "great decision" modal
     };
 
+    // bookedStatus COMPLETED: the counselling already happened, so the card says so instead
+    // of presenting it as a booking still ahead.
+    const bookedCompleted = String(bookedAppointment?.status || '').toUpperCase() === 'COMPLETED';
+
+    // "yyyy-MM-dd" -> "Tue, 17 Jun" — for a completed session, whose time may be a placeholder.
+    const formatApptDate = (date?: string): string => {
+        if (!date) return '';
+        const d = new Date(`${date}T00:00:00`);
+        return isNaN(d.getTime())
+            ? date
+            : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    };
+
     // "Tue, 17 Jun · 3:00 PM" from slotDate (yyyy-MM-dd) + slotStartTime (HH:mm:ss).
     const formatApptWhen = (date?: string, time?: string): string => {
         if (!date || !time) return '';
@@ -1152,17 +1165,26 @@ const ThankYouPage: React.FC = () => {
                                                     <path d="M8 12l3 3 5-6"></path>
                                                 </svg>
                                             </div>
+                                            {/* COMPLETED = counselling already happened (online, or in person
+                                                at school and recorded offline, whose slot time is a placeholder):
+                                                the date only, and no "details sent" line. */}
                                             <h3 style={{ margin: '0 0 6px', fontSize: '1.25rem', fontWeight: 800, color: '#065F46' }}>
-                                                You're all set — your session is booked!
+                                                {bookedCompleted
+                                                    ? (bookedAppointment.slotDate
+                                                        ? `Counselling completed on ${formatApptDate(bookedAppointment.slotDate)}`
+                                                        : 'Counselling completed')
+                                                    : "You're all set — your session is booked!"}
                                             </h3>
-                                            {(bookedAppointment.slotDate && bookedAppointment.slotStartTime) && (
+                                            {!bookedCompleted && bookedAppointment.slotDate && bookedAppointment.slotStartTime && (
                                                 <p style={{ margin: '0 0 14px', fontSize: '0.95rem', color: '#047857', fontWeight: 700 }}>
                                                     {formatApptWhen(bookedAppointment.slotDate, bookedAppointment.slotStartTime)}
                                                 </p>
                                             )}
-                                            <p style={{ margin: '0 0 4px', fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
-                                                We've sent the details to your email and WhatsApp.
-                                            </p>
+                                            {!bookedCompleted && (
+                                                <p style={{ margin: '0 0 4px', fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
+                                                    We've sent the details to your email and WhatsApp.
+                                                </p>
+                                            )}
                                             <p style={{ margin: 0, fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
                                                 Great job taking this step!
                                             </p>

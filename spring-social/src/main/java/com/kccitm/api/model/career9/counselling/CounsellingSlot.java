@@ -31,6 +31,11 @@ public class CounsellingSlot implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Slots ride along inside every appointment (appointment.slot.counsellor) and in the student
+    // slot pickers, so the same payout/identity narrowing as CounsellingAppointment.counsellor.
+    @JsonIgnoreProperties({"bankName", "bankAccount", "bankIfsc", "bankBranch", "govtIdLast4",
+            "govtIdHash", "signedAgreementUrl", "certificationsUrl", "hourlyRatePreference",
+            "passwordHash", "user", "hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "counsellor_id", nullable = false)
     private Counsellor counsellor;
