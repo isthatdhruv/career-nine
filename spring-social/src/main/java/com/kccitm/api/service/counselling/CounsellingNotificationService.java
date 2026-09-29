@@ -477,7 +477,9 @@ public class CounsellingNotificationService {
             Mail mail = CounsellingMails.sessionComplete(
                     AccountMails.firstName(studentName(appointment)),
                     mailLinks.of(referralShareUrl(appointment), "referral"));
-            sendMailToStudentAndParent(appointment, mail);
+            sendMailToStudentAndParent(appointment, mail, contactNumbers(appointment)
+                    .onEvent(WhatsAppCampaigns.COUNSELLING_SESSION_COMPLETED, sessionWhen(appointment))
+                    .withLink(portalCounsellingUrl()));
         } catch (Exception e) {
             logger.error("Failed to send offline session-complete email for appointment ID: {}. Error: {}",
                     appointment != null ? appointment.getId() : "null", e.getMessage());
