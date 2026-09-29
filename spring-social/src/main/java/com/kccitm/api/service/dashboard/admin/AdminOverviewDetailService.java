@@ -26,6 +26,7 @@ import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.Lead;
 import com.kccitm.api.model.career9.PaymentTransaction;
+import com.kccitm.api.model.career9.b2c.Campaign;
 import com.kccitm.api.model.career9.counselling.CounsellingPayment;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
@@ -117,6 +118,8 @@ public class AdminOverviewDetailService {
                               .orderBy("a.slot.date DESC, a.slot.startTime DESC"));
             case AdminOverviewService.PAYMENTS_COMPLETED:
                 return payments(f, search, pageNo, pageSize, offset, t0);
+            case AdminOverviewService.UNPAID_REGISTRATIONS:
+                return unpaidRegistrations(f, search, pageNo, pageSize, offset, t0);
             case AdminOverviewService.WEBSITE_REGISTRATIONS:
                 return leads(f, search, pageNo, pageSize, offset, t0);
             default:
@@ -425,7 +428,15 @@ public class AdminOverviewDetailService {
                 .searchFields(search, "p.studentName", "p.studentEmail", "p.studentPhone", "p.razorpayPaymentId")
                 .orderBy("p.updatedAt DESC, p.transactionId DESC");
         long tTotal = tq.count("SELECT COUNT(p)");
-        List<PaymentTransaction> txns = tq.list("SELECT p", PaymentTransaction.class, 0, fetch);
+        List<PaymentTransaction> txns = new ArrayList<>();
+        Map<Long, Integer> txnInstitute = new HashMap<>();
+        for (Object[] row : tq.list("SELECT p, pc", Object[].class, 0, fetch)) {
+            PaymentTransaction p = (PaymentTransaction) row[0];
+            Campaign pc = (Campaign) row[1];
+            txns.add(p);
+            Integer code = p.getInstituteCode() != null ? p.getInstituteCode() : (pc == null ? null : pc.getInstituteCode());
+            if (code != null) txnInstitute.put(p.getTransactionId(), code);
+        }
 
         OverviewQuery cq = OverviewQuery.counsellingPayments(em, clock.zone(), f)
                 .and("UPPER(cp.status) = 'PAID'")
@@ -439,7 +450,8 @@ public class AdminOverviewDetailService {
         Set<Integer> codes = new HashSet<>();
         for (PaymentTransaction p : txns) {
             if (p.getAssessmentId() != null) aids.add(p.getAssessmentId());
-            if (p.getInstituteCode() != null) codes.add(p.getInstituteCode());
+            Integer code = txnInstitute.get(p.getTransactionId());
+            if (code != null) codes.add(code);
         }
         Map<Long, String> names = assessmentNames(aids);
         Map<Integer, String> institutes = instituteNames(codes);
@@ -451,8 +463,9 @@ public class AdminOverviewDetailService {
             r.put("name", p.getStudentName());
             r.put("email", p.getStudentEmail());
             r.put("phone", p.getStudentPhone());
-            r.put("instituteCode", p.getInstituteCode());
-            r.put("instituteName", p.getInstituteCode() == null ? null : institutes.get(p.getInstituteCode()));
+            Integer code = txnInstitute.get(p.getTransactionId());
+            r.put("instituteCode", code);
+            r.put("instituteName", code == null ? null : institutes.get(code));
             r.put("purpose", p.getPurpose() != null ? p.getPurpose() : "Assessment");
             r.put("assessmentId", p.getAssessmentId());
             r.put("assessmentName", p.getAssessmentId() == null ? null
@@ -485,6 +498,76 @@ public class AdminOverviewDetailService {
         List<Map<String, Object>> rows = new ArrayList<>(merged.subList(from, to));
         return CompletableFuture.completedFuture(AdminOverviewDetail.of(
                 key, "Payments completed", tTotal + cTotal, page, size, search, columns, rows, t0));
+    }
+
+    /**
+     * Unpaid registrations: one row per person (see {@link UnpaidRegistrations}),
+     * newest attempt first, showing their latest link and how many they opened.
+     */
+    private CompletableFuture<AdminOverviewDetail> unpaidRegistrations(AdminOverviewFilter f, String search,
+                                                                       int page, int size, int offset, long t0) {
+        String key = AdminOverviewService.UNPAID_REGISTRATIONS;
+        String title = "Unpaid registrations";
+        List<Column> columns = Arrays.asList(
+                new Column("name", "Student"),
+                new Column("email", "Email"),
+                new Column("phone", "Phone"),
+                new Column("studentClass", "Class"),
+                new Column("instituteName", "Institute"),
+                new Column("campaignName", "Campaign"),
+                new Column("assessmentName", "Assessment"),
+                new Column("amount", "Amount"),
+                new Column("promoCode", "Promo code"),
+                new Column("paymentStatus", "Payment status"),
+                new Column("attempts", "Attempts"),
+                new Column("firstAttemptAt", "First attempt"),
+                new Column("lastAttemptAt", "Last attempt"));
+        if (f.isDenied()) return empty(key, title, page, size, search, columns, t0);
+
+        List<UnpaidRegistrations.Person> people = UnpaidRegistrations.load(em, clock, f, search);
+        List<UnpaidRegistrations.Person> slice =
+                people.subList(Math.min(offset, people.size()), Math.min(offset + size, people.size()));
+
+        Set<Long> aids = new HashSet<>();
+        Set<Integer> codes = new HashSet<>();
+        for (UnpaidRegistrations.Person person : slice) {
+            aids.addAll(person.assessmentIds());
+            if (person.instituteCode() != null) codes.add(person.instituteCode());
+        }
+        Map<Long, String> names = assessmentNames(aids);
+        Map<Integer, String> institutes = instituteNames(codes);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (UnpaidRegistrations.Person person : slice) {
+            PaymentTransaction p = person.latest();
+            Campaign c = person.campaign();
+            List<String> assessments = new ArrayList<>();
+            for (Long aid : person.assessmentIds()) assessments.add(names.getOrDefault(aid, "Assessment #" + aid));
+            String status = p.getStatus() == null ? null : p.getStatus().toLowerCase();
+
+            Map<String, Object> r = AdminOverviewDetail.row();
+            r.put("userStudentId", null);
+            r.put("transactionId", p.getTransactionId());
+            r.put("name", p.getStudentName());
+            r.put("email", p.getStudentEmail());
+            r.put("phone", p.getStudentPhone());
+            r.put("studentClass", p.getStudentClass());
+            r.put("instituteCode", person.instituteCode());
+            r.put("instituteName", person.instituteCode() == null ? null : institutes.get(person.instituteCode()));
+            r.put("campaignName", c == null ? null : c.getName());
+            r.put("assessmentId", p.getAssessmentId());
+            r.put("assessmentName", String.join(", ", assessments));
+            r.put("amount", p.getAmount());
+            r.put("currency", p.getCurrency());
+            r.put("promoCode", p.getPromoCode());
+            r.put("paymentStatus", "created".equals(status) ? "link not used yet" : status);
+            r.put("attempts", person.attempts.size());
+            r.put("firstAttemptAt", iso(person.firstAt()));
+            r.put("lastAttemptAt", iso(p.getCreatedAt()));
+            rows.add(r);
+        }
+        return CompletableFuture.completedFuture(AdminOverviewDetail.of(
+                key, title, people.size(), page, size, search, columns, rows, t0));
     }
 
     /** Website registrations: one row per lead, newest first. */

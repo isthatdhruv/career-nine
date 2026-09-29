@@ -29,6 +29,7 @@ export type OverviewCardKey =
   | "students-absent"
   | "counsellors-absent"
   | "payments-completed"
+  | "unpaid-registrations"
   | "website-registrations";
 
 export const OVERVIEW_CARD_KEYS: OverviewCardKey[] = [
@@ -44,6 +45,7 @@ export const OVERVIEW_CARD_KEYS: OverviewCardKey[] = [
   "students-absent",
   "counsellors-absent",
   "payments-completed",
+  "unpaid-registrations",
   "website-registrations",
 ];
 

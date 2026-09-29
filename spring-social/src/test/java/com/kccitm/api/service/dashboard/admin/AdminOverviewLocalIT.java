@@ -60,6 +60,7 @@ class AdminOverviewLocalIT {
         m.put(AdminOverviewService.STUDENTS_ABSENT, service::studentsAbsent);
         m.put(AdminOverviewService.COUNSELLORS_ABSENT, service::counsellorsAbsent);
         m.put(AdminOverviewService.PAYMENTS_COMPLETED, service::paymentsCompleted);
+        m.put(AdminOverviewService.UNPAID_REGISTRATIONS, service::unpaidRegistrations);
         m.put(AdminOverviewService.WEBSITE_REGISTRATIONS, service::websiteRegistrations);
         return m;
     }
@@ -81,7 +82,7 @@ class AdminOverviewLocalIT {
                     c.getKey(), c.getValue(), c.getThread(), c.getTookMs(), c.getExtra(), c.getBasis());
             out.add(c);
         }
-        assertEquals(13, out.size());
+        assertEquals(14, out.size());
         return out;
     }
 
