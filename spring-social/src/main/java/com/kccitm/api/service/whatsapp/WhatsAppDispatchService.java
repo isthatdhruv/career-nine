@@ -62,6 +62,9 @@ public class WhatsAppDispatchService {
     /** First link in the rendered text, used as the generic template's action parameter. */
     private static final Pattern URL = Pattern.compile("https?://\\S+");
 
+    /** First web link in the email's HTML — the main button; mailto links never match. */
+    private static final Pattern HREF = Pattern.compile("href=\"(https?://[^\"]+)\"");
+
     /** How long a dedupe key suppresses repeats. Covers the booking mail's three retry rounds. */
     private static final long DEDUPE_TTL_MS = 30 * 60 * 1000L;
 
@@ -95,6 +98,10 @@ public class WhatsAppDispatchService {
      */
     @Value("${app.whatsapp.enabled:true}")
     private boolean enabled;
+
+    /** The generic template's link when the email itself carries none. */
+    @Value("${app.frontend.url:https://career-9.com}")
+    private String frontendUrl;
 
     /**
      * Sends the WhatsApp that goes with an email. Called by the email dispatcher for every
@@ -158,12 +165,18 @@ public class WhatsAppDispatchService {
                 }
 
                 // This recipient's own parameters, else the ones shared by the whole message,
-                // else the generic four derived from the mail — each addressed to this person.
-                List<String> params = t.params != null && !t.params.isEmpty()
-                        ? t.params
-                        : (wa != null && !wa.getParams().isEmpty()
-                                ? wa.getParams()
-                                : genericParams(t.name, req, message));
+                // else — on the generic template — the four derived from the mail, or — on a
+                // dedicated one — name + facts + link. Each addressed to this person.
+                List<String> params;
+                if (t.params != null && !t.params.isEmpty()) {
+                    params = t.params;
+                } else if (wa != null && !wa.getParams().isEmpty()) {
+                    params = wa.getParams();
+                } else if (WhatsAppCampaigns.GENERIC_CAMPAIGN.equals(campaign)) {
+                    params = genericParams(t.name, req, message);
+                } else {
+                    params = eventParams(t.name, req, message, wa);
+                }
 
                 boolean sent = whatsAppService.sendTemplate(t.phone, campaign, params);
                 log(t, campaign, type, sent);
@@ -313,8 +326,41 @@ public class WhatsAppDispatchService {
         params.add(greeting(name, req));
         params.add(clean(subject, 120));
         params.add(clean(summary(text), 500));
-        params.add(clean(firstLink(text), 300));
+        params.add(primaryLink(message, text));
         return params;
+    }
+
+    /**
+     * A dedicated (Utility) template's parameters: the recipient's name, the caller's facts,
+     * then one link. Its wording is fixed and names the event, which is what keeps Meta from
+     * re-classing it as Marketing the way it does the all-blanks generic template.
+     */
+    private List<String> eventParams(String name, EmailSendRequest req, SmtpEmailRequest message,
+                                     WhatsAppMessage wa) {
+        List<String> params = new ArrayList<>();
+        params.add(greeting(name, req));
+        if (wa != null) {
+            for (String f : wa.getFacts()) params.add(isSet(f) ? clean(f, 200) : "-");
+        }
+        String link = wa != null && isSet(wa.getLink()) ? clean(wa.getLink(), 300) : null;
+        params.add(isSet(link) ? link
+                : primaryLink(message, message != null ? message.getTextContent() : null));
+        return params;
+    }
+
+    /**
+     * The email's main link: its first web button in the HTML, else the first URL in the text,
+     * else the portal. WhatsApp rejects an empty parameter, so there is always one. The HTML is
+     * read first because the text part shows links without their scheme.
+     */
+    private String primaryLink(SmtpEmailRequest message, String text) {
+        String html = message != null ? message.getHtmlContent() : null;
+        if (isSet(html)) {
+            Matcher m = HREF.matcher(html);
+            if (m.find()) return clean(m.group(1).replace("&amp;", "&"), 300);
+        }
+        String link = clean(firstLink(text), 300);
+        return isSet(link) ? link : frontendUrl;
     }
 
     /** The name to greet. Falls back through the request's context to a neutral "there". */

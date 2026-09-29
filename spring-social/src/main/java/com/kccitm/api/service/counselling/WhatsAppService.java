@@ -97,6 +97,30 @@ public class WhatsAppService {
      * request. Never throws — failures are logged and reported as false.
      */
     public boolean sendTemplate(String phone, String campaignName, List<String> templateParams) {
+        return post(phone, campaignName, templateParams, null);
+    }
+
+    /**
+     * Sends a Meta AUTHENTICATION template ("{{1}} is your verification code." with a Copy Code
+     * button). Meta will not approve a code inside a Utility template, so the check-in code has
+     * to go out this way. The template takes the code twice: once as the body's only parameter
+     * and once for the Copy Code button, which Meta models as a URL button at index 0.
+     */
+    public boolean sendAuthCode(String phone, String campaignName, String code) {
+        Map<String, Object> text = new HashMap<>();
+        text.put("type", "text");
+        text.put("text", code);
+        Map<String, Object> button = new HashMap<>();
+        button.put("type", "button");
+        button.put("sub_type", "url");
+        button.put("index", 0);
+        button.put("parameters", java.util.Collections.singletonList(text));
+        return post(phone, campaignName, java.util.Collections.singletonList(code),
+                java.util.Collections.singletonList(button));
+    }
+
+    private boolean post(String phone, String campaignName, List<String> templateParams,
+                         List<Map<String, Object>> buttons) {
         String apiKey = apiKey();
         if (apiKey == null || apiKey.isEmpty()) {
             logger.info("WhatsApp '{}' not sent: no API key configured (set app.whatsapp.api-key "
@@ -118,6 +142,9 @@ public class WhatsAppService {
             List<String> params = sanitize(templateParams);
             if (!params.isEmpty()) {
                 payload.put("templateParams", params);
+            }
+            if (buttons != null && !buttons.isEmpty()) {
+                payload.put("buttons", buttons);
             }
 
             HttpHeaders headers = new HttpHeaders();

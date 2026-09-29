@@ -70,6 +70,30 @@ public final class CounsellingMails {
             .signature().build();
     }
 
+    /**
+     * The counsellor's copy of a booking. Same session and the same calendar invite as the
+     * student's {@link #bookingConfirmation}, but written to the person running the session:
+     * who is coming and why, the report to read first, and where to go if they cannot take it.
+     */
+    public static Mail bookingConfirmationForCounsellor(String counsellorName, String reason, Session s,
+                                                        MailLink calendar, MailLink portal) {
+        List<Mail.Row> r = new ArrayList<>();
+        for (Mail.Row x : rows(s, true, true)) if (!"Counsellor".equals(x.label)) r.add(x);
+        r.add(new Mail.Row("Duration", s.duration == null ? null : s.duration + " minutes"));
+        r.add(new Mail.Row("Reason", reason));
+        return Mail.builder().subject("A counselling session has been booked with you")
+            .preheader(s.student + ", " + s.date + ". Join link and assessment report inside.")
+            .title("New session booked with you").p(hi(counsellorName))
+            .p(b(s.student) + " has booked a counselling session with you. It is already confirmed, so there is nothing to accept.")
+            .details(r)
+            .action(s.join, "Join the session").outline(calendar, "Add to Google Calendar")
+            .small("A calendar invite is also attached so you can add this to any calendar.")
+            .p("Please go through the student&rsquo;s assessment report before the session, so the time can be spent on their questions rather than on their results.")
+            .links(null, s.report, "Open the assessment report", portal, "Open my dashboard")
+            .small(EARLY + " If you cannot take this session, write to " + SUPPORT + " as early as you can so the student can be moved.")
+            .signature().build();
+    }
+
     public static Mail assignedToCounsellor(String counsellorName, String reason, Session s, MailLink confirm) {
         List<Mail.Row> r = new ArrayList<>(); r.add(new Mail.Row("Reason", reason));
         for (Mail.Row x : rows(s, true, true)) if (!"Counsellor".equals(x.label)) r.add(x);
