@@ -24,6 +24,7 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.AuthorizationService;
 import com.kccitm.api.service.b2c.report.ReportResult;
 import com.kccitm.api.service.b2c.report.ReportRoutingException;
+import com.kccitm.api.service.b2c.report.ReportSuppressedException;
 import com.kccitm.api.service.b2c.report.ReportService;
 import com.kccitm.api.service.b2c.report.SanityFailedException;
 import com.kccitm.api.service.b2c.report.ScoresNotReadyException;
@@ -80,6 +81,9 @@ public class UnifiedReportController {
                     : HttpStatus.UNPROCESSABLE_ENTITY;
             return ResponseEntity.status(s)
                     .body(UnifiedReportResponse.failed(ex.getCode(), ex.getMessage()));
+        } catch (ReportSuppressedException ex) {
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(UnifiedReportResponse.failed(ex.getRuleCode(), ex.getReason()));
         } catch (ReportRoutingException ex) {
             return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                     .body(UnifiedReportResponse.failed("ROUTING", ex.getMessage()));
@@ -131,6 +135,8 @@ public class UnifiedReportController {
                 row.put("status", "error"); row.put("code", "SCORES_NOT_READY"); row.put("message", ex.getMessage());
             } catch (SanityFailedException ex) {
                 row.put("status", "error"); row.put("code", ex.getCode()); row.put("message", ex.getMessage());
+            } catch (ReportSuppressedException ex) {
+                row.put("status", "suppressed"); row.put("code", ex.getRuleCode()); row.put("message", ex.getReason());
             } catch (ReportRoutingException ex) {
                 row.put("status", "error"); row.put("code", "ROUTING"); row.put("message", ex.getMessage());
             } catch (Exception ex) {

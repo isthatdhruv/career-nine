@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.kccitm.api.model.career9.PrincipalDashboardData;
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.career9.PrincipalDashboardReleaseLog;
 import com.kccitm.api.model.email.EmailSendRequest;
@@ -98,6 +99,18 @@ public class PrincipalDashboardNotificationService {
      */
     public List<SendOutcome> notify(Long instituteCode, String instituteName,
             String assessmentName, List<Long> contactPersonIds) {
+        return notify(instituteCode, instituteName, assessmentName, contactPersonIds,
+                PrincipalDashboardData.ENGINE_NAVIGATOR_360);
+    }
+
+    /**
+     * As above, linking to the dashboard of the given product — a Navigator Pro release
+     * points its contacts at the Navigator Pro page, not the Navigator 360 one.
+     */
+    public List<SendOutcome> notify(Long instituteCode, String instituteName,
+            String assessmentName, List<Long> contactPersonIds, String engineCode) {
+        String dashboardPath = PrincipalDashboardData.ENGINE_NAVIGATOR_PRO.equals(engineCode)
+                ? "/school-dashboard/navigator-pro" : "/school-dashboard";
 
         List<Recipient> all = recipientsFor(instituteCode);
         List<SendOutcome> outcomes = new ArrayList<>();
@@ -124,7 +137,7 @@ public class PrincipalDashboardNotificationService {
 
             try {
                 Mail mail = ReportMails.schoolDashboardReady(recipient.name, instituteName, assessmentLabel,
-                        mailLinks.of(frontendUrl + "/school-dashboard", "school_dashboard"));
+                        mailLinks.of(frontendUrl + dashboardPath, "school_dashboard"));
                 EmailSendRequest req = EmailSendRequest.mail(
                         EmailType.SCHOOL_DASHBOARD_READY, recipient.email, mail);
                 // Rule 11: the shell decides branding, from a hint the caller supplies. This mail

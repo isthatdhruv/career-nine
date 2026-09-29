@@ -6,6 +6,7 @@ import {
   getAdminScopes,
   getContacts,
   getReleaseLog,
+  getReleaseEngine,
   getReleaseRuns,
   getReleaseStatus,
   notifyContacts,
@@ -119,6 +120,26 @@ const SchoolDashboardReleasePage = () => {
     };
   }, [instituteCode]);
 
+  /**
+   * Which product this assessment releases into. Navigator Pro assessments build the
+   * college dashboard; everything else builds the Navigator 360 school dashboard. Shown
+   * beside the picker so an admin knows which page they are about to populate, and passed
+   * to the notification so the mail links to that page.
+   */
+  const [engine, setEngine] = useState<string | null>(null);
+  useEffect(() => {
+    setEngine(null);
+    if (instituteCode == null || assessmentId == null) return;
+    let cancelled = false;
+    getReleaseEngine(instituteCode, assessmentId)
+      .then((res) => !cancelled && setEngine(res.data.engineCode))
+      .catch(() => !cancelled && setEngine(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [instituteCode, assessmentId]);
+  const isPro = engine === "navigator_pro";
+
   const ready = instituteCode != null && assessmentId != null;
 
   return (
@@ -176,6 +197,22 @@ const SchoolDashboardReleasePage = () => {
             ))}
           </select>
         </label>
+
+        {ready && engine && (
+          <div className="sdr-field">
+            <span>Dashboard</span>
+            <div className={`sdr-engine${isPro ? " sdr-engine--pro" : ""}`}>
+              {isPro ? "Navigator Pro · college dashboard" : "Navigator 360 · school dashboard"}
+              <a
+                href={isPro ? "/school-dashboard/navigator-pro" : "/school-dashboard"}
+                target="_blank"
+                rel="noreferrer"
+              >
+                open
+              </a>
+            </div>
+          </div>
+        )}
       </div>
 
       {!ready ? (
@@ -222,6 +259,7 @@ const SchoolDashboardReleasePage = () => {
               instituteCode={instituteCode!}
               instituteName={instituteName}
               assessmentName={assessmentName}
+              engine={engine}
             />
           )}
         </>
@@ -857,10 +895,13 @@ const NotifyPanel = ({
   instituteCode,
   instituteName,
   assessmentName,
+  engine,
 }: {
   instituteCode: number;
   instituteName: string;
   assessmentName: string;
+  /** Which dashboard the mail links to. */
+  engine: string | null;
 }) => {
   const [contacts, setContacts] = useState<ContactRecipient[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
@@ -881,7 +922,7 @@ const NotifyPanel = ({
   const send = async () => {
     setSending(true);
     try {
-      const res = await notifyContacts(instituteCode, selected, instituteName, assessmentName);
+      const res = await notifyContacts(instituteCode, selected, instituteName, assessmentName, engine);
       setOutcomes(res.data);
       const sent = res.data.filter((o) => o.sent).length;
       if (sent === res.data.length) {

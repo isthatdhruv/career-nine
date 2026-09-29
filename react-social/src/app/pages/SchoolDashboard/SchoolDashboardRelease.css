@@ -450,3 +450,26 @@
 .sdr-outcomes li:last-child { border-bottom: none; }
 .sdr-outcomes .is-ok b { color: var(--good); }
 .sdr-outcomes .is-bad b { color: var(--crit); }
+
+/* Which dashboard the chosen assessment releases into. */
+.sdr-engine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #eef3fb;
+  color: #19376d;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.sdr-engine--pro {
+  background: #fff7e8;
+  color: #0b2447;
+  border: 1px solid #f0a427;
+}
+.sdr-engine a {
+  font-weight: 500;
+  font-size: 12px;
+}

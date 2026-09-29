@@ -120,6 +120,16 @@ export function exportPsychometricProperties(assessmentId: number, userStudentId
   }, { responseType: 'blob' });
 }
 
+// "Navigator Pro Raw Data": one row per student with item marks, v3 indices,
+// internal cohort percentiles/bands, gate outcome (R1–R6) and the full direction
+// blend, plus an item key and the matrices/thresholds used.
+export function exportNavigatorProRaw(assessmentId: number, userStudentIds?: number[]) {
+  return axios.post(`${API_URL}/general-assessment/export-navigator-pro-raw`, {
+    assessmentId,
+    userStudentIds,
+  }, { responseType: 'blob' });
+}
+
 export function exportGeneralAssessmentExcel(assessmentId: number) {
   return axios.get(`${API_URL}/general-assessment/export-excel/${assessmentId}`, {
     responseType: 'blob',

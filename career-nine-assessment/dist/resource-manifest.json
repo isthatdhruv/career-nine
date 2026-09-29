@@ -1,6 +1,11 @@
 {
+<<<<<<< HEAD
   "version": "mumb725f",
   "generated": "2026-09-29T06:42:21.219Z",
+=======
+  "version": "muf40wet",
+  "generated": "2026-09-24T05:47:13.301Z",
+>>>>>>> 8ed66e7a6845589298180a326f0f909cc2c4944a
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -113,6 +118,7 @@
       "priority": "deferred"
     },
     {
+<<<<<<< HEAD
       "url": "/mediapipe/face_mesh/README.md",
       "size": 389,
       "priority": "deferred"
@@ -129,20 +135,51 @@
     },
     {
       "url": "/assets/HydroTubeGame-DL162Wt7.js",
+=======
+      "url": "/assets/HydroTubeGame-DmBepz1c.js",
+>>>>>>> 8ed66e7a6845589298180a326f0f909cc2c4944a
       "size": 23331,
       "priority": "critical"
     },
     {
+<<<<<<< HEAD
+=======
+      "url": "/assets/JungleSpotGame-CKrz20o3.js",
+      "size": 23397,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/RabbitPathGame-DLTsOJAR.js",
+      "size": 26981,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-BgISDq8X.js",
+      "size": 360,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-Illc6rc8.js",
+      "size": 218011,
+      "priority": "critical"
+    },
+    {
+>>>>>>> 8ed66e7a6845589298180a326f0f909cc2c4944a
       "url": "/assets/index-B99D9I_X.css",
       "size": 268888,
       "priority": "critical"
     },
     {
+<<<<<<< HEAD
       "url": "/assets/index-DAs2WkXS.js",
+=======
+      "url": "/assets/index-C5W3Nlem.js",
+>>>>>>> 8ed66e7a6845589298180a326f0f909cc2c4944a
       "size": 1274010,
       "priority": "critical"
     },
     {
+<<<<<<< HEAD
       "url": "/assets/index-DSZxBywX.js",
       "size": 1318228,
       "priority": "critical"
@@ -155,6 +192,15 @@
     {
       "url": "/assets/JungleSpotGame-CimIcoN7.js",
       "size": 23397,
+=======
+      "url": "/assets/index-qo7Jjth7.js",
+      "size": 1316773,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index.es-J0-n7pvK.js",
+      "size": 158432,
+>>>>>>> 8ed66e7a6845589298180a326f0f909cc2c4944a
       "priority": "critical"
     },
     {
@@ -215,7 +261,11 @@
   ],
   "summary": {
     "total": 42,
+<<<<<<< HEAD
     "totalSize": 23916561,
+=======
+    "totalSize": 23914571,
+>>>>>>> 8ed66e7a6845589298180a326f0f909cc2c4944a
     "byPriority": {
       "game": {
         "count": 11,
@@ -227,7 +277,11 @@
       },
       "critical": {
         "count": 14,
+<<<<<<< HEAD
         "size": 3416032
+=======
+        "size": 3414053
+>>>>>>> 8ed66e7a6845589298180a326f0f909cc2c4944a
       },
       "other": {
         "count": 5,

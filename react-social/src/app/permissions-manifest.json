@@ -98,7 +98,8 @@
     "/school-admin/cohort-insights"
   ],
   "dashboard.school.read": [
-    "/school-dashboard"
+    "/school-dashboard",
+    "/school-dashboard/navigator-pro"
   ],
   "dashboard.school.release": [
     "/school-dashboard/releases"

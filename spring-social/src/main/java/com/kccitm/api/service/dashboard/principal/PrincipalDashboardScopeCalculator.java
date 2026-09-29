@@ -118,8 +118,10 @@ public class PrincipalDashboardScopeCalculator {
     }
 
     // ───────────────────────────── blocks ─────────────────────────────
+    // Package-visible and static: the Navigator Pro calculator emits the same header
+    // blocks, so the two dashboards describe a scope, an assessment and a school the same way.
 
-    private Map<String, Object> scopeBlock(ReleaseSnapshot snapshot, ScopeKey scope) {
+    static Map<String, Object> scopeBlock(ReleaseSnapshot snapshot, ScopeKey scope) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("key", scope.key());
         m.put("level", scope.level());
@@ -135,14 +137,14 @@ public class PrincipalDashboardScopeCalculator {
         return m;
     }
 
-    private Map<String, Object> assessmentBlock(ReleaseSnapshot snapshot) {
+    static Map<String, Object> assessmentBlock(ReleaseSnapshot snapshot) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", snapshot.assessmentId());
         m.put("name", snapshot.assessmentName());
         return m;
     }
 
-    private Map<String, Object> instituteBlock(ReleaseSnapshot snapshot) {
+    static Map<String, Object> instituteBlock(ReleaseSnapshot snapshot) {
         ReleaseSnapshot.InstituteProfile institute = snapshot.institute();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("code", snapshot.instituteCode());
@@ -155,7 +157,7 @@ public class PrincipalDashboardScopeCalculator {
         return m;
     }
 
-    private Map<String, Object> participationBlock(ReleaseSnapshot.Cohort c) {
+    static Map<String, Object> participationBlock(ReleaseSnapshot.Cohort c) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("total", c.total);
         m.put("completed", c.completed);
