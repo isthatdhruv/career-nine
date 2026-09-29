@@ -66,6 +66,14 @@ public class WhatsAppMessage {
     private String campaign;
     private List<String> params = new ArrayList<>();
 
+    /**
+     * For a dedicated template filled per recipient: the template's parameters become
+     * {@code [recipient's name] + facts + [link]}. Used when {@link #params} is empty and the
+     * campaign is not the generic one. The link defaults to the email's main button.
+     */
+    private List<String> facts = new ArrayList<>();
+    private String link;
+
     /** Lower-cased email address → the number for that recipient. */
     private final Map<String, Recipient> byAddress = new LinkedHashMap<>();
 
@@ -132,6 +140,22 @@ public class WhatsAppMessage {
         return this;
     }
 
+    /**
+     * Sends this on a dedicated template whose parameters are the recipient's name, then these
+     * facts, then a link — so each recipient is greeted by their own name.
+     */
+    public WhatsAppMessage onEvent(String campaign, String... facts) {
+        this.campaign = campaign;
+        this.facts = facts != null ? new ArrayList<>(Arrays.asList(facts)) : new ArrayList<>();
+        return this;
+    }
+
+    /** The link for {@link #onEvent}, where it should not be the email's main button. */
+    public WhatsAppMessage withLink(String link) {
+        this.link = link;
+        return this;
+    }
+
     /** One WhatsApp per person per key, however many times the email is retried. */
     public WhatsAppMessage dedupeOn(String key) {
         this.dedupeKey = key;
@@ -147,6 +171,8 @@ public class WhatsAppMessage {
     public void setCampaign(String campaign) { this.campaign = campaign; }
     public List<String> getParams() { return params; }
     public void setParams(List<String> params) { this.params = params != null ? params : new ArrayList<>(); }
+    public List<String> getFacts() { return facts; }
+    public String getLink() { return link; }
     public List<Recipient> getExtras() { return extras; }
     public boolean isSuppressed() { return suppressed; }
     public void setSuppressed(boolean suppressed) { this.suppressed = suppressed; }

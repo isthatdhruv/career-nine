@@ -92,14 +92,18 @@ const CounsellorAuthPage: React.FC = () => {
             aria-hidden={mode !== 'login'}
             style={{
               position: 'absolute', inset: 0,
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
+              display: 'flex', flexDirection: 'column',
+              overflowY: 'auto', padding: '24px 0',
               opacity: mode === 'login' ? 1 : 0,
               transform: `translateX(${mode === 'login' ? '0' : '-40px'})`,
               transition: 'opacity 320ms ease, transform 320ms ease',
               pointerEvents: mode === 'login' ? 'auto' : 'none',
             }}
           >
-            <CounsellorLoginPanel onSwitchToRegister={() => switchTo('register')} />
+            {/* margin auto centers short forms; tall forms start at the top and scroll */}
+            <div style={{ margin: 'auto 0', width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <CounsellorLoginPanel onSwitchToRegister={() => switchTo('register')} />
+            </div>
           </div>
 
           {/* Register panel */}
@@ -107,14 +111,18 @@ const CounsellorAuthPage: React.FC = () => {
             aria-hidden={mode !== 'register'}
             style={{
               position: 'absolute', inset: 0,
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
+              display: 'flex', flexDirection: 'column',
+              overflowY: 'auto', padding: '24px 0',
               opacity: mode === 'register' ? 1 : 0,
               transform: `translateX(${mode === 'register' ? '0' : '40px'})`,
               transition: 'opacity 320ms ease, transform 320ms ease',
               pointerEvents: mode === 'register' ? 'auto' : 'none',
             }}
           >
-            <CounsellorRegisterPanel onSwitchToLogin={() => switchTo('login')} />
+            {/* margin auto centers short forms; tall forms start at the top and scroll */}
+            <div style={{ margin: 'auto 0', width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <CounsellorRegisterPanel onSwitchToLogin={() => switchTo('login')} />
+            </div>
           </div>
         </div>
       </div>

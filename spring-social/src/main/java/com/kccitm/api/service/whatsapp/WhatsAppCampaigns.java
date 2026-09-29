@@ -50,61 +50,48 @@ public class WhatsAppCampaigns {
     public static final String COUNSELLOR_DIGEST = "counsellor_daily_digest";
     public static final String COUNSELLING_NUDGE = "counselling_booking_nudge";
 
+    /** Per-event counselling templates: name, then the session's date/time (and extras), then a link. */
+    public static final String COUNSELLING_CANCELLED = "counselling_cancelled";
+    public static final String COUNSELLING_RESCHEDULED = "counselling_rescheduled";
+    public static final String COUNSELLING_PICK_NEW_SLOT = "counselling_pick_new_slot";
+    public static final String COUNSELLING_COUNSELLOR_CHANGED = "counselling_counsellor_changed";
+    public static final String COUNSELLING_SESSION_ASSIGNED = "counselling_session_assigned";
+    public static final String COUNSELLING_CHECKIN_PENDING = "counselling_checkin_pending";
+    public static final String COUNSELLING_MARKED_ABSENT = "counselling_marked_absent";
+    public static final String COUNSELLING_SESSION_COMPLETED = "counselling_session_completed";
+    public static final String COUNSELLING_BOOKING_INVITE = "counselling_booking_invite";
+
+    /**
+     * Scenarios with a dedicated template. Everything else (internal alerts, rare mails) goes
+     * out on {@link #GENERIC_CAMPAIGN} — name, subject, gist and link. A dedicated template here
+     * is filled as name + link; one set by override must take the same two parameters.
+     *
+     * <p>Counselling events all share COUNSELLING_NOTIFICATION, so they name their templates on
+     * the message itself ({@code WhatsAppMessage#onEvent}) rather than being listed here.
+     */
     private static final Map<EmailType, String> DEFAULTS = new LinkedHashMap<>();
     static {
-        // Auth / account
-        DEFAULTS.put(EmailType.PASSWORD_RESET, "career9_password_reset");
-        DEFAULTS.put(EmailType.PASSWORD_RESET_CONFIRM, "career9_password_changed");
-        DEFAULTS.put(EmailType.ACCOUNT_WELCOME, "career9_welcome");
-        DEFAULTS.put(EmailType.ACCOUNT_ACTIVATED, "career9_account_activated");
-        DEFAULTS.put(EmailType.ADMIN_PASSWORD_RESET, "career9_password_reset");
-
-        // Credentials / verification
-        DEFAULTS.put(EmailType.LOGIN_CREDENTIALS, "career9_login_credentials");
-        DEFAULTS.put(EmailType.STUDENT_ID_EMAIL, "career9_student_id");
-        DEFAULTS.put(EmailType.EMAIL_VERIFICATION_OTP, "career9_verification_otp");
-
-        // Lead capture — the acknowledgement to the enquirer, and the internal alert to the
-        // team, which is the one most worth having reach a phone.
-        DEFAULTS.put(EmailType.LEAD_WELCOME, "career9_lead_welcome");
-        DEFAULTS.put(EmailType.LEAD_NOTIFICATION, "career9_lead_alert");
-
-        // Assessment / B2C
-        DEFAULTS.put(EmailType.ASSESSMENT_COMPLETION, "career9_assessment_complete");
-        DEFAULTS.put(EmailType.ENTITLEMENT_GRANTED, "career9_access_granted");
-        DEFAULTS.put(EmailType.ENTITLEMENT_REMINDER, "career9_assessment_nudge");
-        DEFAULTS.put(EmailType.COUNSELLING_REQUEST, "career9_counselling_request");
-        DEFAULTS.put(EmailType.CAMPAIGN_INVITE, "career9_campaign_invite");
-
-        // Payments
-        DEFAULTS.put(EmailType.PAYMENT_SUCCESS, "career9_payment_success");
-        DEFAULTS.put(EmailType.PAYMENT_FAILED, "career9_payment_failed");
-        DEFAULTS.put(EmailType.PAYMENT_REMINDER, "career9_payment_reminder");
-        DEFAULTS.put(EmailType.PAYMENT_LINK, "career9_payment_link");
-
-        // Reports
-        DEFAULTS.put(EmailType.REPORT_READY, "career9_report_ready");
-        DEFAULTS.put(EmailType.CONTACT_PERSON_REPORT, "career9_report_ready");
-        DEFAULTS.put(EmailType.SCHOOL_DASHBOARD_READY, "career9_dashboard_ready");
-
-        // B2B
-        DEFAULTS.put(EmailType.SCHOOL_REGISTRATION, "career9_school_registration");
-        DEFAULTS.put(EmailType.ASSESSMENT_INSTITUTE_MAPPING, "career9_assessment_assigned");
-
-        // Reminders + counselling
-        DEFAULTS.put(EmailType.REMINDER, COUNSELLING_REMINDER);
-        DEFAULTS.put(EmailType.COUNSELLING_NOTIFICATION, COUNSELLING_REMINDER);
         DEFAULTS.put(EmailType.COUNSELLING_BOOKING, COUNSELLING_CONFIRMATION);
 
-        // Counsellor deactivation alert to the ops list, and the account test mail — the test
-        // mail included, because "did this mailbox work?" is asked from a phone as often as not.
-        DEFAULTS.put(EmailType.COUNSELLOR_DEACTIVATED_ALERT, "career9_counsellor_deactivated_alert");
-        DEFAULTS.put(EmailType.ADMIN_DASHBOARD_DIGEST, "career9_dashboard_digest");
-        DEFAULTS.put(EmailType.ACCOUNT_TEST, GENERIC_CAMPAIGN);
-
-        // Legacy + ad-hoc fall through to the generic template.
-        DEFAULTS.put(EmailType.KCCITM_NOTIFICATION, GENERIC_CAMPAIGN);
-        DEFAULTS.put(EmailType.GENERIC, GENERIC_CAMPAIGN);
+        // Utility templates filled as name + link (see WhatsAppDispatchService#eventParams).
+        // The all-blanks generic template is billed as Marketing (~7x the Utility rate), so
+        // every scenario a student, parent or counsellor receives regularly has its own.
+        DEFAULTS.put(EmailType.LOGIN_CREDENTIALS, "career9_registration_done");
+        DEFAULTS.put(EmailType.STUDENT_ID_EMAIL, "career9_registration_done");
+        DEFAULTS.put(EmailType.ACCOUNT_WELCOME, "career9_registration_done");
+        DEFAULTS.put(EmailType.ENTITLEMENT_GRANTED, "career9_registration_done");
+        DEFAULTS.put(EmailType.ENTITLEMENT_REMINDER, "career9_assessment_pending");
+        DEFAULTS.put(EmailType.ASSESSMENT_COMPLETION, "career9_assessment_completed");
+        DEFAULTS.put(EmailType.REPORT_READY, "career9_report_ready");
+        DEFAULTS.put(EmailType.CONTACT_PERSON_REPORT, "career9_report_ready");
+        DEFAULTS.put(EmailType.PAYMENT_SUCCESS, "career9_payment_received");
+        DEFAULTS.put(EmailType.PAYMENT_FAILED, "career9_payment_failed");
+        DEFAULTS.put(EmailType.PAYMENT_REMINDER, "career9_payment_due");
+        DEFAULTS.put(EmailType.PAYMENT_LINK, "career9_payment_due");
+        DEFAULTS.put(EmailType.PASSWORD_RESET, "career9_password_reset");
+        DEFAULTS.put(EmailType.ADMIN_PASSWORD_RESET, "career9_password_reset");
+        DEFAULTS.put(EmailType.PASSWORD_RESET_CONFIRM, "career9_password_changed");
+        DEFAULTS.put(EmailType.ACCOUNT_ACTIVATED, "career9_account_activated");
     }
 
     private final Environment environment;
