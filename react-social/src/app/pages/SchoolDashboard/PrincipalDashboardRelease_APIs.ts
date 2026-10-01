@@ -67,6 +67,8 @@ export interface ReleasePreview {
   byVerdict: Partial<Record<Verdict, number>>;
   scopes: ScopePlanItem[];
   existingGeneratedAt?: string | null;
+  /** Which dashboard this release builds: "navigator_360" or "navigator_pro". */
+  engineCode?: string | null;
 }
 
 export interface ReleaseAccepted {
@@ -145,6 +147,8 @@ export interface ScopeView {
   scopeLabel: string;
   released: boolean;
   status: ScopeStatus;
+  /** "navigator_360" or "navigator_pro" — which page renders this row. */
+  engineCode?: string | null;
   generatedAt?: string | null;
   scopeLevel?: string;
   /** Students the stored figures were computed from. */
@@ -214,6 +218,17 @@ export function releaseDashboard(
     `${API_URL}/dashboard/principal/release/${instituteCode}`,
     null,
     { params: { assessmentId, ...selectionParams(selection) } }
+  );
+}
+
+/**
+ * Which dashboard an assessment releases into — "navigator_360" or "navigator_pro".
+ * A template lookup; it does not score anything.
+ */
+export function getReleaseEngine(instituteCode: number, assessmentId: number) {
+  return axios.get<{ assessmentId: number; engineCode: string }>(
+    `${API_URL}/dashboard/principal/release/${instituteCode}/engine`,
+    { params: { assessmentId } }
   );
 }
 
@@ -451,11 +466,13 @@ export function notifyContacts(
   instituteCode: number,
   contactPersonIds: number[],
   instituteName?: string,
-  assessmentName?: string
+  assessmentName?: string,
+  /** Which dashboard the mail links to; omitted means Navigator 360. */
+  engine?: string | null
 ) {
   return axios.post<NotifyOutcome[]>(
     `${API_URL}/dashboard/principal/release/${instituteCode}/notify`,
     null,
-    { params: { contactPersonIds, instituteName, assessmentName } }
+    { params: { contactPersonIds, instituteName, assessmentName, engine: engine || undefined } }
   );
 }

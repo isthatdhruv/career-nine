@@ -31,9 +31,11 @@ import {
 import {
   applyInstituteAssessmentFilter,
   assessmentIdsAssignedTo,
+  hasTestMarker,
   instituteKeysOf,
   stripTestEntities,
 } from "./dashboard-admin.filter";
+import { useInstitutes } from "../../lib/queries/lookups";
 import {
   buildSchoolReportWorkbook,
   OverviewExportContext,
@@ -392,39 +394,94 @@ const DashboardAdminContent: FC = () => {
   // Draft picker values — copied into viewInstitutes/viewAssessmentIds on Search.
   const [draftInstitutes, setDraftInstitutes] = useState<string[]>([]);
   const [draftAssessmentIds, setDraftAssessmentIds] = useState<string[]>([]);
+  // Institute picker options come from the light, cached institute list, so the
+  // picker is usable at once instead of waiting on the slow snapshot (a manual
+  // refresh recomputes it server-side). Snapshot rows win when both have a code.
+  const { data: lookupInstitutes = [] } = useInstitutes<any>({
+    enabled: isSuperAdmin,
+    staleTime: 5 * 60 * 1000,
+  });
+  const pickerInstitutes = useMemo(() => {
+    const byCode = new Map<string, any>();
+    for (const i of [...rawInstitutes, ...lookupInstitutes]) {
+      const code = String(pick(i, ["instituteCode", "code"]) ?? "");
+      if (!code || byCode.has(code) || hasTestMarker(pick(i, ["instituteName", "name"]))) continue;
+      byCode.set(code, i);
+    }
+    return Array.from(byCode.values());
+  }, [rawInstitutes, lookupInstitutes]);
   // Institute rows for a list of picked codes (unknown codes dropped), and the
   // union of their filter keys — null when nothing is picked (= no narrowing).
   const instituteRowsFor = useCallback(
     (codes: string[]): any[] =>
       codes
-        .map((code) => rawInstitutes.find((i) => String(pick(i, ["instituteCode", "code"]) ?? "") === code))
+        .map((code) => pickerInstitutes.find((i) => String(pick(i, ["instituteCode", "code"]) ?? "") === code))
         .filter(Boolean),
-    [rawInstitutes]
+    [pickerInstitutes]
   );
+  // Assessments linked to each picked institute, from the server: its active
+  // registration-link mappings plus whatever its students are allotted. Without
+  // this the picker only knew assessments taken by non-test students already in
+  // the snapshot, so a school whose only takers so far are test accounts (or
+  // nobody yet) showed an empty assessment list. Failures are not cached, so a
+  // later pick retries.
+  const [instituteAssessments, setInstituteAssessments] = useState<Record<string, any[]>>({});
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    const missing = draftInstitutes.filter((code) => !(code in instituteAssessments));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      missing.map((code) =>
+        getScopedAssessmentSummariesByInstitute(Number(code))
+          .then((res: any) => [code, (res.data || []) as any[]] as const)
+          .catch(() => null)
+      )
+    ).then((entries) => {
+      if (cancelled) return;
+      setInstituteAssessments((prev) => {
+        const next = { ...prev };
+        for (const e of entries) if (e) next[e[0]] = e[1];
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSuperAdmin, draftInstitutes, instituteAssessments]);
   const draftInstituteRows = useMemo(() => instituteRowsFor(draftInstitutes), [instituteRowsFor, draftInstitutes]);
   const draftInstituteKeys = useMemo(() => unionInstituteKeys(draftInstituteRows), [draftInstituteRows]);
   const viewInstituteRows = useMemo(() => instituteRowsFor(viewInstitutes), [instituteRowsFor, viewInstitutes]);
   const viewInstituteKeys = useMemo(() => unionInstituteKeys(viewInstituteRows), [viewInstituteRows]);
-  // Assessments offered in the picker: only those assigned to students at any
-  // of the chosen institutes (or every scoped assessment when none is chosen).
+  // Assessments offered in the picker: those linked to any of the chosen
+  // institutes — by the server's institute list or by a snapshot assignment —
+  // or every scoped assessment when none is chosen. Test assessments never show.
   const viewAssessmentOptions = useMemo(() => {
-    let pool = scopedAssessments;
+    let pool: any[] = scopedAssessments;
     if (draftInstituteKeys) {
-      const assigned = assessmentIdsAssignedTo(
+      const linked = assessmentIdsAssignedTo(
         rawStudentMappings.filter((m) =>
           draftInstituteKeys.has(String(pick(m, ["instituteId", "institute_id"]) ?? ""))
         )
       );
-      pool = pool.filter((a) => assigned.has(String(pick(a, ["id", "assessmentId"]) ?? "")));
+      const fromServer: any[] = draftInstitutes.flatMap((code) => instituteAssessments[code] || []);
+      fromServer.forEach((a) => linked.add(String(pick(a, ["id", "assessmentId"]) ?? "")));
+      const byId = new Map<string, any>();
+      for (const a of [...scopedAssessments, ...fromServer]) {
+        const id = String(pick(a, ["id", "assessmentId"]) ?? "");
+        if (id && linked.has(id) && !byId.has(id)) byId.set(id, a);
+      }
+      pool = Array.from(byId.values());
     }
     return pool
+      .filter((a) => !hasTestMarker(pick(a, ["assessmentName", "name", "title"])))
       .map((a) => ({
         value: String(pick(a, ["id", "assessmentId"]) ?? ""),
         label: String(pick(a, ["assessmentName", "name", "title"]) || `Assessment #${pick(a, ["id", "assessmentId"])}`),
       }))
       .filter((o) => o.value)
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [scopedAssessments, rawStudentMappings, draftInstituteKeys]);
+  }, [scopedAssessments, rawStudentMappings, draftInstituteKeys, draftInstitutes, instituteAssessments]);
   // Drop selections that are no longer offered (e.g. after switching institute).
   useEffect(() => {
     if (draftAssessmentIds.length === 0) return;
@@ -832,7 +889,7 @@ const DashboardAdminContent: FC = () => {
         {isSuperAdmin && (
           <ViewFilterBar
             t={t}
-            institutes={rawInstitutes}
+            institutes={pickerInstitutes}
             draftInstitutes={draftInstitutes}
             setDraftInstitutes={setDraftInstitutes}
             assessmentOptions={viewAssessmentOptions}
@@ -841,6 +898,10 @@ const DashboardAdminContent: FC = () => {
             appliedActive={viewFilterActive}
             exportEnabled={viewInstitutes.length > 0}
             loading={loading}
+            assessmentsLoading={
+              (loading && viewAssessmentOptions.length === 0) ||
+              draftInstitutes.some((code) => !(code in instituteAssessments))
+            }
             exporting={exporting}
             onExport={handleExportForSchool}
             studentCount={studentMappings.length}
@@ -1271,6 +1332,7 @@ const ViewFilterBar: FC<{
   appliedActive: boolean;
   exportEnabled: boolean;
   loading: boolean;
+  assessmentsLoading: boolean;
   exporting: boolean;
   onExport: () => void;
   studentCount: number;
@@ -1285,6 +1347,7 @@ const ViewFilterBar: FC<{
   appliedActive,
   exportEnabled,
   loading,
+  assessmentsLoading,
   exporting,
   onExport,
   studentCount,
@@ -1328,16 +1391,16 @@ const ViewFilterBar: FC<{
         options={instituteOptions}
         value={draftInstitutes}
         onChange={setDraftInstitutes}
-        placeholder={loading ? "Loading…" : "All institutes"}
-        disabled={loading || instituteOptions.length === 0}
+        placeholder={loading && instituteOptions.length === 0 ? "Loading…" : "All institutes"}
+        disabled={instituteOptions.length === 0}
         style={{ minWidth: 260, flex: 1, maxWidth: 480 }}
       />
       <SearchableMultiSelect
         options={assessmentOptions}
         value={draftAssessmentIds}
         onChange={setDraftAssessmentIds}
-        placeholder={loading ? "Loading…" : "All assessments"}
-        disabled={loading || assessmentOptions.length === 0}
+        placeholder={assessmentsLoading ? "Loading…" : "All assessments"}
+        disabled={assessmentsLoading || assessmentOptions.length === 0}
         style={{ minWidth: 280, flex: 1, maxWidth: 560 }}
       />
       {draftActive && (
@@ -1959,7 +2022,7 @@ const CARD_SECTIONS: CardSection[] = [
   },
   {
     title: "Payments",
-    subtitle: "Successful assessment and counselling payments in the selected range.",
+    subtitle: "Successful payments in the selected range, and students who registered but did not complete payment.",
     tone: "success",
     compact: true,
     cards: [
@@ -1973,6 +2036,22 @@ const CARD_SECTIONS: CardSection[] = [
         meter: (c) => [
           { label: "assessment", value: n(c.extra.assessmentPayments), tone: "success" },
           { label: "counselling", value: n(c.extra.counsellingPayments), tone: "purple" },
+        ],
+      },
+      {
+        key: "unpaid-registrations",
+        title: "Unpaid registrations",
+        tone: "warning",
+        icon: <IconCreditCard />,
+        mode: "range",
+        note: (c) => `students registered but did not pay · ${rupees(c.extra.amount)} not collected`,
+        facts: (c) => [
+          fact(c.extra.attempts, "payment links opened", "info"),
+          ...(n(c.extra.linkOpen) > 0 ? [fact(c.extra.linkOpen, "link not used yet", "warning")] : []),
+        ],
+        meter: (c) => [
+          { label: "link expired", value: n(c.extra.linkExpired), tone: "danger" },
+          { label: "link not used yet", value: n(c.extra.linkOpen), tone: "warning" },
         ],
       },
     ],
@@ -2048,10 +2127,11 @@ const chipTone = (key: string, value: any): Tone => {
   if (key === "source") return v.includes("popup") || v.includes("saved") ? "warning" : "info";
   if (key === "mode") return v === "online" ? "primary" : "info";
   if (key === "activity") return v.startsWith("completed") ? "success" : "info";
+  if (key === "paymentStatus") return v.startsWith("link not used") ? "warning" : "danger";
   return "info";
 };
 
-const CHIP_COLUMNS = new Set(["status", "reportStatus", "leadType", "purpose", "source", "mode", "typeOfReport", "activity"]);
+const CHIP_COLUMNS = new Set(["status", "reportStatus", "leadType", "purpose", "source", "mode", "typeOfReport", "activity", "paymentStatus"]);
 
 const AVATAR_TONES: Tone[] = ["primary", "purple", "success", "warning", "info", "danger"];
 const avatarTone = (name: string): Tone => {

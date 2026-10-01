@@ -426,11 +426,15 @@ public class CounsellorController {
         java.time.LocalDate today = clock.today();
         java.time.LocalDate weekEnd = today.plusDays(6);
 
-        // Today's confirmed/in-progress sessions.
+        // Today's confirmed/in-progress sessions. Sessions recorded from the offline page are
+        // skipped: they sit on a synthetic 00:00 slot dated the day they were recorded, so an
+        // offline counsellor's "today" would otherwise list every student marked done today
+        // with nothing to start or check in. completedCount below still counts them.
         java.util.List<com.kccitm.api.model.career9.counselling.CounsellingAppointment> todays =
                 appointmentRepository.findByCounsellorIdAndDate(id, today);
         java.util.List<Map<String, Object>> todaysDtos = new java.util.ArrayList<>();
         for (com.kccitm.api.model.career9.counselling.CounsellingAppointment a : todays) {
+            if (a.isOfflineRecord()) continue;
             Map<String, Object> d = new java.util.HashMap<>();
             d.put("appointmentId", a.getId());
             d.put("startTime", a.getSlot() != null ? String.valueOf(a.getSlot().getStartTime()) : null);
@@ -453,7 +457,7 @@ public class CounsellorController {
 
         Map<String, Object> out = new java.util.HashMap<>();
         out.put("date", today.toString());
-        out.put("todayCount", todays.size());
+        out.put("todayCount", todaysDtos.size());
         out.put("todaysAppointments", todaysDtos);
         out.put("freeSlotsThisWeek", freeSlots);
         out.put("bookedSlotsThisWeek", bookedSlots);

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.exception.BadRequestException;
 import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
@@ -327,6 +328,48 @@ public class BookingService {
             this.phone = phone;
             this.preferredContactMethod = preferredContactMethod;
         }
+
+        /**
+         * The contact snapshot for a booking the student did not fill in herself (an admin or
+         * an offline counsellor made it): her own name, email and phone from her profile, and
+         * the parent/guardian contact from an earlier booking, since the profile has nowhere to
+         * keep one — a parent address exists only on appointment rows typed at booking time.
+         *
+         * <p>Profile first; where the profile is blank the prior booking's snapshot fills in.
+         * Always worth calling at creation: the async mailers read the snapshot, and falling
+         * back to the student's LAZY profile from another thread finds nothing.
+         *
+         * @param prior the student's most recent earlier appointment that carries a parent
+         *              contact, or null
+         */
+        public static BookingContact fromProfile(UserStudent student, CounsellingAppointment prior) {
+            BookingContact c = new BookingContact();
+            StudentInfo info = null;
+            try {
+                info = student != null ? student.getStudentInfo() : null;
+            } catch (Exception e) {
+                // An unreadable profile is an empty one; the prior snapshot may still cover it.
+            }
+            if (info != null) {
+                c.name = blankToNull(info.getName());
+                c.email = blankToNull(info.getEmail());
+                c.phone = blankToNull(info.getPhoneNumber());
+            }
+            if (prior != null) {
+                if (c.name == null) c.name = blankToNull(prior.getStudentContactName());
+                if (c.email == null) c.email = blankToNull(prior.getStudentContactEmail());
+                if (c.phone == null) c.phone = blankToNull(prior.getStudentContactPhone());
+                c.parentEmail = blankToNull(prior.getParentEmail());
+                c.parentPhone = blankToNull(prior.getParentPhone());
+            }
+            c.preferredContactMethod = prior != null && prior.getPreferredContactMethod() != null
+                    ? prior.getPreferredContactMethod() : "EMAIL";
+            return c;
+        }
+
+        private static String blankToNull(String v) {
+            return v == null || v.trim().isEmpty() ? null : v;
+        }
     }
 
     /** Backwards-compatible overload — books with no extra contact details. */
@@ -470,6 +513,17 @@ public class BookingService {
         appointment.setStudentReason(reason);
         appointment.setStatus("CONFIRMED");
         appointment.setEntitlementId(entitlementId);
+        // Stamp the assessment the session is for while it is known, so "counselled for this
+        // assessment" (offline page, bulk allotment) sees this booking once it completes. The
+        // campaign path books against an entitlement, which names exactly one assessment.
+        if (entitlementId != null) {
+            try {
+                appointment.setAssessmentId(entitlementRepository.findById(entitlementId)
+                        .map(e -> e.getAssessmentId()).orElse(null));
+            } catch (Exception e) {
+                logger.warn("Could not resolve the assessment of entitlement {}: {}", entitlementId, e.getMessage());
+            }
+        }
 
         // The slot is now a confirmed booking, not an open hold — clear any soft-hold TTL
         // so the release sweep never reclaims it.

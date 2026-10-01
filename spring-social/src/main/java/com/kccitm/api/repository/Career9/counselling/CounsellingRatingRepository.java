@@ -27,10 +27,16 @@ public interface CounsellingRatingRepository extends JpaRepository<CounsellingRa
            "GROUP BY r.counsellor.id")
     List<Object[]> summaryByCounsellor();
 
+    /**
+     * Completed sessions the student has not rated yet (the rating prompt). Sessions an offline
+     * counsellor recorded are left out: the student never booked them and was never asked to
+     * rate the school-run session. Null-safe, since ordinary bookings carry no origin.
+     */
     @Query("SELECT a FROM CounsellingAppointment a " +
            "WHERE a.student.userStudentId = :studentId " +
            "AND a.status = 'COMPLETED' " +
            "AND a.counsellor IS NOT NULL " +
+           "AND (a.origin IS NULL OR a.origin <> 'OFFLINE_RECORD') " +
            "AND NOT EXISTS (SELECT r FROM CounsellingRating r WHERE r.appointment.id = a.id) " +
            "ORDER BY a.slot.date ASC, a.slot.startTime ASC")
     List<CounsellingAppointment> findUnratedCompletedAppointmentsForStudent(@Param("studentId") Long studentId);

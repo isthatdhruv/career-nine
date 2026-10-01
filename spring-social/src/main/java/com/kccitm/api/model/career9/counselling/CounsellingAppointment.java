@@ -9,6 +9,7 @@ import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.Index;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToOne;
@@ -17,16 +18,33 @@ import javax.persistence.PreUpdate;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIncludeProperties;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.UserStudent;
 
+/**
+ * One counselling session.
+ *
+ * <p>The index name is declared here as well as in V20260928001 on purpose: Hibernate's
+ * {@code ddl-auto=update} only skips an index it can find <i>by name</i>, so an unnamed
+ * declaration would get a second, hash-named copy next to the migration's.
+ */
 @Entity
-@Table(name = "counselling_appointment")
+@Table(name = "counselling_appointment",
+        indexes = @Index(name = "idx_ca_student_assessment", columnList = "student_id, assessment_id"))
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class CounsellingAppointment implements Serializable {
 
     private static final long serialVersionUID = 1L;
+
+    /**
+     * {@link #origin} of a session an offline counsellor recorded after counselling the student
+     * in person at school. Such a row is born COMPLETED on a synthetic slot of its own (blocked,
+     * 00:00–00:00, {@code blockReason = OFFLINE_RECORD}); nothing about it was ever bookable.
+     */
+    public static final String ORIGIN_OFFLINE_RECORD = "OFFLINE_RECORD";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,10 +58,18 @@ public class CounsellingAppointment implements Serializable {
     @JoinColumn(name = "student_id", nullable = false)
     private UserStudent student;
 
+    // Appointments are returned as raw entities (the student portal's history among them), so
+    // the counsellor's payout, identity and account details must not ride along. Nothing reads
+    // them off an appointment; the profile screens get them from /api/counsellor/get/*.
+    @JsonIgnoreProperties({"bankName", "bankAccount", "bankIfsc", "bankBranch", "govtIdLast4",
+            "govtIdHash", "signedAgreementUrl", "certificationsUrl", "hourlyRatePreference",
+            "passwordHash", "user", "hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "counsellor_id", nullable = true)
     private Counsellor counsellor;
 
+    // A whole User (roles, Google auth string, DOB) otherwise. Nothing reads more than who it was.
+    @JsonIncludeProperties({"id", "name"})
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "assigned_by", nullable = true)
     private User assignedBy;
@@ -124,6 +150,19 @@ public class CounsellingAppointment implements Serializable {
     // lifecycle sweep to credit the session back on a no-show (always rebookable).
     @Column(name = "entitlement_id")
     private Long entitlementId;
+
+    /**
+     * The assessment this session counsels, when known at creation: set by offline records and
+     * by bookings made against an entitlement or an assessment cohort. Null on older rows and
+     * on plain student bookings, where the entitlement (if any) is the only link. "Counselled
+     * for assessment X" reads this first and falls back to the entitlement's assessment.
+     */
+    @Column(name = "assessment_id")
+    private Long assessmentId;
+
+    /** How the row came to exist. Null for ordinary bookings; see {@link #ORIGIN_OFFLINE_RECORD}. */
+    @Column(name = "origin", length = 20)
+    private String origin;
 
     // ─── Cancellation attribution ────────────────────────────────────────────────
     // Who cancelled decides everything downstream: whether it costs the student one of her
@@ -441,6 +480,28 @@ public class CounsellingAppointment implements Serializable {
 
     public void setEntitlementId(Long entitlementId) {
         this.entitlementId = entitlementId;
+    }
+
+    public Long getAssessmentId() {
+        return assessmentId;
+    }
+
+    public void setAssessmentId(Long assessmentId) {
+        this.assessmentId = assessmentId;
+    }
+
+    public String getOrigin() {
+        return origin;
+    }
+
+    public void setOrigin(String origin) {
+        this.origin = origin;
+    }
+
+    /** True for a session recorded from the offline page. JSON already carries {@code origin}. */
+    @JsonIgnore
+    public boolean isOfflineRecord() {
+        return ORIGIN_OFFLINE_RECORD.equals(origin);
     }
 
     public String getCancelledByRole() {

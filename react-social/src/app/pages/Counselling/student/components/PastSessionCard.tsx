@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import StatusBadge from '../../shared/StatusBadge'
 import { getSessionNotes } from '../../API/SessionNotesAPI'
 import { disputeAttendance } from '../../API/AppointmentAPI'
+import { ORIGIN_OFFLINE_RECORD } from '../../API/OfflineCounsellingAPI'
 import '../../Counselling.css'
 
 interface Slot {
@@ -23,6 +24,9 @@ interface Appointment {
   missedByRole?: string | null
   /** Set once she has already contested this absent mark; the server allows only one. */
   disputeRaisedAt?: string | null
+  mode?: string | null
+  /** OFFLINE_RECORD for an in-person session her school's counsellor recorded as done. */
+  origin?: string | null
 }
 
 interface SessionNotes {
@@ -122,6 +126,9 @@ const PastSessionCard: React.FC<PastSessionCardProps> = ({
 }) => {
   const { appointmentId, slot, counsellorName, reason, status } = appointment
   const outcome = resolveOutcome(appointment)
+  // Recorded after an in-person session at school: only the date was taken, and its slot's
+  // 00:00–00:00 times are placeholders, so the card must not print them as fact.
+  const recordedOffline = appointment.origin === ORIGIN_OFFLINE_RECORD
   // Notes only exist for a sitting that actually happened; offering "View Remarks" on a
   // cancelled one just leads to an empty box.
   const sessionHappened = ['COMPLETED', 'ENDED'].includes((status || '').toUpperCase())
@@ -202,15 +209,27 @@ const PastSessionCard: React.FC<PastSessionCardProps> = ({
             {formatDate(slot.date)}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='var(--sp-info, #3B82F6)' strokeWidth='2'>
-            <circle cx='12' cy='12' r='10' />
-            <polyline points='12 6 12 12 16 14' />
-          </svg>
-          <span style={{ fontSize: 13, color: 'var(--sp-muted, #5C7A72)' }}>
-            {formatTime(slot.startTime)} – {formatTime(slot.endTime)}
-          </span>
-        </div>
+        {recordedOffline ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='var(--sp-info, #3B82F6)' strokeWidth='2'>
+              <path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z' />
+              <circle cx='12' cy='10' r='3' />
+            </svg>
+            <span style={{ fontSize: 13, color: 'var(--sp-muted, #5C7A72)' }}>
+              In-person session at your school
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='var(--sp-info, #3B82F6)' strokeWidth='2'>
+              <circle cx='12' cy='12' r='10' />
+              <polyline points='12 6 12 12 16 14' />
+            </svg>
+            <span style={{ fontSize: 13, color: 'var(--sp-muted, #5C7A72)' }}>
+              {formatTime(slot.startTime)} – {formatTime(slot.endTime)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Counsellor */}

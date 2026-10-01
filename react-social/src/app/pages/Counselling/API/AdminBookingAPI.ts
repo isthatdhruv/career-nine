@@ -37,6 +37,10 @@ export interface BulkPreview {
   toBookCount: number
   alreadyBooked: BookedStudentRow[]
   alreadyBookedCount: number
+  // Students whose counselling for this assessment is already done — an online session
+  // completed or an in-person one recorded offline. Read-only: confirm drops them server-side.
+  alreadyCounselled: StudentBrief[]
+  alreadyCounselledCount: number
   availableSlotCount: number
 }
 

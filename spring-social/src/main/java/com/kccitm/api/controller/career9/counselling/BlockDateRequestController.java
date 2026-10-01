@@ -195,9 +195,12 @@ public class BlockDateRequestController {
         }
 
         // Block every remaining slot on that date (AVAILABLE ones with no appointment).
+        // A COMPLETED slot is a session that already happened — including the synthetic slot
+        // every offline record hangs on — so it is history, not availability: cancelling it
+        // would rewrite a held session's slot and make the record look like a blocked hour.
         int cancelledCount = 0;
         for (CounsellingSlot slot : existingSlots) {
-            if (!"CANCELLED".equals(slot.getStatus())) {
+            if (!"CANCELLED".equals(slot.getStatus()) && !"COMPLETED".equals(slot.getStatus())) {
                 slot.setStatus("CANCELLED");
                 slot.setIsBlocked(true);
                 slot.setBlockReason("Date blocked: " + (request.getReason() != null ? request.getReason() : ""));

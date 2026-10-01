@@ -31,6 +31,11 @@ public class AvailabilityTemplate implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Reached from every appointment via appointment.slot.template.counsellor — same narrowing
+    // as CounsellingSlot.counsellor so payout/identity fields never ride along.
+    @JsonIgnoreProperties({"bankName", "bankAccount", "bankIfsc", "bankBranch", "govtIdLast4",
+            "govtIdHash", "signedAgreementUrl", "certificationsUrl", "hourlyRatePreference",
+            "passwordHash", "user", "hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "counsellor_id", nullable = false)
     private Counsellor counsellor;

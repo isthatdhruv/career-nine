@@ -7,9 +7,10 @@ export interface GeneratedReport {
   generatedReportId: number;
   userStudent: { userStudentId: number };
   assessmentId: number;
-  typeOfReport: string; // engineCode: "bet" | "pager" | "legacy"
+  typeOfReport: string; // engineCode: "bet" | "pager" | "legacy" | "navigator_pro"
   reportTemplateId?: number | null;
-  reportStatus: string; // "notGenerated" | "generated" | "failed"
+  reportStatus: string; // "notGenerated" | "queued" | "generated" | "failed" | "suppressed"
+  suppressionReason?: string | null; // "<rule>: <reason>" when reportStatus === "suppressed"
   reportUrl: string | null;
   pdfUrl: string | null;
   pdfStatus: string; // notRequested | pending | rendering | ready | failed

@@ -5,11 +5,13 @@ import { useAuth } from '../../modules/auth/core/Auth'
 import { getCurrentUser } from '../../modules/auth/core/_requests'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { getSlotsByCounsellor } from '../Counselling/API/SlotAPI'
+import { clearOfflineContextCache } from '../Counselling/API/OfflineCounsellingAPI'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
 
 const DASHBOARD = '/counsellor/dashboard'
 const AVAILABILITY = '/counsellor/availability'
+const OFFLINE_SESSIONS = '/counsellor/offline-sessions'
 
 /**
  * Where to drop a counsellor after signing in.
@@ -21,15 +23,25 @@ const AVAILABILITY = '/counsellor/availability'
  * they have availability that reason is gone, and sending them to their calendar every
  * morning instead of their dashboard would just be friction.
  *
+ * <p>An offline counsellor (flagged by an admin) goes straight to Offline Counselling, before
+ * the slot check: the school schedules their sessions, so they never publish slots and would
+ * otherwise be sent to Availability on every sign-in.
+ *
  * <p>Anything unexpected (no counsellor record, request fails) falls back to the dashboard:
  * it is the established home, and the availability page carries the same prompt for whenever
  * they get there under their own steam.
+ *
+ * <p>Also used by the admin "Open as Counsellor" landing. Runs once per sign-in, so it also
+ * drops any cached offline-counselling context: the flag may have changed since the last one.
  */
-async function landingRoute(userId?: number): Promise<string> {
+export async function landingRoute(userId?: number): Promise<string> {
+  clearOfflineContextCache()
   if (!userId) return DASHBOARD
   try {
-    const counsellorId = (await getCounsellorByUserId(userId)).data?.id
+    const me = (await getCounsellorByUserId(userId)).data
+    const counsellorId = me?.id
     if (!counsellorId) return DASHBOARD
+    if (me.isOffline === true) return OFFLINE_SESSIONS
     const slots: any[] = (await getSlotsByCounsellor(counsellorId)).data || []
     const now = Date.now()
     const hasUpcoming = slots.some((s) => {

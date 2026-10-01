@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.transaction.Transactional;
 
@@ -84,8 +85,14 @@ public class AppointmentService {
         return appointmentRepository.findByStatus("PENDING");
     }
 
+    /**
+     * The student's history. A reverted offline record (admin found the session never happened)
+     * is dropped: to her it is not a cancelled session, it is one that should never have shown.
+     */
     public List<CounsellingAppointment> getByStudent(Long studentId) {
-        return appointmentRepository.findByStudentIdOrdered(studentId);
+        return appointmentRepository.findByStudentIdOrdered(studentId).stream()
+                .filter(a -> !(a.isOfflineRecord() && "CANCELLED".equals(a.getStatus())))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -97,7 +104,19 @@ public class AppointmentService {
      * the counsellor's own screen unable to tell a held report from a sent one.
      */
     public List<CounsellingAppointment> getByCounsellor(Long counsellorId) {
-        List<CounsellingAppointment> appointments = appointmentRepository.findByCounsellorId(counsellorId);
+        return getByCounsellor(counsellorId, false);
+    }
+
+    /**
+     * As {@link #getByCounsellor(Long)}, optionally including the sessions recorded from the
+     * offline page. They are left out by default because the screens behind this list poll it
+     * and fetch notes per completed row — for an offline counsellor that is thousands of rows
+     * of sessions those screens have no action for.
+     */
+    public List<CounsellingAppointment> getByCounsellor(Long counsellorId, boolean includeOfflineRecords) {
+        List<CounsellingAppointment> appointments = includeOfflineRecords
+                ? appointmentRepository.findByCounsellorId(counsellorId)
+                : appointmentRepository.findByCounsellorIdExcludingOfflineRecords(counsellorId);
         for (CounsellingAppointment a : appointments) {
             a.setCounsellorReleaseReport(isCounsellorReleased(a));
         }
@@ -148,6 +167,20 @@ public class AppointmentService {
     // ─── State Transitions ────────────────────────────────────────────────────────
 
     /**
+     * Refuses assign / confirm / decline on a session that has already been held. Those steps
+     * arrange a booking; run on a COMPLETED one they would un-complete it (decline even clears
+     * its counsellor and puts the slot back to REQUESTED), silently dropping the student out of
+     * every "counselled" count and letting them be recorded again. An offline record is refused
+     * in any state, as in {@link #reschedule}: its slot is synthetic, and only an admin revert
+     * may undo it.
+     */
+    private static void requireNotHeld(CounsellingAppointment appointment, String action) {
+        if ("COMPLETED".equalsIgnoreCase(appointment.getStatus()) || appointment.isOfflineRecord()) {
+            throw new BadRequestException("This session has already taken place and cannot be " + action + ".");
+        }
+    }
+
+    /**
      * Assigns a counsellor to a PENDING appointment.
      * Transitions appointment → ASSIGNED, slot → ASSIGNED.
      */
@@ -155,6 +188,7 @@ public class AppointmentService {
     public CounsellingAppointment assign(Long appointmentId, Long counsellorId, User admin) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
+        requireNotHeld(appointment, "reassigned");
 
         Counsellor counsellor = counsellorRepository.findById(counsellorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Counsellor", "id", counsellorId));
@@ -202,6 +236,7 @@ public class AppointmentService {
     public CounsellingAppointment confirm(Long appointmentId, User counsellorUser) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
+        requireNotHeld(appointment, "confirmed");
 
         appointment.setStatus("CONFIRMED");
 
@@ -253,6 +288,7 @@ public class AppointmentService {
     public CounsellingAppointment decline(Long appointmentId, User counsellorUser, String reason) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
+        requireNotHeld(appointment, "declined");
 
         appointment.setStatus("PENDING");
         appointment.setCounsellor(null);
@@ -446,6 +482,58 @@ public class AppointmentService {
         return appointment;
     }
 
+    /**
+     * Cancels a live booking without telling anyone and without crediting anything back — used
+     * when an offline counsellor records that the student has already been counselled in person
+     * for the assessment the booking was for.
+     *
+     * <p>Silent because nothing was lost: the student has had her session, so a "your session
+     * was cancelled" mail would only alarm her, and the session this booking drew from the
+     * entitlement is exactly the one she received. The slot is released the same way an admin
+     * cancellation releases it, so the counsellor's hour can be booked by someone else — except
+     * for a parked (AWAITING_RESCHEDULE) booking, which holds no hour any more: its slot is the
+     * one the counsellor dropped or missed, and reopening it would put a cancelled hour back on
+     * sale.
+     *
+     * @param actor          who recorded the offline session (kept on the row)
+     * @param cancellerRole  stored as {@code cancelledByRole}; the offline flow passes SYSTEM,
+     *                       which the miss allowance (STUDENT only) never counts
+     */
+    @Transactional
+    public CounsellingAppointment cancelSilently(Long appointmentId, User actor, String cancellerRole,
+                                                 String reasonCode, String note) {
+        CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
+        guardCancellableStatus(appointment);
+
+        String oldStatus = appointment.getStatus();
+        appointment.setStatus("CANCELLED");
+        appointment.setCancelledByRole(cancellerRole);
+        appointment.setCancelledByUserId(actor != null ? actor.getId() : null);
+        appointment.setCancellationReason(reasonCode);
+        appointment.setCancellationNote(note);
+        appointment.setCancelledAt(clock.now());
+
+        if (!"AWAITING_RESCHEDULE".equals(oldStatus)) {
+            releaseSlot(appointment.getSlot(), cancellerRole);
+        }
+        appointment = appointmentRepository.save(appointment);
+
+        logger.info("Appointment {} cancelled silently ({}), was {}", appointmentId, reasonCode, oldStatus);
+
+        Map<String, Object> oldValues = new HashMap<>();
+        oldValues.put("status", oldStatus);
+        Map<String, Object> newValues = new HashMap<>();
+        newValues.put("status", "CANCELLED");
+        newValues.put("cancelledByRole", cancellerRole);
+        newValues.put("cancellationReason", reasonCode);
+        newValues.put("creditedBack", false);
+        newValues.put("notified", false);
+        auditLogService.log(appointment, "CANCELLED", actor, note, oldValues, newValues);
+
+        return appointment;
+    }
+
     // ─── Cancellation helpers ────────────────────────────────────────────────────
 
     /**
@@ -631,6 +719,13 @@ public class AppointmentService {
         CounsellingAppointment oldAppointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
+        // A held session is history, not a booking. Moving it would flip it to RESCHEDULED and
+        // put its slot back on sale — silently un-counselling the student. An offline record is
+        // refused in any state: its slot is synthetic and was never a bookable hour.
+        if ("COMPLETED".equalsIgnoreCase(oldAppointment.getStatus()) || oldAppointment.isOfflineRecord()) {
+            throw new BadRequestException("This session has already taken place and cannot be rescheduled.");
+        }
+
         CounsellingSlot oldSlot = oldAppointment.getSlot();
 
         // A PARKED session is exempt from every timing and quota rule below. Its old slot time
@@ -721,6 +816,9 @@ public class AppointmentService {
         // its null guard, and a parked session lost the very link that parking exists to
         // protect. Must survive the whole reschedule chain.
         newAppointment.setEntitlementId(oldAppointment.getEntitlementId());
+        // Same for the assessment stamp: a bulk-allotted booking has no entitlement, so this is
+        // its only link to "counselled for assessment X" once the moved session completes.
+        newAppointment.setAssessmentId(oldAppointment.getAssessmentId());
 
         // Delivery details and the contacts given at booking. Also previously dropped, so a
         // rescheduled session lost the parent/guardian address and the preferred channel —

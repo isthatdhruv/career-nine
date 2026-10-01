@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.service.b2c.report.ReportResult;
 import com.kccitm.api.service.b2c.report.ReportService;
+import com.kccitm.api.service.b2c.report.ReportSuppressedException;
 import com.kccitm.api.service.b2c.report.pdf.PdfRenderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Date;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -100,5 +102,15 @@ class ReportGenerateConsumerTest {
         consumer.onGenerate(json(true, "a@b.c", "all", 7L, true));
         verify(reportService, never()).generate(any(), any(), any(), anyBoolean());
         verify(kafkaTemplate, never()).send(any(), any(), any());
+    }
+
+    @Test
+    void suppressedReport_isAckedWithoutRetryOrDlt() throws Exception {
+        when(reportService.generate(5L, 9L, null, false))
+                .thenThrow(new ReportSuppressedException("R1", "attention check not passed"));
+        assertThatCode(() -> consumer.onGenerate(json(false, "a@b.c", "all", null, false)))
+                .doesNotThrowAnyException();
+        verify(kafkaTemplate, never()).send(anyString(), anyString(), anyString());
+        verify(generatedReportRepository, never()).save(any());
     }
 }

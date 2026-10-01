@@ -1,5 +1,6 @@
 package com.kccitm.api.service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,8 +98,15 @@ public class StudentPurgeService {
                 "DELETE t FROM counselling_reminder_sent t JOIN counselling_appointment ca ON t.appointment_id = ca.id WHERE ca.student_id = :id", userStudentId);
         delete(counts, "counselling_rating", "student_id", userStudentId);
         delete(counts, "counselling_payment", "student_id", userStudentId);
+        // Offline records each own a synthetic slot that nothing else points at. The slot is the
+        // FK parent, so its id has to be read now — once the appointments are gone there is no
+        // way back to it — and the slot deleted only after them.
+        List<Long> syntheticSlotIds = offlineRecordSlotIds(userStudentId);
         delete(counts, "counselling_appointment", "student_id", userStudentId);
+        deleteSyntheticSlots(counts, syntheticSlotIds);
         delete(counts, "student_counsellor_mapping", "student_id", userStudentId);
+        // The offline page's OTP attempt counter for this student (no FK, keyed by student).
+        delete(counts, "counselling_otp_guard", "student_id", userStudentId);
         delete(counts, "counselling_request", "user_student_id", userStudentId);
         if (userId != null) {
             delete(counts, "counselling_notification", "user_id", userId);
@@ -182,6 +190,42 @@ public class StudentPurgeService {
         em.createNativeQuery(
                 "UPDATE student_user SET name = '[deleted]', email = NULL, phone = NULL WHERE id = :id")
                 .setParameter("id", userId).executeUpdate();
+    }
+
+    /**
+     * Slots behind this student's offline records. Only a slot that is itself marked as an
+     * offline record's is taken, so a real bookable slot can never be swept up here.
+     */
+    private List<Long> offlineRecordSlotIds(Long userStudentId) {
+        @SuppressWarnings("unchecked")
+        List<Object> rows = em.createNativeQuery(
+                "SELECT ca.slot_id FROM counselling_appointment ca "
+                        + "JOIN counselling_slot s ON s.id = ca.slot_id "
+                        + "WHERE ca.student_id = :id AND ca.origin = 'OFFLINE_RECORD' "
+                        + "AND s.block_reason = 'OFFLINE_RECORD'")
+                .setParameter("id", userStudentId)
+                .getResultList();
+        List<Long> ids = new ArrayList<>(rows.size());
+        for (Object o : rows) {
+            if (o instanceof Number) ids.add(((Number) o).longValue());
+        }
+        return ids;
+    }
+
+    /**
+     * Runs after the student's appointments are deleted. The NOT EXISTS keeps a slot that some
+     * other appointment still references (never expected) from failing the whole purge on the FK.
+     */
+    private void deleteSyntheticSlots(Map<String, Integer> counts, List<Long> slotIds) {
+        int n = 0;
+        if (!slotIds.isEmpty()) {
+            n = em.createNativeQuery(
+                    "DELETE FROM counselling_slot WHERE id IN (:ids) "
+                            + "AND NOT EXISTS (SELECT 1 FROM counselling_appointment ca WHERE ca.slot_id = counselling_slot.id)")
+                    .setParameter("ids", slotIds)
+                    .executeUpdate();
+        }
+        counts.put("counselling_slot (offline records)", n);
     }
 
     private void delete(Map<String, Integer> counts, String table, String column, Long id) {

@@ -4,6 +4,7 @@ import axios from 'axios'
 import { useAuth } from '../../modules/auth/core/Auth'
 import { IMPERSONATION_STORAGE_KEY, IMPERSONATION_MODE_KEY } from '../../modules/auth/core/AuthHelpers'
 import { showErrorToast } from '../../utils/toast'
+import { landingRoute } from './CounsellorLoginPanel'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
 
@@ -50,7 +51,9 @@ const CounsellorImpersonationLanding: React.FC = () => {
         })
         if (me) {
           setCurrentUser(me)
-          navigate('/counsellor/dashboard', { replace: true })
+          // Same landing as a real sign-in, so an admin sees what the counsellor would
+          // (an offline counsellor opens on Offline Counselling, not the dashboard).
+          navigate(await landingRoute(me.id), { replace: true })
         } else {
           throw new Error('no user')
         }

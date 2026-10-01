@@ -90,6 +90,8 @@ const MappingCounsellingSection: React.FC = () => {
         }
         if (sc?.alreadyBooked) {
           setBooked({
+            // Kept so a COMPLETED session reads as done, not as an upcoming booking.
+            status: sc.bookedStatus,
             slotDate: sc.bookedSlotDate,
             slotStartTime: sc.bookedSlotStartTime,
             counsellorName: sc.bookedCounsellorName,
@@ -150,7 +152,11 @@ const MappingCounsellingSection: React.FC = () => {
   // ── Booked: a celebratory confirmation — never a booking CTA. Covers both an
   //    in-session PAY_FIRST booking and an already-booked PAY_LATER on reload. ──
   if (booked) {
-    const when = booked.slotDate && booked.slotStartTime
+    // COMPLETED means the counselling already happened — online, or in person at school and
+    // recorded by the school's counsellor (that record's slot time is a 00:00 placeholder).
+    // So: the date only, and no "details sent" line, which only makes sense before a session.
+    const completed = String(booked.status || '').toUpperCase() === 'COMPLETED';
+    const when = !completed && booked.slotDate && booked.slotStartTime
       ? `${fmtDate(booked.slotDate)} · ${fmtTime(booked.slotStartTime)}`
       : null;
     return (
@@ -173,16 +179,20 @@ const MappingCounsellingSection: React.FC = () => {
           <IconCheckCircle size={44} color="#059669" />
         </div>
         <h3 style={{ margin: '0 0 6px', fontSize: '1.25rem', fontWeight: 800, color: '#065F46' }}>
-          You’re all set — your session is booked!
+          {completed
+            ? (booked.slotDate ? `Counselling completed on ${fmtDate(booked.slotDate)}` : 'Counselling completed')
+            : 'You’re all set — your session is booked!'}
         </h3>
         {when && (
           <p style={{ margin: '0 0 14px', fontSize: '0.95rem', color: '#047857', fontWeight: 700 }}>
             {when}
           </p>
         )}
-        <p style={{ margin: '0 0 4px', fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
-          We’ve sent the details to your email and WhatsApp.
-        </p>
+        {!completed && (
+          <p style={{ margin: '0 0 4px', fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
+            We’ve sent the details to your email and WhatsApp.
+          </p>
+        )}
         <p style={{ margin: 0, fontSize: '0.88rem', color: '#059669', lineHeight: 1.5 }}>
           Great job taking this step!
         </p>

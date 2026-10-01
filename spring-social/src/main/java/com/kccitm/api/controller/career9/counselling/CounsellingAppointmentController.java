@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
@@ -499,11 +500,18 @@ public class CounsellingAppointmentController {
         return ResponseEntity.ok(appointmentService.getByStudent(studentId));
     }
 
+    /**
+     * One counsellor's sessions. Sessions recorded from the offline page are left out unless
+     * {@code ?includeOffline=true}: the portal screens that poll this have no action for them,
+     * and an offline counsellor has thousands.
+     */
     // no scope arg: identifies by counsellorId
     @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/by-counsellor/{counsellorId}")
-    public ResponseEntity<List<CounsellingAppointment>> getByCounsellor(@PathVariable Long counsellorId) {
-        return ResponseEntity.ok(appointmentService.getByCounsellor(counsellorId));
+    public ResponseEntity<List<CounsellingAppointment>> getByCounsellor(
+            @PathVariable Long counsellorId,
+            @RequestParam(value = "includeOffline", defaultValue = "false") boolean includeOffline) {
+        return ResponseEntity.ok(appointmentService.getByCounsellor(counsellorId, includeOffline));
     }
 
     // ─── Manage Sessions (admin, Manage Counsellors page) ────────────────────────

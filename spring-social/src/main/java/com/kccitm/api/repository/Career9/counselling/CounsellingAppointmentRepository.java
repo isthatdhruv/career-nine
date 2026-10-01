@@ -23,13 +23,41 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
 
     List<CounsellingAppointment> findByCounsellorId(Long counsellorId);
 
+    /**
+     * A counsellor's sessions without the ones recorded from the offline page. An offline
+     * counsellor accumulates thousands of those, and the portal's appointment and notes screens
+     * (which poll this list) have nothing to do with them. Null-safe: ordinary bookings have
+     * no origin at all.
+     */
+    @Query("SELECT a FROM CounsellingAppointment a WHERE a.counsellor.id = :counsellorId "
+         + "AND (a.origin IS NULL OR a.origin <> 'OFFLINE_RECORD')")
+    List<CounsellingAppointment> findByCounsellorIdExcludingOfflineRecords(@Param("counsellorId") Long counsellorId);
+
+    /**
+     * "Counselled for this assessment": each student's latest COMPLETED session tied to the
+     * assessment, either directly ({@code assessment_id}) or through the entitlement it was
+     * booked against. Rows are {@code [student_id, appointment_id]}. Native so the answer is
+     * read from the database even when the caller's persistence context already holds some of
+     * these rows (open-in-view), and so the scope filter cannot hide students.
+     */
+    @Query(value = "SELECT ca.student_id, MAX(ca.id) FROM counselling_appointment ca "
+            + "LEFT JOIN student_entitlements se ON se.entitlement_id = ca.entitlement_id "
+            + "WHERE ca.student_id IN (:studentIds) AND ca.status = 'COMPLETED' "
+            + "AND (ca.assessment_id = :assessmentId OR se.assessment_id = :assessmentId) "
+            + "GROUP BY ca.student_id", nativeQuery = true)
+    List<Object[]> findLatestCompletedForAssessment(
+            @Param("studentIds") java.util.Collection<Long> studentIds,
+            @Param("assessmentId") Long assessmentId);
+
     // Admin booking: which of these students already have an UPCOMING, still-active
     // counselling appointment (slot today or later, not cancelled/missed/etc.). Used to
     // surface the "already booked" list the admin chooses whether to re-book, and to skip
     // them by default during bulk allotment. Returns student ids only — one batch query.
+    // COMPLETED is excluded too: a session held earlier today (or recorded offline for today)
+    // is done, not upcoming, and offering to "change counsellor & rebook" it would undo it.
     @Query("SELECT DISTINCT a.student.userStudentId FROM CounsellingAppointment a " +
            "WHERE a.student.userStudentId IN :studentIds " +
-           "AND a.status NOT IN ('CANCELLED', 'MISSED', 'RESCHEDULED', 'DECLINED') " +
+           "AND a.status NOT IN ('CANCELLED', 'MISSED', 'RESCHEDULED', 'DECLINED', 'COMPLETED') " +
            "AND a.slot.date >= :today")
     List<Long> findStudentIdsWithUpcomingAppointment(
             @Param("studentIds") List<Long> studentIds,
@@ -66,7 +94,7 @@ public interface CounsellingAppointmentRepository extends JpaRepository<Counsell
     // offer a counsellor change. Companion to findStudentIdsWithUpcomingAppointment (same filter).
     @Query("SELECT a FROM CounsellingAppointment a " +
            "WHERE a.student.userStudentId IN :studentIds " +
-           "AND a.status NOT IN ('CANCELLED', 'MISSED', 'RESCHEDULED', 'DECLINED') " +
+           "AND a.status NOT IN ('CANCELLED', 'MISSED', 'RESCHEDULED', 'DECLINED', 'COMPLETED') " +
            "AND a.slot.date >= :today " +
            "ORDER BY a.slot.date ASC, a.slot.startTime ASC")
     List<CounsellingAppointment> findUpcomingAppointmentsForStudents(
