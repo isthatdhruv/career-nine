@@ -64,8 +64,9 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
     questionText: "",
     questionType: "",
     maxOptionsAllowed: "",
-    optionsRule: "equal" as "min" | "max" | "equal",
+    optionsRule: "equal" as "min" | "max" | "equal" | "range",
     optionsCount: "",
+    minOptionsAllowed: "",
     questionOptions: [""],
     sectionId: ""
   };
@@ -432,6 +433,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 maxOptionsAllowed: Number(formikValues.optionsCount) || 0,
                 optionsRule: formikValues.optionsRule,
                 optionsCount: Number(formikValues.optionsCount) || 0,
+                minOptionsAllowed:
+                  formikValues.optionsRule === "range" ? Number(formikValues.minOptionsAllowed) || 1 : null,
                 isMQT: isMQT,
                 isMQTtyped: isMQTtyped,
                 options,
@@ -920,14 +923,32 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   onChange={e =>
                     setFormikValues(v => ({
                       ...v,
-                      optionsRule: e.target.value as "min" | "max" | "equal"
+                      optionsRule: e.target.value as "min" | "max" | "equal" | "range"
                     }))
                   }
                 >
                   <option value="min">At least (Min)</option>
                   <option value="max">At most (Max)</option>
                   <option value="equal">Exactly (Equal)</option>
+                  <option value="range">Between (Min–Max)</option>
                 </select>
+                {formikValues.optionsRule === "range" && (
+                  <>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={formikValues.minOptionsAllowed}
+                      onChange={e =>
+                        setFormikValues(v => ({ ...v, minOptionsAllowed: e.target.value }))
+                      }
+                      placeholder="Min"
+                      className="form-control form-control-lg form-control-solid"
+                      style={{ width: 120 }}
+                    />
+                    <span className="text-muted">to</span>
+                  </>
+                )}
                 <input
                   type="number"
                   min={0}
@@ -940,7 +961,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                       maxOptionsAllowed: e.target.value
                     }))
                   }
-                  placeholder="N"
+                  placeholder={formikValues.optionsRule === "range" ? "Max" : "N"}
                   className="form-control form-control-lg form-control-solid"
                   style={{ width: 120 }}
                 />
@@ -948,6 +969,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   {formikValues.optionsRule === "min" && "Student must select at least N options"}
                   {formikValues.optionsRule === "max" && "Student can select up to N options"}
                   {formikValues.optionsRule === "equal" && "Question is answered only when exactly N options are selected"}
+                  {formikValues.optionsRule === "range" && "Student must select between Min and Max options"}
                 </span>
               </div>
             </div>

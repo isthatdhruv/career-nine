@@ -51,6 +51,7 @@ public class AssessmentQuestions implements Serializable {
     //   "min"   — student must select AT LEAST optionsCount options
     //   "max"   — student must select AT MOST optionsCount options
     //   "equal" — student must select EXACTLY optionsCount options
+    //   "range" — student must select minOptionsAllowed..optionsCount options
     // For backward compatibility, legacy rows have optionsRule = null and the
     // student portal falls back to the "equal maxOptionsAllowed" behavior.
     @Column(name = "options_rule", length = 16)
@@ -58,6 +59,10 @@ public class AssessmentQuestions implements Serializable {
 
     @Column(name = "options_count")
     private Integer optionsCount;
+
+    // Lower bound for the "range" rule (optionsCount is the upper bound).
+    @Column(name = "min_options_allowed")
+    private Integer minOptionsAllowed;
 
     @Column(name = "question_media_type")
     private String questionMediaType;
@@ -248,5 +253,13 @@ public class AssessmentQuestions implements Serializable {
 
     public void setOptionsCount(Integer optionsCount) {
         this.optionsCount = optionsCount;
+    }
+
+    public Integer getMinOptionsAllowed() {
+        return minOptionsAllowed;
+    }
+
+    public void setMinOptionsAllowed(Integer minOptionsAllowed) {
+        this.minOptionsAllowed = minOptionsAllowed;
     }
 }

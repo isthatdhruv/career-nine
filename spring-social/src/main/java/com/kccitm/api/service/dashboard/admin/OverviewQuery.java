@@ -101,6 +101,19 @@ final class OverviewQuery {
     static final String PAYMENT_INSTITUTE = "COALESCE(p.instituteCode, pc.instituteCode)";
 
     /**
+     * An assessment purchase that actually collected money: marked paid, at least
+     * ₹1, and settled through Razorpay (it carries a Razorpay payment id). Free
+     * assessments are also stored as {@code paid} with amount 0 and no Razorpay
+     * payment — those are registrations, not payments, and stay out.
+     */
+    static final String PAID_VIA_RAZORPAY = "LOWER(p.status) = 'paid' AND p.amount > 0 "
+            + "AND p.razorpayPaymentId IS NOT NULL AND TRIM(p.razorpayPaymentId) <> ''";
+
+    /** {@link #PAID_VIA_RAZORPAY} for counselling purchases ({@code cp}). */
+    static final String COUNSELLING_PAID_VIA_RAZORPAY = "UPPER(cp.status) = 'PAID' AND cp.amount > 0 "
+            + "AND cp.razorpayPaymentId IS NOT NULL AND TRIM(cp.razorpayPaymentId) <> ''";
+
+    /**
      * Assessment purchases ({@code PaymentTransaction p}, campaign left-joined as
      * {@code pc}). Scope / institute filters apply to {@link #PAYMENT_INSTITUTE}
      * (institute dimension only for scope — the transaction has no

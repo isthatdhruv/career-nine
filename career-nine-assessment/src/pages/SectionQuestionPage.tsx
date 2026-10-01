@@ -75,8 +75,8 @@ type Question = {
     maxOptionsAllowed: number;
     minOptionsAllowed?: number;
     // New rule-based selection model. When optionsRule is set, it overrides the
-    // legacy "min defaults to max" behavior.
-    optionsRule?: "min" | "max" | "equal" | null;
+    // legacy "min defaults to max" behavior. "range" = minOptionsAllowed..optionsCount.
+    optionsRule?: "min" | "max" | "equal" | "range" | null;
     optionsCount?: number | null;
   };
 };
@@ -841,6 +841,13 @@ const SectionQuestionPage: React.FC = () => {
     if (optionsRule && optionsCount != null && optionsCount > 0) {
       if (optionsRule === "min") return { effectiveMin: optionsCount, effectiveMax: 0 };
       if (optionsRule === "max") return { effectiveMin: 1, effectiveMax: optionsCount };
+      if (optionsRule === "range") {
+        const rangeMin = question.question.minOptionsAllowed ?? 1;
+        return {
+          effectiveMin: Math.min(Math.max(rangeMin, 1), optionsCount),
+          effectiveMax: optionsCount,
+        };
+      }
       return { effectiveMin: optionsCount, effectiveMax: optionsCount }; // equal
     }
     // Legacy fallback
@@ -910,6 +917,8 @@ const SectionQuestionPage: React.FC = () => {
       typeof q.question.optionsCount === "number" ? q.question.optionsCount : null;
     if (rule && count != null && count > 0) {
       if (rule === "min" || rule === "equal") return count;
+      if (rule === "range")
+        return Math.min(Math.max(q.question.minOptionsAllowed ?? 1, 1), count);
       return 1; // "max" rule: any non-empty selection is valid
     }
     const maxAllowed = q.question.maxOptionsAllowed;
@@ -1126,7 +1135,7 @@ const SectionQuestionPage: React.FC = () => {
     const willAutoAdvance = (() => {
       if (isAlreadySelected) return false;
       if (optionsRule === "equal") return currentSelectedCount + 1 === effectiveMax;
-      if (optionsRule === "min" || optionsRule === "max") return false;
+      if (optionsRule === "min" || optionsRule === "max" || optionsRule === "range") return false;
       const legacyTarget = maxOptionsAllowed === 0 ? 1 : maxOptionsAllowed;
       return currentSelectedCount + 1 === legacyTarget;
     })();
@@ -1223,7 +1232,7 @@ const SectionQuestionPage: React.FC = () => {
     const willAutoAdvance = (() => {
       if (!isAddingRank) return false;
       if (optionsRule === "equal") return currentRankCount + 1 === effectiveMax;
-      if (optionsRule === "min" || optionsRule === "max") return false;
+      if (optionsRule === "min" || optionsRule === "max" || optionsRule === "range") return false;
       return currentRankCount + 1 === maxOptionsAllowed;
     })();
 
@@ -1291,7 +1300,7 @@ const SectionQuestionPage: React.FC = () => {
     // ranking up to the number of options. Falls back to legacy maxOptionsAllowed.
     const totalOptions = (question.question.options || []).length;
     const maxRanks = (() => {
-      if (optionsRule === "equal" || optionsRule === "max") return effectiveMax;
+      if (optionsRule === "equal" || optionsRule === "max" || optionsRule === "range") return effectiveMax;
       if (optionsRule === "min") return totalOptions;
       return question.question.maxOptionsAllowed || totalOptions;
     })();
@@ -1312,7 +1321,7 @@ const SectionQuestionPage: React.FC = () => {
   // legacy maxOptionsAllowed otherwise.
   const getMaxRanks = (): number => {
     const totalOptions = (question.question.options || []).length;
-    if (optionsRule === "equal" || optionsRule === "max") return effectiveMax;
+    if (optionsRule === "equal" || optionsRule === "max" || optionsRule === "range") return effectiveMax;
     if (optionsRule === "min") return totalOptions;
     return question.question.maxOptionsAllowed || totalOptions;
   };
@@ -2863,6 +2872,14 @@ const SectionQuestionPage: React.FC = () => {
                       <>
                         Please {verb} at least <strong>{effectiveMin}</strong>{" "}
                         {noun}{trailing}.
+                      </>
+                    );
+                  }
+                  if (optionsRule === "range" && effectiveMax > 0) {
+                    return (
+                      <>
+                        Please {verb} between <strong>{effectiveMin}</strong> and{" "}
+                        <strong>{effectiveMax}</strong> {noun}{trailing}.
                       </>
                     );
                   }
