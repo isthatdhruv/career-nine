@@ -999,7 +999,7 @@ const ReportsHubPage: React.FC = () => {
   const handleExportNavigatorProRaw = async () => {
     if (!selectedAssessmentObj) return;
     const ticked = getSelectedIds();
-    const ids = ticked.length > 0 ? ticked : displayedStudents.map((s) => s.userStudentId);
+    const ids = ticked.length > 0 ? ticked : actionRows.map((r) => r.student.userStudentId);
     if (ids.length === 0) { showErrorToast("No students match the current filters."); return; }
 
     setExportingNavigatorPro(true);

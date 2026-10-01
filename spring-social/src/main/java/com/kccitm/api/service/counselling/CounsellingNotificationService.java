@@ -477,8 +477,12 @@ public class CounsellingNotificationService {
             Mail mail = CounsellingMails.sessionComplete(
                     AccountMails.firstName(studentName(appointment)),
                     mailLinks.of(referralShareUrl(appointment), "referral"));
+            // Date only: an offline record's slot carries a placeholder 00:00 time, which
+            // sessionWhen() would print as "12:00 AM".
+            String when = appointment.getSlot() != null && appointment.getSlot().getDate() != null
+                    ? appointment.getSlot().getDate().format(DATE_FMT) : "-";
             sendMailToStudentAndParent(appointment, mail, contactNumbers(appointment)
-                    .onEvent(WhatsAppCampaigns.COUNSELLING_SESSION_COMPLETED, sessionWhen(appointment))
+                    .onEvent(WhatsAppCampaigns.COUNSELLING_SESSION_COMPLETED, when)
                     .withLink(portalCounsellingUrl()));
         } catch (Exception e) {
             logger.error("Failed to send offline session-complete email for appointment ID: {}. Error: {}",
