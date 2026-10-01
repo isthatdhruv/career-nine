@@ -101,6 +101,12 @@ const completedGamesStorageKey = (): string => {
   return `assessmentCompletedGames:${studentId}:${assessmentId}`;
 };
 
+const isNAText = (text: string | null | undefined): boolean => {
+  if (!text) return false;
+  const trimmed = text.trim().toUpperCase();
+  return trimmed === "NA" || trimmed === "N/A";
+};
+
 const SectionQuestionPage: React.FC = () => {
   const { sectionId, questionIndex } = useParams();
   const navigate = useNavigate();
@@ -182,12 +188,36 @@ const SectionQuestionPage: React.FC = () => {
   const [instructionOkCountdown, setInstructionOkCountdown] = useState(0);
   const [showSectionInstruction, setShowSectionInstruction] =
     useState<boolean>(false);
-  const [sectionInstructionTexts, setSectionInstructionTexts] = useState<
+  // True when the student reopened the popup via the "Instructions" button —
+  // they asked for it, so it skips the read-timer and closes immediately.
+  const [sectionInstructionManual, setSectionInstructionManual] =
+    useState<boolean>(false);
+
+  // Current section's displayable instructions (NA placeholders dropped).
+  // Shared by the once-per-section auto popup and the "Instructions" button.
+  const sectionInstructionTexts = useMemo<
     Array<{ text: string; language: string }>
-  >([]);
+  >(() => {
+    if (!sectionId || !questionnaire?.sections) return [];
+    const section = questionnaire.sections.find(
+      (sec: any) => String(sec.section.sectionId) === String(sectionId),
+    );
+    return (section?.instruction || [])
+      .filter(
+        (inst: any) => inst.instructionText && !isNAText(inst.instructionText),
+      )
+      .map((inst: any) => ({
+        text: inst.instructionText,
+        language: inst.language?.languageName || "English",
+      }));
+  }, [sectionId, questionnaire]);
 
   useEffect(() => {
     if (!showSectionInstruction) return;
+    if (sectionInstructionManual) {
+      setInstructionOkCountdown(0);
+      return;
+    }
     setInstructionOkCountdown(3);
     const timer = window.setInterval(() => {
       setInstructionOkCountdown((prev) => {
@@ -199,7 +229,7 @@ const SectionQuestionPage: React.FC = () => {
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [showSectionInstruction]);
+  }, [showSectionInstruction, sectionInstructionManual]);
 
   // Heartbeat moved below the answer-state refs (it reads them for the live
   // answeredCount) — see the useHeartbeat call after the ref declarations.
@@ -706,29 +736,9 @@ const SectionQuestionPage: React.FC = () => {
     // Already seen this section's instructions
     if (seenSectionInstructions.has(sectionId)) return;
 
-    const section = questionnaire.sections.find(
-      (sec: any) => String(sec.section.sectionId) === String(sectionId),
-    );
-
-    if (section?.instruction && section.instruction.length > 0) {
-      const isNAText = (text: string | null | undefined): boolean => {
-        if (!text) return false;
-        const trimmed = text.trim().toUpperCase();
-        return trimmed === "NA" || trimmed === "N/A";
-      };
-      const texts = section.instruction
-        .filter(
-          (inst: any) =>
-            inst.instructionText && !isNAText(inst.instructionText),
-        )
-        .map((inst: any) => ({
-          text: inst.instructionText,
-          language: inst.language?.languageName || "English",
-        }));
-      if (texts.length > 0) {
-        setSectionInstructionTexts(texts);
-        setShowSectionInstruction(true);
-      }
+    if (sectionInstructionTexts.length > 0) {
+      setSectionInstructionManual(false);
+      setShowSectionInstruction(true);
     }
 
     // Mark as seen regardless of whether instructions exist
@@ -737,7 +747,12 @@ const SectionQuestionPage: React.FC = () => {
       next.add(sectionId);
       return next;
     });
-  }, [sectionId, questionnaire]);
+  }, [sectionId, questionnaire, sectionInstructionTexts]);
+
+  const reopenSectionInstructions = () => {
+    setSectionInstructionManual(true);
+    setShowSectionInstruction(true);
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -3547,23 +3562,61 @@ const SectionQuestionPage: React.FC = () => {
             </div>
 
             <div className="d-flex flex-column flex-sm-row justify-content-between question-nav-buttons">
-              <button
-                disabled={currentIndex === 0}
-                onClick={goBack}
-                style={{
-                  background: currentIndex === 0 ? "#e2e8f0" : "white",
-                  color: currentIndex === 0 ? "#9ca3af" : "#4a5568",
-                  border: "2px solid #e2e8f0",
-                  borderRadius: "12px",
-                  padding: "12px 28px",
-                  fontWeight: 600,
-                  fontSize: "0.95rem",
-                  cursor: currentIndex === 0 ? "not-allowed" : "pointer",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                ← Back
-              </button>
+              <div className="d-flex gap-2 question-nav-left">
+                <button
+                  disabled={currentIndex === 0}
+                  onClick={goBack}
+                  style={{
+                    background: currentIndex === 0 ? "#e2e8f0" : "white",
+                    color: currentIndex === 0 ? "#9ca3af" : "#4a5568",
+                    border: "2px solid #e2e8f0",
+                    borderRadius: "12px",
+                    padding: "12px 28px",
+                    fontWeight: 600,
+                    fontSize: "0.95rem",
+                    cursor: currentIndex === 0 ? "not-allowed" : "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  ← Back
+                </button>
+                {sectionInstructionTexts.length > 0 && (
+                  <button
+                    onClick={reopenSectionInstructions}
+                    title="View this section's instructions again"
+                    style={{
+                      background: "white",
+                      color: "#4a5568",
+                      border: "2px solid #e2e8f0",
+                      borderRadius: "12px",
+                      padding: "12px 20px",
+                      fontWeight: 600,
+                      fontSize: "0.95rem",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z" />
+                      <path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
+                    </svg>
+                    Instructions
+                  </button>
+                )}
+              </div>
               {/* <div className="d-flex gap-3 align-items-center">
                 {saveLater && (
                   <button
