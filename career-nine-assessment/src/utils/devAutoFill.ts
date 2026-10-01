@@ -22,7 +22,7 @@ function randomIntInclusive(min: number, max: number): number {
 }
 
 function resolveSelectionBounds(question: any, optionCount: number): { min: number; max: number } {
-  const optionsRule: 'min' | 'max' | 'equal' | null | undefined = question.optionsRule;
+  const optionsRule: 'min' | 'max' | 'equal' | 'range' | null | undefined = question.optionsRule;
   const optionsCount: number | null | undefined =
     typeof question.optionsCount === 'number' ? question.optionsCount : null;
   const maxOptionsAllowed: number = question.maxOptionsAllowed ?? 0;
@@ -37,6 +37,9 @@ function resolveSelectionBounds(question: any, optionCount: number): { min: numb
       max = 0;
     } else if (optionsRule === 'max') {
       min = 1;
+      max = optionsCount;
+    } else if (optionsRule === 'range') {
+      min = minOptionsAllowed ?? 1;
       max = optionsCount;
     } else {
       min = optionsCount;

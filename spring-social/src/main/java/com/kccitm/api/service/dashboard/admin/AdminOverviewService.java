@@ -351,9 +351,11 @@ public class AdminOverviewService {
     // ─── Payments ────────────────────────────────────────────────────────
 
     /**
-     * Payments completed: assessment purchases ({@code payment_transaction.status = paid},
-     * by the time the row was last updated, i.e. when the webhook marked it paid) plus
-     * counselling purchases ({@code counselling_payment.status = PAID}, by {@code paid_at}).
+     * Payments completed: money actually collected through Razorpay — assessment
+     * purchases ({@link OverviewQuery#PAID_VIA_RAZORPAY}, by the time the row was last
+     * updated, i.e. when the webhook marked it paid) plus counselling purchases
+     * ({@link OverviewQuery#COUNSELLING_PAID_VIA_RAZORPAY}, by {@code paid_at}). Free
+     * (₹0) assessments are excluded.
      */
     @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
     @Transactional(readOnly = true)
@@ -362,19 +364,19 @@ public class AdminOverviewService {
         if (f.isDenied()) return done(AdminOverviewCard.of(PAYMENTS_COMPLETED, 0, f, f.hasRange(), "no institute mapped", t0));
 
         long assessment = OverviewQuery.payments(em, clock.zone(), f)
-                .and("LOWER(p.status) = 'paid'")
+                .and(OverviewQuery.PAID_VIA_RAZORPAY)
                 .dateRange("p.updatedAt", f)
                 .count("SELECT COUNT(p)");
         long assessmentAmount = OverviewQuery.payments(em, clock.zone(), f)
-                .and("LOWER(p.status) = 'paid'")
+                .and(OverviewQuery.PAID_VIA_RAZORPAY)
                 .dateRange("p.updatedAt", f)
                 .count("SELECT SUM(p.amount)");
         long counselling = OverviewQuery.counsellingPayments(em, clock.zone(), f)
-                .and("UPPER(cp.status) = 'PAID'")
+                .and(OverviewQuery.COUNSELLING_PAID_VIA_RAZORPAY)
                 .localDateTimeRange("cp.paidAt", f)
                 .count("SELECT COUNT(cp)");
         long counsellingAmount = OverviewQuery.counsellingPayments(em, clock.zone(), f)
-                .and("UPPER(cp.status) = 'PAID'")
+                .and(OverviewQuery.COUNSELLING_PAID_VIA_RAZORPAY)
                 .localDateTimeRange("cp.paidAt", f)
                 .count("SELECT SUM(cp.amount)");
 
