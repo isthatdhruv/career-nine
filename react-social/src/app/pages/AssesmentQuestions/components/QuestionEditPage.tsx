@@ -421,8 +421,9 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       questionText: questionData.questionText || "",
       questionType: questionData.questionType || "",
       maxOptionsAllowed: questionData.maxOptionsAllowed || 0,
-      optionsRule: (questionData.optionsRule as "min" | "max" | "equal") || "equal",
+      optionsRule: (questionData.optionsRule as "min" | "max" | "equal" | "range") || "equal",
       optionsCount: (questionData.optionsCount ?? questionData.maxOptionsAllowed) || 0,
+      minOptionsAllowed: questionData.minOptionsAllowed ?? "",
       isMQT: questionData.isMQT ?? false,
       isMQTtyped: questionData.isMQTtyped ?? false,
       section: questionData.section && typeof questionData.section === "object" && "sectionId" in questionData.section
@@ -569,6 +570,8 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           maxOptionsAllowed: Number(values.optionsCount) || 0,
           optionsRule: values.optionsRule,
           optionsCount: Number(values.optionsCount) || 0,
+          minOptionsAllowed:
+            values.optionsRule === "range" ? Number(values.minOptionsAllowed) || 1 : null,
           isMQT: values.isMQT,
           isMQTtyped: values.isMQTtyped,
           options,
@@ -1333,7 +1336,23 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                   <option value="min">At least (Min)</option>
                   <option value="max">At most (Max)</option>
                   <option value="equal">Exactly (Equal)</option>
+                  <option value="range">Between (Min–Max)</option>
                 </select>
+                {formik.values.optionsRule === "range" && (
+                  <>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={formik.values.minOptionsAllowed}
+                      onChange={e => formik.setFieldValue("minOptionsAllowed", e.target.value)}
+                      placeholder="Min"
+                      className="form-control form-control-lg form-control-solid"
+                      style={{ width: 120 }}
+                    />
+                    <span className="text-muted">to</span>
+                  </>
+                )}
                 <input
                   type="number"
                   min={0}
@@ -1343,7 +1362,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                     formik.setFieldValue("optionsCount", e.target.value);
                     formik.setFieldValue("maxOptionsAllowed", e.target.value);
                   }}
-                  placeholder="N"
+                  placeholder={formik.values.optionsRule === "range" ? "Max" : "N"}
                   className="form-control form-control-lg form-control-solid"
                   style={{ width: 120 }}
                 />
@@ -1351,6 +1370,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                   {formik.values.optionsRule === "min" && "Student must select at least N options"}
                   {formik.values.optionsRule === "max" && "Student can select up to N options"}
                   {formik.values.optionsRule === "equal" && "Question is answered only when exactly N options are selected"}
+                  {formik.values.optionsRule === "range" && "Student must select between Min and Max options"}
                 </span>
               </div>
             </div>

@@ -354,7 +354,7 @@ Every gate is an in-code check off the principal, because `auth.enforce-mode: lo
 - `appointment.counsellor` and the student mapping's `counsellor` no longer serialise the counsellor's bank, government-id, agreement, rate or login fields, and `assignedBy` is narrowed to `{id, name}`. `appointment.slot.counsellor` still serialises the full counsellor; that is not fixed yet.
 
 ### Migration
-`V20260929001__offline_counselling.sql` adds `counsellors.is_offline`, `counselling_appointment.assessment_id` and `origin` (plus index `idx_ca_student_assessment`), dedupes `student_counsellor_mapping` and adds `UNIQUE uk_scm_student(student_id)`, and creates `counselling_otp_guard`. Every statement is guarded on `information_schema`, so it is safe to re-run and safe on a database where Hibernate added the columns first.
+`V20260929002__offline_counselling.sql` adds `counsellors.is_offline`, `counselling_appointment.assessment_id` and `origin` (plus index `idx_ca_student_assessment`), dedupes `student_counsellor_mapping` and adds `UNIQUE uk_scm_student(student_id)`, and creates `counselling_otp_guard`. Every statement is guarded on `information_schema`, so it is safe to re-run and safe on a database where Hibernate added the columns first.
 
 ### Known limitations
 - The principal dashboard's "students counselled" is a release-time snapshot; offline records appear after a re-release or refresh.

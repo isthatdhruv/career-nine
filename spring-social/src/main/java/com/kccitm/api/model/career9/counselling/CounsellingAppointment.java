@@ -27,7 +27,7 @@ import com.kccitm.api.model.career9.UserStudent;
 /**
  * One counselling session.
  *
- * <p>The index name is declared here as well as in V20260929001 on purpose: Hibernate's
+ * <p>The index name is declared here as well as in V20260929002 on purpose: Hibernate's
  * {@code ddl-auto=update} only skips an index it can find <i>by name</i>, so an unnamed
  * declaration would get a second, hash-named copy next to the migration's.
  */

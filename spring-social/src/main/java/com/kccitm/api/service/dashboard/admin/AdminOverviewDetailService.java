@@ -425,7 +425,7 @@ public class AdminOverviewDetailService {
         int fetch = offset + size;
 
         OverviewQuery tq = OverviewQuery.payments(em, clock.zone(), f)
-                .and("LOWER(p.status) = 'paid'")
+                .and(OverviewQuery.PAID_VIA_RAZORPAY)
                 .dateRange("p.updatedAt", f)
                 .searchFields(search, "p.studentName", "p.studentEmail", "p.studentPhone", "p.razorpayPaymentId")
                 .orderBy("p.updatedAt DESC, p.transactionId DESC");
@@ -441,7 +441,7 @@ public class AdminOverviewDetailService {
         }
 
         OverviewQuery cq = OverviewQuery.counsellingPayments(em, clock.zone(), f)
-                .and("UPPER(cp.status) = 'PAID'")
+                .and(OverviewQuery.COUNSELLING_PAID_VIA_RAZORPAY)
                 .localDateTimeRange("cp.paidAt", f)
                 .search(search)
                 .orderBy("cp.paidAt DESC, cp.id DESC");
