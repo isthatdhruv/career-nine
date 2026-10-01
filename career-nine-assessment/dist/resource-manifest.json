@@ -1,6 +1,6 @@
 {
-  "version": "mumdw9cb",
-  "generated": "2026-09-29T07:57:56.171Z",
+  "version": "mupemusj",
+  "generated": "2026-10-01T10:41:55.555Z",
   "resources": [
     {
       "url": "/assets/game/deer.webp",
@@ -128,18 +128,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/HydroTubeGame-3dMHg2VW.js",
+      "url": "/assets/HydroTubeGame-BcWiVdj_.js",
       "size": 23331,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-B7G1f95O.js",
-      "size": 1318711,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/index-B99D9I_X.css",
-      "size": 268888,
+      "url": "/assets/index-CQyf7ydA.css",
+      "size": 269068,
       "priority": "critical"
     },
     {
@@ -148,12 +143,17 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index.es-BCarUBSp.js",
+      "url": "/assets/index-DGadW2Ng.js",
+      "size": 1319969,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index.es-4Nqo7rAJ.js",
       "size": 158825,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-5Tw55DJU.js",
+      "url": "/assets/JungleSpotGame-B4E26Fdj.js",
       "size": 23397,
       "priority": "critical"
     },
@@ -163,7 +163,7 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-B1gxP9sN.js",
+      "url": "/assets/RabbitPathGame-BJz6mjj2.js",
       "size": 26981,
       "priority": "critical"
     },
@@ -215,7 +215,7 @@
   ],
   "summary": {
     "total": 42,
-    "totalSize": 23917044,
+    "totalSize": 23918482,
     "byPriority": {
       "game": {
         "count": 11,
@@ -227,7 +227,7 @@
       },
       "critical": {
         "count": 14,
-        "size": 3416515
+        "size": 3417953
       },
       "other": {
         "count": 5,
