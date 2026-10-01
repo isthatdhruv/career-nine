@@ -1,6 +1,7 @@
 package com.kccitm.api.service.dashboard.admin;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import javax.persistence.EntityManager;
@@ -65,6 +66,7 @@ public class AdminOverviewService {
     public static final String STUDENTS_ABSENT = "students-absent";
     public static final String COUNSELLORS_ABSENT = "counsellors-absent";
     public static final String PAYMENTS_COMPLETED = "payments-completed";
+    public static final String UNPAID_REGISTRATIONS = "unpaid-registrations";
     public static final String WEBSITE_REGISTRATIONS = "website-registrations";
 
     /** Appointment statuses that still represent a real session for the day. */
@@ -381,6 +383,35 @@ public class AdminOverviewService {
                 .with("amount", assessmentAmount + counsellingAmount)
                 .with("assessmentPayments", assessment)
                 .with("counsellingPayments", counselling));
+    }
+
+    /**
+     * Unpaid registrations: people who filled the registration form and got a payment
+     * link in the window but never paid — one per person however many links they
+     * opened (see {@link UnpaidRegistrations}). The extras split their latest link by
+     * status and add up what those links were for.
+     */
+    @Async(AsyncExecutorsConfig.DASHBOARD_EXECUTOR)
+    @Transactional(readOnly = true)
+    public CompletableFuture<AdminOverviewCard> unpaidRegistrations(AdminOverviewFilter f) {
+        long t0 = System.nanoTime();
+        if (f.isDenied()) return done(AdminOverviewCard.of(UNPAID_REGISTRATIONS, 0, f, f.hasRange(), "no institute mapped", t0));
+
+        List<UnpaidRegistrations.Person> people = UnpaidRegistrations.load(em, clock, f, null);
+        long attempts = 0, expired = 0, pending = 0, amount = 0;
+        for (UnpaidRegistrations.Person person : people) {
+            attempts += person.attempts.size();
+            String status = person.latest().getStatus() == null ? "" : person.latest().getStatus().toLowerCase();
+            if ("created".equals(status)) pending++;
+            else expired++;
+            if (person.latest().getAmount() != null) amount += person.latest().getAmount();
+        }
+        return done(AdminOverviewCard.of(UNPAID_REGISTRATIONS, people.size(), f, f.hasRange(),
+                "registered but did not complete payment" + windowSuffix(f), t0)
+                .with("attempts", attempts)
+                .with("linkExpired", expired)
+                .with("linkOpen", pending)
+                .with("amount", amount));
     }
 
     // ─── Website ─────────────────────────────────────────────────────────

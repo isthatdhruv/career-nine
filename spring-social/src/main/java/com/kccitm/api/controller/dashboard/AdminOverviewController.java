@@ -190,6 +190,16 @@ public class AdminOverviewController {
         return service.paymentsCompleted(filter(from, to, instituteCode, assessmentIds));
     }
 
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
+    @GetMapping("/unpaid-registrations")
+    public CompletableFuture<AdminOverviewCard> unpaidRegistrations(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String instituteCode,
+            @RequestParam(required = false) String assessmentIds) {
+        return service.unpaidRegistrations(filter(from, to, instituteCode, assessmentIds));
+    }
+
     // ─── Website ─────────────────────────────────────────────────────────
 
     @PreAuthorize("@auth.allows('dashboard.admin.read')")
@@ -260,6 +270,7 @@ public class AdminOverviewController {
                 service.studentsAbsent(f),
                 service.counsellorsAbsent(f),
                 service.paymentsCompleted(f),
+                service.unpaidRegistrations(f),
                 service.websiteRegistrations(f),
         };
 

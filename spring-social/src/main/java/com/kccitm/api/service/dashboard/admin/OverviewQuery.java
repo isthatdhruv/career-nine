@@ -94,23 +94,58 @@ final class OverviewQuery {
     }
 
     /**
-     * Assessment purchases ({@code PaymentTransaction p}). The row carries the
-     * institute code and assessment id directly, so scope / institute / assessment
-     * filters apply to those columns (institute dimension only for scope — the
-     * transaction has no session/class/section).
+     * The institute a payment belongs to. School-link payments carry it on the row;
+     * campaign payments leave the row's column empty and hold it on the campaign
+     * ({@code pc}, left-joined by {@link #payments}).
+     */
+    static final String PAYMENT_INSTITUTE = "COALESCE(p.instituteCode, pc.instituteCode)";
+
+    /**
+     * Assessment purchases ({@code PaymentTransaction p}, campaign left-joined as
+     * {@code pc}). Scope / institute filters apply to {@link #PAYMENT_INSTITUTE}
+     * (institute dimension only for scope — the transaction has no
+     * session/class/section); the assessment filter to the row's assessment id.
      */
     static OverviewQuery payments(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
-        OverviewQuery q = new OverviewQuery(em, zone, "FROM PaymentTransaction p");
+        OverviewQuery q = new OverviewQuery(em, zone,
+                "FROM PaymentTransaction p LEFT JOIN Campaign pc ON pc.campaignId = p.campaignId");
         if (f.getScope().isPresent()) {
             StringBuilder p = new StringBuilder();
             AccessScopeJpqlBuilder.appendScopePredicate(p, q.params, "sc", f.getScope().get(),
-                    Fields.instituteOnly("p.instituteCode"));
+                    Fields.instituteOnly(PAYMENT_INSTITUTE));
             q.and(p.toString());
         }
-        if (f.hasInstitute()) q.and("p.instituteCode IN :inst").param("inst", f.getInstituteCodes());
+        if (f.hasInstitute()) q.and(PAYMENT_INSTITUTE + " IN :inst").param("inst", f.getInstituteCodes());
         return q.assessments(f, "p.assessmentId")
                 .and(notLike("p.studentName")).and(notLike("p.studentEmail")).param("test", TEST_MARKER)
+                .and("NOT EXISTS (SELECT ti.instituteCode FROM InstituteDetail ti WHERE ti.instituteCode = "
+                        + PAYMENT_INSTITUTE + " AND LOWER(ti.instituteName) LIKE :test)")
                 .notTestAssessment("p.assessmentId");
+    }
+
+    /**
+     * Unpaid registrations: assessment purchases someone started — filled the form,
+     * got a payment link — but never paid ({@code created}, {@code expired},
+     * {@code cancelled}, {@code failed}). A row only counts when it names a person
+     * (an email or a phone) and that person has not since got the assessment some
+     * other way: no paid purchase of the same assessment under the same email (or
+     * phone, when there is no email), and no account with that email already
+     * holding the assessment.
+     */
+    static OverviewQuery unpaidRegistrations(EntityManager em, ZoneId zone, AdminOverviewFilter f) {
+        String hasEmail = "(p.studentEmail IS NOT NULL AND TRIM(p.studentEmail) <> '')";
+        String noEmail = "(p.studentEmail IS NULL OR TRIM(p.studentEmail) = '')";
+        return payments(em, zone, f)
+                .and("(p.status IS NULL OR LOWER(p.status) <> 'paid')")
+                .and("p.assessmentId IS NOT NULL")
+                .and("(" + hasEmail + " OR (p.studentPhone IS NOT NULL AND TRIM(p.studentPhone) <> ''))")
+                .and("NOT EXISTS (SELECT pp.transactionId FROM PaymentTransaction pp "
+                        + "WHERE LOWER(pp.status) = 'paid' AND pp.assessmentId = p.assessmentId AND ("
+                        + "(" + hasEmail + " AND LOWER(TRIM(pp.studentEmail)) = LOWER(TRIM(p.studentEmail))) OR ("
+                        + noEmail + " AND pp.studentPhone = p.studentPhone)))")
+                .and("NOT (" + hasEmail + " AND EXISTS (SELECT um.studentAssessmentId FROM StudentAssessmentMapping um "
+                        + "JOIN um.userStudent uus JOIN uus.studentInfo usi WHERE um.assessmentId = p.assessmentId "
+                        + "AND LOWER(usi.email) = LOWER(TRIM(p.studentEmail))))");
     }
 
     /** Counselling purchases ({@code CounsellingPayment cp}), scoped through the student. */
