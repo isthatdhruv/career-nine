@@ -26,7 +26,7 @@ import com.kccitm.api.model.career9.UserStudent;
  * reassigning moves the row to the new counsellor instead of adding a second active one, and
  * an {@code is_active = 0} row counts as unmapped everywhere.
  *
- * <p>The constraint name is repeated from V20260928001 so Hibernate's {@code ddl-auto=update}
+ * <p>The constraint name is repeated from V20260929002 so Hibernate's {@code ddl-auto=update}
  * finds it by name and does not add a hash-named duplicate beside it.
  */
 @Entity
