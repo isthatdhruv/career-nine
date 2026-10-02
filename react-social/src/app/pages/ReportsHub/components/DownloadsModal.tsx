@@ -9,6 +9,12 @@ export type ZipJob = {
   url?: string;
   error?: string;
   createdAt: number;
+  /** Auto ZIP split per class/section: one download per file. */
+  parts?: { name: string; url: string; fileCount: number }[];
+  /** Set for server-side auto ZIPs — cancel/delete go through the API. */
+  serverJobId?: string;
+  /** One-line result, e.g. "412 PDFs · 27 without a report". */
+  summary?: string;
 };
 
 type Props = {
@@ -54,7 +60,7 @@ const DownloadsModal: React.FC<Props> = ({ open, onClose, jobs, onDelete, deleti
         <div style={{ padding: "16px 24px", overflowY: "auto", flex: 1 }}>
           {jobs.length === 0 && (
             <div style={{ textAlign: "center", color: "#9ca3af", padding: 32 }}>
-              No downloads yet. Use "Download ZIP" to generate report archives.
+              No downloads yet. Use "Auto ZIP" or "Download ZIP" to build report archives.
             </div>
           )}
 
@@ -106,10 +112,46 @@ const DownloadsModal: React.FC<Props> = ({ open, onClose, jobs, onDelete, deleti
                   <div style={{ fontSize: "0.75rem", color: "#dc2626", marginTop: 4 }}>{job.error}</div>
                 )}
 
+                {isDone && job.summary && (
+                  <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: 2 }}>{job.summary}</div>
+                )}
+
+                {/* Server jobs can be cancelled while running, or cleared once failed. */}
+                {job.serverJobId && (isActive || isError) && (
+                  <button
+                    onClick={() => onDelete(job)}
+                    disabled={isDeleting}
+                    style={{
+                      marginTop: 8, padding: "4px 12px", borderRadius: 8, fontSize: "0.75rem", fontWeight: 600,
+                      background: "#fff", color: "#6b7280", border: "1px solid #d1d5db",
+                      cursor: isDeleting ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {isDeleting ? "..." : isActive ? "Cancel" : "Remove"}
+                  </button>
+                )}
+
+                {/* Auto ZIP split into several files: one link per file. */}
+                {isDone && job.parts && job.parts.length > 1 && (
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
+                    {job.parts.map((p) => (
+                      <a key={p.url} href={p.url} download={p.name}
+                        style={{
+                          display: "flex", justifyContent: "space-between", gap: 8,
+                          padding: "5px 10px", borderRadius: 6, fontSize: "0.78rem",
+                          background: "#f5f3ff", color: "#4c1d95", textDecoration: "none", fontWeight: 600,
+                        }}>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                        <span style={{ flexShrink: 0, fontWeight: 500, color: "#6b7280" }}>{p.fileCount} PDFs</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+
                 {/* Actions (if done) */}
-                {isDone && job.url && (
+                {isDone && (job.url || (job.parts && job.parts.length > 1)) && (
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <a
+                    {job.url && <a
                       href={job.url}
                       download={job.name}
                       style={{
@@ -123,7 +165,7 @@ const DownloadsModal: React.FC<Props> = ({ open, onClose, jobs, onDelete, deleti
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                       Download
-                    </a>
+                    </a>}
                     <button
                       onClick={() => onDelete(job)}
                       disabled={isDeleting}

@@ -63,4 +63,71 @@ public interface GeneratedReportRepository extends JpaRepository<GeneratedReport
     List<GeneratedReport> findPagerReportsByInstituteAndAssessment(
             @Param("instituteCode") Long instituteCode,
             @Param("assessmentId") Long assessmentId);
+
+    /**
+     * One row per rendered PDF of a school's students on the given assessments,
+     * with the class/section names already joined in — the source set for the
+     * auto report ZIP. Native + scalar on purpose: the bundling runs on a
+     * background thread, where touching a lazy association would throw.
+     * Institute is matched on student_info (the Reports Hub's roster), not on
+     * user_student.
+     */
+    @Query(value = "SELECT gr.assessment_id AS assessmentId, gr.pdf_url AS pdfUrl, "
+         + "rt.template_name AS templateName, us.user_student_id AS userStudentId, "
+         + "si.id AS studentInfoId, si.name AS studentName, si.school_roll_number AS rollNumber, "
+         + "si.student_class AS studentClass, sc.class_name AS className, ss.section_name AS sectionName "
+         + "FROM generated_report gr "
+         + "JOIN user_student us ON us.user_student_id = gr.user_student_id "
+         + "JOIN student_info si ON si.id = us.id "
+         + "LEFT JOIN school_sections ss ON ss.id = si.school_section_id "
+         + "LEFT JOIN school_classes sc ON sc.id = ss.school_classes_id "
+         + "LEFT JOIN report_template rt ON rt.report_template_id = gr.report_template_id "
+         + "WHERE si.institute_id = :instituteId "
+         + "AND gr.assessment_id IN (:assessmentIds) "
+         + "AND gr.pdf_status = 'ready' AND gr.pdf_url IS NOT NULL",
+         nativeQuery = true)
+    List<SchoolPdfRow> findReadyPdfsForInstitute(
+            @Param("instituteId") Integer instituteId,
+            @Param("assessmentIds") List<Long> assessmentIds);
+
+    /**
+     * Every (student, assessment) allotment at a school — compared against
+     * {@link #findReadyPdfsForInstitute} to list who is missing a report.
+     */
+    @Query(value = "SELECT sam.assessment_id AS assessmentId, sam.status AS assessmentStatus, "
+         + "us.user_student_id AS userStudentId, si.id AS studentInfoId, si.name AS studentName, "
+         + "si.school_roll_number AS rollNumber, si.student_class AS studentClass, "
+         + "sc.class_name AS className, ss.section_name AS sectionName "
+         + "FROM student_assessment_mapping sam "
+         + "JOIN user_student us ON us.user_student_id = sam.user_student_id "
+         + "JOIN student_info si ON si.id = us.id "
+         + "LEFT JOIN school_sections ss ON ss.id = si.school_section_id "
+         + "LEFT JOIN school_classes sc ON sc.id = ss.school_classes_id "
+         + "WHERE si.institute_id = :instituteId "
+         + "AND sam.assessment_id IN (:assessmentIds)",
+         nativeQuery = true)
+    List<SchoolAllotmentRow> findAllotmentsForInstitute(
+            @Param("instituteId") Integer instituteId,
+            @Param("assessmentIds") List<Long> assessmentIds);
+
+    /** Student columns shared by the two auto-ZIP projections. */
+    interface SchoolStudentRow {
+        Long getAssessmentId();
+        Long getUserStudentId();
+        Integer getStudentInfoId();
+        String getStudentName();
+        String getRollNumber();
+        String getStudentClass();
+        String getClassName();
+        String getSectionName();
+    }
+
+    interface SchoolPdfRow extends SchoolStudentRow {
+        String getPdfUrl();
+        String getTemplateName();
+    }
+
+    interface SchoolAllotmentRow extends SchoolStudentRow {
+        String getAssessmentStatus();
+    }
 }

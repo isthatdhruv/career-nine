@@ -77,4 +77,12 @@ public interface StudentInfoRepository extends JpaRepository<StudentInfo, Long> 
      */
     @Query("SELECT si FROM StudentInfo si WHERE si.id IN :ids ORDER BY si.name ASC")
     List<StudentInfo> findAllByIdInScoped(@Param("ids") List<Integer> ids);
+
+    /**
+     * Ids of a school's students the caller may see. JPQL, so the per-request
+     * scopeFilter applies — callers use it to narrow native queries (which
+     * bypass Hibernate filters) to a class/section-scoped user's reach.
+     */
+    @Query("SELECT si.id FROM StudentInfo si WHERE si.instituteId = :instituteId")
+    List<Integer> findIdsByInstituteIdScoped(@Param("instituteId") Integer instituteId);
 }

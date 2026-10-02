@@ -1,7 +1,9 @@
 package com.kccitm.api.service;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -20,12 +22,17 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.BucketCrossOriginConfiguration;
 import com.amazonaws.services.s3.model.CORSRule;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.amazonaws.services.s3.model.UploadPartRequest;
 
 @Service
 public class DigitalOceanSpacesService {
@@ -267,6 +274,16 @@ public class DigitalOceanSpacesService {
         return downloadViaHttp(fileUrl);
     }
 
+    /**
+     * Read one of OUR OWN Spaces objects fully, for server-side bundling (the
+     * auto report ZIP). Same S3-then-public-HTTP order as
+     * {@link #downloadFileByUrl}, but refuses foreign URLs so a bad row in the
+     * database can never turn the bundler into an open fetcher.
+     */
+    public byte[] downloadOwnFile(String fileUrl) {
+        return isOwnSpacesUrl(fileUrl) ? downloadFileByUrl(fileUrl) : null;
+    }
+
     private byte[] downloadViaHttp(String fileUrl) {
         try {
             java.net.HttpURLConnection conn =
@@ -323,6 +340,119 @@ public class DigitalOceanSpacesService {
             this.uploadUrl = uploadUrl;
             this.publicUrl = publicUrl;
             this.key = key;
+        }
+    }
+
+    /**
+     * Start a public-read object of unknown length, written as a stream. Bytes
+     * go up as S3 multipart parts while they are written, so a multi-GB ZIP
+     * never has to sit in heap or on local disk. The caller must either
+     * {@code close()} the stream (completes the object) or {@code abort()} it
+     * (discards the parts) — an abandoned upload keeps billing storage.
+     */
+    public MultipartUploadStream openMultipartUpload(String folder, String fileName, String contentType) {
+        if (s3Client == null) {
+            throw new IllegalStateException("DigitalOcean Spaces is not configured.");
+        }
+        String objectKey = folder + "/" + fileName;
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentType(contentType);
+        InitiateMultipartUploadRequest init = new InitiateMultipartUploadRequest(bucket, objectKey, metadata)
+                .withCannedACL(CannedAccessControlList.PublicRead);
+        String uploadId = s3Client.initiateMultipartUpload(init).getUploadId();
+        return new MultipartUploadStream(objectKey, uploadId);
+    }
+
+    /**
+     * OutputStream over one S3 multipart upload. Buffers a single part at a
+     * time (16 MB — Spaces' minimum is 5 MB for every part but the last), so
+     * memory stays flat however large the object grows.
+     */
+    public class MultipartUploadStream extends OutputStream {
+        private static final int PART_SIZE = 16 * 1024 * 1024;
+
+        private final String objectKey;
+        private final String uploadId;
+        private final byte[] buffer = new byte[PART_SIZE];
+        private final java.util.List<PartETag> partETags = new java.util.ArrayList<>();
+        private int buffered = 0;
+        private long bytesWritten = 0;
+        private boolean finished = false;
+
+        private MultipartUploadStream(String objectKey, String uploadId) {
+            this.objectKey = objectKey;
+            this.uploadId = uploadId;
+        }
+
+        public String getPublicUrl() { return cdnUrl + "/" + objectKey; }
+
+        public long getBytesWritten() { return bytesWritten; }
+
+        @Override
+        public void write(int b) throws IOException {
+            if (buffered == PART_SIZE) uploadPart();
+            buffer[buffered++] = (byte) b;
+            bytesWritten++;
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            while (len > 0) {
+                if (buffered == PART_SIZE) uploadPart();
+                int n = Math.min(len, PART_SIZE - buffered);
+                System.arraycopy(b, off, buffer, buffered, n);
+                buffered += n;
+                off += n;
+                len -= n;
+                bytesWritten += n;
+            }
+        }
+
+        private void uploadPart() throws IOException {
+            if (buffered == 0) return;
+            try {
+                UploadPartRequest req = new UploadPartRequest()
+                        .withBucketName(bucket)
+                        .withKey(objectKey)
+                        .withUploadId(uploadId)
+                        .withPartNumber(partETags.size() + 1)
+                        .withInputStream(new ByteArrayInputStream(buffer, 0, buffered))
+                        .withPartSize(buffered);
+                partETags.add(s3Client.uploadPart(req).getPartETag());
+                buffered = 0;
+            } catch (RuntimeException e) {
+                throw new IOException("Spaces part upload failed: " + e.getMessage(), e);
+            }
+        }
+
+        /** Upload the last part and stitch the object together. */
+        @Override
+        public void close() throws IOException {
+            if (finished) return;
+            if (bytesWritten == 0) {
+                abort();
+                throw new IOException("Nothing was written to " + objectKey);
+            }
+            try {
+                uploadPart();
+                s3Client.completeMultipartUpload(
+                        new CompleteMultipartUploadRequest(bucket, objectKey, uploadId, partETags));
+                finished = true;
+            } catch (IOException | RuntimeException e) {
+                abort();
+                throw e instanceof IOException ? (IOException) e : new IOException(e.getMessage(), e);
+            }
+        }
+
+        /** Throw away every uploaded part. Safe to call more than once. */
+        public void abort() {
+            if (finished) return;
+            finished = true;
+            try {
+                s3Client.abortMultipartUpload(new AbortMultipartUploadRequest(bucket, objectKey, uploadId));
+            } catch (Exception e) {
+                logger.warn("Failed to abort multipart upload {} ({}): {}", objectKey, uploadId, e.getMessage());
+            }
         }
     }
 

@@ -38,7 +38,14 @@ import EmailComposeModal from "./components/EmailComposeModal";
 import DownloadsModal, { ZipJob } from "./components/DownloadsModal";
 import GenerateReportsModal, { ModalStudent } from "./components/GenerateReportsModal";
 import GenerateQueueModal from "./components/GenerateQueueModal";
-import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
+import AutoZipModal from "./components/AutoZipModal";
+import {
+  uploadReportZip,
+  deleteReportZip,
+  AutoZipJob,
+  listAutoZipJobs,
+  deleteAutoZipJob,
+} from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
 import PageHeader from "../../components/PageHeader";
@@ -136,6 +143,35 @@ function formatCompletedOn(iso?: string | null): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+}
+
+const isAutoZipActive = (j: AutoZipJob) => j.status === "queued" || j.status === "running";
+
+/** A server-side auto ZIP, shaped for the Downloads list. */
+function autoZipToDownload(j: AutoZipJob): ZipJob {
+  const active = isAutoZipActive(j);
+  const summary = [
+    `${j.added} PDF${j.added === 1 ? "" : "s"}`,
+    j.parts.length > 1 ? `${j.parts.length} ZIPs` : "",
+    j.missing ? `${j.missing} without a report (see _summary.csv)` : "",
+    j.failed ? `${j.failed} failed to download` : "",
+  ].filter(Boolean).join(" · ");
+  return {
+    id: `auto-${j.id}`,
+    serverJobId: j.id,
+    name: j.name,
+    status: j.status === "done" ? "done" : j.status === "error" ? "error" : "zipping",
+    phase: j.status === "queued"
+      ? "Waiting for a free worker..."
+      : active ? `${j.phase || "Starting..."} · ${j.processed}/${j.total}` : undefined,
+    // Held under 100 until the server has stitched the last ZIP together.
+    progress: active ? Math.min(99, j.total ? Math.round((j.processed / j.total) * 100) : 0) : 100,
+    url: j.parts.length === 1 ? j.parts[0].url : undefined,
+    parts: j.parts,
+    error: j.error || undefined,
+    summary,
+    createdAt: j.createdAt,
+  };
 }
 
 // ═══════════════════════ COMPONENT ═══════════════════════
@@ -238,6 +274,9 @@ const ReportsHubPage: React.FC = () => {
   const zipJobsRef = useRef<ZipJob[]>(zipJobs);
   zipJobsRef.current = zipJobs;
   const [deletingJobs, setDeletingJobs] = useState<Set<string>>(new Set());
+  // Server-side auto ZIPs (survive a page refresh — the server keeps the list).
+  const [autoZipJobs, setAutoZipJobs] = useState<AutoZipJob[]>([]);
+  const [autoZipOpen, setAutoZipOpen] = useState(false);
 
   // ── Modals ──
   const [downloadsOpen, setDownloadsOpen] = useState(false);
@@ -886,8 +925,23 @@ const ReportsHubPage: React.FC = () => {
     })();
   };
 
-  // Delete a completed ZIP from DO Spaces
+  // Delete a completed ZIP from DO Spaces (or cancel/clear a server auto ZIP).
   const handleDeleteZipJob = async (job: ZipJob) => {
+    if (job.serverJobId) {
+      const serverJobId = job.serverJobId;
+      const wasActive = job.status === "zipping" || job.status === "uploading";
+      setDeletingJobs((prev) => new Set(prev).add(job.id));
+      try {
+        await deleteAutoZipJob(serverJobId);
+        setAutoZipJobs((prev) => prev.filter((j) => j.id !== serverJobId));
+        showSuccessToast(wasActive ? `"${job.name}" cancelled.` : `"${job.name}" deleted.`);
+      } catch (err: any) {
+        showErrorToast("Delete failed: " + (err?.response?.data?.error || err.message));
+      } finally {
+        setDeletingJobs((prev) => { const n = new Set(prev); n.delete(job.id); return n; });
+      }
+      return;
+    }
     if (!job.url) return;
     setDeletingJobs((prev) => new Set(prev).add(job.id));
     try {
@@ -901,7 +955,47 @@ const ReportsHubPage: React.FC = () => {
     }
   };
 
-  const activeZipJobs = zipJobs.filter((j) => j.status === "zipping" || j.status === "uploading");
+  // ═══════════════════════ AUTO ZIP (server-side, whole school) ═══════════════════════
+
+  // Pick up the user's server jobs on load, so a refresh doesn't lose them.
+  useEffect(() => {
+    listAutoZipJobs().then((res) => setAutoZipJobs(res.data || [])).catch(() => { /* list stays empty */ });
+  }, []);
+
+  // Poll while any job is still running, and say so when one finishes.
+  const autoZipJobsRef = useRef<AutoZipJob[]>(autoZipJobs);
+  autoZipJobsRef.current = autoZipJobs;
+  const hasActiveAutoZip = autoZipJobs.some(isAutoZipActive);
+  useEffect(() => {
+    if (!hasActiveAutoZip) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const res = await listAutoZipJobs();
+        const next = res.data || [];
+        for (const j of next) {
+          const before = autoZipJobsRef.current.find((p) => p.id === j.id);
+          if (!before || !isAutoZipActive(before)) continue;
+          if (j.status === "done") showSuccessToast(`"${j.name}" is ready — ${j.added} PDF(s). Open Downloads.`);
+          else if (j.status === "error") showErrorToast(`"${j.name}" failed: ${j.error || "unknown error"}`);
+        }
+        setAutoZipJobs(next);
+      } catch { /* try again next tick */ }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [hasActiveAutoZip]);
+
+  const onAutoZipStarted = (job: AutoZipJob) => {
+    setAutoZipJobs((prev) => [job, ...prev.filter((j) => j.id !== job.id)]);
+    showSuccessToast(`Building "${job.name}" — ${job.total} PDF(s). Track it in Downloads.`);
+  };
+
+  /** Browser-built and server-built ZIPs together, newest first. */
+  const allZipJobs = useMemo(
+    () => [...autoZipJobs.map(autoZipToDownload), ...zipJobs].sort((a, b) => b.createdAt - a.createdAt),
+    [autoZipJobs, zipJobs]
+  );
+  const activeZipJobs = allZipJobs.filter((j) => j.status === "zipping" || j.status === "uploading");
+  const canAutoZip = selectedInstitute !== "" && assessments.length > 0;
 
   // ═══════════════════════ MIRA DESAI ACTIONS ═══════════════════════
 
@@ -1198,6 +1292,14 @@ const ReportsHubPage: React.FC = () => {
             variant: "ghost",
             minWidth: 128,
             disabled: !ready || actionRows.length === 0,
+          },
+          {
+            label: "Auto ZIP",
+            iconClass: "bi-file-earmark-zip-fill",
+            onClick: () => setAutoZipOpen(true),
+            variant: "ghost",
+            // Needs only a school — assessments are picked inside the modal.
+            disabled: !canAutoZip,
           },
           {
             label: "Download ZIP",
@@ -1524,6 +1626,18 @@ const ReportsHubPage: React.FC = () => {
                     {`Queue${countLabel}`}
                   </button>
 
+                  {/* Auto ZIP — whole school, by class & section, built on the server */}
+                  <button className="btn btn-sm" disabled={!canAutoZip}
+                    onClick={() => setAutoZipOpen(true)}
+                    title="Zip every rendered report at this school, filed by class and section"
+                    style={{
+                      ...actionBtn(104),
+                      background: "#fff", color: "#5b21b6",
+                      border: "1px solid #7c3aed",
+                    }}>
+                    Auto ZIP
+                  </button>
+
                   {/* Download ZIP */}
                   <button className="btn btn-sm" disabled={reportStats.generated === 0}
                     onClick={handleDownloadZipClick}
@@ -1548,7 +1662,7 @@ const ReportsHubPage: React.FC = () => {
                       position: "relative", overflow: "visible",
                     }}>
                     Downloads
-                    {zipJobs.length > 0 && (
+                    {allZipJobs.length > 0 && (
                       <span style={{
                         position: "absolute", top: -6, right: -6,
                         background: activeZipJobs.length > 0 ? "#dc2626" : "#4361ee",
@@ -1556,7 +1670,7 @@ const ReportsHubPage: React.FC = () => {
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "0.65rem", fontWeight: 700,
                       }}>
-                        {zipJobs.length}
+                        {allZipJobs.length}
                       </span>
                     )}
                   </button>
@@ -1928,10 +2042,22 @@ const ReportsHubPage: React.FC = () => {
       <DownloadsModal
         open={downloadsOpen}
         onClose={() => setDownloadsOpen(false)}
-        jobs={zipJobs}
+        jobs={allZipJobs}
         onDelete={handleDeleteZipJob}
         deleting={deletingJobs}
       />
+
+      {autoZipOpen && selectedInstitute !== "" && (
+        <AutoZipModal
+          open={autoZipOpen}
+          onClose={() => setAutoZipOpen(false)}
+          instituteId={Number(selectedInstitute)}
+          instituteName={selectedInstituteName}
+          assessments={assessments}
+          defaultAssessmentIds={selectedAssessmentIds}
+          onStarted={onAutoZipStarted}
+        />
+      )}
 
       {generateModalOpen && selectedAssessmentObj && (
         <GenerateReportsModal

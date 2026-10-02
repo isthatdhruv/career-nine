@@ -40,6 +40,8 @@ public class AsyncExecutorsConfig {
     public static final String PROCTORING_EXECUTOR = "proctoringExecutor";
     public static final String DASHBOARD_EXECUTOR = "dashboardExecutor";
     public static final String WHATSAPP_EXECUTOR = "whatsAppExecutor";
+    public static final String REPORT_ZIP_EXECUTOR = "reportZipExecutor";
+    public static final String REPORT_ZIP_FETCH_EXECUTOR = "reportZipFetchExecutor";
 
     @Bean(SUBMISSION_EXECUTOR)
     public ThreadPoolTaskExecutor submissionExecutor() {
@@ -111,6 +113,43 @@ public class AsyncExecutorsConfig {
         executor.setMaxPoolSize(16);
         executor.setQueueCapacity(2000);
         executor.setThreadNamePrefix("whatsapp-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
+
+    /**
+     * Auto report ZIPs (AutoReportZipService): one thread per whole-school
+     * bundle. Two at a time is plenty — each streams hundreds of PDFs and
+     * holds a 16 MB upload buffer. AbortPolicy, not CallerRuns: a bundle can
+     * take minutes, and the HTTP thread must answer "busy, try later" instead
+     * of running it inline.
+     */
+    @Bean(REPORT_ZIP_EXECUTOR)
+    public ThreadPoolTaskExecutor reportZipExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(8);
+        executor.setThreadNamePrefix("report-zip-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.initialize();
+        return executor;
+    }
+
+    /**
+     * PDF downloads feeding the auto ZIP — a job keeps a few fetches in flight
+     * ahead of the one it is writing, since Spaces latency, not bandwidth,
+     * dominates a run of 1–2 MB files. CallerRunsPolicy: a saturated pool just
+     * makes the job thread fetch for itself.
+     */
+    @Bean(REPORT_ZIP_FETCH_EXECUTOR)
+    public ThreadPoolTaskExecutor reportZipFetchExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(8);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(32);
+        executor.setThreadNamePrefix("report-zip-fetch-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
