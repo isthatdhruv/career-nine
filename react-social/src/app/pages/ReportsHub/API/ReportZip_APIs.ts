@@ -6,7 +6,8 @@ export function uploadReportZip(file: Blob, fileName: string) {
   const formData = new FormData();
   formData.append("file", file, fileName);
   formData.append("fileName", fileName);
-  return axios.post<{ url: string; fileName: string }>(
+  // url = origin (delete works from it); downloadUrl = edge CDN, for the link.
+  return axios.post<{ url: string; downloadUrl?: string; fileName: string }>(
     `${API_URL}/report-zip/upload`,
     formData,
     { headers: { "Content-Type": "multipart/form-data" }, timeout: 600000 }
@@ -47,7 +48,8 @@ export type AutoZipPreview = {
   groups: AutoZipPreviewGroup[];
 };
 
-export type AutoZipPart = { name: string; url: string; fileCount: number; bytes: number };
+/** url = origin (what delete uses); downloadUrl = edge CDN (what the link uses). */
+export type AutoZipPart = { name: string; url: string; downloadUrl?: string; fileCount: number; bytes: number };
 
 export type AutoZipJob = {
   id: string;

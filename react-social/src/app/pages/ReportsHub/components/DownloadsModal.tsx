@@ -6,7 +6,10 @@ export type ZipJob = {
   status: "zipping" | "uploading" | "done" | "error";
   phase?: string;
   progress: number; // 0-100
+  /** Origin URL — what delete works from. */
   url?: string;
+  /** Edge-CDN URL — several times faster to download than the origin. */
+  downloadUrl?: string;
   error?: string;
   createdAt: number;
   /** Auto ZIP split per class/section: one download per file. */
@@ -152,7 +155,7 @@ const DownloadsModal: React.FC<Props> = ({ open, onClose, jobs, onDelete, deleti
                 {isDone && (job.url || (job.parts && job.parts.length > 1)) && (
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                     {job.url && <a
-                      href={job.url}
+                      href={job.downloadUrl || job.url}
                       download={job.name}
                       style={{
                         display: "inline-flex", alignItems: "center", gap: 4,

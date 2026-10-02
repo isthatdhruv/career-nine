@@ -463,6 +463,7 @@ public class AutoReportZipService {
             Part part = new Part();
             part.name = displayName;
             part.url = out.getPublicUrl();
+            part.downloadUrl = spacesService.toEdgeUrl(part.url);
             part.fileCount = added;
             part.bytes = out.getBytesWritten();
             return part;
@@ -574,7 +575,10 @@ public class AutoReportZipService {
 
     public static class Part {
         public String name;
+        /** Origin URL — what delete works from. */
         public String url;
+        /** Edge-CDN URL — what people download from. */
+        public String downloadUrl;
         public int fileCount;
         public long bytes;
     }

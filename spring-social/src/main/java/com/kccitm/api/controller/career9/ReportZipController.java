@@ -60,6 +60,7 @@ public class ReportZipController {
 
             Map<String, String> response = new HashMap<>();
             response.put("url", url);
+            response.put("downloadUrl", spacesService.toEdgeUrl(url));
             response.put("fileName", name);
             return ResponseEntity.ok(response);
         } catch (IllegalStateException e) {

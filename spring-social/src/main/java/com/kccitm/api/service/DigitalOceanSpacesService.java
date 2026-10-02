@@ -48,6 +48,15 @@ public class DigitalOceanSpacesService {
     @Value("${app.digitalocean.spaces.cdn-url:${DO_SPACES_CDN_URL:https://storage-c9.sgp1.digitaloceanspaces.com}}")
     private String cdnUrl;
 
+    /**
+     * The bucket's edge CDN (Cloudflare) host, for links people download big
+     * files from. {@link #cdnUrl} is, despite its name, the Singapore origin —
+     * every stored URL and key lookup is built on it, so it stays as is; this
+     * one only rewrites download links. Blank derives it from bucket + region.
+     */
+    @Value("${app.digitalocean.spaces.edge-url:${DO_SPACES_EDGE_URL:}}")
+    private String edgeUrl;
+
     @Value("${app.digitalocean.spaces.access-key:${DO_SPACES_ACCESS_KEY:}}")
     private String accessKey;
 
@@ -68,7 +77,11 @@ public class DigitalOceanSpacesService {
         logger.info("  Bucket:     {}", bucket);
         logger.info("  Region:     {}", region);
         logger.info("  Endpoint:   {}", endpoint);
+        if (edgeUrl == null || edgeUrl.isBlank()) {
+            edgeUrl = "https://" + bucket + "." + region + ".cdn.digitaloceanspaces.com";
+        }
         logger.info("  CDN URL:    {}", cdnUrl);
+        logger.info("  Edge URL:   {}", edgeUrl);
         logger.info("  Access Key: {}", accessKey != null && accessKey.length() > 4
                 ? accessKey.substring(0, 4) + "****" : "(not set)");
         logger.info("  Secret Key: {}", secretKey != null && !secretKey.isEmpty() ? "****configured****" : "(not set)");
@@ -272,6 +285,18 @@ public class DigitalOceanSpacesService {
         // uploaded public-read, so this succeeds even when the S3 client has a
         // credential/endpoint mismatch.
         return downloadViaHttp(fileUrl);
+    }
+
+    /**
+     * The edge-CDN twin of one of our Spaces URLs, for download links. From
+     * India the origin crawls at 1–2 MB/s over one long-haul connection while
+     * the edge serves several times faster. Only the link changes — delete and
+     * server-side reads keep using the origin URL. Foreign URLs pass through.
+     */
+    public String toEdgeUrl(String fileUrl) {
+        return isOwnSpacesUrl(fileUrl) && edgeUrl != null && !edgeUrl.isBlank()
+                ? edgeUrl + fileUrl.substring(cdnUrl.length())
+                : fileUrl;
     }
 
     /**

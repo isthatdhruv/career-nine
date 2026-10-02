@@ -167,7 +167,9 @@ function autoZipToDownload(j: AutoZipJob): ZipJob {
     // Held under 100 until the server has stitched the last ZIP together.
     progress: active ? Math.min(99, j.total ? Math.round((j.processed / j.total) * 100) : 0) : 100,
     url: j.parts.length === 1 ? j.parts[0].url : undefined,
-    parts: j.parts,
+    downloadUrl: j.parts.length === 1 ? j.parts[0].downloadUrl : undefined,
+    // Part links go out on the edge CDN; the job itself is deleted by id.
+    parts: j.parts.map((p) => ({ name: p.name, url: p.downloadUrl || p.url, fileCount: p.fileCount })),
     error: j.error || undefined,
     summary,
     createdAt: j.createdAt,
@@ -906,9 +908,9 @@ const ReportsHubPage: React.FC = () => {
         // Upload the ZIP to DO Spaces (unchanged).
         updateJob({ status: "uploading", phase: "Uploading to cloud...", progress: 80 });
         const uploadRes = await uploadReportZip(zipBlob, fileName);
-        const cdnUrl = uploadRes.data.url;
+        const { url, downloadUrl } = uploadRes.data;
 
-        updateJob({ status: "done", phase: undefined, progress: 100, url: cdnUrl });
+        updateJob({ status: "done", phase: undefined, progress: 100, url, downloadUrl });
         showSuccessToast(
           skipped.length
             ? `"${fileName}" ready — ${added} PDF(s), ${skipped.length} skipped (not ready)`
